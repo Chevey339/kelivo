@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/database/generation_run.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -59,6 +60,150 @@ void main() {
       ),
     );
   });
+
+  test(
+    'range and count caches invalidate after content changes and keep limits separate',
+    () async {
+      final conversation = await chat.createConversation(title: 'Cache');
+      final id = conversation.id;
+      final message = await chat.addMessage(
+        conversationId: id,
+        role: 'user',
+        content: 'first',
+      );
+      await chat.addMessage(
+        conversationId: id,
+        role: 'assistant',
+        content: 'reply',
+      );
+      final history = await chat.loadCompressionHistory(id);
+      expect(identical(await chat.loadCompressionHistory(id), history), isTrue);
+      final counts = chat.loadContextMessageCounts(id, limit: 1);
+      expect(
+        identical(chat.loadContextMessageCounts(id, limit: 1), counts),
+        isTrue,
+      );
+      expect((await counts).messages, 1);
+      expect((await chat.loadContextMessageCounts(id, limit: 10)).messages, 2);
+      await chat.updateMessage(message.id, content: 'longer first message');
+      final updated = await chat.loadCompressionHistory(id);
+      expect(identical(updated, history), isFalse);
+      expect(
+        updated.messages.first.contentLength,
+        'longer first message'.length,
+      );
+      final other = await chat.createConversation(title: 'Other');
+      expect(
+        (await chat.loadContextMessageCounts(other.id, limit: 10)).messages,
+        0,
+      );
+    },
+  );
+
+  test(
+    'preview caches refresh after overwriting and restoring the same conversation id',
+    () async {
+      final conversation = await chat.createConversation(
+        title: 'Restore cache',
+      );
+      final id = conversation.id;
+      await chat.addMessage(
+        conversationId: id,
+        role: 'user',
+        content: 'Before restore',
+      );
+      await chat.loadCompressionHistory(id);
+      await chat.loadContextMessageCounts(id, limit: 100);
+      final revision = chat.contextRevision(id);
+      final restored = [
+        for (var i = 0; i < 3; i++)
+          ChatMessage(
+            id: 'restored-$i',
+            role: 'user',
+            conversationId: id,
+            content: 'Restored $i',
+          ),
+      ];
+      await chat.replaceAllDataFromBackup(
+        conversations: [conversation],
+        messages: restored,
+        toolEventsByMessageId: {},
+        geminiSignaturesByMessageId: {},
+      );
+      expect(chat.contextRevision(id), greaterThan(revision));
+      expect(
+        (await chat.loadCompressionHistory(id)).messages.map((m) => m.id),
+        restored.map((m) => m.id),
+      );
+      expect((await chat.loadContextMessageCounts(id, limit: 100)).messages, 3);
+      await chat.restoreConversation(conversation, [
+        restored.first.copyWith(
+          content: 'Edited during single-conversation restore',
+        ),
+        ...restored.skip(1),
+      ]);
+      expect(
+        (await chat.loadCompressionHistory(id)).messages.first.contentLength,
+        'Edited during single-conversation restore'.length,
+      );
+      await chat.close();
+      await chat.init();
+      expect((await chat.loadContextMessageCounts(id, limit: 1)).messages, 1);
+    },
+  );
+
+  for (final temporary in [false, true]) {
+    test(
+      'streaming checkpoints refresh reopened ranges; finalization refreshes open ranges: temporary=$temporary',
+      () async {
+        final conversation = temporary
+            ? await chat.createDraftConversation(
+                title: 'Stream',
+                temporary: true,
+              )
+            : await chat.createConversation(title: 'Stream');
+        final id = conversation.id;
+        final message = await chat.addMessage(
+          conversationId: id,
+          role: 'assistant',
+          content: 'part',
+          isStreaming: true,
+        );
+        await chat.loadCompressionHistory(id);
+        final revision = chat.contextRevision(id);
+        final previewRevision = chat.compressionHistoryRevision(id);
+        await chat.updateStreamingCheckpointSilent(
+          message.copyWith(content: 'a longer partial reply'),
+          const [],
+        );
+        expect(chat.contextRevision(id), revision);
+        expect(
+          (await chat.loadCompressionHistory(id)).messages.single.contentLength,
+          'a longer partial reply'.length,
+        );
+        await chat.finalizeGenerationRunSilent(
+          message: message.copyWith(
+            content: 'the final completed reply',
+            isStreaming: false,
+          ),
+          toolEvents: const [],
+          generationRunId: null,
+          expectedState: null,
+          expectedStateRevision: null,
+          terminalState: GenerationRunState.completed,
+        );
+        expect(chat.contextRevision(id), revision);
+        expect(
+          chat.compressionHistoryRevision(id),
+          greaterThan(previewRevision),
+        );
+        expect(
+          (await chat.loadCompressionHistory(id)).messages.single.contentLength,
+          'the final completed reply'.length,
+        );
+      },
+    );
+  }
 
   tearDown(() async {
     assistants.dispose();

@@ -302,163 +302,223 @@ Future<void> showContextOperationDetails(
   VoidCallback? onRecompress,
   Future<void> Function(String conversationId)? onOpenConversation,
 }) async {
-  final snapshot = await chat.loadContextSnapshot(conversationId);
-  final source = snapshot.messages
-      .where((m) => operation.sourceGroups.contains(ContextHistory.group(m)))
-      .toList();
-  final anchor = snapshot.messages
-      .where((m) => ContextHistory.group(m) == operation.anchorGroupId)
-      .firstOrNull;
-  final affected = ContextHistory.affectedOperations(
-    snapshot.operations,
-    operationIds: {operation.id},
-  );
-  final budgets = await Future.wait([
-    _estimate(chat, conversationId, snapshot.messages, snapshot.operations),
-    operation.canUndo
-        ? _estimate(chat, conversationId, snapshot.messages, [
-            for (final op in snapshot.operations)
-              affected.contains(op.id) ? op.copyWith(revoked: true) : op,
-          ])
-        : Future<CompressionBudget?>.value(),
-  ]);
-  if (!context.mounted) return;
+  var open = true;
+  Future<
+    ({
+      ConversationContextHistory history,
+      List<ChatMessage> source,
+      ChatMessage? anchor,
+      Set<String> affected,
+    })?
+  >
+  load() async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!open || !context.mounted) return null;
+    final snapshot = await chat.loadContextHistory(conversationId);
+    if (!open || !context.mounted) return null;
+    final groups = operation.sourceGroups.toSet();
+    final source = snapshot.messages
+        .where((m) => groups.contains(ContextHistory.group(m)))
+        .toList();
+    final anchor = snapshot.messages
+        .where((m) => ContextHistory.group(m) == operation.anchorGroupId)
+        .firstOrNull;
+    final affected = ContextHistory.affectedOperations(
+      snapshot.operations,
+      operationIds: {operation.id},
+    );
+    return (
+      history: snapshot,
+      source: source,
+      anchor: anchor,
+      affected: affected,
+    );
+  }
+
+  final details = load();
+  Future<List<CompressionBudget?>> estimateBudgets() async {
+    final detail = await details;
+    if (detail == null || !open) return [null, null];
+    final snapshot = detail.history;
+    return Future.wait([
+      _estimate(chat, conversationId, snapshot.messages, snapshot.operations),
+      operation.canUndo
+          ? _estimate(chat, conversationId, snapshot.messages, [
+              for (final op in snapshot.operations)
+                detail.affected.contains(op.id)
+                    ? op.copyWith(revoked: true)
+                    : op,
+            ])
+          : Future<CompressionBudget?>.value(),
+    ]);
+  }
+
+  final budgets = estimateBudgets();
   final l10n = AppLocalizations.of(context)!;
-  final range = source.isEmpty
-      ? ''
-      : l10n.contextDetailRange(
-          (snapshot.messages.indexOf(source.first) + 1).toString(),
-          (snapshot.messages.indexOf(source.last) + 1).toString(),
-          countUserMessages(source),
-        );
-  final hidden = snapshot.operations
-      .skipWhile((op) => op.id != operation.id)
-      .skip(1)
-      .any(
-        (op) =>
-            !op.revoked &&
-            (op.isFixedStart ||
-                (op.isClear &&
-                    op.sourceGroups.contains(operation.anchorGroupId))),
-      );
-  final superseded =
-      operation.isCompression &&
-      snapshot.operations.any(
-        (op) => !op.revoked && op.dependencies.contains(operation.id),
-      );
-  await _showContextContent(
-    context,
-    title: operation.isFixedStart
-        ? l10n.contextFixedStart
-        : operation.isCompression
-        ? operation.isNative
-              ? operation.isImportedNative
-                    ? l10n.compressionNativeImported
-                    : l10n.compressionNativeLabel
-              : l10n.contextDetailTitle
-        : l10n.contextDetailClearTitle,
-    maxWidth: operation.isCompression ? 560 : 500,
-    builder: (detailContext) => ContextOperationContent(
-      operation: operation,
-      sourceConversationAvailable:
-          chat.getConversation(operation.nativeSourceConversationId ?? '') !=
-          null,
-      rangeLabel: range,
-      budget: budgets.first,
-      undoBudget: budgets.last,
-      showHeader: PlatformUtils.isDesktopTarget,
-      statusLabel: hidden
-          ? l10n.contextOperationHidden
-          : superseded
-          ? l10n.contextDetailSuperseded
-          : '',
-      onClose: () => Navigator.of(detailContext).pop(),
-      onSave: operation.revoked || operation.isNative
-          ? null
-          : (summary) => changeContextOperationWithConfirmation(
-              context,
-              chat: chat,
-              conversationId: conversationId,
+  try {
+    await _showContextContent(
+      context,
+      title: operation.isFixedStart
+          ? l10n.contextFixedStart
+          : operation.isCompression
+          ? operation.isNative
+                ? operation.isImportedNative
+                      ? l10n.compressionNativeImported
+                      : l10n.compressionNativeLabel
+                : l10n.contextDetailTitle
+          : l10n.contextDetailClearTitle,
+      maxWidth: operation.isCompression ? 560 : 500,
+      builder: (detailContext) => FutureBuilder(
+        future: details,
+        builder: (_, detailSnapshot) {
+          final detail = detailSnapshot.data;
+          final snapshot = detail?.history;
+          final source = detail?.source ?? const <ChatMessage>[];
+          final anchor = detail?.anchor;
+          final range = source.isEmpty
+              ? detailSnapshot.hasError
+                    ? l10n.contextOperationsLoadFailed
+                    : detailSnapshot.connectionState != ConnectionState.done
+                    ? l10n.contextLogLoading
+                    : ''
+              : l10n.contextDetailRange(
+                  (snapshot!.messages.indexOf(source.first) + 1).toString(),
+                  (snapshot.messages.indexOf(source.last) + 1).toString(),
+                  countUserMessages(source),
+                );
+          final statuses = ContextHistory.operationStatuses(
+            snapshot?.operations ?? const [],
+          );
+          final status = statuses[operation.id];
+          final hidden = status?.hidden ?? false;
+          final superseded = status?.superseded ?? false;
+          return FutureBuilder<List<CompressionBudget?>>(
+            future: budgets,
+            builder: (_, budgetSnapshot) => ContextOperationContent(
               operation: operation,
-              summary: summary,
-            ),
-      onUndo: !operation.canUndo
-          ? null
-          : () => changeContextOperationWithConfirmation(
-              context,
-              chat: chat,
-              conversationId: conversationId,
-              operation: operation,
-            ),
-      estimateSummary: (summary) =>
-          _estimate(chat, conversationId, snapshot.messages, [
-            for (final op in snapshot.operations)
-              if (op.id == operation.id)
-                op.copyWith(summary: summary)
-              else if (affected.contains(op.id))
-                op.copyWith(revoked: true)
-              else
-                op,
-          ]),
-      onViewOriginal: operation.isImportedNative
-          ? onOpenConversation == null ||
-                    chat.getConversation(
-                          operation.nativeSourceConversationId ?? '',
-                        ) ==
-                        null
-                ? null
-                : () {
-                    Navigator.of(detailContext).pop();
-                    onOpenConversation(operation.nativeSourceConversationId!);
-                  }
-          : source.isEmpty || onViewOriginal == null
-          ? null
-          : () {
-              Navigator.of(detailContext).pop();
-              onViewOriginal(source.first.id);
-            },
-      onViewBoundary:
-          operation.isImportedNative || anchor == null || onViewOriginal == null
-          ? null
-          : () {
-              Navigator.of(detailContext).pop();
-              onViewOriginal(anchor.id);
-            },
-      onRecompress: operation.isImportedNative || onRecompress == null
-          ? null
-          : () {
-              Navigator.of(detailContext).pop();
-              onRecompress();
-            },
-      onContinueNewChat:
-          onOpenConversation == null ||
-              !operation.isCompression ||
-              operation.revoked ||
-              hidden ||
-              superseded
-          ? null
-          : () async {
-              Navigator.of(detailContext).pop();
-              try {
-                final created = await chat.continueFromContextSummary(
+              sourceConversationAvailable:
+                  chat.getConversation(
+                    operation.nativeSourceConversationId ?? '',
+                  ) !=
+                  null,
+              rangeLabel: range,
+              budget: budgetSnapshot.data?.first,
+              undoBudget: budgetSnapshot.data?.last,
+              showHeader: PlatformUtils.isDesktopTarget,
+              statusLabel: hidden
+                  ? l10n.contextOperationHidden
+                  : superseded
+                  ? l10n.contextDetailSuperseded
+                  : '',
+              onClose: () => Navigator.of(detailContext).pop(),
+              onSave: operation.revoked || operation.isNative
+                  ? null
+                  : (summary) => changeContextOperationWithConfirmation(
+                      context,
+                      chat: chat,
+                      conversationId: conversationId,
+                      operation: operation,
+                      summary: summary,
+                    ),
+              onUndo: !operation.canUndo
+                  ? null
+                  : () => changeContextOperationWithConfirmation(
+                      context,
+                      chat: chat,
+                      conversationId: conversationId,
+                      operation: operation,
+                    ),
+              estimateSummary: (summary) async {
+                final detail = await details;
+                if (detail == null) return null;
+                return _estimate(
+                  chat,
                   conversationId,
-                  operation.id,
+                  detail.history.messages,
+                  [
+                    for (final op in detail.history.operations)
+                      if (op.id == operation.id)
+                        op.copyWith(summary: summary)
+                      else if (detail.affected.contains(op.id))
+                        op.copyWith(revoked: true)
+                      else
+                        op,
+                  ],
                 );
-                if (context.mounted &&
-                    chat.currentConversationId == conversationId) {
-                  await onOpenConversation(created.id);
-                }
-              } catch (error) {
-                if (!context.mounted) return;
-                showAppSnackBar(
-                  context,
-                  message: compressionErrorLabel(l10n, error.toString()),
-                  type: NotificationType.error,
-                );
-              }
-            },
-    ),
-  );
+              },
+              onViewOriginal: operation.isImportedNative
+                  ? onOpenConversation == null ||
+                            chat.getConversation(
+                                  operation.nativeSourceConversationId ?? '',
+                                ) ==
+                                null
+                        ? null
+                        : () {
+                            Navigator.of(detailContext).pop();
+                            onOpenConversation(
+                              operation.nativeSourceConversationId!,
+                            );
+                          }
+                  : source.isEmpty || onViewOriginal == null
+                  ? null
+                  : () {
+                      Navigator.of(detailContext).pop();
+                      onViewOriginal(source.first.id);
+                    },
+              onViewBoundary:
+                  operation.isImportedNative ||
+                      anchor == null ||
+                      onViewOriginal == null
+                  ? null
+                  : () {
+                      Navigator.of(detailContext).pop();
+                      onViewOriginal(anchor.id);
+                    },
+              onRecompress: operation.isImportedNative || onRecompress == null
+                  ? null
+                  : () {
+                      Navigator.of(detailContext).pop();
+                      onRecompress();
+                    },
+              onContinueNewChat:
+                  snapshot == null ||
+                      onOpenConversation == null ||
+                      !operation.isCompression ||
+                      operation.revoked ||
+                      hidden ||
+                      superseded
+                  ? null
+                  : () async {
+                      Navigator.of(detailContext).pop();
+                      try {
+                        final created = await chat.continueFromContextSummary(
+                          conversationId,
+                          operation.id,
+                        );
+                        if (context.mounted &&
+                            chat.currentConversationId == conversationId) {
+                          await onOpenConversation(created.id);
+                        }
+                      } catch (error) {
+                        if (!context.mounted) return;
+                        showAppSnackBar(
+                          context,
+                          message: compressionErrorLabel(
+                            l10n,
+                            error.toString(),
+                          ),
+                          type: NotificationType.error,
+                        );
+                      }
+                    },
+            ),
+          );
+        },
+      ),
+    );
+  } finally {
+    open = false;
+  }
 }
 
 Future<void> showContextCompressionMenu(

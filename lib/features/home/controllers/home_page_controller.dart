@@ -2053,8 +2053,14 @@ class HomePageController extends ChangeNotifier {
   Future<CompressionRequestPreview> previewCompressionRequest(
     String id,
     CompressContextOptions options,
-    CompressionConfig config,
-  ) => _viewModel.previewCompressionRequest(id, options, config);
+    CompressionConfig config, {
+    required Future<ConversationContextHistory> history,
+  }) => _viewModel.previewCompressionRequest(
+    id,
+    options,
+    config,
+    history: history,
+  );
 
   Future<String?> compressContext({
     required CompressContextOptions options,

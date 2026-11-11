@@ -27,27 +27,56 @@ extension ChatContextRepository on ChatDatabaseRepository {
       });
   // Read only selection metadata for the excluded prefix. Large message parts
   // and provider artifacts are hydrated only for history actually being sent.
-  Future<List<ChatMessage>> _contextMetadata(String id) async {
+  Future<List<ContextMessageMetadata>> _contextMetadata(
+    String id, {
+    bool contentInfo = false,
+  }) async {
     await _timelineIndex.ensureConversation(id);
     final rows = await _db
         .customSelect(
-          'SELECT g.group_id,m.id,m.role FROM timeline_group_rows g '
+          '''SELECT g.group_id,m.id,m.role${contentInfo ? """,
+              COALESCE(SUM(CASE WHEN p.kind='text' THEN kelivo_text_length(p.payload) ELSE 0 END),0) AS content_length,
+              COALESCE(MAX(CASE WHEN p.kind IN ('text','image','file') THEN kelivo_has_context_content(p.kind,p.payload) ELSE 0 END),0) AS has_content,
+              EXISTS(SELECT 1 FROM provider_artifact_rows a WHERE a.revision_id=m.id AND a.kind='openai_native_compaction') AS native
+            """ : ''} FROM timeline_group_rows g '''
           'LEFT JOIN timeline_selection_rows s ON s.conversation_id=g.conversation_id AND s.group_id=g.group_id '
           'JOIN message_rows m ON m.id=${MessageTimelineIndex.selectedRevision('g')} '
-          'WHERE g.conversation_id=? ORDER BY g.anchor_order,g.group_id',
+          "${contentInfo ? 'LEFT JOIN message_part_rows p ON p.revision_id=m.id ' : ''}"
+          'WHERE g.conversation_id=? '
+          "${contentInfo ? 'GROUP BY g.group_id ' : ''}"
+          'ORDER BY g.anchor_order,g.group_id',
           variables: [Variable<String>(id)],
         )
         .get();
     return [
       for (final row in rows)
-        ChatMessage(
+        ContextMessageMetadata(
           id: row.read<String>('id'),
           groupId: row.read<String>('group_id'),
           role: row.read<String>('role'),
-          conversationId: id,
+          contentLength: contentInfo ? row.read<int>('content_length') : 0,
+          hasContent: contentInfo && row.read<int>('has_content') != 0,
+          native: contentInfo && row.read<int>('native') != 0,
         ),
     ];
   }
+
+  Future<CompressionHistory> readCompressionHistory(String id) =>
+      _db.transaction(() async {
+        final operations = await readContextOperations(id);
+        return CompressionHistory(
+          messages: await _contextMetadata(id, contentInfo: true),
+          operations: operations,
+        );
+      });
+
+  Future<({List<ChatMessage> messages, List<ContextOperation> operations})>
+  readContextHistory(String id) => _db.transaction(
+    () async => (
+      operations: await readContextOperations(id),
+      messages: await getSelectedContextMessages(id, limit: 0x7fffffff),
+    ),
+  );
 
   Future<
     ({
@@ -62,7 +91,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
     return (
       messages: messages,
       operations: operations,
-      fingerprint: ContextHistory.fingerprint(messages, operations),
+      fingerprint: await _contextSnapshotFingerprint(messages, operations),
     );
   });
 
@@ -95,18 +124,16 @@ extension ChatContextRepository on ChatDatabaseRepository {
       if (target == null) return <ChatMessage>[];
       throughGroup = target.groupId ?? target.id;
       endGroup = throughGroup;
-      final index = metadata.indexWhere(
-        (m) => ContextHistory.group(m) == throughGroup,
-      );
+      final index = metadata.indexWhere((m) => m.groupId == throughGroup);
       if (includeFollowingAssistant &&
           target.role == 'user' &&
           index >= 0 &&
           index + 1 < metadata.length &&
           metadata[index + 1].role == 'assistant') {
-        endGroup = ContextHistory.group(metadata[index + 1]);
+        endGroup = metadata[index + 1].groupId;
       }
     }
-    final projected = ContextHistory.resolve(
+    final projected = ContextHistory.project(
       metadata,
       operations,
       limit: limit,
@@ -115,13 +142,14 @@ extension ChatContextRepository on ChatDatabaseRepository {
     );
     final hydrated = await getMessagesByIds([
       for (final m in projected)
-        if (!ContextOperation.isSummary(m)) m.id,
+        if (!m.isSummary) m.id,
     ]);
-    final byId = {for (final m in hydrated) m.id: m};
-    return [
-      for (final m in projected)
-        ContextOperation.isSummary(m) ? m : byId[m.id]!,
-    ];
+    return ContextHistory.materialize(
+      hydrated,
+      operations,
+      projected,
+      conversationId: id,
+    );
   });
 
   /// Counts the same projection used for sending without loading message bodies.
@@ -129,22 +157,9 @@ extension ChatContextRepository on ChatDatabaseRepository {
     String id, {
     required int limit,
   }) => _db.transaction(() async {
-    final operations = await readContextOperations(id);
+    final operations = (await readContextMutationState(id)).operations;
     final metadata = await _contextMetadata(id);
-    if (limit <= 0) {
-      return (stored: metadata.length, messages: 0, summaries: 0);
-    }
-    final effective = ContextHistory.resolve(
-      metadata,
-      operations,
-      limit: limit,
-    );
-    final summaries = effective.where(ContextOperation.isSummary).length;
-    return (
-      stored: metadata.length,
-      messages: effective.length - summaries,
-      summaries: summaries,
-    );
+    return _contextMessageCounts(metadata, operations, limit);
   });
 
   Future<int> contextBoundaryIndex(
@@ -331,7 +346,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
             operations.add(
               _legacyClearOperation(
                 index,
-                selected.map(ContextHistory.group).toList(),
+                selected.map((m) => m.groupId).toList(),
                 conversation.updatedAt,
               ),
             );
@@ -705,3 +720,25 @@ Future<List<ContextOperation>> _decodeContextOperations(String payload) =>
 
 Future<String> _encodeContextOperations(List<ContextOperation> operations) =>
     Isolate.run(() => jsonEncode(operations.map((op) => op.toJson()).toList()));
+
+Future<String> _contextSnapshotFingerprint(
+  List<ChatMessage> messages,
+  List<ContextOperation> operations,
+) => Isolate.run(() => ContextHistory.fingerprint(messages, operations));
+
+Future<ContextMessageCounts> _contextMessageCounts(
+  List<ContextMessageMetadata> metadata,
+  List<ContextOperationMetadata> operations,
+  int limit,
+) => Isolate.run(() {
+  if (limit <= 0) {
+    return (stored: metadata.length, messages: 0, summaries: 0);
+  }
+  final effective = ContextHistory.project(metadata, operations, limit: limit);
+  final summaries = effective.where((m) => m.isSummary).length;
+  return (
+    stored: metadata.length,
+    messages: effective.length - summaries,
+    summaries: summaries,
+  );
+});

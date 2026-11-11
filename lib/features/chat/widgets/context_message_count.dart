@@ -33,7 +33,9 @@ class _ContextMessageCountState extends State<ContextMessageCount> {
       id,
       limit: limit ?? 0x7fffffff,
     );
-    final fixedStart = ContextHistory.fixedStart(chat.contextOperationsFor(id));
+    final fixedStart = ContextHistory.fixedStart(
+      await chat.loadContextOperations(id),
+    );
     return (
       actual: counts.messages,
       configured: fixedStart == null ? limit : null,

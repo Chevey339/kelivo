@@ -44,6 +44,35 @@ void main() {
     createdAt: DateTime(2026),
   );
 
+  test('metadata range and counts never decode opaque native payloads', () {
+    final messages = ['A', 'B', 'C', 'D'].map(message).toList();
+    // Deliberately not serializable: projection must only inspect native flags.
+    final native = compact('native', ['A', 'B']).copyWith(
+      compressionDetails: {
+        'nativeCompaction': {'opaque': Object()},
+        'nativeContextImported': true,
+      },
+    );
+    final metadata = messages.map(ContextMessageMetadata.fromMessage).toList();
+    final projected = ContextHistory.project(metadata, [native], limit: 1);
+    expect(projected.map((m) => m.id), [native.summaryMessageId, 'D']);
+    final range = selectCompressionRange(
+      metadata,
+      [native],
+      const CompressContextOptions(
+        mode: CompressContextLimitMode.keepRecent,
+        keepUserMessages: 1,
+        native: true,
+      ),
+    );
+    expect(range.covered.map((m) => m.id), ['A', 'B', 'C']);
+    expect(range.retained.map((m) => m.id), ['D']);
+    final text = selectCompressionRange(metadata, [
+      native,
+    ], const CompressContextOptions(mode: CompressContextLimitMode.unlimited));
+    expect(text.missingOriginals, isTrue);
+  });
+
   for (final includeSummary in [false, true]) {
     test(
       'bounded compression expands only selected summary dependencies: $includeSummary',

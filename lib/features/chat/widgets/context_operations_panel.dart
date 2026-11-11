@@ -143,6 +143,31 @@ class ContextOperationsPanel extends StatefulWidget {
 class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
   late Future<ContextMessageCounts> _counts;
   late int _revision;
+  List<ContextOperation> _operations = const [];
+  Map<String, ({bool hidden, bool superseded})> _statuses = const {};
+  Object? _taskState;
+
+  Object _currentTaskState() {
+    final task = widget.chat.contextCompression.taskFor(widget.conversationId);
+    return (
+      task?.id,
+      task?.phase,
+      task?.completedParts,
+      task?.totalParts,
+      task?.requestAttempts,
+      task?.unknownUsageAttempts,
+      task?.usage?.promptTokens,
+      task?.usage?.completionTokens,
+      task?.error,
+      task?.resultConversationId,
+    );
+  }
+
+  void _readOperations() {
+    _operations = widget.chat.contextOperationsFor(widget.conversationId);
+    _statuses = ContextHistory.operationStatuses(_operations);
+  }
+
   bool _busy = false;
   String? _error;
 
@@ -155,17 +180,29 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
 
   void _load() {
     _revision = widget.chat.contextRevision(widget.conversationId);
-    _counts = widget.chat.loadContextMessageCounts(
-      widget.conversationId,
-      limit: widget.messageLimit,
-    );
+    _taskState = _currentTaskState();
+    final revision = _revision;
+    Future<ContextMessageCounts> load() async {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return (stored: 0, messages: 0, summaries: 0);
+      await widget.chat.loadContextOperations(widget.conversationId);
+      if (mounted && revision == _revision) setState(_readOperations);
+      return widget.chat.loadContextMessageCounts(
+        widget.conversationId,
+        limit: widget.messageLimit,
+      );
+    }
+
+    _counts = load();
   }
 
   void _changed() {
+    final revision = widget.chat.contextRevision(widget.conversationId);
+    final taskState = _currentTaskState();
+    if (revision == _revision && taskState == _taskState) return;
     setState(() {
-      if (_revision != widget.chat.contextRevision(widget.conversationId)) {
-        _load();
-      }
+      _taskState = taskState;
+      if (_revision != revision) _load();
     });
   }
 
@@ -285,9 +322,7 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
     return FutureBuilder<ContextMessageCounts>(
       future: _counts,
       builder: (context, snapshot) {
-        final operations = widget.chat.contextOperationsFor(
-          widget.conversationId,
-        );
+        final operations = _operations;
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -369,25 +404,9 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
                   }
                   final operation =
                       operations[operations.length - (index - 2) - 1];
-                  final hidden = operations
-                      .skipWhile((op) => op.id != operation.id)
-                      .skip(1)
-                      .any(
-                        (op) =>
-                            !op.revoked &&
-                            (op.isFixedStart ||
-                                (op.isClear &&
-                                    op.sourceGroups.contains(
-                                      operation.anchorGroupId,
-                                    ))),
-                      );
+                  final hidden = _statuses[operation.id]?.hidden ?? false;
                   final superseded =
-                      operation.isCompression &&
-                      operations.any(
-                        (op) =>
-                            !op.revoked &&
-                            op.dependencies.contains(operation.id),
-                      );
+                      _statuses[operation.id]?.superseded ?? false;
                   final status = operation.revoked
                       ? l10n.contextOperationUndone
                       : hidden

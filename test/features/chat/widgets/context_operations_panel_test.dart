@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/widgets/context_operation_widgets.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
 import 'dart:async';
@@ -229,6 +230,75 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 1));
   }
+
+  check('operation details paint and close while budgets are pending', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await start((_, _) async => 'Saved detail summary');
+      await until(
+        () =>
+            chat.contextCompression.taskFor(id)!.phase ==
+            CompressionPhase.completed,
+      );
+    });
+    final operation = chat.contextOperationsFor(id).single;
+    final budget = Completer<CompressionBudget>();
+    var started = 0;
+    chat.contextCompression.estimateCandidate =
+        (_, _, {bool? fixedContextStart}) {
+          started++;
+          return budget.future;
+        };
+    BuildContext? pageContext;
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: settings,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                pageContext = context;
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    final closed = showContextOperationDetails(
+      pageContext!,
+      chat: chat,
+      conversationId: id,
+      operation: operation,
+    );
+    await tester.pump();
+    expect(find.byType(ContextOperationContent), findsOneWidget);
+    expect(
+      tester
+          .widget<ContextOperationContent>(find.byType(ContextOperationContent))
+          .budget,
+      isNull,
+    );
+    final estimate = tester
+        .widget<ContextOperationContent>(find.byType(ContextOperationContent))
+        .estimateSummary;
+    expect(estimate, isNotNull);
+    final earlyEditBudget = estimate!('Edited before history was ready');
+    await pumpUntil(tester, () => started == 3);
+    final detailContext = tester.element(find.byType(ContextOperationContent));
+    Navigator.of(detailContext).pop();
+    await tester.pumpAndSettle();
+    await closed;
+    budget.complete((usedTokens: 100, contextWindow: 4000));
+    await tester.pump();
+    expect((await earlyEditBudget)?.usedTokens, 100);
+    expect(find.byType(ContextOperationContent), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   final closePanel = find.byWidgetPredicate(
     (widget) => widget is IosIconButton && widget.semanticLabel == 'Close',

@@ -6,6 +6,7 @@ import 'chat_message.dart';
 import 'compression_config.dart';
 import 'image_context.dart';
 import 'native_compaction.dart';
+import 'message_part.dart';
 import '../utils/token_estimator.dart';
 
 enum ContextOperationKind { clear, compress, start }
@@ -13,6 +14,45 @@ enum ContextOperationKind { clear, compress, start }
 enum ContextHistorySource { effective, previous, original }
 
 typedef ContextMessageCounts = ({int stored, int messages, int summaries});
+
+/// Everything needed to select a range, without message bodies or artifacts.
+class ContextMessageMetadata {
+  const ContextMessageMetadata({
+    required this.id,
+    required this.groupId,
+    required this.role,
+    this.contentLength = 0,
+    this.hasContent = false,
+    this.native = false,
+  });
+
+  factory ContextMessageMetadata.fromMessage(ChatMessage message) =>
+      ContextMessageMetadata(
+        id: message.id,
+        groupId: ContextHistory.group(message),
+        role: message.role,
+        contentLength: message.content.length,
+        hasContent:
+            message.content.trim().isNotEmpty ||
+            message.parts.any((part) => part is ImagePart || part is FilePart),
+        native: message.providerArtifactSnapshot.containsKey(
+          nativeCompactionArtifactKind,
+        ),
+      );
+
+  final String id;
+  final String groupId;
+  final String role;
+  final int contentLength;
+  final bool hasContent;
+  final bool native;
+  bool get isSummary => id.startsWith(ContextOperation.summaryPrefix);
+  bool get isUserMessage =>
+      role == 'user' &&
+      !isSummary &&
+      !id.startsWith('context-note:') &&
+      hasContent;
+}
 
 /// Dependencies and labels needed to approve a source mutation. This never
 /// contains summary text, tool manifests or a native compaction payload.
@@ -41,6 +81,7 @@ class ContextOperationMetadata {
   bool get isCompression => kind == ContextOperationKind.compress;
   bool get isClear => kind == ContextOperationKind.clear;
   bool get isFixedStart => kind == ContextOperationKind.start;
+  String get summaryMessageId => '${ContextOperation.summaryPrefix}$id';
 
   factory ContextOperationMetadata.fromJson(Map<String, dynamic> json) =>
       ContextOperationMetadata(
@@ -166,7 +207,6 @@ class ContextOperation extends ContextOperationMetadata {
       : summary;
 
   bool get isEdited => summary != originalSummary;
-  String get summaryMessageId => '$summaryPrefix$id';
   static bool isSummary(ChatMessage message) =>
       message.id.startsWith(summaryPrefix);
 
@@ -344,8 +384,31 @@ class ContextOperation extends ContextOperationMetadata {
 
 /// Pure projection shared by sending, compression previews and regeneration.
 class ContextHistory {
-  static ContextOperation? fixedStart(List<ContextOperation> operations) =>
-      operations.where((op) => op.isFixedStart && !op.revoked).lastOrNull;
+  static T? fixedStart<T extends ContextOperationMetadata>(
+    List<T> operations,
+  ) => operations.where((op) => op.isFixedStart && !op.revoked).lastOrNull;
+
+  static Map<String, ({bool hidden, bool superseded})> operationStatuses(
+    List<ContextOperationMetadata> operations,
+  ) {
+    final dependencies = {
+      for (final op in operations)
+        if (!op.revoked) ...op.dependencies,
+    };
+    final cleared = <String>{};
+    var pinned = false;
+    final result = <String, ({bool hidden, bool superseded})>{};
+    for (final op in operations.reversed) {
+      result[op.id] = (
+        hidden: pinned || cleared.contains(op.anchorGroupId),
+        superseded: op.isCompression && dependencies.contains(op.id),
+      );
+      if (op.revoked) continue;
+      if (op.isFixedStart) pinned = true;
+      if (op.isClear) cleared.addAll(op.sourceGroups);
+    }
+    return result;
+  }
 
   /// Compression performed under a pin depends on that history projection.
   /// Undoing or replacing the pin must also retire those summaries, otherwise
@@ -416,9 +479,70 @@ class ContextHistory {
     String? throughGroupId,
     String? endGroupId,
     Set<String> omitOperations = const {},
+  }) => materialize(
+    selected,
+    operations,
+    project(
+      selected.map(ContextMessageMetadata.fromMessage).toList(),
+      operations,
+      limit: limit,
+      throughGroupId: throughGroupId,
+      endGroupId: endGroupId,
+      omitOperations: omitOperations,
+    ),
+  );
+
+  /// Only hydrate the summaries that survived projection. Counts and range
+  /// previews never serialize native compaction payloads.
+  static List<ChatMessage> materialize(
+    List<ChatMessage> selected,
+    List<ContextOperation> operations,
+    List<ContextMessageMetadata> projection, {
+    String? conversationId,
+  }) {
+    final messages = {for (final message in selected) message.id: message};
+    final summaries = {for (final op in operations) op.summaryMessageId: op};
+    final notes = {for (final op in operations) 'context-note:${op.id}': op};
+    return [
+      for (final entry in projection)
+        if (summaries[entry.id] case final operation?)
+          ChatMessage(
+            id: entry.id,
+            role: 'user',
+            content: operation.isNative ? '' : operation.contextText,
+            conversationId: conversationId ?? selected.first.conversationId,
+            timestamp: operation.createdAt,
+          )..hydrateProviderArtifacts(
+            operation.isNative
+                ? {
+                    nativeCompactionArtifactKind: jsonEncode(
+                      operation.nativePayload!.toJson(),
+                    ),
+                  }
+                : null,
+          )
+        else if (notes[entry.id] case final operation?)
+          ChatMessage(
+            id: entry.id,
+            role: 'user',
+            content: '[User-edited history summary]\n${operation.summary}',
+            conversationId: conversationId ?? selected.first.conversationId,
+          )
+        else
+          messages[entry.id]!,
+    ];
+  }
+
+  static List<ContextMessageMetadata> project(
+    List<ContextMessageMetadata> selected,
+    List<ContextOperationMetadata> operations, {
+    int? limit,
+    String? throughGroupId,
+    String? endGroupId,
+    Set<String> omitOperations = const {},
   }) {
     final positions = {
-      for (var i = 0; i < selected.length; i++) group(selected[i]): i,
+      for (var i = 0; i < selected.length; i++) selected[i].groupId: i,
     };
     final through = throughGroupId == null
         ? selected.length
@@ -436,8 +560,8 @@ class ContextHistory {
     var result = selected
         .where(
           (message) =>
-              positions[group(message)]! >= start &&
-              positions[group(message)]! <= end,
+              positions[message.groupId]! >= start &&
+              positions[message.groupId]! <= end,
         )
         .toList();
     final summaryPositions = <String, int>{};
@@ -469,7 +593,7 @@ class ContextHistory {
       if (operation.isClear) {
         result.removeWhere(
           (message) =>
-              (summaryPositions[message.id] ?? positions[group(message)]!) <=
+              (summaryPositions[message.id] ?? positions[message.groupId]!) <=
               anchor,
         );
         continue;
@@ -482,44 +606,36 @@ class ContextHistory {
       // in creation order preserves that boundary without inventing dependencies.
       result.removeWhere(
         (message) =>
-            groups.contains(group(message)) ||
+            groups.contains(message.groupId) ||
             dependencyMessages.contains(message.id),
       );
       summaryPositions[operation.summaryMessageId] = anchor;
       final insertion = result.indexWhere(
         (message) =>
-            (summaryPositions[message.id] ?? positions[group(message)]!) >
+            (summaryPositions[message.id] ?? positions[message.groupId]!) >
             anchor,
       );
       result.insert(
         insertion < 0 ? result.length : insertion,
-        ChatMessage(
+        ContextMessageMetadata(
           id: operation.summaryMessageId,
+          groupId: operation.summaryMessageId,
           role: 'user',
-          content: operation.isNative ? '' : operation.contextText,
-          conversationId: selected.first.conversationId,
-          timestamp: operation.createdAt,
-        )..hydrateProviderArtifacts(
-          operation.isNative
-              ? {
-                  nativeCompactionArtifactKind: jsonEncode(
-                    operation.nativePayload!.toJson(),
-                  ),
-                }
-              : null,
+          contentLength: operation is ContextOperation && !operation.isNative
+              ? operation.contextText.length
+              : 0,
+          native: operation is ContextOperation && operation.isNative,
         ),
       );
     }
     if (limit != null && startOperation == null) {
-      final raw = result.where((m) => !ContextOperation.isSummary(m)).toList();
+      final raw = result.where((m) => !m.isSummary).toList();
       final retained = raw
           .skip((raw.length - limit).clamp(0, raw.length))
           .map((m) => m.id)
           .toSet();
       result = result
-          .where(
-            (m) => ContextOperation.isSummary(m) || retained.contains(m.id),
-          )
+          .where((m) => m.isSummary || retained.contains(m.id))
           .toList();
     }
     return result;
@@ -531,15 +647,34 @@ class ContextHistory {
     required ContextHistorySource source,
     bool includeEditedSummaries = true,
     bool includeNative = false,
+  }) => materialize(
+    selected,
+    operations,
+    compressionProjection(
+      selected.map(ContextMessageMetadata.fromMessage).toList(),
+      operations,
+      source: source,
+      includeEditedSummaries: includeEditedSummaries,
+      includeNative: includeNative,
+    ),
+  );
+
+  static List<ContextMessageMetadata> compressionProjection(
+    List<ContextMessageMetadata> selected,
+    List<ContextOperation> operations, {
+    required ContextHistorySource source,
+    bool includeEditedSummaries = true,
+    bool includeNative = false,
   }) {
+    final byId = {for (final op in operations) op.id: op};
     if (source == ContextHistorySource.effective &&
         (includeNative ||
             !operations.any((op) => op.isNative && !op.revoked))) {
-      return resolve(selected, operations);
+      return project(selected, operations);
     }
-    final effective = resolve(selected, operations);
+    final effective = project(selected, operations);
     final visibleIds = effective
-        .where(ContextOperation.isSummary)
+        .where((m) => m.isSummary)
         .map((m) => m.id.substring(ContextOperation.summaryPrefix.length))
         .toSet();
     final expanded = <String>{
@@ -551,12 +686,10 @@ class ContextHistory {
     };
     if (source == ContextHistorySource.original || !includeNative) {
       void include(String id) {
-        final op = operations.firstWhere((op) => op.id == id);
+        final op = byId[id]!;
         for (final dependency in op.dependencies) {
           // Projection dependencies must stay active while summaries expand.
-          if (!operations
-              .firstWhere((op) => op.id == dependency)
-              .isCompression) {
+          if (!byId[dependency]!.isCompression) {
             continue;
           }
           if (expanded.add(dependency)) include(dependency);
@@ -564,28 +697,26 @@ class ContextHistory {
       }
 
       for (final id in expanded.toList()) {
-        if (source == ContextHistorySource.original ||
-            operations.firstWhere((op) => op.id == id).isNative) {
+        if (source == ContextHistorySource.original || byId[id]!.isNative) {
           include(id);
         }
       }
     }
     // Imported opaque state has no local originals to expand. Preserve it so
     // callers can reject a text-only reread instead of silently losing history.
-    expanded.removeWhere(
-      (id) => operations.any((op) => op.id == id && op.isImportedNative),
-    );
-    final result = resolve(selected, operations, omitOperations: expanded);
+    expanded.removeWhere((id) => byId[id]!.isImportedNative);
+    final result = project(selected, operations, omitOperations: expanded);
     if (includeEditedSummaries) {
       for (final op in operations) {
         if (expanded.contains(op.id) && !op.revoked && op.isEdited) {
           result.insert(
             0,
-            ChatMessage(
+            ContextMessageMetadata(
               id: 'context-note:${op.id}',
+              groupId: 'context-note:${op.id}',
               role: 'user',
-              content: '[User-edited history summary]\n${op.summary}',
-              conversationId: selected.first.conversationId,
+              contentLength:
+                  '[User-edited history summary]\n${op.summary}'.length,
             ),
           );
         }

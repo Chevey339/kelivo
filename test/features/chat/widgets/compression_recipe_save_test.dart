@@ -1,3 +1,5 @@
+import '../../../support/compression_options_pump.dart';
+import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -97,8 +99,8 @@ void main() {
                   context: context,
                   builder: (sheet) => CompressContextOptionsDialog(
                     sheet: sheet,
-                    messages: const [],
-                    operations: const [],
+                    loadHistory: () async =>
+                        CompressionHistory.fromMessages(const [], const []),
                   ),
                 ),
               ),
@@ -108,10 +110,10 @@ void main() {
       ),
     );
     await tester.tap(find.text('Open compression'));
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     await tester.ensureVisible(find.text(l10n.compressionMore));
     await tester.tap(find.text(l10n.compressionMore));
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
   }
 
   Finder recipeDialog() => find.ancestor(
@@ -128,7 +130,7 @@ void main() {
   Future<void> openRecipe(WidgetTester tester) async {
     await tester.ensureVisible(find.text(l10n.compressionSaveRecipeAction));
     await tester.tap(find.text(l10n.compressionSaveRecipeAction));
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     expect(recipeDialog(), findsOneWidget);
     expect(tester.takeException(), isNull);
   }
@@ -141,7 +143,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 20));
     }
     expect(done(), isTrue);
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     expect(tester.takeException(), isNull);
   }
 
@@ -173,7 +175,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 80));
         expect(tester.takeException(), isNull);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(recipeDialog(), findsNothing);
         expect(find.byType(CompressContextOptionsDialog), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -263,11 +265,11 @@ void main() {
   ) async {
     await prepare(tester, TargetPlatform.iOS);
     tester.view.physicalSize = const Size(320, 640);
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     await openRecipe(tester);
     await tester.enterText(nameField(), 'Keyboard recipe');
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     expect(tester.takeException(), isNull);
     expect(recipeButton(l10n.multiKeyPageSave).hitTestable(), findsOneWidget);
     await tester.tap(recipeButton(l10n.multiKeyPageSave));

@@ -360,6 +360,56 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  final Map<String, int> _compressionHistoryRevisions = {};
+  final Map<String, ValueNotifier<int>> _compressionHistoryRevisionNotifiers =
+      {};
+
+  /// Includes completed output changes, without invalidating the exact usage
+  /// anchor for the request whose input context revision is unchanged.
+  int compressionHistoryRevision(String id) =>
+      _compressionHistoryRevisions[id] ?? 0;
+
+  ValueListenable<int> compressionHistoryRevisionListenable(String id) =>
+      _compressionHistoryRevisionNotifiers.putIfAbsent(
+        id,
+        () => ValueNotifier(compressionHistoryRevision(id)),
+      );
+
+  void _bumpCompressionHistoryRevision(String id) {
+    if (_compressionHistoryCache?.id == id) _compressionHistoryCache = null;
+    final revision = compressionHistoryRevision(id) + 1;
+    _compressionHistoryRevisions[id] = revision;
+    _compressionHistoryRevisionNotifiers[id]?.value = revision;
+  }
+
+  int _contextPreviewEpoch = 0;
+  ({String id, int revision, Future<CompressionHistory> value})?
+  _compressionHistoryCache;
+  ({String id, int revision, int limit, Future<ContextMessageCounts> value})?
+  _contextCountsCache;
+
+  void _resetContextPreviewCaches({bool notify = false}) {
+    final ids = {
+      ..._contextRevisions.keys,
+      ..._contextRevisionNotifiers.keys,
+      ..._compressionHistoryRevisions.keys,
+      ..._compressionHistoryRevisionNotifiers.keys,
+      if (_compressionHistoryCache != null) _compressionHistoryCache!.id,
+      if (_contextCountsCache != null) _contextCountsCache!.id,
+    };
+    _contextPreviewEpoch++;
+    _compressionHistoryCache = null;
+    _contextCountsCache = null;
+    if (notify) {
+      for (final id in ids) {
+        final revision = contextRevision(id) + 1;
+        _contextRevisions[id] = revision;
+        _contextRevisionNotifiers[id]?.value = revision;
+        _bumpCompressionHistoryRevision(id);
+      }
+    }
+  }
+
   final Map<String, int> _contextRevisions = {};
   final Map<String, ValueNotifier<int>> _contextRevisionNotifiers = {};
 
@@ -384,13 +434,24 @@ class ChatService extends ChangeNotifier {
       if (draftSeed != null) _repo.composerDrafts.updateSeed(draftSeed);
     }
     if (conversationId.isEmpty) return;
+    if (_compressionHistoryCache?.id == conversationId) {
+      _compressionHistoryCache = null;
+    }
+    if (_contextCountsCache?.id == conversationId) _contextCountsCache = null;
     final next = contextRevision(conversationId) + 1;
     _contextRevisions[conversationId] = next;
     final notifier = _contextRevisionNotifiers[conversationId];
     if (notifier != null) notifier.value = next;
+    _bumpCompressionHistoryRevision(conversationId);
   }
 
   void _forgetContextRevision(String conversationId) {
+    if (_compressionHistoryCache?.id == conversationId) {
+      _compressionHistoryCache = null;
+    }
+    if (_contextCountsCache?.id == conversationId) _contextCountsCache = null;
+    _compressionHistoryRevisions.remove(conversationId);
+    _compressionHistoryRevisionNotifiers.remove(conversationId)?.dispose();
     _contextOperations.remove(conversationId);
     _contextStartIndices.remove(conversationId);
     _contextStateVersions.remove(conversationId);
@@ -513,10 +574,15 @@ class ChatService extends ChangeNotifier {
     await _repo.genUiStates.flush();
     _repo.composerDrafts.removeListener(notifyListeners);
     _initialized = false;
-    for (final id in List<String>.of(_contextRevisionNotifiers.keys)) {
+    for (final id in {
+      ..._contextRevisionNotifiers.keys,
+      ..._compressionHistoryRevisionNotifiers.keys,
+    }) {
       _forgetContextRevision(id);
     }
     _contextRevisions.clear();
+    _compressionHistoryRevisions.clear();
+    _resetContextPreviewCaches();
     final lease = _databaseLease;
     _databaseLease = null;
     await lease?.release();
@@ -565,6 +631,7 @@ class ChatService extends ChangeNotifier {
           (conversation) => MapEntry(conversation.id, conversation),
         ),
       );
+    _resetContextPreviewCaches(notify: true);
     _bumpConversationListRevision();
   }
 
@@ -2739,6 +2806,7 @@ class ChatService extends ChangeNotifier {
         .map((message) => message.id)
         .toList(growable: true);
     _messageCounts[restored.id] = messages.length;
+    _bumpContextRevision(restored.id);
     _bumpConversationListRevision();
     notifyListeners();
   }
@@ -3744,6 +3812,10 @@ class ChatService extends ChangeNotifier {
           cacheWriteTokens: cacheWriteTokens,
         ),
       );
+      if (_compressionHistoryCache?.id == temporaryMessage.conversationId &&
+          (content != null || parts != null)) {
+        _compressionHistoryCache = null;
+      }
       if (shouldBump) _bumpContextRevision(temporaryMessage.conversationId);
       if (notify) notifyListeners();
       return;
@@ -3778,6 +3850,10 @@ class ChatService extends ChangeNotifier {
     }
 
     _replaceCachedMessage(updatedMessage);
+    if (_compressionHistoryCache?.id == updatedMessage.conversationId &&
+        (content != null || parts != null)) {
+      _compressionHistoryCache = null;
+    }
     if (shouldBump) {
       _bumpContextRevision(updatedMessage.conversationId);
       await loadContextOperations(updatedMessage.conversationId, refresh: true);
@@ -3798,6 +3874,9 @@ class ChatService extends ChangeNotifier {
       return;
     }
     if (isTemporaryConversation(message.conversationId)) {
+      if (_compressionHistoryCache?.id == message.conversationId) {
+        _compressionHistoryCache = null;
+      }
       _replaceCachedMessage(message);
       _temporaryToolEvents[message.id] = List<Map<String, dynamic>>.of(
         toolEvents,
@@ -3811,6 +3890,11 @@ class ChatService extends ChangeNotifier {
       generationRunId: generationRunId,
       checkpointSeq: checkpointSeq,
     );
+    // Reopening during a stream should read its latest checkpoint. The open
+    // dialog keeps a stable snapshot until finalization advances the revision.
+    if (_compressionHistoryCache?.id == message.conversationId) {
+      _compressionHistoryCache = null;
+    }
     _replaceCachedMessage(message);
     _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
   }
@@ -3847,6 +3931,8 @@ class ChatService extends ChangeNotifier {
     if (isTemporaryConversation(message.conversationId)) {
       await updateStreamingCheckpointSilent(message, toolEvents);
       message.hydrateGenerationState(terminalState);
+      _bumpCompressionHistoryRevision(message.conversationId);
+      notifyListeners();
       return null;
     }
     if (generationRunId == null) {
@@ -3860,6 +3946,7 @@ class ChatService extends ChangeNotifier {
           )) {
         await _synchronizePersistedMessageAssetsBestEffort(message.id);
       }
+      _bumpCompressionHistoryRevision(message.conversationId);
       _statisticsRevision++;
       notifyListeners();
       return null;
@@ -3889,6 +3976,7 @@ class ChatService extends ChangeNotifier {
     }
     _replaceCachedMessage(message);
     _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
+    _bumpCompressionHistoryRevision(message.conversationId);
     _statisticsRevision++;
     notifyListeners();
     return run;
@@ -4942,10 +5030,15 @@ class ChatService extends ChangeNotifier {
     _messageOrderIds.clear();
     _firstGroupIndicesCache.clear();
     _currentConversationId = null;
-    for (final id in List<String>.of(_contextRevisionNotifiers.keys)) {
+    for (final id in {
+      ..._contextRevisionNotifiers.keys,
+      ..._compressionHistoryRevisionNotifiers.keys,
+    }) {
       _forgetContextRevision(id);
     }
     _contextRevisions.clear();
+    _compressionHistoryRevisions.clear();
+    _resetContextPreviewCaches();
     if (deleteUploads) await _deleteUploadDirectory();
     _bumpConversationListRevision();
     notifyListeners();

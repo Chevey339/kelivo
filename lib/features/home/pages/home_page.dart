@@ -2024,28 +2024,38 @@ class _HomePageState extends State<HomePage>
     final messageWindow = assistant?.limitContextMessages == true
         ? assistant!.contextMessageSize
         : null;
-    final snapshot = await chat.loadContextSnapshot(conversation.id);
-    if (!mounted) return;
-    final estimator = chat.contextCompression.estimateCandidate;
+    Future<ConversationContextHistory>? previewHistory;
+    var previewRevision = -1;
     final options = await showCompressContextOptions(
       context: context,
       builder: (sheet) => CompressContextOptionsDialog(
         sheet: sheet,
         conversationId: conversation.id,
-        previewRequest: (options, config) => _controller
-            .previewCompressionRequest(conversation.id, options, config),
-        messages: snapshot.messages,
-        operations: snapshot.operations,
+        loadHistory: () => chat.loadCompressionHistory(conversation.id),
+        historyRevision: chat.compressionHistoryRevisionListenable(
+          conversation.id,
+        ),
+        previewRequest: (options, config) {
+          final revision = chat.compressionHistoryRevision(conversation.id);
+          if (previewHistory == null || previewRevision != revision) {
+            previewRevision = revision;
+            previewHistory = chat.loadContextHistory(conversation.id);
+          }
+          final history = previewHistory!;
+          return _controller
+              .previewCompressionRequest(
+                conversation.id,
+                options,
+                config,
+                history: history,
+              )
+              .catchError((Object error, StackTrace stack) {
+                if (identical(previewHistory, history)) previewHistory = null;
+                Error.throwWithStackTrace(error, stack);
+              });
+        },
         messageWindow: messageWindow,
         initialOptions: initialOptions,
-        prepareInput: (messages, include) => chat.messagesForCompression(
-          messages,
-          includeAttachmentsAndTools: include,
-          quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
-        ),
-        estimateContext: estimator == null
-            ? null
-            : (history) => estimator(conversation.id, history),
       ),
     );
     if (options == null || !mounted) return;

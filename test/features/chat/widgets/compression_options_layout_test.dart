@@ -1,3 +1,5 @@
+import '../../../support/compression_options_pump.dart';
+import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
@@ -122,16 +124,16 @@ void main() {
                               estimatedRequests: 1,
                               maxRequestAttempts: config.maxRequestAttempts,
                             ),
-                            messages: [
-                              for (var i = 0; i < 10; i++)
-                                ChatMessage(
-                                  id: 'u$i',
-                                  role: 'user',
-                                  content: 'Example $i',
-                                  conversationId: 'c',
-                                ),
-                            ],
-                            operations: const [],
+                            loadHistory: () async =>
+                                CompressionHistory.fromMessages([
+                                  for (var i = 0; i < 10; i++)
+                                    ChatMessage(
+                                      id: 'u$i',
+                                      role: 'user',
+                                      content: 'Example $i',
+                                      conversationId: 'c',
+                                    ),
+                                ], const []),
                           ),
                         ),
                       ),
@@ -143,7 +145,7 @@ void main() {
           ),
         );
         await tester.tap(find.text('Open compression'));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         final l10n = AppLocalizations.of(
           tester.element(find.byType(CompressContextOptionsDialog)),
         )!;
@@ -154,7 +156,7 @@ void main() {
             );
             await tester.pump();
           }
-          await tester.pumpAndSettle();
+          await settleCompressionOptions(tester);
           expect(finder, findsOneWidget);
           expect(tester.takeException(), isNull);
         }
@@ -206,7 +208,7 @@ void main() {
         await tester.tap(find.text('Claude Sonnet 4'));
         await waitFor(find.text('Claude Haiku 4.5'));
         await tester.tap(find.text('Claude Haiku 4.5'));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(find.text('Claude Haiku 4.5'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.tap(find.text(l10n.compressionManage));
@@ -223,7 +225,7 @@ void main() {
           matching: find.text(l10n.compressionRoleplay),
         );
         await tester.ensureVisible(lastTemplate);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(lastTemplate.hitTestable(), findsOneWidget);
         await tester.ensureVisible(
           find.descendant(
@@ -231,7 +233,7 @@ void main() {
             matching: find.text(l10n.compressionGeneral),
           ),
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         Future<void> openBuiltInEditor() async {
           await tester.tap(
             find
@@ -241,9 +243,9 @@ void main() {
                 )
                 .first,
           );
-          await tester.pumpAndSettle();
+          await settleCompressionOptions(tester);
           await tester.tap(find.text(l10n.compressionEditTemplate));
-          await tester.pumpAndSettle();
+          await settleCompressionOptions(tester);
         }
 
         await openBuiltInEditor();
@@ -266,10 +268,10 @@ void main() {
         );
         await tester.ensureVisible(language);
         await tester.tap(language);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.ensureVisible(find.text('English').last);
         await tester.tap(find.text('English').last);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await saveForm();
         await waitFor(
           find.descendant(of: library, matching: find.text(editedPrompt)),
@@ -289,7 +291,7 @@ void main() {
           editedPrompt,
         );
         await tester.tap(find.text(l10n.compressionRestoreDefault));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(
           tester
               .widget<TextField>(field(l10n.compressionPrompt))
@@ -303,7 +305,7 @@ void main() {
             matching: find.text(l10n.homePageCancel),
           ),
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(
           (await tester.runAsync(
             () => chat.chatRepositoryOrNull!.compression.template(
@@ -337,16 +339,16 @@ void main() {
           find.descendant(of: library, matching: find.byType(TextField)),
           l10n.compressionCode,
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.tap(
           find.descendant(
             of: library,
             matching: find.byTooltip(l10n.compressionMore),
           ),
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.tap(find.text(l10n.compressionSetGlobal));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         for (
           var i = 0;
           i < 100 && settings.compressionDefaults.templateId != 'code';
@@ -364,7 +366,7 @@ void main() {
             matching: find.byTooltip(l10n.commonClose),
           ),
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         for (var i = 0; i < 30; i++) {
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 10)),
@@ -383,7 +385,7 @@ void main() {
         await tester.tap(find.text(l10n.compressionManage));
         await waitFor(library);
         await tester.tap(find.text(l10n.compressionNewTemplate));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.enterText(
           field(l10n.compressionTemplateName),
           'Project notes',
@@ -392,18 +394,18 @@ void main() {
           field(l10n.compressionPrompt),
           'Summarize decisions and next steps:\n{content}',
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await screenshot('editor');
         if (mobile) {
           tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-          await tester.pumpAndSettle();
+          await settleCompressionOptions(tester);
           expect(tester.takeException(), isNull);
           expect(
             find.text(l10n.multiKeyPageSave).hitTestable(),
             findsOneWidget,
           );
           tester.view.resetViewInsets();
-          await tester.pumpAndSettle();
+          await settleCompressionOptions(tester);
         }
         await saveForm();
         await waitFor(find.byType(CompressionTemplateLibrary));
@@ -413,14 +415,14 @@ void main() {
         );
         await waitFor(createdTemplate);
         await tester.tap(createdTemplate);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(find.byType(CompressionTemplateLibrary), findsNothing);
         expect(find.text('Project notes'), findsOneWidget);
         // Cover both a persisted default and a selection not saved yet.
         if (dark) {
           await tester.ensureVisible(find.text(l10n.compressionMore));
           await tester.tap(find.text(l10n.compressionMore));
-          await tester.pumpAndSettle();
+          await settleCompressionOptions(tester);
           await saveForm();
           await waitFor(find.text(l10n.compressionManage));
         }
@@ -442,9 +444,9 @@ void main() {
             matching: find.byTooltip(l10n.compressionMore),
           ),
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.tap(find.text(l10n.homePageDelete));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.tap(
           find.byWidgetPredicate(
             (w) =>
@@ -452,16 +454,16 @@ void main() {
                 w.semanticLabel == l10n.compressionReplacementTemplate,
           ),
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.tap(find.text(l10n.compressionCode).last);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.tap(
           find.descendant(
             of: find.byType(FormSheetActions).last,
             matching: find.text(l10n.homePageDelete),
           ),
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         for (var i = 0; i < 100 && libraryTemplate.evaluate().isNotEmpty; i++) {
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 10)),
@@ -491,7 +493,7 @@ void main() {
         expect(find.byType(DropdownButtonFormField<String>), findsNothing);
         await tester.ensureVisible(field(l10n.compressionKeepTurns));
         await tester.tap(find.text(l10n.compressionKeepTurns));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         final keepField = tester.widget<TextField>(
           field(l10n.compressionKeepTurns),
         );
@@ -505,37 +507,37 @@ void main() {
         );
         await tester.ensureVisible(find.text(l10n.compressionMore));
         await tester.tap(find.text(l10n.compressionMore));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(tester.takeException(), isNull);
         expect(field(l10n.compressionKeepTurns), findsNothing);
         await screenshot('settings');
         expect(field(l10n.compressionTrigger), findsNothing);
         expect(field(l10n.compressionTarget), findsNothing);
         await tester.tap(find.text(l10n.compressionAutoNotify));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(field(l10n.compressionTrigger), findsOneWidget);
         expect(field(l10n.compressionTarget), findsNothing);
         await tester.enterText(field(l10n.compressionTrigger), '75');
         await tester.tap(find.text(l10n.compressionAutoOn));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.ensureVisible(field(l10n.compressionTarget));
         await tester.enterText(field(l10n.compressionTarget), '55');
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(tester.takeException(), isNull);
         await screenshot('settings-auto');
         await tester.ensureVisible(find.text(l10n.compressionAutoOff));
         await tester.tap(find.text(l10n.compressionAutoOff));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(field(l10n.compressionTrigger), findsNothing);
         await tester.ensureVisible(find.text(l10n.compressionAdvancedOptions));
         await tester.tap(find.text(l10n.compressionAdvancedOptions));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await screenshot('settings-details');
         await tester.ensureVisible(field(l10n.compressionWindow));
         await tester.enterText(field(l10n.compressionWindow), '64000');
         await tester.ensureVisible(find.text(l10n.compressionAdvancedOptions));
         await tester.tap(find.text(l10n.compressionAdvancedOptions));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(field(l10n.compressionWindow), findsNothing);
         await saveForm();
         await waitFor(find.text(l10n.compressionManage));
@@ -551,7 +553,7 @@ void main() {
         expect(selected!.where((t) => t.name == 'Project notes'), isEmpty);
         // Resetting the override immediately restores the current chat model.
         await tester.tap(find.text(l10n.compressionChatModel).first);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(find.text('Claude Sonnet 4'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
         debugDefaultTargetPlatformOverride = null;
