@@ -51,7 +51,14 @@ class ReasoningSection extends StatelessWidget {
               ),
               onReset: () => controller.reset(ModelSpecField.reasoningLevels),
             ),
-            for (final level in kModelSpecEditableLevels)
+            for (final level in [
+              if (controller.base.reasoning.levels.contains(
+                    ReasoningLevel.on,
+                  ) ||
+                  spec.reasoning.levels.contains(ReasoningLevel.on))
+                ReasoningLevel.on,
+              ...kModelSpecEditableLevels,
+            ])
               _CheckRow(
                 label: reasoningLevelLabel(l10n, level),
                 value: spec.reasoning.levels.contains(level),
@@ -241,6 +248,7 @@ String reasoningLevelLabel(AppLocalizations l10n, ReasoningLevel level) {
   return switch (level) {
     ReasoningLevel.auto => l10n.reasoningLevelAuto,
     ReasoningLevel.off => l10n.reasoningLevelOff,
+    ReasoningLevel.on => l10n.reasoningLevelOn,
     ReasoningLevel.minimal => l10n.reasoningLevelMinimal,
     ReasoningLevel.low => l10n.reasoningLevelLow,
     ReasoningLevel.medium => l10n.reasoningLevelMedium,
@@ -263,6 +271,8 @@ String dialectLabel(AppLocalizations l10n, ReasoningDialect dialect) {
       l10n.modelSpecFormDialectAnthropicBudget,
     ReasoningDialect.anthropicAdaptiveEffort =>
       l10n.modelSpecFormDialectAnthropicAdaptiveEffort,
+    ReasoningDialect.anthropicBetweenTools =>
+      l10n.modelSpecFormDialectAnthropicBetweenTools,
     ReasoningDialect.anthropicEffort =>
       l10n.modelSpecFormDialectAnthropicEffort,
     ReasoningDialect.geminiThinkingBudget =>
@@ -296,6 +306,8 @@ String dialectSubtitle(AppLocalizations l10n, ReasoningDialect dialect) {
       l10n.modelSpecFormDialectAnthropicBudgetSubtitle,
     ReasoningDialect.anthropicAdaptiveEffort =>
       l10n.modelSpecFormDialectAnthropicAdaptiveEffortSubtitle,
+    ReasoningDialect.anthropicBetweenTools =>
+      l10n.modelSpecFormDialectAnthropicBetweenToolsSubtitle,
     ReasoningDialect.anthropicEffort =>
       l10n.modelSpecFormDialectAnthropicEffortSubtitle,
     ReasoningDialect.geminiThinkingBudget =>

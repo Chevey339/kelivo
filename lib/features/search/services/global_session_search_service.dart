@@ -7,6 +7,7 @@ class GlobalSessionSearchResult {
     required this.conversationTitle,
     required this.updatedAt,
     required this.firstMatchedMessageId,
+    this.matchedSurfaceKey,
     required this.snippet,
     required this.score,
     required this.titleMatched,
@@ -16,6 +17,7 @@ class GlobalSessionSearchResult {
   final String conversationTitle;
   final DateTime updatedAt;
   final String firstMatchedMessageId;
+  final String? matchedSurfaceKey;
   final String snippet;
   final int score;
   final bool titleMatched;
@@ -23,20 +25,6 @@ class GlobalSessionSearchResult {
 
 class GlobalSessionSearchService {
   const GlobalSessionSearchService._();
-
-  // Hidden/internal blocks that should not participate in global search.
-  static final RegExp _geminiThoughtSigRe = RegExp(
-    r'<!--\s*gemini_thought_signatures:.*?-->',
-    dotAll: true,
-  );
-  static final RegExp _thinkBlockRe = RegExp(
-    r'<(?:think|thought)>[\s\S]*?<\/(?:think|thought)>',
-    caseSensitive: false,
-  );
-  static final RegExp _reasoningBlockRe = RegExp(
-    r'<reasoning>[\s\S]*?<\/reasoning>',
-    caseSensitive: false,
-  );
 
   static Future<List<GlobalSessionSearchResult>> search({
     required ChatService chatService,
@@ -86,31 +74,44 @@ class GlobalSessionSearchService {
     final title = first.conversationTitle.trim();
     final lowerTitle = title.toLowerCase();
 
+    final verifiedTokens = {
+      for (final match in matches) ...match.verifiedTokens,
+    };
+    final missingTokens = tokens.toSet()
+      ..removeWhere(lowerTitle.contains)
+      ..removeAll(verifiedTokens);
     final contentItems = <_ContentRef>[];
+    var firstMatchedIndex = -1;
+    var contentMatches = 0;
     for (final m in matches) {
       if (!_isVisibleVersion(m)) continue;
       // Only search visible conversation body: user + assistant messages.
       // Exclude tool/system-like messages and hidden reasoning/thought blocks.
       if (m.messageRole != 'user' && m.messageRole != 'assistant') continue;
-      final body = _searchableBody(m.messageContent ?? '');
+      final body = _normalize(m.searchableText ?? '');
       if (body.isEmpty) continue;
       final messageId = m.messageId;
       if (messageId == null || messageId.isEmpty) continue;
-      contentItems.add(_ContentRef(messageId: messageId, text: body));
+      final lowerBody = body.toLowerCase();
+      missingTokens.removeWhere(lowerBody.contains);
+      final matchesInBody = _countMatches(lowerBody, tokens);
+      contentMatches += matchesInBody;
+      if (firstMatchedIndex < 0 && matchesInBody > 0) {
+        firstMatchedIndex = contentItems.length;
+      }
+      contentItems.add(
+        _ContentRef(
+          messageId: messageId,
+          text: body,
+          surfaceKey: m.matchedSurfaceKey,
+        ),
+      );
     }
     if (contentItems.isEmpty && title.isEmpty) return null;
 
-    final contentLower = contentItems
-        .map((e) => e.text.toLowerCase())
-        .join('\n');
-    final searchHaystack = '$lowerTitle\n$contentLower';
-    for (final t in tokens) {
-      if (!searchHaystack.contains(t)) return null;
-    }
+    if (missingTokens.isNotEmpty) return null;
 
     final titleMatches = _countMatches(lowerTitle, tokens);
-    final firstMatchedIndex = _firstMatchedContentIndex(contentItems, tokens);
-    final contentMatches = _countMatches(contentLower, tokens);
     final hasTitleMatch = titleMatches > 0;
 
     final fallbackMessageId = contentItems.isNotEmpty
@@ -161,6 +162,9 @@ class GlobalSessionSearchService {
       conversationTitle: displayTitle,
       updatedAt: first.updatedAt,
       firstMatchedMessageId: targetMessageId,
+      matchedSurfaceKey: firstMatchedIndex >= 0
+          ? contentItems[firstMatchedIndex].surfaceKey
+          : null,
       snippet: snippet,
       score: score,
       titleMatched: hasTitleMatch,
@@ -202,19 +206,6 @@ class GlobalSessionSearchService {
     return score;
   }
 
-  static int _firstMatchedContentIndex(
-    List<_ContentRef> items,
-    List<String> tokens,
-  ) {
-    for (var i = 0; i < items.length; i++) {
-      final lower = items[i].text.toLowerCase();
-      for (final t in tokens) {
-        if (lower.contains(t)) return i;
-      }
-    }
-    return -1;
-  }
-
   static String _contextSnippet({
     required List<_ContentRef> items,
     required int centerIndex,
@@ -230,7 +221,7 @@ class GlobalSessionSearchService {
 
     String joinWindow() {
       return [
-        for (var i = left; i <= right; i++) _normalize(items[i].text),
+        for (var i = left; i <= right; i++) items[i].text,
       ].where((e) => e.isNotEmpty).join('  ');
     }
 
@@ -280,16 +271,6 @@ class GlobalSessionSearchService {
         .trim();
   }
 
-  static String _searchableBody(String content) {
-    if (content.trim().isEmpty) return '';
-    return _normalize(
-      content
-          .replaceAll(_geminiThoughtSigRe, ' ')
-          .replaceAll(_thinkBlockRe, ' ')
-          .replaceAll(_reasoningBlockRe, ' '),
-    );
-  }
-
   static String _snippetFor(String source, List<String> tokens) {
     final s = source.trim();
     if (s.isEmpty) return '';
@@ -324,8 +305,13 @@ class GlobalSessionSearchService {
 }
 
 class _ContentRef {
-  const _ContentRef({required this.messageId, required this.text});
+  const _ContentRef({
+    required this.messageId,
+    required this.text,
+    this.surfaceKey,
+  });
 
   final String messageId;
   final String text;
+  final String? surfaceKey;
 }

@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../animations/status_animation.dart';
+
 class ThinkingSheenParams {
   const ThinkingSheenParams({
     required this.speed,
@@ -70,117 +72,38 @@ class ThinkingSheen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!enabled) return child;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return _ThinkingSheenAnimation(
-      params: params,
-      palette: palette ?? ThinkingSheenPalette.fromTheme(context, color: color),
-      paused: paused || reduceMotion,
-      child: child,
-    );
-  }
-}
-
-class _ThinkingSheenAnimation extends StatefulWidget {
-  const _ThinkingSheenAnimation({
-    required this.params,
-    required this.palette,
-    required this.paused,
-    required this.child,
-  });
-
-  final ThinkingSheenParams params;
-  final ThinkingSheenPalette palette;
-  final bool paused;
-  final Widget child;
-
-  @override
-  State<_ThinkingSheenAnimation> createState() =>
-      _ThinkingSheenAnimationState();
-}
-
-class _ThinkingSheenAnimationState extends State<_ThinkingSheenAnimation>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: _scaledDuration(
-        const Duration(milliseconds: 2400),
-        widget.params.speed,
-      ),
-    );
-    _syncPlayback();
-  }
-
-  @override
-  void didUpdateWidget(covariant _ThinkingSheenAnimation oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.params.speed != widget.params.speed) {
-      _controller.duration = _scaledDuration(
-        const Duration(milliseconds: 2400),
-        widget.params.speed,
-      );
-      if (!widget.paused) {
-        _controller.repeat();
-      }
-    }
-    if (oldWidget.paused != widget.paused) {
-      _syncPlayback();
-    }
-  }
-
-  void _syncPlayback() {
-    if (widget.paused) {
-      _controller.stop();
-      if (_controller.value == 0) {
-        _controller.value = 0.42;
-      }
-    } else {
-      _controller.repeat();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final base = _opaque(widget.palette.base);
+    final colors =
+        palette ?? ThinkingSheenPalette.fromTheme(context, color: color);
+    final base = _opaque(colors.base);
     final peak = _opaque(
-      Color.lerp(
-        base,
-        widget.palette.highlight,
-        0.42 + widget.params.intensity * 0.58,
-      )!,
+      Color.lerp(base, colors.highlight, 0.42 + params.intensity * 0.58)!,
     );
     final mid = _opaque(Color.lerp(base, peak, 0.5)!);
     return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return ShaderMask(
+      child: StatusAnimation(
+        duration: _scaledDuration(
+          const Duration(milliseconds: 2400),
+          params.speed,
+        ),
+        paused: paused,
+        initialValue: 0.42,
+        builder: (context, progress) => AnimatedBuilder(
+          animation: progress,
+          builder: (context, child) => ShaderMask(
             blendMode: BlendMode.srcIn,
-            shaderCallback: (bounds) {
-              return LinearGradient(
-                begin: const Alignment(-1.0, -0.18),
-                end: const Alignment(1.0, 0.18),
-                colors: [base, base, mid, peak, mid, base, base],
-                stops: _sheenStops(widget.params.spread),
-                transform: _SlideGradientTransform(_controller.value),
-              ).createShader(bounds);
-            },
+            shaderCallback: (bounds) => LinearGradient(
+              begin: const Alignment(-1.0, -0.18),
+              end: const Alignment(1.0, 0.18),
+              colors: [base, base, mid, peak, mid, base, base],
+              stops: _sheenStops(params.spread),
+              transform: _SlideGradientTransform(progress.value),
+            ).createShader(bounds),
             child: child,
-          );
-        },
-        child: widget.child,
+          ),
+          child: child,
+        ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 }
 

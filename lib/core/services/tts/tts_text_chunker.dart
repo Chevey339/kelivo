@@ -19,7 +19,10 @@ class TtsTextChunker {
     final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (normalized.isEmpty) return const <TtsTextChunk>[];
 
-    final safeMax = maxChunkLength < 40 ? maxChunkLength : maxChunkLength;
+    if (maxChunkLength < 2) {
+      throw RangeError.range(maxChunkLength, 2, null, 'maxChunkLength');
+    }
+    final safeMax = maxChunkLength;
     final segments = _splitIntoSegments(normalized, safeMax);
     final chunks = <String>[];
 
@@ -28,7 +31,7 @@ class TtsTextChunker {
         chunks.add(segment);
         continue;
       }
-      final merged = _joinForSpeech(chunks.last, segment);
+      final merged = chunks.last + segment;
       if (merged.length <= safeMax) {
         chunks[chunks.length - 1] = merged;
       } else {
@@ -51,27 +54,17 @@ class TtsTextChunker {
     final buffer = StringBuffer();
 
     void flush() {
-      final value = buffer.toString().trim();
+      final value = buffer.toString();
       buffer.clear();
       if (value.isEmpty) return;
-      if (value.length <= maxChunkLength) {
-        segments.add(value);
-        return;
-      }
-      for (var start = 0; start < value.length; start += maxChunkLength) {
-        final end = (start + maxChunkLength).clamp(0, value.length).toInt();
-        segments.add(value.substring(start, end));
-      }
+      segments.add(value);
     }
 
-    for (final codeUnit in text.codeUnits) {
-      final char = String.fromCharCode(codeUnit);
+    for (final rune in text.runes) {
+      final char = String.fromCharCode(rune);
+      if (buffer.length + char.length > maxChunkLength) flush();
       buffer.write(char);
-      if (_isSentenceBoundary(char)) {
-        flush();
-      } else if (buffer.length >= maxChunkLength) {
-        flush();
-      }
+      if (_isSentenceBoundary(char) || buffer.length >= maxChunkLength) flush();
     }
     flush();
     return segments;
@@ -79,29 +72,5 @@ class TtsTextChunker {
 
   static bool _isSentenceBoundary(String char) {
     return const {'。', '！', '？', '；', '!', '?', ';', '.', '\n'}.contains(char);
-  }
-
-  static String _joinForSpeech(String first, String second) {
-    if (first.isEmpty) return second;
-    if (second.isEmpty) return first;
-    final needsSpace =
-        _isAsciiBoundary(first.codeUnitAt(first.length - 1)) &&
-        _isAsciiWord(second.codeUnitAt(0));
-    return needsSpace ? '$first $second' : '$first$second';
-  }
-
-  static bool _isAsciiBoundary(int codeUnit) {
-    return codeUnit == 0x2e ||
-        codeUnit == 0x21 ||
-        codeUnit == 0x3f ||
-        codeUnit == 0x3b ||
-        codeUnit == 0x3a ||
-        codeUnit == 0x2c;
-  }
-
-  static bool _isAsciiWord(int codeUnit) {
-    return (codeUnit >= 0x30 && codeUnit <= 0x39) ||
-        (codeUnit >= 0x41 && codeUnit <= 0x5a) ||
-        (codeUnit >= 0x61 && codeUnit <= 0x7a);
   }
 }

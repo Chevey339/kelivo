@@ -1,6 +1,6 @@
 import 'dart:async';
 
-enum DesktopSettingsNavigationTarget { backup, mcp }
+enum DesktopSettingsNavigationTarget { backup, mcp, topicPosition }
 
 class DesktopSettingsNavigationBus {
   DesktopSettingsNavigationBus._();
@@ -12,6 +12,19 @@ class DesktopSettingsNavigationBus {
       StreamController<DesktopSettingsNavigationTarget>.broadcast();
 
   Stream<DesktopSettingsNavigationTarget> get stream => _controller.stream;
+
+  bool _topicPositionRequested = false;
+
+  bool consumeTopicPositionRequest() {
+    final requested = _topicPositionRequested;
+    _topicPositionRequested = false;
+    return requested;
+  }
+
+  void openTopicPosition() {
+    _topicPositionRequested = true;
+    _controller.add(DesktopSettingsNavigationTarget.topicPosition);
+  }
 
   void openBackup() {
     _controller.add(DesktopSettingsNavigationTarget.backup);

@@ -43,6 +43,8 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
             .firstOrNull;
         child = MarkstreamDetailsBlock(
           node: node,
+          expansionState: detailsExpansionState,
+          stateKey: detailsStateKey,
           source: node.span.slice(document.source),
           open: node.attributes.containsKey('open'),
           theme: theme,
@@ -50,17 +52,17 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
               ? SelectionContainer.disabled(
                   child: Text(labels.details, style: theme.details.summary),
                 )
-              : inlineText(
+              : _blockContent.inlineText(
                   context,
                   summary,
                   summary.children,
                   theme.details.summary,
                   streaming: streaming,
                 ),
-          body: (context) => htmlFlow(
+          body: (context) => _blockContent.htmlFlow(
             context,
             node.children.where((child) => !identical(child, summary)).toList(),
-            style,
+            style.copyWith(color: theme.colors.ink2),
             streaming: streaming,
           ),
         );
@@ -123,9 +125,9 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
             .where((n) => n.tag == 'code')
             .firstOrNull;
         final language =
-            RegExp(r'(?:^|\s)language-([\w+-]+)')
-                .firstMatch(code?.attributes['class'] ?? '')
-                ?.group(1) ??
+            RegExp(
+              r'(?:^|\s)language-([\w+-]+)',
+            ).firstMatch(code?.attributes['class'] ?? '')?.group(1) ??
             '';
         child = MarkstreamCodeBlock(
           node: CodeBlockNode(
@@ -287,7 +289,7 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
       exporting: exporting,
       buildCell: (context, cell, style) {
         final owner = owners[cell.span];
-        final content = inlineText(
+        final content = _blockContent.inlineText(
           context,
           owner ?? cell,
           cell.children,
@@ -297,13 +299,20 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
         if (owner == null) return content;
         return DocumentSelectionGroup(
           node: owner,
-          child: Align(
-            alignment: switch (owner.attributes['align']) {
-              'center' => Alignment.center,
-              'right' => Alignment.centerRight,
-              _ => AlignmentDirectional.centerStart,
+          child: DefaultTextStyle.merge(
+            textAlign: switch (owner.attributes['align']) {
+              'center' => TextAlign.center,
+              'right' => TextAlign.right,
+              _ => TextAlign.start,
             },
-            child: content,
+            child: Align(
+              alignment: switch (owner.attributes['align']) {
+                'center' => Alignment.center,
+                'right' => Alignment.centerRight,
+                _ => AlignmentDirectional.centerStart,
+              },
+              child: content,
+            ),
           ),
         );
       },

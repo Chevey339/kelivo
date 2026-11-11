@@ -1,22 +1,38 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
+import '../../../utils/windows_explorer.dart';
 import 'workspace_runtime.dart';
+import 'desktop_shell.dart';
+import 'desktop_process.dart';
 
 /// Native host-process [WorkspaceRuntime] for macOS, Linux, and Windows.
 ///
 /// Commands run as a fresh shell process (not a sandbox). Mounts are ignored.
 class DesktopProcessRuntime extends WorkspaceRuntime {
+  DesktopProcessRuntime({
+    this.loadShellPath,
+    DesktopShellResolver? shellResolver,
+  }) : shellResolver = shellResolver ?? DesktopShellResolver();
+
+  final Future<String> Function()? loadShellPath;
+  final DesktopShellResolver shellResolver;
+  String? _resolvedPath;
+
+  void refreshShell() {
+    _shellFuture = null;
+    _whichCache.clear();
+  }
+
   final Map<String, _LiveRun> _live = <String, _LiveRun>{};
   final Set<String> _starting = <String>{};
   final Set<String> _pendingCancel = <String>{};
   final Map<String, String?> _whichCache = <String, String?>{};
 
-  Future<_ShellSpec?>? _shellFuture;
+  Future<DesktopShell>? _shellFuture;
 
   @override
   bool get supportsPty => false;
@@ -29,20 +45,22 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
 
   @override
   Future<RuntimeStatus> status() async {
-    final shell = await _shell();
-    if (shell == null) {
-      return const RuntimeStatus(
+    try {
+      final shell = await _shell();
+      return RuntimeStatus(
+        ready: true,
+        engine: 'process',
+        sandboxed: false,
+        shell: shell,
+      );
+    } on Exception catch (error) {
+      return RuntimeStatus(
         ready: false,
-        reason: 'Shell binary not found',
+        reason: error.toString(),
         engine: 'process',
         sandboxed: false,
       );
     }
-    return const RuntimeStatus(
-      ready: true,
-      engine: 'process',
-      sandboxed: false,
-    );
   }
 
   @override
@@ -124,7 +142,7 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
       return;
     }
     if (Platform.isWindows) {
-      final args = isDir ? <String>[hostPath] : <String>['/select,$hostPath'];
+      final args = windowsExplorerArguments(hostPath, isDirectory: isDir);
       // Explorer can return a nonzero exit code after opening the location.
       // Only a failure to start the process should fail this action.
       await Process.start('explorer', args, mode: ProcessStartMode.detached);
@@ -166,10 +184,7 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
 
     _starting.add(request.runId);
     try {
-      final spec = await _shell();
-      if (spec == null) {
-        throw StateError('Shell binary not found');
-      }
+      final spec = request.shell ?? await _shell();
       if (_pendingCancel.remove(request.runId)) {
         emitExit(exitCode: -1, timedOut: false, cancelled: true);
         return;
@@ -270,101 +285,14 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
   }
 
   Future<({Process process, Stream<List<int>> stdout, int? processGroup})>
-  _startProcess(_ShellSpec spec, CommandRequest request) async {
-    final unix = Platform.isMacOS || Platform.isLinux;
-    final process = await Process.start(
-      unix ? '/bin/bash' : spec.executable,
-      unix
-          ? [
-              '--noprofile',
-              '--norc',
-              '-p',
-              '-c',
-              _unixLauncher,
-              'kelivo-shell',
-              spec.executable,
-              ...spec.arguments(request.command),
-            ]
-          : spec.arguments(request.command),
-      workingDirectory: request.cwd,
-      environment: <String, String>{...Platform.environment, ...request.env},
-      includeParentEnvironment: false,
-    );
-    if (!unix) {
-      return (process: process, stdout: process.stdout, processGroup: null);
-    }
-
-    final output = StreamController<List<int>>();
-    final group = Completer<int>();
-    final header = <int>[];
-    final subscription = process.stdout.listen(
-      (chunk) {
-        if (group.isCompleted) {
-          output.add(chunk);
-          return;
-        }
-        final newline = chunk.indexOf(10);
-        header.addAll(newline < 0 ? chunk : chunk.sublist(0, newline));
-        if (header.length <= 20 && newline < 0) return;
-        final id = int.tryParse(ascii.decode(header, allowInvalid: true));
-        if (newline < 0 || id == null || id <= 1) {
-          group.completeError(StateError('Shell process group did not start'));
-          return;
-        }
-        group.complete(id);
-        if (newline + 1 < chunk.length) {
-          output.add(chunk.sublist(newline + 1));
-        }
-      },
-      onError: (Object error, StackTrace stack) {
-        if (!group.isCompleted) {
-          group.completeError(error, stack);
-        } else {
-          output.addError(error, stack);
-        }
-      },
-      onDone: () {
-        if (!group.isCompleted) {
-          group.completeError(StateError('Shell process group did not start'));
-        }
-        unawaited(output.close());
-      },
-    );
-    output.onCancel = subscription.cancel;
-    output.onPause = subscription.pause;
-    output.onResume = subscription.resume;
-    try {
-      return (
-        process: process,
-        stdout: output.stream,
-        processGroup: await group.future,
+  _startProcess(DesktopShell spec, CommandRequest request) =>
+      startDesktopProcess(
+        spec.executable,
+        spec.arguments(request.command),
+        workingDirectory: request.cwd,
+        environment: <String, String>{...Platform.environment, ...request.env},
+        includeParentEnvironment: false,
       );
-    } catch (_) {
-      // Closing stdin also releases a child still waiting at the startup gate.
-      await process.stdin.close();
-      process.kill();
-      await subscription.cancel();
-      unawaited(output.close());
-      await process.stderr.drain<void>();
-      await process.exitCode;
-      rethrow;
-    }
-  }
-
-  // Bash job control creates a separate process group without detaching the
-  // launcher, so dart:io still reports the selected shell's actual exit code.
-  // -p keeps BASH_ENV and exported shell options out of this control protocol;
-  // the selected user shell is launched with its original arguments and env.
-  static const _unixLauncher = r'''
-set -m
-(
-  set +m
-  IFS= read -r _ || exit 125
-  exec "$@"
-) <&0 &
-printf '%s\n' "$!"
-wait "$!" 2>/dev/null
-''';
 
   Future<void> _killTree(_LiveRun live) => live.stopping ??= _stopProcess(live);
 
@@ -372,7 +300,7 @@ wait "$!" 2>/dev/null
     try {
       final group = live.processGroup;
       if (group != null) {
-        await _killUnixGroup(group);
+        await stopDesktopProcessGroup(group);
         return;
       }
       // Windows taskkill identifies its tree by the still-live parent PID.
@@ -396,99 +324,13 @@ wait "$!" 2>/dev/null
     }
   }
 
-  Future<void> _killUnixGroup(int group) async {
-    if (!Process.killPid(-group, ProcessSignal.sigterm)) return;
-    final deadline = DateTime.now().add(const Duration(seconds: 2));
-    while (await _unixGroupAlive(group)) {
-      if (!DateTime.now().isBefore(deadline)) {
-        Process.killPid(-group, ProcessSignal.sigkill);
-        return;
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+  Future<DesktopShell> _shell() async {
+    final path = (await loadShellPath?.call() ?? '').trim();
+    if (_resolvedPath != path) {
+      _resolvedPath = path;
+      _shellFuture = null;
     }
-  }
-
-  Future<bool> _unixGroupAlive(int group) async {
-    // -g selects different things on BSD and GNU ps. Read the PGID column on
-    // both platforms, excluding zombies that are already unable to run.
-    final result = await Process.run('/bin/ps', ['-axo', 'pgid=,stat=']);
-    if (result.exitCode != 0) return true;
-    for (final line in result.stdout.toString().split('\n')) {
-      final fields = line.trim().split(RegExp(r'\s+'));
-      if (fields.length >= 2 &&
-          fields[0] == '$group' &&
-          !fields[1].startsWith('Z')) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  Future<_ShellSpec?> _shell() => _shellFuture ??= _resolveShell();
-
-  Future<_ShellSpec?> _resolveShell() async {
-    if (Platform.isWindows) {
-      return _resolveWindowsShell();
-    }
-    if (Platform.isMacOS || Platform.isLinux) {
-      if (!File('/bin/bash').existsSync()) return null;
-      final fromEnv = Platform.environment['SHELL'];
-      if (fromEnv != null && fromEnv.isNotEmpty && File(fromEnv).existsSync()) {
-        return _ShellSpec(fromEnv, _unixArgs);
-      }
-      if (File('/bin/sh').existsSync()) {
-        return _ShellSpec('/bin/sh', _unixArgs);
-      }
-      return null;
-    }
-    return null;
-  }
-
-  List<String> _unixArgs(String command) => <String>['-lc', command];
-
-  Future<_ShellSpec?> _resolveWindowsShell() async {
-    final pwsh = await _which('pwsh');
-    if (pwsh != null) {
-      return _ShellSpec(pwsh, _powerShellArgs);
-    }
-    final powershell = await _which('powershell');
-    if (powershell != null) {
-      return _ShellSpec(powershell, _powerShellArgs);
-    }
-    final cmd = await _which('cmd');
-    if (cmd != null) {
-      return _ShellSpec(cmd, _cmdArgs);
-    }
-    return null;
-  }
-
-  List<String> _powerShellArgs(String command) {
-    return <String>[
-      '-NoLogo',
-      '-NoProfile',
-      '-NonInteractive',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-EncodedCommand',
-      _powerShellEncodedCommand(command),
-    ];
-  }
-
-  List<String> _cmdArgs(String command) {
-    return <String>['/d', '/s', '/c', 'chcp 65001>nul && $command'];
-  }
-
-  String _powerShellEncodedCommand(String command) {
-    const preamble =
-        '[Console]::OutputEncoding=[Text.Encoding]::UTF8; \$OutputEncoding=[Text.Encoding]::UTF8; ';
-    final script = '$preamble$command';
-    final units = script.codeUnits;
-    final bytes = Uint8List(units.length * 2);
-    final data = ByteData.sublistView(bytes);
-    for (var i = 0; i < units.length; i++) {
-      data.setUint16(i * 2, units[i], Endian.little);
-    }
-    return base64Encode(bytes);
+    return _shellFuture ??= shellResolver.resolve(path);
   }
 
   Future<void> _openLinuxTerminal(String hostDir) async {
@@ -556,62 +398,9 @@ wait "$!" 2>/dev/null
 
   Future<String?> _which(String name) async {
     if (_whichCache.containsKey(name)) return _whichCache[name];
-    final found = await _lookupExecutable(name);
+    final found = await shellResolver.findExecutable(name);
     _whichCache[name] = found;
     return found;
-  }
-
-  Future<String?> _lookupExecutable(String name) async {
-    if (Platform.isWindows) {
-      try {
-        final result = await Process.run('where', [name]);
-        if (result.exitCode == 0) {
-          for (final line in result.stdout.toString().split(RegExp(r'\r?\n'))) {
-            final path = line.trim();
-            if (path.isNotEmpty && File(path).existsSync()) return path;
-          }
-        }
-      } catch (_) {}
-    } else {
-      try {
-        final result = await Process.run('which', [name]);
-        if (result.exitCode == 0) {
-          final path = result.stdout.toString().trim().split('\n').first.trim();
-          if (path.isNotEmpty && File(path).existsSync()) return path;
-        }
-      } catch (_) {}
-    }
-    return _scanPath(name);
-  }
-
-  String? _scanPath(String name) {
-    final dirs = (Platform.environment['PATH'] ?? '').split(
-      Platform.isWindows ? ';' : ':',
-    );
-    final names = <String>[name];
-    if (Platform.isWindows) {
-      final exts = (Platform.environment['PATHEXT'] ?? '.EXE;.CMD;.BAT;.COM')
-          .split(';')
-          .where((e) => e.isNotEmpty);
-      if (!name.contains('.')) {
-        for (final ext in exts) {
-          names.add('$name$ext');
-        }
-      }
-    }
-    for (final dir in dirs) {
-      if (dir.isEmpty) continue;
-      for (final candidateName in names) {
-        final candidate = p.join(dir, candidateName);
-        if (File(candidate).existsSync()) return candidate;
-      }
-    }
-    if (Platform.isWindows && name.toLowerCase() == 'cmd') {
-      final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
-      final cmd = p.join(root, 'System32', 'cmd.exe');
-      if (File(cmd).existsSync()) return cmd;
-    }
-    return null;
   }
 
   String _shSingleQuote(String value) {
@@ -630,11 +419,4 @@ class _LiveRun {
   final stopped = Completer<void>();
   bool processExited = false;
   bool finished = false;
-}
-
-class _ShellSpec {
-  const _ShellSpec(this.executable, this.arguments);
-
-  final String executable;
-  final List<String> Function(String command) arguments;
 }

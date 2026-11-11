@@ -40,8 +40,11 @@ class _DelayedSnapshotRepository extends ChatDatabaseRepository {
   Completer<void>? pageGate;
   Completer<void>? pageCaptured;
   @override
-  Future<List<ChatMessage>> getMessagesByIds(List<String> ids) async {
-    final snapshot = await super.getMessagesByIds(ids);
+  Future<List<ChatMessage>> getMessagesByIds(
+    List<String> ids, {
+    bool background = false,
+  }) async {
+    final snapshot = await super.getMessagesByIds(ids, background: background);
     final gate = pageGate;
     if (gate != null) {
       pageGate = null;
@@ -292,7 +295,6 @@ void main() {
       );
       final snapshot = (await service.loadSelectedContextMessages(
         conversation.id,
-        truncateIndex: -1,
         limit: 1,
       )).single;
       await service.updateMessage(source.id, translation: 'translated');

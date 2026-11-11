@@ -1,3 +1,4 @@
+import '../../../core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -221,11 +222,17 @@ class ToolHandlerService {
   // Tool Definitions Builder
   // ============================================================================
 
-  McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) {
+  McpToolRouteSnapshot captureMcpToolRoutes(
+    Assistant? assistant, {
+    String? conversationId,
+  }) {
     return contextProvider.read<McpToolService>().captureRoutesForAssistant(
       contextProvider.read<McpProvider>(),
       contextProvider.read<AssistantProvider>(),
       assistantId: assistant?.id,
+      conversation: conversationId == null
+          ? null
+          : contextProvider.read<ChatService>().getConversation(conversationId),
       reservedNames: BuiltInToolNames.all,
     );
   }
@@ -235,7 +242,7 @@ class ToolHandlerService {
   /// Returns a list of tool definitions including:
   /// - Search tool (if enabled and model supports tools)
   /// - Memory tools (if assistant has memory / past-recall enabled)
-  /// - MCP tools (from selected servers for the assistant)
+  /// - MCP tools (from the effective conversation or assistant selection)
   /// Whether the chat being generated is a throwaway one.
   ///
   /// Scheduled sends can target a different conversation from the visible one.
@@ -263,6 +270,39 @@ class ToolHandlerService {
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
+    // Keep this candidate for images returned later in the tool loop.
+    // RequestImageContext gates its declaration on every outgoing request.
+    if (supportsTools &&
+        conversationId != null &&
+        ModelSpecResolver.instance
+            .spec(settings.getProviderConfig(providerKey), modelId)
+            .supportsImageInput) {
+      toolDefs.add({
+        'type': 'function',
+        'function': {
+          'name': 'read_chat_image',
+          'description':
+              'Read an image from this conversation using its image_id. Omit image_id to list available images, then use next_offset to list more. Reading adds a fresh observation without rewriting earlier history.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'image_id': {
+                'type': 'string',
+                'description':
+                    'The img_ identifier from an image placeholder or listing.',
+              },
+              'offset': {
+                'type': 'integer',
+                'minimum': 0,
+                'description': 'Offset for listing images; default 0.',
+              },
+            },
+
+            'additionalProperties': false,
+          },
+        },
+      });
+    }
 
     // Search tool (skip when Gemini built-in search is active)
     if (assistant?.searchEnabled == true &&
@@ -317,6 +357,7 @@ class ToolHandlerService {
       providerKey: providerKey,
       supportsTools: supportsTools,
       mcpRouteSnapshot: mcpRouteSnapshot,
+      conversationId: conversationId,
     );
     toolDefs.addAll(mcpTools);
 
@@ -348,6 +389,7 @@ class ToolHandlerService {
     required String providerKey,
     required bool supportsTools,
     McpToolRouteSnapshot? mcpRouteSnapshot,
+    String? conversationId,
   }) {
     if (!supportsTools) return [];
 
@@ -357,6 +399,9 @@ class ToolHandlerService {
       mcp,
       contextProvider.read<AssistantProvider>(),
       assistant?.id,
+      conversation: conversationId == null
+          ? null
+          : contextProvider.read<ChatService>().getConversation(conversationId),
       routeSnapshot: mcpRouteSnapshot,
       reservedNames: BuiltInToolNames.all,
     );
@@ -426,12 +471,19 @@ class ToolHandlerService {
     // Capture AssistantProvider reference before async gap to avoid
     // use_build_context_synchronously warning
     final assistantProvider = contextProvider.read<AssistantProvider>();
+    ChatService? permissionChat;
+    try {
+      permissionChat = contextProvider.read<ChatService>();
+    } catch (_) {}
     final routes =
         mcpRouteSnapshot ??
         toolSvc.captureRoutesForAssistant(
           mcp,
           assistantProvider,
           assistantId: assistant?.id,
+          conversation: conversationId == null
+              ? null
+              : permissionChat?.getConversation(conversationId),
           reservedNames: BuiltInToolNames.all,
         );
 
@@ -441,10 +493,6 @@ class ToolHandlerService {
       return '${name}_${DateTime.now().microsecondsSinceEpoch}';
     }
 
-    ChatService? permissionChat;
-    try {
-      permissionChat = contextProvider.read<ChatService>();
-    } catch (_) {}
     ToolCallPermission permissionFor(String name, String? toolCallId) =>
         ToolCallPermission(
           toolName: name,
@@ -469,6 +517,9 @@ class ToolHandlerService {
           mcp,
           assistantProvider,
           assistantId: assistant?.id,
+          conversation: conversationId == null
+              ? null
+              : permissionChat?.getConversation(conversationId),
           toolName: name,
           routeSnapshot: routes,
         )) {
@@ -485,6 +536,9 @@ class ToolHandlerService {
           mcp,
           assistantProvider,
           assistantId: assistant?.id,
+          conversation: conversationId == null
+              ? null
+              : permissionChat?.getConversation(conversationId),
           toolName: name,
           routeSnapshot: routes,
           reservedNames: BuiltInToolNames.all,
@@ -496,6 +550,9 @@ class ToolHandlerService {
         mcp,
         assistantProvider,
         assistantId: assistant?.id,
+        conversation: conversationId == null
+            ? null
+            : permissionChat?.getConversation(conversationId),
         toolName: name,
         arguments: args,
         routeSnapshot: routes,
@@ -509,6 +566,33 @@ class ToolHandlerService {
       final permission = permissionFor(name, toolCallId);
       Future<Object?> execute() async {
         try {
+          if (name == 'read_chat_image') {
+            final imageContext = RequestImageContext.current;
+            final chat = permissionChat;
+            if (imageContext == null ||
+                conversationId == null ||
+                chat == null) {
+              return const ClientToolResult(
+                'Image is unavailable in the current conversation context.',
+              );
+            }
+            if (!(await chat.imageContextSettings(
+              conversationId,
+            )).allowRecall) {
+              return const ClientToolResult(
+                'Image recall is disabled for this conversation. Ask the user to attach the image again if needed.',
+              );
+            }
+            final allowed = await chat.imageContextHistory(
+              conversationId,
+              throughMessageId: imageContext.targetMessageId,
+            );
+            return imageContext.readImage(
+              (args['image_id'] ?? '').toString(),
+              allowedMessages: allowed.map((m) => m.id).toSet(),
+              offset: args['offset'] is int ? args['offset'] as int : 0,
+            );
+          }
           if (name == BrowserToolsService.toolName) {
             final current = assistant == null
                 ? null

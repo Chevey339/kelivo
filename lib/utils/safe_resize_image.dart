@@ -109,6 +109,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     this.allowUpscaling = false,
     this.maxEdge,
     this.maxPixels,
+    this.cacheRevision,
   });
 
   factory SafeResizeImage.wrap(
@@ -119,6 +120,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     bool allowUpscaling = false,
     int? maxEdge,
     int? maxPixels,
+    int? cacheRevision,
   }) {
     if (!_isSupportedBaseProvider(imageProvider)) {
       throw FlutterError(
@@ -134,6 +136,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
       allowUpscaling: allowUpscaling,
       maxEdge: maxEdge,
       maxPixels: maxPixels,
+      cacheRevision: cacheRevision,
     );
   }
 
@@ -148,6 +151,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     bool allowUpscaling = false,
     int? maxEdge,
     int? maxPixels,
+    int? cacheRevision,
   }) {
     if (_isSupportedBaseProvider(imageProvider)) {
       return SafeResizeImage.wrap(
@@ -158,6 +162,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
         allowUpscaling: allowUpscaling,
         maxEdge: maxEdge,
         maxPixels: maxPixels,
+        cacheRevision: cacheRevision,
       );
     }
     return SafeResizeImage(
@@ -168,10 +173,16 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
       allowUpscaling: allowUpscaling,
       maxEdge: maxEdge,
       maxPixels: maxPixels,
+      cacheRevision: cacheRevision,
     );
   }
 
   final ImageProvider imageProvider;
+
+  /// Changes when the bytes at an otherwise identical provider key change.
+  /// Every decoded size then gets a fresh cache identity, including unmounted
+  /// images that cannot be reached by evicting a currently displayed provider.
+  final int? cacheRevision;
   final int width;
   final int height;
   final SafeResizeFit fit;
@@ -245,6 +256,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
               allowUpscaling: allowUpscaling,
               maxEdge: maxEdge,
               maxPixels: maxPixels,
+              cacheRevision: cacheRevision,
             );
             if (completer == null) {
               result = SynchronousFuture<SafeResizeImageKey>(wrapped);
@@ -278,7 +290,8 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
         fit == other.fit &&
         allowUpscaling == other.allowUpscaling &&
         maxEdge == other.maxEdge &&
-        maxPixels == other.maxPixels;
+        maxPixels == other.maxPixels &&
+        cacheRevision == other.cacheRevision;
   }
 
   @override
@@ -290,6 +303,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     allowUpscaling,
     maxEdge,
     maxPixels,
+    cacheRevision,
   );
 }
 
@@ -321,9 +335,11 @@ class SafeResizeImageKey {
     required this.allowUpscaling,
     required this.maxEdge,
     required this.maxPixels,
+    this.cacheRevision,
   });
 
   final Object providerCacheKey;
+  final int? cacheRevision;
   final int width;
   final int height;
   final SafeResizeFit fit;
@@ -340,7 +356,8 @@ class SafeResizeImageKey {
         other.fit == fit &&
         other.allowUpscaling == allowUpscaling &&
         other.maxEdge == maxEdge &&
-        other.maxPixels == maxPixels;
+        other.maxPixels == maxPixels &&
+        other.cacheRevision == cacheRevision;
   }
 
   @override
@@ -352,5 +369,6 @@ class SafeResizeImageKey {
     allowUpscaling,
     maxEdge,
     maxPixels,
+    cacheRevision,
   );
 }

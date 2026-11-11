@@ -244,9 +244,12 @@ final class Annotations extends StreamChunk {
 }
 
 final class Usage extends StreamChunk {
-  const Usage(this.usage, {this.startsRequest = false});
+  const Usage(this.usage, {this.startsRequest = false, this.estimated = false});
 
   final TokenUsage usage;
+
+  /// Local size estimates are not provider-reported, billable usage.
+  final bool estimated;
 
   /// The first usage snapshot of another API request in this turn.
   /// Later snapshots replace counters within that request; they are not deltas.

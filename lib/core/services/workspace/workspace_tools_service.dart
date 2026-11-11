@@ -29,7 +29,7 @@ import 'output_buffer.dart';
 import 'tool_run_registry.dart';
 import 'workspace_paths.dart';
 import 'workspace_runtime.dart';
-import 'workspace_session_sync.dart';
+import 'desktop_shell.dart';
 import 'workspace_tool_context.dart';
 import 'workspace_tool_metadata.dart';
 
@@ -77,10 +77,18 @@ class WorkspaceToolsService {
       'when unset, prefers /bin/bash if available, otherwise /bin/sh. '
       'This is not an interactive shell; do not assume ~/.bashrc is loaded.';
 
-  static String get _shellInvocation =>
-      defaultTargetPlatform == TargetPlatform.android
-      ? 'configured shell -lc'
-      : 'sh -lc';
+  static String _shellInvocation(DesktopShell? shell) {
+    if (shell != null) return shell.invocation;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => 'configured shell -lc',
+      TargetPlatform.iOS => 'sh -lc',
+      _ => 'native shell selected in Environment settings',
+    };
+  }
+
+  static String _shellInstructions(DesktopShell? shell) =>
+      'Fresh non-interactive ${_shellInvocation(shell)} per call; no cwd/env persists. '
+      '${shell?.syntaxHint ?? 'Use the syntax of the selected shell.'}';
 
   final ToolRunRegistry registry;
   final WorkspaceRuntimeProvider runtimeProvider;
@@ -196,6 +204,7 @@ class WorkspaceToolsService {
       ];
     }
     return definitions(
+          shell: ctx.runtimeStatus?.shell,
           vocab: _pathVocab(ctx.paths),
           outputHint: ctx.paths.sandboxed
               ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
@@ -212,12 +221,13 @@ class WorkspaceToolsService {
   static List<Map<String, dynamic>> definitions({
     List<String> vocab = const ['/workspace', '/chat', '/skills', '/tmp'],
     String outputHint = '/chat/outputs/<id>.txt',
+    DesktopShell? shell,
   }) {
     return [
       _fn(
         'shell',
         [
-          'Fresh non-interactive $_shellInvocation per call; no cwd/env persists. Chain with &&.',
+          _shellInstructions(shell),
           if (defaultTargetPlatform == TargetPlatform.android)
             _androidShellHint,
           'Use non-interactive flags (e.g. -y). Output is capped; long output is saved',
@@ -226,7 +236,8 @@ class WorkspaceToolsService {
         {
           'command': {
             'type': 'string',
-            'description': 'Shell command to run with $_shellInvocation.',
+            'description':
+                'Shell command to run with ${_shellInvocation(shell)}.',
           },
           'cwd': {
             'type': 'string',
@@ -377,11 +388,11 @@ class WorkspaceToolsService {
 
   static String buildPromptFragment(
     WorkspaceToolContext ctx, {
-    List<AttachmentInfo> attachments = const [],
     Iterable<String> environmentVariableNames = const [],
   }) {
     if (ctx.skillsOnly) return '';
     final paths = ctx.paths;
+    final shell = ctx.runtimeStatus?.shell;
     final workspace = paths.sandboxed
         ? WorkspacePaths.guestWorkspace
         : paths.workspaceHostRoot;
@@ -395,10 +406,6 @@ class WorkspaceToolsService {
     final outputsHint = paths.sandboxed
         ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
         : '${paths.sessionHostDir}/outputs/<id>.txt';
-    final attachDir = paths.sandboxed
-        ? '${WorkspacePaths.guestChat}/attachments/'
-        : '${paths.sessionHostDir}/attachments/';
-
     final buf = StringBuffer()
       ..writeln('<workspace>')
       ..writeln('Path zones:')
@@ -430,15 +437,16 @@ class WorkspaceToolsService {
       ..writeln();
     if (ctx.workspace.isToolEnabled('shell')) {
       buf.writeln(
-        'shell is one-shot: a fresh non-interactive $_shellInvocation each call. '
-        'No cd or env persists. Chain with &&. Use non-interactive flags (-y). '
+        'shell is one-shot: ${_shellInstructions(shell)} '
+        'Use non-interactive flags (-y). '
         'Output is capped; long output is saved to $outputsHint.',
       );
       if (environmentVariableNames.isNotEmpty) {
         buf.writeln(
           'User-configured environment variables are already injected: '
           '${environmentVariableNames.join(', ')}. '
-          r'Use $NAME references; do not print or attempt to discover their values.',
+          'Use ${shell?.environmentReference ?? (defaultTargetPlatform == TargetPlatform.windows ? 'the selected shell’s environment variable syntax' : r'$NAME')} references; '
+          'do not print or attempt to discover their values.',
         );
       }
     }
@@ -460,13 +468,6 @@ class WorkspaceToolsService {
       )
       ..writeln()
       ..writeln(_engineLine(ctx));
-    if (attachments.isNotEmpty) {
-      buf.writeln();
-      buf.writeln('Attachments under $attachDir');
-      for (final item in attachments) {
-        buf.writeln('- ${item.name} (${item.size} bytes)');
-      }
-    }
     buf.write('</workspace>');
     return buf.toString();
   }
@@ -739,8 +740,9 @@ class WorkspaceToolsService {
         tool: tool,
         error: 'environment_not_ready',
         message: status?.reason ?? 'Sandbox environment is not ready',
-        instruction:
-            'tell the user to install/enable the sandbox environment in Settings → Workspace',
+        instruction: status?.engine == 'process'
+            ? 'tell the user to check Environment → Default shell'
+            : 'tell the user to install/enable the sandbox environment in Settings → Workspace',
         meta: const WorkspaceToolMetadata(
           tool: tool,
           status: 'error',
@@ -775,6 +777,10 @@ class WorkspaceToolsService {
 
     await Directory(ctx.paths.tmpHostRoot).create(recursive: true);
     final runtimeRunId = const Uuid().v4();
+    final before = await FileSnapshot.snapshot([
+      Directory(ctx.paths.workspaceHostRoot),
+      ctx.sessionDir,
+    ], checkCancelled: cancellation?.throwIfCancelled);
     final run = registry.start(
       toolCallId,
       tool,
@@ -782,28 +788,23 @@ class WorkspaceToolsService {
       conversationId: conversationId ?? ctx.conversationId,
       runtimeRunId: runtimeRunId,
     );
-    final before = await FileSnapshot.snapshot([
-      Directory(ctx.paths.workspaceHostRoot),
-      ctx.sessionDir,
-    ]);
 
     CommandExited? exited;
     Object? executionError;
-    var executing = false;
+    void Function()? unregisterCancellation;
     try {
       cancellation?.throwIfCancelled();
       await access.permission.authorize(needed: needsApproval, arguments: args);
-      executing = true;
-      unawaited(
-        cancellation?.cancelled.then((_) async {
-          if (executing) await runtime.cancel(runtimeRunId);
-        }),
-      );
+      cancellation?.throwIfCancelled();
+      unregisterCancellation = cancellation?.onCancel(() {
+        unawaited(runtime.cancel(runtimeRunId));
+      });
       await for (final event in runtime.run(
         CommandRequest(
           runId: runtimeRunId,
           isCancelled: cancellation?.isCancelled,
           command: command,
+          shell: ctx.runtimeStatus?.shell,
           cwd: cwd,
           timeout: Duration(seconds: timeoutSeconds),
           env: env,
@@ -826,7 +827,7 @@ class WorkspaceToolsService {
     } catch (e) {
       executionError = e;
     } finally {
-      executing = false;
+      unregisterCancellation?.call();
       // A failed or cancelled command may still have installed/updated files.
       // Refresh observers without turning a refresh failure into a tool error.
       try {
@@ -845,115 +846,129 @@ class WorkspaceToolsService {
         : exited.exitCode == 0
         ? ToolRunStatus.succeeded
         : ToolRunStatus.failed;
-    run.complete(status: runStatus, exitCode: exited?.exitCode);
-    final stdout = run.stdoutSoFar;
-    final stderr = run.stderrSoFar;
+    run.complete(
+      status: runStatus,
+      exitCode: exited?.exitCode,
+      retainUntilHandoff: true,
+    );
+    try {
+      final stdout = run.stdoutSoFar;
+      final stderr = run.stderrSoFar;
 
-    final after = await FileSnapshot.snapshot([
-      Directory(ctx.paths.workspaceHostRoot),
-      ctx.sessionDir,
-    ]);
-    final changedHost = FileSnapshot.changedSince(before, after);
-    final files = <WorkspaceToolFile>[];
-    for (final hostPath in changedHost.take(_changedFilesCap)) {
-      final modelPath = ctx.paths.toModelPath(hostPath);
-      try {
-        final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
-        if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
-        files.add(
-          _fileFor(
-            ctx,
-            resolved,
-            role: before.containsKey(hostPath)
-                ? WorkspaceFileRole.modified
-                : WorkspaceFileRole.created,
+      final after = await FileSnapshot.snapshot([
+        Directory(ctx.paths.workspaceHostRoot),
+        ctx.sessionDir,
+      ]);
+      final changedHost = FileSnapshot.changedSince(before, after);
+      final files = <WorkspaceToolFile>[];
+      for (final hostPath in changedHost.take(_changedFilesCap)) {
+        final modelPath = ctx.paths.toModelPath(hostPath);
+        try {
+          final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
+          if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
+          files.add(
+            _fileFor(
+              ctx,
+              resolved,
+              role: before.containsKey(hostPath)
+                  ? WorkspaceFileRole.modified
+                  : WorkspaceFileRole.created,
+            ),
+          );
+        } on PathResolutionException {
+          files.add(
+            WorkspaceToolFile(
+              path: modelPath,
+              role: WorkspaceFileRole.modified,
+            ),
+          );
+        } on FileSystemException {
+          // A file removed again before collection is not a remaining output.
+        }
+      }
+      final filesTruncated =
+          changedHost.length > _changedFilesCap ||
+          before.length >= FileSnapshot.defaultMaxEntries ||
+          after.length >= FileSnapshot.defaultMaxEntries;
+
+      if (executionError != null || exited == null) {
+        return _errorResult(
+          tool: tool,
+          error: 'shell_failed',
+          message:
+              executionError?.toString() ??
+              'Command ended without an exit event',
+          meta: WorkspaceToolMetadata(
+            tool: tool,
+            status: 'error',
+            code: 'shell_failed',
+            command: command,
+            stdoutPreview: stdout,
+            stderrPreview: stderr,
+            files: files,
+            filesTruncated: filesTruncated,
           ),
         );
-      } on PathResolutionException {
-        files.add(
-          WorkspaceToolFile(path: modelPath, role: WorkspaceFileRole.modified),
-        );
-      } on FileSystemException {
-        // A file removed again before collection is not a remaining output.
       }
-    }
-    final filesTruncated =
-        changedHost.length > _changedFilesCap ||
-        before.length >= FileSnapshot.defaultMaxEntries ||
-        after.length >= FileSnapshot.defaultMaxEntries;
 
-    if (executionError != null || exited == null) {
-      return _errorResult(
-        tool: tool,
-        error: 'shell_failed',
-        message:
-            executionError?.toString() ?? 'Command ended without an exit event',
-        meta: WorkspaceToolMetadata(
-          tool: tool,
-          status: 'error',
-          code: 'shell_failed',
-          command: command,
-          stdoutPreview: stdout,
-          stderrPreview: stderr,
-          files: files,
-          filesTruncated: filesTruncated,
-        ),
+      final offload = await ToolOutputOffloader.maybeOffload(
+        toolCallId: toolCallId,
+        stdout: stdout,
+        stderr: stderr,
+        outputsDir: ctx.outputsDir,
       );
-    }
+      final payload = _shellPayload(offload.modelText);
+      payload['exit_code'] = exited.exitCode;
+      payload['duration_ms'] = exited.duration.inMilliseconds;
+      payload['timed_out'] = exited.timedOut;
+      payload['cancelled'] = exited.cancelled;
+      payload['interrupted'] = exited.interrupted;
+      if (run.stdoutTruncated || run.stderrTruncated) {
+        payload['truncated'] = true;
+      }
+      if (files.isNotEmpty) {
+        payload['changed_files'] = [for (final file in files) file.path];
+      }
+      if (filesTruncated) payload['changed_files_truncated'] = true;
+      if (offload.offloadHostPath != null) {
+        final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
+        payload['output_file'] = outputFile;
+        payload['truncated'] = true;
+        final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
+        files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
+      }
 
-    final offload = await ToolOutputOffloader.maybeOffload(
-      toolCallId: toolCallId,
-      stdout: stdout,
-      stderr: stderr,
-      outputsDir: ctx.outputsDir,
-    );
-    final payload = _shellPayload(offload.modelText);
-    payload['exit_code'] = exited.exitCode;
-    payload['duration_ms'] = exited.duration.inMilliseconds;
-    payload['timed_out'] = exited.timedOut;
-    payload['cancelled'] = exited.cancelled;
-    payload['interrupted'] = exited.interrupted;
-    if (run.stdoutTruncated || run.stderrTruncated) {
-      payload['truncated'] = true;
+      final metaStatus = exited.timedOut
+          ? 'timeout'
+          : exited.cancelled
+          ? 'cancelled'
+          : 'ok';
+      final meta = WorkspaceToolMetadata(
+        tool: tool,
+        status: metaStatus,
+        command: command,
+        exitCode: exited.exitCode,
+        durationMs: exited.duration.inMilliseconds,
+        timedOut: exited.timedOut,
+        cancelled: exited.cancelled,
+        interrupted: exited.interrupted,
+        stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
+        stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
+        files: files,
+        filesTruncated: filesTruncated,
+        truncated: payload['truncated'] == true,
+      );
+      await _markToolsUsed(
+        ctx,
+        conversationId: conversationId,
+        status: metaStatus,
+      );
+      return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
+    } finally {
+      // Model output and metadata now own immutable strings (or the offloaded
+      // file). Only now may the registry evict this completed execution.
+      run.finishHandoff();
     }
-    if (files.isNotEmpty) {
-      payload['changed_files'] = [for (final file in files) file.path];
-    }
-    if (filesTruncated) payload['changed_files_truncated'] = true;
-    if (offload.offloadHostPath != null) {
-      final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
-      payload['output_file'] = outputFile;
-      payload['truncated'] = true;
-      final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
-      files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
-    }
-
-    final metaStatus = exited.timedOut
-        ? 'timeout'
-        : exited.cancelled
-        ? 'cancelled'
-        : 'ok';
-    final meta = WorkspaceToolMetadata(
-      tool: tool,
-      status: metaStatus,
-      command: command,
-      exitCode: exited.exitCode,
-      durationMs: exited.duration.inMilliseconds,
-      timedOut: exited.timedOut,
-      cancelled: exited.cancelled,
-      interrupted: exited.interrupted,
-      stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
-      stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
-      files: files,
-      filesTruncated: filesTruncated,
-      truncated: payload['truncated'] == true,
-    );
-    await _markToolsUsed(
-      ctx,
-      conversationId: conversationId,
-      status: metaStatus,
-    );
-    return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
   }
 
   Future<String> _snapshotImage(ToolImage image) async {
@@ -1539,6 +1554,9 @@ class WorkspaceToolsService {
   static String _engineLine(WorkspaceToolContext ctx) {
     final status = ctx.runtimeStatus;
     if (!ctx.runtimeRegistered || status == null || !status.ready) {
+      if (status?.engine == 'process') {
+        return 'Native shell unavailable — ask the user to check Environment > Default shell.';
+      }
       return 'Sandbox environment not installed — `shell` will fail until the user installs it';
     }
     switch (status.engine) {

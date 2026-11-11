@@ -11,6 +11,7 @@ class InlineCodeCapsule extends StatelessWidget {
     required this.style,
     required this.backgroundColor,
     required this.borderColor,
+    this.textSpan,
     this.padding = const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
     this.border,
     this.radius = 6,
@@ -18,6 +19,7 @@ class InlineCodeCapsule extends StatelessWidget {
   });
 
   final String text;
+  final TextSpan? textSpan;
   final TextStyle style;
   final Color backgroundColor;
   final Color borderColor;
@@ -44,8 +46,8 @@ class InlineCodeCapsule extends StatelessWidget {
       ),
       child: Padding(
         padding: padding,
-        child: Text(
-          text,
+        child: Text.rich(
+          textSpan ?? TextSpan(text: text),
           style: style,
           textHeightBehavior: const TextHeightBehavior(
             leadingDistribution: TextLeadingDistribution.even,

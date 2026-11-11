@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-/// Stable tool-facing failures. Native exception text stays out of the wire
-/// contract; recovery advice must never suggest repeating an unknown mutation.
+/// Stable tool-facing failures with optional native navigation diagnostics.
+/// Recovery advice must never suggest repeating an unknown mutation.
 class BrowserFailure implements Exception {
   const BrowserFailure(
     this.code,
@@ -10,9 +10,11 @@ class BrowserFailure implements Exception {
     this.nextAction, {
     this.recoverable = true,
     this.outcomeUnknown = false,
+    this.details,
   });
   final String code, message, nextAction;
   final bool recoverable, outcomeUnknown;
+  final Map<String, Object?>? details;
 
   static BrowserFailure loadTimeout(String stage) => BrowserFailure(
     'browser_load_timeout',
@@ -58,11 +60,22 @@ class BrowserFailure implements Exception {
       r'(browser_[a-z_]+|stale_ref|element_[a-z_]+|input_[a-z_]+|option_[a-z_]+|ambiguous_[a-z_]+|snapshot_budget_too_small|coordinates_outside_viewport)',
     ).firstMatch(raw)?.group(0);
     return switch (code) {
+      'browser_storage_bridge_unsupported' => const BrowserFailure(
+        'browser_storage_bridge_unsupported',
+        'This WebView cannot safely run a persistent workspace app.',
+        'Update Android System WebView or Microsoft Edge WebView2 Runtime to 152 or later before opening .app.html pages.',
+        recoverable: false,
+      ),
       'browser_agent_disabled' => const BrowserFailure(
         'browser_agent_disabled',
         'Browser control is disabled.',
         'Ask the user to enable browser control.',
         recoverable: false,
+      ),
+      'browser_settings_updating' => const BrowserFailure(
+        'browser_settings_updating',
+        'Browser settings are being applied.',
+        'Wait for the settings update to finish, then inspect the page before continuing.',
       ),
       'browser_human_control' => const BrowserFailure(
         'browser_human_control',
@@ -114,8 +127,8 @@ class BrowserFailure implements Exception {
       final String value when value.startsWith('browser_workspace') =>
         BrowserFailure(
           value,
-          'The requested workspace file is unavailable or outside the current binding.',
-          'Use a PNG path inside the conversation’s bound workspace; do not use absolute paths or overwrite existing files.',
+          'The requested local file is unavailable or outside the current binding.',
+          'Check the conversation’s workspace or session file URL. Screenshot outputs must use a new workspace-relative PNG path.',
         ),
       'browser_tab_owner_changed' => const BrowserFailure(
         'browser_tab_owner_changed',
@@ -141,6 +154,7 @@ class BrowserFailure implements Exception {
     'recoverable': recoverable,
     'outcome_unknown': outcomeUnknown,
     'next_action': nextAction,
+    if (details != null) 'details': details,
   };
 
   @override

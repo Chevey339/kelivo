@@ -6,6 +6,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
@@ -102,13 +103,17 @@ class _BackupScopeEditor extends StatefulWidget {
 }
 
 class _BackupScopeEditorState extends State<_BackupScopeEditor> {
+  static const _contentCategories = [
+    BackupCategory.chats,
+    BackupCategory.files,
+  ];
+
   late BackupScope _scope = widget.scope;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final showDividers = showSheetTileDividers(context);
     final body = SafeArea(
       top: false,
       child: Column(
@@ -142,17 +147,11 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
                     ),
                   ),
                 ),
-                TextButton(
+                IosTextButton(
                   key: const ValueKey('backup-scope-save'),
+                  label: l10n.backupPageSave,
+                  fontSize: 15,
                   onPressed: () => Navigator.of(context).pop(_scope),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(56, 44),
-                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontSize: 15,
-                      fontWeight: AppFontWeights.semibold,
-                    ),
-                  ),
-                  child: Text(l10n.backupPageSave),
                 ),
                 IosIconButton(
                   key: const ValueKey('backup-scope-cancel'),
@@ -201,20 +200,18 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
                           child: Wrap(
                             alignment: WrapAlignment.end,
                             children: [
-                              TextButton(
+                              IosTextButton(
+                                label: l10n.sideDrawerSelectionSelectAll,
                                 onPressed: () => setState(
                                   () => _scope = const BackupScope(),
                                 ),
-                                child: Text(l10n.sideDrawerSelectionSelectAll),
                               ),
-                              TextButton(
+                              IosTextButton(
+                                label: l10n.sideDrawerSelectionDeselectAll,
                                 onPressed: () => setState(
                                   () => _scope = BackupScope(
                                     excluded: BackupCategory.values.toSet(),
                                   ),
-                                ),
-                                child: Text(
-                                  l10n.sideDrawerSelectionDeselectAll,
                                 ),
                               ),
                             ],
@@ -223,68 +220,25 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
                       ],
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: sheetTileColor(context),
-                      borderRadius: BorderRadius.circular(14),
+                  _buildCategoryGroup(context, _contentCategories),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 8, 4, 16),
+                    child: Text(
+                      l10n.backupPageFilesDescription,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        for (final category in BackupCategory.values) ...[
-                          if (showDividers &&
-                              category != BackupCategory.values.first)
-                            Divider(
-                              height: 0.5,
-                              thickness: 0.5,
-                              indent: 46,
-                              endIndent: 12,
-                              color: cs.outlineVariant.withValues(alpha: 0.18),
-                            ),
-                          IosCardPress(
-                            onTap: () => setState(
-                              () => _scope = _scope.withCategory(
-                                category,
-                                !_scope.includes(category),
-                              ),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 2,
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  category.icon,
-                                  size: 20,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Text(
-                                    category.label(l10n),
-                                    style: const TextStyle(fontSize: 15),
-                                  ),
-                                ),
-                                IosSwitch(
-                                  key: ValueKey(
-                                    'backup-scope-${category.name}',
-                                  ),
-                                  semanticLabel: category.label(l10n),
-                                  value: _scope.includes(category),
-                                  onChanged: (value) => setState(
-                                    () => _scope = _scope.withCategory(
-                                      category,
-                                      value,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                  ),
+                  _buildCategoryGroup(
+                    context,
+                    BackupCategory.values
+                        .where(
+                          (category) => !_contentCategories.contains(category),
+                        )
+                        .toList(),
                   ),
                 ],
               ),
@@ -306,6 +260,72 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
           maxHeight: MediaQuery.sizeOf(context).height * 0.85,
         ),
         child: body,
+      ),
+    );
+  }
+
+  Widget _buildCategoryGroup(
+    BuildContext context,
+    List<BackupCategory> categories,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final showDividers = showSheetTileDividers(context);
+    return SectionCard(
+      radius: 14,
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (final category in categories) ...[
+            if (showDividers && category != categories.first)
+              Divider(
+                height: 0.5,
+                thickness: 0.5,
+                indent: 50,
+                endIndent: 14,
+                color: cs.outlineVariant.withValues(alpha: 0.18),
+              ),
+            IosCardPress(
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.zero,
+              onTap: () => setState(
+                () => _scope = _scope.withCategory(
+                  category,
+                  !_scope.includes(category),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    child: Icon(
+                      category.icon,
+                      size: 20,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      category.label(l10n),
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IosSwitch(
+                    key: ValueKey('backup-scope-${category.name}'),
+                    semanticLabel: category.label(l10n),
+                    value: _scope.includes(category),
+                    onChanged: (value) => setState(
+                      () => _scope = _scope.withCategory(category, value),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

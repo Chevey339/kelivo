@@ -1,5 +1,8 @@
+import 'package:Kelivo/core/models/conversation_mcp_settings.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +24,77 @@ import '../../../support/business_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'image recall checks the current switch during an existing request',
+    (tester) async {
+      final chat = _RecallChat();
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final mcpProvider = McpProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final toolSvc = McpToolService();
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      addTearDown(chat.dispose);
+      addTearDown(assistants.dispose);
+      addTearDown(mcpProvider.dispose);
+      addTearDown(toolSvc.dispose);
+      addTearDown(settings.dispose);
+      await settings.loaded;
+      await assistants.loaded;
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+            ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+            ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
+            ChangeNotifierProvider<McpToolService>.value(value: toolSvc),
+          ],
+          child: const SizedBox.shrink(),
+        ),
+      );
+      final handler = ToolHandlerService(
+        contextProvider: tester.element(find.byType(SizedBox)),
+      ).buildToolCallHandler(settings, null, conversationId: 'chat')!;
+      final context = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [
+          ChatContextImage(
+            identity: const ContextImageIdentity('u', 'part:0'),
+            uri: 'data:image/png;base64,YWJj',
+            source: ContextImageSource.user,
+            label: 'image',
+          ),
+        ],
+      );
+      await tester.runAsync(
+        () => context.run(() async* {
+          final before = ClientToolResult.fromHandler(
+            await handler('read_chat_image', {}),
+          );
+          expect(before.content, contains('"images"'));
+          await chat.setImageContextSettings(
+            'chat',
+            const ImageContextSettings(allowRecall: false),
+          );
+          for (final args in [
+            <String, dynamic>{},
+            {'image_id': context.images.single.handle},
+          ]) {
+            final result = ClientToolResult.fromHandler(
+              await handler('read_chat_image', args),
+            );
+            expect(result.content, contains('disabled'));
+            expect(result.content, isNot(contains('read_chat_image')));
+            expect(result.metadata, isNull);
+          }
+          yield 0;
+        }).drain<void>(),
+      );
+    },
+  );
 
   group('ToolHandlerService tool schema sanitization', () {
     for (final kind in const [ProviderKind.openai, ProviderKind.claude]) {
@@ -342,123 +416,150 @@ void main() {
   });
 
   group('ToolHandlerService MCP approval identity', () {
-    for (final full in [false, true]) {
-      testWidgets('MCP approval uses the conversation mode (full: $full)', (
-        tester,
-      ) async {
-        final mcpProvider = _RecordingMcpProvider([
-          McpServerConfig(
-            id: 'srv-id',
-            enabled: true,
-            name: 'Test MCP',
-            transport: McpTransportType.http,
-            tools: [
-              McpToolConfig(enabled: true, name: 'echo', needsApproval: true),
-            ],
-          ),
-        ]);
-        final assistants = AssistantProvider(
-          preferences: createBusinessTestPreferences(),
-        );
-        final toolSvc = McpToolService();
-        final settings = SettingsProvider(createBusinessTestPreferences());
-        final approval = ToolApprovalService();
-        addTearDown(mcpProvider.dispose);
-        addTearDown(assistants.dispose);
-        addTearDown(toolSvc.dispose);
-        addTearDown(settings.dispose);
-        addTearDown(approval.dispose);
+    for (final (full, customMcp) in [
+      (false, false),
+      (true, false),
+      (false, true),
+      (true, true),
+    ]) {
+      testWidgets(
+        'MCP approval and revocation use conversation scope (full: $full, custom: $customMcp)',
+        (tester) async {
+          final mcpProvider = _RecordingMcpProvider([
+            McpServerConfig(
+              id: 'srv-id',
+              enabled: true,
+              name: 'Test MCP',
+              transport: McpTransportType.http,
+              tools: [
+                McpToolConfig(enabled: true, name: 'echo', needsApproval: true),
+              ],
+            ),
+          ]);
+          final assistants = AssistantProvider(
+            preferences: createBusinessTestPreferences(),
+          );
+          final toolSvc = McpToolService();
+          final settings = SettingsProvider(createBusinessTestPreferences());
+          final approval = ToolApprovalService();
+          addTearDown(mcpProvider.dispose);
+          addTearDown(assistants.dispose);
+          addTearDown(toolSvc.dispose);
+          addTearDown(settings.dispose);
+          addTearDown(approval.dispose);
 
-        await assistants.loaded;
-        await settings.loaded;
-        final assistantId = await assistants.addAssistant(name: 'Test');
-        await assistants.updateAssistant(
-          assistants
-              .getById(assistantId)!
-              .copyWith(mcpServerIds: const ['srv-id']),
-        );
+          await assistants.loaded;
+          await settings.loaded;
+          final assistantId = await assistants.addAssistant(name: 'Test');
+          await assistants.updateAssistant(
+            assistants
+                .getById(assistantId)!
+                .copyWith(
+                  mcpServerIds: customMcp ? const [] : const ['srv-id'],
+                  allowConversationMcp: customMcp,
+                ),
+          );
 
-        final chat = _PermissionChat(
-          Conversation(
-            id: 'conv-1',
-            title: 'Chat',
-            assistantId: assistantId,
-            extras:
-                (full
-                        ? ToolPermissionMode.fullAccess
-                        : ToolPermissionMode.requestApproval)
-                    .applyTo({}),
-          ),
-        );
-        addTearDown(chat.dispose);
-        await tester.pumpWidget(
-          MultiProvider(
-            providers: [
-              ChangeNotifierProvider<ChatService>.value(value: chat),
-              ChangeNotifierProvider<AssistantProvider>.value(
-                value: assistants,
-              ),
-              ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
-              ChangeNotifierProvider<McpToolService>.value(value: toolSvc),
-            ],
-            child: const SizedBox.shrink(),
-          ),
-        );
+          final chat = _PermissionChat(
+            Conversation(
+              id: 'conv-1',
+              title: 'Chat',
+              assistantId: assistantId,
+              mcpServerIds: customMcp ? const ['srv-id'] : const [],
+              extras:
+                  (full
+                          ? ToolPermissionMode.fullAccess
+                          : ToolPermissionMode.requestApproval)
+                      .applyTo({
+                        if (customMcp)
+                          ConversationMcpSettings.overrideKey: true,
+                      }),
+            ),
+          );
+          addTearDown(chat.dispose);
+          await tester.pumpWidget(
+            MultiProvider(
+              providers: [
+                ChangeNotifierProvider<ChatService>.value(value: chat),
+                ChangeNotifierProvider<AssistantProvider>.value(
+                  value: assistants,
+                ),
+                ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
+                ChangeNotifierProvider<McpToolService>.value(value: toolSvc),
+              ],
+              child: const SizedBox.shrink(),
+            ),
+          );
 
-        final service = ToolHandlerService(
-          contextProvider: tester.element(find.byType(SizedBox)),
-        );
-        final handler = service.buildToolCallHandler(
-          settings,
-          assistants.getById(assistantId),
-          approvalService: approval,
-          conversationId: 'conv-1',
-        );
-        expect(handler, isNotNull);
+          final service = ToolHandlerService(
+            contextProvider: tester.element(find.byType(SizedBox)),
+          );
+          final snapshot = service.captureMcpToolRoutes(
+            assistants.getById(assistantId),
+            conversationId: 'conv-1',
+          );
+          expect(snapshot.containsExposedName('echo'), isTrue);
+          final handler = service.buildToolCallHandler(
+            settings,
+            assistants.getById(assistantId),
+            approvalService: approval,
+            conversationId: 'conv-1',
+            mcpRouteSnapshot: snapshot,
+          );
+          expect(handler, isNotNull);
 
-        final future = handler!('echo', <String, dynamic>{
-          'city': 'Seattle',
-        }, toolCallId: 'provider-call-99');
-        await tester.pump();
-
-        final pending = approval.pendingFor(
-          toolCallId: 'provider-call-99',
-          conversationId: 'conv-1',
-        );
-        if (!full) {
-          expect(pending, isNotNull);
-          expect(pending!.toolName, 'echo');
-          expect(pending.conversationId, 'conv-1');
-          expect(mcpProvider.calls, isEmpty);
-
-          approval.approve('provider-call-99', conversationId: 'conv-1');
-        } else {
-          expect(pending, isNull);
-        }
-        final result = ClientToolResult.fromHandler(await future);
-        expect(result.content, 'srv-id:echo');
-        expect(
-          result.metadata?['toolPermission'],
-          full ? 'fullAccess' : isNull,
-        );
-        expect(mcpProvider.calls, [(serverId: 'srv-id', toolName: 'echo')]);
-        Future<Object?> blocked;
-        if (full) {
-          mcpProvider._servers.clear();
-          blocked = handler('echo', {}, toolCallId: 'disabled');
-        } else {
-          blocked = handler('echo', {}, toolCallId: 'disabled');
+          final future = handler!('echo', <String, dynamic>{
+            'city': 'Seattle',
+          }, toolCallId: 'provider-call-99');
           await tester.pump();
-          expect(approval.hasPending, isTrue);
-          mcpProvider._servers.clear();
-          approval.approve('disabled', conversationId: 'conv-1');
-        }
-        final denied = ClientToolResult.fromHandler(await blocked);
-        expect(denied.metadata?['toolPermissionError'], 'tool_disabled');
-        expect(denied.metadata?['toolPermission'], isNull);
-        expect(mcpProvider.calls, hasLength(1));
-        expect(approval.hasPending, isFalse);
-      });
+
+          final pending = approval.pendingFor(
+            toolCallId: 'provider-call-99',
+            conversationId: 'conv-1',
+          );
+          if (!full) {
+            expect(pending, isNotNull);
+            expect(pending!.toolName, 'echo');
+            expect(pending.conversationId, 'conv-1');
+            expect(mcpProvider.calls, isEmpty);
+
+            approval.approve('provider-call-99', conversationId: 'conv-1');
+          } else {
+            expect(pending, isNull);
+          }
+          final result = ClientToolResult.fromHandler(await future);
+          expect(result.content, 'srv-id:echo');
+          expect(
+            result.metadata?['toolPermission'],
+            full ? 'fullAccess' : isNull,
+          );
+          expect(mcpProvider.calls, [(serverId: 'srv-id', toolName: 'echo')]);
+          Future<Object?> blocked;
+          if (full) {
+            if (customMcp) {
+              chat.conversation = chat.conversation.copyWith(mcpServerIds: []);
+            } else {
+              mcpProvider._servers.clear();
+            }
+            blocked = handler('echo', {}, toolCallId: 'disabled');
+          } else {
+            blocked = handler('echo', {}, toolCallId: 'disabled');
+            await tester.pump();
+            expect(approval.hasPending, isTrue);
+            if (customMcp) {
+              chat.conversation = chat.conversation.copyWith(mcpServerIds: []);
+            } else {
+              mcpProvider._servers.clear();
+            }
+            approval.approve('disabled', conversationId: 'conv-1');
+          }
+          final denied = ClientToolResult.fromHandler(await blocked);
+          expect(denied.metadata?['toolPermissionError'], 'tool_disabled');
+          expect(denied.metadata?['toolPermission'], isNull);
+          expect(mcpProvider.calls, hasLength(1));
+          expect(approval.hasPending, isFalse);
+        },
+      );
     }
   });
 
@@ -574,6 +675,7 @@ class _StubMcpToolService extends McpToolService {
     McpProvider mcpProvider,
     AssistantProvider assistants,
     String? assistantId, {
+    Conversation? conversation,
     McpToolRouteSnapshot? routeSnapshot,
     Set<String> reservedNames = const {},
   }) {
@@ -583,8 +685,13 @@ class _StubMcpToolService extends McpToolService {
 
 class _PermissionChat extends ChatService {
   _PermissionChat(this.conversation);
-  final Conversation conversation;
+  Conversation conversation;
   @override
   Conversation? getConversation(String id) =>
       id == conversation.id ? conversation : null;
+}
+
+class _RecallChat extends ChatService {
+  @override
+  bool isTemporaryConversation(String? id) => true;
 }

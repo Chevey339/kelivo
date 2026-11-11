@@ -1,56 +1,78 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/backup/backup_encryption.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../../../shared/widgets/form_sheet.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
 import '../../../shared/widgets/ios_switch.dart';
 
-/// Passwords live only in the owning page's state, never in backed-up settings.
+/// The saved preference is independent of the in-memory session password.
 class BackupEncryptionTile extends StatelessWidget {
   const BackupEncryptionTile({
     super.key,
-    required this.password,
+    required this.enabled,
     required this.onChanged,
   });
 
-  final String? password;
-  final ValueChanged<String?>? onChanged;
+  final bool enabled;
+  final Future<void> Function(String?)? onChanged;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     Future<void> change(bool enabled) async {
       if (onChanged == null) return;
-      if (!enabled) {
-        onChanged!(null);
-        return;
+      try {
+        if (!enabled) {
+          await onChanged!(null);
+          return;
+        }
+        final value = await showBackupPasswordDialog(context, creating: true);
+        if (context.mounted && value != null) await onChanged!(value);
+      } catch (error) {
+        if (context.mounted) {
+          showAppSnackBar(
+            context,
+            message: error.toString(),
+            type: NotificationType.error,
+          );
+        }
       }
-      final value = await showBackupPasswordDialog(context, creating: true);
-      if (context.mounted && value != null) onChanged!(value);
     }
 
     return IosNavRow(
       icon: Lucide.Lock,
       label: l10n.backupEncryptionTitle,
-      subtitle: password == null
+      subtitle: !enabled
           ? l10n.backupEncryptionOffHint
           : l10n.backupEncryptionOnHint,
       subtitleMaxLines: null,
-      onTap: onChanged == null ? null : () => change(password == null),
+      onTap: onChanged == null ? null : () => change(!enabled),
       trailing: IosSwitch(
         key: const ValueKey('backup-encryption-switch'),
         semanticLabel: l10n.backupEncryptionTitle,
-        value: password != null,
+        value: enabled,
         onChanged: onChanged == null ? null : change,
       ),
     );
   }
+}
+
+Future<String?> backupPasswordForExport(BuildContext context) {
+  return context.read<SettingsProvider>().resolveBackupEncryptionPassword(
+    () async {
+      if (!context.mounted) return null;
+      return showBackupPasswordDialog(context, creating: true);
+    },
+  );
 }
 
 BackupPasswordPrompt backupPasswordPrompt(BuildContext context) {

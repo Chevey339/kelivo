@@ -306,7 +306,7 @@ void main() {
         messageId: original.id,
         content: 'regenerated hidden answer',
       );
-      await service.toggleTruncateAtTail(conversation.id);
+      await service.clearConversationContext(conversation.id);
       await service.addMessage(
         conversationId: conversation.id,
         role: 'user',

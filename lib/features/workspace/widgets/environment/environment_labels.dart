@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
@@ -356,19 +354,6 @@ double? workspaceEnvProgressFraction(EnvironmentState state) {
 
 String workspaceEnvMb(int bytes) {
   return (bytes / (1024 * 1024)).toStringAsFixed(1);
-}
-
-String workspaceEnvNativeShellPath() {
-  if (defaultTargetPlatform == TargetPlatform.windows) {
-    final shell = Platform.environment['SHELL'];
-    if (shell != null && shell.isNotEmpty) return shell;
-    final comspec = Platform.environment['COMSPEC'];
-    if (comspec != null && comspec.isNotEmpty) return comspec;
-    return 'PowerShell';
-  }
-  final shell = Platform.environment['SHELL'];
-  if (shell != null && shell.isNotEmpty) return shell;
-  return '/bin/sh';
 }
 
 List<MirrorProbe> workspaceEnvSortedProbes(List<MirrorProbe> probes) {

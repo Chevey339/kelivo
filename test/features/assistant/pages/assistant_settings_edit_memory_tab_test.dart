@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/memory_entry.dart';
 import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider.dart';
@@ -25,6 +26,7 @@ import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dar
 import 'package:Kelivo/features/settings/pages/memory_settings_page.dart';
 import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
 import 'package:Kelivo/shared/widgets/tip_icon.dart';
+import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -125,12 +127,16 @@ Widget _buildHarness({
   required MemoryProviderV2 memoryV2,
   required MemoryPipelineService pipeline,
   required Widget child,
+  SettingsProvider? settings,
 }) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(
-        create: (_) => SettingsProvider(assistantProvider.preferences),
-      ),
+      if (settings != null)
+        ChangeNotifierProvider.value(value: settings)
+      else
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(assistantProvider.preferences),
+        ),
       ChangeNotifierProvider.value(value: assistantProvider),
       ChangeNotifierProvider.value(value: chatService),
       ChangeNotifierProvider(
@@ -184,6 +190,156 @@ Future<void> _tapSwitchNearLabel(WidgetTester tester, String label) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'full injection choices belong to the edited assistant (desktop=$desktop)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = desktop
+            ? TargetPlatform.macOS
+            : TargetPlatform.iOS;
+        try {
+          tester.view.physicalSize = desktop
+              ? const Size(1100, 900)
+              : const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
+          final settings = SettingsProvider(ap.preferences);
+          addTearDown(settings.dispose);
+          await settings.loaded;
+          // Start on the tab under test, without laying out basic settings.
+          await settings.setMobileAssistantEditTabOrder(['memory']);
+          final otherId = await ap.addAssistant(name: 'Other');
+          for (final id in [_assistantId, otherId]) {
+            await ap.updateAssistant(
+              ap.getById(id)!.copyWith(enableMemory: true),
+            );
+          }
+
+          Future<void> openAssistant(String id) async {
+            await tester.pumpWidget(
+              _buildHarness(
+                assistantProvider: ap,
+                chatService: chat,
+                memoryV2: memoryV2,
+                pipeline: pipeline,
+                settings: settings,
+                child: AssistantSettingsEditPage(
+                  key: ValueKey(id),
+                  assistantId: id,
+                ),
+              ),
+            );
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 350));
+            expect(
+              find.text('Use long-term memory').hitTestable(),
+              findsOneWidget,
+            );
+          }
+
+          await openAssistant(_assistantId);
+          final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+          Finder checkbox(String label) => find.byWidgetPredicate(
+            (widget) => widget is IosCheckbox && widget.semanticLabel == label,
+          );
+          final voice = checkbox(l10n.memoryEntryTypeVoice);
+          final instruction = checkbox(l10n.memoryEntryTypeInstruction);
+          Future<void> openPicker() async {
+            final row = find.text(
+              l10n.assistantEditMemoryFullInjectionTypesTitle,
+            );
+            await tester.ensureVisible(row);
+            await tester.tap(row);
+            await tester.pumpAndSettle();
+            expect(
+              find.byType(Dialog),
+              desktop ? findsOneWidget : findsNothing,
+            );
+            expect(
+              find.byType(BottomSheet),
+              desktop ? findsNothing : findsOneWidget,
+            );
+          }
+
+          Future<void> toggle(Finder target) async {
+            await tester.ensureVisible(target);
+            await tester.tap(target);
+            await tester.pumpAndSettle();
+          }
+
+          Future<void> save() async {
+            await tester.tap(find.text(l10n.userProfileSave));
+            await tester.pumpAndSettle();
+          }
+
+          expect(find.byType(MemorySelectChip), findsNothing);
+          expect(
+            find.text(l10n.assistantEditMemoryFullInjectionTypesNone),
+            findsOneWidget,
+          );
+          await openPicker();
+          expect(tester.widget<IosCheckbox>(voice).value, isFalse);
+          await toggle(voice);
+          expect(ap.getById(_assistantId)!.memoryFullInjectionTypes, isEmpty);
+          await tester.tap(find.text(l10n.homePageCancel));
+          await tester.pumpAndSettle();
+          await openPicker();
+          expect(tester.widget<IosCheckbox>(voice).value, isFalse);
+          await toggle(voice);
+          await toggle(instruction);
+          await save();
+          expect(ap.getById(_assistantId)!.memoryFullInjectionTypes, {
+            MemoryType.voice,
+            MemoryType.instruction,
+          });
+          expect(ap.getById(otherId)!.memoryFullInjectionTypes, isEmpty);
+          expect(
+            find.text(l10n.assistantEditMemoryFullInjectionTypesSelected(2)),
+            findsOneWidget,
+          );
+
+          await openAssistant(otherId);
+          await openPicker();
+          expect(tester.widget<IosCheckbox>(voice).value, isFalse);
+          expect(tester.widget<IosCheckbox>(instruction).value, isFalse);
+          await toggle(voice);
+          await save();
+          expect(ap.getById(otherId)!.memoryFullInjectionTypes, {
+            MemoryType.voice,
+          });
+          expect(find.text(l10n.memoryEntryTypeVoice), findsOneWidget);
+
+          await openAssistant(_assistantId);
+          await openPicker();
+          expect(tester.widget<IosCheckbox>(voice).value, isTrue);
+          expect(tester.widget<IosCheckbox>(instruction).value, isTrue);
+          await toggle(voice);
+          await toggle(instruction);
+          await save();
+          await ap.preferences.flushPendingWrites();
+          final saved = Assistant.decodeList(
+            ap.preferences.getString('assistants_v1')!,
+          );
+          expect(
+            saved
+                .firstWhere((a) => a.id == _assistantId)
+                .memoryFullInjectionTypes,
+            isEmpty,
+          );
+          expect(
+            saved.firstWhere((a) => a.id == otherId).memoryFullInjectionTypes,
+            {MemoryType.voice},
+          );
+          expect(tester.takeException(), isNull);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
 
   testWidgets('memory tab switches persist and reveal nested rows', (
     tester,

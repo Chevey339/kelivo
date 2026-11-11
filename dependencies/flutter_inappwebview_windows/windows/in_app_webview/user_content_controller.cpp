@@ -6,6 +6,7 @@
 #include "../utils/vector.h"
 #include "in_app_webview.h"
 #include "user_content_controller.h"
+#include "workspace_bridge_message.h"
 
 namespace flutter_inappwebview_plugin
 {
@@ -49,7 +50,7 @@ namespace flutter_inappwebview_plugin
       const int id = context["id"].get<int>();
       const bool isDefault = aux.contains("isDefault") && aux["isDefault"] == true;
       const auto name = isDefault ? ContentWorld::page()->name : context.value("name", std::string());
-      executionContexts_.insert_or_assign(id, ExecutionContext{ context["uniqueId"], aux["frameId"] });
+      executionContexts_.insert_or_assign(id, ExecutionContext{ context["uniqueId"], aux["frameId"], context.value("origin", std::string()) });
       if (aux["frameId"] == webView_->pageFrameId()) {
         contentWorlds_.insert_or_assign(name, id);
         if (!isDefault) addPluginScriptsIfRequired(std::make_shared<ContentWorld>(name));
@@ -117,7 +118,16 @@ namespace flutter_inappwebview_plugin
       callback->error = [reply](const std::string& code, const std::string& message, const flutter::EncodableValue*) {
         reply(code + ", " + message, true);
       };
-      webView_->channelDelegate->onCallJsHandler(body["handlerName"].get<std::string>(), body["args"].get<std::string>(), std::move(callback));
+      const auto handlerName = body["handlerName"].get<std::string>();
+      const auto arguments = body["args"].get<std::string>();
+      if (handlerName == "kelivoWorkspaceStorage") {
+        if (!workspaceBridgeAllowed(context->second.origin,
+          context->second.frameId, webView_->pageFrameId(), arguments.size())) return;
+      }
+      // Metadata travels separately from the caller's JSON. Dart stamps the
+      // envelope after worker decoding; caller fields cannot replace it.
+      webView_->channelDelegate->onCallJsHandler(handlerName, arguments,
+        context->second.origin, true, std::move(callback));
     });
 
     initializeMethod(L"Runtime.enable", "{}", [this](const nlohmann::json&) {
@@ -394,8 +404,9 @@ namespace flutter_inappwebview_plugin
         {"worldName", worldName}
       };
       auto hr = webView_->webView->CallDevToolsProtocolMethod(L"Page.createIsolatedWorld", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-        [this, completionHandler, worldName](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+        [this, alive = alive_, completionHandler, worldName](HRESULT errorCode, LPCWSTR returnObjectAsJson)
         {
+          if (!*alive) return S_OK;
           if (succeededOrLog(errorCode) && completionHandler) {
             auto id = nlohmann::json::parse(wide_to_utf8(returnObjectAsJson))["executionContextId"].get<int>();
             addPluginScriptsIfRequired(std::make_shared<ContentWorld>(worldName));

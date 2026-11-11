@@ -7,6 +7,7 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/features/chat/widgets/viewport_block_list.dart';
 import 'package:Kelivo/features/browser/widgets/browser_page_card.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
@@ -17,6 +18,7 @@ import '../../../support/business_test_harness.dart';
 ToolCallPart browserPart(
   String id, {
   bool loading = false,
+  bool failed = false,
   String? image,
 }) => ToolCallPart(
   jsonEncode({
@@ -26,7 +28,8 @@ ToolCallPart browserPart(
     if (!loading)
       'content':
           '${jsonEncode({
-            'ok': true,
+            'ok': !failed,
+            if (failed) 'error': 'This browser action failed',
             'page': {'tab_id': 'tab-1', 'url': 'https://example.com', 'title': 'Page $id'},
           })}${image == null ? '' : '\n![]($image)'}',
   }),
@@ -116,6 +119,62 @@ void main() {
     expect(tester.getSize(find.byType(BrowserPageCard).first).height, 36);
     expect(find.byKey(const ValueKey('browser-actions-toggle')), findsNothing);
   });
+
+  for (final missingIds in [false, true]) {
+    testWidgets(
+      missingIds
+          ? 'empty-id browser groups restore their own measured heights'
+          : 'folded browser groups restore measured heights on the first frame',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 20000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.runAsync(() => settings.setCollapseThinkingSteps(false));
+        await pump(tester, [
+          for (var i = 0; i < 50; i++)
+            browserPart(missingIds ? '' : 'short-$i'),
+          const ReasoningPart('Check another page'),
+          for (var i = 0; i < 50; i++)
+            browserPart(missingIds ? '' : 'tall-$i', failed: true),
+        ]);
+        await tester.pumpAndSettle();
+
+        final firstHeader = find
+            .byKey(
+              ValueKey('browser-group-header-${missingIds ? '' : 'short-0'}'),
+            )
+            .first;
+        await tester.tap(firstHeader);
+        await tester.pumpAndSettle();
+        for (var i = 0; i < 2; i++) {
+          await tester.tap(find.text('45 earlier steps').first);
+          await tester.pumpAndSettle();
+        }
+        final lists = find.byWidgetPredicate(
+          (widget) => widget is ViewportBlockList && widget.itemCount == 50,
+        );
+        expect(lists, findsNWidgets(2));
+        final firstHeight = tester.getSize(lists.first).height;
+        expect(firstHeight, lessThan(tester.getSize(lists.last).height));
+
+        // Folding destroys the first group's virtual list. Reopening it must use
+        // its own measurements on the first frame, before rows can remeasure.
+        await tester.tap(firstHeader);
+        await tester.pumpAndSettle();
+        expect(lists, findsOneWidget);
+        await tester.tap(firstHeader);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('45 earlier steps'));
+        await tester.pump();
+        expect(lists, findsNWidgets(2));
+        expect(tester.getSize(lists.first).height, closeTo(firstHeight, .5));
+        await tester.pumpAndSettle();
+        expect(tester.getSize(lists.first).height, closeTo(firstHeight, .5));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('pending browser approval stays separate and actionable', (
     tester,
   ) async {

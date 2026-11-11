@@ -87,7 +87,7 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
   OverlayEntry? _renderOverlayEntry;
   bool _renderQueued = false;
   bool _renderingBitmap = false;
-  String? _renderKey;
+  int _renderGeneration = 0;
   Uint8List? _lastRenderedBytes;
   Timer? _streamingRenderDebounce;
   bool _bitmapRenderingUnsupported = false;
@@ -171,11 +171,11 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: mermaidColors.fillBlock,
-        borderRadius: BorderRadius.circular(widget.theme.code.radius),
+        borderRadius: BorderRadius.circular(widget.theme.imageRadius),
       ),
       clipBehavior: Clip.antiAlias,
       foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(widget.theme.code.radius),
+        borderRadius: BorderRadius.circular(widget.theme.imageRadius),
         border: Border.all(color: mermaidColors.border),
       ),
       child: Column(
@@ -346,7 +346,7 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
         _renderQueued = false;
         _renderingBitmap = false;
         _removeRenderOverlay();
-        _renderKey = null;
+        _renderGeneration++;
       }
     }
     if (widget.code.trim().isEmpty) {
@@ -359,6 +359,7 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
 
   @override
   void dispose() {
+    _renderGeneration++;
     _streamingRenderDebounce?.cancel();
     _removeRenderOverlay();
     _vMermaidScrollController.dispose();
@@ -386,40 +387,58 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
   }) async {
     final code = widget.code;
     final cacheKey = _cacheKey(code, isDark, themeVars);
-    if (MermaidImageCache.get(cacheKey) != null) return;
     final renderOverride = debugMermaidBitmapRenderOverride;
     final overlay = renderOverride == null ? Overlay.maybeOf(context) : null;
     if (renderOverride == null && overlay == null) {
-      _markBitmapRenderingUnsupported(cacheKey);
+      _markBitmapRenderingUnsupported();
       return;
     }
+    final generation = ++_renderGeneration;
     setState(() {
-      _renderKey = cacheKey;
       _renderingBitmap = true;
     });
 
     MermaidBitmapRenderResult result = MermaidBitmapRenderResult.failed();
     try {
-      result = renderOverride == null
-          ? await _renderMermaidBitmapWithOverlay(
-              overlay!,
-              code,
-              isDark,
-              themeVars,
-            )
-          : await renderOverride(code, isDark, themeVars);
-      if (!mounted || _renderKey != cacheKey) return;
+      result = await renderDiagramSerially(() async {
+        // A queued block may have scrolled out of the tree or changed while
+        // another diagram was rendering. Do not create a WebView for it.
+        if (!mounted ||
+            generation != _renderGeneration ||
+            widget.code != code) {
+          return MermaidBitmapRenderResult.failed();
+        }
+        final cached = MermaidImageCache.get(cacheKey);
+        if (cached != null) return MermaidBitmapRenderResult.success(cached);
+        final rendered = renderOverride == null
+            ? await _renderMermaidBitmapWithOverlay(
+                overlay!,
+                code,
+                isDark,
+                themeVars,
+              )
+            : await renderOverride(code, isDark, themeVars);
+        final bytes = rendered.bytes;
+        if (rendered.status == MermaidBitmapRenderStatus.success &&
+            bytes != null &&
+            bytes.isNotEmpty) {
+          // Publish before releasing the slot so identical queued blocks reuse
+          // the result instead of constructing another native renderer.
+          MermaidImageCache.put(cacheKey, bytes);
+        }
+        return rendered;
+      });
+      if (!mounted || generation != _renderGeneration) return;
       final bytes = result.bytes;
       if (result.status == MermaidBitmapRenderStatus.success &&
           bytes != null &&
           bytes.isNotEmpty) {
-        MermaidImageCache.put(cacheKey, bytes);
         _failedBitmapRenderKeys.remove(cacheKey);
       }
     } catch (_) {
       // The existing failed-result state presents the localized error view.
     } finally {
-      if (mounted && _renderKey == cacheKey) {
+      if (mounted && generation == _renderGeneration) {
         _removeRenderOverlay();
         setState(() {
           if (result.status == MermaidBitmapRenderStatus.success &&
@@ -468,19 +487,23 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
     );
     overlay.insert(_renderOverlayEntry!);
 
-    return _captureMermaidBitmap(handle);
+    try {
+      return await _captureMermaidBitmap(handle);
+    } finally {
+      final hadOverlay = _renderOverlayEntry != null;
+      _removeRenderOverlay();
+      if (hadOverlay) await WidgetsBinding.instance.endOfFrame;
+    }
   }
 
-  void _markBitmapRenderingUnsupported(String cacheKey) {
+  void _markBitmapRenderingUnsupported() {
     if (!mounted) return;
     _streamingRenderDebounce?.cancel();
     _removeRenderOverlay();
     setState(() {
-      if (_renderKey == null || _renderKey == cacheKey) {
-        _renderKey = null;
-        _renderQueued = false;
-        _renderingBitmap = false;
-      }
+      _renderGeneration++;
+      _renderQueued = false;
+      _renderingBitmap = false;
       _bitmapRenderingUnsupported = true;
     });
   }
@@ -516,10 +539,10 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
     await Future<void>.delayed(const Duration(milliseconds: 120));
     for (var i = 0; i < 4; i++) {
       try {
-        final bytes = await exportBytes().timeout(
-          const Duration(milliseconds: 900),
-          onTimeout: () => null,
-        );
+        // The native bridge waits for Mermaid's render-complete event and
+        // bounds its own waits. Timing out here leaves an export in flight
+        // while the next retry replaces its result callback.
+        final bytes = await exportBytes();
         if (bytes != null && bytes.isNotEmpty) {
           return MermaidBitmapRenderResult.success(bytes);
         }
@@ -588,10 +611,12 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
   }
 
   void _removeRenderOverlay() {
-    try {
-      _renderOverlayEntry?.remove();
-    } catch (_) {}
+    final entry = _renderOverlayEntry;
     _renderOverlayEntry = null;
+    try {
+      entry?.remove();
+      entry?.dispose();
+    } catch (_) {}
   }
 
   Future<bool> _saveCachedMermaidPng(Uint8List bytes) async {

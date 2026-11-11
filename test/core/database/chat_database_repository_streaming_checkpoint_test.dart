@@ -77,6 +77,74 @@ void main() {
     });
 
     test(
+      'text checkpoints batch only dirty parts and retry rolled-back changes',
+      () async {
+        final tools = List.generate(
+          1000,
+          (i) => ToolCallPart(
+            jsonEncode({'id': 'tool-$i', 'name': 'shell', 'content': 'done'}),
+          ),
+        );
+        final snapshot = ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          conversationId: 'conversation',
+          isStreaming: true,
+          parts: [...tools, const TextPart('initial')],
+        );
+        await repository.updateStreamingCheckpoint(snapshot, const []);
+        final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+        try {
+          raw.execute('CREATE TABLE part_attempts (ordinal INTEGER)');
+          raw.execute(
+            "CREATE TRIGGER audit_parts BEFORE INSERT ON message_part_rows BEGIN INSERT INTO part_attempts VALUES (NEW.ordinal); END",
+          );
+          await repository.updateStreamingCheckpoint(
+            snapshot.copyWith(parts: [...tools, const TextPart('next')]),
+            const [],
+          );
+          expect(
+            raw
+                .select('SELECT ordinal FROM part_attempts')
+                .map((r) => r['ordinal']),
+            [1000],
+          );
+          raw.execute(
+            "CREATE TRIGGER fail_parts BEFORE INSERT ON message_part_rows WHEN NEW.payload = 'fail' BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END",
+          );
+          final changed = [...tools]
+            ..[2] = const ToolCallPart(
+              '{"id":"tool-2","content":"late result"}',
+            );
+          await expectLater(
+            repository.updateStreamingCheckpoint(
+              snapshot.copyWith(parts: [...changed, const TextPart('fail')]),
+              const [],
+            ),
+            throwsA(anything),
+          );
+          raw.execute('DROP TRIGGER fail_parts');
+          raw.execute('DELETE FROM part_attempts');
+          await repository.updateStreamingCheckpoint(
+            snapshot.copyWith(parts: [...changed, const TextPart('recovered')]),
+            const [],
+          );
+          expect(
+            raw
+                .select('SELECT ordinal FROM part_attempts')
+                .map((r) => r['ordinal']),
+            [2, 1000],
+          );
+          final stored = await repository.getMessage('streaming');
+          expect(stored!.parts[2], changed[2]);
+          expect(stored.content, 'recovered');
+        } finally {
+          raw.close();
+        }
+      },
+    );
+
+    test(
       'checkpoints preserve unchanged parts and remove only a truncated tail',
       () async {
         final snapshot = ChatMessage(
@@ -135,6 +203,31 @@ void main() {
         } finally {
           raw.close();
         }
+      },
+    );
+
+    test(
+      'late provider round metadata is compared with committed JSON',
+      () async {
+        final details = <dynamic>[
+          {'signature': 'pending'},
+        ];
+        final snapshot = ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          conversationId: 'conversation',
+          isStreaming: true,
+          parts: [
+            const TextPart('body'),
+            AssistantRoundEndPart(reasoningDetails: details),
+          ],
+        );
+        await repository.updateStreamingCheckpoint(snapshot, const []);
+        (details.single as Map)['signature'] = 'final';
+        await repository.updateStreamingCheckpoint(snapshot, const []);
+        final loaded = await repository.getMessage('streaming');
+        final round = loaded!.parts.whereType<AssistantRoundEndPart>().single;
+        expect((round.reasoningDetails!.single as Map)['signature'], 'final');
       },
     );
 

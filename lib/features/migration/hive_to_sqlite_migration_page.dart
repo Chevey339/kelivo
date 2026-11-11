@@ -1203,7 +1203,7 @@ class _ChecklistCard extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: items[i].state == _TaskState.active
                             ? AppFontWeights.semibold
-                            : FontWeight.w500,
+                            : AppFontWeights.medium,
                         color: items[i].state == _TaskState.active
                             ? cs.primary
                             : cs.onSurfaceVariant,

@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/storage/windows_data_directory.dart';
 import 'package:Kelivo/desktop/windows_paste_fix.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -199,6 +200,11 @@ void main() {
   }
 
   testWidgets('Windows 历史粘贴复用文本、长文本附件和图片入口', (tester) async {
+    await tester.runAsync(() async {
+      final storage = await WindowsDataDirectory.instance;
+      await storage.initialize();
+      addTearDown(storage.close);
+    });
     final nativeClipboardContext = MockMessageChannelContext()
       ..registerMockMethodCallHandler('ClipboardReader', (_) {
         throw PlatformException(code: 'unavailable-in-widget-test');
@@ -908,6 +914,63 @@ void main() {
     expect(submitted?.imagePaths.single, product.path);
     expect(await fileExists(tester, source), isTrue);
 
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('removing restored history images only changes the draft', (
+    tester,
+  ) async {
+    late List<File> sources;
+    await tester.runAsync(() async {
+      sources = [
+        await writeUserImage('history_first.png'),
+        await writeUserImage('history_second.png'),
+      ];
+    });
+    final controller = TextEditingController(text: 'history caption');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    var submissions = 0;
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (_) async {
+          submissions++;
+          return ChatInputSubmissionResult.sent;
+        },
+      ),
+    );
+    mediaController.restoreInput(
+      ChatInputData(
+        text: controller.text,
+        imagePaths: sources.map((file) => file.path).toList(),
+      ),
+    );
+    await tester.pump();
+
+    ChatInputData? changedDraft;
+    mediaController.onDraftChanged = () {
+      changedDraft = mediaController.snapshotInput(controller.text);
+    };
+    for (var remaining = 1; remaining >= 0; remaining--) {
+      await tester.tap(find.byKey(const ValueKey('chat-input-image-remove:0')));
+      await tester.pumpAndSettle();
+      expect(
+        changedDraft!.imagePaths,
+        sources.skip(2 - remaining).map((f) => f.path),
+      );
+      expect(controller.text, 'history caption');
+      expect(submissions, 0);
+      expect(tester.takeException(), isNull);
+      for (final source in sources) {
+        expect(await fileExists(tester, source), isTrue);
+      }
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     focusNode.dispose();
   });

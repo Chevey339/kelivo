@@ -12,6 +12,7 @@ class BrowserWindowChrome extends StatefulWidget {
     this.onShortcut,
     this.windowSpacing = true,
     this.shortcutsEnabled = true,
+    this.shortcutCommands,
     required this.child,
   });
 
@@ -19,6 +20,9 @@ class BrowserWindowChrome extends StatefulWidget {
   final ValueChanged<String>? onShortcut;
   final bool windowSpacing;
   final bool shortcutsEnabled;
+
+  /// Canonical commands to intercept while a native view owns focus.
+  final Set<String>? shortcutCommands;
   final Widget child;
 
   @override
@@ -30,6 +34,7 @@ class _BrowserWindowChromeState extends State<BrowserWindowChrome> {
   static final _hosts = <_BrowserWindowChromeState>[];
   static bool _chromeEnabled = false;
   static bool _shortcutsEnabled = false;
+  static Set<String> _commands = {};
   ModalRoute<dynamic>? _route;
   bool _registered = false;
 
@@ -50,9 +55,30 @@ class _BrowserWindowChromeState extends State<BrowserWindowChrome> {
     }
   }
 
+  static Future<void> _setCommands(Set<String> commands) async {
+    try {
+      await _channel.invokeMethod<void>(
+        'setBrowserShortcutCommands',
+        commands.toList(),
+      );
+    } on MissingPluginException {
+      /* No native window in widget tests. */
+    }
+  }
+
   static void _syncWindow() {
     final chromeEnabled = _hosts.any((host) => host.widget.windowSpacing);
     final shortcutsEnabled = _activeHost != null;
+    final commands =
+        _activeHost?.widget.shortcutCommands ??
+        {
+          for (final key in ['f', 'l', 't', 'w', 'r'])
+            '${defaultTargetPlatform == TargetPlatform.macOS ? 'cmd' : 'ctrl'}+$key',
+        };
+    if (!setEquals(_commands, commands)) {
+      _commands = commands;
+      unawaited(_setCommands(commands));
+    }
     if (_chromeEnabled != chromeEnabled) {
       _chromeEnabled = chromeEnabled;
       unawaited(_setEnabled('setBrowserChrome', chromeEnabled));
@@ -66,16 +92,49 @@ class _BrowserWindowChromeState extends State<BrowserWindowChrome> {
   static Future<void> _handleMethod(MethodCall call) async {
     if (call.method != 'shortcut' || call.arguments is! String) return;
     final key = call.arguments as String;
-    if (!const {'f', 'l', 't', 'w', 'r'}.contains(key)) return;
+    final host = _activeHost;
+    if (host == null) return;
+    if (host.widget.shortcutCommands != null &&
+        !host.widget.shortcutCommands!.contains(key)) {
+      return;
+    }
+    if (host.widget.shortcutCommands == null &&
+        !const {
+          'f',
+          'l',
+          't',
+          'w',
+          'r',
+          'cmd+f',
+          'cmd+l',
+          'cmd+t',
+          'cmd+w',
+          'cmd+r',
+          'ctrl+f',
+          'ctrl+l',
+          'ctrl+t',
+          'ctrl+w',
+          'ctrl+r',
+        }.contains(key)) {
+      return;
+    }
     // Read isCurrent again: an event queued before a modal opened must not
     // activate a browser command underneath that modal.
-    _activeHost?.widget.onShortcut?.call(key);
+    host.widget.onShortcut?.call(
+      host.widget.shortcutCommands == null ? key.split('+').last : key,
+    );
   }
 
   @override
   void initState() {
     super.initState();
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.macOS) return;
+    if (kIsWeb ||
+        !{
+          TargetPlatform.macOS,
+          TargetPlatform.windows,
+        }.contains(defaultTargetPlatform)) {
+      return;
+    }
     _registered = true;
     if (_hosts.isEmpty) _channel.setMethodCallHandler(_handleMethod);
     _hosts.add(this);

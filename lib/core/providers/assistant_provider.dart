@@ -7,9 +7,11 @@ import 'package:uuid/uuid.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../database/business_preferences.dart';
 import '../models/assistant.dart';
+import '../models/assistant_copy_options.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
 import '../services/chat/chat_service.dart';
+import '../services/assistant_copy_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
@@ -25,6 +27,7 @@ class AssistantProvider extends ChangeNotifier {
   String? _currentAssistantId;
   String? _orphanedAssistantId;
   final ChatService? chatService;
+  bool _isLoaded = false;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
   String? get currentAssistantId => currentAssistant?.id;
@@ -105,6 +108,7 @@ class AssistantProvider extends ChangeNotifier {
     if (_currentAssistantId != null && savedValue != _currentAssistantId) {
       await preferences.setString(_currentAssistantKey, _currentAssistantId!);
     }
+    _isLoaded = true;
     notifyListeners();
   }
 
@@ -188,6 +192,7 @@ class AssistantProvider extends ChangeNotifier {
     String? rawPath, {
     required bool isAvatar,
     required String newId,
+    required List<File> createdFiles,
   }) async {
     final raw = (rawPath ?? '').trim();
     if (raw.isEmpty) return rawPath;
@@ -196,30 +201,27 @@ class AssistantProvider extends ChangeNotifier {
     final src = File(fixed);
     if (!await src.exists()) return rawPath;
 
-    try {
-      final dir = isAvatar
-          ? await AppDirectories.getAvatarsDirectory()
-          : await AppDirectories.getImagesDirectory();
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      String ext = '';
-      final dot = fixed.lastIndexOf('.');
-      if (dot != -1 && dot < fixed.length - 1) {
-        ext = fixed.substring(dot + 1).toLowerCase();
-        if (ext.length > 6) ext = 'jpg';
-      } else {
-        ext = 'jpg';
-      }
-      final prefix = isAvatar ? 'assistant' : 'background';
-      final dest = File(
-        '${dir.path}/${prefix}_${newId}_${DateTime.now().millisecondsSinceEpoch}.$ext',
-      );
-      await src.copy(dest.path);
-      return dest.path;
-    } catch (_) {
-      return rawPath;
+    final dir = isAvatar
+        ? await AppDirectories.getAvatarsDirectory()
+        : await AppDirectories.getImagesDirectory();
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
     }
+    String ext = '';
+    final dot = fixed.lastIndexOf('.');
+    if (dot != -1 && dot < fixed.length - 1) {
+      ext = fixed.substring(dot + 1).toLowerCase();
+      if (ext.length > 6) ext = 'jpg';
+    } else {
+      ext = 'jpg';
+    }
+    final prefix = isAvatar ? 'assistant' : 'background';
+    final dest = File(
+      '${dir.path}/${prefix}_${newId}_${DateTime.now().millisecondsSinceEpoch}.$ext',
+    );
+    createdFiles.add(dest);
+    await src.copy(dest.path);
+    return dest.path;
   }
 
   Future<String?> _copyLocalAssetToManagedDirectory(
@@ -283,13 +285,13 @@ class AssistantProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> _persist() async {
+  Future<void> _persist() => preferences.runExclusiveMutation(() async {
     await preferences.setString(
       _assistantsKey,
       Assistant.encodeList(_assistants),
     );
     await _ensureOrphanedAssistant();
-  }
+  });
 
   Future<void> setCurrentAssistant(String id) async {
     await loaded;
@@ -353,75 +355,130 @@ class AssistantProvider extends ChangeNotifier {
   Future<String?> duplicateAssistant(
     String id, {
     AppLocalizations? l10n,
+    AssistantCopyOptions options = const AssistantCopyOptions(),
   }) async {
-    final idx = _assistants.indexWhere((a) => a.id == id);
-    if (idx == -1) return null;
-    final source = _assistants[idx];
+    if (!_isLoaded) await loaded;
+    final source = getById(id);
+    if (source == null) return null;
     final newId = const Uuid().v4();
+    final createdFiles = <File>[];
+    var committed = false;
+    try {
+      final avatarCopy = await _duplicateLocalFile(
+        source.avatar,
+        isAvatar: true,
+        newId: newId,
+        createdFiles: createdFiles,
+      );
+      final backgroundCopy = await _duplicateLocalFile(
+        source.background,
+        isAvatar: false,
+        newId: newId,
+        createdFiles: createdFiles,
+      );
+      return await preferences.runExclusiveMutation(() async {
+        final index = _assistants.indexWhere((a) => a.id == id);
+        if (index == -1) return null;
+        final copy = source.copyWith(
+          id: newId,
+          name: _buildCopyName(source, l10n),
+          avatar: avatarCopy,
+          background: backgroundCopy,
+          mcpServerIds: options.mcp
+              ? List<String>.of(source.mcpServerIds)
+              : const [],
+          allowConversationMcp: options.mcp && source.allowConversationMcp,
+          localToolIds: options.tools
+              ? List<String>.of(source.localToolIds)
+              : const [],
+          searchEnabled: options.tools && source.searchEnabled,
+          defaultWorkspaceId: options.workspace
+              ? source.defaultWorkspaceId
+              : null,
+          clearDefaultWorkspaceId: !options.workspace,
+          defaultWorkspaceSetup: options.workspace
+              ? null
+              : DefaultWorkspaceSetup.automatic,
+          skillIds: !options.skills
+              ? const []
+              : source.skillIds == null
+              ? null
+              : List<String>.of(source.skillIds!),
+          healthDataTypeIds: options.tools
+              ? List<String>.of(source.healthDataTypeIds)
+              : const [],
+          customHeaders: source.customHeaders
+              .map((e) => Map<String, String>.from(e))
+              .toList(),
+          customBody: source.customBody
+              .map((e) => Map<String, String>.from(e))
+              .toList(),
+          presetMessages: source.presetMessages
+              .map((m) => PresetMessage(role: m.role, content: m.content))
+              .toList(),
+          regexRules: !options.regexRules
+              ? const []
+              : source.regexRules
+                    .map(
+                      (r) => AssistantRegex(
+                        id: const Uuid().v4(),
+                        name: r.name,
+                        pattern: r.pattern,
+                        replacement: r.replacement,
+                        scopes: List<AssistantRegexScope>.of(r.scopes),
+                        visualOnly: r.visualOnly,
+                        replaceOnly: r.replaceOnly,
+                        enabled: r.enabled,
+                      ),
+                    )
+                    .toList(),
+        );
 
-    final avatarCopy = await _duplicateLocalFile(
-      source.avatar,
-      isAvatar: true,
-      newId: newId,
-    );
-    final backgroundCopy = await _duplicateLocalFile(
-      source.background,
-      isAvatar: false,
-      newId: newId,
-    );
-
-    final copy = source.copyWith(
-      id: newId,
-      name: _buildCopyName(source, l10n),
-      avatar: avatarCopy,
-      background: backgroundCopy,
-      mcpServerIds: List<String>.of(source.mcpServerIds),
-      localToolIds: List<String>.of(source.localToolIds),
-      defaultWorkspaceId: source.defaultWorkspaceId,
-      skillIds: source.skillIds == null
-          ? null
-          : List<String>.of(source.skillIds!),
-      healthDataTypeIds: List<String>.of(source.healthDataTypeIds),
-      customHeaders: source.customHeaders
-          .map((e) => Map<String, String>.from(e))
-          .toList(),
-      customBody: source.customBody
-          .map((e) => Map<String, String>.from(e))
-          .toList(),
-      presetMessages: source.presetMessages
-          .map((m) => PresetMessage(role: m.role, content: m.content))
-          .toList(),
-      regexRules: source.regexRules
-          .map(
-            (r) => AssistantRegex(
-              id: const Uuid().v4(),
-              name: r.name,
-              pattern: r.pattern,
-              replacement: r.replacement,
-              scopes: List<AssistantRegexScope>.of(r.scopes),
-              visualOnly: r.visualOnly,
-              replaceOnly: r.replaceOnly,
-              enabled: r.enabled,
-            ),
-          )
-          .toList(),
-    );
-
-    _assistants.insert(idx + 1, copy);
-    await _persist();
-    notifyListeners();
-    return copy.id;
+        final assistants = List<Assistant>.of(_assistants)
+          ..insert(index + 1, copy);
+        final updates = AssistantCopyService(
+          preferences,
+        ).relatedUpdates(sourceId: id, targetId: newId, options: options);
+        await preferences.setMany({
+          _assistantsKey: Assistant.encodeList(assistants),
+          ...updates,
+        });
+        committed = true;
+        // Keep edits made while SQLite was committing. Their queued persistence
+        // reads the live list after this insertion, so it also retains the copy.
+        final currentIndex = _assistants.indexWhere((a) => a.id == id);
+        _assistants.insert(
+          currentIndex == -1 ? _assistants.length : currentIndex + 1,
+          copy,
+        );
+        notifyListeners();
+        return copy.id;
+      });
+    } finally {
+      if (!committed) {
+        for (final file in createdFiles) {
+          try {
+            if (await file.exists()) await file.delete();
+          } catch (_) {}
+        }
+      }
+    }
   }
 
-  Future<void> clearModelSelectionsForProvider(String providerKey) async {
+  Future<void> clearModelSelectionsForProvider(
+    String providerKey, {
+    String? modelId,
+  }) async {
     await loaded;
     for (final assistant in assistants) {
-      if (assistant.chatModelProvider == providerKey) {
+      if (assistant.chatModelProvider == providerKey &&
+          (modelId == null || assistant.chatModelId == modelId)) {
         await updateAssistant(assistant.copyWith(clearChatModel: true));
       }
     }
     await chatService?.clearConversationModelOverrides(
       providerKey: providerKey,
+      modelId: modelId,
     );
   }
 

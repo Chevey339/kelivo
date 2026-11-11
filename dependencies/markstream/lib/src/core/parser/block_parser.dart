@@ -365,8 +365,9 @@ final class _BlockSession {
       return;
     }
     block.text.addAll(
-      LineCursor(SourceLine(source, cursor.offset, close, close))
-          .textFragments(),
+      LineCursor(
+        SourceLine(source, cursor.offset, close, close),
+      ).textFragments(),
     );
     block
       ..closed = true
@@ -787,11 +788,12 @@ final class _BlockSession {
         cursor.advance(1);
         cursor.indent(1);
         if (options.alerts) {
-          final name = alertName(cursor.rest);
-          if (name != null) {
+          final alert = readAlert(cursor.rest);
+          if (alert != null) {
             quote
               ..kind = _Kind.named
-              ..name = name
+              ..name = alert.name
+              ..attributes = {if (alert.title != null) 'title': alert.title!}
               ..syntax = NamedBlockSyntax.alert;
             _touch(line);
             return;
@@ -849,8 +851,9 @@ final class _BlockSession {
             ..markerSpan = SourceSpan(task.start, task.end)
             ..end = line.end;
           node.text.addAll(
-            LineCursor(SourceLine(source, task.end, line.end, line.next))
-                .textFragments(),
+            LineCursor(
+              SourceLine(source, task.end, line.end, line.next),
+            ).textFragments(),
           );
           _touch(line);
           return;

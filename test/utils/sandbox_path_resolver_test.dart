@@ -58,6 +58,31 @@ void main() {
     });
   });
 
+  group('SandboxPathResolver.dedupeKey', () {
+    test('matches kelivo-file URI and absolute path of the same file', () {
+      final temp = Directory.systemTemp.createTempSync('sandbox_dedupe_');
+      addTearDown(() {
+        if (temp.existsSync()) temp.deleteSync(recursive: true);
+      });
+      Directory(p.join(temp.path, 'upload')).createSync();
+      final file = File(p.join(temp.path, 'upload', 'draft-0.png'))
+        ..writeAsStringSync('ok');
+      SandboxPathResolver.debugSetDirs(docsDir: temp.path);
+
+      expect(
+        SandboxPathResolver.dedupeKey('kelivo-file:///upload/draft-0.png'),
+        SandboxPathResolver.dedupeKey(file.path),
+      );
+    });
+
+    test('leaves http and data URIs unchanged', () {
+      const http = 'https://example.com/a.png';
+      const data = 'data:image/png;base64,AAAA';
+      expect(SandboxPathResolver.dedupeKey(http), http);
+      expect(SandboxPathResolver.dedupeKey(data), data);
+    });
+  });
+
   group('SandboxPathResolver.fix http/data pass-through', () {
     test('leaves http(s) and data URIs unchanged', () {
       SandboxPathResolver.debugSetDirs(docsDir: '/tmp/kelivo_docs');

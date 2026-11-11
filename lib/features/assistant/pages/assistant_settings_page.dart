@@ -9,6 +9,7 @@ import '../../../core/models/assistant.dart';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'assistant_settings_edit_page.dart';
+import '../widgets/assistant_copy_dialog.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/haptics.dart';
@@ -207,19 +208,7 @@ class _AssistantCard extends StatelessWidget {
             backgroundColor: Colors.transparent,
             padding: const EdgeInsets.symmetric(horizontal: 4),
             onPressed: (_) async {
-              final assistantProvider = context.read<AssistantProvider>();
-              final newId = await assistantProvider.duplicateAssistant(
-                item.id,
-                l10n: l10n,
-              );
-              if (!context.mounted) return;
-              if (newId != null) {
-                showAppSnackBar(
-                  context,
-                  message: l10n.assistantSettingsCopySuccess,
-                  type: NotificationType.success,
-                );
-              }
+              await copyAssistantWithScope(context, item.id);
             },
             child: Container(
               width: double.infinity,

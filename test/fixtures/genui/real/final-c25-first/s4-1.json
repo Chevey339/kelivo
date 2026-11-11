@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "80f455ea308cab4dc35fba96aa160489835d3dc1",
+  "task": "s4-1",
+  "response": "方案 1–12 中，方案 4 的价格缺省为空值，排序时该空值会始终排在其他值之后；其余价格从 2 递增到 24，得分从 99 递减到 88。表格每页显示 10 行，共两页。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[intro,table])\nintro = Markdown(text=\"以下为合成方案比较表，可本地排序、筛选与分页（每页 10 行）。价格为空值，未以 0 填充。\")\ntable = DataTable(data=[{\"id\": \"p01\", \"name\": \"方案 1\", \"price\": 2, \"score\": 99}, {\"id\": \"p02\", \"name\": \"方案 2\", \"price\": 4, \"score\": 98}, {\"id\": \"p03\", \"name\": \"方案 3\", \"price\": 6, \"score\": 97}, {\"id\": \"p04\", \"name\": \"方案 4\", \"price\": null, \"score\": 96}, {\"id\": \"p05\", \"name\": \"方案 5\", \"price\": 10, \"score\": 95}, {\"id\": \"p06\", \"name\": \"方案 6\", \"price\": 12, \"score\": 94}, {\"id\": \"p07\", \"name\": \"方案 7\", \"price\": 14, \"score\": 93}, {\"id\": \"p08\", \"name\": \"方案 8\", \"price\": 16, \"score\": 92}, {\"id\": \"p09\", \"name\": \"方案 9\", \"price\": 18, \"score\": 91}, {\"id\": \"p10\", \"name\": \"方案 10\", \"price\": 20, \"score\": 90}, {\"id\": \"p11\", \"name\": \"方案 11\", \"price\": 22, \"score\": 89}, {\"id\": \"p12\", \"name\": \"方案 12\", \"price\": 24, \"score\": 88}], rowKey=\"id\", columns=[{\"key\": \"name\", \"label\": \"方案\"}, {\"key\": \"price\", \"label\": \"价格\", \"digits\": 2}, {\"key\": \"score\", \"label\": \"得分\"}], pageSize=10, sortable=true, filterable=true)\n```\n\n- 行数：12 行原始数据全部保留；`id` 唯一，作为行键。\n- 列：方案、价格（保留 2 位小数）、得分，与指定定义一致。\n- 交互：可点击列头排序、按内容筛选、分页浏览（10 + 2）。\n- 空值：方案 4 的 `price` 为 `null`，显示为空，不当作 0。",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: all twelve source rows, exact columns/digits, rowKey id and p04 null price are preserved. The response labels the table synthetic and accurately describes local sorting/filtering and 10+2 pagination."
+  }
+}

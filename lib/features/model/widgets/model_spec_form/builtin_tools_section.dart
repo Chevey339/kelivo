@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/models/model_spec.dart';
+import '../../../../core/models/image_generation_options.dart';
+import '../../../../core/models/provider_oauth.dart';
 import '../../../../core/providers/settings_provider.dart';
 import '../../../../core/services/api/builtin_tools.dart';
 import '../../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/ios_switch.dart';
+import '../../../../shared/widgets/ios_settings_rows.dart';
+import '../../../../shared/widgets/option_sheet.dart';
 import '../../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'model_spec_form_controller.dart';
@@ -182,7 +186,7 @@ class BuiltinToolsSection extends StatelessWidget {
                   ),
                 ),
               ),
-            for (final tool in tiles)
+            for (final tool in tiles) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                 child: _ToolTile(
@@ -195,11 +199,114 @@ class BuiltinToolsSection extends StatelessWidget {
                       : null,
                 ),
               ),
+              if (tool.name == BuiltInToolNames.imageGeneration &&
+                  tool.available &&
+                  !isOpenRouter &&
+                  controller.isBuiltInToolOn(tool.name))
+                _ImageGenerationSettings(controller: controller),
+            ],
           ],
         );
       },
     );
   }
+}
+
+class _ImageGenerationSettings extends StatelessWidget {
+  const _ImageGenerationSettings({required this.controller});
+
+  final ModelSpecFormController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final options = controller.imageGeneration;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        IosNavRow(
+          key: const ValueKey('image-generation-model'),
+          label: l10n.modelDetailSheetImageGenerationModel,
+          subtitle: options.model ?? l10n.modelDetailSheetImageGenerationAuto,
+          subtitleMaxLines: null,
+          onTap: () async {
+            final picked = await showOptionSheet<String>(
+              context,
+              title: l10n.modelDetailSheetImageGenerationModel,
+              selected: options.model ?? '',
+              items: [
+                OptionSheetItem(
+                  value: '',
+                  label: l10n.modelDetailSheetImageGenerationAuto,
+                ),
+                for (final model in {
+                  ...ImageGenerationOptions.models.keys,
+                  if (options.model != null) options.model!,
+                })
+                  OptionSheetItem(value: model, label: model),
+              ],
+            );
+            if (picked != null && context.mounted) {
+              controller.setImageGenerationModel(
+                picked.isEmpty ? null : picked,
+              );
+            }
+          },
+        ),
+        if (options.supportsComplexity)
+          IosNavRow(
+            key: const ValueKey('image-generation-complexity'),
+            label: l10n.modelDetailSheetImageGenerationComplexity,
+            subtitle: l10n.modelDetailSheetImageGenerationComplexityDescription,
+            subtitleMaxLines: null,
+            detailText: _complexityLabel(l10n, options.complexity),
+            onTap: () async {
+              final picked = await showOptionSheet<String>(
+                context,
+                title: l10n.modelDetailSheetImageGenerationComplexity,
+                selected: options.complexity ?? '',
+                items: [
+                  for (final value in [
+                    '',
+                    ...ImageGenerationOptions.complexities,
+                  ])
+                    OptionSheetItem(
+                      value: value,
+                      label: _complexityLabel(l10n, value),
+                    ),
+                ],
+              );
+              if (picked != null && context.mounted) {
+                controller.setImageGenerationComplexity(
+                  picked.isEmpty ? null : picked,
+                );
+              }
+            },
+          ),
+        if (controller.config.oauthProvider == OAuthProvider.chatgpt)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            child: Text(
+              l10n.modelDetailSheetImageGenerationOAuthHint,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.65),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _complexityLabel(AppLocalizations l10n, String? value) =>
+      switch (value) {
+        'low' => l10n.modelDetailSheetImageGenerationComplexityLow,
+        'medium' => l10n.modelDetailSheetImageGenerationComplexityMedium,
+        'high' => l10n.modelDetailSheetImageGenerationComplexityHigh,
+        _ => l10n.modelDetailSheetImageGenerationComplexityDefault,
+      };
 }
 
 class _ToolTile extends StatelessWidget {

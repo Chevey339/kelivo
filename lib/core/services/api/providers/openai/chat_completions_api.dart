@@ -1,3 +1,7 @@
+import '../../../network/provider_http_exception.dart';
+import '../../../../models/image_context.dart';
+import '../../request_history_context.dart';
+import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
@@ -12,6 +16,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../response_speed.dart';
 import '../../builtin_tools.dart';
 import '../../native_input_attachments.dart';
 import '../../tool_result_content.dart';
@@ -32,6 +37,9 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
   final out = <String, dynamic>{
     'role': role,
     'content': m.containsKey('content') ? (m['content'] ?? '') : '',
+    if (m[historySourceKey] != null) historySourceKey: m[historySourceKey],
+    if (m[imageContextOwnerKey] != null)
+      imageContextOwnerKey: m[imageContextOwnerKey],
   };
 
   // Preserve optional name (some providers support it on non-tool roles).
@@ -83,6 +91,10 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
 
   // Keep structured media refs across tool-followup rebuilds so later
   // Chat Completions builders can still emit image_url / multimodal parts.
+  final imageReferences = internalImageReferences(m);
+  if (imageReferences.isNotEmpty) {
+    out[multimodalInternalImageReferencesKey] = imageReferences;
+  }
   final mediaPaths = m[multimodalInternalMediaPathsKey];
   if (mediaPaths != null) {
     if (mediaPaths is List) {
@@ -280,20 +292,16 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   // message (same pattern as Responses shouldAttachAssistantImage).
   // Use last *user* index — not array-tail — so tool follow-ups that append
   // assistant tool_calls / tool results still receive stashed assistant media.
-  int lastUserIndex = -1;
-  for (int i = messages.length - 1; i >= 0; i--) {
-    if ((messages[i]['role'] ?? '').toString() == 'user') {
-      lastUserIndex = i;
-      break;
-    }
-  }
+  final lastUserIndex = lastUserInputIndex(messages);
   final pendingAssistantMediaUrls = <String>[];
   final pendingToolImageParts = <Map<String, dynamic>>[];
+  Object? pendingToolOwner;
   void flushToolImages() {
     if (pendingToolImageParts.isEmpty) return;
     out.add({
       'role': 'user',
       'content': [...pendingToolImageParts],
+      if (pendingToolOwner != null) historySourceKey: pendingToolOwner,
     });
     pendingToolImageParts.clear();
   }
@@ -339,6 +347,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
           ...nativeParts,
         ];
       }
+      RequestHistoryContext.mark(m, [message]);
       out.add(message);
     }
 
@@ -346,7 +355,10 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       m[multimodalInternalMediaPathsKey],
     );
     final outMsg = Map<String, dynamic>.from(m);
+    outMsg.remove(imageContextOwnerKey);
+    outMsg.remove(multimodalInternalImageReferencesKey);
     outMsg.remove(multimodalInternalMediaPathsKey);
+    outMsg.remove(multimodalInternalLiteralTextKey);
     outMsg.remove(multimodalInternalDocumentPathsKey);
     outMsg.remove(multimodalInternalRevisionIdKey);
     outMsg.remove(multimodalInternalClaudeContainerKey);
@@ -483,14 +495,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         final seenImageUrls = <String>{};
         final seenVideoUrls = <String>{};
 
-        String normalizeSrc(String src) {
-          if (src.startsWith('http') || src.startsWith('data:')) return src;
-          try {
-            return SandboxPathResolver.fix(src);
-          } catch (_) {
-            return src;
-          }
-        }
+        String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
         void addImageUrl(String url) {
           if (url.isEmpty) return;
@@ -639,11 +644,13 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         (m['name'] ?? '').toString(),
         raw,
         metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+        toolCallId: m['tool_call_id']?.toString(),
         canImageInput: canImageInput,
       );
       outMsg['content'] = result.text;
       addMessage(outMsg);
       if (result.imageUrls.isNotEmpty) {
+        pendingToolOwner = m[historySourceKey];
         pendingToolImageParts.add({
           'type': 'text',
           'text': 'Image returned by ${m['name']} (${m['tool_call_id']}):',
@@ -687,6 +694,8 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
 
     final parsed = await parseTextAndImages(
       raw,
+      literalText: internalLiteralText(m),
+      imageReferences: internalImageReferences(m),
       allowRemoteImages: canImageInput && allowRemoteImages,
       allowLocalImages: canImageInput,
       allowDataImages: canImageInput,
@@ -705,14 +714,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     final seenImageUrls = <String>{};
     final seenVideoUrls = <String>{};
 
-    String normalizeSrc(String src) {
-      if (src.startsWith('http') || src.startsWith('data:')) return src;
-      try {
-        return SandboxPathResolver.fix(src);
-      } catch (_) {
-        return src;
-      }
-    }
+    String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
     void addImageUrl(String url) {
       if (url.isEmpty) return;
@@ -870,6 +872,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required Object? builtInSearchQuery,
   required Map<String, dynamic> extraBodyCfg,
   required String? promptCacheKey,
+  String? serviceTier,
   required Map<String, String>? extraHeaders,
   required bool wantsImageOutput,
   required bool needsReasoningEcho,
@@ -944,11 +947,13 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       maybeAddStreamingUsageOptions(body2, stream: true, config: config);
       applyOpenAIResolvedRequest(
         body2,
+        config: config,
         spec: spec,
         reasoning: reasoning,
         transport: ReasoningTransport.chatCompletions,
       );
       CustomRequestMerger.applyBody(body2, extraBodyCfg);
+      applyServiceTier(body2, config, serviceTier);
       if (promptCacheKey != null) {
         body2.putIfAbsent('prompt_cache_key', () => promptCacheKey);
       }
@@ -973,14 +978,16 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           assistantHeaders: extraHeaders,
         ),
       );
-      req2.body = jsonEncode(body2);
+      req2.body = await RequestImageContext.encodeBody(body2);
       final http.StreamedResponse resp2;
       try {
         resp2 = await client.send(req2);
         if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
           final errorBody = await resp2.stream.bytesToString();
-          throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+          throw ProviderHttpException(resp2, errorBody);
         }
+      } on ImageContextBudgetException {
+        rethrow;
       } on ProviderOAuthException {
         rethrow;
       } on HttpException {
@@ -1020,6 +1027,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       final approxTotal = approxPromptTokens + (chars / 4).round();
       return emitDone(
         ids: StreamChunkIds('finish'),
+        finishReason: lastRound?.finishReason,
         reasoningDetails: includeReasoningDetailsOnDone
             ? reasoningDetails()
             : null,
@@ -1135,11 +1143,11 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
         skipImageParsing: skipImageParsing,
       );
       reqBody.remove('stream');
-      req.body = jsonEncode(reqBody);
+      req.body = await RequestImageContext.encodeBody(reqBody);
       final resp2 = await client.send(req);
       if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
         final errorBody = await resp2.stream.bytesToString();
-        throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+        throw ProviderHttpException(resp2, errorBody);
       }
       lastObj =
           jsonDecode(await decodeUtf8Stream(resp2.stream))

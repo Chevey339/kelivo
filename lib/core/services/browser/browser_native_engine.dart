@@ -18,7 +18,12 @@ import 'browser_download_cookies.dart';
 import 'browser_favicon_loader.dart';
 import 'browser_native_scroll_observer.dart';
 import 'browser_scroll_observer.dart';
+import 'browser_viewport_anchor.dart';
 import 'browser_workspace_resources.dart';
+import 'browser_workspace_app.dart';
+import '../workspace/workspace_app_storage.dart';
+import '../conversation_tool_permissions.dart';
+import 'browser_windows_environment.dart';
 
 const browserHistoryHandlerName = 'kelivoBrowserHistory';
 const browserHistoryDocumentScript =
@@ -105,9 +110,16 @@ class NativeBrowserEngine implements BrowserEngine {
   _WorkspacePathHandler? _workspacePathHandler;
   final Completer<InAppWebViewController> _created = Completer();
   HeadlessInAppWebView? _headless;
+  WebViewEnvironment? _environment;
   InAppWebViewController? _controller;
   bool _disposed = false;
   Future<void> _dialogBridgeReady = Future<void>.value();
+  Future<void> _storageBridgeReady = Future<void>.value();
+  bool _storageBridgeInstalled = false;
+  final _localAuthorities = <String, String>{};
+  int _storageCalls = 0;
+  int _storageReplies = 0;
+  String? _storageDocument;
   Completer<void>? _viewReady;
   bool _visible = true;
   Future<void> _visibilityUpdate = Future<void>.value();
@@ -165,6 +177,13 @@ class NativeBrowserEngine implements BrowserEngine {
       injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
       forMainFrameOnly: true,
     ),
+    if (Platform.isIOS)
+      UserScript(
+        groupName: 'kelivo-browser-viewport-anchor',
+        source: browserViewportAnchorScript,
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        forMainFrameOnly: true,
+      ),
     if (!Platform.isIOS)
       UserScript(
         groupName: 'kelivo-browser-scroll',
@@ -173,11 +192,28 @@ class NativeBrowserEngine implements BrowserEngine {
         forMainFrameOnly: true,
       ),
   ]);
+  UserScript? get _storageUserScript {
+    final scope = _workspace;
+    final app = scope?.app;
+    if (scope == null || app == null) return null;
+    return UserScript(
+      groupName: browserStorageScriptGroup,
+      source: browserStorageScript(
+        scope.host,
+        app.entry,
+        windows: Platform.isWindows,
+      ),
+      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+      forMainFrameOnly: false,
+    );
+  }
+
   void _beginNavigation({bool fromHistory = false}) {
     if (!fromHistory) _historyCommandEpoch++;
     _finishHistoryTraversal();
     _historyDocument = null;
     _navigationGeneration++;
+    if (!fromHistory) _storageDocument = null;
     if (Platform.isIOS) {
       _nativeScrollObserver.reset();
     } else {
@@ -207,6 +243,7 @@ class NativeBrowserEngine implements BrowserEngine {
     required void Function(String, String?) onDownload,
     required Future<bool> Function(String?, int) onNewWindow,
     required bool Function() isAgentActive,
+    Future<WebViewEnvironment?> Function()? webViewEnvironment,
   }) async {
     final engine = NativeBrowserEngine._(
       tab: tab,
@@ -217,11 +254,15 @@ class NativeBrowserEngine implements BrowserEngine {
       isAgentActive: isAgentActive,
     );
     try {
-      await engine._initialize();
+      await engine._initialize(webViewEnvironment);
       return engine;
-    } catch (_) {
-      await engine.dispose();
-      rethrow;
+    } catch (error, stack) {
+      try {
+        await engine.dispose();
+      } catch (cleanupError) {
+        debugPrint('Browser initialization cleanup failed: $cleanupError');
+      }
+      Error.throwWithStackTrace(error, stack);
     }
   }
 
@@ -231,6 +272,15 @@ class NativeBrowserEngine implements BrowserEngine {
     // each WebView scroll frame.
     useHybridComposition: _usesHybridComposition,
     javaScriptEnabled: true,
+    blockNetworkLoads: _workspace?.app != null,
+    useShouldInterceptRequest: _workspace?.app != null,
+    contentBlockers: [
+      if (_workspace?.app != null && (Platform.isIOS || Platform.isMacOS))
+        ContentBlocker(
+          trigger: ContentBlockerTrigger(urlFilter: r'^https?://'),
+          action: ContentBlockerAction(type: ContentBlockerActionType.BLOCK),
+        ),
+    ],
     resourceCustomSchemes: const ['kelivo'],
     webViewAssetLoader: _workspaceLoader,
     useShouldOverrideUrlLoading: true,
@@ -264,9 +314,16 @@ class NativeBrowserEngine implements BrowserEngine {
         : '',
   );
 
-  Future<void> _initialize() async {
+  Future<void> _initialize(
+    Future<WebViewEnvironment?> Function()? webViewEnvironment,
+  ) async {
     _beginNavigation();
     _navigationUrl = tab.url;
+    if (webViewEnvironment != null) {
+      _environment = await webViewEnvironment();
+    } else if (Platform.isWindows) {
+      _environment = await BrowserWindowsEnvironment.instance.get();
+    }
     if (Platform.isAndroid) {
       _defaultUserAgent = await InAppWebViewController.getDefaultUserAgent();
     }
@@ -282,12 +339,13 @@ class NativeBrowserEngine implements BrowserEngine {
         ? URLRequest(url: WebUri(initialUrl))
         : null;
     _headless = HeadlessInAppWebView(
+      webViewEnvironment: _environment,
       initialSize: Size(
         viewport.width.clamp(320, 1280),
         viewport.height.clamp(320, 1024),
       ),
       windowId: tab.windowId,
-      initialUrlRequest: initialRequest,
+      initialUrlRequest: _workspace?.app == null ? initialRequest : null,
       initialSettings: _viewSettings,
       initialUserScripts: _userScripts,
       findInteractionController: _findController,
@@ -306,6 +364,7 @@ class NativeBrowserEngine implements BrowserEngine {
       onCloseWindow: (_) => _emit(const BrowserPageState(closeRequested: true)),
       onDownloadStartRequest: _onDownload,
       onLoadResourceWithCustomScheme: _onWorkspaceResource,
+      shouldInterceptRequest: _onWorkspaceRequest,
       onPermissionRequest: _onPermission,
       onJsAlert: _onAlert,
       onJsConfirm: _onConfirm,
@@ -316,7 +375,10 @@ class NativeBrowserEngine implements BrowserEngine {
     await _headless!.run().timeout(const Duration(seconds: 20));
     await _created.future.timeout(const Duration(seconds: 20));
     await _dialogBridgeReady;
-    if (tab.windowId == null && initialRequest == null) {
+    await _storageBridgeReady;
+    if (_workspace?.app != null && initialRequest != null) {
+      await _webView.loadUrl(urlRequest: initialRequest);
+    } else if (tab.windowId == null && initialRequest == null) {
       _emit(
         const BrowserPageState(
           url: 'about:blank',
@@ -359,10 +421,314 @@ class NativeBrowserEngine implements BrowserEngine {
     if (Platform.isWindows) {
       _dialogBridgeReady = _installWindowsDialogs(_controller!);
     }
+    if (_workspace?.app != null) {
+      _storageBridgeReady = _installStorageBridge().then((_) async {
+        await _webView.removeUserScriptsByGroupName(
+          groupName: browserStorageScriptGroup,
+        );
+        if (_storageUserScript case final UserScript script) {
+          await _webView.addUserScript(userScript: script);
+        }
+      });
+    }
     if (!_created.isCompleted) _created.complete(_controller);
   }
 
   String publicUrl(String url) => _workspace?.publicUrl(url) ?? url;
+
+  Future<void> _installStorageBridge() async {
+    // A Windows headless -> visible transfer creates a new Dart handler map.
+    // Rebind its handler even though the native document/bridge survived.
+    if (_storageBridgeInstalled && !Platform.isWindows) return;
+    if (!_storageBridgeInstalled &&
+        (Platform.isAndroid || Platform.isWindows)) {
+      final String? version;
+      if (Platform.isAndroid) {
+        version = (await InAppWebViewController.getCurrentWebViewPackage())
+            ?.versionName;
+      } else {
+        // Query the running engine, not a newly installed Runtime or a
+        // page-controlled/custom user agent.
+        final details = await _webView.callDevToolsProtocolMethod(
+          methodName: 'Browser.getVersion',
+        );
+        version = details is Map ? details['product'] as String? : null;
+      }
+      if (!BrowserWorkspaceApp.supportsConnectionAllowlist(version)) {
+        throw StateError('browser_storage_bridge_unsupported');
+      }
+    }
+    if (Platform.isWindows) {
+      _webView.addJavaScriptHandler(
+        handlerName: browserStorageHandler,
+        callback: (args) async {
+          final envelope = args.length == 1 && args.first is Map
+              ? args.first as Map
+              : const {};
+          if (envelope['validateReply'] == true) {
+            return _canSendStorageReply(
+              envelope['message'],
+              envelope['origin'] as String?,
+              envelope['isMainFrame'] == true,
+            );
+          }
+          return _storageMessage(
+            envelope['message'],
+            envelope['origin'] as String?,
+            envelope['isMainFrame'] == true,
+          );
+        },
+      );
+    } else {
+      if (Platform.isAndroid &&
+          (!await WebViewFeature.isFeatureSupported(
+                WebViewFeature.WEB_MESSAGE_LISTENER,
+              ) ||
+              !await WebViewFeature.isFeatureSupported(
+                WebViewFeature.DOCUMENT_START_SCRIPT,
+              ))) {
+        throw StateError('browser_storage_bridge_unsupported');
+      }
+      await _webView.addWebMessageListener(
+        WebMessageListener(
+          jsObjectName: browserStorageTransport,
+          allowedOriginRules: {
+            Platform.isAndroid ? 'https://*.invalid' : 'kelivo://',
+          },
+          onPostMessage: (message, source, mainFrame, _) async {
+            final scope = _workspace;
+            final app = scope?.app;
+            if (_disposed ||
+                scope == null ||
+                app == null ||
+                tab.windowId != null ||
+                !app.acceptsCaller(
+                  source?.toString(),
+                  mainFrame,
+                  scope.host,
+                  android: Platform.isAndroid,
+                ) ||
+                _storageCalls >= 8 ||
+                _storageCalls + _storageReplies >= 16) {
+              return;
+            }
+            final data = message?.data;
+            if (data is! String ||
+                data.length > 6 * WorkspaceAppStorage.maxBytes + 4096) {
+              return;
+            }
+            // Reserve before decoding so bursts cannot spawn unbounded JSON
+            // worker isolates, and retain the slot through reply encoding.
+            _storageCalls++;
+            var slotHeld = true;
+            try {
+              final generation = _navigationGeneration;
+              Object? request;
+              try {
+                request = data.length > 65536
+                    ? await decodeWorkspaceMessage(data)
+                    : jsonDecode(data);
+              } on FormatException {
+                return;
+              }
+              if (_disposed || generation != _navigationGeneration) return;
+              final response = await _storageMessage(
+                request,
+                source?.toString(),
+                mainFrame,
+                reserved: true,
+              );
+              if (response == null || _disposed) return;
+              final result = response['result'];
+              final large =
+                  result is Map &&
+                  result['content'] is String &&
+                  (result['content'] as String).length > 65536;
+              final encoded = large
+                  ? await encodeWorkspaceMessage(response)
+                  : jsonEncode(response);
+              if (_disposed ||
+                  generation != _navigationGeneration ||
+                  !identical(scope, _workspace) ||
+                  !await _canSendStorageReply(
+                    request,
+                    source?.toString(),
+                    mainFrame,
+                  )) {
+                return;
+              }
+              // The receiving JS promise may immediately enqueue another
+              // batch, before evaluateJavascript's native acknowledgement.
+              _storageCalls--;
+              slotHeld = false;
+              _storageReplies++;
+              // Guard before invoking page code, including navigation between
+              // the Dart check above and native script execution.
+              try {
+                await _webView.evaluateJavascript(
+                  source: browserStorageReplyScript(
+                    response['document'] as String,
+                    encoded,
+                  ),
+                );
+              } catch (_) {
+                /* The originating document has been released. */
+              } finally {
+                _storageReplies--;
+              }
+            } finally {
+              if (slotHeld) _storageCalls--;
+            }
+          },
+        ),
+      );
+    }
+    _storageBridgeInstalled = true;
+  }
+
+  Future<bool> _canSendStorageReply(
+    Object? value,
+    String? origin,
+    bool mainFrame,
+  ) async {
+    final scope = _workspace;
+    final app = scope?.app;
+    if (_disposed ||
+        scope == null ||
+        app == null ||
+        tab.windowId != null ||
+        value is! Map ||
+        value['document'] != _storageDocument ||
+        !app.acceptsCaller(
+          origin,
+          mainFrame,
+          scope.host,
+          android: Platform.isAndroid,
+        )) {
+      return false;
+    }
+    final epoch = _workspaceEpoch, generation = _navigationGeneration;
+    try {
+      await scope.checkCurrent();
+    } on StateError {
+      return false;
+    } on FileSystemException {
+      return false;
+    }
+    return !_disposed &&
+        identical(scope, _workspace) &&
+        epoch == _workspaceEpoch &&
+        generation == _navigationGeneration &&
+        value['document'] == _storageDocument;
+  }
+
+  Future<Map<String, Object?>?> _storageMessage(
+    Object? value,
+    String? origin,
+    bool mainFrame, {
+    bool reserved = false,
+  }) async {
+    final scope = _workspace;
+    final app = scope?.app;
+    if (_disposed ||
+        scope == null ||
+        app == null ||
+        tab.windowId != null ||
+        !app.acceptsCaller(
+          origin,
+          mainFrame,
+          scope.host,
+          android: Platform.isAndroid,
+        ) ||
+        value is! Map ||
+        value['id'] is! int ||
+        value['document'] is! String ||
+        (value['document'] as String).length > 128) {
+      return null;
+    }
+    final owner = _workspaceEpoch, document = _navigationGeneration;
+    final reply = <String, Object?>{
+      'id': value['id'],
+      'document': value['document'],
+    };
+    if (!reserved) {
+      if (_storageCalls >= 8) return {...reply, 'error': 'storage_busy'};
+      _storageCalls++;
+    }
+    try {
+      void checkDocument() {
+        if (_disposed ||
+            owner != _workspaceEpoch ||
+            document != _navigationGeneration ||
+            !identical(scope, _workspace) ||
+            value['document'] != _storageDocument) {
+          throw StateError('storage_document_changed');
+        }
+      }
+
+      await scope.checkCurrent();
+      if (value['operation'] == 'ready') {
+        final current = await _webView.evaluateJavascript(
+          source: 'window.__kelivoStorageDocument',
+        );
+        if (current != value['document'] || document != _navigationGeneration) {
+          throw StateError('storage_document_changed');
+        }
+        _storageDocument = current as String;
+        reply['result'] = {'version': 1};
+      } else {
+        checkDocument();
+        final storage = WorkspaceAppStorage(
+          root: scope.root,
+          directory: app.dataDirectory,
+          authorize: (relative, write) async {
+            checkDocument();
+            await scope.checkCurrent();
+            final authorize = scope.resources.authorizeData;
+            if (authorize == null) throw StateError('storage_access_denied');
+            await authorize(
+              scope.sessionId,
+              scope.dataAccessPath(relative),
+              write,
+            );
+            await scope.checkCurrent();
+            checkDocument();
+          },
+        );
+        if (value['path'] is! String) throw StateError('storage_invalid_path');
+        if (value['operation'] == 'read') {
+          reply['result'] = await storage.read(value['path'] as String);
+        } else if (value['operation'] == 'write' &&
+            value['content'] is String &&
+            value.containsKey('version') &&
+            (value['version'] == null || value['version'] is String)) {
+          reply['result'] = await storage.write(
+            value['path'] as String,
+            value['content'] as String,
+            value['version'] as String?,
+          );
+        } else {
+          throw StateError('storage_invalid_request');
+        }
+      }
+    } catch (error) {
+      reply['error'] = error is StateError
+          ? error.message.toString()
+          : error is ToolPermissionException
+          ? error.code
+          : error is FileSystemException
+          ? 'storage_io_error'
+          : 'storage_failed';
+    } finally {
+      if (!reserved) _storageCalls--;
+    }
+    return !_disposed &&
+            owner == _workspaceEpoch &&
+            document == _navigationGeneration &&
+            identical(scope, _workspace)
+        ? reply
+        : null;
+  }
 
   void _dialogEvent(String type, String? message, bool accept) {
     final text = message ?? '';
@@ -413,6 +779,7 @@ class NativeBrowserEngine implements BrowserEngine {
       // Leave a pending real navigation intact, including a same-URL POST.
       return;
     }
+    _storageDocument = null;
     if (_navigation == null ||
         _navigation!.isCompleted ||
         _commit?.isCompleted == true) {
@@ -431,14 +798,7 @@ class NativeBrowserEngine implements BrowserEngine {
     _renderedDocumentLoaded = false;
     _replacingRenderedDocument = false;
     _awaitingRenderedLoadStart = false;
-    _emit(
-      BrowserPageState(
-        url: _pageUrl(url),
-        isLoading: true,
-        progress: 0,
-        replacesRenderedDocument: replaced,
-      ),
-    );
+    _emit(const BrowserPageState(isLoading: true, progress: 0));
   }
 
   String? _pageUrl(WebUri? url) {
@@ -472,15 +832,15 @@ class NativeBrowserEngine implements BrowserEngine {
     return url.scheme == 'data' || url.toString() == documentUrl;
   }
 
-  Future<void> _onLoadStop(
-    InAppWebViewController controller,
-    WebUri? url,
-  ) async {
+  Future<void> _onLoadStop(InAppWebViewController _, WebUri? url) async {
     if (_disposed) return;
     final generation = _navigationGeneration;
     final historyRevision = ++_historyRevision;
     final navigation = _navigation;
-    final current = await controller.getUrl();
+    // A headless -> visible transfer disposes the callback's Dart controller.
+    // Read through the retained controller, reacquiring it after each await.
+    final current = await _webView.getUrl();
+    if (_disposed || generation != _navigationGeneration) return;
     if (url != null &&
         current != null &&
         current.toString() != url.toString()) {
@@ -488,7 +848,7 @@ class NativeBrowserEngine implements BrowserEngine {
       // representation of the same loadData document. Reject unrelated stale
       // callbacks, but allow this explicit render alias once its DOM is ready.
       if (!_isRenderedUrl(url) || !_isRenderedUrl(current)) return;
-      final readiness = await controller.evaluateJavascript(
+      final readiness = await _webView.evaluateJavascript(
         source: 'document.readyState',
       );
       if (readiness != 'complete') return;
@@ -500,8 +860,8 @@ class NativeBrowserEngine implements BrowserEngine {
       _latestHistoryRevision = historyRevision;
     }
     final values = await Future.wait<Object?>([
-      controller.getTitle(),
-      _readHistory(controller),
+      _webView.getTitle(),
+      _readHistory(_webView),
     ]);
     if (_disposed || generation != _navigationGeneration) return;
     _awaitingRenderedLoadStart = false;
@@ -522,6 +882,8 @@ class NativeBrowserEngine implements BrowserEngine {
             ? null
             : history.index + 1 < history.length,
         completedNavigation: _loadFailure == null,
+        replacesRenderedDocument:
+            _loadFailure == null && _renderedDocumentUrl == null,
         error: _loadFailure?.message,
       ),
     );
@@ -533,6 +895,7 @@ class NativeBrowserEngine implements BrowserEngine {
   }
 
   Future<void> _loadFavicon() async {
+    if (_workspace?.app != null) return;
     final generation = _navigationGeneration;
     try {
       final controller = _webView;
@@ -608,15 +971,33 @@ class NativeBrowserEngine implements BrowserEngine {
     WebUri? url,
     bool? reload,
   ) async {
-    // URL callbacks arrive in native order. Publish the URL before querying
-    // availability so a slower query cannot replay an older SPA location.
+    // WebView2 can announce the requested URL even when an offline app's
+    // departure was cancelled and its original document is still displayed.
+    final scope = _workspace;
+    if (scope?.app != null &&
+        url != null &&
+        (url.scheme != (Platform.isAndroid ? 'https' : 'kelivo') ||
+            !scope!.owns(url))) {
+      await _refreshHistory(controller);
+      return;
+    }
+    // Publish committed/same-document URLs before querying availability so a
+    // slower query cannot replay an older SPA location. Failed provisional
+    // navigation can also emit a URL event without replacing the document.
     // A newly created WebView can report its previous about:blank document
     // after load-start. URL notifications alone must not change the ownership
     // of an unfinished navigation; commit/redirect events establish that.
-    if (_navigation?.isCompleted == true || _navigationUrl == null) {
+    if (_loadFailure == null &&
+        (_navigation?.isCompleted == true || _navigationUrl == null)) {
       _navigationUrl = _pageUrl(url) ?? _navigationUrl;
     }
-    _emit(BrowserPageState(url: _pageUrl(url)));
+    if (_loadFailure == null &&
+        (_navigation?.isCompleted == true ||
+            _commit?.isCompleted == true ||
+            _historyTraversal != null ||
+            _historyDocument != null)) {
+      _emit(BrowserPageState(url: _pageUrl(url)));
+    }
     await _refreshHistory(controller);
     if (_navigation?.isCompleted == true) unawaited(_loadFavicon());
   }
@@ -657,6 +1038,13 @@ class NativeBrowserEngine implements BrowserEngine {
       // The current native document, rather than an earlier history event,
       // owns this commit. Windows additionally filters by NavigationId.
       _navigationUrl = _pageUrl(url);
+      _emit(
+        BrowserPageState(
+          url: _navigationUrl,
+          title: '',
+          replacesRenderedDocument: _renderedDocumentUrl == null,
+        ),
+      );
       if (!(_commit?.isCompleted ?? true)) _commit!.complete();
       unawaited(_refreshHistory(controller));
     } catch (_) {
@@ -834,6 +1222,12 @@ class NativeBrowserEngine implements BrowserEngine {
         code,
         'The page could not be loaded ($code).',
         'Check the connection or address, then open another page in this tab. Do not repeat form submissions automatically.',
+        details: {
+          'native_type': error.type.toString(),
+          'native_description': error.description.length > 512
+              ? error.description.substring(0, 512)
+              : error.description,
+        },
       ),
     );
     if (!Platform.isIOS) _scrollObserver.allowCurrentDocument();
@@ -889,6 +1283,14 @@ class NativeBrowserEngine implements BrowserEngine {
   ) async {
     final url = action.request.url;
     if (url == null) return NavigationActionPolicy.CANCEL;
+    if (_workspace?.app case final BrowserWorkspaceApp app) {
+      return action.isForMainFrame &&
+              url.scheme == (Platform.isAndroid ? 'https' : 'kelivo') &&
+              _workspace!.owns(url) &&
+              app.acceptsResource(url)
+          ? NavigationActionPolicy.ALLOW
+          : NavigationActionPolicy.CANCEL;
+    }
     if (_workspace?.owns(url) == true) return NavigationActionPolicy.ALLOW;
     if (url.toString() == 'about:blank' ||
         url.scheme == 'http' ||
@@ -916,6 +1318,7 @@ class NativeBrowserEngine implements BrowserEngine {
     InAppWebViewController controller,
     CreateWindowAction action,
   ) async {
+    if (_workspace?.app != null) return false;
     final url = action.request.url;
     if (url != null &&
         url.toString() != 'about:blank' &&
@@ -936,6 +1339,7 @@ class NativeBrowserEngine implements BrowserEngine {
     InAppWebViewController controller,
     DownloadStartRequest request,
   ) {
+    if (_workspace?.app != null) return;
     onDownload(request.url.toString(), request.suggestedFilename);
   }
 
@@ -1030,6 +1434,7 @@ class NativeBrowserEngine implements BrowserEngine {
   Widget _buildNativeView(bool hybrid, Completer<void> ready) {
     return InAppWebView(
       key: ValueKey(hybrid),
+      webViewEnvironment: _environment,
       initialSettings: _viewSettings,
       initialUserScripts: _userScripts,
       keepAlive: _keepAlive,
@@ -1055,6 +1460,7 @@ class NativeBrowserEngine implements BrowserEngine {
       onCloseWindow: (_) => _emit(const BrowserPageState(closeRequested: true)),
       onDownloadStartRequest: _onDownload,
       onLoadResourceWithCustomScheme: _onWorkspaceResource,
+      shouldInterceptRequest: _onWorkspaceRequest,
       onPermissionRequest: _onPermission,
       onJsAlert: _onAlert,
       onJsConfirm: _onConfirm,
@@ -1067,7 +1473,16 @@ class NativeBrowserEngine implements BrowserEngine {
   InAppWebViewController get _webView =>
       _controller ?? (throw StateError('browser_engine_not_ready'));
   Future<String> _prepareWorkspaceUrl(String url) async {
-    if (!BrowserWorkspaceResources.isWorkspaceUrl(url)) return url;
+    if (!BrowserWorkspaceResources.isLocalUrl(url)) {
+      if (_workspace?.app != null) {
+        _workspace!.close();
+        _workspace = null;
+        if (_controller != null) {
+          await _webView.setSettings(settings: _viewSettings);
+        }
+      }
+      return url;
+    }
     final epoch = _workspaceEpoch;
     final owner = _ownerSessionId;
     void checkOwner() {
@@ -1076,11 +1491,21 @@ class NativeBrowserEngine implements BrowserEngine {
       }
     }
 
-    final next = await BrowserWorkspaceResources.instance.scope(owner);
+    final next = await BrowserWorkspaceResources.instance.scope(
+      owner,
+      pageUrl: url,
+    );
+    final applicationTransition = _workspace?.app != null || next.app != null;
     try {
       checkOwner();
       await next.file(Uri.parse(url));
       checkOwner();
+      // Fail unsupported bridge installation before changing the live page's
+      // scope or network settings, so a refused app cannot break normal tabs.
+      if (next.app != null && _controller != null) {
+        await _installStorageBridge();
+        checkOwner();
+      }
       if (_workspace?.host == next.host) {
         next.close();
       } else {
@@ -1100,6 +1525,20 @@ class NativeBrowserEngine implements BrowserEngine {
           }
         }
       }
+      if (_controller != null &&
+          (next.app != null || _storageBridgeInstalled)) {
+        if (applicationTransition && !Platform.isAndroid) {
+          await _webView.setSettings(settings: _viewSettings);
+        }
+        await _webView.removeUserScriptsByGroupName(
+          groupName: browserStorageScriptGroup,
+        );
+        if (_storageUserScript case final UserScript script) {
+          await _webView.addUserScript(userScript: script);
+        }
+        checkOwner();
+      }
+      _localAuthorities[next.host] = next.authority;
       return _workspace!
           .internalUrl(url, android: Platform.isAndroid)
           .toString();
@@ -1125,10 +1564,36 @@ class NativeBrowserEngine implements BrowserEngine {
     }
     final resource = await scope.read(uri);
     if (resource == null) return null;
+    if (scope.app != null) {
+      return BrowserWorkspaceAppResponse(
+        data: resource.bytes,
+        contentType: resource.mime,
+      );
+    }
     return CustomSchemeResponse(
       data: resource.bytes,
       contentType: resource.mime,
       contentEncoding: 'utf-8',
+    );
+  }
+
+  Future<WebResourceResponse?> _onWorkspaceRequest(
+    InAppWebViewController controller,
+    WebResourceRequest request,
+  ) async {
+    final scope = _workspace;
+    if (scope?.app == null ||
+        (request.url.scheme == (Platform.isAndroid ? 'https' : 'kelivo') &&
+            scope!.owns(request.url) &&
+            scope.app!.acceptsResource(request.url))) {
+      return null;
+    }
+    return WebResourceResponse(
+      data: Uint8List(0),
+      contentType: 'text/plain',
+      statusCode: 403,
+      reasonPhrase: 'Forbidden',
+      headers: const {'Cache-Control': 'no-store'},
     );
   }
 
@@ -1145,17 +1610,24 @@ class NativeBrowserEngine implements BrowserEngine {
     _renderedDocumentLoaded = false;
     _beginNavigation();
     _navigationUrl = publicUrl(url);
+    _emit(const BrowserPageState(isLoading: true, progress: 0));
     await _webView.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
   }
 
   @override
   Future<void> loadHtml(String html, {String? baseUrl}) async {
+    if (_workspace?.app != null) {
+      _workspace!.close();
+      _workspace = null;
+      await _webView.setSettings(settings: _viewSettings);
+    }
     _renderedDocumentUrl = baseUrl ?? 'about:blank';
     _navigationUrl = _renderedDocumentUrl;
     _awaitingRenderedLoadStart = true;
     _replacingRenderedDocument = false;
     _renderedDocumentLoaded = false;
     _beginNavigation();
+    _emit(const BrowserPageState(isLoading: true, progress: 0));
     try {
       await _webView.loadData(
         data: html,
@@ -1186,6 +1658,29 @@ class NativeBrowserEngine implements BrowserEngine {
       }
       final target = before.index + direction;
       if (target < 0 || target >= before.length) return;
+      if (_localAuthorities.isNotEmpty) {
+        final history = await controller.getCopyBackForwardList();
+        final items = history?.list;
+        final targetUrl = items != null && target < items.length
+            ? items[target].url
+            : null;
+        if (targetUrl != null && targetUrl.host != _workspace?.host) {
+          final local = BrowserWorkspaceResources.isInternalHost(
+            targetUrl.host,
+          );
+          final authority = _localAuthorities[targetUrl.host];
+          if (local && authority == null) {
+            throw StateError('browser_workspace_binding_changed');
+          }
+          final publicTarget = local
+              ? targetUrl.replace(scheme: 'kelivo', host: authority).toString()
+              : targetUrl.toString();
+          final prepared = await _prepareWorkspaceUrl(publicTarget);
+          if (local && Uri.parse(prepared).host != targetUrl.host) {
+            throw StateError('browser_workspace_binding_changed');
+          }
+        }
+      }
       final document = await _readHistoryDocument(controller);
       if (_disposed || commandEpoch != _historyCommandEpoch) return;
       _replacingRenderedDocument = _renderedDocumentUrl != null;
@@ -1443,7 +1938,9 @@ class NativeBrowserEngine implements BrowserEngine {
   Future<Map<String, String>> downloadHeaders(String url) async {
     final destination = Uri.parse(url);
     final cookies =
-        (await CookieManager.instance().getCookies(url: WebUri(url)))
+        (await CookieManager.instance(
+              webViewEnvironment: _environment,
+            ).getCookies(url: WebUri(url)))
             .where(
               (cookie) => browserDownloadCookieMatches(cookie, destination),
             )
@@ -1561,9 +2058,10 @@ class _WorkspacePathHandler extends CustomPathHandler {
       contentEncoding: 'utf-8',
       statusCode: resource == null ? 404 : 200,
       reasonPhrase: resource == null ? 'Not Found' : 'OK',
-      headers: const {
+      headers: {
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
+        if (scope.app != null) ...BrowserWorkspaceApp.headers,
       },
     );
   }

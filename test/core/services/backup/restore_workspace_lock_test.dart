@@ -49,6 +49,37 @@ void main() {
       },
     );
 
+    test(
+      'live cleanup cannot discard another marker-only restore run',
+      () async {
+        const actual = '0123456789abcdef0123456789abcdef';
+        const expected = '1123456789abcdef0123456789abcdef';
+        await lock.synchronized(() async {
+          final marker = File(
+            p.join(
+              lock.workspaceRoot.path,
+              RestoreWorkspaceLock.activeRunFileName,
+            ),
+          );
+          await marker.writeAsString(actual, flush: true);
+          await expectLater(
+            lock.discardStrictlyUnpublishedRunWhileWorkspaceLocked(
+              expectedRunId: expected,
+            ),
+            throwsStateError,
+          );
+          expect(await marker.readAsString(), actual);
+          expect(
+            await lock.discardStrictlyUnpublishedRunWhileWorkspaceLocked(
+              expectedRunId: actual,
+            ),
+            isTrue,
+          );
+          expect(await marker.exists(), isFalse);
+        });
+      },
+    );
+
     test('serializes same-root Future.wait calls in FIFO order', () async {
       final firstEntered = Completer<void>();
       final releaseFirst = Completer<void>();

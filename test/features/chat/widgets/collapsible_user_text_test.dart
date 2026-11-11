@@ -31,6 +31,32 @@ void main() {
       'The quick brown fox jumps over the lazy dog. '
       'The quick brown fox jumps over the lazy dog.';
 
+  testWidgets(
+    'revealing a quoted range expands its source and keeps it open afterwards',
+    (tester) async {
+      Widget app(bool reveal) => MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: CollapsibleUserText(
+            reveal: reveal,
+            collapsedHeight: 20,
+            child: const Text(longText),
+          ),
+        ),
+      );
+      await tester.pumpWidget(app(false));
+      await tester.pumpAndSettle();
+      expect(find.byKey(clipKey), findsOneWidget);
+      await tester.pumpWidget(app(true));
+      await tester.pumpAndSettle();
+      expect(find.byKey(clipKey), findsNothing);
+      await tester.pumpWidget(app(false));
+      await tester.pumpAndSettle();
+      expect(find.byKey(clipKey), findsNothing);
+    },
+  );
+
   Future<void> pumpText(
     WidgetTester tester,
     String text, {

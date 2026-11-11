@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:Kelivo/core/models/auto_retry_options.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/network/provider_http_exception.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -61,10 +62,118 @@ Future<HttpServer> _dropConnectionServer(void Function() onRequest) async {
 }
 
 void main() {
+  for (final noRetry in [false, true]) {
+    test('truncated HTTP error retains no-retry verdict: $noRetry', () async {
+      var requests = 0;
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sockets = <Socket>[];
+      addTearDown(() async {
+        for (final socket in sockets) {
+          socket.destroy();
+        }
+        await server.close();
+      });
+      server.listen((socket) {
+        sockets.add(socket);
+        var replied = false;
+        final incoming = StringBuffer();
+        socket.listen((bytes) async {
+          incoming.write(utf8.decode(bytes));
+          if (replied || !incoming.toString().contains('\r\n\r\n')) return;
+          replied = true;
+          requests++;
+          socket.write(
+            'HTTP/1.1 503 Service Unavailable\r\n'
+            'Content-Length: 100\r\n'
+            '${noRetry ? 'X-Should-Retry: false\r\n' : ''}'
+            'Connection: close\r\n\r\nshort',
+          );
+          await socket.flush();
+          socket.destroy();
+        });
+      });
+      await expectLater(
+        ChatApiService.sendMessageStream(
+          config: _openAIConfig(
+            'http://127.0.0.1:${server.port}/v1',
+          ).copyWith(useResponseApi: true),
+          modelId: 'gpt-4o-mini',
+          messages: const [
+            {'role': 'user', 'content': 'Hi'},
+          ],
+          retryOverride: _retryTwice(),
+        ).toList(),
+        throwsA(isA<ProviderHttpException>()),
+      );
+      expect(requests, noRetry ? 1 : 3);
+    });
+  }
+
+  for (final backend in ['chat', 'responses', 'claude', 'gemini']) {
+    for (final status in [429, 503]) {
+      for (final verdict in [null, 'false', 'true']) {
+        test('$backend HTTP $status respects retry verdict $verdict', () async {
+          var requests = 0;
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          server.listen((request) async {
+            requests++;
+            await request.drain<void>();
+            request.response.statusCode = status;
+            if (verdict != null) {
+              request.response.headers.set('X-Should-Retry', verdict);
+            }
+            request.response.write('overloaded, try again');
+            await request.response.close();
+          });
+          final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+          final config = ProviderConfig(
+            id: 'retry-$backend',
+            enabled: true,
+            name: backend,
+            apiKey: 'test-key',
+            baseUrl: baseUrl,
+            providerType: backend == 'claude'
+                ? ProviderKind.claude
+                : backend == 'gemini'
+                ? ProviderKind.google
+                : ProviderKind.openai,
+            useResponseApi: backend == 'responses',
+          );
+          await expectLater(
+            ChatApiService.sendMessageStream(
+              config: config,
+              modelId: backend == 'claude'
+                  ? 'claude-sonnet-4-6'
+                  : backend == 'gemini'
+                  ? 'gemini-2.5-flash'
+                  : 'gpt-4o-mini',
+              messages: const [
+                {'role': 'user', 'content': 'Hi'},
+              ],
+              retryOverride: _retryTwice(),
+            ).toList(),
+            throwsA(
+              isA<ProviderHttpException>()
+                  .having((error) => error.statusCode, 'status', status)
+                  .having(
+                    (error) => error.headers['x-should-retry'],
+                    'verdict',
+                    verdict,
+                  ),
+            ),
+          );
+          expect(requests, verdict == 'false' ? 1 : 3);
+        });
+      }
+    }
+  }
+
   test(
     'non-stream usage is delivered before a later tool request fails',
     () async {
       var requests = 0;
+      var executedTools = 0;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => server.close(force: true));
       server.listen((request) async {
@@ -94,6 +203,7 @@ void main() {
           );
         } else {
           request.response.statusCode = HttpStatus.serviceUnavailable;
+          request.response.headers.set('x-should-retry', 'false');
           request.response.write('unavailable');
         }
         await request.response.close();
@@ -117,13 +227,17 @@ void main() {
               },
             },
           ],
-          onToolCall: (name, arguments, {toolCallId}) async => 'ok',
-          retryOverride: const AutoRetryOptions.defaults(),
+          onToolCall: (name, arguments, {toolCallId}) async {
+            executedTools++;
+            return 'ok';
+          },
+          retryOverride: _retryTwice(),
           onUsage: captured.handle,
         ),
         throwsA(isA<HttpException>()),
       );
       expect(requests, 2);
+      expect(executedTools, 1);
       expect(captured.totalUsage!.totalTokens, 120);
     },
   );

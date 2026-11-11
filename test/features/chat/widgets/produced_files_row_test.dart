@@ -33,6 +33,26 @@ WorkspaceToolPart _write({required List<String> links, List<String>? files}) {
 }
 
 void main() {
+  test(
+    'body updates reuse the summary and changed tools replace file revisions',
+    () {
+      final cache = ProducedFilesSummaryCache();
+      final first = _write(links: ['kelivo://workspace/a.txt']);
+      final parts = [first];
+      final summary = cache.update(parts);
+      for (var i = 0; i < 1000; i++) {
+        expect(cache.update(parts), same(summary));
+      }
+      final second = _write(links: ['kelivo://workspace/b.txt']);
+      final updated = cache.update([
+        first,
+        second,
+        _write(links: ['kelivo://workspace/a.txt']),
+      ]);
+      expect(updated.entries.map((entry) => entry.label), ['a.txt', 'b.txt']);
+      expect(cache.update([second]).entries.single.label, 'b.txt');
+    },
+  );
   test('dedupes produced files by first appearance', () {
     final entries = collectProducedFileEntries([
       _write(links: ['kelivo://workspace/a.txt']),

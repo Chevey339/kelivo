@@ -145,7 +145,7 @@ class ModelDefaultsGuesser {
 
   static final RegExp _reasoning = RegExp(
     (r'(gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
-            r'gemini-(?:2\.5|3).*|gemini-(?:flash-latest|pro-latest)|'
+            r'gemini-(?:2\.5|3|4).*|gemini-(?:flash-latest|pro-latest)|'
             r'gemini-3-pro-image-preview|'
             r'gemma[-_]?4|'
             r'claude|'
@@ -200,6 +200,7 @@ class ModelDefaultsGuesser {
     _ReasoningRule(matches: _isGemini3Pro, apply: _gemini3Pro),
     _ReasoningRule(matches: _isGemini3Flash, apply: _gemini3Flash),
     _ReasoningRule(matches: _isGemini3ReplayOnly, apply: _gemini3ReplayOnly),
+    _ReasoningRule(matches: _isGemini4, apply: _gemini4),
     _ReasoningRule(matches: _isGeminiBudgetFamily, apply: _geminiBudget),
     _ReasoningRule(matches: _isQwen3Family, apply: _qwen3),
     _ReasoningRule(matches: _isLaguna, apply: _laguna),
@@ -476,7 +477,7 @@ String _normalizeGuesserId(String modelId) {
 /// Anthropic dynamic-filtering search / fetch tool versions (2026-03-18).
 bool _isClaudeDynamicSearchGeneration(String id) {
   if (id.contains('mythos') || id.contains('fable')) return true;
-  return _isClaude5(id) ||
+  return _matches(id, r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])') ||
       _matches(id, r'claude-opus-4[-.][678](?:$|[._:@/-])') ||
       _matches(id, r'claude-sonnet-4[-.]6(?:$|[._:@/-])');
 }
@@ -613,6 +614,14 @@ bool _isGemini3ReplayOnly(String id) =>
 
 bool _isGemini25NonTextVariant(String id) =>
     _isGeminiNonTextVariant(id) && !id.contains('gemini-3');
+
+final _gemini4Id = RegExp(
+  r'(^|[/:_-])gemini-4(?:\.\d+)?-',
+  caseSensitive: false,
+);
+
+bool _isGemini4(String id) =>
+    _gemini4Id.hasMatch(id) && !_isGeminiNonTextVariant(id);
 
 bool _isGeminiBudgetFamily(String id) {
   return id.contains('gemini') &&
@@ -961,6 +970,25 @@ _ReasoningHit _gemini3Flash(String id) {
   );
 }
 
+// gemini-4 rejects thinking_budget and MINIMAL with HTTP 400.
+_ReasoningHit _gemini4(String id) {
+  return _fixed(
+    dialect: ReasoningDialect.geminiThinkingLevel,
+    levels: const [
+      ReasoningLevel.low,
+      ReasoningLevel.medium,
+      ReasoningLevel.high,
+    ],
+    canDisable: false,
+    defaultLevel: id.contains('cyber-permissive')
+        ? ReasoningLevel.high
+        : ReasoningLevel.medium,
+    sampling: SamplingPolicy.never,
+    maxOutput: 65536,
+    replay: ReasoningReplayPolicy.all,
+  );
+}
+
 _ReasoningHit _geminiBudget(String id) {
   return _fixed(
     dialect: ReasoningDialect.geminiThinkingBudget,
@@ -970,52 +998,52 @@ _ReasoningHit _geminiBudget(String id) {
   );
 }
 
-bool _isClaude5(String id) =>
-    _matches(id, r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])');
+final _claudeVersionPattern = RegExp(
+  r'claude-(?:(opus|sonnet|haiku)-(\d+)(?:[.-](\d{1,2})(?!\d))?'
+  r'|(\d+)(?:[.-](\d{1,2})(?!\d))?-(opus|sonnet|haiku))'
+  r'(?:$|[._:@/-])',
+);
+
+({String family, int major, int minor})? _claudeVersion(String id) {
+  final match = _claudeVersionPattern.firstMatch(id);
+  if (match == null) return null;
+  final major = int.tryParse((match.group(2) ?? match.group(4))!);
+  if (major == null) return null;
+  return (
+    family: (match.group(1) ?? match.group(6))!,
+    major: major,
+    // Eight-digit snapshot dates are suffixes, not minor versions.
+    minor: int.parse(match.group(3) ?? match.group(5) ?? '0'),
+  );
+}
+
+bool _isClaude5(String id) => _claudeVersion(id)?.major == 5;
+
+bool _isClaude55Family(String id, String family) {
+  final version = _claudeVersion(id);
+  return version != null &&
+      version.family == family &&
+      version.major == 5 &&
+      version.minor >= 5;
+}
 
 bool _isClaudeAlwaysOn(String id) =>
-    id.contains('claude-fable') || id.contains('claude-mythos');
+    id.contains('claude-fable') ||
+    id.contains('claude-mythos') ||
+    _isClaude55Family(id, 'opus');
 
 bool _supportsClaudeAdaptive(String id) {
-  if (!id.contains('claude-')) return false;
-  if (id.contains('fable') || id.contains('mythos')) return true;
-  if (_isClaude5(id)) return true;
-  final m = RegExp(
-    r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-    caseSensitive: false,
-  ).firstMatch(id);
-  if (m != null) {
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major != null && minor != null) {
-      return major > 4 || (major == 4 && minor >= 6);
-    }
-  }
-  return id.contains('4-6') || id.contains('4.6');
+  if (_isClaudeAlwaysOn(id)) return true;
+  final version = _claudeVersion(id);
+  return version != null &&
+      (version.major > 4 || (version.major == 4 && version.minor >= 6));
 }
 
 bool _isClaudeAdaptiveOnly(String id) {
-  if (!id.contains('claude-')) return false;
-  if (id.contains('fable') || id.contains('mythos')) return true;
-  if (_isClaude5(id)) return true;
-  final m = RegExp(
-    r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-    caseSensitive: false,
-  ).firstMatch(id);
-  if (m == null) {
-    return id.contains('4-7') ||
-        id.contains('4.7') ||
-        id.contains('4-8') ||
-        id.contains('4.8');
-  }
-  final family = (m.group(1) ?? '').toLowerCase();
-  final major = int.tryParse(m.group(2) ?? '');
-  final minor = int.tryParse(m.group(3) ?? '');
-  if (major == null || minor == null) return false;
-  if (major > 4) return true;
-  if (major < 4) return false;
-  if (family == 'opus' && minor >= 7) return true;
-  return false;
+  if (_isClaudeAlwaysOn(id)) return true;
+  final version = _claudeVersion(id);
+  return version != null &&
+      (version.major > 4 || (version.major == 4 && version.minor >= 7));
 }
 
 bool _claudeSupportsXhigh(String id) {
@@ -1038,31 +1066,27 @@ bool _claudeSupportsMax(String id) {
 }
 
 int _claudeMaxOutput(String id) {
-  if (_matches(
-    id,
-    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-[678])|sonnet-(?:5|4-6))(?:$|[._:/-])',
-  )) {
+  if (_isClaude5(id) ||
+      _matches(id, r'claude-(?:fable|mythos)-5(?:$|[._:@/-])')) {
     return 128000;
+  }
+  final version = _claudeVersion(id);
+  if (version != null && version.major == 4) {
+    if (version.family == 'opus' && version.minor <= 1) return 32000;
+    if ((version.family == 'opus' || version.family == 'sonnet') &&
+        version.minor >= 6) {
+      return 128000;
+    }
   }
   if (_matches(id, r'claude-3-haiku(?:$|[._:/])')) return 8000;
   if (id.contains('claude-3-5-sonnet') || id.contains('claude-3.5-sonnet')) {
     return 8192;
   }
-  if (_matches(id, r'claude-opus-4-1(?:$|[._:/])') ||
-      _matches(id, r'claude-opus-4(?:$|[._:/])')) {
-    return 32000;
-  }
   return 64000;
 }
 
 SamplingPolicy? _claudeSampling(String id) {
-  if (_isClaudeAlwaysOn(id)) return SamplingPolicy.never;
-  if (_isClaude5(id) ||
-      id.contains('claude-opus-4-8') ||
-      id.contains('claude-opus-4.8')) {
-    return SamplingPolicy.never;
-  }
-  if (_isClaudeAdaptiveOnly(id)) return SamplingPolicy.onlyWhenReasoningOff;
+  if (_isClaudeAdaptiveOnly(id)) return SamplingPolicy.never;
   return null;
 }
 
@@ -1082,7 +1106,9 @@ _ReasoningHit _claudeFamily(String id) {
   final sampling = _claudeSampling(id);
   if (_isClaudeAlwaysOn(id) || _supportsClaudeAdaptive(id)) {
     return _fixed(
-      dialect: ReasoningDialect.anthropicAdaptiveEffort,
+      dialect: _isClaude55Family(id, 'sonnet')
+          ? ReasoningDialect.anthropicBetweenTools
+          : ReasoningDialect.anthropicAdaptiveEffort,
       levels: _claudeAdaptiveLevels(id),
       canDisable: !_isClaudeAlwaysOn(id),
       sampling: sampling,

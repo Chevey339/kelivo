@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+FontWeight _identityFontWeight(FontWeight weight) => weight;
+
 // Value equality keeps cached prefix widgets valid when an app reconstructs
 // an equivalent theme during a streaming update.
 @immutable
@@ -233,49 +235,53 @@ final class InlineCodeTheme extends _ThemeTokens {
 final class CodeBlockTheme extends _ThemeTokens {
   const CodeBlockTheme({
     required this.text,
-    required this.label,
+    required this.chrome,
     required this.margin,
-    required this.headerPadding,
+    required this.bodyPadding,
+    required this.titlePadding,
+    required this.actionSpacing,
     required this.radius,
     required this.borderColor,
     required this.backgroundColor,
-    required this.headerBackgroundColor,
     required this.collapseDuration,
     required this.fadeHeight,
     required this.virtualizedHeight,
   });
   final TextStyle text;
-  final TextStyle label;
+  final MarkstreamChromeTheme chrome;
   final EdgeInsetsGeometry margin;
-  final EdgeInsetsGeometry headerPadding;
+  final EdgeInsetsGeometry bodyPadding;
+  final EdgeInsetsGeometry titlePadding;
+  final double actionSpacing;
   final double radius;
   final Color borderColor;
   final Color backgroundColor;
-  final Color headerBackgroundColor;
   final Duration collapseDuration;
   final double fadeHeight;
   final double virtualizedHeight;
   CodeBlockTheme copyWith({
     TextStyle? text,
-    TextStyle? label,
+    MarkstreamChromeTheme? chrome,
     EdgeInsetsGeometry? margin,
-    EdgeInsetsGeometry? headerPadding,
+    EdgeInsetsGeometry? bodyPadding,
+    EdgeInsetsGeometry? titlePadding,
+    double? actionSpacing,
     double? radius,
     Color? borderColor,
     Color? backgroundColor,
-    Color? headerBackgroundColor,
     Duration? collapseDuration,
     double? fadeHeight,
     double? virtualizedHeight,
   }) => CodeBlockTheme(
     text: text ?? this.text,
-    label: label ?? this.label,
+    chrome: chrome ?? this.chrome,
     margin: margin ?? this.margin,
-    headerPadding: headerPadding ?? this.headerPadding,
+    bodyPadding: bodyPadding ?? this.bodyPadding,
+    titlePadding: titlePadding ?? this.titlePadding,
+    actionSpacing: actionSpacing ?? this.actionSpacing,
     radius: radius ?? this.radius,
     borderColor: borderColor ?? this.borderColor,
     backgroundColor: backgroundColor ?? this.backgroundColor,
-    headerBackgroundColor: headerBackgroundColor ?? this.headerBackgroundColor,
     collapseDuration: collapseDuration ?? this.collapseDuration,
     fadeHeight: fadeHeight ?? this.fadeHeight,
     virtualizedHeight: virtualizedHeight ?? this.virtualizedHeight,
@@ -283,13 +289,14 @@ final class CodeBlockTheme extends _ThemeTokens {
   @override
   List<Object?> get _values => [
     text,
-    label,
+    chrome,
     margin,
-    headerPadding,
+    bodyPadding,
+    titlePadding,
+    actionSpacing,
     radius,
     borderColor,
     backgroundColor,
-    headerBackgroundColor,
     collapseDuration,
     fadeHeight,
     virtualizedHeight,
@@ -544,12 +551,15 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.colors,
     required this.brightness,
     required this.body,
+    required this.monospace,
     required this.strongWeight,
+    this.fontWeightResolver = _identityFontWeight,
     required List<TextStyle> headings,
     required this.headingPadding,
     required this.blockSpacing,
     required this.link,
     required this.inlineCode,
+    required this.keyboard,
     required this.code,
     required this.quote,
     required this.listMarkerPadding,
@@ -570,12 +580,20 @@ final class MarkstreamTheme extends _ThemeTokens {
   final MarkstreamColors colors;
   final Brightness brightness;
   final TextStyle body;
+
+  /// Baseline monospace text, independent of fenced code block styling.
+  final TextStyle monospace;
   final FontWeight strongWeight;
+
+  /// Resolves raw font weights from theme defaults and inline HTML.
+  /// Already-resolved styles must not pass through this a second time.
+  final FontWeight Function(FontWeight) fontWeightResolver;
   final List<TextStyle> headings;
   final EdgeInsetsGeometry headingPadding;
   final double blockSpacing;
   final TextStyle link;
   final InlineCodeTheme inlineCode;
+  final InlineCodeTheme keyboard;
   final CodeBlockTheme code;
   final QuoteTheme quote;
   final EdgeInsetsGeometry listMarkerPadding;
@@ -589,18 +607,50 @@ final class MarkstreamTheme extends _ThemeTokens {
   final EdgeInsetsGeometry mathPadding;
   final DetailsTheme details;
   final MarkstreamFillAlphas fillAlphas;
+
+  /// Foreground for content painted directly on the surrounding message.
+  Color get proseInk => backdrop == MarkstreamBackdrop.plain
+      ? colors.ink
+      : body.color ?? colors.ink;
+
+  /// Paragraphs and nested markup inside a painted block share its ink.
+  MarkstreamTheme get blockContentTheme {
+    if (body.color == colors.ink) return this;
+    final quoteBar = colors.ink.withValues(alpha: colors.quoteBar.a);
+    return copyWith(
+      colors: colors.copyWith(quoteBar: quoteBar),
+      body: body.copyWith(color: colors.ink),
+      headings: [
+        for (var i = 0; i < headings.length; i++)
+          headings[i].copyWith(color: i == 5 ? colors.ink2 : colors.ink),
+      ],
+      quote: quote.copyWith(textColor: colors.ink2, barColor: quoteBar),
+      task: task.copyWith(
+        borderColor: colors.borderStrong,
+        checkedText: task.checkedText.copyWith(
+          color: colors.ink3,
+          decorationColor: colors.ink3,
+        ),
+      ),
+      ruleColor: colors.border,
+    );
+  }
+
   MarkstreamTheme copyWith({
     MarkstreamBackdrop? backdrop,
     MarkstreamChromeTheme? chrome,
     MarkstreamColors? colors,
     Brightness? brightness,
     TextStyle? body,
+    TextStyle? monospace,
     FontWeight? strongWeight,
+    FontWeight Function(FontWeight)? fontWeightResolver,
     List<TextStyle>? headings,
     EdgeInsetsGeometry? headingPadding,
     double? blockSpacing,
     TextStyle? link,
     InlineCodeTheme? inlineCode,
+    InlineCodeTheme? keyboard,
     CodeBlockTheme? code,
     QuoteTheme? quote,
     EdgeInsetsGeometry? listMarkerPadding,
@@ -620,12 +670,15 @@ final class MarkstreamTheme extends _ThemeTokens {
     colors: colors ?? this.colors,
     brightness: brightness ?? this.brightness,
     body: body ?? this.body,
+    monospace: monospace ?? this.monospace,
     strongWeight: strongWeight ?? this.strongWeight,
+    fontWeightResolver: fontWeightResolver ?? this.fontWeightResolver,
     headings: headings ?? this.headings,
     headingPadding: headingPadding ?? this.headingPadding,
     blockSpacing: blockSpacing ?? this.blockSpacing,
     link: link ?? this.link,
     inlineCode: inlineCode ?? this.inlineCode,
+    keyboard: keyboard ?? this.keyboard,
     code: code ?? this.code,
     quote: quote ?? this.quote,
     listMarkerPadding: listMarkerPadding ?? this.listMarkerPadding,
@@ -647,12 +700,15 @@ final class MarkstreamTheme extends _ThemeTokens {
     colors,
     brightness,
     body,
+    monospace,
     strongWeight,
+    fontWeightResolver,
     ...headings,
     headingPadding,
     blockSpacing,
     link,
     inlineCode,
+    keyboard,
     code,
     quote,
     listMarkerPadding,
@@ -677,12 +733,13 @@ final class MarkstreamTheme extends _ThemeTokens {
     double maskStrength = 1,
     String codeFontFamily = 'monospace',
     bool desktop = false,
-    FontWeight medium = FontWeight.w500,
-    FontWeight semibold = FontWeight.w600,
-    FontWeight strong = FontWeight.w700,
+    FontWeight Function(FontWeight) fontWeightResolver = _identityFontWeight,
     bool cjk = false,
     MarkstreamFillAlphas fillAlphas = const MarkstreamFillAlphas(),
   }) {
+    final medium = fontWeightResolver(FontWeight.w500);
+    final semibold = fontWeightResolver(FontWeight.w600);
+    final strong = fontWeightResolver(FontWeight.w700);
     final dark = colors.brightness == Brightness.dark;
     // App adapters already resolve these defaults. Keep that immutable style
     // instead of allocating an identical copy for every theme construction.
@@ -700,13 +757,13 @@ final class MarkstreamTheme extends _ThemeTokens {
             color: bodyStyle?.color ?? colors.onSurface,
           );
     final b = body.fontSize!;
-    // Opaque surfaces keep their paired scheme ink, independently of a
-    // surrounding bubble's text override. Translucent surfaces inherit it.
-    final on = backdrop == MarkstreamBackdrop.plain
-        ? colors.onSurface
-        : body.color!;
+    // Painted blocks keep their paired scheme ink even when translucent.
+    // Text directly on the message bubble retains its inherited foreground.
+    final on = colors.onSurface;
+    final bodyInk = backdrop == MarkstreamBackdrop.plain ? on : body.color!;
     const white = Colors.white;
     final tint = dark ? white : on;
+    final bodyTint = dark ? white : bodyInk;
     final surface = colors.surface;
     final opaque = Color.alphaBlend(
       white.withValues(alpha: dark ? .04 : .70),
@@ -759,13 +816,13 @@ final class MarkstreamTheme extends _ThemeTokens {
             ? (dark ? .07 : .05)
             : (dark ? .06 : (wallpaper ? .045 : .04)),
       ),
-      fillInline: wallpaper
+      fillInline: translucent
           ? Color.alphaBlend(
               tint.withValues(alpha: dark ? .10 : .07),
-              surface.withValues(alpha: .55),
+              fillBlock,
             )
           : tint.withValues(alpha: dark ? .10 : (bubble ? .07 : .06)),
-      quoteBar: tint.withValues(alpha: dark ? .20 : .14),
+      quoteBar: bodyTint.withValues(alpha: dark ? .20 : .14),
       accent: colors.primary,
       surface: surface,
       tip: Color(dark ? 0xff75dfa3 : 0xff16a34a),
@@ -773,6 +830,8 @@ final class MarkstreamTheme extends _ThemeTokens {
       danger: colors.error,
       important: colors.tertiary,
     );
+    final mutedBodyInk = bodyInk.withValues(alpha: palette.ink2.a);
+    final faintBodyInk = bodyInk.withValues(alpha: palette.ink3.a);
     final chrome = MarkstreamChromeTheme(
       height: 36,
       padding: const EdgeInsetsDirectional.only(start: 12, end: 4),
@@ -780,8 +839,9 @@ final class MarkstreamTheme extends _ThemeTokens {
       divider: palette.divider,
       label: body.copyWith(
         fontSize: 12.5,
-        fontWeight: FontWeight.w500,
-        color: palette.ink2,
+        fontWeight: medium,
+        // The translucent header adds another tint over the block fill.
+        color: translucent ? on.withValues(alpha: .78) : palette.ink2,
         letterSpacing: .2,
         height: 1,
       ),
@@ -797,40 +857,39 @@ final class MarkstreamTheme extends _ThemeTokens {
       fontFamily: codeFontFamily,
       fontFamilyFallback: body.fontFamilyFallback,
     );
+    final inlineCode = InlineCodeTheme(
+      text: mono.copyWith(
+        fontSize: b * .86,
+        height: 1,
+        leadingDistribution: TextLeadingDistribution.even,
+        color: palette.ink.withValues(alpha: .92),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+      opticalCenter: b * .35,
+      radius: radiusSm,
+      backgroundColor: palette.fillInline,
+      borderColor: Colors.transparent,
+    );
     return MarkstreamTheme(
       backdrop: backdrop,
       colors: palette,
       chrome: chrome,
       brightness: colors.brightness,
       body: body,
+      monospace: mono,
       strongWeight: strong,
+      fontWeightResolver: fontWeightResolver,
       headings: [
-        body.copyWith(
-          fontSize: b * 1.45,
-          fontWeight: FontWeight.w700,
-          height: 1.3,
-        ),
-        body.copyWith(
-          fontSize: b * 1.27,
-          fontWeight: FontWeight.w600,
-          height: 1.35,
-        ),
-        body.copyWith(
-          fontSize: b * 1.13,
-          fontWeight: FontWeight.w600,
-          height: 1.4,
-        ),
-        body.copyWith(fontSize: b, fontWeight: FontWeight.w600, height: 1.45),
-        body.copyWith(
-          fontSize: b * .94,
-          fontWeight: FontWeight.w600,
-          height: 1.45,
-        ),
+        body.copyWith(fontSize: b * 1.45, fontWeight: strong, height: 1.3),
+        body.copyWith(fontSize: b * 1.27, fontWeight: semibold, height: 1.35),
+        body.copyWith(fontSize: b * 1.13, fontWeight: semibold, height: 1.4),
+        body.copyWith(fontSize: b, fontWeight: medium, height: 1.45),
+        body.copyWith(fontSize: b * .94, fontWeight: medium, height: 1.45),
         body.copyWith(
           fontSize: b * .88,
-          fontWeight: FontWeight.w600,
+          fontWeight: medium,
           height: 1.45,
-          color: palette.ink2,
+          color: mutedBodyInk,
         ),
       ],
       headingPadding: const EdgeInsets.only(top: 4),
@@ -841,28 +900,24 @@ final class MarkstreamTheme extends _ThemeTokens {
         decorationColor: palette.accent.withValues(alpha: .35),
         decorationThickness: 1,
       ),
-      inlineCode: InlineCodeTheme(
-        text: mono.copyWith(
-          fontSize: b * .86,
-          height: 1,
-          leadingDistribution: TextLeadingDistribution.even,
-          color: palette.ink.withValues(alpha: .92),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-        opticalCenter: b * .35,
-        radius: radiusSm,
-        backgroundColor: palette.fillInline,
-        borderColor: Colors.transparent,
+      inlineCode: inlineCode,
+      keyboard: inlineCode.copyWith(
+        radius: radiusXs,
+        backgroundColor: backdrop == MarkstreamBackdrop.plain
+            ? palette.fillBlock
+            : palette.fillRaised,
+        borderColor: palette.borderStrong,
       ),
       code: CodeBlockTheme(
         text: mono,
-        label: chrome.label,
+        chrome: chrome,
         margin: const EdgeInsets.symmetric(vertical: 4),
-        headerPadding: const EdgeInsets.symmetric(horizontal: 12),
+        bodyPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        titlePadding: const EdgeInsets.symmetric(horizontal: 6),
+        actionSpacing: 0,
         radius: radiusMd,
         borderColor: palette.border,
         backgroundColor: palette.fillBlock,
-        headerBackgroundColor: palette.fillHead,
         collapseDuration: const Duration(milliseconds: 220),
         fadeHeight: 24,
         virtualizedHeight: 420,
@@ -873,28 +928,28 @@ final class MarkstreamTheme extends _ThemeTokens {
         barWidth: 3,
         barRadius: 1.5,
         barColor: palette.quoteBar,
-        textColor: palette.ink2,
+        textColor: mutedBodyInk,
       ),
       listMarkerPadding: const EdgeInsetsDirectional.only(end: 6),
       task: TaskTheme(
         size: 16,
         radius: radiusXs,
         strokeWidth: 1.5,
-        borderColor: palette.borderStrong,
+        borderColor: bodyTint.withValues(alpha: palette.borderStrong.a),
         selectedColor: colors.primary,
         checkColor: colors.onPrimary,
         checkSize: 10,
         checkedText: body.copyWith(
           decoration: TextDecoration.lineThrough,
-          decorationColor: palette.ink3,
-          color: palette.ink3,
+          decorationColor: faintBodyInk,
+          color: faintBodyInk,
         ),
       ),
       table: MarkdownTableTheme(
         heading: body.copyWith(
           fontSize: 13,
           height: 1.45,
-          fontWeight: FontWeight.w600,
+          fontWeight: semibold,
           color: palette.ink,
         ),
         body: body.copyWith(
@@ -919,7 +974,7 @@ final class MarkstreamTheme extends _ThemeTokens {
       ),
       rulePadding: const EdgeInsets.symmetric(vertical: 12),
       ruleThickness: stroke,
-      ruleColor: palette.border,
+      ruleColor: bodyTint.withValues(alpha: palette.border.a),
       imageRadius: radiusMd,
       inlineMathScale: 1.1,
       mathPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -928,7 +983,7 @@ final class MarkstreamTheme extends _ThemeTokens {
         radius: radiusMd,
         backgroundColor: palette.fillBlock,
         borderColor: palette.border,
-        summary: body.copyWith(fontWeight: medium),
+        summary: body.copyWith(fontWeight: medium, color: palette.ink),
         summaryPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         contentPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         chevronSize: 14,

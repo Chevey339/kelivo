@@ -308,7 +308,7 @@ class _BlockColumn extends MultiChildRenderObjectWidget {
 
 typedef ViewportClips = ({Rect? paint, Rect? semantics});
 
-ViewportClips viewportClips(RenderBox target) {
+ViewportClips viewportClips(RenderBox target, {double paintOverflow = 32}) {
   Rect? paint;
   Rect? semantics;
   // Intersect every viewport, including a code area's horizontal viewport
@@ -328,7 +328,7 @@ ViewportClips viewportClips(RenderBox target) {
           transform,
           Offset.zero & box.size,
         );
-        final paintRect = rect.inflate(32);
+        final paintRect = rect.inflate(paintOverflow);
         final semanticsRect = rect.inflate(box.size.height + 250);
         paint = paint?.intersect(paintRect) ?? paintRect;
         semantics = semantics?.intersect(semanticsRect) ?? semanticsRect;
@@ -406,8 +406,9 @@ class _RenderBlockColumn extends RenderFlex implements ViewportClipParticipant {
     final next = _childrenNearViewport(clips.semantics);
     final previous = _semanticChildren ?? const <RenderBox>[];
     if (next.length != previous.length ||
-        Iterable<int>.generate(next.length)
-            .any((i) => next[i] != previous[i])) {
+        Iterable<int>.generate(
+          next.length,
+        ).any((i) => next[i] != previous[i])) {
       _semanticChildren = next;
       markNeedsSemanticsUpdate();
     }

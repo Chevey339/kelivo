@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/conversation_mcp_settings.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'dart:async';
@@ -123,6 +124,60 @@ void main() {
     });
   });
 
+  for (final enabled in [false, true]) {
+    testWidgets('scheduled target uses its MCP override (enabled: $enabled)', (
+      tester,
+    ) async {
+      final harness = await mount(tester);
+      await tester.runAsync(() async {
+        await harness.assistants.updateAssistant(
+          harness.assistants
+              .getById('assistant')!
+              .copyWith(
+                allowConversationMcp: true,
+                mcpServerIds: enabled ? [] : ['remote'],
+              ),
+        );
+        final target = Conversation(
+          id: 'target',
+          title: 'Target',
+          assistantId: 'assistant',
+          mcpServerIds: enabled ? ['remote'] : [],
+          extras: const {ConversationMcpSettings.overrideKey: true},
+        );
+        harness.chat.existing[target.id] = target;
+        final outcome = harness.run(
+          null,
+          const ScheduledTask(
+            id: 'task',
+            name: 'Task',
+            prompt: 'Hello',
+            assistantId: 'assistant',
+            hour: 8,
+            minute: 0,
+            mode: ScheduledTaskMode.followUp,
+            conversationId: 'target',
+          ),
+        );
+        if (enabled) {
+          await pumpEventQueue();
+          expect(harness.viewModel.requests, isEmpty);
+          harness.server.releaseTools.complete();
+        }
+        expect(
+          await outcome.timeout(const Duration(seconds: 5)),
+          isA<_RequestCaptured>(),
+        );
+        expect(
+          harness.viewModel.toolSnapshots.single,
+          enabled ? ['echo'] : isEmpty,
+        );
+        expect(harness.viewModel.requests.single.conversationId, target.id);
+        expect(harness.chat.created, isEmpty);
+      });
+    });
+  }
+
   for (final mode in ScheduledTaskMode.values) {
     testWidgets('${mode.name} uses the selected target and task model', (
       tester,
@@ -200,6 +255,32 @@ void main() {
       });
     });
   }
+
+  testWidgets('task cannot run with a disabled model', (tester) async {
+    final harness = await mount(tester);
+    await tester.runAsync(() async {
+      await harness.settings.setModelEnabled(
+        'task-provider',
+        'task-model',
+        false,
+      );
+      final task = ScheduledTask(
+        id: 'task',
+        name: 'Task',
+        prompt: 'Prompt',
+        assistantId: 'assistant',
+        hour: 8,
+        minute: 0,
+        modelProvider: 'task-provider',
+        modelId: 'task-model',
+      );
+      expect(
+        await harness.run(null, task),
+        isA<StateError>().having((e) => e.message, 'message', 'model_missing'),
+      );
+      expect(harness.viewModel.requests, isEmpty);
+    });
+  });
 
   testWidgets('busy target does not acquire a cancellation callback', (
     tester,
@@ -499,7 +580,12 @@ class _RecordingViewModel extends Fake implements HomeViewModel {
     final tools = McpToolService();
     toolSnapshots.add(
       tools
-          .listAvailableToolsForAssistant(mcpProvider, assistants, assistant.id)
+          .listAvailableToolsForAssistant(
+            mcpProvider,
+            assistants,
+            assistant.id,
+            conversation: conversation,
+          )
           .map((tool) => tool.name)
           .toList(),
     );

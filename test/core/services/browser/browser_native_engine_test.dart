@@ -12,6 +12,7 @@ import 'package:Kelivo/core/services/browser/browser_failure.dart';
 import 'package:Kelivo/core/services/browser/browser_scroll_observer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 // Exercise the Windows implementation resolved by flutter_inappwebview itself.
@@ -33,7 +34,11 @@ void main() {
     platform = _BrowserPlatform();
     InAppWebViewPlatform.instance = platform;
     store = _MemoryStore();
-    service = BrowserService(store: store, supported: true);
+    service = BrowserService(
+      store: store,
+      supported: true,
+      engineFactory: _createEngine,
+    );
   });
 
   tearDown(() async {
@@ -43,6 +48,77 @@ void main() {
       InAppWebViewPlatform.instance = previousPlatform;
     }
   });
+
+  test(
+    'initialization failure survives a second failure during cleanup',
+    () async {
+      final failure = PlatformException(
+        code: '0x80070005',
+        message:
+            'CreateCoreWebView2CompositionController failed: Access is denied.',
+        details: {'stage': 'CreateCoreWebView2CompositionController'},
+      );
+      platform.runError = failure;
+      platform.disposeError = StateError('cleanup failed');
+      await expectLater(
+        _createEngine(
+          tab: const BrowserTab(id: 'failed-initialization'),
+          settings: const BrowserSettings(),
+          onChanged: (_) {},
+          onDownload: (_, __) {},
+          onNewWindow: (_, __) async => false,
+          isAgentActive: () => false,
+        ),
+        throwsA(same(failure)),
+      );
+      expect(platform.views.single.disposed, isTrue);
+    },
+  );
+
+  test(
+    'bridge refusal leaves an existing normal tab network policy intact',
+    () async {
+      final root = await Directory.systemTemp.createTemp('bridge-refusal-');
+      await File('${root.path}/notes.app.html').writeAsString('offline app');
+      final resources = BrowserWorkspaceResources.instance;
+      final previous = resources.rootForSession;
+      resources.rootForSession = (_) async => root;
+      addTearDown(() async {
+        resources.rootForSession = previous;
+        await root.delete(recursive: true);
+      });
+      platform.messageListenerError = StateError(
+        'browser_storage_bridge_unsupported',
+      );
+      await service.initialize();
+      final tab = await service.createTab(
+        ownerSessionId: 'chat',
+        url: 'https://example.com',
+      );
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final view = platform.views.single;
+      await expectLater(
+        service.navigate('kelivo://workspace/notes.app.html', tabId: tab.id),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'code',
+            'browser_storage_bridge_unsupported',
+          ),
+        ),
+      );
+      expect(
+        view.document.appliedSettings.any((s) => s.blockNetworkLoads == true),
+        false,
+      );
+      await service.navigate('https://example.org', tabId: tab.id);
+      expect(view.document.url.toString(), 'https://example.org');
+      expect(
+        await view.policy('https://example.org'),
+        NavigationActionPolicy.ALLOW,
+      );
+    },
+  );
 
   test(
     'workspace resources use scoped URLs and reject other tab origins',
@@ -119,6 +195,8 @@ void main() {
         'kelivo://workspace/index.html',
         android: false,
       );
+      await view.start(uriB.toString());
+      await view.stop(uriB.toString());
       final response = await view.params.onLoadResourceWithCustomScheme!(
         view.callbackController,
         WebResourceRequest(url: WebUri(uriB.toString()), method: 'GET'),
@@ -269,7 +347,7 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       platform.useWindowsFindFactory = true;
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: const BrowserTab(id: 'windows', url: 'https://example.com'),
         settings: const BrowserSettings(),
         onChanged: (_) {},
@@ -1116,6 +1194,7 @@ void main() {
       if (crash) {
         await service.navigate('https://recovered.example/', tabId: tab.id);
         expect(platform.views.last, isNot(same(native)));
+        await platform.views.last.commit('https://recovered.example/');
         expect(service.requireTab(tab.id).url, 'https://recovered.example/');
       }
       await service.closeTab(tab.id);
@@ -1175,7 +1254,7 @@ void main() {
   );
 
   test('changing UA also invalidates the cached download header', () async {
-    final engine = await NativeBrowserEngine.create(
+    final engine = await _createEngine(
       tab: const BrowserTab(id: 'ua-download'),
       settings: const BrowserSettings(),
       onChanged: (_) {},
@@ -1206,7 +1285,7 @@ void main() {
   test(
     'download headers exclude cross-host, insecure and wrong-path credentials',
     () async {
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: const BrowserTab(id: 'cookies'),
         settings: const BrowserSettings(),
         onChanged: (_) {},
@@ -1246,7 +1325,7 @@ void main() {
   test(
     'tab thumbnails are small JPEGs while agent screenshots retain their PNG contract',
     () async {
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: const BrowserTab(id: 'preview-test'),
         settings: const BrowserSettings(),
         onChanged: (_) {},
@@ -1286,7 +1365,7 @@ void main() {
   test(
     'covered tabs clear native focus and a rapid return supersedes pause',
     () async {
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: const BrowserTab(id: 'focus-test'),
         settings: const BrowserSettings(),
         onChanged: (_) {},
@@ -1348,7 +1427,7 @@ void main() {
     ) async {
       debugDefaultTargetPlatformOverride = target;
       const tab = BrowserTab(id: 'composition-test');
-      final engine = await NativeBrowserEngine.create(
+      final engine = await _createEngine(
         tab: tab,
         settings: const BrowserSettings(
           surfaceStyle: BrowserSurfaceStyle.solid,
@@ -1533,7 +1612,11 @@ void main() {
       expect(service.requireTab(tab.id).hasContent, isTrue);
 
       await service.flush();
-      final restored = BrowserService(store: store, supported: true);
+      final restored = BrowserService(
+        store: store,
+        supported: true,
+        engineFactory: _createEngine,
+      );
       await restored.initialize();
       expect(restored.tabs.single.id, tab.id);
       expect(restored.tabs.single.url, 'about:blank');
@@ -1605,7 +1688,11 @@ void main() {
       expect(service.requireTab(tab.id).hasContent, isTrue);
 
       await service.flush();
-      final restored = BrowserService(store: store, supported: true);
+      final restored = BrowserService(
+        store: store,
+        supported: true,
+        engineFactory: _createEngine,
+      );
       await restored.initialize();
       expect(restored.tabs.single.id, tab.id);
       expect(restored.tabs.single.url, 'about:blank');
@@ -1933,7 +2020,96 @@ void main() {
       expect(await handler([reset(3)]), isTrue);
     },
   );
+  test(
+    'load-stop survives disposal of its transferred callback controller',
+    () async {
+      const url = 'https://example.com/';
+      final tab = await service.createTab(url: url);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(url);
+      final read = native.document.urlRead = Completer<WebUri?>();
+      native.params.onLoadStop!(native.callbackController, WebUri(url));
+      native.params.onWebViewCreated!(native.callbackController);
+      native.controller.dispose(isKeepAlive: true);
+      read.complete(WebUri(url));
+      await service.waitForLoad(
+        tabId: tab.id,
+        stage: BrowserLoadStage.load,
+        timeout: const Duration(milliseconds: 100),
+      );
+      expect(service.requireTab(tab.id).title, 'Rendered document');
+      expect(service.requireTab(tab.id).isLoading, false);
+    },
+  );
+
+  test(
+    'failed provisional navigation keeps the document URL and render clears failure at commit',
+    () async {
+      const old = 'https://example.com/';
+      const target = 'https://offline.example/';
+      final tab = await service.createTab(url: old);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(old);
+      await native.stop(old);
+      final title = service.requireTab(tab.id).title;
+      await service.navigate(target, tabId: tab.id);
+      await native.start(target);
+      await native.history(target);
+      expect(service.requireTab(tab.id).url, old);
+      await native.error(
+        target,
+        WebResourceErrorType.CONNECTION_ABORTED,
+        'net::ERR_CONNECTION_ABORTED',
+      );
+      await native.history(target);
+      expect(service.requireTab(tab.id).url, old);
+      expect(service.requireTab(tab.id).title, title);
+      await expectLater(
+        service.waitForLoad(tabId: tab.id),
+        throwsA(
+          isA<BrowserFailure>().having(
+            (e) => e.details?['native_description'],
+            'native diagnostic',
+            'net::ERR_CONNECTION_ABORTED',
+          ),
+        ),
+      );
+      await service.loadHtml('<title>Recovered</title>', tabId: tab.id);
+      // WebView2 NavigateToString can commit without a Fetch-based load-start.
+      await native.commit('about:blank');
+      await service.waitForLoad(
+        tabId: tab.id,
+        stage: BrowserLoadStage.domcontentloaded,
+      );
+      expect(service.requireTab(tab.id).error, isNull);
+      expect(service.requireTab(tab.id).url, 'about:blank');
+      await native.stop('about:blank');
+      expect(service.requireTab(tab.id).error, isNull);
+    },
+  );
 }
+
+// Mock browser tests must not initialize an actual Windows profile, including
+// when this suite itself runs on Windows. The runtime suite supplies a real,
+// isolated environment through the same factory seam.
+Future<BrowserEngine> _createEngine({
+  required BrowserTab tab,
+  required BrowserSettings settings,
+  required void Function(BrowserPageState) onChanged,
+  required void Function(String, String?) onDownload,
+  required Future<bool> Function(String?, int) onNewWindow,
+  required bool Function() isAgentActive,
+}) => NativeBrowserEngine.create(
+  tab: tab,
+  settings: settings,
+  onChanged: onChanged,
+  onDownload: onDownload,
+  onNewWindow: onNewWindow,
+  isAgentActive: isAgentActive,
+  webViewEnvironment: () async => null,
+);
 
 class _MemoryStore extends BrowserStore {
   Map<String, Object?> state = {};
@@ -1944,6 +2120,18 @@ class _MemoryStore extends BrowserStore {
 }
 
 class _BrowserPlatform extends InAppWebViewPlatform {
+  Object? messageListenerError;
+
+  @override
+  PlatformWebMessageListener createPlatformWebMessageListener(
+    PlatformWebMessageListenerCreationParams params,
+  ) {
+    if (messageListenerError != null) throw messageListenerError!;
+    return super.createPlatformWebMessageListener(params);
+  }
+
+  Object? runError;
+  Object? disposeError;
   bool useWindowsFindFactory = false;
   final List<_HeadlessView> views = [];
   final Map<Object, _Document> documents = {};
@@ -1997,6 +2185,8 @@ class _BrowserPlatform extends InAppWebViewPlatform {
     final document = _Document();
     documents[id] = document;
     final view = _HeadlessView(params, id, document);
+    view.runError = runError;
+    view.disposeError = disposeError;
     views.add(view);
     return view;
   }
@@ -2063,6 +2253,7 @@ class _Document {
   void Function()? onBack;
   void Function()? onForward;
   WebUri? url;
+  Completer<WebUri?>? urlRead;
   String readiness = 'complete';
   Completer<CallAsyncJavaScriptResult?>? domReady;
   int domWaits = 0;
@@ -2078,6 +2269,8 @@ class _HeadlessView extends PlatformHeadlessInAppWebView {
   final String id;
   final _Document document;
   bool disposed = false;
+  Object? runError;
+  Object? disposeError;
   late final _Controller controller = _Controller(
     PlatformInAppWebViewControllerCreationParams(id: id, webviewParams: params),
     document,
@@ -2087,9 +2280,17 @@ class _HeadlessView extends PlatformHeadlessInAppWebView {
       params.controllerFromPlatform!(controller) as InAppWebViewController;
 
   @override
-  Future<void> run() async => params.onWebViewCreated!(callbackController);
+  Future<void> run() async {
+    if (runError != null) throw runError!;
+    params.onWebViewCreated!(callbackController);
+  }
+
   @override
-  Future<void> dispose() async => disposed = true;
+  Future<void> dispose() async {
+    disposed = true;
+    if (disposeError != null) throw disposeError!;
+  }
+
   @override
   bool isRunning() => !disposed;
   @override
@@ -2152,6 +2353,7 @@ class _HeadlessView extends PlatformHeadlessInAppWebView {
 class _Controller extends PlatformInAppWebViewController {
   _Controller(super.params, this.document) : super.implementation();
   final _Document document;
+  bool disposed = false;
   @override
   Future<CallAsyncJavaScriptResult?> callAsyncJavaScript({
     required String functionBody,
@@ -2180,9 +2382,13 @@ class _Controller extends PlatformInAppWebViewController {
   }
 
   @override
-  Future<WebUri?> getUrl() async => document.url;
+  Future<WebUri?> getUrl() async => document.urlRead?.future ?? document.url;
   @override
-  Future<String?> getTitle() async => 'Rendered document';
+  Future<String?> getTitle() async {
+    if (disposed) throw StateError('Controller already disposed');
+    return 'Rendered document';
+  }
+
   @override
   Future<bool> canGoBack() async {
     document.independentHistoryReads++;
@@ -2253,7 +2459,7 @@ class _Controller extends PlatformInAppWebViewController {
   @override
   Future<void> stopLoading() async {}
   @override
-  void dispose({bool isKeepAlive = false}) {}
+  void dispose({bool isKeepAlive = false}) => disposed = true;
   @override
   Future<void> disposeKeepAlive(InAppWebViewKeepAlive keepAlive) async {}
   @override

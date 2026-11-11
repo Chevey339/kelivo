@@ -1,3 +1,4 @@
+import 'features/side_panel/desktop_side_panel_controller.dart';
 import 'core/services/scheduled_tasks_service.dart';
 import 'core/services/auth/provider_oauth_service.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
@@ -19,6 +20,7 @@ import 'desktop/desktop_window_controller.dart';
 import 'core/services/linux_window_service.dart';
 import 'desktop/desktop_tray_controller.dart';
 import 'desktop/windows_paste_fix.dart';
+import 'shared/text_input/android_ime_selection.dart';
 // import 'package:logging/logging.dart' as logging;
 // Theme is now managed in SettingsProvider
 import 'theme/theme_factory.dart';
@@ -95,6 +97,8 @@ import 'shared/widgets/floating_ipad_padding.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_progress_screen.dart';
+import 'shared/widgets/windows_data_directory_startup.dart';
+import 'core/services/storage/windows_data_directory.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
 import 'shared/widgets/update_required_screen.dart';
 import 'package:system_fonts/system_fonts.dart';
@@ -110,6 +114,9 @@ import 'features/home/controllers/chat_actions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/models/workspace_binding.dart';
 import 'core/services/browser/browser_workspace_resources.dart';
+import 'core/services/workspace/workspace_file_access.dart';
+import 'core/services/workspace/workspace_paths.dart';
+import 'core/services/conversation_tool_permissions.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
@@ -122,6 +129,52 @@ void _wireWorkspaceServices(BuildContext ctx) {
     final chat = ctx.read<ChatService>();
     final workspaces = ctx.read<WorkspaceProvider>();
     final assistants = ctx.read<AssistantProvider>();
+    Future<Directory>? storageSkills;
+    BrowserWorkspaceResources.instance.bindingForSession = (sessionId) {
+      final conversation = chat.getConversation(sessionId);
+      return conversation == null
+          ? null
+          : '${WorkspaceBinding.fromExtras(conversation.extras).workspaceId}\n${conversation.assistantId}';
+    };
+    BrowserWorkspaceResources
+        .instance
+        .authorizeData = (sessionId, relativePath, write) async {
+      if (!ctx.mounted) throw StateError('browser_workspace_not_bound');
+      final mounts = ctx.read<ExternalMountsProvider>();
+      final state = ConversationToolPermissions.forChat(chat).read(sessionId);
+      final workspace = state?.workspaceId == null
+          ? null
+          : workspaces.byId(state!.workspaceId!);
+      if (workspace == null) throw StateError('browser_workspace_not_bound');
+      final tool = write ? 'write_file' : 'read_file';
+      final root = await workspaces.hostRootFor(workspace);
+      final skills = await (storageSkills ??=
+          AppDirectories.getSkillsDirectory());
+      await mounts.loaded;
+      // Uses the existing path-zone rules without starting a shell/VM or
+      // repeatedly resolving directory bookmarks for each auto-save.
+      final paths = WorkspacePaths.sandboxed(
+        workspaceHostRoot: root,
+        sessionHostDir: (await AppDirectories.sessionDir(sessionId)).path,
+        skillsHostDir: skills.path,
+        externalMounts: mounts.activeMounts,
+      );
+      await WorkspaceFileAccess(
+        paths: paths,
+        arguments: const {},
+        permission: ToolCallPermission(
+          toolName: tool,
+          toolCallId: '',
+          conversationId: sessionId,
+          workspaceId: workspace.id,
+          assistantId: state!.assistantId,
+          readState: () =>
+              ConversationToolPermissions.forChat(chat).read(sessionId),
+          isEnabled: () =>
+              workspaces.byId(workspace.id)?.isToolEnabled(tool) == true,
+        ),
+      ).resolve(relativePath, paths.modelRoot, write: write);
+    };
     BrowserWorkspaceResources.instance.rootForSession = (sessionId) async {
       await workspaces.loaded;
       final conversation = chat.getConversation(sessionId);
@@ -133,6 +186,11 @@ void _wireWorkspaceServices(BuildContext ctx) {
       if (workspace == null) return null;
       return Directory(await workspaces.hostRootFor(workspace));
     };
+    BrowserWorkspaceResources.instance.sessionRootForSession =
+        (sessionId) async {
+          if (chat.getConversation(sessionId) == null) return null;
+          return AppDirectories.sessionDir(sessionId);
+        };
     chat.newConversationExtras = (assistantId) {
       if (assistantId == null) {
         return const <String, dynamic>{};
@@ -168,6 +226,7 @@ Future<void> main() async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
       WindowsPasteFix.instance.install();
+      AndroidImeSelection.instance.install();
       // Register notification tap handling for every Android launch. This is
       // independent of the current background-chat mode: an older completion
       // notification can still launch the app after the mode has changed.
@@ -182,6 +241,11 @@ Future<void> main() async {
       // Show before the restore gate so progress and failure screens stay visible.
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
         await _initDesktopWindow();
+      }
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        await initializeWindowsDataDirectory(
+          showWindow: _initRestoreFailureWindow,
+        );
       }
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final retained = await AppDirectories.documentsDirectoryFor(
@@ -410,8 +474,19 @@ Future<void> main() async {
           return;
         }
       }
-      // Desktop exit hook: drain queued preference writes before process exit.
-      _installExitFlush(businessPreferences);
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        try {
+          await (await WindowsDataDirectory.instance).confirmStartup();
+        } catch (error) {
+          // Keep the retained source when confirmation cannot be persisted.
+          stderr.writeln('[DataDirectoryConfirmation] $error');
+        }
+      }
+      // Desktop exit hook: stop producers, drain writes, then close SQLite.
+      final chatService = ChatService(
+        existingRepository: processDatabaseLease.chatRepository,
+      );
+      _installExitFlush(businessPreferences, chatService);
       ScheduledTasksService.configureDevice(businessPreferences);
       // Best-effort trim of archived restore runs after a few cold starts.
       unawaited(_pruneRestoreArchive(appDataDirectory));
@@ -422,6 +497,7 @@ Future<void> main() async {
       runApp(
         MyApp(
           databaseLease: processDatabaseLease,
+          chatService: chatService,
           businessPreferences: businessPreferences,
           appDataDirectory: appDataDirectory,
           restoreOutcome: restoreOutcome?.state,
@@ -612,27 +688,43 @@ Future<void> _initDesktopWindow() async {
 AppLifecycleListener? _exitFlushListener;
 
 /// Desktop-only: mobile process kills cannot be intercepted, and SQLite WAL
-/// already protects committed transactions, so only Dart-side write queues
-/// need draining before exit.
-void _installExitFlush(BusinessPreferences businessPreferences) {
+/// already protects committed transactions. On desktop, close the worker
+/// before engine shutdown so native finalizers do not race isolate teardown.
+void _installExitFlush(
+  BusinessPreferences businessPreferences,
+  ChatService chatService,
+) {
   if (kIsWeb) return;
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.linux;
   if (!isDesktop || _exitFlushListener != null) return;
+  AppExitFlush.register(DesktopSidePanelController.instance.flush);
   AppExitFlush.register(businessPreferences.flushPendingWrites);
   AppExitFlush.register(ChatActions.flushActiveGenerationProgress);
+  AppExitFlush.configureShutdown(
+    prepare: () async {
+      try {
+        await Future.wait([
+          ScheduledTasksService.instance.stopForExit(),
+          ChatActions.prepareForExit(),
+        ]);
+      } finally {
+        await chatService.close();
+      }
+    },
+    close: () async {
+      try {
+        await businessPreferences.close();
+      } finally {
+        await ChatDatabaseGateway.instance.shutdown();
+      }
+    },
+  );
   _exitFlushListener = AppLifecycleListener(
     onExitRequested: () async {
-      try {
-        // Bound the wait: a stuck write transaction must not leave the
-        // process unkillable after macOS answers NSTerminateLater.
-        await AppExitFlush.flushAll().timeout(
-          const Duration(seconds: 2),
-          onTimeout: () {},
-        );
-      } catch (_) {}
+      await AppExitFlush.shutdown();
       return AppExitResponse.exit;
     },
   );
@@ -695,12 +787,14 @@ class MyApp extends StatelessWidget {
   const MyApp({
     super.key,
     required this.databaseLease,
+    required this.chatService,
     required this.businessPreferences,
     required this.appDataDirectory,
     this.restoreOutcome,
   });
 
   final ChatDatabaseLease databaseLease;
+  final ChatService chatService;
   final BusinessPreferences businessPreferences;
   final Directory appDataDirectory;
   final RestoreReceiptState? restoreOutcome;
@@ -716,10 +810,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => UserProvider(preferences: businessPreferences),
         ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              ChatService(existingRepository: databaseLease.chatRepository),
-        ),
+        ChangeNotifierProvider(create: (_) => chatService),
         ChangeNotifierProvider(create: (_) => McpToolService()),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
@@ -732,6 +823,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (ctx) {
             final assistants = ctx.read<AssistantProvider>();
+            DesktopSidePanelController.instance.bindPreferences(
+              businessPreferences,
+            );
             final settings = SettingsProvider(
               businessPreferences,
               onProviderModelsRetired:
@@ -1109,7 +1203,8 @@ class MyApp extends StatelessWidget {
                   child: _selectHome(),
                 ),
                 builder: (ctx, child) {
-                  final bright = Theme.of(ctx).brightness;
+                  final appTheme = Theme.of(ctx);
+                  final bright = appTheme.brightness;
                   final overlay = bright == Brightness.dark
                       ? const SystemUiOverlayStyle(
                           statusBarColor: Colors.transparent,
@@ -1174,6 +1269,7 @@ class MyApp extends StatelessWidget {
                         coordinator.configureFromSettings(
                           backgroundSettings,
                           l10n,
+                          overlayProgressColor: appTheme.colorScheme.primary,
                         ),
                       );
                     });

@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "53eb751c8ac2fcdb1326323d4ad67533af7bb504",
+  "task": "s5-3",
+  "response": "关闭开关后，明细字段会隐藏，但其中的值仍保留为 `保留内容`，并且不参与必填校验；点击按钮只会准备一份**可编辑草稿**，不会自动发送。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form, ask])\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\nform = Form(children=[toggle, nameField, detailField], title=\"旅行同行人条件\")\ntoggle = Switch(bind=$on, label=\"启用同行人明细\")\nnameField = TextField(bind=$name, label=\"同行人姓名\", required=true)\ndetailField = TextField(bind=$detail, label=\"同行人明细\", required=true, visible=$on)\nask = Button(label=\"准备检查草稿\", form=form, action=Ask(text=\"请检查这份旅行同行人条件表单。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}))\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: conditional-form variant 3 uses the requested states, required name and conditionally visible required detail, retains hidden values, and associates Ask with the Form and exact name/enabled/detail context. Text describes an editable review draft rather than automatic sending. Defaults are blank/explicit placeholders, consistent with the first round's provenance interpretation."
+  }
+}

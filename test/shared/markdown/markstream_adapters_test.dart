@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
@@ -8,6 +9,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/markdown/citation_syntax.dart';
 import 'package:Kelivo/shared/markdown/highlight_adapter.dart';
 import 'package:Kelivo/shared/markdown/link_image_handlers.dart';
+import 'package:Kelivo/shared/markdown/markdown_image_sources.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/markdown/math_adapter.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
@@ -15,29 +17,32 @@ import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/markdown_backdrop_host.dart';
 
 Widget host(
   Widget child, {
   SettingsProvider? settings,
   bool dark = false,
+  bool wallpaper = false,
   double width = 390,
   Locale locale = const Locale('en'),
-}) => ChangeNotifierProvider.value(
-  value: settings ?? SettingsProvider(createBusinessTestPreferences()),
-  child: MaterialApp(
-    locale: locale,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    theme: ThemeData(brightness: dark ? Brightness.dark : Brightness.light),
-    home: AppSnackBarOverlay(
-      child: Scaffold(
-        body: SingleChildScrollView(
-          child: SizedBox(width: width, child: child),
-        ),
-      ),
+}) {
+  Widget body = SingleChildScrollView(
+    child: SizedBox(width: width, child: child),
+  );
+  if (wallpaper) body = MarkdownWallpaperTestHost(child: body);
+  return ChangeNotifierProvider.value(
+    value: settings ?? SettingsProvider(createBusinessTestPreferences()),
+    child: MaterialApp(
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      theme: ThemeData(brightness: dark ? Brightness.dark : Brightness.light),
+      home: AppSnackBarOverlay(child: Scaffold(body: body)),
     ),
-  ),
-);
+  );
+}
+
 List<MarkdownNode> nodes(MarkdownNode root) {
   final result = <MarkdownNode>[], pending = [root];
   while (pending.isNotEmpty) {
@@ -50,6 +55,94 @@ List<MarkdownNode> nodes(MarkdownNode root) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  for (final dark in [false, true]) {
+    for (final wallpaper in [false, true]) {
+      for (final streaming in [false, true]) {
+        testWidgets('inline code style switches live and preserves content: '
+            'dark=$dark wallpaper=$wallpaper streaming=$streaming', (
+          tester,
+        ) async {
+          final settings = SettingsProvider(createBusinessTestPreferences());
+          addTearDown(settings.dispose);
+          await settings.loaded;
+          final selection = MarkstreamSelectionController();
+          addTearDown(selection.dispose);
+          final code = List.filled(8, 'wrapped code 中文').join(' ');
+          final child = MarkstreamSelectionScope(
+            controller: selection,
+            child: SelectionArea(
+              child: MarkdownWithCodeHighlight(
+                text: 'Before `$code` after <kbd>Ctrl</kbd>\n\nTail',
+                streaming: streaming,
+              ),
+            ),
+          );
+          await tester.pumpWidget(
+            host(child, settings: settings, dark: dark, wallpaper: wallpaper),
+          );
+          await tester.pumpAndSettle();
+          final view = find.byType(MarkstreamView);
+          final state = tester.state(view);
+          final current = tester.widget<MarkstreamView>(view).theme!;
+          InlineCodeCapsule keyboard() => tester.widget<InlineCodeCapsule>(
+            find.byWidgetPredicate(
+              (widget) => widget is InlineCodeCapsule && widget.text == 'Ctrl',
+            ),
+          );
+          final originalKeyboard = keyboard();
+          expect(current.inlineCode.text.height, 1);
+          expect(current.inlineCode.borderColor, Colors.transparent);
+
+          String? selected;
+          for (final enabled in [false, true, false]) {
+            await settings.setUseLegacyInlineCodeStyle(enabled);
+            await tester.pumpAndSettle();
+            final updated = tester.widget<MarkstreamView>(view).theme!;
+            expect(tester.state(view), same(state));
+            expect(updated.copyWith(inlineCode: current.inlineCode), current);
+            final key = keyboard();
+            expect(
+              (
+                key.style,
+                key.padding,
+                key.backgroundColor,
+                key.border,
+                key.radius,
+              ),
+              (
+                originalKeyboard.style,
+                originalKeyboard.padding,
+                originalKeyboard.backgroundColor,
+                originalKeyboard.border,
+                originalKeyboard.radius,
+              ),
+              reason: 'The inline code preference must not restyle <kbd>.',
+            );
+            if (enabled) {
+              expect(updated.inlineCode.text.height, 1.4);
+              expect(updated.inlineCode.borderColor.a, greaterThan(0));
+              if (wallpaper) {
+                expect(
+                  updated.inlineCode.backgroundColor,
+                  updated.colors.fillBlock,
+                );
+              }
+            } else {
+              expect(updated, current);
+            }
+            tester
+                .state<SelectableRegionState>(find.byType(SelectableRegion))
+                .selectAll(SelectionChangedCause.keyboard);
+            await tester.pumpAndSettle();
+            selected ??= selection.selectedPlainText;
+            expect(selection.selectedPlainText, contains(code));
+            expect(selection.selectedPlainText, selected);
+            expect(tester.takeException(), isNull);
+          }
+        });
+      }
+    }
+  }
   testWidgets('directive cards follow the app locale when it changes', (
     tester,
   ) async {
@@ -207,6 +300,51 @@ void main() {
     }
     expect(debugHighlightParseCount, 1);
   });
+  test('cached syntax resolves platform weights without changing source', () {
+    debugResetHighlightNodeCache();
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    const source = '**strong** and *italic*';
+    for (final platform in [
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+      TargetPlatform.macOS,
+    ]) {
+      debugDefaultTargetPlatformOverride = platform;
+      for (final brightness in Brightness.values) {
+        for (final wallpaper in [false, true]) {
+          final span = KelivoCodeHighlighter(wallpaper: wallpaper).highlight(
+            source,
+            language: 'markdown',
+            style: TextStyle(fontWeight: AppFontWeights.semibold),
+            brightness: brightness,
+          );
+          final pending = [...?span.children];
+          final weights = <FontWeight>[];
+          var italic = false;
+          while (pending.isNotEmpty) {
+            final node = pending.removeLast();
+            if (node.style?.fontWeight case final weight?) weights.add(weight);
+            italic |= node.style?.fontStyle == FontStyle.italic;
+            if (node is TextSpan) pending.addAll(node.children ?? const []);
+          }
+          expect(span.toPlainText(), source);
+          expect(weights, isNotEmpty);
+          expect(
+            weights,
+            everyElement(
+              platform == TargetPlatform.android
+                  ? FontWeight.w500
+                  : FontWeight.w700,
+            ),
+          );
+          expect(italic, isTrue);
+          // The caller's style is already normalized; do not reduce it again.
+          expect(span.style!.fontWeight, AppFontWeights.semibold);
+        }
+      }
+    }
+    expect(debugHighlightParseCount, 1);
+  });
   test('math normalization repairs visuals and preserves color arguments', () {
     expect(normalizeMathTex(r'\# + #'), r'\# + \#');
     expect(
@@ -305,6 +443,7 @@ void main() {
       expect(style.fontFamilyFallback, ['CallerCjk']);
     }
     expect(view.theme!.strongWeight, AppFontWeights.strong);
+    expect(view.theme!.fontWeightResolver, AppFontWeights.normalize);
     expect(view.codeOptions.autoCollapse, isTrue);
     expect(view.codeOptions.mobileWrap, isTrue);
     await settings.setEnableMathRendering(false);

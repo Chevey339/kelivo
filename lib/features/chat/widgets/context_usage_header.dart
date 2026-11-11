@@ -66,6 +66,7 @@ class _ContextUsageHeaderState extends State<ContextUsageHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final usage = context.watch<ContextUsageService?>();
     final id = _conversationId;
     final snapshot = id == null
@@ -81,7 +82,21 @@ class _ContextUsageHeaderState extends State<ContextUsageHeader> {
       key: const ValueKey('context-usage-header'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ContextUsageBreakdown(snapshot: snapshot),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+          child: ContextUsageBreakdown(
+            snapshot: snapshot,
+            headerTrailing: snapshot?.state == ContextUsageState.failed
+                ? IosIconButton(
+                    tooltip: l10n.retry,
+                    semanticLabel: l10n.retry,
+                    icon: Lucide.RefreshCw,
+                    size: 16,
+                    onTap: () => _refresh(force: true),
+                  )
+                : null,
+          ),
+        ),
         if (showSetWindow) ...[
           const SizedBox(height: 12),
           _SetWindowRow(onTap: () => _openSetWindow(snapshot)),

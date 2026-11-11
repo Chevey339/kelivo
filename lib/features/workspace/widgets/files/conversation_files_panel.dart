@@ -83,9 +83,11 @@ class ConversationFilesPanel extends StatefulWidget {
     this.embedded = false,
     this.initialTab = ConversationFilesTab.attachments,
     this.scrollController,
+    this.onOpenFile,
   });
 
   final String conversationId;
+  final Future<void> Function(String path, String source)? onOpenFile;
 
   /// When true, the dialog/sheet chrome is omitted so the tabs can sit in a
   /// desktop side bar or other host that already provides a header.
@@ -306,6 +308,9 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
       case ConversationFilesTab.attachments:
         return FileBrowser(
           root: _attachments!,
+          onOpenFile: widget.onOpenFile == null
+              ? null
+              : (file) => widget.onOpenFile!(file.path, "attachments"),
           rootLabel: l10n.workspaceFilesTabAttachments,
           readOnly: true,
           emptyIcon: Lucide.Paperclip,
@@ -320,6 +325,9 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
       case ConversationFilesTab.outputs:
         return FileBrowser(
           root: _outputs!,
+          onOpenFile: widget.onOpenFile == null
+              ? null
+              : (file) => widget.onOpenFile!(file.path, "outputs"),
           rootLabel: l10n.workspaceFilesTabOutputs,
           readOnly: true,
           emptyIcon: Lucide.Sparkles,
@@ -377,12 +385,17 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
       scrollController: widget.scrollController,
       modelPathOf: (host) => WorkspaceModelPaths.workspaceFile(host, root.path),
       onOpenFile: (file) async {
-        final navigator = Navigator.of(context);
         final html =
             ['.html', '.htm'].contains(p.extension(file.path).toLowerCase()) &&
             !Platform.isLinux;
-        final targetContext = html ? navigator.context : context;
-        if (html && navigator.canPop()) navigator.pop();
+        if (!html && widget.onOpenFile != null) {
+          await widget.onOpenFile!(file.path, 'workspace');
+          return;
+        }
+        final navigator = Navigator.of(context);
+        final leaveFileSheet = html && widget.onOpenFile == null;
+        final targetContext = leaveFileSheet ? navigator.context : context;
+        if (leaveFileSheet && navigator.canPop()) navigator.pop();
         await openWorkspaceLinkedFile(
           targetContext,
           'kelivo://workspace/${KelivoLink.encodePath(p.relative(file.path, from: root.path))}',

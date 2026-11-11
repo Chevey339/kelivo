@@ -4,8 +4,7 @@ import '../../models/model_spec.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
 
-/// Host / kind / oauth-derived defaults. Model-id defaults live in
-/// [ModelDefaultsGuesser].
+/// Provider wire defaults, including model-specific endpoint requirements.
 @immutable
 class VendorDefaults {
   final ReasoningDialect? dialect;
@@ -28,14 +27,20 @@ class VendorDefaults {
     this.replayField,
   });
 
-  static VendorDefaults forProvider(ProviderConfig cfg) {
+  static VendorDefaults forProvider(ProviderConfig cfg, {String? modelId}) {
     final host = _hostOf(cfg);
     final providerId = cfg.id.toLowerCase();
     final kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
     );
-    final protocolDefault = _protocolDefault(kind, cfg);
+    final isVertexClaude =
+        kind == ProviderKind.google &&
+        cfg.vertexAI == true &&
+        (modelId?.toLowerCase().startsWith('claude-') ?? false);
+    final protocolDefault = isVertexClaude
+        ? ReasoningDialect.anthropicBudget
+        : _protocolDefault(kind, cfg);
     final sendStreamOptions = _shouldSendStreamOptions(host, cfg.baseUrl);
 
     ReasoningDialect? dialect;
@@ -54,7 +59,12 @@ class VendorDefaults {
 
     final isAzure = host.contains('openai.azure.com');
     final isMimoHost = host.contains('xiaomimimo');
-    if (isAzure || isMimoHost) {
+    final modernOpenAI =
+        host == 'api.openai.com' &&
+        RegExp(
+          r'^(?:o\d+|gpt-[56])(?:$|[-.])',
+        ).hasMatch(modelId?.toLowerCase() ?? '');
+    if (isAzure || isMimoHost || modernOpenAI) {
       maxTokensKey = 'max_completion_tokens';
     }
 
@@ -93,7 +103,7 @@ class VendorDefaults {
 
     // Anthropic Messages: model dialect comes from the guesser/catalog.
     // Host names like "OpenRouter" must not force Chat Completions dialects.
-    if (kind == ProviderKind.claude) {
+    if (kind == ProviderKind.claude || isVertexClaude) {
       return VendorDefaults(
         protocolDefault: protocolDefault,
         maxTokensKey: maxTokensKey,

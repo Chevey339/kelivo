@@ -353,6 +353,7 @@ final class McpOAuthService {
     Uri? protectedResourceUri;
     McpOAuthException? transientFailure;
     McpOAuthException? resourceMismatch;
+    var canDiscoverAtOrigin = !hasExplicitMetadata;
     for (final candidate in _distinctMetadataCandidates(candidates)) {
       try {
         final response = await _get(
@@ -365,10 +366,29 @@ final class McpOAuthService {
           deadline: deadline,
           discoveredTarget: !_sameOrigin(server, candidate.metadataUri),
         );
-        if (response.statusCode < 200 || response.statusCode >= 300) continue;
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          if (response.statusCode != 404 && response.statusCode != 405) {
+            canDiscoverAtOrigin = false;
+          }
+          continue;
+        }
         final decoded = jsonDecode(response.body);
-        if (decoded is! Map) continue;
+        if (decoded is! Map) {
+          canDiscoverAtOrigin = false;
+          continue;
+        }
         final value = decoded.cast<String, dynamic>();
+        // Some servers (e.g. Zomato) serve authorization metadata here instead
+        // of resource metadata. Ignore it and discover at the trusted origin;
+        // never reinterpret a document that actually declares resource fields.
+        if (!hasExplicitMetadata &&
+            !value.containsKey('resource') &&
+            !value.containsKey('authorization_servers') &&
+            value['issuer'] is String &&
+            value['authorization_endpoint'] is String &&
+            value['token_endpoint'] is String) {
+          continue;
+        }
         final rawResource = value['resource'];
         final resource = rawResource is String
             ? Uri.tryParse(rawResource)
@@ -400,22 +420,33 @@ final class McpOAuthService {
           protectedResourceUri = resource;
           break;
         }
+        canDiscoverAtOrigin = false;
       } on McpOAuthException catch (error) {
+        canDiscoverAtOrigin = false;
         if (error.isTransient) transientFailure ??= error;
       } catch (_) {
+        canDiscoverAtOrigin = false;
         // Try the next standard discovery location.
       }
     }
+    final List<dynamic> rawAuthorizationServers;
     if (protectedResource == null || protectedResourceUri == null) {
       if (resourceMismatch != null) throw resourceMismatch;
       if (transientFailure != null) throw transientFailure;
-      throw const McpOAuthException(
-        'protected resource metadata could not be discovered',
-      );
+      if (!canDiscoverAtOrigin) {
+        throw const McpOAuthException(
+          'protected resource metadata could not be discovered',
+        );
+      }
+      // No resource metadata was advertised or usable. Keep the full MCP
+      // resource binding and try only its own origin as the authorization server.
+      protectedResourceUri = canonicalResource(server);
+      rawAuthorizationServers = [_originUri(server, '').toString()];
+    } else {
+      rawAuthorizationServers =
+          protectedResource['authorization_servers'] as List;
     }
 
-    final rawAuthorizationServers =
-        protectedResource['authorization_servers'] as List;
     Map<String, dynamic>? authorizationMetadata;
     Uri? authorizationServer;
     transientFailure = null;
@@ -444,7 +475,9 @@ final class McpOAuthService {
           final decoded = jsonDecode(response.body);
           if (decoded is! Map) continue;
           final value = decoded.cast<String, dynamic>();
-          if (value['issuer'] != issuer.toString()) {
+          final metadataIssuer = value['issuer'];
+          if (metadataIssuer is! String ||
+              !_matchesAuthorizationIssuer(metadataIssuer, issuer)) {
             issuerMismatch = true;
             continue;
           }
@@ -459,7 +492,9 @@ final class McpOAuthService {
             continue;
           }
           authorizationMetadata = value;
-          authorizationServer = issuer;
+          // Keep the actual issuer for client registration, token persistence
+          // and strict callback validation, even when discovery used a root alias.
+          authorizationServer = Uri.parse(metadataIssuer);
           break;
         } on McpOAuthException catch (error) {
           if (error.isTransient) transientFailure ??= error;
@@ -489,7 +524,9 @@ final class McpOAuthService {
     final challengedScopes = _validScope(challengedScope)
         ? _splitScopes(challengedScope)
         : const <String>[];
-    final resourceScopes = _stringList(protectedResource['scopes_supported']);
+    final resourceScopes = _stringList(
+      (protectedResource ?? authorizationMetadata)['scopes_supported'],
+    );
     final authorizationEndpoint = _requireDiscoveredHttpsUri(
       authorizationMetadata['authorization_endpoint'] as String,
       label: 'authorization endpoint',
@@ -1509,6 +1546,17 @@ final class McpOAuthService {
         _originUri(issuer, '/.well-known/openid-configuration'),
       ],
     ];
+  }
+
+  static bool _matchesAuthorizationIssuer(String actual, Uri expected) {
+    final value = expected.toString();
+    if (actual == value) return true;
+    // Some servers disagree with resource metadata about a root issuer's
+    // trailing slash. Allow only that difference, including delegated issuers;
+    // tenant paths and every other part of the identifier must match exactly.
+    return (expected.path.isEmpty && actual == '$value/') ||
+        (expected.path == '/' &&
+            actual == value.substring(0, value.length - 1));
   }
 
   static Uri _originUri(Uri source, String path, {String? query}) => Uri(

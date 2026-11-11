@@ -121,6 +121,8 @@ const extraCorpusIds = <String>[
   'grok-4.6',
   'x-ai/grok-4.6',
   'x-ai/grok-4',
+  'gemini-4-argon',
+  'gemini-4-argon-cyber-permissive',
   'gemini-3.5-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.6-flash',

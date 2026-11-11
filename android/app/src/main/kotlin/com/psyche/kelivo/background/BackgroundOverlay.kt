@@ -129,6 +129,9 @@ class BackgroundOverlay(
                 }
             }
             updateIcon()
+            (runtime.setting("overlayProgressColor") as? Number)?.let {
+                spinner?.setColor(it.toInt())
+            }
             clampPosition()
         } catch (error: RuntimeException) {
             runtime.recordError("overlay_failed: ${error.message}")
@@ -309,9 +312,14 @@ class BackgroundOverlay(
 private class OverlayProgressRing(context: Context, private val stroke: Float) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = stroke; strokeCap = Paint.Cap.ROUND
-        color = Color.rgb(0, 137, 153)
+        color = Color.TRANSPARENT
     }
     private var animator: ObjectAnimator? = null
+    fun setColor(color: Int) {
+        if (paint.color == color) return
+        paint.color = color
+        invalidate()
+    }
     override fun onDraw(canvas: Canvas) {
         val inset = stroke / 2
         canvas.drawArc(inset, inset, width - inset, height - inset, -90f, 270f, false, paint)

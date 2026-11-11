@@ -58,6 +58,7 @@ namespace flutter_inappwebview_plugin
       return m_hWnd;
     }
   private:
+    const std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
     const HINSTANCE m_hInstance;
     HWND m_hWnd;
     bool destroyed_ = false;

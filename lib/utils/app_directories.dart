@@ -3,11 +3,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import '../core/services/storage/windows_data_directory.dart';
 
 /// Platform-specific application data directory utilities.
 ///
-/// - Windows/macOS/Linux: use the Application Support (app data) directory
-///   provided by `path_provider`.
+/// - Windows: the selected data directory, defaulting to Application Support.
+/// - macOS/Linux: Application Support, provided by `path_provider`.
 /// - iOS: database state in Application Support; user files in Documents.
 /// - Android: Application Documents directory.
 class AppDirectories {
@@ -15,12 +16,13 @@ class AppDirectories {
 
   /// Gets the root directory for application data storage.
   ///
-  /// - Windows/macOS/Linux: Application Support directory
+  /// - Windows: selected data directory; macOS/Linux: Application Support
   /// - iOS: private Application Support storage
   /// - Android: Application Documents directory
   static Future<Directory> getAppDataDirectory() async {
     switch (defaultTargetPlatform) {
       case TargetPlatform.windows:
+        return (await WindowsDataDirectory.instance).directory;
       case TargetPlatform.macOS:
       case TargetPlatform.linux:
         return await getApplicationSupportDirectory();

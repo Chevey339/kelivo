@@ -27,6 +27,11 @@ class ShellOutputBuffer {
 
   String get currentLine => _line.text;
 
+  int get currentLineRetainedBytes => _line.totalBytes.clamp(0, maxBytes);
+  // Includes conservative UTF-16 snapshots as well as retained UTF-8 windows.
+  int get retainedBytes =>
+      3 * (_completed.totalBytes.clamp(0, maxBytes) + currentLineRetainedBytes);
+
   bool get hasCurrentLine => _line.totalBytes > 0;
 
   bool get truncated =>

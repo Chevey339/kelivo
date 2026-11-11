@@ -7,14 +7,19 @@ import java.util.concurrent.TimeUnit
 
 /** PRoot forks its first tracee before installing its SIGQUIT handler. Sending
  * SIGQUIT in that startup window would kill only the tracer and orphan the guest. */
-internal fun awaitProotSignalHandler(procDir: File, timeoutMillis: Long = 5_000): Boolean {
+internal fun awaitProotSignalHandler(
+    procDir: File,
+    timeoutMillis: Long = 5_000,
+    stillOwned: () -> Boolean = { true },
+): Boolean {
     val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
     while (true) {
+        if (!stillOwned()) return false
         try {
             // The PTY child initially inherits the app's handlers until exec.
             // Its caught-signal mask alone is therefore not a readiness signal.
             val executable = Files.readSymbolicLink(File(procDir, "exe").toPath())
-            if (executable.fileName.toString() == ProotCommand.EXEC_LIB) {
+            if (executable.fileName.toString().removeSuffix(" (deleted)") == ProotCommand.EXEC_LIB) {
                 val caught = File(procDir, "status").readLines()
                     .firstOrNull { it.startsWith("SigCgt:") }
                     ?.substringAfter(':')?.trim()?.toULongOrNull(16)
@@ -23,8 +28,10 @@ internal fun awaitProotSignalHandler(procDir: File, timeoutMillis: Long = 5_000)
         } catch (_: NoSuchFileException) {
             // Gone or a zombie: the caller still has to confirm process exit.
             return false
-        } catch (error: java.io.FileNotFoundException) {
-            if (!procDir.exists()) return false
+        } catch (error: java.io.IOException) {
+            // /proc can return ESRCH after opening status if the process is
+            // reaped during the read. Do not confuse that with access denial.
+            if (Files.notExists(procDir.toPath())) return false
             throw error
         }
         check(System.nanoTime() < deadline) { "workspace process did not become ready to stop" }

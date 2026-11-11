@@ -9,7 +9,8 @@ import 'package:path/path.dart' as p;
 import '../../../utils/app_directories.dart';
 
 /// Finds retained data without moving, opening or deleting any candidate.
-/// Restrict traversal to data roots and snapshot folders, never user workspaces.
+/// Restrict traversal to data roots, snapshot folders and app-local trash.
+/// Trash is evidence for an explicit recovery choice, never an automatic restore.
 abstract final class RecoveryFileDiscovery {
   static const _databaseSidecars = ['-wal', '-shm', '-journal'];
   static bool isSnapshotDirectory(String name) => RegExp(
@@ -128,9 +129,48 @@ abstract final class RecoveryFileDiscovery {
     void Function(Object)? onError,
   ) async* {
     try {
-      yield* directory.list(followLinks: false);
+      await for (final entry in directory.list(followLinks: false)) {
+        yield entry;
+        if (p.basename(entry.path).toLowerCase() != '.trash') continue;
+        if (entry is! Directory) {
+          onError?.call(StateError('recovery_trash_type'));
+          continue;
+        }
+        yield* _trashChildren(entry, onError);
+      }
     } catch (error) {
       onError?.call(error);
+    }
+  }
+
+  static Stream<FileSystemEntity> _trashChildren(
+    Directory trash,
+    void Function(Object)? onError,
+  ) async* {
+    final pending = [(trash, 0)];
+    var visited = 0;
+    while (pending.isNotEmpty) {
+      final (directory, depth) = pending.removeLast();
+      try {
+        await for (final entry in directory.list(followLinks: false)) {
+          if (++visited > 10000) {
+            onError?.call(StateError('recovery_trash_scan_limit'));
+            return;
+          }
+          // Never follow a link out of the app's retained data.
+          if (entry is Link) continue;
+          yield entry;
+          if (entry is Directory) {
+            if (depth >= 8) {
+              onError?.call(StateError('recovery_trash_scan_limit'));
+            } else {
+              pending.add((entry, depth + 1));
+            }
+          }
+        }
+      } catch (error) {
+        onError?.call(error);
+      }
     }
   }
 
@@ -174,7 +214,10 @@ abstract final class RecoveryFileDiscovery {
     try {
       for (final directory in await roots(root)) {
         if (!await directory.exists()) continue;
-        await for (final entry in directory.list(followLinks: false)) {
+        await for (final entry in _children(
+          directory,
+          (error) => throw error,
+        )) {
           final name = p.basename(entry.path);
           if (entry is File &&
               (isDatabaseFamilyFile(name) ||

@@ -25,7 +25,8 @@ namespace flutter_inappwebview_plugin
     WebViewEnvironment(const FlutterInappwebviewWindowsPlugin* plugin, const std::string& id);
     ~WebViewEnvironment();
 
-    void create(const std::unique_ptr<WebViewEnvironmentSettings> settings, const std::function<void(HRESULT)> completionHandler);
+    void create(const std::unique_ptr<WebViewEnvironmentSettings> settings,
+      const std::function<void(HRESULT, const std::string&)> completionHandler);
     wil::com_ptr<ICoreWebView2Environment> getEnvironment()
     {
       return environment_;
@@ -39,6 +40,7 @@ namespace flutter_inappwebview_plugin
       return webView_;
     }
   private:
+    const std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
     wil::com_ptr<ICoreWebView2Environment> environment_;
     wil::com_ptr<ICoreWebView2Controller> webViewController_;
     wil::com_ptr<ICoreWebView2> webView_;

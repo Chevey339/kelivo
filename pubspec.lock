@@ -266,7 +266,7 @@ packages:
     source: hosted
     version: "1.2.1"
   collection:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: collection
       sha256: "2f5709ae4d3d59dd8f7cd309b4e023046b57d8a6c82130785d2b0e5868084e76"
@@ -544,6 +544,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  fl_chart:
+    dependency: "direct main"
+    description:
+      name: fl_chart
+      sha256: "5ed69b8be550c6276c8f0bc25c09704fb061018ed1b1681867ad18fcf477e7b7"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.0"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -804,10 +812,10 @@ packages:
     dependency: transitive
     description:
       name: hooks
-      sha256: "9a62a50b50b769a737bc0a8ff381f333529df3ab746b2f6b02e83760231455ba"
+      sha256: eaac480a35ec0814146c2c48d96aaa829e0e44a7662c88ae84c9edf4bc35651f
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.2"
+    version: "2.2.0"
   hotkey_manager:
     dependency: "direct main"
     description:
@@ -1572,10 +1580,10 @@ packages:
     dependency: transitive
     description:
       name: record_use
-      sha256: "2551bd8eecfe95d14ae75f6021ad0248be5c27f138c2ec12fcb52b500b3ba1ed"
+      sha256: "1cb8564af8d43b464294411db9217f5ec04891c6f22ee2c32d73ae05e88a6bd2"
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.0"
+    version: "1.1.1"
   record_web:
     dependency: transitive
     description:
@@ -1864,11 +1872,12 @@ packages:
   sqlite3:
     dependency: "direct main"
     description:
-      name: sqlite3
-      sha256: "4c7fe79840389aaeaf05fd093f795b631b5a98e2bd28d54e555c100f4a9c7a1c"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.5.2"
+      path: sqlite3
+      ref: "8db87537775047cdde00353f09afb1521befbeec"
+      resolved-ref: "8db87537775047cdde00353f09afb1521befbeec"
+      url: "https://github.com/simolus3/sqlite3.dart.git"
+    source: git
+    version: "3.9.1"
   sqlparser:
     dependency: transitive
     description:
@@ -2148,12 +2157,11 @@ packages:
     source: hosted
     version: "1.1.13"
   vector_graphics_compiler:
-    dependency: transitive
+    dependency: "direct dev"
     description:
-      name: vector_graphics_compiler
-      sha256: "4dca4feb77dc3ec7f6e27e49c53241eb8217f55e4f9b12599a27f8903bca5682"
-      url: "https://pub.dev"
-    source: hosted
+      path: "dependencies/vector_graphics_compiler"
+      relative: true
+    source: path
     version: "1.3.0"
   vector_math:
     dependency: transitive
@@ -2236,7 +2244,7 @@ packages:
     source: hosted
     version: "4.14.1"
   webview_flutter_android:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: webview_flutter_android
       sha256: "4de8b3d1ff4ebe1bdb42e68a5e4f809194a3cb0117a8f495f590004f00da3964"
@@ -2244,7 +2252,7 @@ packages:
     source: hosted
     version: "4.14.1"
   webview_flutter_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: webview_flutter_platform_interface
       sha256: "1221c1b12f5278791042f2ec2841743784cf25c5a644e23d6680e5d718824f04"
@@ -2262,10 +2270,9 @@ packages:
   webview_windows:
     dependency: "direct main"
     description:
-      name: webview_windows
-      sha256: "47fcad5875a45db29dbb5c9e6709bf5c88dcc429049872701343f91ed7255730"
-      url: "https://pub.dev"
-    source: hosted
+      path: "dependencies/webview_windows"
+      relative: true
+    source: path
     version: "0.4.0"
   win32:
     dependency: transitive

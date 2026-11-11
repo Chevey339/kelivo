@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
 import 'package:Kelivo/shared/markdown/highlight_adapter.dart';
 import 'package:Kelivo/theme/palettes.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Iterable<TextSpan> spans(TextSpan root) sync* {
   yield root;
@@ -111,7 +112,7 @@ void main() {
               expect(span.style!.fontStyle, FontStyle.italic);
             }
             if (source.$1 == 'bash' && !dark) {
-              expect(span.style!.fontWeight, FontWeight.bold);
+              expect(span.style!.fontWeight, AppFontWeights.strong);
             }
           }
         },

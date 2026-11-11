@@ -13,6 +13,7 @@ import 'browser_glass.dart';
 import 'browser_scroll_configuration.dart';
 import '../models/browser_models.dart';
 import 'browser_switch_lens.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 bool _desktopControls(BuildContext context) =>
     switch (Theme.of(context).platform) {
@@ -329,7 +330,7 @@ class BrowserTextButton extends StatelessWidget {
           style: TextStyle(
             color: color.withValues(alpha: onPressed == null ? .38 : 1),
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -425,7 +426,7 @@ class BrowserSurfaceField extends StatelessWidget {
               style: TextStyle(
                 color: colors.onSurfaceVariant,
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontWeight: AppFontWeights.medium,
               ),
             ),
           ),
@@ -445,7 +446,6 @@ class BrowserSurfaceField extends StatelessWidget {
             placeholder: hintText,
             autofocus: autofocus,
             autocorrect: autocorrect,
-            enableSuggestions: keyboardType != TextInputType.url,
             keyboardType: keyboardType,
             textInputAction: onSubmitted == null
                 ? TextInputAction.done
@@ -968,7 +968,7 @@ class BrowserDialogHeader extends StatelessWidget {
             title,
             style: TextStyle(
               fontSize: _desktopControls(context) ? 17 : 21,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
             ),
           ),
         ),

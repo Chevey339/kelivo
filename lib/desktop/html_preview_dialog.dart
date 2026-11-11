@@ -1,3 +1,4 @@
+import 'widgets/desktop_form_dialog.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -10,7 +11,6 @@ import '../icons/lucide_adapter.dart';
 import '../shared/widgets/snackbar.dart';
 import '../shared/widgets/ios_tactile.dart';
 import 'dart:convert';
-import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 Future<void> showHtmlPreviewDesktopDialog(
@@ -197,38 +197,19 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                  child: Row(
-                    children: [
-                      // Left title
-                      Text(
-                        l10n.assistantEditPreviewTitle,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: AppFontWeights.emphasis,
-                        ),
-                      ),
-                      const Spacer(),
-                      // Right function buttons
-                      IosIconButton(
-                        icon: Lucide.Terminal,
-                        size: 18,
-                        minSize: 34,
-                        semanticLabel: l10n.messageWebViewConsoleLogs,
-                        onTap: _openConsoleDialog,
-                      ),
-                      const SizedBox(width: 4),
-                      // Far right: close
-                      IosIconButton(
-                        icon: Lucide.X,
-                        size: 18,
-                        minSize: 34,
-                        semanticLabel: l10n.mcpPageClose,
-                        onTap: () => Navigator.of(context).maybePop(),
-                      ),
-                    ],
-                  ),
+                DesktopFormDialogHeader(
+                  title: l10n.assistantEditPreviewTitle,
+                  closeSemanticLabel: l10n.mcpPageClose,
+                  onClose: () => Navigator.of(context).maybePop(),
+                  actions: [
+                    IosIconButton(
+                      icon: Lucide.Terminal,
+                      size: 18,
+                      minSize: 34,
+                      semanticLabel: l10n.messageWebViewConsoleLogs,
+                      onTap: _openConsoleDialog,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Expanded(
@@ -325,29 +306,12 @@ class _ConsoleDialog extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: AppFontWeights.emphasis,
-                        ),
-                      ),
-                      const Spacer(),
-                      IosIconButton(
-                        icon: Lucide.X,
-                        size: 18,
-                        minSize: 34,
-                        semanticLabel: AppLocalizations.of(
-                          context,
-                        )!.mcpPageClose,
-                        onTap: () => Navigator.of(context).maybePop(),
-                      ),
-                    ],
-                  ),
+                DesktopFormDialogHeader(
+                  title: title,
+                  closeSemanticLabel: AppLocalizations.of(
+                    context,
+                  )!.mcpPageClose,
+                  onClose: () => Navigator.of(context).maybePop(),
                 ),
                 const SizedBox(height: 4),
                 Expanded(

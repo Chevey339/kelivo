@@ -112,13 +112,15 @@ void _appendChatTool(Map<String, dynamic> body, Map<String, dynamic> tool) {
   body['tool_choice'] ??= 'auto';
 }
 
-/// Reasoning and sampling shaping; callers merge the custom body afterwards.
+/// Shared first-round and tool-continuation defaults. Custom body goes last.
 void applyOpenAIResolvedRequest(
   Map<String, dynamic> body, {
+  required ProviderConfig config,
   required ModelSpec spec,
   required ReasoningRequest reasoning,
   required ReasoningTransport transport,
 }) {
+  applyOpenRouterClaudePromptCaching(body, config: config, spec: spec);
   applyReasoning(body, spec, reasoning, transport: transport);
   applySamplingPolicy(
     body,

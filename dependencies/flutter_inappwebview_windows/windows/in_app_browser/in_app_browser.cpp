@@ -13,7 +13,7 @@ namespace flutter_inappwebview_plugin
     m_hInstance(GetModuleHandle(nullptr)),
     id(params.id),
     settings(params.initialSettings),
-    channelDelegate(std::make_unique<InAppBrowserChannelDelegate>(id, plugin->registrar->messenger()))
+    channelDelegate(std::make_unique<InAppBrowserChannelDelegate>(id, plugin->messenger()))
   {
 
     WNDCLASS wndClass = {};
@@ -74,9 +74,13 @@ namespace flutter_inappwebview_plugin
     auto webViewEnvironment = params.webViewEnvironmentId.has_value() && map_contains(plugin->webViewEnvironmentManager->webViewEnvironments, params.webViewEnvironmentId.value())
       ? plugin->webViewEnvironmentManager->webViewEnvironments.at(params.webViewEnvironmentId.value()).get() : nullptr;
 
-    InAppWebView::createInAppWebViewEnv(m_hWnd, false, webViewEnvironment, params.initialWebViewSettings,
-      [this, params, webViewParams](wil::com_ptr<ICoreWebView2Environment> webViewEnv, wil::com_ptr<ICoreWebView2Controller> webViewController, wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController) -> void
+    InAppWebView::createInAppWebViewEnv(plugin, m_hWnd, false, webViewEnvironment, params.initialWebViewSettings,
+      [this, alive = alive_, params, webViewParams](HRESULT creationResult, const std::string& creationStage, wil::com_ptr<ICoreWebView2Environment> webViewEnv, wil::com_ptr<ICoreWebView2Controller> webViewController, wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController) -> void
       {
+        if (!*alive) {
+          if (webViewController) webViewController->Close();
+          return;
+        }
         if (webViewEnv && webViewController) {
           webView = std::make_unique<InAppWebView>(this, this->plugin, webViewParams, m_hWnd, std::move(webViewEnv), std::move(webViewController), nullptr);
           webView->initChannel(std::nullopt, InAppBrowser::METHOD_CHANNEL_NAME_PREFIX + id);
@@ -85,7 +89,8 @@ namespace flutter_inappwebview_plugin
             channelDelegate->onBrowserCreated();
           }
 
-          webView->whenReady([this, params](HRESULT hr) {
+          webView->whenReady([this, alive, params](HRESULT hr) {
+            if (!*alive) return;
             if (FAILED(hr)) { close(); return; }
             if (params.urlRequest.has_value()) {
               webView->loadUrl(params.urlRequest.value());
@@ -99,7 +104,7 @@ namespace flutter_inappwebview_plugin
           });
         }
         else {
-          std::cerr << "Cannot create the InAppWebView instance!" << std::endl;
+          std::cerr << creationStage << ": " << getHRMessage(creationResult) << std::endl;
           close();
         }
       });
@@ -255,8 +260,10 @@ namespace flutter_inappwebview_plugin
   InAppBrowser::~InAppBrowser()
   {
     debugLog("dealloc InAppBrowser");
+    *alive_ = false;
     webView.reset();
     SetWindowLongPtr(m_hWnd, GWLP_USERDATA, 0);
+    DestroyWindow(m_hWnd);
     plugin = nullptr;
   }
 

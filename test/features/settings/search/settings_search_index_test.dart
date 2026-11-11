@@ -112,6 +112,28 @@ void main() {
   });
 
   test(
+    'auto-follow is searchable on mobile and desktop without a delay entry',
+    () {
+      for (final platform in TargetPlatform.values) {
+        final candidate = SettingsSearchIndex(en, platform: platform);
+        for (final query in ['auto follow', '自动跟随底部', '自動跟隨底部']) {
+          final result = candidate.search(query).first;
+          expect(result.id, 'displaySettingsPageAutoScrollEnableTitle');
+          expect(result.destination, SettingsSearchDestination.display);
+          expect(
+            result.targetLabel,
+            en.displaySettingsPageAutoScrollEnableTitle,
+          );
+        }
+        expect(
+          candidate.entries.map((entry) => entry.id),
+          isNot(contains('displaySettingsPageAutoScrollIdleTitle')),
+        );
+      }
+    },
+  );
+
+  test(
     'native menu rollback is searchable by its appearance and destination',
     () {
       for (final query in ['liquid glass', '液态玻璃', '原生選取選單']) {
@@ -125,6 +147,36 @@ void main() {
       }
     },
   );
+
+  test('legacy inline code style is searchable on every settings surface', () {
+    for (final platform in TargetPlatform.values) {
+      final candidate = SettingsSearchIndex(en, platform: platform);
+      for (final query in ['legacy inline code', '旧版行内代码', '舊版行內程式碼']) {
+        final result = candidate.search(query).first;
+        expect(result.id, 'displaySettingsPageUseLegacyInlineCodeStyleTitle');
+        expect(result.destination, SettingsSearchDestination.rendering);
+        expect(
+          result.targetLabel,
+          en.displaySettingsPageUseLegacyInlineCodeStyleTitle,
+        );
+      }
+    }
+  });
+
+  test('legacy code block style is searchable on every settings surface', () {
+    for (final platform in TargetPlatform.values) {
+      final candidate = SettingsSearchIndex(en, platform: platform);
+      for (final query in ['legacy code block', '旧版代码块', '舊版程式碼區塊']) {
+        final result = candidate.search(query).first;
+        expect(result.id, 'displaySettingsPageUseLegacyCodeBlockStyleTitle');
+        expect(result.destination, SettingsSearchDestination.rendering);
+        expect(
+          result.targetLabel,
+          en.displaySettingsPageUseLegacyCodeBlockStyleTitle,
+        );
+      }
+    }
+  });
 
   test(
     'entries have stable unique ids, paths and localized destination labels',

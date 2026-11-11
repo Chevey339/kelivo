@@ -7,6 +7,69 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 
 void main() {
+  test(
+    'long Unicode lines obey a byte budget and release decoding buffers',
+    () {
+      final run = ToolRun(toolCallId: 'large', toolName: 'shell');
+      addTearDown(run.dispose);
+      for (var i = 0; i < 250; i++) {
+        run.appendStdout(utf8.encode('${'😀' * 40000}\n'));
+        expect(run.tailBytes, lessThanOrEqualTo(ToolRun.maxTailBytes));
+      }
+      final output = run.stdoutSoFar;
+      run.complete(status: ToolRunStatus.succeeded);
+      expect(run.hasOutputBuffers, isFalse);
+      expect(run.stdoutSoFar, output);
+      expect(run.tailLines.join(), isNot(contains('\uFFFD')));
+      expect(
+        run.tailLines.join().length * 2,
+        lessThanOrEqualTo(ToolRun.maxTailBytes),
+      );
+    },
+  );
+
+  test(
+    'registry budgets completed output and protects active readers and handoff',
+    () {
+      final registry = ToolRunRegistry();
+      addTearDown(registry.dispose);
+      final active = registry.start('active', 'shell');
+      final reading = registry.start('reading', 'shell');
+      void listener() {}
+      reading.addListener(listener);
+      reading.complete(status: ToolRunStatus.succeeded);
+      final handingOff = registry.start('handoff', 'shell');
+      handingOff.complete(
+        status: ToolRunStatus.succeeded,
+        retainUntilHandoff: true,
+      );
+      for (var i = 0; i < 210; i++) {
+        registry.start('$i', 'shell')
+          ..appendStdout(utf8.encode('x' * (128 * 1024)))
+          ..complete(status: ToolRunStatus.succeeded);
+      }
+      expect(
+        registry.retainedBytes,
+        lessThanOrEqualTo(ToolRunRegistry.maxRetainedBytes),
+      );
+      expect(registry.of('active'), same(active));
+      expect(registry.of('reading'), same(reading));
+      expect(registry.of('handoff'), same(handingOff));
+      reading.removeListener(listener);
+      handingOff.finishHandoff();
+    },
+  );
+
+  test('entry limit never disposes running tools', () {
+    final registry = ToolRunRegistry();
+    addTearDown(registry.dispose);
+    for (var i = 0; i <= ToolRunRegistry.maxEntries; i++) {
+      registry.start('$i', 'shell');
+    }
+    expect(registry.running.length, ToolRunRegistry.maxEntries + 1);
+    registry.of('0')!.appendStdout(utf8.encode('still running'));
+  });
+
   test('unobserved pending lines freeze correctly when streams interleave', () {
     final run = ToolRun(toolCallId: 'lazy-tail', toolName: 'shell');
     addTearDown(run.dispose);

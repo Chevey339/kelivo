@@ -35,7 +35,14 @@ Future<WorkspaceStack> createWorkspaceStack({
   required EnvironmentProvider env,
 }) async {
   if (!kIsWeb && (Platform.isMacOS || Platform.isLinux || Platform.isWindows)) {
-    return WorkspaceStack(runtime: DesktopProcessRuntime());
+    return WorkspaceStack(
+      runtime: DesktopProcessRuntime(
+        loadShellPath: () async {
+          await env.loaded;
+          return env.nativeShellPath;
+        },
+      ),
+    );
   }
   final mobile = await createMobileWorkspaceStack(env: env);
   if (mobile == null) {

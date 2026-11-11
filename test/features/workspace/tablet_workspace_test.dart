@@ -37,6 +37,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:provider/provider.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/file_browser_test_helpers.dart';
 import 'environment/environment_test_fakes.dart';
 import 'terminal/fake_workspace_runtime.dart';
 
@@ -344,8 +345,9 @@ void main() {
     );
     await flushIo(tester);
     expect(find.byType(DesktopWorkspaceFiles), findsOneWidget);
-    await tester.runAsync(
-      tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries,
+    await waitForFileBrowserOperation(
+      tester,
+      tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries(),
     );
     await tester.pump();
     final l10n = AppLocalizations.of(

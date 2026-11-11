@@ -13,10 +13,12 @@ class MarkstreamMathBlock extends StatelessWidget {
   const MarkstreamMathBlock({
     super.key,
     required this.node,
+    required this.tex,
     required this.theme,
     this.renderer,
   });
-  final MathBlockNode node;
+  final BlockNode node;
+  final String tex;
   final MarkstreamTheme theme;
   final MathRenderer? renderer;
   @override
@@ -27,30 +29,32 @@ class MarkstreamMathBlock extends StatelessWidget {
     ],
     child: SourceHighlightScope.of(context).atom(
       node.span,
-      Padding(
-        padding: theme.mathPadding,
-        child: SelectableSpanAdapter(
-          selectedText: toPlainText(node),
-          child: SelectionContainer.disabled(
-            child: LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                primary: false,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: constraints.hasBoundedWidth
-                        ? constraints.maxWidth
-                        : 0,
-                  ),
+      SelectableSpanAdapter(
+        selectedText: toPlainText(node),
+        child: SelectionContainer.disabled(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              primary: false,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: constraints.hasBoundedWidth
+                      ? constraints.maxWidth
+                      : 0,
+                ),
+                child: Padding(
+                  // Glyphs can paint slightly beyond their TeX layout bounds.
+                  // Keep their vertical breathing room inside the scroll clip.
+                  padding: theme.mathPadding,
                   child: Center(
                     child:
                         renderer?.build(
                           context,
-                          node.tex,
+                          tex,
                           style: theme.body,
                           displayMode: true,
                         ) ??
-                        Text(node.tex, style: theme.body),
+                        Text(tex, style: theme.body),
                   ),
                 ),
               ),

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
-import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 
 ChatMessage _message({
@@ -334,78 +333,6 @@ void main() {
       );
 
       expect(result.map((message) => message.id).toList(), ['u1', 'a1']);
-    });
-  });
-
-  group('ChatActions.conversationForMessageContext', () {
-    test('投影历史短于持久化截断点时不截空重试上下文', () {
-      final messages = <ChatMessage>[
-        for (var i = 0; i < 20; i++)
-          _message(
-            id: 'm$i',
-            role: i.isEven ? 'user' : 'assistant',
-            groupId: 'm$i',
-            version: 0,
-          ),
-      ];
-
-      final conversation = ChatActions.conversationForMessageContext(
-        conversation: Conversation(
-          id: 'conversation-1',
-          title: 'Long chat',
-          truncateIndex: 50,
-        ),
-        messages: messages,
-      );
-
-      expect(conversation.truncateIndex, -1);
-    });
-
-    test('重试目标之前的上下文不使用未来截断点', () {
-      final messages = <ChatMessage>[
-        for (var i = 0; i < 60; i++)
-          _message(
-            id: 'm$i',
-            role: i.isEven ? 'user' : 'assistant',
-            groupId: 'm$i',
-            version: 0,
-          ),
-      ];
-
-      final conversation = ChatActions.conversationForMessageContext(
-        conversation: Conversation(
-          id: 'conversation-1',
-          title: 'Long chat',
-          truncateIndex: 50,
-        ),
-        messages: messages,
-        maxRawTruncateIndex: 40,
-      );
-
-      expect(conversation.truncateIndex, -1);
-    });
-
-    test('完整历史上下文保留持久化截断点', () {
-      final messages = <ChatMessage>[
-        for (var i = 0; i < 80; i++)
-          _message(
-            id: 'm$i',
-            role: i.isEven ? 'user' : 'assistant',
-            groupId: 'm$i',
-            version: 0,
-          ),
-      ];
-
-      final conversation = ChatActions.conversationForMessageContext(
-        conversation: Conversation(
-          id: 'conversation-1',
-          title: 'Long chat',
-          truncateIndex: 50,
-        ),
-        messages: messages,
-      );
-
-      expect(conversation.truncateIndex, 50);
     });
   });
 }

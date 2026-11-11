@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="phone_control_service_label">Kelivo telefon kontrolü</string>
+    <string name="phone_control_service_description">Etkinleştirdiğiniz asistanların geçerli ekranı okumasına ve telefon kontrolü görevleriniz için dokunma, metin girişi, kaydırma ve gezinme işlemlerini gerçekleştirmesine izin verir. Ekran içeriği, sohbet için yapılandırılmış model sağlayıcısına gönderilir. Bu hizmeti istediğiniz zaman Erişilebilirlik ayarlarından devre dışı bırakabilirsiniz.</string>
+</resources>

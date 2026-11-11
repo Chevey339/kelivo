@@ -28,7 +28,7 @@ public class CustomSchemeHandler: NSObject, WKURLSchemeHandler {
                         "Content-Length": String(response.data.count),
                         "Cache-Control": "no-store",
                         "X-Content-Type-Options": "nosniff"
-                    ])!
+                    ].merging(response.headers) { _, supplied in supplied })!
                 urlSchemeTask.didReceive(urlResponse)
                 urlSchemeTask.didReceive(response.data)
                 urlSchemeTask.didFinish()

@@ -1,8 +1,15 @@
+import '../../../core/models/compression_config.dart';
+import '../../../core/services/chat/chat_service.dart';
+import '../../chat/controllers/quote_editing_controller.dart';
+import '../../intelligent_ui/models/ui_context_attachment.dart';
+import '../../intelligent_ui/host/ui_composer_context_chip.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../theme/app_semantic_colors.dart';
 import 'package:Kelivo/features/chat/widgets/tool_permission_widgets.dart';
 import '../services/composer_clipboard.dart';
 import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/rendering.dart';
 import '../../../core/services/incoming_share_service.dart';
 import 'composer_attachment_card.dart';
@@ -25,6 +32,7 @@ import '../../../shared/responsive/breakpoints.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
+import '../../../core/models/quote_ref.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/services/api/reasoning/reasoning_level_options.dart';
@@ -45,6 +53,7 @@ import '../../../shared/widgets/interactive_drawer.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/platform_utils.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:re_editor/re_editor.dart' show CodeEditorTapRegion;
 import '../../../desktop/desktop_context_menu.dart';
@@ -329,6 +338,7 @@ class ChatInputBarController {
   }
 
   void insertText(String text) {
+    text = text.replaceAll(quotePlaceholder, '');
     if (_currentTarget) {
       _root._state?._insertPastedText(text);
     } else {
@@ -355,7 +365,68 @@ class ChatInputBarController {
       ],
       documents: draft.documents,
       allowImagesApiRouting: draft.allowImagesApiRouting,
+      uiContext: draft.uiContext,
+      quotes: draft.quotes,
     );
+  }
+
+  bool get hasUiContext =>
+      (_state?._uiContext ?? _pendingDraft?.uiContext) != null;
+
+  bool get isComposing =>
+      !(_root._state?._controller.value.composing.isCollapsed ?? true);
+
+  bool get _canStageDraft {
+    final state = _root._state;
+    return _currentTarget &&
+        state != null &&
+        !state._composerLocked &&
+        !state._isSubmitting &&
+        !state._ownsVoiceSession &&
+        !state._finishingVoice &&
+        (state._nativeOwner?.pending ?? 0) == 0 &&
+        !(state._controller is MessageEditingController &&
+            (state._controller as MessageEditingController).isInputPaused);
+  }
+
+  /// Flush accepted native work before a preview. A captured controller can
+  /// only stage into the still-visible owner/edit/input epoch.
+  Future<ComposerDraftInput?> prepareExternalDraft() async {
+    if (!_canStageDraft) return null;
+    final state = _root._state!;
+    final value = await state._controller.flushMessageInput();
+    if (!_canStageDraft ||
+        !identical(state, _root._state) ||
+        !value.composing.isCollapsed) {
+      return null;
+    }
+    return state._snapshotDraft(value.text);
+  }
+
+  bool applyExternalDraft(
+    ComposerDraftInput expected,
+    ComposerDraftInput next,
+  ) {
+    if (!_canStageDraft) return false;
+    final state = _root._state!;
+    if (!state._controller.value.composing.isCollapsed ||
+        !state._snapshotDraft(state._controller.text).sameValue(expected)) {
+      return false;
+    }
+    state.setState(() {
+      state._uiContext = next.uiContext;
+      state._controller.value = TextEditingValue(
+        text: next.text,
+        selection: TextSelection.collapsed(offset: next.text.length),
+      );
+    });
+    _root.onDraftChanged?.call();
+    // A draft can be prepared from an expanded UI route. Keep that route's
+    // keyboard focus until it closes; a covered composer must not steal Esc.
+    if (ModalRoute.of(state.context)?.isCurrent != false) {
+      state.widget.focusNode?.requestFocus();
+    }
+    return true;
   }
 
   void clearDraft() {
@@ -571,6 +642,7 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
+    this.reasoningButtonKey,
     this.onOpenContextUsage,
     this.moreOpen = false,
     this.focusNode,
@@ -581,6 +653,9 @@ class ChatInputBar extends StatefulWidget {
     this.loading = false,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
+    this.queuedStatusLabel,
+    this.queuedSubtitle,
+    this.queuedPaused = false,
     this.onCancelQueuedInput,
     this.onExpandedChanged,
     this.reasoningActive = false,
@@ -599,6 +674,7 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenWorldBook,
     this.onClearContext,
     this.onCompressContext,
+    this.onContextOperations,
     this.onLongPressLearning,
     this.learningModeActive = false,
     this.worldBookActive = false,
@@ -632,6 +708,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
+  final GlobalKey? reasoningButtonKey;
   final VoidCallback? onOpenContextUsage;
   final bool moreOpen;
   final FocusNode? focusNode;
@@ -642,6 +719,9 @@ class ChatInputBar extends StatefulWidget {
   final bool loading;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
+  final String? queuedStatusLabel;
+  final String? queuedSubtitle;
+  final bool queuedPaused;
   final VoidCallback? onCancelQueuedInput;
 
   /// Reports when the composer starts filling the chat area and when it has
@@ -663,6 +743,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
+  final VoidCallback? onContextOperations;
   final VoidCallback? onLongPressLearning;
   final bool learningModeActive;
   final bool worldBookActive;
@@ -782,9 +863,12 @@ class _ChatInputBarState extends State<ChatInputBar>
   final GlobalKey _contextMgmtAnchorKey = GlobalKey(
     debugLabel: 'context-mgmt-anchor',
   );
+  bool _contextManagementMenuOpen = false;
+  bool _savingAutoCompression = false;
   static const double _imageRemoveButtonSize = 18;
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
+  UiContextAttachment? _uiContext;
   bool _isSubmitting = false;
   int _submitSerial = 0;
   String? _imageModeModelKey;
@@ -924,14 +1008,33 @@ class _ChatInputBarState extends State<ChatInputBar>
   // Instance method for onChanged to avoid recreating the callback on every build
   void _onTextChanged(String _) => setState(() {});
 
+  AppLocalizations? _usageLocalizations;
   String? _usageDraftConversationId;
   String? _usageDraftText;
+  List<QuoteRef> _observedQuotes = const [];
+
+  void _onQuoteEdits() {
+    if (_controller is! QuoteEditingController) return;
+    final next = (_controller as QuoteEditingController).quotes;
+    if (listEquals(next, _observedQuotes)) return;
+    _observedQuotes = next;
+    if (mounted) setState(() {});
+  }
 
   void _syncUsageDraft() {
-    if (!mounted) return;
+    final l10n = _usageLocalizations;
+    // A pending draft can restore from _bind during initState, before the
+    // inherited locale is available. didChangeDependencies publishes it next.
+    if (!mounted || l10n == null) return;
     final id = widget.conversationId;
     if (id == null || id.isEmpty) return;
-    final text = _controller.text;
+    final text = _controller is QuoteEditingController
+        ? formatQuotedMessage(
+            _controller.text,
+            (_controller as QuoteEditingController).quotes,
+            quoteMarker: l10n.selectionQuoteMarker,
+          )
+        : _controller.text;
     if (_usageDraftConversationId == id && _usageDraftText == text) return;
     _usageDraftConversationId = id;
     _usageDraftText = text;
@@ -1097,6 +1200,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   void _restoreInput(ChatInputData input) {
     setState(() {
       _draftReplacementRevision++;
+      _uiContext = input.uiContext;
       _abandonVoiceSession();
       _pendingImagePasteIds.clear();
       _pendingTextPasteIds.clear();
@@ -1130,11 +1234,18 @@ class _ChatInputBarState extends State<ChatInputBar>
       ],
       documents: List<DocumentAttachment>.of(_docs),
       allowImagesApiRouting: _allowImagesApiRouting,
+      uiContext: _uiContext,
+      quotes: _controller is QuoteEditingController
+          ? (_controller as QuoteEditingController).quotes
+          : const [],
     );
   }
 
   ComposerDraftInput _snapshotDraft(String text) => ComposerDraftInput(
     text: text,
+    quotes: _controller is QuoteEditingController
+        ? (_controller as QuoteEditingController).quotes
+        : const [],
     selectionBase: _controller.selection.baseOffset,
     selectionExtent: _controller.selection.extentOffset,
     images: [
@@ -1147,9 +1258,26 @@ class _ChatInputBarState extends State<ChatInputBar>
     ],
     documents: List.of(_docs),
     allowImagesApiRouting: _allowImagesApiRouting,
+    uiContext: _uiContext,
   );
 
   void _restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
+    if (_controller case final QuoteEditingController quotes) {
+      quotes.restore(
+        TextEditingValue(
+          text: input.text,
+          selection: TextSelection(
+            baseOffset: input.selectionBase < 0
+                ? input.text.length
+                : input.selectionBase.clamp(0, input.text.length),
+            extentOffset: input.selectionExtent < 0
+                ? input.text.length
+                : input.selectionExtent.clamp(0, input.text.length),
+          ),
+        ),
+        input.quotes,
+      );
+    }
     if (resetHistory) _resetInputHistory();
     final config = context
         .read<SettingsProvider>()
@@ -1167,6 +1295,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       );
     setState(() {
       _draftReplacementRevision++;
+      _uiContext = input.uiContext;
       if (resetHistory) {
         _abandonVoiceSession();
         _pendingImagePasteIds.clear();
@@ -1215,6 +1344,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     setState(() {
       _draftReplacementRevision++;
       _abandonVoiceSession();
+      _uiContext = null;
       _controller.clear();
       _pendingImagePasteIds.clear();
       _pendingTextPasteIds.clear();
@@ -1238,13 +1368,22 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void initState() {
     super.initState();
-    _controller = widget.controller ?? MessageEditingController();
+    _controller = widget.controller ?? QuoteEditingController();
     _controller.addListener(_syncUsageDraft);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncUsageDraft());
+    _controller.addListener(_onQuoteEdits);
     widget.mediaController?._bind(this);
     if (widget.mediaController == null) _ownedNativeMedia._bind(this);
     widget.asrProvider?.addListener(_handleAsrChanged);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final l10n = AppLocalizations.of(context)!;
+    if (identical(_usageLocalizations, l10n)) return;
+    _usageLocalizations = l10n;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncUsageDraft());
   }
 
   @override
@@ -1253,8 +1392,11 @@ class _ChatInputBarState extends State<ChatInputBar>
     // When app resumes from background, suppress context menu briefly to avoid flickering
     if (state == AppLifecycleState.resumed) {
       _suppressContextMenu = true;
-      // Also unfocus to reset any stuck toolbar state
-      widget.focusNode?.unfocus();
+      // Only iOS needs this toolbar reset. Desktop must retain the focus
+      // restored by Flutter after switching windows (for example, Alt+Tab).
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        widget.focusNode?.unfocus();
+      }
       // Re-enable context menu after a short delay
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
@@ -1265,7 +1407,9 @@ class _ChatInputBarState extends State<ChatInputBar>
         state == AppLifecycleState.paused) {
       // When going to background, hide any open toolbar
       _suppressContextMenu = true;
-      widget.focusNode?.unfocus();
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        widget.focusNode?.unfocus();
+      }
       if (_ownsVoiceSession) _abandonVoiceSession();
     }
   }
@@ -1279,6 +1423,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     _nativeOwner?.detachView();
     _nativeOwner?.removeListener(_onNativeOwnerChanged);
     _controller.removeListener(_syncUsageDraft);
+    _controller.removeListener(_onQuoteEdits);
     WidgetsBinding.instance.removeObserver(this);
     _stopVoiceLevelSampling();
     final asr = widget.asrProvider;
@@ -1973,10 +2118,24 @@ class _ChatInputBarState extends State<ChatInputBar>
       return;
     }
     final submittedValue = orderedValue ?? _controller.value;
+    if (_controller is QuoteEditingController &&
+        (_controller as QuoteEditingController).quotes.length >
+            maxMessageQuotes) {
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.quoteLimit,
+      );
+      return;
+    }
     final submittedText = submittedValue.text;
     final send = widget.onSend;
     final text = submittedText.trim();
-    if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
+    if (text.isEmpty &&
+        _images.isEmpty &&
+        _docs.isEmpty &&
+        _uiContext == null) {
+      return;
+    }
     final submittedImages = List<_DraftImage>.of(_images);
     final submittedImageIds = submittedImages.map((image) => image.id).toSet();
     final submittedDocuments = List<DocumentAttachment>.of(_docs);
@@ -2003,6 +2162,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     // depend on it at all. A rejected send puts everything back below.
     setState(() {
       _resetInputHistory();
+      _uiContext = null;
       _controller.clear();
       _images.removeWhere((image) => submittedImageIds.contains(image.id));
       for (final document in submittedDocuments) {
@@ -2028,6 +2188,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           submittedValue,
           submittedImages,
           submittedDocuments,
+          submittedDraft.uiContext,
         ),
       );
     }
@@ -2044,6 +2205,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                 documents: List<DocumentAttachment>.of(submittedDocuments),
                 allowImagesApiRouting: submittedDraft.allowImagesApiRouting,
                 draftSubmission: draftSubmission,
+                uiContext: submittedDraft.uiContext,
+                quotes: submittedDraft.quotes,
               ),
             ) ??
             ChatInputSubmissionResult.rejected;
@@ -2090,7 +2253,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     TextEditingValue submittedValue,
     List<_DraftImage> submittedImages,
     List<DocumentAttachment> submittedDocuments,
+    UiContextAttachment? submittedUiContext,
   ) {
+    _uiContext = submittedUiContext;
     _restoreSubmittedText(submittedValue);
     final existingImageIds = _images.map((image) => image.id).toSet();
     _images.insertAll(
@@ -2122,11 +2287,19 @@ class _ChatInputBarState extends State<ChatInputBar>
             end: currentValue.composing.end + offset,
           )
         : currentValue.composing;
-    _controller.value = currentValue.copyWith(
-      text: submittedValue.text + currentValue.text,
-      selection: selection,
-      composing: composing,
-    );
+    _controller.value =
+        currentValue is QuoteEditingValue && submittedValue is QuoteEditingValue
+        ? QuoteEditingValue(
+            text: submittedValue.text + currentValue.text,
+            quotes: [...submittedValue.quotes, ...currentValue.quotes],
+            selection: selection,
+            composing: composing,
+          )
+        : currentValue.copyWith(
+            text: submittedValue.text + currentValue.text,
+            selection: selection,
+            composing: composing,
+          );
   }
 
   void _insertNewlineAtCursor() {
@@ -2333,9 +2506,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       return KeyEventResult.handled;
     }
 
-    // Enter handling on tablet/desktop: configurable shortcut
-    if (isEnter && isTabletOrDesktop) {
+    // Desktop send shortcuts must survive resizing below the tablet breakpoint.
+    if (isEnter && (PlatformUtils.isDesktopTarget || isTabletOrDesktop)) {
       if (!isDown) return KeyEventResult.handled; // ignore key up
+      if (_composerLocked || _ownsVoiceSession) return KeyEventResult.handled;
       // Respect IME composition (e.g., Chinese Pinyin). If composing, let IME handle Enter.
       final composing = _controller.value.composing;
       final composingActive = composing.isValid && !composing.isCollapsed;
@@ -2825,6 +2999,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   void _insertPastedText(String text) {
     if (!mounted) return;
+    text = text.replaceAll(quotePlaceholder, '');
     final value = _controller.value;
     final selection = value.selection;
     if (!selection.isValid) {
@@ -2932,6 +3107,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     return LayoutBuilder(
       builder: (context, constraints) {
         final List<_OverflowAction> actions = [];
+        int? reasoningActionIndex;
 
         // Model select (always present; can be hidden if overflow)
         actions.add(
@@ -3077,12 +3253,14 @@ class _ChatInputBarState extends State<ChatInputBar>
                   customBudget: widget.reasoningCustomBudget,
                 )
               : null;
+          reasoningActionIndex = actions.length;
           actions.add(
             _OverflowAction(
               width: compactLabel == null
                   ? normalButtonW
                   : _reasoningButtonWidth(compactLabel),
               builder: () => _CompactIconButton(
+                key: widget.reasoningButtonKey,
                 tooltip: l10n.chatInputBarReasoningStrengthTooltip,
                 icon: Lucide.Brain,
                 active: widget.reasoningActive,
@@ -3300,24 +3478,83 @@ class _ChatInputBarState extends State<ChatInputBar>
         }
 
         if (widget.onClearContext != null) {
-          void showContextMenu() {
-            showDesktopAnchoredMenu(
-              context,
-              anchorKey: _contextMgmtAnchorKey,
-              items: [
-                if (widget.onCompressContext != null)
+          Future<void> showContextMenu() async {
+            if (_contextManagementMenuOpen) return;
+            _contextManagementMenuOpen = true;
+            try {
+              final conversationId = widget.conversationId;
+              final chat = context.read<ChatService?>();
+              final config = conversationId == null || chat == null
+                  ? null
+                  : await chat.compressionConfig(
+                      conversationId,
+                      context.read<SettingsProvider>().compressionDefaults,
+                    );
+              if (!context.mounted || widget.conversationId != conversationId) {
+                return;
+              }
+              await showDesktopAnchoredMenu(
+                context,
+                anchorKey: _contextMgmtAnchorKey,
+                items: [
+                  if (conversationId != null && chat != null && config != null)
+                    DesktopContextMenuItem(
+                      icon: Lucide.Sparkles,
+                      label: l10n.compressionAutoTitle,
+                      checked: config.mode == AutoCompressionMode.auto,
+                      onTap: _savingAutoCompression
+                          ? null
+                          : () async {
+                              if (_savingAutoCompression) return;
+                              _savingAutoCompression = true;
+                              try {
+                                await chat.setAutoCompressionEnabled(
+                                  conversationId,
+                                  config.mode != AutoCompressionMode.auto,
+                                );
+                              } catch (error) {
+                                if (context.mounted) {
+                                  showAppSnackBar(
+                                    context,
+                                    message: error.toString(),
+                                    type: NotificationType.error,
+                                  );
+                                }
+                              } finally {
+                                _savingAutoCompression = false;
+                              }
+                            },
+                    ),
+                  if (widget.onContextOperations != null)
+                    DesktopContextMenuItem(
+                      icon: Lucide.History,
+                      label: l10n.contextOperationsTitle,
+                      onTap: widget.onContextOperations,
+                    ),
+                  if (widget.onCompressContext != null)
+                    DesktopContextMenuItem(
+                      icon: Lucide.package2,
+                      label: l10n.compressContext,
+                      onTap: lockTap(widget.onCompressContext),
+                    ),
                   DesktopContextMenuItem(
-                    icon: Lucide.package2,
-                    label: l10n.compressContext,
-                    onTap: lockTap(widget.onCompressContext),
+                    icon: Lucide.Eraser,
+                    label: l10n.bottomToolsSheetClearContext,
+                    onTap: lockTap(widget.onClearContext),
                   ),
-                DesktopContextMenuItem(
-                  icon: Lucide.Eraser,
-                  label: l10n.bottomToolsSheetClearContext,
-                  onTap: lockTap(widget.onClearContext),
-                ),
-              ],
-            );
+                ],
+              );
+            } catch (error) {
+              if (context.mounted) {
+                showAppSnackBar(
+                  context,
+                  message: error.toString(),
+                  type: NotificationType.error,
+                );
+              }
+            } finally {
+              _contextManagementMenuOpen = false;
+            }
           }
 
           actions.add(
@@ -3328,13 +3565,13 @@ class _ChatInputBarState extends State<ChatInputBar>
                 child: _CompactIconButton(
                   tooltip: l10n.contextManagement,
                   icon: Lucide.Eraser,
-                  onTap: _composerLocked ? null : showContextMenu,
+                  onTap: showContextMenu,
                 ),
               ),
               menu: DesktopContextMenuItem(
                 icon: Lucide.Eraser,
                 label: l10n.contextManagement,
-                onTap: _composerLocked ? null : showContextMenu,
+                onTap: showContextMenu,
               ),
             ),
           );
@@ -3425,6 +3662,11 @@ class _ChatInputBarState extends State<ChatInputBar>
             Container(
               key: _leftOverflowAnchorKey,
               child: _CompactIconButton(
+                key:
+                    reasoningActionIndex != null &&
+                        reasoningActionIndex >= visibleCount
+                    ? widget.reasoningButtonKey
+                    : null,
                 tooltip: l10n.chatInputBarMoreTooltip,
                 icon: Lucide.Plus,
                 onTap: () {
@@ -3759,7 +4001,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
-    final hasInput = hasText || hasImages || hasDocs;
+    final hasInput = hasText || hasImages || hasDocs || _uiContext != null;
     _supportsImagesApiRouting(context);
     final bool isMobileLayout =
         MediaQuery.sizeOf(context).width < AppBreakpoints.tablet;
@@ -3838,10 +4080,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                 ),
               if (widget.hasQueuedInput) ...[
                 _QueuedInputBanner(
-                  label: AppLocalizations.of(
-                    context,
-                  )!.chatInputBarQueuedPending,
+                  label:
+                      widget.queuedStatusLabel ??
+                      AppLocalizations.of(context)!.chatInputBarQueuedPending,
                   previewText: widget.queuedPreviewText,
+                  subtitle: widget.queuedSubtitle,
+                  paused: widget.queuedPaused,
                   cancelLabel: AppLocalizations.of(
                     context,
                   )!.chatInputBarQueuedCancel,
@@ -3977,6 +4221,28 @@ class _ChatInputBarState extends State<ChatInputBar>
                                             ),
                                     ),
                                 ],
+                                if (_uiContext case final attachment?)
+                                  Padding(
+                                    padding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                          AppSpacing.md,
+                                          AppSpacing.xs,
+                                          AppSpacing.md,
+                                          AppSpacing.xs,
+                                        ),
+                                    child: UiComposerContextChip(
+                                      attachment: attachment,
+                                      onRemove: _composerLocked || _isSubmitting
+                                          ? null
+                                          : () {
+                                              setState(() => _uiContext = null);
+                                              widget
+                                                  .mediaController
+                                                  ?.onDraftChanged
+                                                  ?.call();
+                                            },
+                                    ),
+                                  ),
                                 if (hasDocs || hasImages)
                                   _buildInlineAttachmentPreviews(
                                     context,
@@ -4303,10 +4569,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                               ?.isNotEmpty ??
                                                           false))
                                                     _ContextUsageInputControl(
-                                                      onTap: _composerLocked
-                                                          ? null
-                                                          : widget
-                                                                .onOpenContextUsage,
+                                                      onTap: widget
+                                                          .onOpenContextUsage,
                                                     ),
                                                   if (showVoiceInput) ...[
                                                     _CompactIconButton(
@@ -4425,12 +4689,16 @@ class _QueuedInputBanner extends StatelessWidget {
     required this.label,
     required this.cancelLabel,
     this.previewText,
+    this.subtitle,
+    this.paused = false,
     this.onCancel,
   });
 
   final String label;
   final String cancelLabel;
   final String? previewText;
+  final String? subtitle;
+  final bool paused;
   final VoidCallback? onCancel;
 
   @override
@@ -4460,9 +4728,11 @@ class _QueuedInputBanner extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Icon(
-              Icons.schedule_rounded,
+              paused ? LucideIcons.pause : LucideIcons.clock,
               size: 16,
-              color: theme.colorScheme.primary,
+              color: paused
+                  ? context.appColors.warning
+                  : theme.colorScheme.primary,
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
@@ -4471,11 +4741,26 @@ class _QueuedInputBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: AppFontWeights.semibold,
-                  ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                  ],
                 ),
                 if (hasPreview) ...[
                   const SizedBox(height: 2),
@@ -4639,6 +4924,7 @@ double _reasoningButtonWidth(String label) {
 
 class _CompactIconButton extends StatelessWidget {
   const _CompactIconButton({
+    super.key,
     required this.icon,
     this.onTap,
     this.onLongPress,

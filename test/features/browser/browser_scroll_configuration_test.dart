@@ -227,7 +227,7 @@ void main() {
   browserTest(
     'browser start and independently pushed management pages have no stretch decoration',
     (tester) async {
-      final service = BrowserService(store: _MemoryStore());
+      final service = BrowserService(store: _MemoryStore(), supported: true);
       await service.initialize();
       try {
         await mount(tester, BrowserPage(service: service));
@@ -264,7 +264,7 @@ void main() {
   browserTest(
     'Android embedded settings dialog also keeps scrolling outside stretch filters',
     (tester) async {
-      final service = BrowserService(store: _MemoryStore());
+      final service = BrowserService(store: _MemoryStore(), supported: true);
       await service.initialize();
       try {
         await mount(

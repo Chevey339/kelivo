@@ -3,8 +3,16 @@
 The in-app browser uses one `browser` tool with explicit actions. It shares the
 user-visible WebView session, while tabs remain owned by a conversation. Agent
 access requires both the assistant's browser tool switch and the browser's global
-Agent switch. Human takeover invalidates queued work; resuming requires a user
-action. Cancelled mutations report an unknown outcome rather than being retried.
+Agent switch. Human takeover and native-command timeouts pause only the owning
+conversation and invalidate its queued work; only the affected tab stops loading.
+Resuming requires a user action. `list_tabs` reads saved tab and pause state even
+while commands are paused or draining. After a timeout, `close_tab` can release an
+owned tab through the guarded command queue, without resuming the conversation.
+Human takeover still blocks closing tabs. Disabling Agent control or changing the
+global User-Agent invalidates all conversations' queued work. Page commands are
+blocked while a User-Agent update applies to the engines and reloads the visible
+page; saved tab state remains readable. Cancelled mutations report an unknown
+outcome rather than being retried.
 
 The supplied `deliverable(1)/04_browser_feature/tool_definitions.md` and
 `tool_dispatch.md` informed the open → snapshot → action interaction, optional

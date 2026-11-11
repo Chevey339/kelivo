@@ -208,6 +208,49 @@ void main() {
     messageTemplate: '{{ message }}',
   );
 
+  test('each assistant injects its own selected types', () async {
+    await seedAssistant(assistant.id);
+    await seedAssistant('other');
+    await settings.setMemoryInjectionMaxItems(1);
+    for (final type in [MemoryType.voice, MemoryType.workflow]) {
+      for (var i = 0; i < 2; i++) {
+        await putEntry(
+          id: '${type.name}-$i',
+          type: type,
+          content: '${type.name} $i',
+        );
+      }
+    }
+    final service = buildService();
+    final a = assistant.copyWith(memoryFullInjectionTypes: {MemoryType.voice});
+    final b = assistant.copyWith(
+      id: 'other',
+      memoryFullInjectionTypes: {MemoryType.workflow},
+    );
+    Future<String> snapshot(Assistant value) async =>
+        (await service.currentMemorySnapshot(
+          assistant: value,
+          lang: MemoryPromptLang.zh,
+          settings: settings,
+        ))!.prefix;
+    final first = await snapshot(a);
+    final second = await snapshot(b);
+    expect(first, contains('<user_memory type="voice">'));
+    expect(
+      first,
+      contains(
+        '<user_memory type="workflow" mode="summary" total="2" shown="1">',
+      ),
+    );
+    expect(second, contains('<user_memory type="workflow">'));
+    expect(
+      second,
+      contains('<user_memory type="voice" mode="summary" total="2" shown="1">'),
+    );
+    await snapshot(a.copyWith(memoryFullInjectionTypes: {}));
+    expect(await snapshot(b), second);
+  });
+
   for (final initiallyFull in [false, true]) {
     test(
       'full injection toggle refreshes sends and regeneration ($initiallyFull)',
@@ -215,9 +258,9 @@ void main() {
         await seedAssistant(assistant.id);
         await seedAssistant('other');
         await settings.setMemoryInjectionMaxItems(1);
-        if (initiallyFull) {
-          await settings.setMemoryFullInjectionTypes({MemoryType.voice});
-        }
+        var currentAssistant = assistant.copyWith(
+          memoryFullInjectionTypes: initiallyFull ? {MemoryType.voice} : {},
+        );
         await putEntry(
           id: 'voice-1',
           type: MemoryType.voice,
@@ -263,7 +306,7 @@ void main() {
           await service.processUserMessagesForApi(
             api,
             settings,
-            assistant,
+            currentAssistant,
             conversation: conversation,
             sourceMessages: messages,
           );
@@ -293,8 +336,8 @@ void main() {
         final frozen = (await chatRepository.getMessagePrompt(
           first.id,
         ))!.payload;
-        await settings.setMemoryFullInjectionTypes(
-          initiallyFull ? {} : {MemoryType.voice},
+        currentAssistant = currentAssistant.copyWith(
+          memoryFullInjectionTypes: initiallyFull ? {} : {MemoryType.voice},
         );
 
         // Regeneration has only the frozen user message to carry the new snapshot.

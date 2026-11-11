@@ -3,6 +3,10 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 
 import '../../../../core/models/model_spec.dart';
+import '../../../../core/models/image_generation_options.dart';
+import '../../../../core/models/request_budget.dart';
+import '../../../../core/models/avatar_config.dart';
+import '../../../../utils/avatar_files.dart';
 import '../../../../core/providers/settings_provider.dart';
 import '../../../../core/services/api/builtin_tools.dart';
 import '../../../../core/services/logging/flutter_logger.dart';
@@ -26,6 +30,14 @@ class ModelSpecFormController extends ChangeNotifier {
   }) : _config = config,
        _modelKey = modelKey,
        isNew = isNew {
+    avatar = isNew ? null : config.modelAvatar(modelKey);
+    final override = isNew ? null : config.modelOverrides[modelKey];
+    requestBudget = RequestBudgetOverrides.fromJson(
+      override is Map ? override['requestBudget'] : null,
+    );
+    imageGeneration = ImageGenerationOptions.fromJson(
+      override is Map ? override['imageGeneration'] : null,
+    );
     final displayModelId = _initialDisplayModelId(config, modelKey, isNew);
     final resolveKey = isNew
         ? (displayModelId.isEmpty ? 'custom' : displayModelId)
@@ -68,7 +80,7 @@ class ModelSpecFormController extends ChangeNotifier {
           ? (draft.pricing?.currency ?? 'USD')
           : (pricing?.currency ?? ''),
     );
-    for (final level in kModelSpecEditableLevels) {
+    for (final level in [ReasoningLevel.on, ...kModelSpecEditableLevels]) {
       budgetControllers[level] = TextEditingController(
         text: _formatInt(draft.reasoning?.budgets?[level]),
       );
@@ -85,6 +97,44 @@ class ModelSpecFormController extends ChangeNotifier {
   final String _modelKey;
   final bool isNew;
   bool _displayNameTouched = false;
+  AvatarConfig? avatar;
+  bool _avatarTouched = false;
+
+  void setAvatar(AvatarConfig? value) {
+    avatar = value;
+    _avatarTouched = true;
+    notifyListeners();
+  }
+
+  late RequestBudgetOverrides requestBudget;
+  bool _requestBudgetTouched = false;
+  void setRequestBudget(RequestBudgetOverrides value) {
+    requestBudget = value;
+    _requestBudgetTouched = true;
+    notifyListeners();
+  }
+
+  late ImageGenerationOptions imageGeneration;
+  bool _imageGenerationTouched = false;
+
+  void setImageGenerationModel(String? model) {
+    final next = ImageGenerationOptions(model: model);
+    imageGeneration = ImageGenerationOptions(
+      model: model,
+      complexity: next.supportsComplexity ? imageGeneration.complexity : null,
+    );
+    _imageGenerationTouched = true;
+    notifyListeners();
+  }
+
+  void setImageGenerationComplexity(String? complexity) {
+    imageGeneration = ImageGenerationOptions(
+      model: imageGeneration.model,
+      complexity: complexity,
+    );
+    _imageGenerationTouched = true;
+    notifyListeners();
+  }
 
   late ModelSpec base;
   late Map<ModelSpecField, SpecSource> sources;
@@ -166,7 +216,7 @@ class ModelSpecFormController extends ChangeNotifier {
         _patchReasoning((current) => current.copyWith(clearDefaultLevel: true));
       case ModelSpecField.reasoningBudgets:
         _patchReasoning((current) => current.copyWith(clearBudgets: true));
-        for (final level in kModelSpecEditableLevels) {
+        for (final level in [ReasoningLevel.on, ...kModelSpecEditableLevels]) {
           _setControllerText(budgetControllers[level]!, '');
         }
       case ModelSpecField.reasoningReplay:
@@ -551,32 +601,48 @@ class ModelSpecFormController extends ChangeNotifier {
     if (!_hasValidDraft()) return false;
     _commitIdentityFields();
 
-    final current = settings.providerConfigs[providerId] ?? _config;
-    final apiModelId = apiModelIdController.text.trim();
-    final key = isNew ? _nextModelKey(current, apiModelId) : _modelKey;
-    final prev = current.modelOverrides[key];
-    final payload = _payloadForSave(
-      currentConfig: current,
-      previous: prev,
-      logicalKey: key,
-    );
-    final overrides = Map<String, dynamic>.from(current.modelOverrides);
-    overrides[key] = payload;
     try {
-      if (isNew) {
-        await settings.setProviderConfig(
-          providerId,
-          current.copyWith(
-            modelOverrides: overrides,
-            models: [...current.models, key],
-          ),
-        );
-      } else {
-        await settings.setProviderConfig(
-          providerId,
-          current.copyWith(modelOverrides: overrides),
+      var savedAvatar = avatar;
+      if (_avatarTouched && savedAvatar?.type == AvatarType.file) {
+        savedAvatar = AvatarConfig(
+          type: AvatarType.file,
+          value: await importAvatarFile(savedAvatar!.value),
         );
       }
+      final current = settings.providerConfigs[providerId] ?? _config;
+      final apiModelId = apiModelIdController.text.trim();
+      final key = isNew ? _nextModelKey(current, apiModelId) : _modelKey;
+      final payload = _payloadForSave(
+        currentConfig: current,
+        previous: current.modelOverrides[key],
+        logicalKey: key,
+      );
+      if (_avatarTouched) {
+        payload.remove('avatar');
+        if (savedAvatar != null) payload['avatar'] = savedAvatar.toJson();
+      }
+      if (_requestBudgetTouched) {
+        payload.remove('requestBudget');
+        if (!requestBudget.isEmpty) {
+          payload['requestBudget'] = requestBudget.toJson();
+        }
+      }
+      if (_imageGenerationTouched) {
+        payload.remove('imageGeneration');
+        final options = imageGeneration.toJson();
+        if (options.isNotEmpty) payload['imageGeneration'] = options;
+      }
+      final overrides = Map<String, dynamic>.from(current.modelOverrides);
+      overrides[key] = payload;
+      await settings.setProviderConfig(
+        providerId,
+        current.copyWith(
+          modelOverrides: overrides,
+          models: isNew ? [...current.models, key] : current.models,
+        ),
+      );
+      avatar = savedAvatar;
+      _avatarTouched = false;
     } catch (e, st) {
       FlutterLogger.log('[ModelSpecForm] save failed: $e\n$st', tag: 'Model');
       return false;

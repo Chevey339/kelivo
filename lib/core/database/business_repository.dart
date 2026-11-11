@@ -66,6 +66,20 @@ final class BusinessRepository {
     });
   }
 
+  /// Commits related entities and bindings together, without replacing any
+  /// unrelated tables or preferences.
+  Future<void> writeBatch({
+    required Map<BusinessEntityKind, List<BusinessEntityValue>> entities,
+    required Map<String, Object> preferences,
+  }) => _database.transaction(() async {
+    for (final entry in entities.entries) {
+      await synchronizeEntities(entry.key, entry.value);
+    }
+    for (final entry in preferences.entries) {
+      await setPreference(entry.key, entry.value);
+    }
+  });
+
   Future<void> upsertEntity(
     BusinessEntityKind kind,
     BusinessEntityValue row,

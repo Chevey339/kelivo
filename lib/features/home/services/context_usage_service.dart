@@ -1,3 +1,5 @@
+import '../../../core/models/native_compaction.dart';
+import '../../../core/services/api/request_image_context.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
@@ -9,7 +11,6 @@ import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/conversation_prompt_settings.dart';
-import '../../../core/models/memory_entry.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -18,6 +19,7 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/memory/memory_snapshot.dart';
 import '../../../core/services/model_catalog/model_catalog_service.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
@@ -25,7 +27,15 @@ import '../utils/model_display_helper.dart';
 import 'context_assembly.dart';
 import 'draft_token_counter.dart';
 
-enum ContextUsageState { none, computing, exact, estimated, stale }
+enum ContextUsageState {
+  none,
+  computing,
+  exact,
+  estimated,
+  stale,
+  failed,
+  opaque,
+}
 
 typedef ContextUsageConfiguration = ({
   Object settings,
@@ -47,7 +57,7 @@ Future<String?> readContextMemorySnapshotHash({
     assistantId: assistant!.id,
     lang: settings.resolvedMemoryPromptLang,
     maxItems: settings.memoryInjectionMaxItems,
-    fullInjectionTypes: settings.memoryFullInjectionTypes,
+    fullInjectionTypes: assistant.memoryFullInjectionTypes,
   );
   return snapshot.isEmpty ? null : snapshot.hash;
 }
@@ -73,12 +83,10 @@ ContextUsageConfiguration contextUsageConfiguration({
     assistant?.id ?? assistantId,
     ProviderConfig.classify(providerKey, explicitType: config.providerType),
     ModelSpecResolver.instance.spec(config, modelId),
+    jsonEncode(config.requestBudgetForModel(modelId).toJson()),
     jsonEncode(assistant?.toJson()),
     settings.legacyMemoryMode,
     settings.memoryInjectionMaxItems,
-    jsonEncode(
-      settings.memoryFullInjectionTypes.map(MemoryEntry.typeToString).toList(),
-    ),
     settings.resolvedMemoryPromptLang,
     settings.memoryRulesPromptEn,
     settings.memoryRulesPromptZh,
@@ -253,6 +261,8 @@ class ContextUsageSnapshot {
     required this.assistantId,
     required this.computedAt,
     this.calibrated = false,
+    this.hasUnknownNativeTokens = false,
+    this.lastRequestInputTokens,
   });
 
   final ContextUsageState state;
@@ -264,12 +274,24 @@ class ContextUsageSnapshot {
   final String providerKey;
   final String modelId;
   final String? assistantId;
-  final DateTime computedAt;
+
+  /// Last successful count; null while no usable result has been computed.
+  final DateTime? computedAt;
   final bool calibrated;
+
+  /// The buckets cover readable content, excluding opaque native state.
+  final bool hasUnknownNativeTokens;
+
+  /// Input usage from the last matching request, not the current window total.
+  final int? lastRequestInputTokens;
+
+  bool get hasUsage => state != ContextUsageState.none && computedAt != null;
 
   double? get ratio {
     final window = contextWindow;
-    if (window == null || window <= 0) return null;
+    if (!hasUsage || hasUnknownNativeTokens || window == null || window <= 0) {
+      return null;
+    }
     return usedTokens / window;
   }
 
@@ -285,6 +307,8 @@ class ContextUsageSnapshot {
     String? assistantId,
     DateTime? computedAt,
     bool? calibrated,
+    bool? hasUnknownNativeTokens,
+    int? lastRequestInputTokens,
   }) {
     return ContextUsageSnapshot(
       state: state ?? this.state,
@@ -298,6 +322,10 @@ class ContextUsageSnapshot {
       assistantId: assistantId ?? this.assistantId,
       computedAt: computedAt ?? this.computedAt,
       calibrated: calibrated ?? this.calibrated,
+      hasUnknownNativeTokens:
+          hasUnknownNativeTokens ?? this.hasUnknownNativeTokens,
+      lastRequestInputTokens:
+          lastRequestInputTokens ?? this.lastRequestInputTokens,
     );
   }
 }
@@ -357,6 +385,20 @@ class ContextUsageService extends ChangeNotifier {
 
   ContextUsageSnapshot? snapshot(String conversationId) =>
       _snapshots[conversationId];
+
+  Future<RequestImageContext?> imageContextPreview(
+    String conversationId,
+  ) async {
+    final resolved = _resolvedIdentity(conversationId);
+    final assemble = _assemble;
+    if (resolved == null || assemble == null) return null;
+    return (await assemble(
+      conversationId: conversationId,
+      providerKey: resolved.providerKey,
+      modelId: resolved.modelId,
+      assistantId: resolved.assistantId,
+    )).imageContext;
+  }
 
   void bindAssembler(ContextAssemblyPreviewFn assemble) {
     _assemble = assemble;
@@ -449,6 +491,30 @@ class ContextUsageService extends ChangeNotifier {
     final revision = _chatService.contextRevision(conversationId);
     final before = _resolvedIdentity(conversationId);
     if (before == null) return;
+    // Auto-compaction can change the revision during a request. Its input
+    // usage remains a historical measurement even when it cannot calibrate
+    // the current window. Record it before awaiting so a later response wins.
+    if (before.providerKey == providerKey && before.modelId == modelId) {
+      final previous = _snapshots[conversationId];
+      final snapshot =
+          previous?.providerKey == providerKey && previous?.modelId == modelId
+          ? previous!
+          : ContextUsageSnapshot(
+              state: ContextUsageState.none,
+              buckets: const ContextUsageBuckets(),
+              usedTokens: 0,
+              contextWindow: before.contextWindow,
+              conversationId: conversationId,
+              revision: revision,
+              providerKey: providerKey,
+              modelId: modelId,
+              assistantId: before.assistantId,
+              computedAt: null,
+            );
+      _snapshots[conversationId] = snapshot.copyWith(
+        lastRequestInputTokens: usage.promptTokens,
+      );
+    }
     final memoryHash = await _readMemoryHash(before);
     if (_disposed) return;
     _memorySnapshotHashes[conversationId] = memoryHash;
@@ -487,12 +553,16 @@ class ContextUsageService extends ChangeNotifier {
       assistantId: storedAssistantId,
       configuration: configuration,
     );
+    final buckets = (previous?.buckets ?? const ContextUsageBuckets()).copyWith(
+      draft: draft,
+    );
+    final hasUnknownNativeTokens = previous?.hasUnknownNativeTokens ?? false;
     _snapshots[conversationId] = ContextUsageSnapshot(
-      state: ContextUsageState.exact,
-      buckets: (previous?.buckets ?? const ContextUsageBuckets()).copyWith(
-        draft: draft,
-      ),
-      usedTokens: used + draft,
+      state: hasUnknownNativeTokens
+          ? ContextUsageState.opaque
+          : ContextUsageState.exact,
+      buckets: buckets,
+      usedTokens: hasUnknownNativeTokens ? buckets.total : used + draft,
       contextWindow: window,
       conversationId: conversationId,
       revision: revision,
@@ -500,6 +570,8 @@ class ContextUsageService extends ChangeNotifier {
       modelId: modelId,
       assistantId: storedAssistantId,
       computedAt: computedAt,
+      hasUnknownNativeTokens: hasUnknownNativeTokens,
+      lastRequestInputTokens: previous?.lastRequestInputTokens,
     );
     notifyListeners();
     unawaited(refresh(conversationId, force: true));
@@ -560,7 +632,13 @@ class ContextUsageService extends ChangeNotifier {
           providerKey: resolved.providerKey,
           modelId: resolved.modelId,
           assistantId: resolved.assistantId,
-          computedAt: existing?.computedAt ?? DateTime.now(),
+          computedAt: existing?.computedAt,
+          hasUnknownNativeTokens: existing?.hasUnknownNativeTokens ?? false,
+          lastRequestInputTokens:
+              existing?.providerKey == resolved.providerKey &&
+                  existing?.modelId == resolved.modelId
+              ? existing?.lastRequestInputTokens
+              : null,
         );
         notifyListeners();
       }
@@ -582,7 +660,7 @@ class ContextUsageService extends ChangeNotifier {
             );
       if (_disposed || _inFlight[conversationId] != generation) return;
       final job = ContextEstimateJob(preview: preview, kind: resolved.kind);
-      final estimated = await _runEstimate(() => estimateContextBuckets(job));
+      final estimated = await _runEstimate(job.call);
       if (_disposed || _inFlight[conversationId] != generation) return;
       final latestMemoryHash = await _readMemoryHash(resolved);
       if (_disposed || _inFlight[conversationId] != generation) return;
@@ -623,23 +701,39 @@ class ContextUsageService extends ChangeNotifier {
         revision: revision,
         resolved: resolved,
         buckets: buckets,
+        opaque: preview.apiMessages.any(
+          (m) => m[nativeCompactionMessageKey] is Map,
+        ),
       );
       notifyListeners();
-    } catch (_) {
+    } catch (error, stack) {
       if (_disposed ||
           (generation == null
               ? _memoryChecks[conversationId] != check
               : _inFlight[conversationId] != generation)) {
         return;
       }
+      FlutterLogger.log(
+        'Context usage refresh failed for $conversationId: $error\n$stack',
+        tag: 'ContextUsage',
+      );
       final fallback = _snapshots[conversationId];
       _clearExactAnchor(conversationId);
-      if (fallback != null && fallback.state != ContextUsageState.none) {
-        _snapshots[conversationId] = fallback.copyWith(
-          state: ContextUsageState.stale,
-        );
-        notifyListeners();
-      }
+      _snapshots[conversationId] =
+          fallback?.copyWith(state: ContextUsageState.failed) ??
+          ContextUsageSnapshot(
+            state: ContextUsageState.failed,
+            buckets: const ContextUsageBuckets(),
+            usedTokens: 0,
+            contextWindow: initial.contextWindow,
+            conversationId: conversationId,
+            revision: revision,
+            providerKey: initial.providerKey,
+            modelId: initial.modelId,
+            assistantId: initial.assistantId,
+            computedAt: null,
+          );
+      notifyListeners();
     }
   }
 
@@ -669,8 +763,31 @@ class ContextUsageService extends ChangeNotifier {
     required int revision,
     required _ResolvedIdentity resolved,
     required ContextUsageBuckets buckets,
+    bool opaque = false,
   }) {
     final anchor = _anchors[conversationId];
+    final previous = _snapshots[conversationId];
+    final lastRequestInputTokens =
+        previous?.providerKey == resolved.providerKey &&
+            previous?.modelId == resolved.modelId
+        ? previous?.lastRequestInputTokens
+        : null;
+    if (opaque) {
+      return ContextUsageSnapshot(
+        state: ContextUsageState.opaque,
+        buckets: buckets,
+        usedTokens: buckets.total,
+        contextWindow: resolved.contextWindow,
+        conversationId: conversationId,
+        revision: revision,
+        providerKey: resolved.providerKey,
+        modelId: resolved.modelId,
+        assistantId: resolved.assistantId,
+        computedAt: DateTime.now(),
+        hasUnknownNativeTokens: true,
+        lastRequestInputTokens: lastRequestInputTokens,
+      );
+    }
     if (anchor != null && _anchorMatches(conversationId, revision, resolved)) {
       final calibrated = calibrateContextUsageBuckets(
         estimated: buckets,
@@ -689,6 +806,7 @@ class ContextUsageService extends ChangeNotifier {
           assistantId: resolved.assistantId,
           computedAt: anchor.computedAt,
           calibrated: true,
+          lastRequestInputTokens: lastRequestInputTokens,
         );
       }
       return ContextUsageSnapshot(
@@ -702,6 +820,7 @@ class ContextUsageService extends ChangeNotifier {
         modelId: resolved.modelId,
         assistantId: resolved.assistantId,
         computedAt: anchor.computedAt,
+        lastRequestInputTokens: lastRequestInputTokens,
       );
     }
     _clearExactAnchor(conversationId);
@@ -716,6 +835,7 @@ class ContextUsageService extends ChangeNotifier {
       modelId: resolved.modelId,
       assistantId: resolved.assistantId,
       computedAt: DateTime.now(),
+      lastRequestInputTokens: lastRequestInputTokens,
     );
   }
 
@@ -754,7 +874,8 @@ class ContextUsageService extends ChangeNotifier {
     _ResolvedIdentity resolved,
   ) {
     if (snapshot.state != ContextUsageState.exact &&
-        snapshot.state != ContextUsageState.estimated) {
+        snapshot.state != ContextUsageState.estimated &&
+        snapshot.state != ContextUsageState.opaque) {
       return false;
     }
     return snapshot.revision == _chatService.contextRevision(conversationId) &&

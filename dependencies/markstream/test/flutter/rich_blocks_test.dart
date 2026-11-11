@@ -703,6 +703,15 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    final scrollable = find.descendant(
+      of: find.byType(MarkstreamMathBlock),
+      matching: find.byType(Scrollable),
+    );
+    final position = tester.state<ScrollableState>(scrollable).position;
+    expect(position.maxScrollExtent, greaterThan(0));
+    await tester.drag(scrollable, const Offset(-80, 0));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(0));
     selectAll(tester);
     await tester.pumpAndSettle();
     expect(math.display, isTrue);

@@ -1,4 +1,5 @@
 import '../../../support/business_test_harness.dart';
+import '../../../support/android_selection_menu_mock.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -13,18 +14,22 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/android_text_selection_toolbar.dart';
 
 void main() {
   const barKey = Key('bar');
   const bodyHeight = 600.0;
   const nativeMenuChannel = MethodChannel('app.ios_selection_menu');
+  late AndroidSelectionMenuMock androidMenu;
 
   setUp(() {
+    androidMenu = AndroidSelectionMenuMock();
     // These assertions exercise the existing Flutter toolbar on older iOS.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(nativeMenuChannel, (_) async => false);
   });
   tearDown(() {
+    androidMenu.dispose();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(nativeMenuChannel, null);
   });
@@ -88,6 +93,95 @@ void main() {
 
   double barHeight(WidgetTester tester) =>
       tester.getSize(find.byKey(barKey)).height;
+
+  for (final draft in ['short', 'scrolling', 'long']) {
+    testWidgets(
+      'Android Select all keeps the $draft draft menu available for Copy',
+      (tester) async {
+        final source = switch (draft) {
+          'short' => 'alpha beta gamma',
+          'scrolling' => 'alpha beta gamma\n' * 25,
+          _ => 'alpha beta gamma\n' * 500,
+        };
+        final controller = TextEditingController(text: source);
+        addTearDown(controller.dispose);
+        String? clipboard;
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(SystemChannels.platform, (
+          call,
+        ) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboard = (call.arguments as Map)['text'] as String;
+          } else if (call.method == 'Clipboard.getData') {
+            return {'text': clipboard};
+          } else if (call.method == 'Clipboard.hasStrings') {
+            return {'value': clipboard?.isNotEmpty ?? false};
+          }
+          return null;
+        });
+        addTearDown(
+          () =>
+              messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+        );
+        await pumpBar(tester, controller);
+
+        // Repeat after Copy as well as directly from the initial selection.
+        for (var cycle = 0; cycle < 2; cycle++) {
+          clipboard = null;
+          if (draft == 'long') {
+            final editor = tester.widget<CodeEditor>(find.byType(CodeEditor));
+            editor.focusNode!.requestFocus();
+            editor.controller!.selection = const CodeLineSelection.collapsed(
+              index: 0,
+              offset: 0,
+            );
+            editor.scrollController!.verticalScroller.jumpTo(0);
+            await tester.pumpAndSettle();
+            await tester.longPressAt(
+              tester.getTopLeft(find.byType(CodeEditor)) + const Offset(20, 12),
+            );
+          } else {
+            final editable = tester.state<EditableTextState>(
+              find.byType(EditableText),
+            );
+            editable.widget.focusNode.requestFocus();
+            await tester.pumpAndSettle();
+            editable.userUpdateTextEditingValue(
+              controller.value.copyWith(
+                selection: const TextSelection(baseOffset: 0, extentOffset: 5),
+              ),
+              SelectionChangedCause.longPress,
+            );
+            editable.showToolbar();
+          }
+          await tester.pumpAndSettle();
+          expect(controller.selection.isCollapsed, isFalse);
+          expect(controller.selection.end, lessThan(source.length));
+          expect(androidMenu.isShown, isTrue);
+
+          await androidMenu.press('Select all');
+          // Also allow Copy before the next frame refreshes the editor menu.
+          if (cycle == 0) await tester.pumpAndSettle();
+          expect(
+            controller.selection,
+            TextSelection(baseOffset: 0, extentOffset: source.length),
+          );
+          expect(find.byType(AndroidTextSelectionToolbar), findsOneWidget);
+          expect(androidMenu.isShown, isTrue);
+
+          await androidMenu.press('Copy');
+          await tester.pumpAndSettle();
+          expect(clipboard, source);
+          expect(controller.text, source);
+          expect(androidMenu.isShown, isFalse);
+          expect(find.byType(AndroidTextSelectionToolbar), findsNothing);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
+  }
 
   for (final kind in [
     PointerDeviceKind.touch,
@@ -176,12 +270,28 @@ void main() {
           tester.getTopLeft(find.byType(CodeEditor)) + const Offset(20, 12),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Copy'), findsOneWidget);
+        final android =
+            Theme.of(tester.element(find.byType(CodeEditor))).platform ==
+            TargetPlatform.android;
+        if (android) {
+          expect(androidMenu.labels, contains('Copy'));
+        } else {
+          expect(find.text('Copy'), findsOneWidget);
+        }
+        final nativeHides = androidMenu.calls
+            .where((call) => call.method == 'hide')
+            .length;
 
         await tester.tap(find.byTooltip(tooltip));
         await tester.pumpAndSettle();
         expect(editor.focusNode!.hasFocus, isTrue);
         expect(find.text('Copy'), findsNothing);
+        if (android) {
+          expect(
+            androidMenu.calls.where((call) => call.method == 'hide').length,
+            greaterThan(nativeHides),
+          );
+        }
         expect(controller.text, source);
       }
     },

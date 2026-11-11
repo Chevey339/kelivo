@@ -10,9 +10,11 @@ import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_encryption.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 
-// Independently generated with Node/OpenSSL pbkdf2Sync + aes-256-gcm.
+// Independently generated with Node/OpenSSL argon2Sync / pbkdf2Sync + aes-256-gcm.
 // Salt: 00..0f, nonce prefix: 10..17, AAD: 41-byte header + block index.
 const _fixture =
+    'S0VMSVZFTkMDAAECAwQFBgcICQoLDA0ODxAREhMUFRYXAAAAAAAAADCgtAt6fQD2nKDFYUlUjFwfeaU1Tj/XjKe+YCWkK3EzeoUGXgB9UQM4R1L83lOfeBuTfuXE43GvC2URkuLlWoh7';
+const _legacyFixture =
     'S0VMSVZFTkMCAAECAwQFBgcICQoLDA0ODxAREhMUFRYXAAAAAAAAADDfv9sQMhLcGKdBs+O9GOv9+MuXeoLSOUhIh3sqp/OT1ePJ5gwXLAZaLMdjSR/ez4GfRT25MBu1ge4+HpO4y/WM';
 const _password = '  口令🔐\u0000 secret  ';
 
@@ -33,19 +35,24 @@ void main() {
 
   tearDown(() => root.delete(recursive: true));
 
-  test('decrypts an independent AES-GCM and PBKDF2 fixture', () async {
-    await encrypted.writeAsBytes(base64Decode(_fixture));
-    expect(await BackupEncryption.isEncrypted(encrypted), isTrue);
-    await BackupEncryption.decryptFile(
-      source: encrypted,
-      destination: restored,
-      password: _password,
+  for (final fixture in [_legacyFixture, _fixture]) {
+    test(
+      'decrypts the independent version ${base64Decode(fixture)[8]} fixture',
+      () async {
+        await encrypted.writeAsBytes(base64Decode(fixture));
+        expect(await BackupEncryption.isEncrypted(encrypted), isTrue);
+        await BackupEncryption.decryptFile(
+          source: encrypted,
+          destination: restored,
+          password: _password,
+        );
+        expect(
+          await restored.readAsString(),
+          'Kelivo encrypted backup\nAPI key and chat content',
+        );
+      },
     );
-    expect(
-      await restored.readAsString(),
-      'Kelivo encrypted backup\nAPI key and chat content',
-    );
-  });
+  }
 
   for (final length in [
     0,
@@ -73,6 +80,7 @@ void main() {
             ? 1
             : (length + _chunkSize - 1) ~/ _chunkSize;
         expect(await encrypted.length(), 41 + length + chunks * 16);
+        expect((await encrypted.readAsBytes())[8], 3);
         expect(await BackupEncryption.isEncrypted(source), isFalse);
         await BackupEncryption.decryptFile(
           source: encrypted,
@@ -105,6 +113,7 @@ void main() {
 
   for (final mutation in [
     'password',
+    'version',
     'salt',
     'nonce',
     'ciphertext',
@@ -115,6 +124,8 @@ void main() {
     test('$mutation fails authentication and removes plaintext', () async {
       final bytes = base64Decode(_fixture).toList();
       switch (mutation) {
+        case 'version':
+          bytes[8] = 2;
         case 'salt':
           bytes[9] ^= 1;
         case 'nonce':
@@ -149,7 +160,7 @@ void main() {
     () async {
       for (final bytes in [
         base64Decode(_fixture)..[8] = 1,
-        base64Decode(_fixture)..[8] = 3,
+        base64Decode(_fixture)..[8] = 4,
         base64Decode(_fixture)..[33] = 0x80,
         base64Decode(_fixture).sublist(0, 20),
       ]) {
@@ -167,78 +178,89 @@ void main() {
     },
   );
 
-  test(
-    'multi-chunk stream matches OpenSSL and rejects reorder and truncation',
-    () async {
-      final plaintext = Uint8List.fromList(
-        List.generate(2 * _chunkSize + 17, (i) => (i * 31 + 7) % 256),
-      );
-      final header = base64Decode(
-        'S0VMSVZFTkMCAAECAwQFBgcICQoLDA0ODxAREhMUFRYXAAAAAAAgABE=',
-      );
-      final keyHex =
-          '8187ee17dd32ce6139b1f78e5fe635ee15c7606fc9dc6fbb2032f166cdefc462';
-      final key = Uint8List.fromList([
-        for (var i = 0; i < keyHex.length; i += 2)
-          int.parse(keyHex.substring(i, i + 2), radix: 16),
-      ]);
-      final chunks = <Uint8List>[];
-      for (var index = 0; index < 3; index++) {
-        final nonce = Uint8List(12)..setRange(0, 8, header, 25);
-        ByteData.sublistView(nonce).setUint32(8, index, Endian.big);
-        final aad = Uint8List(45)..setRange(0, 41, header);
-        ByteData.sublistView(aad).setUint32(41, index, Endian.big);
-        final cipher = GCMBlockCipher(AESEngine())
-          ..init(true, AEADParameters(KeyParameter(key), 128, nonce, aad));
-        chunks.add(
-          cipher.process(
-            Uint8List.sublistView(
-              plaintext,
-              index * _chunkSize,
-              index == 2 ? plaintext.length : (index + 1) * _chunkSize,
+  for (final vector in [
+    (
+      version: 2,
+      key: '8187ee17dd32ce6139b1f78e5fe635ee15c7606fc9dc6fbb2032f166cdefc462',
+      digest:
+          'a5b7058125a1b6a5672389e32c12adf85709043b29579c3af02b467b87f1693d',
+    ),
+    (
+      version: 3,
+      key: '505e127f579263515448cbf900e8a19fa5d9a02373fac3dc86ff69632245e72a',
+      digest:
+          'e05b34579f3e53f830f2a6a405a297f510c5d962b7a8e29cbf17700757b64118',
+    ),
+  ]) {
+    test(
+      'v${vector.version} multi-chunk stream matches OpenSSL and rejects reorder and truncation',
+      () async {
+        final plaintext = Uint8List.fromList(
+          List.generate(2 * _chunkSize + 17, (i) => (i * 31 + 7) % 256),
+        );
+        final header = base64Decode(
+          'S0VMSVZFTkMCAAECAwQFBgcICQoLDA0ODxAREhMUFRYXAAAAAAAgABE=',
+        )..[8] = vector.version;
+        final keyHex = vector.key;
+        final key = Uint8List.fromList([
+          for (var i = 0; i < keyHex.length; i += 2)
+            int.parse(keyHex.substring(i, i + 2), radix: 16),
+        ]);
+        final chunks = <Uint8List>[];
+        for (var index = 0; index < 3; index++) {
+          final nonce = Uint8List(12)..setRange(0, 8, header, 25);
+          ByteData.sublistView(nonce).setUint32(8, index, Endian.big);
+          final aad = Uint8List(45)..setRange(0, 41, header);
+          ByteData.sublistView(aad).setUint32(41, index, Endian.big);
+          final cipher = GCMBlockCipher(AESEngine())
+            ..init(true, AEADParameters(KeyParameter(key), 128, nonce, aad));
+          chunks.add(
+            cipher.process(
+              Uint8List.sublistView(
+                plaintext,
+                index * _chunkSize,
+                index == 2 ? plaintext.length : (index + 1) * _chunkSize,
+              ),
             ),
-          ),
+          );
+        }
+        final fixture = Uint8List.fromList([
+          ...header,
+          for (final chunk in chunks) ...chunk,
+        ]);
+        // Independent Node/OpenSSL digest of the complete three-chunk envelope.
+        expect(crypto.sha256.convert(fixture).toString(), vector.digest);
+        await encrypted.writeAsBytes(fixture);
+        await BackupEncryption.decryptFile(
+          source: encrypted,
+          destination: restored,
+          password: _password,
         );
-      }
-      final fixture = Uint8List.fromList([
-        ...header,
-        for (final chunk in chunks) ...chunk,
-      ]);
-      // Independent Node/OpenSSL digest of the complete three-chunk envelope.
-      expect(
-        crypto.sha256.convert(fixture).toString(),
-        'a5b7058125a1b6a5672389e32c12adf85709043b29579c3af02b467b87f1693d',
-      );
-      await encrypted.writeAsBytes(fixture);
-      await BackupEncryption.decryptFile(
-        source: encrypted,
-        destination: restored,
-        password: _password,
-      );
-      expect(await restored.readAsBytes(), plaintext);
-      await restored.delete();
-      final shortHeader = Uint8List.fromList(header);
-      ByteData.sublistView(shortHeader).setUint64(33, _chunkSize, Endian.big);
-      final corruptLast = Uint8List.fromList(chunks.last)..[0] ^= 1;
-      for (final changed in [
-        [...header, ...chunks[1], ...chunks[0], ...chunks[2]],
-        [...header, ...chunks[0], ...chunks[0], ...chunks[2]],
-        [...shortHeader, ...chunks[0]],
-        [...header, ...chunks[0], ...chunks[1], ...corruptLast],
-      ]) {
-        await encrypted.writeAsBytes(changed);
-        await expectLater(
-          BackupEncryption.decryptFile(
-            source: encrypted,
-            destination: restored,
-            password: _password,
-          ),
-          throwsA(isA<BackupDecryptionException>()),
-        );
-        expect(await restored.exists(), isFalse);
-      }
-    },
-  );
+        expect(await restored.readAsBytes(), plaintext);
+        await restored.delete();
+        final shortHeader = Uint8List.fromList(header);
+        ByteData.sublistView(shortHeader).setUint64(33, _chunkSize, Endian.big);
+        final corruptLast = Uint8List.fromList(chunks.last)..[0] ^= 1;
+        for (final changed in [
+          [...header, ...chunks[1], ...chunks[0], ...chunks[2]],
+          [...header, ...chunks[0], ...chunks[0], ...chunks[2]],
+          [...shortHeader, ...chunks[0]],
+          [...header, ...chunks[0], ...chunks[1], ...corruptLast],
+        ]) {
+          await encrypted.writeAsBytes(changed);
+          await expectLater(
+            BackupEncryption.decryptFile(
+              source: encrypted,
+              destination: restored,
+              password: _password,
+            ),
+            throwsA(isA<BackupDecryptionException>()),
+          );
+          expect(await restored.exists(), isFalse);
+        }
+      },
+    );
+  }
 
   test('cancellation during key derivation never publishes output', () async {
     await source.writeAsString('secret');

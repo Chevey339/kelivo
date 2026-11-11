@@ -39,7 +39,7 @@ String? svgPreviewDataUri(String source) {
 
 /// Uses an SVG image document so embedded scripts cannot run in the WebView.
 /// The existing diagram bridge requests its PNG, then disposes the WebView.
-String buildSvgPreviewHtml(String source) {
+String buildSvgPreviewHtml(String source, {required int generation}) {
   final uri = svgPreviewDataUri(source) ?? '';
   return '''<!doctype html>
 <html><head><meta charset="utf-8" /></head><body>
@@ -52,7 +52,14 @@ function sendExport(data) {
     window.chrome.webview.postMessage(JSON.stringify({type: 'export', data}));
   }
 }
-image.onload = function() { loaded = true; };
+function reportReady(success) {
+  if (window.ReadyChannel) ReadyChannel.postMessage('$generation:' + (success ? 'ready' : 'error'));
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.postMessage(JSON.stringify({type: 'ready', generation: $generation, success}));
+  }
+}
+image.onload = function() { loaded = true; reportReady(true); };
+image.onerror = function() { reportReady(false); };
 image.src = '$uri';
 window.exportSvgToPng = function() {
   if (!loaded || !image.naturalWidth || !image.naturalHeight) {

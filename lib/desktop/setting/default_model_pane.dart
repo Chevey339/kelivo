@@ -1,3 +1,5 @@
+import '../../features/chat/widgets/compression_template_library.dart';
+import '../../features/home/widgets/model_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
@@ -7,8 +9,6 @@ import '../../shared/widgets/snackbar.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../features/model/utils/ocr_model_capability.dart';
-import '../../utils/brand_assets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -240,6 +240,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       }
                     },
                     configAction: () => _showCompressPromptDialog(context),
+                    footer: const _ThinkingSwitchRow(
+                      task: _BackgroundModelTask.compress,
+                      trailing: SizedBox.shrink(),
+                    ),
                   ),
 
                   const SizedBox(height: 16),
@@ -699,99 +703,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
   }
 
   Future<void> _showCompressPromptDialog(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.read<SettingsProvider>();
-    final ctrl = TextEditingController(text: sp.compressPrompt);
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return Dialog(
-          backgroundColor: context.overlaySurface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _ThinkingSwitchRow(
-                    task: _BackgroundModelTask.compress,
-                    trailing: SizedBox.shrink(),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.defaultModelPagePromptLabel,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  _promptEditor(
-                    ctx,
-                    controller: ctrl,
-                    hintText: l10n.defaultModelPageCompressPromptHint,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _DeskIosButton(
-                        label: l10n.defaultModelPageResetDefault,
-                        filled: false,
-                        dense: true,
-                        onTap: () async {
-                          await sp.resetCompressPrompt();
-                          await sp.resetCompressGenerationThinkingEnabled();
-                          ctrl.text = sp.compressPrompt;
-                        },
-                      ),
-                      const Spacer(),
-                      _DeskIosButton(
-                        label: l10n.defaultModelPageSave,
-                        filled: true,
-                        dense: true,
-                        onTap: () async {
-                          await sp.setCompressPrompt(ctrl.text.trim());
-                          if (ctx.mounted) Navigator.of(ctx).maybePop();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.defaultModelPageCompressVars('{content}', '{locale}'),
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    await showCompressionTemplateLibrary(context);
   }
 
   Future<void> _showSuggestionPromptDialog(BuildContext context) async {
@@ -910,6 +822,7 @@ class _ModelCard extends StatefulWidget {
     this.onReset,
     this.onDisable,
     this.configAction,
+    this.footer,
   });
 
   final IconData icon;
@@ -926,6 +839,7 @@ class _ModelCard extends StatefulWidget {
   final VoidCallback? onDisable;
   final VoidCallback onPick;
   final VoidCallback? configAction;
+  final Widget? footer;
 
   @override
   State<_ModelCard> createState() => _ModelCardState();
@@ -1063,16 +977,16 @@ class _ModelCardState extends State<_ModelCard> {
                   ),
                   child: Row(
                     children: [
-                      _BrandCircle(
-                        name: modelDisplay ?? (providerName ?? '?'),
+                      CurrentModelIcon(
+                        providerKey: effectiveProvider,
+                        modelId: effectiveModelId,
                         size: 24,
+                        iconScale: .62,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           modelDisplay ?? (providerName ?? '-'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: AppFontWeights.semibold,
@@ -1084,6 +998,10 @@ class _ModelCardState extends State<_ModelCard> {
                 ),
               ),
             ),
+            if (widget.footer != null) ...[
+              const SizedBox(height: 12),
+              widget.footer!,
+            ],
           ],
         ),
       ),
@@ -1370,56 +1288,6 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
           child: Icon(widget.icon, size: 18, color: cs.onSurface),
         ),
       ),
-    );
-  }
-}
-
-class _BrandCircle extends StatelessWidget {
-  const _BrandCircle({required this.name, this.size = 22});
-  final String name;
-  final double size;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    Widget inner;
-    if (asset == null) {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.heavy,
-          fontSize: size * 0.45,
-        ),
-      );
-    } else if (asset.endsWith('.svg')) {
-      inner = SvgPicture.asset(
-        asset,
-        width: size * 0.62,
-        height: size * 0.62,
-        fit: BoxFit.contain,
-        colorFilter: isDark && BrandAssets.assetNeedsDarkInvert(asset)
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null,
-      );
-    } else {
-      inner = Image.asset(
-        asset,
-        width: size * 0.62,
-        height: size * 0.62,
-        fit: BoxFit.contain,
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.10),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: inner,
     );
   }
 }

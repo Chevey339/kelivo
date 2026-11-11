@@ -9,13 +9,12 @@ import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../desktop/model_spec_edit_dialog.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../pages/model_spec_edit_page.dart';
 import '../../provider/pages/provider_detail_page.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../utils/brand_assets.dart';
+import '../../home/widgets/model_icon.dart';
 import '../../../utils/provider_grouping_logic.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
@@ -77,11 +76,6 @@ class _ModelProcessingResult {
   });
 }
 
-// Lightweight brand asset resolver usable in isolates
-String? _assetForNameStatic(String n) {
-  return BrandAssets.assetForName(n);
-}
-
 List<String> _buildDisplayProvidersOrder(
   SettingsProvider settings,
   Iterable<String> providerKeys,
@@ -114,11 +108,11 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
 
   providers.forEach((key, cfg) {
     if (!cfg.enabled) return;
-    if (cfg.models.isEmpty) return;
+    if (cfg.enabledModels.isEmpty) return;
 
     final name = cfg.name;
     final list = <_ModelItem>[
-      for (final mid in cfg.models)
+      for (final mid in cfg.enabledModels)
         () {
           final spec = ModelSpecResolver.instance.spec(cfg, mid);
           return _ModelItem(
@@ -128,7 +122,6 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
             info: spec,
             pinned: data.pinnedModels.contains('$key::$mid'),
             selected: data.currentModelKey == '$key::$mid',
-            asset: _assetForNameStatic(spec.upstreamId),
           );
         }(),
     ];
@@ -145,6 +138,9 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     if (parts.length < 2) continue;
     final pk = parts[0];
     final mid = parts.sublist(1).join('::');
+    if (data.providerConfigs[pk]?.disabledModels.contains(mid) == true) {
+      continue;
+    }
     final g = groups[pk];
     if (g == null) continue;
     final found = g.items.firstWhere(
@@ -538,6 +534,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   }
 
   Future<void> _jumpToCurrentSelection() async {
+    if (!mounted || _rows.isEmpty) return;
     // If user has entered a search query, decouple from previous selection
     // and jump to the first matching provider group instead.
     final currentQuery = _search.text.trim();
@@ -566,30 +563,51 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final targetIndex = _currentSelectionTargetIndex();
 
     if (targetIndex != null) {
-      final alignment = _currentSelectionScrollAlignment(targetIndex);
       try {
-        await _itemScrollController.scrollTo(
-          index: targetIndex,
-          alignment: alignment,
-          duration: const Duration(milliseconds: 360),
-          curve: Curves.easeOutCubic,
-        );
+        await _scrollCurrentSelectionIntoView(targetIndex);
         _autoScrolled = true;
       } catch (_) {
         // If scroll fails for any reason, try again once.
         Future.delayed(const Duration(milliseconds: 80), () async {
           if (!mounted || _autoScrolled) return;
           try {
-            await _itemScrollController.scrollTo(
-              index: targetIndex,
-              alignment: alignment,
-              duration: const Duration(milliseconds: 360),
-              curve: Curves.easeOutCubic,
-            );
+            await _scrollCurrentSelectionIntoView(targetIndex);
             _autoScrolled = true;
           } catch (_) {}
         });
       }
+    }
+  }
+
+  Future<void> _scrollCurrentSelectionIntoView(int targetIndex) async {
+    await _itemScrollController.scrollTo(
+      index: targetIndex,
+      alignment: _currentSelectionScrollAlignment(targetIndex),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
+    // Wrapped names can make the target taller than the initial estimate.
+    // Wait for the list to publish its measured bounds before correcting it.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted ||
+        !_itemScrollController.isAttached ||
+        _listViewportHeight <= 0 ||
+        _currentSelectionTargetIndex() != targetIndex) {
+      return;
+    }
+    for (final position in _itemPositionsListener.itemPositions.value) {
+      if (position.index != targetIndex) continue;
+      if (position.itemTrailingEdge <= 1) return;
+      final extent = position.itemTrailingEdge - position.itemLeadingEdge;
+      final alignment = (1 - extent - _listBottomPadding / _listViewportHeight)
+          .clamp(_currentSelectionTopAlignment, 1.0);
+      await _itemScrollController.scrollTo(
+        index: targetIndex,
+        alignment: alignment,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+      );
+      return;
     }
   }
 
@@ -621,9 +639,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     if (_listViewportHeight <= 0) {
       return 0;
     }
-    final topAlignment = widget.limitProviderKey == null
-        ? (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3)
-        : 0.0;
+    final topAlignment = _currentSelectionTopAlignment;
     if (_rows.length <= 1) return topAlignment;
 
     final remainingExtent = _estimatedRemainingExtentFrom(targetIndex);
@@ -633,6 +649,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final tailAlignment = 1.0 - (remainingExtent / _listViewportHeight);
     return tailAlignment.clamp(topAlignment, 0.72);
   }
+
+  double get _currentSelectionTopAlignment =>
+      widget.limitProviderKey == null && _listViewportHeight > 0
+      ? (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3)
+      : 0.0;
 
   double _estimatedRemainingExtentFrom(int targetIndex) {
     var extent = _listBottomPadding;
@@ -1029,6 +1050,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           if (parts.length < 2) continue;
           final pk = parts[0];
           final mid = parts.sublist(1).join('::');
+          if (settings.getProviderConfig(pk).disabledModels.contains(mid)) {
+            continue;
+          }
           final g = _groups[pk];
           if (g == null) continue;
           final found = g.items.firstWhere(
@@ -1406,7 +1430,12 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             width: double.infinity,
             child: Row(
               children: [
-                _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
+                CurrentModelIcon(
+                  providerKey: m.providerKey,
+                  modelId: m.id,
+                  size: 28,
+                  iconScale: .62,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -1415,8 +1444,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                       if (!showProviderLabel)
                         Text(
                           m.info.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: AppFontWeights.semibold,
@@ -1440,8 +1467,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                               ),
                             ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       const SizedBox(height: 4),
                       ModelTagWrap(model: m.info),
@@ -1661,7 +1686,6 @@ class _ModelItem {
   final ModelSpec info;
   final bool pinned;
   final bool selected;
-  final String? asset; // pre-resolved avatar asset for performance
   _ModelItem({
     required this.providerKey,
     required this.providerName,
@@ -1669,7 +1693,6 @@ class _ModelItem {
     required this.info,
     this.pinned = false,
     this.selected = false,
-    this.asset,
   });
   _ModelItem copyWith({bool? pinned, bool? selected}) => _ModelItem(
     providerKey: providerKey,
@@ -1678,7 +1701,6 @@ class _ModelItem {
     info: info,
     pinned: pinned ?? this.pinned,
     selected: selected ?? this.selected,
-    asset: asset,
   );
 }
 
@@ -1706,63 +1728,6 @@ class _ModelRow extends _ListRow {
 class _InheritRow extends _ListRow {
   final String label;
   _InheritRow(this.label);
-}
-
-// Reuse badges and avatars similar to provider detail
-class _BrandAvatar extends StatelessWidget {
-  const _BrandAvatar({required this.name, this.size = 20, this.assetOverride});
-  final String name;
-  final double size;
-  final String? assetOverride;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = assetOverride ?? BrandAssets.assetForName(name);
-    Widget inner;
-    if (asset != null) {
-      if (asset.endsWith('.svg')) {
-        final dark = Theme.of(context).brightness == Brightness.dark;
-        final ColorFilter? tint =
-            (dark && BrandAssets.assetNeedsDarkInvert(asset))
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null;
-        inner = SvgPicture.asset(
-          asset,
-          width: size * 0.62,
-          height: size * 0.62,
-          colorFilter: tint,
-        );
-      } else {
-        inner = Image.asset(
-          asset,
-          width: size * 0.62,
-          height: size * 0.62,
-          fit: BoxFit.contain,
-        );
-      }
-    } else {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
-        ),
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: inner,
-    );
-  }
 }
 
 // ===== Desktop dialog implementation =====
@@ -1977,6 +1942,9 @@ class _DesktopModelSelectDialogBodyState
           if (parts.length < 2) continue;
           final pk = parts[0];
           final mid = parts.sublist(1).join('::');
+          if (settings.getProviderConfig(pk).disabledModels.contains(mid)) {
+            continue;
+          }
           final g = _groups[pk];
           if (g == null) continue;
           final found = g.items.firstWhere(
@@ -2206,6 +2174,7 @@ class _DesktopModelSelectDialogBodyState
   }
 
   Future<void> _autoScrollToCurrent() async {
+    if (!mounted || _rows.isEmpty) return;
     // Ensure controller is attached to the list before scrolling
     if (!_itemScrollController.isAttached) {
       Future.delayed(const Duration(milliseconds: 60), () {
@@ -2335,70 +2304,82 @@ class _DesktopModelSelectDialogBodyState
             Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
         child: Row(
           children: [
-            _BrandAvatar(name: m.id, assetOverride: m.asset, size: 18),
+            CurrentModelIcon(
+              providerKey: m.providerKey,
+              modelId: m.id,
+              size: 18,
+              iconScale: .62,
+            ),
             const SizedBox(width: 6),
             Expanded(
-              child: Text.rich(
-                TextSpan(
-                  text: m.info.displayName,
-                  style: TextStyle(fontSize: 12.5),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Row(
                   children: [
-                    if (showProviderLabel)
-                      TextSpan(
-                        text: ' | ${m.providerName}',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: cs.onSurface.withValues(alpha: 0.6),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          text: m.info.displayName,
+                          style: TextStyle(fontSize: 12.5),
+                          children: [
+                            if (showProviderLabel)
+                              TextSpan(
+                                text: ' | ${m.providerName}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: cs.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      // Keep room for the full name; extra capabilities wrap
+                      // within the trailing half instead of squeezing it out.
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth / 2,
+                      ),
+                      child: ModelCapsulesRow(
+                        model: m.info,
+                        alignment: WrapAlignment.end,
+                        pillPadding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        bgOpacityDark: 0.18,
+                        bgOpacityLight: 0.14,
+                        borderOpacity: 0.22,
+                        itemSpacing: 4,
+                      ),
+                    ),
                   ],
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ModelCapsulesRow(
-                  model: m.info,
-                  alignment: WrapAlignment.end,
-                  pillPadding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 2,
+            const SizedBox(width: 4),
+            Builder(
+              builder: (context) {
+                final pinnedNow = context.select<SettingsProvider, bool>(
+                  (s) => s.isModelPinned(m.providerKey, m.id),
+                );
+                final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
+                return IosIconButton(
+                  key: ValueKey(
+                    'desktop-model-favorite-${m.providerKey}::${m.id}',
                   ),
-                  bgOpacityDark: 0.18,
-                  bgOpacityLight: 0.14,
-                  borderOpacity: 0.22,
-                  itemSpacing: 4,
-                ),
-                const SizedBox(width: 4),
-                Builder(
-                  builder: (context) {
-                    final pinnedNow = context.select<SettingsProvider, bool>(
-                      (s) => s.isModelPinned(m.providerKey, m.id),
-                    );
-                    final icon = pinnedNow
-                        ? Icons.favorite
-                        : Icons.favorite_border;
-                    return IosIconButton(
-                      key: ValueKey(
-                        'desktop-model-favorite-${m.providerKey}::${m.id}',
-                      ),
-                      icon: icon,
-                      size: 16,
-                      color: cs.primary,
-                      tooltip: l10n.modelSelectSheetFavoriteTooltip,
-                      onTap: () => context
-                          .read<SettingsProvider>()
-                          .togglePinModel(m.providerKey, m.id),
-                      padding: const EdgeInsets.all(3),
-                      minSize: 26,
-                    );
-                  },
-                ),
-              ],
+                  icon: icon,
+                  size: 16,
+                  color: cs.primary,
+                  tooltip: l10n.modelSelectSheetFavoriteTooltip,
+                  onTap: () => context.read<SettingsProvider>().togglePinModel(
+                    m.providerKey,
+                    m.id,
+                  ),
+                  padding: const EdgeInsets.all(3),
+                  minSize: 26,
+                );
+              },
             ),
           ],
         ),

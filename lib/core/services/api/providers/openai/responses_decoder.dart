@@ -68,6 +68,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
 
   TokenUsage? get usage => _round?.asSnapshot() ?? initialUsage;
 
+  String? finishReason;
   bool completed = false;
   int approxCompletionChars = 0;
 
@@ -97,6 +98,8 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final Set<String> _openServerToolIds = <String>{};
   final Set<String> _endedServerToolIds = <String>{};
   final Set<String> _seenCitationUrls = <String>{};
+  final Set<String> _openReasoningIds = <String>{};
+  final Set<String> _endedReasoningIds = <String>{};
   bool _emittedCitationEvents = false;
   bool _closed = false;
 
@@ -256,10 +259,10 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         final reasoningType = isSummary
             ? ReasoningType.summaryText
             : ReasoningType.reasoningText;
-        if (isSummary) {
-          if (_endedReasoningIds.contains(id)) return;
-          chunks.addAll(_startReasoning(id, reasoningType));
-        }
+
+        if (isSummary && _endedReasoningIds.contains(id)) return;
+
+        chunks.addAll(_startReasoning(id, reasoningType));
         chunks.add(
           ReasoningDelta(id: id, text: delta, reasoningType: reasoningType),
         );
@@ -275,7 +278,9 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     if (type == 'response.output_item.added') {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
-      if (item is Map && (item['type'] ?? '') == 'function_call') {
+      if (item is Map && item['type'] == 'reasoning') {
+        chunks.addAll(_startReasoning(_reasoningSeriesId(obj)));
+      } else if (item is Map && (item['type'] ?? '') == 'function_call') {
         final callId = (item['call_id'] ?? '').toString();
         final name = (item['name'] ?? '').toString();
         final args = (item['arguments'] ?? '').toString();
@@ -342,7 +347,9 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
       if (item is Map) _outputItems[idx] = item.cast<String, dynamic>();
-      if (item is Map && (item['type'] ?? '') == 'function_call') {
+      if (item is Map && item['type'] == 'reasoning') {
+        chunks.addAll(_endReasoning(_reasoningSeriesId(obj)));
+      } else if (item is Map && (item['type'] ?? '') == 'function_call') {
         final args = (item['arguments'] ?? '').toString();
         final entry = toolCallsByIndex.putIfAbsent(
           idx,
@@ -458,6 +465,8 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     required bool failed,
   }) {
     final response = obj['response'];
+    finishReason =
+        responsesFinishReason(obj) ?? (failed ? 'incomplete' : 'completed');
     if (response is Map) {
       final u = response['usage'];
       if (u != null) {
@@ -719,10 +728,26 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     ];
   }
 
+  List<StreamChunk> _startReasoning(String id) {
+    if (_endedReasoningIds.contains(id) || !_openReasoningIds.add(id)) {
+      return const [];
+    }
+    return [ReasoningStart(id: id)];
+  }
+
+  List<StreamChunk> _endReasoning(String id) {
+    if (!_openReasoningIds.remove(id)) return const [];
+    _endedReasoningIds.add(id);
+    return [ReasoningEnd(id: id)];
+  }
+
   List<StreamChunk> _closeOpenSeries({
     ServerToolStatus serverStatus = ServerToolStatus.completed,
   }) {
     final chunks = <StreamChunk>[];
+    for (final id in _openReasoningIds.toList()) {
+      chunks.addAll(_endReasoning(id));
+    }
     for (final id in _openToolIds.toList()) {
       chunks.addAll(_endTool(id));
     }
@@ -837,4 +862,27 @@ int _readInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+/// Preserve terminal status even when a Responses payload contains partial text.
+String? responsesFinishReason(Map response) {
+  final value = response['response'] is Map
+      ? response['response'] as Map
+      : response;
+  final status = value['status']?.toString();
+  if (status == 'incomplete') {
+    final details = value['incomplete_details'];
+    final reason = details is Map ? details['reason']?.toString() : null;
+    return reason == 'max_output_tokens' || reason == 'content_filter'
+        ? reason
+        : 'incomplete';
+  }
+  if (status == 'completed' &&
+      value['output'] is List &&
+      (value['output'] as List).whereType<Map>().any(
+        (item) => item['type'] == 'function_call',
+      )) {
+    return 'tool_calls';
+  }
+  return status;
 }

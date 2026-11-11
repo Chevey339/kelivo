@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'dart:io';
 
 import 'package:fake_async/fake_async.dart';
@@ -11,6 +12,8 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/conversation_prompt_settings.dart';
 import 'package:Kelivo/core/models/instruction_injection.dart';
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/models/request_budget.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -18,6 +21,7 @@ import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/utils/token_estimator.dart';
 import 'package:Kelivo/features/home/services/context_assembly.dart';
 import 'package:Kelivo/features/home/services/context_usage_service.dart';
@@ -124,6 +128,7 @@ void main() {
     InstructionInjectionProvider? instructions,
     WorldBookProvider? worldBooks,
     ContextAssemblyPreviewFn? assemble,
+    bool useRealIsolate = false,
   }) {
     final resolvedInstructions =
         instructions ??
@@ -160,7 +165,9 @@ void main() {
             ],
             images: [ContextImageRef()],
           ),
-      runEstimate: <T>(T Function() computation) async => computation(),
+      runEstimate: useRealIsolate
+          ? null
+          : <T>(T Function() computation) async => computation(),
     );
     disposers.add(service.dispose);
     return service;
@@ -199,6 +206,447 @@ void main() {
   );
 
   String tokenWords(int count) => List.filled(count, 'aa').join(' ');
+
+  test(
+    'request budget changes invalidate context usage configuration',
+    () async {
+      final providers = await createProviders();
+      final before = requestConfiguration(providers);
+      final config = providers.settings.getProviderConfig('TestProvider');
+      await providers.settings.setProviderConfig(
+        'TestProvider',
+        config.copyWith(
+          requestBudget: const RequestBudgetOverrides(imageCount: 10),
+        ),
+      );
+      final providerChanged = requestConfiguration(providers);
+      expect(providerChanged, isNot(before));
+      expect(requestConfiguration(providers), providerChanged);
+      await providers.settings.setProviderConfig(
+        'TestProvider',
+        providers.settings
+            .getProviderConfig('TestProvider')
+            .copyWith(
+              modelOverrides: {
+                ...config.modelOverrides,
+                'window-model': {
+                  ...(config.modelOverrides['window-model'] as Map),
+                  'requestBudget': {'imageCount': 4},
+                },
+              },
+            ),
+      );
+      expect(requestConfiguration(providers), isNot(providerChanged));
+    },
+  );
+
+  test(
+    'native partial estimates stay separate from measured request input',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final conversation = await chat.createDraftConversation(title: 'Native');
+      final reply = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'reply',
+      );
+      var native = true;
+      var fail = false;
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async {
+              if (fail) throw StateError('estimate failed');
+              return ContextAssemblyPreview(
+                systemText: 'system',
+                injectionsText: '',
+                historyText: 'retained messages and recent reply',
+                tools: [],
+                images: [],
+                apiMessages: [
+                  if (native)
+                    {
+                      nativeCompactionMessageKey: {'opaque': true},
+                    },
+                ],
+              );
+            },
+      );
+      usage.setActiveConversation(conversation.id);
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.opaque);
+      expect(usage.current!.hasUsage, isTrue);
+      expect(usage.current!.hasUnknownNativeTokens, isTrue);
+      final estimated = usage.current!.usedTokens;
+      expect(estimated, greaterThan(0));
+      expect(usage.current!.lastRequestInputTokens, isNull);
+      expect(usage.current!.ratio, isNull);
+      await usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: null,
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration(providers),
+        usage: const TokenUsage(promptTokens: 321, completionTokens: 2),
+        assistantMessage: reply,
+      );
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.opaque);
+      expect(usage.current!.usedTokens, estimated);
+      expect(
+        usage.current!.buckets.history,
+        estimateTokens('retained messages and recent reply'),
+      );
+      expect(usage.current!.calibrated, isFalse);
+      expect(usage.current!.lastRequestInputTokens, 321);
+      expect(usage.current!.hasUsage, isTrue);
+      expect(usage.current!.ratio, isNull);
+
+      await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'next question',
+      );
+      await usage.refresh(conversation.id, draftText: 'new draft', force: true);
+      expect(
+        usage.current!.usedTokens,
+        estimated + estimateTokens('new draft'),
+      );
+      expect(usage.current!.lastRequestInputTokens, 321);
+      expect(usage.current!.ratio, isNull);
+
+      fail = true;
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.failed);
+      expect(usage.current!.hasUsage, isTrue);
+      expect(usage.current!.hasUnknownNativeTokens, isTrue);
+      expect(usage.current!.ratio, isNull);
+
+      fail = false;
+      native = false;
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.estimated);
+      expect(usage.current!.hasUnknownNativeTokens, isFalse);
+      expect(usage.current!.lastRequestInputTokens, 321);
+      expect(usage.current!.ratio, isNotNull);
+    },
+  );
+
+  test(
+    'first native compaction retains the previous request input usage',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final conversation = await chat.createDraftConversation(
+        title: 'First compact',
+      );
+      final reply = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'reply',
+      );
+      var native = false;
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async => ContextAssemblyPreview(
+              systemText: 'system',
+              injectionsText: '',
+              historyText: 'history',
+              tools: [],
+              images: [],
+              apiMessages: [
+                if (native)
+                  {
+                    nativeCompactionMessageKey: {'opaque': true},
+                  },
+              ],
+            ),
+      );
+      usage.setActiveConversation(conversation.id);
+      await usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: null,
+        usage: const TokenUsage(promptTokens: 321, completionTokens: 2),
+        assistantMessage: reply,
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration(providers),
+      );
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.exact);
+      expect(usage.current!.usedTokens, 323);
+      native = true;
+      await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'next',
+      );
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.hasUnknownNativeTokens, isTrue);
+      expect(usage.current!.lastRequestInputTokens, 321);
+      expect(usage.current!.usedTokens, lessThan(321));
+      await providers.settings.setCurrentModel('TestProvider', 'plain-model');
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.modelId, 'plain-model');
+      expect(usage.current!.lastRequestInputTokens, isNull);
+    },
+  );
+
+  for (final hadSnapshot in [false, true]) {
+    test(
+      'native reply records input after an in-request revision change, prior=$hadSnapshot',
+      () async {
+        final chat = await createChat();
+        final providers = await createProviders();
+        final conversation = await chat.createDraftConversation(
+          title: 'Auto compact',
+        );
+        final reply = await chat.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'reply',
+        );
+        final usage = createUsage(
+          chat: chat,
+          settings: providers.settings,
+          assistants: providers.assistants,
+          assemble:
+              ({
+                required conversationId,
+                required providerKey,
+                required modelId,
+                required assistantId,
+              }) async => const ContextAssemblyPreview(
+                systemText: 'system',
+                injectionsText: '',
+                historyText: 'retained',
+                tools: [],
+                images: [],
+                apiMessages: [
+                  {
+                    nativeCompactionMessageKey: {'opaque': true},
+                  },
+                ],
+              ),
+        );
+        usage.setActiveConversation(conversation.id);
+        if (hadSnapshot) await usage.refresh(conversation.id);
+        final sentRevision = chat.contextRevision(conversation.id);
+        // A context operation written by auto-compaction also bumps this revision.
+        await chat.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'next',
+        );
+        expect(chat.contextRevision(conversation.id), isNot(sentRevision));
+        await usage.recordUsage(
+          conversationId: conversation.id,
+          providerKey: 'TestProvider',
+          modelId: 'window-model',
+          assistantId: null,
+          usage: const TokenUsage(promptTokens: 321, completionTokens: 2),
+          assistantMessage: reply,
+          requestRevision: sentRevision,
+          requestConfiguration: requestConfiguration(providers),
+        );
+        await usage.refresh(conversation.id, force: true);
+        expect(usage.current!.lastRequestInputTokens, 321);
+        expect(usage.current!.state, ContextUsageState.opaque);
+        expect(usage.current!.calibrated, isFalse);
+        expect(
+          usage.current!.usedTokens,
+          estimateTokens('system') + estimateTokens('retained'),
+        );
+        expect(usage.current!.ratio, isNull);
+      },
+    );
+  }
+
+  test(
+    'real isolate refresh completes after adding a historical image',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final conversation = await chat.createDraftConversation(title: 'Images');
+      await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'Describe this image',
+      );
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        useRealIsolate: true,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async {
+              final history = await chat.loadMessages(conversationId);
+              final imageContext = RequestImageContext(
+                settings: const ImageContextSettings(),
+                images: RequestImageContext.collect(history),
+              );
+              imageContext.activeHandles.addAll(
+                imageContext.images.map((image) => image.handle),
+              );
+              // Awaiting preview completes the size reads, but their Futures
+              // remain in the image context's cache and cannot cross isolates.
+              final images = await imageContext.preview();
+              return ContextAssemblyPreview(
+                systemText: 'system',
+                injectionsText: '',
+                historyText: history
+                    .map((message) => message.content)
+                    .join('\n'),
+                tools: const [],
+                images: [
+                  for (final image in images)
+                    if (image.included) const ContextImageRef(),
+                ],
+                imageContext: imageContext,
+              );
+            },
+      );
+      await usage.refresh(conversation.id);
+      final before = usage.snapshot(conversation.id)!;
+      expect(before.state, ContextUsageState.estimated);
+      expect(before.buckets.attachments, 0);
+
+      await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: '',
+        parts: [ImagePart(uri: 'data:image/png;base64,YWJj')],
+      );
+      await usage.refresh(conversation.id);
+      final after = usage.snapshot(conversation.id)!;
+      expect(after.state, ContextUsageState.estimated);
+      expect(after.buckets.attachments, greaterThan(0));
+      expect(after.usedTokens, greaterThan(before.usedTokens));
+      expect(after.revision, chat.contextRevision(conversation.id));
+    },
+  );
+
+  for (final hasPrevious in [false, true]) {
+    test('failed refresh can retry, previous usage=$hasPrevious', () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final conversation = await chat.createDraftConversation(title: 'Retry');
+      var shouldFail = !hasPrevious;
+      var history = 'first result';
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        useRealIsolate: true,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async {
+              if (shouldFail) throw StateError('assembly failed');
+              return ContextAssemblyPreview(
+                systemText: '',
+                injectionsText: '',
+                historyText: history,
+                tools: const [],
+                images: const [],
+              );
+            },
+      );
+      ContextUsageSnapshot? previous;
+      if (hasPrevious) {
+        await usage.refresh(conversation.id);
+        previous = usage.snapshot(conversation.id)!;
+        expect(previous.state, ContextUsageState.estimated);
+        shouldFail = true;
+      }
+
+      await usage.refresh(conversation.id, force: true);
+      final failed = usage.snapshot(conversation.id)!;
+      expect(failed.state, ContextUsageState.failed);
+      expect(failed.hasUsage, hasPrevious);
+      expect(failed.usedTokens, previous?.usedTokens ?? 0);
+      expect(failed.computedAt, previous?.computedAt);
+      expect(failed.ratio, previous?.ratio);
+
+      shouldFail = false;
+      history = tokenWords(30);
+      await usage.refresh(conversation.id, force: true);
+      final retried = usage.snapshot(conversation.id)!;
+      expect(retried.state, ContextUsageState.estimated);
+      expect(retried.hasUsage, isTrue);
+      expect(retried.usedTokens, 30);
+    });
+  }
+
+  test('an older failed refresh cannot replace a successful retry', () async {
+    final chat = await createChat();
+    final providers = await createProviders();
+    final conversation = await chat.createDraftConversation(title: 'Overlap');
+    final started = Completer<void>();
+    final pending = Completer<ContextAssemblyPreview>();
+    var calls = 0;
+    final usage = createUsage(
+      chat: chat,
+      settings: providers.settings,
+      assistants: providers.assistants,
+      assemble:
+          ({
+            required conversationId,
+            required providerKey,
+            required modelId,
+            required assistantId,
+          }) {
+            if (++calls == 1) {
+              started.complete();
+              return pending.future;
+            }
+            return Future.value(
+              const ContextAssemblyPreview(
+                systemText: '',
+                injectionsText: '',
+                historyText: 'new result',
+                tools: [],
+                images: [],
+              ),
+            );
+          },
+    );
+    final first = usage.refresh(conversation.id);
+    await started.future;
+    expect(usage.snapshot(conversation.id)!.hasUsage, isFalse);
+    await usage.refresh(conversation.id, force: true);
+    final latest = usage.snapshot(conversation.id);
+    pending.completeError(StateError('old failure'));
+    await first;
+    expect(usage.snapshot(conversation.id), same(latest));
+    expect(latest!.state, ContextUsageState.estimated);
+  });
 
   test(
     'late usage rejects a changed history revision, not streaming writes',

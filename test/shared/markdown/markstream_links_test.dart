@@ -1,7 +1,7 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
-import 'package:Kelivo/shared/markdown/link_image_handlers.dart';
+import 'package:Kelivo/shared/markdown/markdown_image_sources.dart';
 import 'package:markstream/markstream.dart';
 // ignore: depend_on_referenced_packages
 import 'package:url_launcher_platform_interface/link.dart';

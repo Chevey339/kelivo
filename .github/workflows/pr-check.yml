@@ -32,6 +32,10 @@ jobs:
         working-directory: dependencies/markstream
         run: flutter pub get --enforce-lockfile
 
+      - name: Flutter pub get (localization tools)
+        working-directory: tool/l10n
+        run: flutter pub get --enforce-lockfile
+
       - name: Dart format (changed files only)
         shell: bash
         run: |
@@ -44,7 +48,7 @@ jobs:
             HEAD_SHA="${{ github.sha }}"
           fi
 
-          files="$(git diff --diff-filter=ACMR --name-only "$BASE_SHA" "$HEAD_SHA" -- | grep -E '^(lib|test|integration_test|dependencies/markstream/(lib|test))/.*\.dart$' || true)"
+          files="$(git diff --diff-filter=ACMR --name-only "$BASE_SHA" "$HEAD_SHA" -- | grep -E '^(lib|test|integration_test|tool|dependencies/markstream/(lib|test))/.*\.dart$' || true)"
           if [ -z "$files" ]; then
             echo "No changed Dart files to format-check."
             exit 0
@@ -59,31 +63,14 @@ jobs:
           flutter gen-l10n
           git diff --exit-code -- lib/l10n
 
-      - name: No new untranslated messages (PR)
-        if: ${{ github.event_name == 'pull_request' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          BASE_SHA='${{ github.event.pull_request.base.sha }}'
-          BASE_DIR="$(mktemp -d)"
-          cleanup() {
-            git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true
-            rm -rf "$BASE_DIR" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
+      - name: Validate translation coverage and source freshness
+        run: python3 tool/l10n/translate.py check
 
-          git worktree add --detach "$BASE_DIR" "$BASE_SHA"
-          pushd "$BASE_DIR" >/dev/null
-          flutter pub get
-          flutter gen-l10n
-          popd >/dev/null
+      - name: Localization tool tests
+        run: python3 -m unittest discover -s tool/l10n -p 'test_*.py'
 
-          python3 .github/scripts/check_no_new_untranslated.py \
-            "$BASE_DIR/desiredFileName.txt" \
-            "desiredFileName.txt"
-
-      - name: dart analyze (root package only)
-        run: dart analyze --fatal-infos lib test integration_test
+      - name: dart analyze (app and development tools)
+        run: dart analyze --fatal-infos lib test integration_test tool
 
       - name: flutter test
         run: flutter test

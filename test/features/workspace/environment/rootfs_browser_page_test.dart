@@ -16,6 +16,7 @@ import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/file_browser_test_helpers.dart';
 
 void main() {
   test('resolveRootfsBrowserDir appends data on iOS', () async {
@@ -97,8 +98,9 @@ void main() {
 
     final browser = find.byType(FileBrowser);
     expect(browser, findsOneWidget);
-    await tester.runAsync(
-      tester.state<FileBrowserState>(browser).refreshEntries,
+    await waitForFileBrowserOperation(
+      tester,
+      tester.state<FileBrowserState>(browser).refreshEntries(),
     );
     await tester.pump();
 

@@ -48,6 +48,7 @@ class RoHelper {
   RoHelper(RO_INIT_TYPE init_type);
   ~RoHelper();
   bool WinRtAvailable() const;
+  HRESULT initializationResult() const { return mInitializationResult; }
   bool SupportedWindowsRelease();
   HRESULT GetStringReference(PCWSTR source, HSTRING* act,
                              HSTRING_HEADER* header);
@@ -90,6 +91,8 @@ class RoHelper {
   RoUninitialize_* mFpRoUninitialize;
 
   bool mWinRtAvailable;
+  HRESULT mInitializationResult = E_FAIL;
+  bool mNeedsUninitialize = false;
 
   HMODULE mComBaseModule;
   HMODULE mCoreMessagingModule;

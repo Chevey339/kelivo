@@ -19,10 +19,13 @@ class IosIconButton extends StatefulWidget {
     this.color,
     this.pressedColor,
     this.minSize,
+    this.visualSize,
     this.borderRadius = 8,
     this.semanticLabel,
     this.tooltip,
     this.enabled = true,
+    this.focusNode,
+    this.mouseCursor = SystemMouseCursors.click,
   }) : assert(
          icon != null || builder != null,
          'Either icon or builder must be provided',
@@ -40,9 +43,13 @@ class IosIconButton extends StatefulWidget {
   pressedColor; // override pressed color; defaults to blend with primary
   final double borderRadius;
   final double? minSize; // min tap target (e.g., 44 for AppBar)
+  /// Optional painted feedback size within the unchanged full touch target.
+  final double? visualSize;
   final String? semanticLabel;
   final String? tooltip;
   final bool enabled;
+  final FocusNode? focusNode;
+  final MouseCursor mouseCursor;
 
   @override
   State<IosIconButton> createState() => _IosIconButtonState();
@@ -85,7 +92,9 @@ class _IosIconButtonState extends State<IosIconButton> {
 
     final child = TweenAnimationBuilder<Color?>(
       tween: ColorTween(end: target),
-      duration: const Duration(milliseconds: 200),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
       builder: (context, color, _) {
         final c = color ?? base;
@@ -115,7 +124,7 @@ class _IosIconButtonState extends State<IosIconButton> {
       enabled: widget.enabled,
       label: widget.semanticLabel ?? widget.tooltip,
       child: MouseRegion(
-        cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
+        cursor: _interactive ? widget.mouseCursor : MouseCursor.defer,
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: Listener(
@@ -135,29 +144,49 @@ class _IosIconButtonState extends State<IosIconButton> {
             onLongPress: widget.enabled && widget.onLongPress != null
                 ? widget.onLongPress
                 : null,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              decoration: BoxDecoration(
-                color: bgTarget,
-                borderRadius: BorderRadius.circular(widget.borderRadius),
+            child: ConstrainedBox(
+              constraints: widget.minSize == null
+                  ? const BoxConstraints()
+                  : BoxConstraints(
+                      minWidth: widget.minSize!,
+                      minHeight: widget.minSize!,
+                    ),
+              child: Center(
+                widthFactor: 1,
+                heightFactor: 1,
+                child: AnimatedContainer(
+                  constraints:
+                      widget.visualSize == null && widget.minSize != null
+                      ? BoxConstraints(
+                          minWidth: widget.minSize!,
+                          minHeight: widget.minSize!,
+                        )
+                      : null,
+                  width: widget.visualSize,
+                  height: widget.visualSize,
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: bgTarget,
+                    borderRadius: BorderRadius.circular(widget.borderRadius),
+                  ),
+                  child: Padding(
+                    padding: widget.padding,
+                    child: Center(
+                      widthFactor: 1,
+                      heightFactor: 1,
+                      child: child,
+                    ),
+                  ),
+                ),
               ),
-              child: Padding(padding: widget.padding, child: child),
             ),
           ),
         ),
       ),
     );
-
-    if (widget.minSize != null) {
-      content = ConstrainedBox(
-        constraints: BoxConstraints(
-          minWidth: widget.minSize!,
-          minHeight: widget.minSize!,
-        ),
-        child: Center(child: content),
-      );
-    }
 
     final tooltip = widget.tooltip;
     if (tooltip != null && tooltip.isNotEmpty) {
@@ -174,6 +203,7 @@ class _IosIconButtonState extends State<IosIconButton> {
       );
     }
     return FocusableActionDetector(
+      focusNode: widget.focusNode,
       enabled: _interactive,
       onShowFocusHighlight: (value) => setState(() => _focused = value),
       shortcuts: const {
@@ -210,6 +240,7 @@ class IosCardPress extends StatefulWidget {
     this.duration,
     this.haptics = true,
     this.focusable = false,
+    this.mouseCursor = SystemMouseCursors.click,
   });
 
   final Widget child;
@@ -229,6 +260,7 @@ class IosCardPress extends StatefulWidget {
   // Whether to perform a soft haptic on tap (also gated by settings/global toggles)
   final bool haptics;
   final bool focusable;
+  final MouseCursor mouseCursor;
 
   @override
   State<IosCardPress> createState() => _IosCardPressState();
@@ -386,7 +418,7 @@ class _IosCardPressState extends State<IosCardPress> {
     }
 
     final interactiveContent = MouseRegion(
-      cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
+      cursor: _interactive ? widget.mouseCursor : MouseCursor.defer,
       onEnter: (_) {
         if (!_interactive) return;
         setState(() => _hovered = true);

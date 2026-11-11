@@ -105,7 +105,10 @@ String _attributes(String tag, Map<String, String> attributes) {
 }
 
 /// Portable HTML for export and clipboard use; active tags and URL schemes are excluded.
-String toHtml(MarkdownNode root) => serializeNodes(root, (node, output) {
+String toHtml(MarkdownNode root) => serializeNodes<String>(root, (
+  node,
+  output,
+) {
   final body = joinChildren(node, output);
   if (node is TextNode) return escapeHtml(node.text);
   if (node is LineBreakNode) return node.hard ? '<br />\n' : '\n';
@@ -117,6 +120,7 @@ String toHtml(MarkdownNode root) => serializeNodes(root, (node, output) {
     return '<$tag>$body</$tag>';
   }
   if (node is StrikethroughNode) return '<del>$body</del>';
+  if (node is HighlightNode) return '<mark>$body</mark>';
   if (node is CodeSpanNode) return '<code>${escapeHtml(node.code)}</code>';
   if (node is CodeBlockNode || node is HtmlBlockNode && node.fullDocument) {
     final raw = node is CodeBlockNode ? node.code : (node as HtmlBlockNode).raw;

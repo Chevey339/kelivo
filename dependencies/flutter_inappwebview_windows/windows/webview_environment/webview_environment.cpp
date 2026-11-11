@@ -13,14 +13,15 @@ namespace flutter_inappwebview_plugin
 
   WebViewEnvironment::WebViewEnvironment(const FlutterInappwebviewWindowsPlugin* plugin, const std::string& id)
     : plugin(plugin), id(id),
-    channelDelegate(std::make_unique<WebViewEnvironmentChannelDelegate>(this, plugin->registrar->messenger()))
+    channelDelegate(std::make_unique<WebViewEnvironmentChannelDelegate>(this, plugin->messenger()))
   {}
 
-  void WebViewEnvironment::create(const std::unique_ptr<WebViewEnvironmentSettings> settings, const std::function<void(HRESULT)> completionHandler)
+  void WebViewEnvironment::create(const std::unique_ptr<WebViewEnvironmentSettings> settings,
+    const std::function<void(HRESULT, const std::string&)> completionHandler)
   {
     if (!plugin) {
       if (completionHandler) {
-        completionHandler(E_FAIL);
+        completionHandler(E_ABORT, "WebViewEnvironment disposed");
       }
       return;
     }
@@ -28,7 +29,7 @@ namespace flutter_inappwebview_plugin
     auto hwnd = plugin->webViewEnvironmentManager->getHWND();
     if (!hwnd) {
       if (completionHandler) {
-        completionHandler(E_FAIL);
+        completionHandler(plugin->webViewEnvironmentManager->windowCreationResult(), "CreateWindowEx(WebViewEnvironment)");
       }
       return;
     }
@@ -63,42 +64,57 @@ namespace flutter_inappwebview_plugin
       settings && settings->userDataFolder.has_value() ? utf8_to_wide(settings->userDataFolder.value()).c_str() : nullptr,
       options.Get(),
       Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-        [this, hwnd, completionHandler](HRESULT result, wil::com_ptr<ICoreWebView2Environment> environment) -> HRESULT
+        [this, alive = alive_, pluginAlive = plugin->alive, hwnd, completionHandler](HRESULT result, wil::com_ptr<ICoreWebView2Environment> environment) -> HRESULT
         {
+          if (!*alive || !*pluginAlive) return S_OK;
           if (succeededOrLog(result)) {
             environment_ = std::move(environment);
 
             auto hr = environment_->CreateCoreWebView2Controller(hwnd, Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-              [this, completionHandler](HRESULT result, wil::com_ptr<ICoreWebView2Controller> controller) -> HRESULT
+              [this, alive, pluginAlive, completionHandler](HRESULT result, wil::com_ptr<ICoreWebView2Controller> controller) -> HRESULT
               {
+                if (!*alive || !*pluginAlive) {
+                  if (controller) controller->Close();
+                  return S_OK;
+                }
+                std::string stage = "CreateCoreWebView2Controller";
                 if (succeededOrLog(result)) {
                   webViewController_ = std::move(controller);
-                  webViewController_->get_CoreWebView2(&webView_);
-                  webViewController_->put_IsVisible(false);
+                  stage = "get_CoreWebView2";
+                  result = webViewController_->get_CoreWebView2(&webView_);
+                  if (SUCCEEDED(result)) {
+                    stage = "put_IsVisible";
+                    result = webViewController_->put_IsVisible(false);
+                  }
                 }
                 if (completionHandler) {
-                  completionHandler(result);
+                  completionHandler(result, stage);
                 }
                 return S_OK;
               }).Get());
 
             if (failedAndLog(hr) && completionHandler) {
-              completionHandler(hr);
+              completionHandler(hr, "CreateCoreWebView2Controller");
             }
           }
           else if (completionHandler) {
-            completionHandler(result);
+            completionHandler(result, "CreateCoreWebView2EnvironmentWithOptions");
           }
           return S_OK;
         }).Get());
 
     if (failedAndLog(hr) && completionHandler) {
-      completionHandler(hr);
+      completionHandler(hr, "CreateCoreWebView2EnvironmentWithOptions");
     }
   }
 
   WebViewEnvironment::~WebViewEnvironment()
   {
     debugLog("dealloc WebViewEnvironment");
+    *alive_ = false;
+    if (webViewController_) webViewController_->Close();
+    webView_ = nullptr;
+    webViewController_ = nullptr;
+    environment_ = nullptr;
   }
 }

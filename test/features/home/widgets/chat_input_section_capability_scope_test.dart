@@ -58,10 +58,7 @@ void main() {
       );
       await preferences.setString('current_assistant_id_v1', 'assistant-1');
       provider = AssistantProvider(preferences: preferences);
-      for (var i = 0; i < 100; i++) {
-        if (provider.currentAssistant != null) break;
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await provider.loaded;
     });
     return provider;
   }
@@ -78,6 +75,7 @@ void main() {
     bool desktopTools = false,
     double composerWidth = 800,
     VoidCallback? openBrowser,
+    GlobalKey? reasoningButtonKey,
   }) async {
     final settings = settingsOverride ?? SettingsProvider(preferences);
     final inputBarKey = GlobalKey();
@@ -113,6 +111,7 @@ void main() {
               builder: (context) {
                 final section = ChatInputSection(
                   inputBarKey: inputBarKey,
+                  reasoningButtonKey: reasoningButtonKey,
                   chatModelProviderKey: providerKey,
                   chatModelId: modelId,
                   chatModelIsConversationOverride: isConversationOverride,
@@ -169,6 +168,30 @@ void main() {
       supportsTools: true,
     ),
   ]) {
+    testWidgets(
+      'reasoning anchor follows the toolbar button and its overflow entry',
+      (tester) async {
+        final assistants = await loadAssistantWithMcp(tester);
+        final key = GlobalKey();
+        for (final width in [800.0, 180.0]) {
+          await pumpComposer(
+            tester,
+            assistants: assistants,
+            isConversationOverride: false,
+            supportsReasoning: true,
+            desktopTools: true,
+            composerWidth: width,
+            reasoningButtonKey: key,
+          );
+          await tester.pumpAndSettle();
+          expect(key.currentContext, isNotNull);
+          final box = key.currentContext!.findRenderObject() as RenderBox;
+          expect(box.size.width, lessThan(80));
+          expect(box.size.height, lessThan(60));
+        }
+      },
+    );
+
     testWidgets('desktop browser entry stays available with ${scenario.name}', (
       tester,
     ) async {
@@ -361,6 +384,28 @@ void main() {
 
     expect(assistants.currentAssistant?.mcpServerIds, isEmpty);
   });
+
+  testWidgets(
+    'conversation MCP mode keeps assistant defaults when the model lacks tools',
+    (tester) async {
+      final assistants = await loadAssistantWithMcp(tester);
+      await tester.runAsync(
+        () => assistants.updateAssistant(
+          assistants.currentAssistant!.copyWith(allowConversationMcp: true),
+        ),
+      );
+      await pumpComposer(
+        tester,
+        assistants: assistants,
+        isConversationOverride: false,
+      );
+      expect(assistants.currentAssistant!.mcpServerIds, ['server-1']);
+      expect(
+        tester.widget<ChatInputBar>(find.byType(ChatInputBar)).toolsActive,
+        isFalse,
+      );
+    },
+  );
 
   Future<void> pumpTabletComposer(
     WidgetTester tester, {

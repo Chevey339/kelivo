@@ -1,10 +1,14 @@
 import 'dart:io';
+import 'package:Kelivo/core/services/storage/storage_space.dart';
 import 'package:archive/archive_io.dart';
 import 'package:Kelivo/core/database/startup_recovery_service.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/services/backup/local_copy_catalog.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
+import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
+import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
+import 'package:Kelivo/core/database/database_family_preserver.dart';
 import '../../support/recovery_snapshot_fixture.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -31,6 +35,199 @@ void main() {
     ).writeAsString('old snapshot');
   });
   tearDown(() async => root.delete(recursive: true));
+  test(
+    'explicit deletion removes the retained family and preserves live data',
+    () async {
+      await PrivateDataStorage.prepare(source: source, target: target);
+      await File(
+        p.join(source.path, 'kelivo.db-shm'),
+      ).writeAsString('shared memory');
+      await File(
+        p.join(source.path, 'kelivo.db-journal'),
+      ).writeAsString('journal');
+      final attachment = File(p.join(source.path, 'images', 'photo.png'));
+      await attachment.parent.create();
+      await attachment.writeAsString('photo');
+      final active = File(p.join(target.path, 'kelivo.db'));
+      await active.writeAsString('current conversations');
+
+      expect(
+        await PrivateDataStorage.canDeleteRetainedDatabase(
+          source: source,
+          target: target,
+        ),
+        isTrue,
+      );
+      await PrivateDataStorage.deleteRetainedDatabase(
+        source: source,
+        target: target,
+      );
+
+      for (final suffix in DatabaseFamilyPreserver.suffixes) {
+        expect(
+          await File(p.join(source.path, 'kelivo.db$suffix')).exists(),
+          isFalse,
+        );
+      }
+      expect(await active.readAsString(), 'current conversations');
+      expect(
+        await File(p.join(target.path, 'kelivo.db-wal')).readAsString(),
+        'committed WAL',
+      );
+      expect(await attachment.readAsString(), 'photo');
+      expect(
+        await File(
+          p.join(source.path, 'snapshots 2', 'kept.zip'),
+        ).readAsString(),
+        'old snapshot',
+      );
+      // The next launch must keep the installed private database after cleanup.
+      await PrivateDataStorage.prepare(source: source, target: target);
+      expect(await active.readAsString(), 'current conversations');
+    },
+  );
+
+  for (final failure in [
+    'missing installation',
+    'mismatched identity',
+    'missing active database',
+    'empty active database',
+    'pending recovery',
+    'pending snapshot',
+    'pending preservation',
+    'invalid sidecar',
+  ]) {
+    test(
+      'retained deletion refuses $failure without touching the source',
+      () async {
+        await PrivateDataStorage.prepare(source: source, target: target);
+        switch (failure) {
+          case 'missing installation':
+            await File(
+              p.join(target.parent.path, PrivateDataStorage.recordName),
+            ).delete();
+          case 'mismatched identity':
+            await File(
+              p.join(target.path, PrivateDataStorage.readyName),
+            ).writeAsString(
+              '{"version":1,"id":"00000000-0000-0000-0000-000000000000"}',
+            );
+          case 'missing active database':
+            await File(p.join(target.path, 'kelivo.db')).delete();
+          case 'empty active database':
+            await File(p.join(target.path, 'kelivo.db')).writeAsString('');
+          case 'pending recovery':
+            await File(
+              p.join(target.parent.path, PrivateDataStorage.recoveryName),
+            ).writeAsString('pending');
+          case 'pending snapshot':
+            await File(
+              p.join(
+                target.path,
+                RestoreWorkspaceLock.snapshotRecoveryMarkerName,
+              ),
+            ).writeAsString('pending');
+          case 'pending preservation':
+            await File(
+              p.join(source.path, DatabaseFamilyPreserver.pendingName),
+            ).writeAsString('pending');
+          case 'invalid sidecar':
+            await Directory(p.join(source.path, 'kelivo.db-journal')).create();
+        }
+        expect(
+          await PrivateDataStorage.canDeleteRetainedDatabase(
+            source: source,
+            target: target,
+          ),
+          isFalse,
+        );
+        await expectLater(
+          PrivateDataStorage.deleteRetainedDatabase(
+            source: source,
+            target: target,
+          ),
+          throwsA(isA<StateError>()),
+        );
+        expect(
+          await File(p.join(source.path, 'kelivo.db')).readAsString(),
+          'original database',
+        );
+        expect(
+          await File(p.join(source.path, 'kelivo.db-wal')).readAsString(),
+          'committed WAL',
+        );
+      },
+    );
+  }
+
+  test('retained deletion refuses an alias of the live directory', () async {
+    await PrivateDataStorage.prepare(source: source, target: target);
+    final alias = Link(p.join(root.path, 'alias'));
+    await alias.create(target.parent.path);
+    final aliasedTarget = Directory(p.join(alias.path, 'kelivo-data'));
+    await expectLater(
+      PrivateDataStorage.deleteRetainedDatabase(
+        source: aliasedTarget,
+        target: target,
+      ),
+      throwsA(isA<StateError>()),
+    );
+    expect(
+      await File(p.join(target.path, 'kelivo.db')).readAsString(),
+      'original database',
+    );
+  }, skip: Platform.isWindows);
+
+  test(
+    'retained deletion refuses linked sidecars before removing any file',
+    () async {
+      await PrivateDataStorage.prepare(source: source, target: target);
+      await Link(
+        p.join(source.path, 'kelivo.db-journal'),
+      ).create(p.join(target.path, 'kelivo.db'));
+      await expectLater(
+        PrivateDataStorage.deleteRetainedDatabase(
+          source: source,
+          target: target,
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        await File(p.join(source.path, 'kelivo.db-wal')).readAsString(),
+        'committed WAL',
+      );
+      expect(
+        await File(p.join(target.path, 'kelivo.db')).readAsString(),
+        'original database',
+      );
+    },
+    skip: Platform.isWindows,
+  );
+
+  test('retained deletion respects a process still using Documents', () async {
+    await PrivateDataStorage.prepare(source: source, target: target);
+    final lease = await RestoreBusinessLease.acquire(appDataDirectory: source);
+    try {
+      await expectLater(
+        PrivateDataStorage.deleteRetainedDatabase(
+          source: source,
+          target: target,
+        ),
+        throwsA(isA<RestoreBusinessLeaseUnavailable>()),
+      );
+      expect(
+        await File(p.join(source.path, 'kelivo.db')).readAsString(),
+        'original database',
+      );
+    } finally {
+      await lease.close();
+    }
+    await PrivateDataStorage.deleteRetainedDatabase(
+      source: source,
+      target: target,
+    );
+  });
+
   test(
     'copies only database state and leaves snapshots and assets in Documents',
     () async {
@@ -232,13 +429,7 @@ void main() {
       addTearDown(() => DeviceStorageProbe.debugOverride = null);
       await expectLater(
         PrivateDataStorage.prepare(source: source, target: target),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'code',
-            'private_storage_insufficient_space',
-          ),
-        ),
+        throwsA(isA<InsufficientStorageSpace>()),
       );
       expect(await target.exists(), isFalse);
       expect(

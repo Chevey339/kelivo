@@ -1,3 +1,6 @@
+import '../../side_panel/desktop_side_panel_controller.dart';
+import '../../side_panel/widgets/side_panel_web_loading.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
@@ -40,6 +43,7 @@ import '../browser_management_route.dart';
 import 'browser_desktop_layout.dart';
 import 'browser_mobile_layout.dart';
 import 'browser_management_page.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 enum _BrowserMenu {
   newTab,
@@ -70,8 +74,12 @@ class BrowserPage extends StatefulWidget {
     this.onClose,
     this.onExpand,
     this.onDock,
+    this.sidePanel,
+    this.onShowAllTabs,
   });
 
+  final DesktopSidePanelController? sidePanel;
+  final VoidCallback? onShowAllTabs;
   final String? conversationId;
 
   /// Presentation handoffs preserve the selected tab without changing its owner.
@@ -85,10 +93,11 @@ class BrowserPage extends StatefulWidget {
   final VoidCallback? onDock;
 
   @override
-  State<BrowserPage> createState() => _BrowserPageState();
+  State<BrowserPage> createState() => BrowserPageViewState();
 }
 
-class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
+class BrowserPageViewState extends State<BrowserPage>
+    with WidgetsBindingObserver {
   late final BrowserService _service =
       widget.service ?? BrowserService.instance;
   final GlobalKey _startPageBoundary = GlobalKey();
@@ -316,6 +325,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   void _prepareOpticsWhenSettled([AnimationStatus? _]) {
+    if (widget.sidePanel != null) return;
     if (_opticsScheduled ||
         !mounted ||
         !_service.isInitialized ||
@@ -329,7 +339,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       if (_service.settings.surfaceStyle != BrowserSurfaceStyle.solid) {
         unawaited(BrowserProgressiveEdge.prewarm());
         unawaited(BrowserSwitchLens.prewarm());
-        if (_service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
+        if (widget.sidePanel == null &&
+            _service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
           unawaited(BrowserGlass.prewarm(nativeBackdrop: false));
         }
       }
@@ -359,14 +370,42 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     _chromeMotion.value = (progress: 0, animate: false);
   }
 
+  void focusAddress() => _focusAddress();
+  void focusFind() => _focusFind();
+  void reloadPage() {
+    if (_service.isSupported && !_blank) {
+      unawaited(_userRun(() => _service.reload()));
+    }
+  }
+
+  bool escapePanelEditing() {
+    if (_showFind) {
+      _toggleFind();
+      return true;
+    }
+    if (!_editingAddress && !_addressFocus.hasFocus) return false;
+    _addressFocus.unfocus();
+    setState(() => _editingAddress = false);
+    _syncAddress(force: true);
+    return true;
+  }
+
+  bool get _panelUnloaded =>
+      widget.sidePanel != null &&
+      !_blank &&
+      !_service.hasLiveEngine(_service.activeTabId!);
+
+  bool get _canFind => !_blank && _service.isSupported && !_panelUnloaded;
+
   Future<void> _initialize() async {
     try {
       await _service.initialize();
-      if (_service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
+      if (widget.sidePanel == null &&
+          _service.settings.surfaceStyle == BrowserSurfaceStyle.liquid) {
         await BrowserGlass.prewarm();
       }
       if (!mounted) return;
-      if (_service.isSupported) {
+      if (_service.isSupported && widget.sidePanel == null) {
         final conversationId = widget.conversationId;
         final initialTab = _service.tabs
             .where((tab) => tab.id == widget.initialTabId)
@@ -503,7 +542,9 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     }
     if ((maxOffset - offset) * scale <= 8 &&
         (scroll.gestureDelta != 0 ||
-            (scroll.phase == BrowserScrollPhase.update && cssDelta != 0))) {
+            (!_scrollTouchHasIntent &&
+                scroll.phase == BrowserScrollPhase.update &&
+                cssDelta != 0))) {
       _scrollIntent = 0;
       _chromeMotion.value = (progress: 0, animate: true);
       return;
@@ -539,7 +580,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     }
     _syncAddress();
     _releaseTabReturnCoverWhenReady();
-    if (_showFind && _findTabId != _service.activeTabId) {
+    if (_showFind && (_findTabId != _service.activeTabId || !_canFind)) {
       _findDebounce?.cancel();
       final previous = _findTabId;
       if (previous != null && _service.tabs.any((tab) => tab.id == previous)) {
@@ -647,6 +688,16 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     });
     unawaited(
       _userRun(() async {
+        if (widget.sidePanel != null && !_service.isSupported) {
+          final url = BrowserService.normalizeAddress(
+            value,
+            searchEngine: _service.settings.searchEngine,
+          );
+          final tabId = _service.activeTabId;
+          if (tabId != null) await _service.setSavedAddress(tabId, url);
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+          return;
+        }
         if (_service.activeTab == null) {
           await _service.createTab(
             url: value,
@@ -660,7 +711,11 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   Future<void> _newTab() => _run(() async {
-    await _service.createTab(ownerSessionId: widget.conversationId);
+    if (widget.sidePanel != null) {
+      await widget.sidePanel!.newWebTab();
+    } else {
+      await _service.createTab(ownerSessionId: widget.conversationId);
+    }
     if (mounted) _focusAddress();
   });
 
@@ -691,7 +746,9 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     builder: (context, _) {
       return BrowserScrollConfiguration(
         child: BrowserGlassScope(
-          style: _service.settings.surfaceStyle,
+          style: widget.sidePanel != null
+              ? BrowserSurfaceStyle.solid
+              : _service.settings.surfaceStyle,
           child: Theme(
             data: Theme.of(context).copyWith(
               splashFactory: NoSplash.splashFactory,
@@ -700,7 +757,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
               hoverColor: Colors.transparent,
             ),
             child: BrowserGlassBackdrop(
-              native: _desktop || !_blank,
+              native: widget.sidePanel == null && (_desktop || !_blank),
               child: BrowserMenuHost(child: Builder(builder: _buildBrowser)),
             ),
           ),
@@ -719,7 +776,20 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         _addressFocus.hasFocus ||
         (_addressKeyboardSession && keyboardInset > 0);
     return CallbackShortcuts(
-      bindings: widget.shortcutsEnabled
+      bindings: widget.sidePanel != null
+          ? {
+              SingleActivator(
+                LogicalKeyboardKey.keyR,
+                meta: mac,
+                control: !mac,
+              ): reloadPage,
+              SingleActivator(
+                LogicalKeyboardKey.keyF,
+                meta: mac,
+                control: !mac,
+              ): _focusFind,
+            }
+          : widget.shortcutsEnabled
           ? {
               SingleActivator(
                 LogicalKeyboardKey.keyL,
@@ -780,9 +850,11 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
           : const {},
       child: Focus(
         focusNode: _pageFocus,
-        autofocus: true,
+        autofocus: widget.sidePanel == null,
         child: Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: widget.sidePanel != null
+              ? Colors.transparent
+              : Theme.of(context).colorScheme.surface,
           // Keep the scene behind the system keyboard while editing the URL.
           // Webpage form keyboards retain normal viewport avoidance.
           resizeToAvoidBottomInset: _desktop || !retainKeyboardBackdrop,
@@ -818,6 +890,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                       progress: tab?.progress ?? 0,
                       secure: tab?.url.startsWith('https://') ?? false,
                       compact: _desktop,
+                      focusOutline: widget.sidePanel != null,
                       editing: _editingAddress || _addressFocus.hasFocus,
                       displayText: _displayHost,
                       onEdit: _focusAddress,
@@ -835,16 +908,22 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                     final layout = _desktop
                         ? BrowserWindowChrome(
                             windowSpacing: !widget.embedded,
-                            shortcutsEnabled: widget.shortcutsEnabled,
+                            shortcutsEnabled:
+                                widget.shortcutsEnabled &&
+                                widget.sidePanel == null,
                             onShortcut: _handleWindowShortcut,
                             child: BrowserViewportInsets(
                               tabId: _service.activeTabId,
                               viewIdentity: tab?.runtimeVersion,
-                              top: BrowserDesktopLayout.headerHeight,
+                              top: widget.sidePanel == null
+                                  ? BrowserDesktopLayout.headerHeight
+                                  : 0,
                               builder: (context, underlap) =>
                                   BrowserDesktopLayout(
                                     embedded: widget.embedded,
-                                    underlapHeader: underlap,
+                                    showTabBar: widget.sidePanel == null,
+                                    underlapHeader:
+                                        widget.sidePanel == null && underlap,
                                     tabBar: BrowserTabStrip(
                                       service: _service,
                                       tabs: _service.tabsForSession(
@@ -904,76 +983,18 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                                     findBar: _showFind
                                         ? _findBar(context)
                                         : null,
-                                    content: _desktopContent(context, underlap),
+                                    content: _panelFrame(
+                                      context,
+                                      _desktopContent(context, underlap),
+                                    ),
                                   ),
                             ),
                           )
-                        : BrowserViewportInsets(
-                            tabId: _blank ? null : _service.activeTabId,
-                            viewIdentity: tab?.runtimeVersion,
-                            top: MediaQuery.viewPaddingOf(context).top,
-                            builder: (context, underlap) =>
-                                ValueListenableBuilder<bool>(
-                                  valueListenable:
-                                      BrowserViewportInsets.reduceTransparency,
-                                  builder: (context, reduceTransparency, _) =>
-                                      BrowserMobileLayout(
-                                        key: _mobileLayoutKey,
-                                        underlapStatusBar: _blank || underlap,
-                                        fadeBehindToolbar:
-                                            !_blank &&
-                                            underlap &&
-                                            !reduceTransparency,
-                                        viewPadding: viewPadding,
-                                        keyboardInset: keyboardInset,
-                                        viewportResizesForKeyboard:
-                                            !retainKeyboardBackdrop,
-                                        onViewportHeight: (height) =>
-                                            _viewportHeight = height,
-                                        toolbar: _mobileToolbar(
-                                          context,
-                                          bottomSafeInset: viewPadding.bottom,
-                                          foregroundShadows:
-                                              defaultTargetPlatform ==
-                                                      TargetPlatform.iOS &&
-                                                  !_blank &&
-                                                  underlap &&
-                                                  !reduceTransparency &&
-                                                  !MediaQuery.highContrastOf(
-                                                    context,
-                                                  ) &&
-                                                  Theme.of(
-                                                        context,
-                                                      ).brightness ==
-                                                      Brightness.dark &&
-                                                  _service
-                                                          .settings
-                                                          .surfaceStyle ==
-                                                      BrowserSurfaceStyle.liquid
-                                              ? const [
-                                                  Shadow(
-                                                    color: Color(0x66000000),
-                                                    offset: Offset(0, .5),
-                                                    blurRadius: 0,
-                                                  ),
-                                                ]
-                                              : null,
-                                        ),
-                                        agentStatus: _agentStatus(context),
-                                        findBar: _showFind
-                                            ? _findBar(context)
-                                            : null,
-                                        content: _content(
-                                          context,
-                                          previewTopInset: underlap
-                                              ? viewPadding.top
-                                              : 0,
-                                        ),
-                                        transitionOverlay: _tabReturnOverlay(
-                                          context,
-                                        ),
-                                      ),
-                                ),
+                        : _mobileLayout(
+                            context,
+                            viewPadding: viewPadding,
+                            keyboardInset: keyboardInset,
+                            retainKeyboardBackdrop: retainKeyboardBackdrop,
                           );
                     return PopScope(
                       canPop:
@@ -993,6 +1014,84 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _mobileLayout(
+    BuildContext context, {
+    required EdgeInsets viewPadding,
+    required double keyboardInset,
+    required bool retainKeyboardBackdrop,
+  }) {
+    final editing = _editingAddress || _addressFocus.hasFocus;
+    return ValueListenableBuilder<({double progress, bool animate})>(
+      valueListenable: _chromeMotion,
+      builder: (context, motion, _) => BrowserChromeTransition(
+        progress: editing ? 0 : motion.progress,
+        animate: !editing && motion.animate,
+        reducedMotion: MediaQuery.disableAnimationsOf(context),
+        onProgress: (value) => _visibleCollapseProgress = value,
+        builder: (context, progress) {
+          final bottomContentInset =
+              !_blank && defaultTargetPlatform == TargetPlatform.iOS
+              ? BrowserMobileLayout.contentBottomInsetFor(
+                  bottomSafeInset: viewPadding.bottom,
+                  keyboardInset: keyboardInset,
+                  viewportResizesForKeyboard: !retainKeyboardBackdrop,
+                  collapseProgress: progress,
+                )
+              : 0.0;
+          return BrowserViewportInsets(
+            tabId: _blank ? null : _service.activeTabId,
+            viewIdentity: _service.activeTab?.runtimeVersion,
+            top: MediaQuery.viewPaddingOf(context).top,
+            bottom: bottomContentInset,
+            builder: (context, underlap) => ValueListenableBuilder<bool>(
+              valueListenable: BrowserViewportInsets.reduceTransparency,
+              builder: (context, reduceTransparency, _) => BrowserMobileLayout(
+                key: _mobileLayoutKey,
+                underlapStatusBar: _blank || underlap,
+                bottomContentInset: bottomContentInset,
+                underlapToolbar: underlap,
+                fadeBehindToolbar: !_blank && underlap && !reduceTransparency,
+                viewPadding: viewPadding,
+                keyboardInset: keyboardInset,
+                viewportResizesForKeyboard: !retainKeyboardBackdrop,
+                onViewportHeight: (height) => _viewportHeight = height,
+                toolbar: _mobileToolbar(
+                  context,
+                  collapseProgress: progress,
+                  bottomSafeInset: viewPadding.bottom,
+                  foregroundShadows:
+                      defaultTargetPlatform == TargetPlatform.iOS &&
+                          !_blank &&
+                          underlap &&
+                          !reduceTransparency &&
+                          !MediaQuery.highContrastOf(context) &&
+                          Theme.of(context).brightness == Brightness.dark &&
+                          _service.settings.surfaceStyle ==
+                              BrowserSurfaceStyle.liquid
+                      ? const [
+                          Shadow(
+                            color: Color(0x66000000),
+                            offset: Offset(0, .5),
+                            blurRadius: 0,
+                          ),
+                        ]
+                      : null,
+                ),
+                agentStatus: _agentStatus(context),
+                findBar: _showFind ? _findBar(context) : null,
+                content: _content(
+                  context,
+                  previewTopInset: underlap ? viewPadding.top : 0,
+                ),
+                transitionOverlay: _tabReturnOverlay(context),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _mobileHeader(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     return Padding(
@@ -1008,7 +1107,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
             child: Text(
               l.browserTitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.semibold,
+              ),
             ),
           ),
           BrowserActionButton(
@@ -1028,6 +1130,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
 
   Widget _mobileToolbar(
     BuildContext context, {
+    required double collapseProgress,
     required double bottomSafeInset,
     List<Shadow>? foregroundShadows,
   }) => TweenAnimationBuilder<double>(
@@ -1048,6 +1151,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         excluding: opacity < 1,
         child: _mobileToolbarContents(
           context,
+          collapseProgress: collapseProgress,
           bottomSafeInset: bottomSafeInset,
           revealOpacity: opacity,
           foregroundShadows: foregroundShadows,
@@ -1058,6 +1162,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
 
   Widget _mobileToolbarContents(
     BuildContext context, {
+    required double collapseProgress,
     required double bottomSafeInset,
     required double revealOpacity,
     List<Shadow>? foregroundShadows,
@@ -1066,8 +1171,8 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     final tab = _service.activeTab;
     final reduced = MediaQuery.disableAnimationsOf(context);
     final canGoForward = tab?.canGoForward == true;
-    // Measure once outside the per-frame chrome builder. Only labels that need
-    // ellipsis use two stable layouts; fitting hosts keep continuous scaling.
+    // Labels that need ellipsis use two stable text layouts; fitting hosts
+    // keep continuous scaling as the shared chrome animation progresses.
     double measureHost(double fontSize) {
       final painter = TextPainter(
         text: TextSpan(
@@ -1075,7 +1180,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
           style: DefaultTextStyle.of(context).style.merge(
             TextStyle(
               fontSize: fontSize,
-              fontWeight: FontWeight.w500,
+              fontWeight: AppFontWeights.medium,
               height: 1.15,
             ),
           ),
@@ -1090,10 +1195,15 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
 
     final expandedHostWidth = measureHost(16);
     final hostWidth = expandedHostWidth * 13 / 16;
+    final height = BrowserMobileLayout.controlHeightFor(collapseProgress);
+    final sideHeight = defaultTargetPlatform == TargetPlatform.iOS
+        ? height
+        : 48.0;
     final backControl = BrowserActionButton(
       label: l.browserBack,
       icon: LucideIcons.chevronLeft,
       iconSize: 22,
+      size: sideHeight,
       foregroundShadows: foregroundShadows,
       useParentFeedback: true,
       onPressed: tab?.canGoBack == true
@@ -1105,6 +1215,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       label: l.browserForward,
       icon: LucideIcons.chevronRight,
       iconSize: 22,
+      size: sideHeight,
       foregroundShadows: foregroundShadows,
       useParentFeedback: true,
       onPressed: canGoForward
@@ -1123,219 +1234,203 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         curve: Curves.easeInOutCubic,
         builder: (context, forwardProgress, _) {
           final navigationWidth = 48 + 36 * forwardProgress;
-          return ValueListenableBuilder<({double progress, bool animate})>(
-            valueListenable: _chromeMotion,
-            builder: (context, motion, _) => TweenAnimationBuilder<double>(
-              tween: Tween(begin: 1, end: _menuTransitionStarted ? 0 : 1),
-              duration: Duration(milliseconds: reduced ? 0 : 180),
-              curve: Curves.easeOutCubic,
-              builder: (context, toolbarOpacity, _) => LayoutBuilder(
-                builder: (context, constraints) {
-                  final expandedWidth = math.max(
-                    0.0,
-                    constraints.maxWidth - navigationWidth - 68,
-                  );
-                  final collapsedWidth = (hostWidth + 32).clamp(
-                    math.min(94.0, expandedWidth),
-                    expandedWidth,
-                  );
-                  return BrowserChromeTransition(
-                    progress: editing ? 0 : motion.progress,
-                    animate: !editing && motion.animate,
-                    reducedMotion: reduced,
-                    onProgress: (value) => _visibleCollapseProgress = value,
-                    builder: (context, t) {
-                      final width = constraints.maxWidth;
-                      final drop = BrowserMobileLayout.collapseDropFor(
-                        bottomSafeInset,
-                      );
-                      final sideOpacity =
-                          (1 - editProgress) *
-                          toolbarOpacity *
-                          revealOpacity *
-                          (1 - t);
-                      final moreOpacity = _menuTransitionStarted
-                          ? 0.0
-                          : (1 - editProgress) * (1 - t) * revealOpacity;
-                      final pillWidth = lerpDouble(
-                        lerpDouble(expandedWidth, width, editProgress),
-                        collapsedWidth,
-                        t,
-                      )!;
-                      final height = lerpDouble(48, 34, t)!;
-                      return SizedBox(
-                        height: BrowserMobileLayout.expandedChromeHeight + drop,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Positioned(
-                              key: const ValueKey('browserBackPosition'),
-                              left: 0,
-                              bottom: drop,
-                              child: Transform.translate(
-                                offset: Offset(42 * t, drop * t),
-                                child: SizedBox(
-                                  width: navigationWidth,
-                                  height: 48,
-                                  child: ExcludeSemantics(
-                                    excluding: editing || t >= .995,
-                                    child: IgnorePointer(
-                                      ignoring: editing || t >= .995,
-                                      child: BrowserPress(
-                                        draggable: true,
-                                        child: BrowserGlass(
-                                          key: const ValueKey(
-                                            'browserMobileNavigationGroup',
-                                          ),
-                                          radius: 1000,
-                                          opacity: sideOpacity,
-                                          child: Row(
-                                            children: [
-                                              SizedBox(
-                                                width: 48 - 6 * forwardProgress,
-                                                child: backControl,
-                                              ),
-                                              if (forwardProgress > 0)
-                                                SizedBox(
-                                                  width: 42 * forwardProgress,
-                                                  height: 48,
-                                                  child: ClipRect(
-                                                    child: OverflowBox(
-                                                      minWidth: 42,
-                                                      maxWidth: 42,
-                                                      alignment:
-                                                          Alignment.centerRight,
-                                                      child: IgnorePointer(
-                                                        ignoring: !canGoForward,
-                                                        child: ExcludeSemantics(
-                                                          excluding:
-                                                              !canGoForward,
-                                                          child: Opacity(
-                                                            opacity:
-                                                                forwardProgress,
-                                                            child:
-                                                                forwardControl,
-                                                          ),
-                                                        ),
-                                                      ),
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 1, end: _menuTransitionStarted ? 0 : 1),
+            duration: Duration(milliseconds: reduced ? 0 : 180),
+            curve: Curves.easeOutCubic,
+            builder: (context, toolbarOpacity, _) => LayoutBuilder(
+              builder: (context, constraints) {
+                final expandedWidth = math.max(
+                  0.0,
+                  constraints.maxWidth - navigationWidth - 68,
+                );
+                final collapsedWidth = (hostWidth + 32).clamp(
+                  math.min(94.0, expandedWidth),
+                  expandedWidth,
+                );
+                final t = collapseProgress;
+                final width = constraints.maxWidth;
+                final drop = BrowserMobileLayout.collapseDropFor(
+                  bottomSafeInset,
+                );
+                final sideOpacity =
+                    (1 - editProgress) *
+                    toolbarOpacity *
+                    revealOpacity *
+                    (1 - t);
+                final moreOpacity = _menuTransitionStarted
+                    ? 0.0
+                    : (1 - editProgress) * (1 - t) * revealOpacity;
+                final pillWidth = lerpDouble(
+                  lerpDouble(expandedWidth, width, editProgress),
+                  collapsedWidth,
+                  t,
+                )!;
+                return SizedBox(
+                  height: BrowserMobileLayout.expandedChromeHeight + drop,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        key: const ValueKey('browserBackPosition'),
+                        left: 0,
+                        bottom: drop,
+                        child: Transform.translate(
+                          offset: Offset(42 * t, drop * t),
+                          child: SizedBox(
+                            width: navigationWidth,
+                            height: sideHeight,
+                            child: ExcludeSemantics(
+                              excluding: editing || t >= .995,
+                              child: IgnorePointer(
+                                ignoring: editing || t >= .995,
+                                child: BrowserPress(
+                                  draggable: true,
+                                  child: BrowserGlass(
+                                    key: const ValueKey(
+                                      'browserMobileNavigationGroup',
+                                    ),
+                                    radius: 1000,
+                                    opacity: sideOpacity,
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 48 - 6 * forwardProgress,
+                                          child: backControl,
+                                        ),
+                                        if (forwardProgress > 0)
+                                          SizedBox(
+                                            width: 42 * forwardProgress,
+                                            height: sideHeight,
+                                            child: ClipRect(
+                                              child: OverflowBox(
+                                                minWidth: 42,
+                                                maxWidth: 42,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: IgnorePointer(
+                                                  ignoring: !canGoForward,
+                                                  child: ExcludeSemantics(
+                                                    excluding: !canGoForward,
+                                                    child: Opacity(
+                                                      opacity: forwardProgress,
+                                                      child: forwardControl,
                                                     ),
                                                   ),
                                                 ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              key: const ValueKey('browserAddressPosition'),
-                              left: lerpDouble(
-                                (navigationWidth + 10) * (1 - editProgress),
-                                (width - collapsedWidth) / 2,
-                                t,
-                              ),
-                              bottom: drop * (1 - t),
-                              width: pillWidth,
-                              height: height,
-                              child: BrowserAddressBar(
-                                stabilizeTruncation:
-                                    expandedHostWidth > expandedWidth - 86 ||
-                                    hostWidth > collapsedWidth - 24,
-                                expandedContentWidth: expandedWidth,
-                                collapsedContentWidth: collapsedWidth
-                                    .toDouble(),
-                                siteIcon: BrowserFavicon(
-                                  url: tab?.url ?? '',
-                                  service: _service,
-                                  size: 20,
-                                ),
-                                foregroundShadows: foregroundShadows,
-                                opacity: toolbarOpacity * revealOpacity,
-                                controller: _address,
-                                focusNode: _addressFocus,
-                                onSubmitted: _navigate,
-                                loading: tab?.isLoading ?? false,
-                                progress: tab?.progress ?? 0,
-                                secure:
-                                    tab?.url.startsWith('https://') ?? false,
-                                editing: editing,
-                                collapseProgress: t,
-                                displayText: _displayHost,
-                                onEdit: () {
-                                  if (_visibleCollapseProgress > 0) {
-                                    setState(() {
-                                      _chromeMotion.value = (
-                                        progress: 0,
-                                        animate: true,
-                                      );
-                                    });
-                                  } else {
-                                    _focusAddress();
-                                  }
-                                },
-                                onPageMenu: _openMenu,
-                                onReload: _blank
-                                    ? null
-                                    : () => unawaited(
-                                        _userRun(
-                                          () => tab?.isLoading == true
-                                              ? _service.stop()
-                                              : _service.reload(),
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            Positioned(
-                              key: const ValueKey('browserMorePosition'),
-                              right: 0,
-                              bottom: drop,
-                              child: Transform.translate(
-                                offset: Offset(-42 * t, drop * t),
-                                child: SizedBox(
-                                  // Keep the resting anchor outside the hidden control so
-                                  // a hidden held source still returns to 48x48.
-                                  key: _menuRestKey,
-                                  width: 48,
-                                  height: 48,
-                                  child: ExcludeSemantics(
-                                    excluding: editing || t >= .995,
-                                    child: IgnorePointer(
-                                      // Retain its material through keyboard and
-                                      // collapse transitions; alpha owns visibility.
-                                      ignoring: editing || t >= .995,
-                                      child: BrowserActionButton(
-                                        foregroundShadows: foregroundShadows,
-                                        surface: true,
-                                        // The menu owns this lens until its final frame.
-                                        // Only the companion controls use the fade above.
-                                        opacity: moreOpacity,
-                                        anchorKey: _menuButtonKey,
-                                        label: l.browserMore,
-                                        icon: LucideIcons.ellipsis,
-                                        onPressed: _openMenu,
-                                        onLongPress: _openMenu,
-                                        onLongPressStart: (pointer, details) =>
-                                            _openMenu(
-                                              heldPointer: pointer,
-                                              pressPosition:
-                                                  details.globalPosition,
+                                              ),
                                             ),
-                                      ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      );
-                    },
-                  );
-                },
-              ),
+                      ),
+                      Positioned(
+                        key: const ValueKey('browserAddressPosition'),
+                        left: lerpDouble(
+                          (navigationWidth + 10) * (1 - editProgress),
+                          (width - collapsedWidth) / 2,
+                          t,
+                        ),
+                        bottom: drop * (1 - t),
+                        width: pillWidth,
+                        height: height,
+                        child: BrowserAddressBar(
+                          stabilizeTruncation:
+                              expandedHostWidth > expandedWidth - 86 ||
+                              hostWidth > collapsedWidth - 24,
+                          expandedContentWidth: expandedWidth,
+                          collapsedContentWidth: collapsedWidth.toDouble(),
+                          siteIcon: BrowserFavicon(
+                            url: tab?.url ?? '',
+                            service: _service,
+                            size: 20,
+                          ),
+                          foregroundShadows: foregroundShadows,
+                          opacity: toolbarOpacity * revealOpacity,
+                          controller: _address,
+                          focusNode: _addressFocus,
+                          onSubmitted: _navigate,
+                          loading: tab?.isLoading ?? false,
+                          progress: tab?.progress ?? 0,
+                          secure: tab?.url.startsWith('https://') ?? false,
+                          editing: editing,
+                          collapseProgress: t,
+                          displayText: _displayHost,
+                          onEdit: () {
+                            if (_visibleCollapseProgress > 0) {
+                              setState(() {
+                                _chromeMotion.value = (
+                                  progress: 0,
+                                  animate: true,
+                                );
+                              });
+                            } else {
+                              _focusAddress();
+                            }
+                          },
+                          onPageMenu: _openMenu,
+                          onReload: _blank
+                              ? null
+                              : () => unawaited(
+                                  _userRun(
+                                    () => tab?.isLoading == true
+                                        ? _service.stop()
+                                        : _service.reload(),
+                                  ),
+                                ),
+                        ),
+                      ),
+                      Positioned(
+                        key: const ValueKey('browserMorePosition'),
+                        right: 0,
+                        bottom: drop,
+                        child: Transform.translate(
+                          offset: Offset(-42 * t, drop * t),
+                          child: SizedBox(
+                            // Keep the resting anchor outside the hidden control so
+                            // a hidden held source still returns to 48x48.
+                            key: _menuRestKey,
+                            width: 48,
+                            height: sideHeight,
+                            child: ExcludeSemantics(
+                              excluding: editing || t >= .995,
+                              child: IgnorePointer(
+                                // Retain its material through keyboard and
+                                // collapse transitions; alpha owns visibility.
+                                ignoring: editing || t >= .995,
+                                child: BrowserActionButton(
+                                  size: sideHeight,
+                                  foregroundShadows: foregroundShadows,
+                                  surface: true,
+                                  // The menu owns this lens until its final frame.
+                                  // Only the companion controls use the fade above.
+                                  opacity: moreOpacity,
+                                  anchorKey: _menuButtonKey,
+                                  label: l.browserMore,
+                                  icon: LucideIcons.ellipsis,
+                                  onPressed: _openMenu,
+                                  onLongPress: _openMenu,
+                                  onLongPressStart: (pointer, details) =>
+                                      _openMenu(
+                                        heldPointer: pointer,
+                                        pressPosition: details.globalPosition,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           );
         },
@@ -1388,12 +1483,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       compactActions: more(),
       actions: BrowserDesktopControlGroup(
         children: [
-          BrowserActionButton(
-            compact: true,
-            label: l.browserTabs,
-            icon: LucideIcons.panelsTopLeft,
-            onPressed: _openTabs,
-          ),
+          if (widget.sidePanel == null)
+            BrowserActionButton(
+              compact: true,
+              label: l.browserTabs,
+              icon: LucideIcons.panelsTopLeft,
+              onPressed: _openTabs,
+            ),
           more(),
         ],
       ),
@@ -1408,7 +1504,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     if (activity == BrowserAgentActivity.idle) return null;
     return BrowserAgentStatusChip(
       activity: activity,
-      pauseReason: _service.agentPauseReason,
+      pauseReason: _service.agentPauseFor(_visibleConversationId)?.reason,
       onPause: () => _service.takeOver(
         sessionId: _visibleConversationId,
         tabId: _service.activeTabId,
@@ -1424,6 +1520,27 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       return BrowserEmptyState(
         icon: LucideIcons.globe,
         title: l.browserUnsupported,
+        action: widget.sidePanel == null
+            ? null
+            : IosTileButton(
+                label: l.browserOpenExternal,
+                icon: LucideIcons.externalLink,
+                onTap: () {
+                  final url = _service.activeTab?.url;
+                  if (url == null || url == 'about:blank') {
+                    _focusAddress();
+                  } else {
+                    unawaited(
+                      _run(() async {
+                        await launchUrl(
+                          Uri.parse(url),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }),
+                    );
+                  }
+                },
+              ),
       );
     }
     final tab = _service.activeTab;
@@ -1456,6 +1573,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                   key: const ValueKey('browserObserverInputShield'),
                   absorbing: observing,
                   child: _service.buildViewport(
+                    loadMissingViews: widget.sidePanel == null,
                     deferNewViews: _deferNativeViews,
                     previewTopInset: previewTopInset,
                   ),
@@ -1476,7 +1594,35 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
               ),
             ),
           ),
-        if (tab?.error != null)
+        if (_panelUnloaded)
+          Positioned.fill(
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: BrowserEmptyState(
+                icon: LucideIcons.rotateCw,
+                title: l.sidePanelEvictedTitle,
+                subtitle:
+                    '${l.sidePanelEvictedBody(_service.liveViewLimit - 1)}\n\n${tab!.url}',
+                action: BrowserTextButton(
+                  icon: LucideIcons.rotateCw,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  onPressed: reloadPage,
+                  child: Text(l.browserReload),
+                ),
+              ),
+            ),
+          ),
+        if (widget.sidePanel != null &&
+            !_panelUnloaded &&
+            tab?.isLoading == true)
+          Positioned.fill(
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: const SidePanelWebLoading(),
+            ),
+          ),
+        if (tab?.error != null && !_panelUnloaded)
           Positioned.fill(
             child: ColoredBox(
               color: Theme.of(context).colorScheme.surface,
@@ -1619,7 +1765,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         unawaited(_newTab());
       case 'w':
         final id = _service.activeTabId;
-        if (id != null) unawaited(_userRun(() => _service.closeTab(id)));
+        if (id != null) {
+          if (widget.sidePanel != null) {
+            widget.sidePanel!.closeTab('web:$id');
+          } else {
+            unawaited(_userRun(() => _service.closeTab(id)));
+          }
+        }
       case 'f':
         _focusFind();
       case 'r':
@@ -1628,7 +1780,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   void _focusFind() {
-    if (_blank) return;
+    if (!_canFind) return;
     if (_showFind) {
       _findFocus.requestFocus();
       return;
@@ -1640,12 +1792,13 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   }
 
   void _toggleFind() {
-    if (_blank) return;
+    if (!_showFind && !_canFind) return;
 
     if (_showFind) {
       _findDebounce?.cancel();
       unawaited(_run(() => _service.clearFind(tabId: _findTabId)));
       _find.clear();
+      _findTabId = null;
     } else {
       _findTabId = _service.activeTabId;
     }
@@ -1663,6 +1816,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       _findDebounce?.cancel();
       final tabId = _findTabId;
       _findDebounce = Timer(const Duration(milliseconds: 180), () {
+        if (!_canFind || !_showFind || _findTabId != tabId) return;
         unawaited(_userRun(() => _service.findInPage(text, tabId: tabId)));
       });
     },
@@ -1768,7 +1922,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       context: context,
       barrierDismissible: true,
       barrierLabel: title,
-      barrierColor: Colors.black.withValues(alpha: .12),
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: .12),
       transitionDuration: Duration(milliseconds: reduced ? 0 : 160),
       pageBuilder: (panelContext, _, __) {
         final content = builder(panelContext, null);
@@ -1860,6 +2014,37 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
     unawaited(_userRun(() => _service.selectTab(id)));
   }
 
+  Widget _panelFrame(BuildContext context, Widget child) {
+    if (widget.sidePanel == null) return child;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final radius = dark ? 10.0 : 0.0;
+    final borderWidth = dark ? .5 : 0.0;
+    return Padding(
+      padding: dark ? const EdgeInsets.fromLTRB(8, 6, 8, 8) : EdgeInsets.zero,
+      // AppKit excludes foreground Flutter paint bounds from native hit tests.
+      // A foreground rounded border blocks the entire WebView rectangle, even
+      // with IgnorePointer. Paint the frame behind an inset native viewport.
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          border: dark
+              ? Border.all(
+                  color: Colors.white.withValues(alpha: .14),
+                  width: borderWidth,
+                )
+              : null,
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(borderWidth),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(radius - borderWidth),
+            child: ColoredBox(color: Colors.white, child: child),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _desktopContent(BuildContext context, bool underlap) => IndexedStack(
     index: _showDesktopTabs ? 1 : 0,
     sizing: StackFit.expand,
@@ -1889,6 +2074,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   );
 
   void _openTabs() {
+    if (widget.onShowAllTabs != null) {
+      widget.onShowAllTabs!();
+      return;
+    }
     if (_desktop) {
       if (_showFind) _toggleFind();
       _addressFocus.unfocus();
@@ -2225,7 +2414,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
           icon: LucideIcons.download,
           label: l.browserDownloads,
         ),
-        if (!_blank)
+        if (_canFind)
           BrowserMenuEntry(
             value: _BrowserMenu.find,
             secondary: true,
@@ -2265,7 +2454,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
             value: _BrowserMenu.agent,
             group: BrowserMenuGroup.application,
             icon: LucideIcons.hand,
-            label: _service.agentPaused
+            label: _service.agentPauseFor(_visibleConversationId) != null
                 ? l.browserAllowAgent
                 : l.browserTakeOver,
           ),
@@ -2308,10 +2497,14 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         final url = _service.activeTab?.url;
         if (url != null) {
           await _run(() async {
-            await _service.createTab(
-              url: url,
-              ownerSessionId: widget.conversationId,
-            );
+            if (widget.sidePanel != null) {
+              await widget.sidePanel!.newWebTab(url: url);
+            } else {
+              await _service.createTab(
+                url: url,
+                ownerSessionId: widget.conversationId,
+              );
+            }
           });
         }
       case _BrowserMenu.tabs:
@@ -2344,7 +2537,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
           });
         }
       case _BrowserMenu.agent:
-        if (_service.agentPaused) {
+        if (_service.agentPauseFor(_visibleConversationId) != null) {
           _service.allowAgentControl(sessionId: _visibleConversationId);
         } else {
           _service.takeOver(
@@ -2409,7 +2602,7 @@ class BrowserStartPage extends StatelessWidget {
                 'Kelivo',
                 style: TextStyle(
                   fontSize: 38,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   letterSpacing: -1.4,
                   color: cs.onSurface,
                 ),
@@ -2419,7 +2612,7 @@ class BrowserStartPage extends StatelessWidget {
                 l.browserFavorites,
                 style: TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   color: cs.onSurface,
                 ),
               ),

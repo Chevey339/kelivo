@@ -285,6 +285,102 @@ void main() {
       expect(resolved.spec.pricing?.cacheWrite, 3.75);
     });
 
+    test(
+      'Claude 5.5 catalog capabilities retain native thinking request rules',
+      () {
+        const models = [
+          'claude-opus-5-5',
+          'claude-sonnet-5-5',
+          'claude-haiku-5-5',
+        ];
+        catalog.debugSetData(
+          ModelCatalogData(
+            schemaVersion: 1,
+            generatedAt: DateTime.utc(2026, 10, 26),
+            providers: {
+              'anthropic': _provider(
+                'anthropic',
+                models: [
+                  for (final id in models)
+                    _model(
+                      id,
+                      reasoning: true,
+                      temperature: false,
+                      contextLimit: 1000000,
+                      outputLimit: 128000,
+                      reasoningOptions: [
+                        if (id == 'claude-haiku-5-5')
+                          const CatalogReasoningOption(type: 'toggle'),
+                        const CatalogReasoningOption(
+                          type: 'effort',
+                          values: ['low', 'medium', 'high', 'xhigh', 'max'],
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            },
+          ),
+        );
+        final expectedOff = {
+          'claude-opus-5-5': {
+            'thinking': {'type': 'adaptive', 'display': 'summarized'},
+            'output_config': {'effort': 'low'},
+          },
+          'claude-sonnet-5-5': {
+            'thinking': {'type': 'between_tools'},
+          },
+          'claude-haiku-5-5': {
+            'thinking': {'type': 'disabled'},
+          },
+        };
+        for (final id in models) {
+          final resolved = resolver.resolve(_anthropic(), id);
+          expect(resolved.catalog, isNotNull, reason: id);
+          expect(
+            resolved.sources[ModelSpecField.abilities],
+            SpecSource.catalog,
+          );
+          expect(
+            resolved.sources[ModelSpecField.reasoningLevels],
+            SpecSource.catalog,
+          );
+          expect(
+            resolved.sources[ModelSpecField.maxOutput],
+            SpecSource.catalog,
+          );
+          expect(
+            resolved.sources[ModelSpecField.reasoningDialect],
+            SpecSource.guess,
+          );
+          expect(resolved.spec.sampling, SamplingPolicy.never);
+          expect(
+            applyReasoning(
+              {},
+              resolved.spec,
+              ReasoningRequest.off,
+              transport: ReasoningTransport.anthropicMessages,
+            ),
+            expectedOff[id],
+            reason: id,
+          );
+          expect(
+            applyReasoning(
+              {},
+              resolved.spec,
+              const ReasoningRequest(ReasoningLevel.medium),
+              transport: ReasoningTransport.anthropicMessages,
+            ),
+            {
+              'thinking': {'type': 'adaptive', 'display': 'summarized'},
+              'output_config': {'effort': 'medium'},
+            },
+            reason: id,
+          );
+        }
+      },
+    );
+
     test('guesser is used when the host has no catalog match', () {
       final cfg = _cfg(
         id: 'proxy',

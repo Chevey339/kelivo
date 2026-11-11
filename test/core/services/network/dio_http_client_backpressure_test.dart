@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:Kelivo/core/services/network/dio_http_client.dart';
+import 'package:Kelivo/core/services/network/provider_http_exception.dart';
 
 class _Adapter implements HttpClientAdapter {
-  _Adapter(this.open);
+  _Adapter(this.open, {this.statusCode = 200, this.headers = const {}});
   final FutureOr<Stream<Uint8List>> Function() open;
+  final int statusCode;
+  final Map<String, List<String>> headers;
   final requests = <RequestOptions>[];
   final bodies = <List<int>>[];
 
@@ -24,7 +28,7 @@ class _Adapter implements HttpClientAdapter {
           ? const []
           : await requestStream.expand((bytes) => bytes).toList(),
     );
-    return ResponseBody(await open(), 200);
+    return ResponseBody(await open(), statusCode, headers: headers);
   }
 
   @override
@@ -32,6 +36,72 @@ class _Adapter implements HttpClientAdapter {
 }
 
 void main() {
+  for (final buffered in [false, true]) {
+    for (final status in [200, 503]) {
+      test(
+        'body read failures retain response metadata: buffered=$buffered status=$status',
+        () async {
+          const failure = HttpException(
+            'Connection closed while receiving data',
+          );
+          final client = DioHttpClient(
+            logRequests: false,
+            adapter: _Adapter(
+              () => Stream<Uint8List>.error(failure),
+              statusCode: status,
+              headers: {
+                'x-should-retry': ['false'],
+              },
+            ),
+          );
+          addTearDown(client.close);
+          final uri = Uri.parse('https://test.invalid');
+          final Future<Object> read = buffered
+              ? client.post(uri)
+              : client
+                    .send(http.Request('POST', uri))
+                    .then((response) => response.stream.toBytes());
+          await expectLater(
+            read,
+            throwsA(
+              status == 200
+                  ? same(failure)
+                  : isA<ProviderHttpException>()
+                        .having((e) => e.statusCode, 'status', 503)
+                        .having((e) => e.prohibitsRetry, 'no retry', isTrue)
+                        .having((e) => e.bodyReadError, 'cause', same(failure)),
+            ),
+          );
+        },
+      );
+    }
+  }
+
+  test(
+    'adapter cancellation after error headers stays a cancellation',
+    () async {
+      final cancelled = DioException(
+        requestOptions: RequestOptions(path: '/'),
+        type: DioExceptionType.cancel,
+      );
+      final client = DioHttpClient(
+        logRequests: false,
+        adapter: _Adapter(
+          () => Stream<Uint8List>.error(cancelled),
+          statusCode: 503,
+          headers: {
+            'x-should-retry': ['false'],
+          },
+        ),
+      );
+      addTearDown(client.close);
+      final response = await client.send(
+        http.Request('GET', Uri.parse('https://test.invalid')),
+      );
+      await expectLater(response.stream.toBytes(), throwsA(same(cancelled)));
+    },
+  );
+
   for (final fails in [false, true]) {
     test(
       fails

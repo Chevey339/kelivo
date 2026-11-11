@@ -1,0 +1,63 @@
+{
+  "recordedAtUtc": "2026-10-24T10:40:57.087128+00:00",
+  "executor": "Codex implementation agent; CUA native clicks on macOS/iOS simulator; Flutter pointer injection on Android",
+  "flutter": "3.47.6 / 5fc346839b5d0eef006ed8404392afb4dfae428d",
+  "results": {
+    "macos": {
+      "kind": "physical",
+      "cases": 23,
+      "trustedGestures": 5,
+      "httpOutbound": 0,
+      "tlsOutbound": 0,
+      "completeRunPassed": true,
+      "log": "build/genui/logs/c21-native-macos.log",
+      "os": "26.5.2 (25F84)",
+      "engine": "WKWebView 21624.2.5.11.8"
+    },
+    "ios-simulator": {
+      "kind": "simulator",
+      "cases": 23,
+      "trustedGestures": 5,
+      "httpOutbound": 0,
+      "tlsOutbound": 0,
+      "completeRunPassed": true,
+      "log": "build/genui/logs/c21-native-ios-simulator.log",
+      "os": "iOS 26.5",
+      "device": "iPhone 17 simulator",
+      "engine": "System WKWebView"
+    },
+    "android": {
+      "kind": "physical",
+      "cases": 23,
+      "trustedGestures": 5,
+      "httpOutbound": 0,
+      "tlsOutbound": 0,
+      "completeRunPassed": true,
+      "log": "build/genui/logs/c21-native-android.log",
+      "os": "Android 11 / API 30",
+      "device": "2112123AC dedicated physical test device",
+      "engine": "Android WebView Dev 151.0.7885.0"
+    }
+  },
+  "positiveControls": [
+    "Same executable temporary file via local path and file://localhost URI",
+    "Ordinary HTTP and TLS reach the same local listeners",
+    "Ordinary page still loads and retains its synthetic storage after all previews"
+  ],
+  "additionalChecks": [
+    "Each preview closes to a verified empty parent document and stays empty",
+    "Three close-during-initialization iterations",
+    "Nested srcdoc executes and retains opaque storage restrictions",
+    "Five gesture probes require isTrusted and active user activation"
+  ],
+  "deferrals": {
+    "windows": "User paused all work after a blue screen; no further machine access. Windows activation and remote SMB/UNC, shared-profile worker/autofill checks are deferred.",
+    "ios-physical": "User said to handle iPhone later. Isolated signed app installed, but no physical acceptance completed.",
+    "linux": "User deferred Linux acceptance; source/copy/HTML export behavior covered by widget tests."
+  },
+  "limits": [
+    "Controlled HTTP/TLS probes are evidence for the exercised routes and engines, not proof of absolute network isolation.",
+    "WebRTC remains the explicitly accepted residual risk.",
+    "iOS simulator results are not physical-iPhone evidence."
+  ]
+}

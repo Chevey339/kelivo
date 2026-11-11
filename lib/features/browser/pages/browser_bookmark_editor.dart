@@ -10,6 +10,7 @@ import '../models/browser_models.dart';
 import '../browser_management_route.dart';
 import '../widgets/browser_surface_controls.dart';
 import 'browser_management_page.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 typedef BrowserBookmarkEdit = ({String title, String url});
 
@@ -111,7 +112,7 @@ class _BrowserBookmarkEditorState extends State<BrowserBookmarkEditor> {
     final l = AppLocalizations.of(context)!;
     final titleStyle = DefaultTextStyle.of(
       context,
-    ).style.merge(const TextStyle(fontSize: 17, fontWeight: FontWeight.w600));
+    ).style.merge(TextStyle(fontSize: 17, fontWeight: AppFontWeights.semibold));
     // Let the actual localized button lay itself out. Measuring just its font
     // size misses inherited letter spacing and font fallback, which can leave
     // the save label with less width than even its ellipsis needs.
@@ -183,7 +184,6 @@ class _BrowserBookmarkEditorState extends State<BrowserBookmarkEditor> {
         keyboardType: url ? TextInputType.url : TextInputType.text,
         textInputAction: url ? TextInputAction.done : TextInputAction.next,
         autocorrect: !url,
-        enableSuggestions: !url,
         onChanged: url && _invalid
             ? (_) => setState(() => _invalid = false)
             : null,

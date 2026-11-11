@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../widgets/browser_progressive_edge.dart';
 import '../widgets/browser_scroll_configuration.dart';
 import '../widgets/browser_surface_controls.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Mobile management content scrolls beneath a safe-area-aware floating header.
 class BrowserManagementPage extends StatelessWidget {
@@ -64,7 +65,7 @@ class BrowserManagementPage extends StatelessWidget {
                         final style = DefaultTextStyle.of(context).style
                             .copyWith(
                               fontSize: 17,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                             );
                         final actionWidth = trailing == null
                             ? 0.0

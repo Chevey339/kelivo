@@ -11,6 +11,7 @@ DocumentNode selectedDocument(
   List<TextSegment> selected, {
   required Set<MarkdownNode> visible,
   required Set<MarkdownNode> complete,
+  Map<MarkdownNode, MarkdownNode> replacements = const {},
 }) {
   final completeHtmlTables = complete
       .whereType<HtmlElementNode>()
@@ -34,6 +35,11 @@ DocumentNode selectedDocument(
   final pending = <(MarkdownNode, bool)>[(document, false)];
   while (pending.isNotEmpty) {
     final (node, visited) = pending.removeLast();
+    final replacement = replacements[node];
+    if (replacement != null) {
+      converted[node] = replacement;
+      continue;
+    }
     final children = node is HtmlBlockNode && node.fullDocument
         ? node.rawFragments
         : node.children;

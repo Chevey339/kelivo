@@ -113,8 +113,11 @@ Stream<StreamChunk> emitReasoning(
   );
 }
 
-Stream<StreamChunk> emitUsage(TokenUsage? usage) async* {
-  if (usage != null) yield Usage(usage);
+Stream<StreamChunk> emitUsage(
+  TokenUsage? usage, {
+  bool estimated = false,
+}) async* {
+  if (usage != null) yield Usage(usage, estimated: estimated);
 }
 
 Stream<StreamChunk> emitFinish({
@@ -125,7 +128,10 @@ Stream<StreamChunk> emitFinish({
   String? finishReason,
 }) async* {
   yield* emitReasoning(null, ids: ids, details: reasoningDetails);
-  yield* emitUsage(_usageOrApprox(usage, totalTokens));
+  yield* emitUsage(
+    _usageOrApprox(usage, totalTokens),
+    estimated: usage == null && totalTokens > 0,
+  );
   yield Finish(finishReason: finishReason);
 }
 
@@ -137,7 +143,10 @@ Stream<StreamChunk> emitDelta({
   TokenUsage? usage,
   int totalTokens = 0,
 }) async* {
-  yield* emitUsage(_usageOrApprox(usage, totalTokens));
+  yield* emitUsage(
+    _usageOrApprox(usage, totalTokens),
+    estimated: usage == null && totalTokens > 0,
+  );
   yield* emitReasoning(reasoning, ids: ids, details: reasoningDetails);
   yield* emitText(content, ids: ids);
 }
@@ -226,7 +235,10 @@ Stream<StreamChunk> emitToolCalls(
   TokenUsage? usage,
   int totalTokens = 0,
 }) async* {
-  yield* emitUsage(_usageOrApprox(usage, totalTokens));
+  yield* emitUsage(
+    _usageOrApprox(usage, totalTokens),
+    estimated: usage == null && totalTokens > 0,
+  );
   for (final call in calls) {
     yield ToolCallStart(
       id: call.id,
@@ -245,7 +257,10 @@ Stream<StreamChunk> emitToolResults(
   TokenUsage? usage,
   int totalTokens = 0,
 }) async* {
-  yield* emitUsage(_usageOrApprox(usage, totalTokens));
+  yield* emitUsage(
+    _usageOrApprox(usage, totalTokens),
+    estimated: usage == null && totalTokens > 0,
+  );
   for (final result in results) {
     yield ToolCallResult(
       id: result.id,

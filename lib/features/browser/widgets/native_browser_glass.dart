@@ -8,8 +8,7 @@ import 'package:flutter/widgets.dart';
 
 /// A passive native material below Flutter's browser controls. On iOS/macOS 26,
 /// `liquid` uses the system's live glass compositor above the WKWebView.
-/// iOS 17–25 uses a guarded native backdrop mesh for live edge refraction;
-/// runtimes without the required Core Animation facilities retain UIKit blur.
+/// Earlier iOS versions use UIKit blur with subtle edge lighting.
 /// Flutter-only pages use BrowserGlass's shader instead of this native host.
 ///
 /// Size this widget from its parent. Keep Flutter opacity and clipping outside

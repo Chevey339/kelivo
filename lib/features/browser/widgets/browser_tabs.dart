@@ -17,6 +17,7 @@ import 'browser_favicon.dart';
 import 'browser_menu.dart';
 import 'browser_surface_controls.dart';
 import 'browser_progressive_edge.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class BrowserTabStrip extends StatelessWidget {
   const BrowserTabStrip({
@@ -135,8 +136,8 @@ class _DesktopTabState extends State<_DesktopTab> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: widget.active
-                              ? FontWeight.w500
-                              : FontWeight.w400,
+                              ? AppFontWeights.medium
+                              : AppFontWeights.regular,
                         ),
                       ),
                     ),
@@ -256,7 +257,9 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
               color: color,
               fontSize: desktop ? 12 : 13,
               height: 1.3,
-              fontWeight: desktop ? FontWeight.w500 : FontWeight.w600,
+              fontWeight: desktop
+                  ? AppFontWeights.medium
+                  : AppFontWeights.semibold,
             ),
           ),
         ),
@@ -535,10 +538,10 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                                       '${group.key == widget.conversationId ? l.browserTabsCurrentConversation : widget.conversationTitle?.call(group.key) ?? (group.key == null ? l.browserTabsUnassigned : l.browserTabsUnknownConversation)} · ${group.value.length}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 12,
                                         height: 1.3,
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: AppFontWeights.semibold,
                                       ),
                                     ),
                                   ),
@@ -734,9 +737,9 @@ class _BrowserTabOverviewState extends State<BrowserTabOverview> {
                                   l.browserTabsCount(scopedTabs.length),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: AppFontWeights.semibold,
                                   ),
                                 ),
                               ),
@@ -919,9 +922,9 @@ class _TabCard extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                   ),
                 ),
@@ -978,9 +981,9 @@ class _NewTabCard extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                 ),
               ),
             ),

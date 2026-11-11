@@ -159,6 +159,13 @@ void main() {
   late BusinessTestHarness storage;
   late SettingsProvider settings;
   late AssistantProvider assistants;
+
+  Future<void> setFullInjectionTypes(Set<MemoryType> types) async {
+    await assistants.updateAssistant(
+      assistants.getById('a')!.copyWith(memoryFullInjectionTypes: types),
+    );
+  }
+
   late MemoryProviderV2 memories;
   late MemoryProvider legacyMemories;
   late MessageBuilderService builder;
@@ -448,7 +455,7 @@ void main() {
           await tester.runAsync(() async {
             await settings.setMemoryInjectionMaxItems(1);
             if (change == 'limitedInjection') {
-              await settings.setMemoryFullInjectionTypes({MemoryType.identity});
+              await setFullInjectionTypes({MemoryType.identity});
             }
           });
         }
@@ -490,15 +497,15 @@ void main() {
             case 'limit':
               await settings.setMemoryInjectionMaxItems(1);
             case 'fullInjection':
-              await settings.setMemoryFullInjectionTypes({MemoryType.identity});
+              await setFullInjectionTypes({MemoryType.identity});
             case 'limitedInjection':
-              await settings.setMemoryFullInjectionTypes({});
+              await setFullInjectionTypes({});
           }
           await waitFor('pending'); // Requires the real binding's listener.
           final revision = await executor.revision(task);
           final context = await executor.buildContext(
             task,
-            assistant,
+            assistants.getById(task.assistantId)!,
             null,
             'm',
           );

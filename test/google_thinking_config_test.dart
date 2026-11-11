@@ -311,6 +311,30 @@ final _cases = <_GeminiCase>[
     },
   ),
   _GeminiCase(
+    name: 'Gemini 4 Argon maps a budget to a level, never thinkingBudget',
+    modelId: 'gemini-4-argon',
+    thinkingBudget: 32000,
+    stream: true,
+    verify: (body) {
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingLevel': 'HIGH',
+      });
+      expect((body['generationConfig'] as Map)['maxOutputTokens'], 65536);
+    },
+  ),
+  _GeminiCase(
+    name: 'Gemini 4 Argon off floors at LOW',
+    modelId: 'gemini-4-argon',
+    thinkingBudget: 0,
+    verify: (body) {
+      expect(_thinkingConfig(body), {
+        'includeThoughts': false,
+        'thinkingLevel': 'LOW',
+      });
+    },
+  ),
+  _GeminiCase(
     name: 'Gemini 2.5 Flash auto only writes includeThoughts',
     modelId: 'gemini-2.5-flash',
     verify: (body) {

@@ -161,18 +161,22 @@ class ProviderUsageWindow {
     this.usedPercent,
     this.used,
     this.limit,
+    this.remaining,
     this.resetsAt,
     this.duration,
     this.unit,
+    this.advisory = false,
   });
   final String id;
   final String? label;
   final double? usedPercent;
   final double? used;
   final double? limit;
+  final double? remaining;
   final DateTime? resetsAt;
   final Duration? duration;
   final String? unit;
+  final bool advisory;
 }
 
 class ProviderUsageSnapshot {
@@ -210,6 +214,27 @@ enum ProviderOAuthFailure {
   usageUnavailable,
 }
 
+enum ProviderOAuthStage {
+  requestDeviceCode,
+  waitDeviceAuthorization,
+  prepareBrowser,
+  browserAuthorization,
+  exchangeToken,
+  refreshToken,
+}
+
+enum ProviderOAuthTransportFailure {
+  dns,
+  tls,
+  proxy,
+  connection,
+  connectionTimeout,
+  sendTimeout,
+  receiveTimeout,
+  requestTimeout,
+  unknown,
+}
+
 class ProviderOAuthException implements Exception {
   const ProviderOAuthException(
     this.kind, {
@@ -217,16 +242,35 @@ class ProviderOAuthException implements Exception {
     this.statusCode,
     this.code,
     this.message,
+    this.stage,
+    this.transportFailure,
   });
   final ProviderOAuthFailure kind;
   final String? providerId;
   final int? statusCode;
   final String? code;
+  final ProviderOAuthStage? stage;
+  final ProviderOAuthTransportFailure? transportFailure;
 
   /// Sanitized server explanation; token responses are never copied here.
   final String? message;
 
+  ProviderOAuthException atStage(ProviderOAuthStage value) => stage != null
+      ? this
+      : ProviderOAuthException(
+          kind,
+          providerId: providerId,
+          statusCode: statusCode,
+          code: code,
+          message: message,
+          stage: value,
+          transportFailure: transportFailure,
+        );
+
   @override
   String toString() =>
-      'OAuth: ${kind.name}${statusCode == null ? '' : ' (HTTP $statusCode)'}';
+      'OAuth: ${kind.name}'
+      '${stage == null ? '' : ' [${stage!.name}]'}'
+      '${transportFailure == null ? '' : ' [${transportFailure!.name}]'}'
+      '${statusCode == null ? '' : ' (HTTP $statusCode)'}';
 }

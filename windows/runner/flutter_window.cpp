@@ -14,6 +14,7 @@
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
 #include <flutter_windows.h>
+#include <flutter_inappwebview_windows/flutter_inappwebview_windows_plugin_c_api.h>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -84,7 +85,10 @@ std::optional<RECT> DecodeWindowRect(const flutter::EncodableValue* value) {
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
 
-FlutterWindow::~FlutterWindow() {}
+FlutterWindow::~FlutterWindow() {
+  // WM_QUIT can end the loop without a WM_DESTROY (windowManager.destroy()).
+  OnDestroy();
+}
 
 bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
@@ -101,6 +105,8 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  webview_registrar_ = flutter_controller_->engine()->GetRegistrarForPlugin(
+      "FlutterInappwebviewWindowsPluginCApi");
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   auto window_channel =
@@ -410,7 +416,17 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
-    flutter_controller_ = nullptr;
+    engine_shutdown_.Run(
+        [this] {
+          // Draining the WebView dispatcher can run queued Flutter channel
+          // calls. Do it before ANY plugin registrar/handler is destroyed.
+          FlutterInappwebviewWindowsPluginCApiPrepareForShutdown(
+              webview_registrar_);
+        },
+        [this] {
+          webview_registrar_ = nullptr;
+          flutter_controller_ = nullptr;
+        });
   }
   Win32Window::OnDestroy();
 }
@@ -419,6 +435,12 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // Queue draining may re-enter this window. A second close/destroy must not
+  // tear down the engine while other plugins are still servicing callbacks.
+  if (engine_shutdown_.started() &&
+      (message == WM_CLOSE || message == WM_DESTROY)) {
+    return 0;
+  }
   if (message == WM_GETDPISCALEDSIZE && restoring_bounds_) {
     auto* size = reinterpret_cast<SIZE*>(lparam);
     size->cx = restoring_bounds_->right - restoring_bounds_->left;

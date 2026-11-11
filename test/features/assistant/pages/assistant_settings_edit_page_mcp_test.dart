@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'dart:io';
 import "../../../support/business_test_harness.dart";
 import 'package:flutter/material.dart';
@@ -126,6 +127,9 @@ Widget _buildHarness({
         create: (_) => SettingsProvider(assistantProvider.preferences),
       ),
       ChangeNotifierProvider.value(value: assistantProvider),
+      ChangeNotifierProvider(
+        create: (_) => McpProvider(preferences: assistantProvider.preferences),
+      ),
       ChangeNotifierProvider.value(value: chatService),
       ChangeNotifierProvider(
         create: (_) =>
@@ -166,6 +170,56 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('MCP'), findsOneWidget);
+  });
+
+  testWidgets('assistant MCP customization switch defaults off and persists', (
+    tester,
+  ) async {
+    final bundle = await _createAssistantProvider(tester);
+    final assistants = bundle.assistantProvider;
+    await tester.pumpWidget(
+      _buildHarness(
+        assistantProvider: assistants,
+        chatService: bundle.chatService,
+        memoryV2: bundle.memoryV2,
+        pipeline: bundle.pipeline,
+        child: const AssistantSettingsEditPage(assistantId: _assistantId),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('MCP'));
+    await tester.pumpAndSettle();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpAndSettle();
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(AssistantSettingsEditPage)),
+    )!;
+    expect(find.text(l10n.assistantConversationMcpTitle), findsOneWidget);
+    expect(assistants.getById(_assistantId)!.allowConversationMcp, isFalse);
+    await tester.tap(find.text(l10n.assistantConversationMcpTitle));
+    await tester.runAsync(() async {
+      for (var i = 0; i < 50; i++) {
+        final saved = Assistant.decodeList(
+          assistants.preferences.getString('assistants_v1') ?? '[]',
+        );
+        if (saved.single.allowConversationMcp) return;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    });
+    await tester.pumpAndSettle();
+    expect(assistants.getById(_assistantId)!.allowConversationMcp, isTrue);
+    expect(
+      Assistant.decodeList(
+        assistants.preferences.getString('assistants_v1')!,
+      ).single.allowConversationMcp,
+      isTrue,
+    );
+    await tester.tap(find.text(l10n.assistantConversationMcpTitle));
+    await tester.pumpAndSettle();
+    expect(assistants.getById(_assistantId)!.allowConversationMcp, isFalse);
   });
 
   testWidgets('assistant local tools page uses clock icon for time info', (

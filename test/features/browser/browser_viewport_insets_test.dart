@@ -12,16 +12,22 @@ void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
   final calls = <MethodCall>[];
 
-  Widget scene(String? id, {int version = 0, double top = 80, Key? key}) =>
-      MaterialApp(
-        home: BrowserViewportInsets(
-          key: key,
-          tabId: id,
-          viewIdentity: version,
-          top: top,
-          builder: (_, underlap) => Text(underlap ? 'underlap' : 'below'),
-        ),
-      );
+  Widget scene(
+    String? id, {
+    int version = 0,
+    double top = 80,
+    double bottom = 0,
+    Key? key,
+  }) => MaterialApp(
+    home: BrowserViewportInsets(
+      key: key,
+      tabId: id,
+      viewIdentity: version,
+      top: top,
+      bottom: bottom,
+      builder: (_, underlap) => Text(underlap ? 'underlap' : 'below'),
+    ),
+  );
 
   void viewportTest(String name, WidgetTesterCallback body) {
     for (final platform in [TargetPlatform.macOS, TargetPlatform.iOS]) {
@@ -400,6 +406,94 @@ void main() {
       expect(calls.length, callCount);
     },
   );
+
+  viewportTest(
+    'toolbar inset changes keep the native viewport and ignore stale replies',
+    (tester) async {
+      final acknowledgements = <Completer<bool>>[];
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        calls.add(call);
+        if (call.method == 'supportsBrowserViewportInsets') return true;
+        if (call.method == 'setBrowserViewportInsets') {
+          final acknowledgement = Completer<bool>();
+          acknowledgements.add(acknowledgement);
+          return acknowledgement.future;
+        }
+        return null;
+      });
+      await tester.pumpWidget(scene('a', top: 59, bottom: 98));
+      await tester.pump();
+      expect(find.text('below'), findsOneWidget);
+      expect(calls.last.arguments['bottom'], 98);
+      acknowledgements.single.complete(true);
+      await tester.pumpAndSettle();
+      expect(find.text('underlap'), findsOneWidget);
+
+      // The form keyboard replaces the home-indicator safe area. Neither this
+      // update nor a tab switch should resize the established native host.
+      await tester.pumpWidget(scene('a', top: 59, bottom: 64));
+      await tester.pump();
+      expect(calls.last.arguments['bottom'], 64);
+      expect(find.text('underlap'), findsOneWidget);
+      await tester.pumpWidget(scene('b', top: 59, bottom: 98));
+      await tester.pump();
+      expect(calls.last.arguments['bottom'], 98);
+      expect(calls.last.arguments['marker'], browserTabUserScriptMarker('b'));
+      acknowledgements.last.complete(true);
+      await tester.pumpAndSettle();
+      acknowledgements[1].complete(false);
+      await tester.pumpAndSettle();
+      expect(find.text('underlap'), findsOneWidget);
+      final callCount = calls.length;
+      await tester.pump(const Duration(seconds: 2));
+      expect(calls.length, callCount);
+      expect(
+        calls.where((call) => call.method == 'releaseBrowserViewportInsets'),
+        isEmpty,
+      );
+    },
+  );
+
+  viewportTest('animation does not invalidate a pending native attachment', (
+    tester,
+  ) async {
+    final replies = <Completer<bool>>[];
+    binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      calls.add(call);
+      if (call.method == 'supportsBrowserViewportInsets') return true;
+      if (call.method == 'setBrowserViewportInsets') {
+        final reply = Completer<bool>();
+        replies.add(reply);
+        return reply.future;
+      }
+      return null;
+    });
+    await tester.pumpWidget(scene('a', bottom: 98));
+    await tester.pump();
+    await tester.pumpWidget(scene('a', bottom: 90));
+    await tester.pump();
+    await tester.pumpWidget(scene('a', bottom: 80));
+    await tester.pump();
+    replies.first.complete(true);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('underlap'), findsOneWidget);
+    replies.last.complete(true);
+    replies[1].complete(false);
+    await tester.pumpAndSettle();
+    expect(find.text('underlap'), findsOneWidget);
+    final count = calls.length;
+    await tester.pump(const Duration(seconds: 2));
+    expect(
+      calls.length,
+      count,
+      reason: 'an obsolete frame must not start retries',
+    );
+  });
 
   viewportTest('replacement hosts release only their own native lease', (
     tester,

@@ -5,6 +5,7 @@ import '../../providers/settings_provider.dart';
 import '../model_catalog/catalog_entry.dart';
 import '../model_catalog/model_catalog_service.dart';
 import 'model_defaults_guesser.dart';
+import 'ollama_model_service.dart';
 import 'vendor_defaults.dart';
 
 enum SpecSource { override, catalog, guess, vendor, fallback }
@@ -61,8 +62,9 @@ class _MemoEntry {
 }
 
 class ModelSpecResolver {
-  ModelSpecResolver({ModelCatalogService? catalog})
-    : _catalog = catalog ?? ModelCatalogService.instance {
+  ModelSpecResolver({ModelCatalogService? catalog, OllamaModelService? ollama})
+    : _catalog = catalog ?? ModelCatalogService.instance,
+      _ollama = ollama ?? OllamaModelService.instance {
     _catalog.addListener(_onCatalogChanged);
   }
 
@@ -106,6 +108,7 @@ class ModelSpecResolver {
   };
 
   final ModelCatalogService _catalog;
+  final OllamaModelService _ollama;
   final Map<(String, String), _MemoEntry> _memo = {};
   int _seenCatalogVersion = -1;
 
@@ -120,7 +123,11 @@ class ModelSpecResolver {
     cfg = cfg.forModelProtocol(modelKey);
     final rawOverride = _rawOverride(cfg, modelKey);
     final catalogVersion = _catalog.version;
-    final fingerprint = _fingerprint(cfg, displayName);
+    final fingerprint = Object.hash(
+      _fingerprint(cfg, displayName),
+      _ollama.version,
+      _ollama.cacheScope(cfg),
+    );
     final key = (cfg.id, modelKey);
     final cached = _memo[key];
     if (cached != null &&
@@ -174,7 +181,7 @@ class ModelSpecResolver {
         _catalog.lookup(cfg, upstreamId) ??
         (upstreamId != modelKey ? _catalog.lookup(cfg, modelKey) : null);
     final guess = ModelDefaultsGuesser.guess(upstreamId);
-    final vendor = VendorDefaults.forProvider(cfg);
+    final vendor = VendorDefaults.forProvider(cfg, modelId: upstreamId);
     final sources = <ModelSpecField, SpecSource>{};
 
     final type = _resolveType(guess: guess, match: match, sources: sources);
@@ -222,7 +229,7 @@ class ModelSpecResolver {
     );
     final pricing = _resolvePricing(match: match, sources: sources);
 
-    final base = ModelSpec(
+    var base = ModelSpec(
       id: modelKey,
       displayName: displayName ?? modelKey,
       type: type,
@@ -243,6 +250,33 @@ class ModelSpecResolver {
     sources[ModelSpecField.dynamicWebSearch] = SpecSource.guess;
     sources[ModelSpecField.remoteImageUrls] = SpecSource.guess;
     sources[ModelSpecField.promptCacheControl] = SpecSource.guess;
+    final discovered = _ollama.lookup(cfg, upstreamId);
+    if (discovered != null) {
+      base = discovered.applyTo(base);
+      if (base.type == ModelType.chat) {
+        base = base.copyWith(
+          input: _protocolInput(cfg, upstreamId, base.input),
+        );
+      }
+      for (final field in const [
+        ModelSpecField.type,
+        ModelSpecField.input,
+        ModelSpecField.output,
+        ModelSpecField.abilities,
+        ModelSpecField.reasoningDialect,
+        ModelSpecField.reasoningLevels,
+        ModelSpecField.reasoningCanDisable,
+        ModelSpecField.reasoningDefaultLevel,
+        ModelSpecField.reasoningBudgets,
+        ModelSpecField.reasoningReplay,
+        ModelSpecField.sampling,
+        ModelSpecField.dynamicWebSearch,
+        ModelSpecField.remoteImageUrls,
+        ModelSpecField.promptCacheControl,
+      ]) {
+        sources[field] = SpecSource.vendor;
+      }
+    }
     final spec = ov.applyTo(base, applyDisplayName: true);
     _markOverrideSources(ov, sources);
 
@@ -393,6 +427,7 @@ class ModelSpecResolver {
       vendor: vendor,
       match: match,
       guess: guess,
+      dialect: dialect,
       sources: sources,
     );
     final budgets = _resolveBudgets(
@@ -508,11 +543,18 @@ class ModelSpecResolver {
     required VendorDefaults vendor,
     required CatalogMatch? match,
     required ModelGuess guess,
+    required ReasoningDialect dialect,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
     if (vendor.canDisable != null) {
       sources[ModelSpecField.reasoningCanDisable] = SpecSource.vendor;
       return vendor.canDisable!;
+    }
+    // Catalog toggles describe fully disabling thinking. This dialect turns
+    // off only up-front thinking while retaining thinking between tool calls.
+    if (dialect == ReasoningDialect.anthropicBetweenTools) {
+      sources[ModelSpecField.reasoningCanDisable] = SpecSource.guess;
+      return true;
     }
     final catalog = _catalogCanDisable(match?.model);
     if (catalog != null) {

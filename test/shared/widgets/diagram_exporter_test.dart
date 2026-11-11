@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -79,6 +80,62 @@ graph TD; A-->B
         diagramImageCacheKey('<svg/>', true, {'a': '1', 'b': '2'}, isSvg: true),
       ),
     );
+  });
+
+  testWidgets('exports without missing diagrams bypass active rendering', (
+    tester,
+  ) async {
+    MermaidImageCache.clear();
+    addTearDown(MermaidImageCache.clear);
+    final hostKey = GlobalKey();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SizedBox(key: hostKey)),
+      ),
+    );
+    final context = hostKey.currentContext!;
+    final theme = Theme.of(context);
+    const diagram = (code: 'graph TD; A-->B', isSvg: false);
+    MermaidImageCache.put(
+      diagramImageCacheKey(
+        diagram.code,
+        theme.brightness == Brightness.dark,
+        buildThemeVarsFromColorScheme(theme.colorScheme),
+      ),
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      ),
+    );
+
+    final activeRender = Completer<void>();
+    final rendering = renderDiagramSerially(() => activeRender.future);
+    var emptyCompleted = false;
+    var cachedCompleted = false;
+    final emptyExport = preRenderDiagramCodesForExport(
+      context,
+      [],
+    ).then((_) => emptyCompleted = true);
+    final cachedExport = preRenderDiagramCodesForExport(context, [
+      diagram,
+    ]).then((_) => cachedCompleted = true);
+    try {
+      await tester.pump();
+      expect(
+        emptyCompleted,
+        isTrue,
+        reason: 'Plain-text exports do not need a native renderer',
+      );
+      expect(
+        cachedCompleted,
+        isTrue,
+        reason: 'Cached diagrams do not need a native renderer',
+      );
+      expect(activeRender.isCompleted, isFalse);
+    } finally {
+      activeRender.complete();
+      await tester.pump();
+      await Future.wait([rendering, emptyExport, cachedExport]);
+    }
   });
 
   for (final language in ['svg', 'xml', 'mermaid']) {

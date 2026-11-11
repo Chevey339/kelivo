@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class PtySessions(
     private val events: WorkspaceEvents,
+    private val processOwner: WorkspaceProcessOwner? = null,
 ) {
     private val sessions = ConcurrentHashMap<String, PtySession>()
     // Keep closing sessions until waitpid confirms exit, including replaced IDs.
@@ -51,7 +52,10 @@ class PtySessions(
         sessions[sessionId] = session
         liveSessions.add(session)
         try {
-            return session.start(launch, rows = rows, cols = cols)
+            return session.start(
+                launch.copy(processEnv = launch.processEnv + (processOwner?.environment(sessionId) ?: emptyMap())),
+                rows = rows, cols = cols,
+            )
         } catch (error: Exception) {
             sessions.remove(sessionId, session)
             liveSessions.remove(session)

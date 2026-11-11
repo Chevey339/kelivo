@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-import 'package:Kelivo/core/models/memory_entry.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/setting/memory_settings_pane.dart';
 import 'package:Kelivo/features/settings/pages/memory_settings_page.dart';
@@ -16,7 +15,7 @@ import '../../../support/business_test_harness.dart';
 void main() {
   for (final desktop in [false, true]) {
     testWidgets(
-      'full injection types can be selected independently (desktop=$desktop)',
+      'global memory settings retain only the shared item limit (desktop=$desktop)',
       (tester) async {
         debugDefaultTargetPlatformOverride = desktop
             ? TargetPlatform.linux
@@ -55,42 +54,19 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          expect(settings.memoryFullInjectionTypes, isEmpty);
-          final voice = find.widgetWithText(
-            MemorySelectChip,
-            l10n.memoryEntryTypeVoice,
-          );
-          final instruction = find.widgetWithText(
-            MemorySelectChip,
-            l10n.memoryEntryTypeInstruction,
-          );
-          await tester.ensureVisible(voice);
+          final limit = find.text(l10n.memorySettingsInjectionMaxItemsTitle);
+          await tester.ensureVisible(limit);
           await tester.pumpAndSettle();
           expect(
-            find.text(l10n.memorySettingsFullInjectionTypesSubtitle),
-            findsOneWidget,
+            find.text(l10n.assistantEditMemoryFullInjectionTypesTitle),
+            findsNothing,
           );
-          expect(tester.widget<MemorySelectChip>(voice).selected, isFalse);
-          await tester.tap(voice);
+          expect(find.byType(MemorySelectChip), findsNothing);
+          await tester.tap(limit);
           await tester.pumpAndSettle();
-          await tester.ensureVisible(instruction);
-          await tester.tap(instruction);
+          await tester.tap(find.text('5').last);
           await tester.pumpAndSettle();
-          expect(settings.memoryFullInjectionTypes, {
-            MemoryType.voice,
-            MemoryType.instruction,
-          });
-          expect(tester.widget<MemorySelectChip>(voice).selected, isTrue);
-          expect(tester.widget<MemorySelectChip>(instruction).selected, isTrue);
-          await tester.tap(voice);
-          await tester.pumpAndSettle();
-          expect(tester.widget<MemorySelectChip>(voice).selected, isFalse);
-          expect(tester.widget<MemorySelectChip>(instruction).selected, isTrue);
-          await tester.runAsync(storage.preferences.flushPendingWrites);
-          expect(
-            storage.preferences.getStringList('memory_full_injection_types_v1'),
-            ['instruction'],
-          );
+          expect(settings.memoryInjectionMaxItems, 5);
           final legacyMode = find.byWidgetPredicate(
             (widget) =>
                 widget is IosSwitch &&
@@ -102,7 +78,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.byType(MemorySelectChip), findsNothing);
           expect(tester.takeException(), isNull);
-          await tester.runAsync(storage.preferences.flushPendingWrites);
+          await storage.preferences.flushPendingWrites();
         } finally {
           debugDefaultTargetPlatformOverride = null;
         }

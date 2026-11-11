@@ -1,29 +1,116 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_math_fork/tex.dart';
 import 'package:markstream/markstream.dart';
 
 /// The parser retains original LaTeX; repairs belong only to its visual adapter.
 class KelivoMathRenderer implements MathRenderer {
   const KelivoMathRenderer();
+
   @override
   Widget build(
     BuildContext context,
     String tex, {
     required TextStyle style,
     required bool displayMode,
-  }) {
-    final normalized = normalizeMathTex(tex);
+  }) => _ParsedMath(
+    tex: tex,
+    builder: (context, renderer) =>
+        renderer.build(context, tex, style: style, displayMode: displayMode),
+  );
+}
+
+/// A fenced formula keeps its source-code UI when parsing fails.
+class KelivoMathBlock extends StatelessWidget {
+  const KelivoMathBlock({
+    super.key,
+    required this.node,
+    required this.theme,
+    required this.fallback,
+  });
+
+  final CodeBlockNode node;
+  final MarkstreamTheme theme;
+  final Widget fallback;
+
+  @override
+  Widget build(BuildContext context) => _ParsedMath(
+    tex: node.code,
+    builder: (context, renderer) => renderer.ast == null
+        ? fallback
+        : MarkstreamMathBlock(
+            node: node,
+            tex: node.code,
+            theme: theme,
+            renderer: renderer,
+          ),
+  );
+}
+
+class _ParsedMath extends StatefulWidget {
+  const _ParsedMath({required this.tex, required this.builder});
+
+  final String tex;
+  final Widget Function(BuildContext, _ParsedMathRenderer) builder;
+
+  @override
+  State<_ParsedMath> createState() => _ParsedMathState();
+}
+
+class _ParsedMathState extends State<_ParsedMath> {
+  // flutter_math_fork trees retain widgets and GlobalKeys, so each mounted
+  // formula must own its tree. Keep only its current parse until unmounted.
+  late _ParsedMathRenderer _renderer;
+
+  @override
+  void initState() {
+    super.initState();
+    _parse();
+  }
+
+  @override
+  void didUpdateWidget(_ParsedMath oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tex != widget.tex) _parse();
+  }
+
+  void _parse() {
+    final normalized = normalizeMathTex(widget.tex);
+    SyntaxTree? ast;
     try {
-      return Math.tex(
-        normalized,
-        mathStyle: displayMode ? MathStyle.display : MathStyle.text,
-        textStyle: style,
-        onErrorFallback: (_) => Text(normalized, style: style),
+      ast = SyntaxTree(
+        greenRoot: TexParser(normalized, const TexParserSettings()).parse(),
       );
     } catch (_) {
-      return Text(normalized, style: style);
+      // Preserve malformed input; changed streaming text gets a fresh parse.
     }
+    _renderer = _ParsedMathRenderer(normalized, ast);
   }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _renderer);
+}
+
+class _ParsedMathRenderer implements MathRenderer {
+  const _ParsedMathRenderer(this.normalized, this.ast);
+
+  final String normalized;
+  final SyntaxTree? ast;
+
+  @override
+  Widget build(
+    BuildContext context,
+    String tex, {
+    required TextStyle style,
+    required bool displayMode,
+  }) => ast == null
+      ? Text(normalized, style: style)
+      : Math(
+          ast: ast,
+          mathStyle: displayMode ? MathStyle.display : MathStyle.text,
+          textStyle: style,
+          onErrorFallback: (_) => Text(normalized, style: style),
+        );
 }
 
 String normalizeMathTex(String tex) {

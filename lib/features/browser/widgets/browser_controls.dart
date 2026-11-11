@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import 'browser_glass.dart';
 import '../models/browser_models.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Browser controls intentionally have no Material ink or app-wide press paint.
 class BrowserActionButton extends StatelessWidget {
@@ -126,6 +127,7 @@ class BrowserAddressBar extends StatelessWidget {
     this.expandedContentWidth,
     this.collapsedContentWidth,
     this.stabilizeTruncation = false,
+    this.focusOutline = false,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -141,6 +143,7 @@ class BrowserAddressBar extends StatelessWidget {
   final Widget? siteIcon;
   final double? expandedContentWidth, collapsedContentWidth;
   final bool stabilizeTruncation;
+  final bool focusOutline;
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +191,6 @@ class BrowserAddressBar extends StatelessWidget {
                             focusNode: focusNode,
                             autofocus: false,
                             autocorrect: false,
-                            enableSuggestions: false,
                             keyboardType: TextInputType.url,
                             textInputAction: TextInputAction.go,
                             placeholder: l.browserSearchHint,
@@ -221,8 +223,8 @@ class BrowserAddressBar extends StatelessWidget {
                               fontSize: compact ? 12.5 : 16,
                               height: 1.15,
                               fontWeight: compact
-                                  ? FontWeight.w400
-                                  : FontWeight.w500,
+                                  ? AppFontWeights.regular
+                                  : AppFontWeights.medium,
                             ),
                           ),
                   ),
@@ -304,8 +306,10 @@ class BrowserAddressBar extends StatelessWidget {
                   : Colors.white.withValues(alpha: dark ? .08 : .38),
               borderRadius: BorderRadius.circular(1000),
               border: Border.all(
-                color: cs.onSurface.withValues(alpha: .08),
-                width: .5,
+                color: focusOutline && editing
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: .08),
+                width: focusOutline && editing ? 1 : .5,
               ),
             ),
             child: BrowserControlFeedback(radius: 1000, child: content),
@@ -379,7 +383,7 @@ class BrowserEmptyState extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   color: cs.onSurface,
                 ),
               ),

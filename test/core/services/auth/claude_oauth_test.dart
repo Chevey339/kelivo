@@ -1372,7 +1372,7 @@ void main() {
               )
               as Map;
       final markers = cacheMarkers(body);
-      expect(body['max_tokens'], 64000);
+      expect(body['max_tokens'], 128000);
       expect(body['cache_control'], isNull);
       if (ttl == 'off') {
         expect(markers, isEmpty);
@@ -1392,24 +1392,31 @@ void main() {
   test(
     'Claude raises output allowance for thinking and reserves OMP output buffer',
     () {
-      for (final (budget, maximum, expectedMax, expectedBudget) in [
-        (16000, 4096, 20000, 16000),
-        (64000, 128000, 64000, 60000),
+      for (final (budget, maximum, ceiling, expectedMax, expectedBudget) in [
+        (16000, 4096, 128000, 20000, 16000),
+        (64000, 128000, 128000, 128000, 64000),
+        (128000, 128000, 128000, 128000, 124000),
+        (64000, 128000, null, 64000, 60000),
+        (16000, 4096, 8192, 8192, 4192),
+        (4096, 4096, 4096, 4096, 1024),
+        (4096, 8, 1025, 1025, 1024),
       ]) {
+        final input = <String, dynamic>{
+          'model': 'claude-sonnet-4-5',
+          'messages': [
+            <String, dynamic>{'role': 'user', 'content': 'Think'},
+          ],
+          'max_tokens': maximum,
+          'thinking': <String, dynamic>{
+            'type': 'enabled',
+            'budget_tokens': budget,
+          },
+        };
+        applyClaudeOAuthOutputLimits(input, maxOutput: ceiling);
         final body =
             jsonDecode(
                   encodeClaudeOAuthRequest(
-                    {
-                      'model': 'claude-sonnet-4-5',
-                      'messages': [
-                        <String, dynamic>{'role': 'user', 'content': 'Think'},
-                      ],
-                      'max_tokens': maximum,
-                      'thinking': <String, dynamic>{
-                        'type': 'enabled',
-                        'budget_tokens': budget,
-                      },
-                    },
+                    input,
                     claudeConfig(),
                     {},
                     'conversation-1',
@@ -1418,6 +1425,71 @@ void main() {
                 as Map;
         expect(body['max_tokens'], expectedMax);
         expect(body['thinking']['budget_tokens'], expectedBudget);
+      }
+    },
+  );
+
+  test('Claude rejects output ceilings that cannot contain valid thinking', () {
+    for (final ceiling in [512, 1024]) {
+      expect(
+        () => applyClaudeOAuthOutputLimits({
+          'max_tokens': ceiling,
+          'thinking': {'type': 'enabled', 'budget_tokens': 4096},
+        }, maxOutput: ceiling),
+        throwsArgumentError,
+      );
+    }
+  });
+
+  test(
+    'Claude OAuth honors aliased model ceilings on streaming and JSON requests',
+    () async {
+      for (final stream in [false, true]) {
+        for (final (ceiling, requested, expected) in [
+          (128000, null, 128000),
+          (128000, 4096, 4096),
+          (8192, 128000, 8192),
+        ]) {
+          final config = claudeConfig().copyWith(
+            modelOverrides: {
+              'local-alias': {
+                'apiModelId': 'claude-opus-5-5',
+                'maxOutput': ceiling,
+              },
+            },
+          );
+          await settings.setProviderConfig(config.id, config);
+          final service = ProviderOAuthService()..bind(settings);
+          final requests = <http.Request>[];
+          final client = service.authenticatedClient(
+            MockClient((request) async {
+              requests.add(request);
+              return messageResponse(
+                [
+                  {'type': 'text', 'text': 'OK'},
+                ],
+                stream: stream,
+                tool: false,
+              );
+            }),
+            config,
+          );
+          await sendClaudeStream(
+            client,
+            config,
+            'local-alias',
+            [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            stream: stream,
+            maxTokens: requested,
+          ).toList();
+          final body = jsonDecode(requests.single.body) as Map;
+          expect(body['model'], 'claude-opus-5-5');
+          expect(body['max_tokens'], expected);
+          client.close();
+          service.dispose();
+        }
       }
     },
   );

@@ -50,6 +50,16 @@ class ProotShutdownTest {
         assertFalse(awaitProotSignalHandler(File(temporary.root, "gone"), 0))
     }
 
+    @Test fun reusedPidIsRejectedEvenWhenItHasAHandler() {
+        val proc = process(ProotCommand.EXEC_LIB, "0000000000000004")
+        assertFalse(awaitProotSignalHandler(proc, 0, stillOwned = { false }))
+    }
+
+    @Test fun executableFromBeforeAnAppUpgradeCanStillBeStopped() {
+        val proc = process("${ProotCommand.EXEC_LIB} (deleted)", "0000000000000004")
+        assertTrue(awaitProotSignalHandler(proc, 0))
+    }
+
     private fun process(executable: String, caught: String): File {
         val proc = temporary.newFolder("123")
         Files.createSymbolicLink(File(proc, "exe").toPath(), File("/native/$executable").toPath())

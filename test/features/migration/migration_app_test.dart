@@ -53,7 +53,14 @@ void main() {
         var restartCalls = 0;
         final reportedErrors = <FlutterErrorDetails>[];
         final previousOnError = FlutterError.onError;
-        FlutterError.onError = reportedErrors.add;
+        FlutterError.onError = (details) {
+          if (details.exception.toString() ==
+              'Bad state: injected restart failure') {
+            reportedErrors.add(details);
+          } else {
+            previousOnError?.call(details);
+          }
+        };
         try {
           await tester.pumpWidget(
             MaterialApp(
@@ -504,10 +511,18 @@ Future<void> _waitForEnabledButton(WidgetTester tester, IconData icon) async {
 }
 
 Future<void> _waitUntil(bool Function() condition) async {
-  for (var i = 0; i < 100 && !condition(); i++) {
+  // These callbacks perform real filesystem/SQLite work in runAsync. A one
+  // second wall-clock limit races a loaded full-suite worker, unlike fake-time
+  // widget pumping. Finish as soon as the specific operation completes.
+  final elapsed = Stopwatch()..start();
+  while (!condition() && elapsed.elapsed < const Duration(seconds: 10)) {
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
-  expect(condition(), isTrue);
+  expect(
+    condition(),
+    isTrue,
+    reason: 'Async operation did not complete in 10 seconds',
+  );
 }
 
 HiveToSqliteMigrationService _completeService() {

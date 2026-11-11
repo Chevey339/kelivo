@@ -28,6 +28,7 @@ import '../../models/chat_message.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
+import '../storage/attachment_file_lock.dart';
 import '../migration/legacy_message_content_decoder.dart';
 import '../migration/legacy_record_sanitizer.dart';
 import '../../utils/multimodal_input_utils.dart';
@@ -36,6 +37,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../database/backup_portability.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
+import 'restore_durability.dart';
 import 'restore_workspace_lock.dart';
 import 'restore_business_lease.dart';
 import 'temporary_restore_file.dart';
@@ -310,6 +312,7 @@ class DataSync {
   final ChatService chatService;
   final BusinessRepository businessRepository;
   final BusinessPreferences? businessPreferences;
+  final RestoreDurability? _restoreDurability;
   BackupMergeReport? _lastMergeReport;
   BackupMergeReport? get lastMergeReport => _lastMergeReport;
 
@@ -317,16 +320,25 @@ class DataSync {
     required this.chatService,
     required this.businessRepository,
     this.businessPreferences,
-  });
+    @visibleForTesting RestoreDurability? restoreDurability,
+    // Public injection name deliberately omits the private-field prefix.
+    // ignore: prefer_initializing_formals
+  }) : _restoreDurability = restoreDurability;
 
-  Future<T> _runLiveBusinessRestore<T>(Future<T> Function() operation) {
+  Future<T> _runLiveBusinessRestore<T>(
+    Future<T> Function() operation, {
+    bool Function()? canResumeOnError,
+  }) {
     final preferences = businessPreferences;
     return preferences == null
         ? operation()
-        : preferences.runWithRestoreWriteFence(operation);
+        : preferences.runWithRestoreWriteFence(
+            operation,
+            canResumeOnError: canResumeOnError,
+          );
   }
 
-  static Future<void> _prepareRestoreBundle({
+  Future<void> _prepareLiveRestoreBundle({
     required String appDataPath,
     required String extractedPath,
     required String sourceManifestSha256,
@@ -338,19 +350,37 @@ class DataSync {
     Map<String, dynamic>? validatedSettings,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
-  }) => RestoreBundlePreparation.prepare(
-    appDataDirectory: Directory(appDataPath),
-    extractedDirectory: Directory(extractedPath),
-    sourceManifestSha256: sourceManifestSha256,
-    bundleIncludesChats: includeChats,
-    bundleIncludesFiles: includeFiles,
-    restoreChats: restoreChats,
-    restoreFiles: restoreFiles,
-    scope: scope,
-    validatedSettings: validatedSettings,
-    onProgress: onProgress,
-    cancelToken: cancelToken,
-  );
+  }) {
+    var canResume = true;
+    void Function()? resumeUi;
+    return _runLiveBusinessRestore<void>(() async {
+      await RestoreBundlePreparation.prepare(
+        appDataDirectory: Directory(appDataPath),
+        extractedDirectory: Directory(extractedPath),
+        sourceManifestSha256: sourceManifestSha256,
+        bundleIncludesChats: includeChats,
+        bundleIncludesFiles: includeFiles,
+        restoreChats: restoreChats,
+        restoreFiles: restoreFiles,
+        scope: scope,
+        validatedSettings: validatedSettings,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+        durability: _restoreDurability,
+        beforePublish: () async {
+          final uiStore = chatService.chatRepositoryOrNull?.genUiStates;
+          await uiStore?.pauseAndDrain();
+          resumeUi = uiStore?.resume;
+          // This conclusion also controls settings, even with no mounted UI store.
+          canResume = false;
+        },
+        onUnpublishedDiscarded: () {
+          canResume = true;
+          resumeUi?.call();
+        },
+      );
+    }, canResumeOnError: () => canResume);
+  }
 
   /// Prepares a local snapshot without opening the live database or providers.
   /// The normal startup gate installs the durable candidate on restart, keeping
@@ -643,6 +673,14 @@ class DataSync {
     if (password != null && password.isEmpty) {
       throw ArgumentError('backup_password_empty');
     }
+    // All interactive backup providers inject the shared business preferences.
+    // Enforce the saved choice here too, so a missing UI password cannot turn
+    // an encrypted backup into a plaintext export or upload.
+    await businessPreferences?.load();
+    if (password == null &&
+        businessPreferences?.getBool('backup_encryption_enabled_v1') == true) {
+      throw const FormatException('backup_password_required');
+    }
     final archive = await _prepareBackupArchive(
       chatService: chatService,
       includeChats: cfg.scope.includes(BackupCategory.chats),
@@ -734,6 +772,7 @@ class DataSync {
     File? manifestTmp;
     File? settingsTmp;
     File? databaseTmp;
+    AttachmentFileLock? attachmentLease;
     var abandonWorkDir = false;
     try {
       onProgress?.call(
@@ -745,6 +784,24 @@ class DataSync {
       );
       if (cancelToken?.isCancelled == true) {
         throw const BackupCancelledException();
+      }
+      if (includeFiles) {
+        final pending = AttachmentFileLock.acquire();
+        try {
+          attachmentLease = cancelToken == null
+              ? await pending
+              : await Future.any([
+                  pending,
+                  cancelToken.whenCancelled.then<AttachmentFileLock>(
+                    (_) => throw const BackupCancelledException(),
+                  ),
+                ]);
+          cancelToken?.throwIfCancelled();
+        } catch (_) {
+          // Cancellation must not leave a queued acquisition holding the lock.
+          unawaited(pending.then((lease) => lease.release()));
+          rethrow;
+        }
       }
       // --- Step 1: Prepare temp files that need the main isolate ---
       // settings.json
@@ -831,6 +888,15 @@ class DataSync {
         appVersion: appVersion,
       );
     } catch (error) {
+      if (backupIsolateStillAlive(error)) {
+        final lease = attachmentLease;
+        attachmentLease = null;
+        final exited = backupIsolateExitFuture(error);
+        if (lease != null && exited != null) {
+          unawaited(exited.then((_) => lease.release()));
+        }
+        // Without exit proof, retain the lease for the process lifetime.
+      }
       if (shouldDeleteTempPathsAfterIsolateError(error)) {
         unregisterLiveTempPath(workDir.path);
         await _deleteDirectoryQuietly(workDir);
@@ -840,6 +906,7 @@ class DataSync {
       }
       rethrow;
     } finally {
+      attachmentLease?.release();
       // Cleanup temp intermediate files. The final zip is returned to callers
       // and must be deleted by the upload/export caller after it is consumed.
       // If a snapshot/pack isolate is still alive, leave the directory alone.
@@ -1486,7 +1553,6 @@ class DataSync {
         }
 
         final manifestEntry = archiveFiles[_manifestEntryName];
-        Map<String, int>? declaredEntrySizes;
         if (manifestEntry != null) {
           if (manifestEntry.size < 0 ||
               manifestEntry.size > _maxManifestBytes) {
@@ -1496,6 +1562,7 @@ class DataSync {
           final manifestOutput = _BoundedOutputFileStream(
             manifestPath,
             expectedBytes: manifestEntry.size,
+            expectedCrc32: manifestEntry.crc32!,
             maxEntryBytes: _maxManifestBytes,
             budget: _ExtractionBudget(maxTotalBytes: _maxManifestBytes),
           );
@@ -1508,19 +1575,6 @@ class DataSync {
             manifestOutput.verifyComplete();
           } finally {
             manifestOutput.closeSync();
-          }
-          final manifestBytes = File(manifestPath).readAsBytesSync();
-          declaredEntrySizes = _declaredManifestEntrySizes(manifestBytes);
-          final actualEntries = archiveFiles.keys.toSet()
-            ..remove(_manifestEntryName);
-          if (actualEntries.length != declaredEntrySizes.length ||
-              !actualEntries.containsAll(declaredEntrySizes.keys)) {
-            throw const FormatException('manifest_entries');
-          }
-          for (final declaredEntry in declaredEntrySizes.entries) {
-            if (archiveFiles[declaredEntry.key]!.size != declaredEntry.value) {
-              throw FormatException('manifest_entry_size:${declaredEntry.key}');
-            }
           }
         } else if (archiveFiles.containsKey(_databaseEntryName)) {
           throw const FormatException('database_manifest');
@@ -1560,7 +1614,8 @@ class DataSync {
             File(outPath).parent.createSync(recursive: true);
             final output = _BoundedOutputFileStream(
               outPath,
-              expectedBytes: declaredEntrySizes?[canonical] ?? entry.size,
+              expectedBytes: entry.size,
+              expectedCrc32: entry.crc32!,
               maxEntryBytes: _maxRestoreEntryBytes,
               budget: extractionBudget,
               meter: meter,
@@ -1633,44 +1688,6 @@ class DataSync {
         }
       }
     }
-  }
-
-  static Map<String, int> _declaredManifestEntrySizes(List<int> manifestBytes) {
-    final decoded = jsonDecode(utf8.decode(manifestBytes));
-    if (decoded is! Map) {
-      throw const FormatException('manifest.json');
-    }
-    final manifest = decoded.cast<String, dynamic>();
-    if (manifest['format'] != _backupFormat ||
-        !_acceptsArchiveFormat(manifest)) {
-      throw const FormatException('manifest_version');
-    }
-    final rawEntries = manifest['entries'];
-    if (rawEntries is! Map) {
-      throw const FormatException('manifest_entries');
-    }
-    final entries = <String, int>{};
-    final caseFolded = <String>{};
-    for (final rawEntry in rawEntries.entries) {
-      final rawName = rawEntry.key;
-      if (rawName is! String || rawEntry.value is! Map) {
-        throw const FormatException('manifest_entry_name');
-      }
-      final canonical = _validatedZipEntryName(rawName);
-      if (canonical != rawName || canonical == _manifestEntryName) {
-        throw FormatException('manifest_entry_name:$rawName');
-      }
-      if (!caseFolded.add(canonical.toLowerCase())) {
-        throw FormatException('manifest_entry_collision:$canonical');
-      }
-      final metadata = (rawEntry.value as Map).cast<String, dynamic>();
-      final bytes = metadata['bytes'];
-      if (bytes is! int || bytes < 0) {
-        throw FormatException('manifest_entry_size:$canonical');
-      }
-      entries[canonical] = bytes;
-    }
-    return entries;
   }
 
   Future<void> backupToWebDav(
@@ -2330,6 +2347,7 @@ class DataSync {
   ) => _preflightVersionedBackup(
     manifestPath: args.manifestPath,
     extractDirPath: args.extractDirPath,
+    allowEditedBackup: args.allowEditedBackup,
     allowUnverifiedForwardCompatible: args.allowUnverifiedForwardCompatible,
     ctx: ctx,
   );
@@ -2337,6 +2355,7 @@ class DataSync {
   static Future<_VersionedBackupInfo> _preflightVersionedBackup({
     required String manifestPath,
     required String extractDirPath,
+    bool allowEditedBackup = false,
     bool allowUnverifiedForwardCompatible = false,
     BackupIsolateContext? ctx,
   }) async {
@@ -2379,33 +2398,41 @@ class DataSync {
         ? BackupScope.fromJson(manifest['scope'])
         : const BackupScope(excluded: {BackupCategory.environmentVariables});
 
-    final rawEntries = manifest['entries'];
-    if (rawEntries is! Map) {
-      throw const FormatException('manifest_entries');
+    // A user may edit the database or add/remove attachments before repacking.
+    // ZIP extraction verifies the repacked bytes. Rebuild the manifest from
+    // those files instead of treating the original export's inventory as truth.
+    // The new hashes still bind the payload throughout staging and cutover.
+    final files = <String, File>{};
+    for (final entity in Directory(
+      extractDirPath,
+    ).listSync(recursive: true, followLinks: false)) {
+      ctx?.throwIfCancelled();
+      if (entity is! File) continue;
+      final name = p
+          .relative(entity.path, from: extractDirPath)
+          .split(p.separator)
+          .join('/');
+      if (name == _manifestEntryName) continue;
+      // Finder adds these metadata files when recompressing an edited backup.
+      if (allowEditedBackup &&
+          (name.startsWith('__MACOSX/') ||
+              p.posix.basename(name) == '.DS_Store')) {
+        entity.deleteSync();
+        continue;
+      }
+      files[name] = entity;
     }
-    final entries = <String, _BackupEntryMetadata>{};
-    for (final rawEntry in rawEntries.entries) {
-      if (rawEntry.key is! String || rawEntry.value is! Map) {
-        throw const FormatException('manifest_entry');
-      }
-      final name = rawEntry.key as String;
-      final canonical = _validatedZipEntryName(name);
-      if (canonical != name || canonical == _manifestEntryName) {
-        throw FormatException('manifest_entry_name:$name');
-      }
-      final metadata = (rawEntry.value as Map).cast<String, dynamic>();
-      final bytes = metadata['bytes'];
-      final digest = metadata['sha256'];
-      if (bytes is! int ||
-          bytes < 0 ||
-          digest is! String ||
-          !RegExp(r'^[0-9a-f]{64}$').hasMatch(digest)) {
-        throw FormatException('manifest_entry_metadata:$name');
-      }
-      entries[name] = (bytes: bytes, sha256: digest);
-    }
-    if (!entries.containsKey('settings.json')) {
+    if (!files.containsKey('settings.json')) {
       throw const FormatException('settings.json');
+    }
+    final originalEntries = manifest['entries'];
+    // Internal recovery snapshots must still match the retained export. Only
+    // ordinary user imports can adopt a manually edited file inventory.
+    if (!allowEditedBackup &&
+        (originalEntries is! Map ||
+            originalEntries.length != files.length ||
+            !files.keys.toSet().containsAll(originalEntries.keys))) {
+      throw const FormatException('manifest_entries');
     }
     // Entries this build has no use for. Tolerated only when the backup comes
     // from a NEWER build, where they are the archive-level counterpart of the
@@ -2414,7 +2441,7 @@ class DataSync {
     // decides whether the backup may be restored at all -- this only decides
     // whether an unrecognised entry is fatal on its own.
     final unknownEntryNames = <String>[];
-    for (final name in entries.keys) {
+    for (final name in files.keys) {
       final isFileEntry = _assetRootNames.any(
         (root) => name.startsWith('$root/'),
       );
@@ -2435,21 +2462,19 @@ class DataSync {
         );
       }
       for (final name in unknownEntryNames) {
-        entries.remove(name);
         // Removed from disk too, so nothing downstream can pick them up: the
         // rewritten manifest below no longer mentions them, and a staged
         // candidate must contain only what its manifest declares.
-        final file = File(p.joinAll([extractDirPath, ...name.split('/')]));
-        if (file.existsSync()) file.deleteSync();
+        files.remove(name)!.deleteSync();
       }
     }
     // Same idea one level up: a newer build may describe itself with manifest
     // fields this one has never heard of.
     _stripUnknownManifestKeys(manifest);
 
-    final validateTotal = entries.values.fold<int>(
+    final validateTotal = files.values.fold<int>(
       0,
-      (sum, metadata) => sum + metadata.bytes,
+      (sum, file) => sum + file.lengthSync(),
     );
     final meter = _BackupByteMeter(
       ctx: ctx,
@@ -2457,16 +2482,28 @@ class DataSync {
       total: validateTotal,
     );
     meter.report();
-    for (final entry in entries.entries) {
+    final entries = <String, _BackupEntryMetadata>{};
+    for (final entry in files.entries) {
       ctx?.throwIfCancelled();
-      final file = File(p.joinAll([extractDirPath, ...entry.key.split('/')]));
-      if (!file.existsSync() || file.lengthSync() != entry.value.bytes) {
-        throw FormatException('manifest_entry_size:${entry.key}');
+      final file = entry.value;
+      final bytes = file.lengthSync();
+      entries[entry.key] = (
+        bytes: bytes,
+        sha256: _sha256FileSync(file, ctx: ctx),
+      );
+      if (!allowEditedBackup) {
+        final original = (originalEntries as Map)[entry.key];
+        if (original is! Map) {
+          throw FormatException('manifest_entry_metadata:${entry.key}');
+        }
+        if (original['bytes'] != bytes) {
+          throw FormatException('manifest_entry_size:${entry.key}');
+        }
+        if (original['sha256'] != entries[entry.key]!.sha256) {
+          throw FormatException('manifest_entry_hash:${entry.key}');
+        }
       }
-      if (_sha256FileSync(file, ctx: ctx) != entry.value.sha256) {
-        throw FormatException('manifest_entry_hash:${entry.key}');
-      }
-      meter.add(entry.value.bytes, detail: entry.key);
+      meter.add(bytes, detail: entry.key);
     }
 
     ctx?.reportProgress(
@@ -2489,19 +2526,13 @@ class DataSync {
       final schemaVersion = database['schemaVersion'];
       final declaredMinimumReadable =
           database[SchemaMigrations.minimumReadableManifestKey];
-      final conversationCount = database['conversationCount'];
-      final messageCount = database['messageCount'];
       if (database['entry'] != _databaseEntryName ||
           schemaVersion is! int ||
           schemaVersion < 1 ||
           (declaredMinimumReadable != null &&
               (declaredMinimumReadable is! int ||
                   declaredMinimumReadable < 1 ||
-                  declaredMinimumReadable > schemaVersion)) ||
-          conversationCount is! int ||
-          conversationCount < 0 ||
-          messageCount is! int ||
-          messageCount < 0) {
+                  declaredMinimumReadable > schemaVersion))) {
         throw const FormatException('manifest_database');
       }
       final verdict = SchemaMigrations.classifyBackup(
@@ -2533,14 +2564,15 @@ class DataSync {
                 verdict == BackupSchemaVerdict.forwardUndeclared,
           );
       validatedDatabase = databaseInfo;
-      // The manifest records the schema the backup was AUTHORED at; the info
-      // records the schema after prepareSnapshotForRestore migrated it, so the
-      // two legitimately differ for an older backup. Row counts are the
-      // invariant instead: a migration must never add or drop rows.
-      if (databaseInfo.conversationCount != conversationCount ||
-          databaseInfo.messageCount != messageCount) {
+      if (!allowEditedBackup &&
+          (database['conversationCount'] != databaseInfo.conversationCount ||
+              database['messageCount'] != databaseInfo.messageCount)) {
         throw const FormatException('manifest_database_metadata');
       }
+      // Record counts can change during manual cleanup. Freeze the validated
+      // database's actual counts for the subsequent staging checks.
+      database['conversationCount'] = databaseInfo.conversationCount;
+      database['messageCount'] = databaseInfo.messageCount;
       entries[_databaseEntryName] = (
         bytes: databaseFile.lengthSync(),
         sha256: _sha256FileSync(databaseFile, ctx: ctx),
@@ -3337,6 +3369,7 @@ class DataSync {
               payload: _BackupPreflightArgs(
                 manifestPath: manifestFile.path,
                 extractDirPath: extractDir.path,
+                allowEditedBackup: true,
                 allowUnverifiedForwardCompatible:
                     allowUnverifiedForwardCompatible,
               ),
@@ -3439,20 +3472,18 @@ class DataSync {
           }
           // Drain accepted business writes before preserving unselected data,
           // then keep writers fenced until the required restart.
-          await _runLiveBusinessRestore(
-            () => _prepareRestoreBundle(
-              appDataPath: appDataPath,
-              extractedPath: extractedPath,
-              sourceManifestSha256: sourceManifestSha256,
-              includeChats: includeChats,
-              includeFiles: includeFiles,
-              restoreChats: restoreChats,
-              restoreFiles: restoreFiles,
-              validatedSettings: settings,
-              scope: scope,
-              onProgress: onProgress,
-              cancelToken: cancelToken,
-            ),
+          await _prepareLiveRestoreBundle(
+            appDataPath: appDataPath,
+            extractedPath: extractedPath,
+            sourceManifestSha256: sourceManifestSha256,
+            includeChats: includeChats,
+            includeFiles: includeFiles,
+            restoreChats: restoreChats,
+            restoreFiles: restoreFiles,
+            validatedSettings: settings,
+            scope: scope,
+            onProgress: onProgress,
+            cancelToken: cancelToken,
           );
           return;
         }
@@ -3727,16 +3758,19 @@ class _BoundedOutputFileStream extends OutputFileStream {
   _BoundedOutputFileStream(
     String path, {
     required this.expectedBytes,
+    required this.expectedCrc32,
     required this.maxEntryBytes,
     required this.budget,
     this.meter,
   }) : super.withFileHandle(FileHandle(path, mode: FileAccess.write));
 
   final int expectedBytes;
+  final int expectedCrc32;
   final int maxEntryBytes;
   final _ExtractionBudget budget;
   final _BackupByteMeter? meter;
   int _entryBytes = 0;
+  int _crc32 = 0;
 
   void _reserve(int bytes) {
     if (bytes < 0 ||
@@ -3752,6 +3786,7 @@ class _BoundedOutputFileStream extends OutputFileStream {
   @override
   void writeByte(int value) {
     _reserve(1);
+    _crc32 = getCrc32([value], _crc32);
     super.writeByte(value);
   }
 
@@ -3762,6 +3797,12 @@ class _BoundedOutputFileStream extends OutputFileStream {
       throw RangeError.range(writeLength, 0, bytes.length, 'length');
     }
     _reserve(writeLength);
+    final chunk = writeLength == bytes.length
+        ? bytes
+        : bytes is Uint8List
+        ? Uint8List.sublistView(bytes, 0, writeLength)
+        : bytes.sublist(0, writeLength);
+    _crc32 = getCrc32(chunk, _crc32);
     super.writeBytes(bytes, length: writeLength);
   }
 
@@ -3780,6 +3821,9 @@ class _BoundedOutputFileStream extends OutputFileStream {
   void verifyComplete() {
     if (_entryBytes != expectedBytes) {
       throw const FormatException('zip_entry_size');
+    }
+    if (_crc32 != expectedCrc32) {
+      throw const FormatException('zip_entry_crc');
     }
   }
 }
@@ -3810,11 +3854,13 @@ class _BackupPreflightArgs {
   const _BackupPreflightArgs({
     required this.manifestPath,
     required this.extractDirPath,
+    this.allowEditedBackup = false,
     this.allowUnverifiedForwardCompatible = false,
   });
 
   final String manifestPath;
   final String extractDirPath;
+  final bool allowEditedBackup;
 
   /// Set only after the user has been told the backup comes from a newer
   /// version that made no compatibility promise, and chose to continue.

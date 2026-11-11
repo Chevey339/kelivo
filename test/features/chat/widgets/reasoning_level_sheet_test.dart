@@ -341,6 +341,54 @@ void main() {
       expect(settings.reasoningChoiceFor('Test', 'kelivo-test-effort'), isNull);
     });
 
+    testWidgets(
+      'dragging previews locally and notifies settings once on release',
+      (tester) async {
+        final config = _effortConfig();
+        final settings = await _settingsWith(
+          tester,
+          config,
+          'kelivo-test-effort',
+        );
+        addTearDown(settings.dispose);
+        await _pumpSheet(
+          tester,
+          settings: settings,
+          config: config,
+          modelId: 'kelivo-test-effort',
+        );
+        await _openSheet(tester);
+        var notifications = 0;
+        settings.addListener(() => notifications++);
+        final rect = tester.getRect(find.byType(EffortSlider));
+        Offset position(double index) => Offset(
+          rect.left + 19 + (rect.width - 38) * index / 3,
+          rect.center.dy,
+        );
+        final gesture = await tester.startGesture(position(2));
+        await gesture.moveTo(position(1));
+        await tester.pump();
+        await gesture.moveTo(position(0));
+        await tester.pump();
+        await gesture.moveTo(position(3));
+        await tester.pumpAndSettle();
+
+        expect(find.text('High'), findsOneWidget);
+        expect(
+          settings.reasoningChoiceFor('Test', 'kelivo-test-effort'),
+          isNull,
+        );
+        expect(notifications, 0);
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(
+          settings.reasoningChoiceFor('Test', 'kelivo-test-effort'),
+          const ReasoningRequest(ReasoningLevel.high),
+        );
+        expect(notifications, 1);
+      },
+    );
+
     testWidgets('custom budget path writes requestForCustomBudget', (
       tester,
     ) async {

@@ -75,7 +75,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
   // The line editor lays out LTR lines. Keep Flutter's bidi and accessibility
   // editing paths, and preserve documents with non-LF line separators verbatim.
   static final _requiresParagraph = RegExp(
-    r'[\r\u0590-\u08ff\u200e-\u200f\u2028-\u202e\u2066-\u2069\ufb1d-\ufdff\ufe70-\ufeff\ud802-\ud803\ud83b]',
+    r'[\r\u0590-\u08ff\u200e-\u200f\u2028-\u202e\u2066-\u2069\ufb1d-\ufdff\ufe70-\ufeff\ufffc\ud802-\ud803\ud83b]',
   );
 
   late FocusNode _focus;

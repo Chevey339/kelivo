@@ -1,7 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/services/api/response_speed.dart';
+import '../../../core/services/auth/provider_oauth_service.dart';
+import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/reasoning/reasoning_level_options.dart';
@@ -14,6 +20,7 @@ import '../../../shared/dialogs/reasoning_budget_custom_dialog.dart';
 import '../../../shared/widgets/effort_slider.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 
@@ -22,16 +29,16 @@ Future<void> showReasoningLevelSheet(
   required ProviderConfig config,
   required String modelId,
   Assistant? assistant,
-}) {
-  return showReasoningPickerSheet<void>(
-    context: context,
-    builder: (context) => ReasoningLevelPicker(
-      config: config,
-      modelId: modelId,
-      assistant: assistant,
-    ),
-  );
-}
+  String? conversationId,
+}) => showReasoningPickerSheet<void>(
+  context: context,
+  builder: (context) => ReasoningLevelPicker(
+    config: config,
+    modelId: modelId,
+    assistant: assistant,
+    conversationId: conversationId,
+  ),
+);
 
 /// Plain content-sized mobile sheet: handle + child, no title or close.
 Future<T?> showReasoningPickerSheet<T>({
@@ -93,6 +100,7 @@ String reasoningLevelLabel(AppLocalizations l10n, ReasoningLevel level) {
   return switch (level) {
     ReasoningLevel.auto => l10n.reasoningLevelAuto,
     ReasoningLevel.off => l10n.reasoningLevelOff,
+    ReasoningLevel.on => l10n.reasoningLevelOn,
     ReasoningLevel.minimal => l10n.reasoningLevelMinimal,
     ReasoningLevel.low => l10n.reasoningLevelLow,
     ReasoningLevel.medium => l10n.reasoningLevelMedium,
@@ -106,6 +114,7 @@ String reasoningLevelCompactLabel(AppLocalizations l10n, ReasoningLevel level) {
   return switch (level) {
     ReasoningLevel.auto => l10n.reasoningLevelAuto,
     ReasoningLevel.off => l10n.reasoningLevelOff,
+    ReasoningLevel.on => l10n.reasoningLevelOn,
     ReasoningLevel.minimal => l10n.reasoningLevelCompactMin,
     ReasoningLevel.low => l10n.reasoningLevelCompactLow,
     ReasoningLevel.medium => l10n.reasoningLevelCompactMid,
@@ -122,6 +131,7 @@ String reasoningLevelEffortSubtitle(
   return switch (level) {
     ReasoningLevel.auto => l10n.reasoningLevelAutoSubtitle,
     ReasoningLevel.off => l10n.reasoningLevelOffSubtitle,
+    ReasoningLevel.on => l10n.reasoningLevelOnSubtitle,
     ReasoningLevel.minimal => l10n.reasoningLevelMinimalSubtitle,
     ReasoningLevel.low => l10n.reasoningLevelLowSubtitle,
     ReasoningLevel.medium => l10n.reasoningLevelMediumSubtitle,
@@ -154,15 +164,20 @@ class ReasoningLevelPicker extends StatelessWidget {
     required this.config,
     required this.modelId,
     this.assistant,
+    this.conversationId,
+    this.compact = false,
   });
 
   final ProviderConfig config;
   final String modelId;
   final Assistant? assistant;
+  final String? conversationId;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    final config = settings.providerConfigs[this.config.id] ?? this.config;
     final spec = ModelSpecResolver.instance.spec(config, modelId);
     if (!spec.supportsReasoning) {
       return const _UnsupportedState();
@@ -182,6 +197,8 @@ class ReasoningLevelPicker extends StatelessWidget {
       config: config,
       modelId: modelId,
       assistant: assistant,
+      conversationId: conversationId,
+      compact: compact,
     );
   }
 }
@@ -207,42 +224,156 @@ class _UnsupportedState extends StatelessWidget {
   }
 }
 
-class _SliderPicker extends StatelessWidget {
+class _SliderPicker extends StatefulWidget {
   const _SliderPicker({
     required this.snapshot,
     required this.config,
     required this.modelId,
     this.assistant,
+    this.conversationId,
+    this.compact = false,
   });
 
   final ReasoningLevelPickerSnapshot snapshot;
   final ProviderConfig config;
   final String modelId;
   final Assistant? assistant;
+  final String? conversationId;
+  final bool compact;
+
+  @override
+  State<_SliderPicker> createState() => _SliderPickerState();
+}
+
+class _SliderPickerState extends State<_SliderPicker> {
+  bool _saving = false;
+  bool _loadingTiers = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final config = widget.config;
+    final override = config.modelOverrides[widget.modelId];
+    if (config.oauthProvider == OAuthProvider.chatgpt &&
+        config.oauthCredentials != null &&
+        (override is! Map ||
+            override['oauthServiceTierSessionId'] !=
+                config.oauthCredentials!.sessionId)) {
+      _loadingTiers = true;
+      unawaited(
+        Future<void>(() async {
+          try {
+            await ProviderOAuthService.instance.syncModels(config.id);
+          } catch (_) {
+            // Keep reasoning controls usable offline; never probe availability
+            // with a generation request.
+          } finally {
+            if (mounted) setState(() => _loadingTiers = false);
+          }
+        }),
+      );
+    }
+  }
+
+  String _speedLabel(AppLocalizations l10n, ResponseSpeed speed) =>
+      switch (speed) {
+        ResponseSpeed.standard => l10n.responseSpeedStandard,
+        ResponseSpeed.fast => 'Fast',
+        ResponseSpeed.ultrafast => 'UltraFast',
+      };
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final snapshot = widget.snapshot;
     final stops = snapshot.sliderStops;
+    final chat = widget.conversationId == null
+        ? null
+        : context.watch<ChatService>();
+    final conversation = chat?.getConversation(widget.conversationId!);
+    final capabilities = ResponseSpeedCapabilities.resolve(
+      widget.config,
+      widget.modelId,
+    );
+    final speed = ConversationResponseSpeed.effective(
+      conversation,
+      widget.config,
+      widget.modelId,
+      assistantBody: ModelOverridePayloadParser.customBodyFromRows(
+        widget.assistant?.customBody,
+      ),
+    );
+    final speedVisible = capabilities.supportedProvider && conversation != null;
+    final savedSpeed = ConversationResponseSpeed.selected(
+      conversation,
+      widget.config.id,
+      widget.modelId,
+    );
+    final nextSpeed = capabilities.next(speed);
+    final speedColor = switch (speed) {
+      ResponseSpeed.standard => cs.onSurface.withValues(alpha: 0.5),
+      ResponseSpeed.fast => cs.primary,
+      ResponseSpeed.ultrafast =>
+        Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFFAD8CFF)
+            : const Color(0xFF7951C2),
+    };
+    final speedHint = _loadingTiers
+        ? l10n.responseSpeedLoading
+        : nextSpeed != speed
+        ? l10n.responseSpeedTapTo(_speedLabel(l10n, nextSpeed))
+        : l10n.responseSpeedUnavailable;
+    final speedTooltip = [
+      '${_speedLabel(l10n, speed)} · $speedHint',
+      if (speed == ResponseSpeed.fast &&
+          capabilities.ultrafastRequiresResponses)
+        l10n.responseSpeedUltrafastNeedsResponses,
+      if (savedSpeed != null && !capabilities.supports(savedSpeed))
+        l10n.responseSpeedSelectionUnavailable,
+    ].join('\n');
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         EffortSliderGroup(
           selectedIndex: snapshot.sliderIndex,
           customSelected: snapshot.customSelected,
-          customIcon: Icon(Lucide.Hash, size: 18, color: cs.primary),
+          customIcon: Icon(Lucide.Hash, size: 16, color: cs.primary),
           customIconKey: 'custom',
           customTitle: l10n.reasoningLevelCustomBudget,
           customSubtitle: snapshot.selected.budgetTokens?.toString(),
-          onCommit: (index) => _commitStop(context, stops[index]),
+          compact: widget.compact,
+          headerTitleStyle: TextStyle(
+            fontSize: widget.compact ? 14 : 16,
+            fontWeight: AppFontWeights.medium,
+          ),
+          headerSpacing: widget.compact ? 6 : 10,
+          padding: EdgeInsets.symmetric(horizontal: widget.compact ? 14 : 28),
+          animatedTrack: speedVisible && speed != ResponseSpeed.standard,
+          headerAction: speedVisible
+              ? IosIconButton(
+                  key: const ValueKey('response-speed-toggle'),
+                  icon: Lucide.Zap,
+                  size: widget.compact ? 14 : 16,
+                  minSize: 32,
+                  visualSize: widget.compact ? 26 : 28,
+                  padding: const EdgeInsets.all(6),
+                  color: speedColor,
+                  tooltip: speedTooltip,
+                  semanticLabel:
+                      '${l10n.responseSpeedLabel}: ${_speedLabel(l10n, speed)}',
+                  enabled: !_saving && !_loadingTiers && nextSpeed != speed,
+                  onTap: _toggleSpeed,
+                )
+              : null,
+          onCommit: (index) => _commitStop(stops[index]),
           stops: [
             for (final stop in stops)
               EffortSliderStop(
                 stopKey: stop.key,
                 icon: ReasoningIcons.levelIcon(
                   stop.level ?? ReasoningLevel.auto,
-                  size: 18,
+                  size: 16,
                   color: cs.primary,
                 ),
                 iconKey: stop.level ?? ReasoningLevel.auto,
@@ -255,47 +386,98 @@ class _SliderPicker extends StatelessWidget {
           ],
         ),
         if (snapshot.isBudgetStyle) ...[
-          const SizedBox(height: 20),
+          SizedBox(height: widget.compact ? 8 : 20),
           _CustomBudgetRow(
             selected: snapshot.customSelected,
             budget: snapshot.customSelected
                 ? snapshot.selected.budgetTokens
                 : null,
-            onTap: () => _pickCustomBudget(context),
+            onTap: _pickCustomBudget,
           ),
         ],
-        const SizedBox(height: 12),
+        SizedBox(height: widget.compact ? 4 : 12),
       ],
     );
   }
 
-  Future<void> _commitStop(BuildContext context, ReasoningLevelRow row) async {
+  Future<void> _toggleSpeed() async {
+    if (_saving || _loadingTiers || widget.conversationId == null) return;
+    final config = context.read<SettingsProvider>().getProviderConfig(
+      widget.config.id,
+    );
+    final capabilities = ResponseSpeedCapabilities.resolve(
+      config,
+      widget.modelId,
+    );
+    final current = ConversationResponseSpeed.effective(
+      context.read<ChatService>().getConversation(widget.conversationId!),
+      config,
+      widget.modelId,
+      assistantBody: ModelOverridePayloadParser.customBodyFromRows(
+        widget.assistant?.customBody,
+      ),
+    );
+    final next = capabilities.next(current);
+    if (next == current) return;
+    Haptics.soft();
+    await _saveSpeed(next);
+  }
+
+  Future<void> _saveSpeed(ResponseSpeed speed) async {
+    final id = widget.conversationId;
+    if (id == null || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await context.read<ChatService>().updateConversationExtras(
+        id,
+        (extras) => ConversationResponseSpeed.updateExtras(
+          extras,
+          widget.config.id,
+          widget.modelId,
+          speed,
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.responseSpeedSaveFailed,
+          type: NotificationType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _commitStop(ReasoningLevelRow row) async {
     final request = row.request;
     if (request == null) return;
     await commitReasoningChoice(
       context.read<SettingsProvider>(),
-      config,
-      modelId,
-      assistant,
+      widget.config,
+      widget.modelId,
+      widget.assistant,
       request,
     );
   }
 
-  Future<void> _pickCustomBudget(BuildContext context) async {
+  Future<void> _pickCustomBudget() async {
     Haptics.light();
-    final initial = snapshot.customSelected
-        ? (snapshot.selected.budgetTokens ?? 2048)
-        : 2048;
+    final snapshot = widget.snapshot;
+
     final chosen = await ReasoningBudgetCustomDialog.show(
       context,
-      initialValue: initial,
+      initialValue: snapshot.customSelected
+          ? (snapshot.selected.budgetTokens ?? 2048)
+          : 2048,
     );
-    if (!context.mounted || chosen == null) return;
+    if (!mounted || chosen == null) return;
     await commitReasoningChoice(
       context.read<SettingsProvider>(),
-      config,
-      modelId,
-      assistant,
+      widget.config,
+      widget.modelId,
+      widget.assistant,
       requestForCustomBudget(snapshot.spec, chosen),
     );
   }

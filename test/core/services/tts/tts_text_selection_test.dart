@@ -2,6 +2,91 @@ import 'package:Kelivo/core/services/tts/tts_text_selection.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'quote and parenthesis selection continues across semantic boundaries',
+    () {
+      expect(
+        TtsTextSelection.prepareParts(const [
+          TtsTextPart('Before (hidden'),
+          TtsTextPart('UI: 3', literal: true),
+          TtsTextPart('hidden) After'),
+        ], mode: TtsTextSelectionMode.outsideParentheses),
+        'Before After',
+      );
+      expect(
+        TtsTextSelection.prepareParts(const [
+          TtsTextPart('Outside “start'),
+          TtsTextPart('UI: 3', literal: true),
+          TtsTextPart('end” Outside'),
+        ], mode: TtsTextSelectionMode.quotedOnly),
+        'start UI: 3 end',
+      );
+      expect(
+        TtsTextSelection.prepareParts(const [
+          TtsTextPart('<em>start'),
+          TtsTextPart('*plain*', literal: true),
+          TtsTextPart('end</em> other'),
+        ], mode: TtsTextSelectionMode.italicOnly),
+        'start *plain* end',
+      );
+    },
+  );
+
+  test('semantic literals survive Markdown cleanup and selection modes', () {
+    const parts = [
+      TtsTextPart('**Normal** *emphasis* `code`'),
+      TtsTextPart('-3 `literal` *not italic* “spoken” (aside)', literal: true),
+    ];
+    expect(
+      TtsTextSelection.prepareParts(parts, mode: TtsTextSelectionMode.fullText),
+      'Normal emphasis -3 `literal` *not italic* “spoken” (aside)',
+    );
+    expect(
+      TtsTextSelection.prepareParts(
+        parts,
+        mode: TtsTextSelectionMode.quotedOnly,
+      ),
+      'spoken',
+    );
+    expect(
+      TtsTextSelection.prepareParts(
+        parts,
+        mode: TtsTextSelectionMode.italicOnly,
+      ),
+      'emphasis',
+    );
+    expect(
+      TtsTextSelection.prepareParts(
+        parts,
+        mode: TtsTextSelectionMode.nonItalic,
+      ),
+      'Normal -3 `literal` *not italic* “spoken” (aside)',
+    );
+    expect(
+      TtsTextSelection.prepareParts(
+        parts,
+        mode: TtsTextSelectionMode.outsideParentheses,
+      ),
+      'Normal emphasis -3 `literal` *not italic* “spoken”',
+    );
+  });
+  test('speech fallback applies once across ordinary and semantic parts', () {
+    expect(
+      TtsTextSelection.prepareParts(const [
+        TtsTextPart('unquoted ordinary'),
+        TtsTextPart('value: 4', literal: true),
+      ], mode: TtsTextSelectionMode.quotedOnly),
+      'unquoted ordinary value: 4',
+    );
+    expect(
+      TtsTextSelection.prepareParts(const [
+        TtsTextPart('unquoted ordinary'),
+        TtsTextPart('“value”', literal: true),
+      ], mode: TtsTextSelectionMode.quotedOnly),
+      'value',
+    );
+  });
+
   test('speech excludes an open fence after Unicode line separators', () {
     for (final separator in ['\u2028', '\u2029']) {
       expect(

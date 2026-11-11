@@ -9,6 +9,7 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
+import 'package:Kelivo/features/chat/utils/tool_event_deduplication.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -282,7 +283,7 @@ void main() {
     final state = buildStreamingState(settings);
     addTearDown(() => controller.cleanupTimers(state.messageId));
 
-    await controller.handleReasoningChunk('thinking', state);
+    await controller.handleReasoningChunk('thinking', state, id: 'r');
 
     expect(
       controller.reasoningSegments[state.messageId]!.single.expanded,
@@ -413,9 +414,7 @@ void main() {
   test(
     'dedupeToolEvents keeps completed no-id tool results with different content',
     () {
-      final controller = buildController();
-
-      final events = controller.dedupeToolEvents(const [
+      final events = dedupeToolEvents(const [
         {
           'id': '',
           'name': 'builtin_search',
@@ -469,9 +468,7 @@ void main() {
   test(
     'dedupeToolEvents keeps latest completed result for the same non-empty id',
     () {
-      final controller = buildController();
-
-      final events = controller.dedupeToolEvents(const [
+      final events = dedupeToolEvents(const [
         {
           'id': 'builtin_search',
           'name': 'builtin_search',
@@ -657,9 +654,7 @@ void main() {
   test(
     'dedupeToolEvents drops stale no-id placeholders when a completed result exists',
     () {
-      final controller = buildController();
-
-      final events = controller.dedupeToolEvents(const [
+      final events = dedupeToolEvents(const [
         {
           'id': '',
           'name': 'builtin_search',

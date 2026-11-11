@@ -242,17 +242,20 @@ void main() {
     );
   });
 
-  test('tiny work area keeps the UI minimum and its title bar at the top', () {
-    final screen = display(const Rect.fromLTWH(0, 30, 800, 570));
-    expect(
-      resolveWindowsWindowBounds(
-        size: size,
-        savedPosition: null,
-        displays: [screen],
-      ),
-      const Rect.fromLTWH(0, 30, 960, 640),
-    );
-  });
+  test(
+    'tiny work area fits the width and keeps minimum height and title bar',
+    () {
+      final screen = display(const Rect.fromLTWH(0, 30, 800, 570));
+      expect(
+        resolveWindowsWindowBounds(
+          size: size,
+          savedPosition: null,
+          displays: [screen],
+        ),
+        const Rect.fromLTWH(0, 30, 800, 640),
+      );
+    },
+  );
 
   test('invalid display metadata leaves restoration to the initial window', () {
     expect(

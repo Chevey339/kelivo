@@ -548,10 +548,10 @@ class SettingsSearchIndex {
       keywords: 'font size text scale 字号 字號 文字大小 字体大小',
     );
     add(
-      'displaySettingsPageAutoScrollIdleTitle',
+      'displaySettingsPageAutoScrollEnableTitle',
       SettingsSearchDestination.display,
-      (l) => l.displaySettingsPageAutoScrollIdleTitle,
-      keywords: 'auto scroll 自动滚动 自動捲動 延迟 延遲',
+      (l) => l.displaySettingsPageAutoScrollEnableTitle,
+      keywords: 'auto scroll follow bottom streaming 自动滚动 自動捲動 跟随 跟隨 底部 流式',
     );
     add(
       'displaySettingsPageChatBackgroundMaskTitle',
@@ -653,6 +653,18 @@ class SettingsSearchIndex {
       (l) => l.displaySettingsPageEnableMathTitle,
     );
     add(
+      'displaySettingsPageUseLegacyInlineCodeStyleTitle',
+      SettingsSearchDestination.rendering,
+      (l) => l.displaySettingsPageUseLegacyInlineCodeStyleTitle,
+      keywords: 'inline code legacy classic style 行内代码 行內程式碼 旧版 舊版 样式 樣式',
+    );
+    add(
+      'displaySettingsPageUseLegacyCodeBlockStyleTitle',
+      SettingsSearchDestination.rendering,
+      (l) => l.displaySettingsPageUseLegacyCodeBlockStyleTitle,
+      keywords: 'code block legacy classic style 代码块 程式碼區塊 旧版 舊版 样式 樣式',
+    );
+    add(
       'displaySettingsPageEnableUserMarkdownTitle',
       SettingsSearchDestination.rendering,
       (l) => l.displaySettingsPageEnableUserMarkdownTitle,
@@ -666,6 +678,12 @@ class SettingsSearchIndex {
       'displaySettingsPageEnableAssistantMarkdownTitle',
       SettingsSearchDestination.rendering,
       (l) => l.displaySettingsPageEnableAssistantMarkdownTitle,
+    );
+    add(
+      'displaySettingsShowGenUiHeader',
+      SettingsSearchDestination.rendering,
+      (l) => l.displaySettingsShowGenUiHeader,
+      keywords: 'genui intelligent interactive header immersive 交互界面 标题栏 沉浸',
     );
     add(
       'displaySettingsPageAutoCollapseCodeBlockTitle',
@@ -926,13 +944,6 @@ class SettingsSearchIndex {
         'displaySettingsPageSendShortcutTitle',
         SettingsSearchDestination.behavior,
         (l) => l.displaySettingsPageSendShortcutTitle,
-      );
-    }
-    if (desktop) {
-      add(
-        'displaySettingsPageAutoScrollEnableTitle',
-        SettingsSearchDestination.display,
-        (l) => l.displaySettingsPageAutoScrollEnableTitle,
       );
     }
 

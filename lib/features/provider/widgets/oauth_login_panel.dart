@@ -18,25 +18,50 @@ import 'provider_avatar.dart';
 String oauthErrorText(BuildContext context, Object error) {
   final l = AppLocalizations.of(context)!;
   if (error is! ProviderOAuthException) return l.oauthNetworkError;
-  final summary = switch (error.kind) {
-    ProviderOAuthFailure.loginRequired => l.oauthNeedsLogin,
-    ProviderOAuthFailure.timeout => l.oauthTimeout,
-    ProviderOAuthFailure.denied => l.oauthDenied,
-    ProviderOAuthFailure.network => l.oauthNetworkError,
-    ProviderOAuthFailure.quotaExceeded => l.oauthQuotaExceeded,
-    ProviderOAuthFailure.usageUnavailable => l.oauthUsageUnavailable,
-    ProviderOAuthFailure.requestRejected => switch (error.statusCode) {
-      429 => l.oauthRateLimited,
-      403 => l.oauthPermissionDenied,
-      _ => l.oauthRequestFailed,
-    },
-    _ => l.oauthInvalidResponse,
+  final transportSummary = switch (error.transportFailure) {
+    ProviderOAuthTransportFailure.dns => l.oauthDnsError,
+    ProviderOAuthTransportFailure.tls => l.oauthTlsError,
+    ProviderOAuthTransportFailure.proxy => l.oauthProxyError,
+    ProviderOAuthTransportFailure.connection => l.oauthConnectionError,
+    ProviderOAuthTransportFailure.connectionTimeout => l.oauthConnectionTimeout,
+    ProviderOAuthTransportFailure.sendTimeout => l.oauthSendTimeout,
+    ProviderOAuthTransportFailure.receiveTimeout => l.oauthReceiveTimeout,
+    ProviderOAuthTransportFailure.requestTimeout => l.oauthRequestTimeout,
+    _ => null,
   };
+  final summary =
+      transportSummary ??
+      switch (error.kind) {
+        ProviderOAuthFailure.loginRequired => l.oauthNeedsLogin,
+        ProviderOAuthFailure.timeout => l.oauthTimeout,
+        ProviderOAuthFailure.denied => l.oauthDenied,
+        ProviderOAuthFailure.network => l.oauthNetworkError,
+        ProviderOAuthFailure.quotaExceeded => l.oauthQuotaExceeded,
+        ProviderOAuthFailure.usageUnavailable => l.oauthUsageUnavailable,
+        ProviderOAuthFailure.requestRejected => switch (error.statusCode) {
+          429 => l.oauthRateLimited,
+          403 => l.oauthPermissionDenied,
+          _ => l.oauthRequestFailed,
+        },
+        _ => l.oauthInvalidResponse,
+      };
   final status = [
     if (error.statusCode != null) 'HTTP ${error.statusCode}',
+    if (error.transportFailure != null) error.transportFailure!.name,
     if (error.code?.isNotEmpty == true) error.code!,
   ].join(' / ');
+  final stage = switch (error.stage) {
+    ProviderOAuthStage.requestDeviceCode => l.oauthStageRequestDeviceCode,
+    ProviderOAuthStage.waitDeviceAuthorization =>
+      l.oauthStageWaitDeviceAuthorization,
+    ProviderOAuthStage.prepareBrowser => l.oauthStagePrepareBrowser,
+    ProviderOAuthStage.browserAuthorization => l.oauthStageBrowserAuthorization,
+    ProviderOAuthStage.exchangeToken => l.oauthStageExchangeToken,
+    ProviderOAuthStage.refreshToken => l.oauthStageRefreshToken,
+    null => null,
+  };
   return [
+    if (stage != null) l.oauthFailureStage(stage),
     '$summary${status.isEmpty ? '' : ' ($status)'}',
     if (error.message?.isNotEmpty == true) error.message!,
   ].join('\n');

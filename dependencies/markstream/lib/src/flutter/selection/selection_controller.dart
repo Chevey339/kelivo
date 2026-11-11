@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
@@ -9,6 +10,11 @@ import '../../core/serialize/to_markdown.dart';
 import '../../core/text_index/text_index.dart';
 import 'selected_document.dart' as selection_slice;
 import 'stable_selection_container.dart';
+
+class MarkstreamCopyLimitException implements Exception {
+  const MarkstreamCopyLimitException(this.bytes);
+  final int bytes;
+}
 
 /// A consumer may share one controller among multiple Markdown views inside
 /// the same SelectionArea. It owns no gesture handling or SelectionArea.
@@ -42,8 +48,38 @@ class MarkstreamSelectionController extends ChangeNotifier {
         return vertical != 0 ? vertical : first.dx.compareTo(second.dx);
       });
   bool get hasSelection => _documents.any(
-    (binding) => binding.fragments.any((fragment) => fragment.hasSelection),
+    (binding) =>
+        binding.fragments.any((fragment) => fragment.hasSelection) ||
+        binding.projections.any((projection) => projection.hasSelection),
   );
+  int? get selectionByteLimit {
+    int? limit;
+    for (final binding in _documents) {
+      for (final projection in binding.projections) {
+        final value = projection.byteLimit();
+        if (projection.hasSelection && value != null) {
+          limit = limit == null ? value : math.min(limit, value);
+        }
+      }
+    }
+    return limit;
+  }
+
+  void verifyCopyBudget(Iterable<String> representations, {int? byteLimit}) {
+    final selectedLimit = selectionByteLimit;
+    final limit = byteLimit == null
+        ? selectedLimit
+        : selectedLimit == null
+        ? byteLimit
+        : math.min(byteLimit, selectedLimit);
+    if (limit == null) return;
+    for (final text in representations) {
+      if (text.length > limit || utf8.encode(text).length > limit) {
+        throw MarkstreamCopyLimitException(limit);
+      }
+    }
+  }
+
   String get selectedPlainText => _orderedDocuments
       .map((binding) => binding.plainText)
       .whereType<String>()
@@ -58,6 +94,7 @@ class MarkstreamSelectionController extends ChangeNotifier {
       selections.map((selection) => selection.markdown).join('\n\n');
   Future<void> copySelectionAsMarkdown() async {
     final value = selectedMarkdown;
+    verifyCopyBudget([value]);
     if (value.isNotEmpty) await Clipboard.setData(ClipboardData(text: value));
   }
 
@@ -117,6 +154,28 @@ class SelectionGroupRegistration {
   }
 }
 
+/// An extension owns native glyph ranges and supplies a clipboard-only node.
+class SelectionProjectionRegistration {
+  SelectionProjectionRegistration(
+    this.node,
+    this.delegate,
+    this.registered,
+    this.byteLimit,
+  );
+  final bool Function() registered;
+  final int? Function() byteLimit;
+  final MarkdownNode Function() node;
+  final StableSelectionDelegate delegate;
+  bool get hasSelection {
+    if (!registered()) return false;
+    final range = delegate.getSelection();
+    return range != null && range.startOffset != range.endOffset;
+  }
+
+  String? get text =>
+      hasSelection ? delegate.getSelectedContent()?.plainText : null;
+}
+
 class DocumentSelectionBinding {
   DocumentSelectionBinding(this.document, this.controller, this.renderBox);
   final RenderBox? Function() renderBox;
@@ -131,6 +190,7 @@ class DocumentSelectionBinding {
   MarkstreamSelectionController controller;
   final fragments = <_MarkstreamSelectionFragmentState>{};
   final groups = <SelectionGroupRegistration>{};
+  final projections = <SelectionProjectionRegistration>{};
   void changed() => controller.changed();
   List<_MarkstreamSelectionFragmentState> get _ordered => fragments.toList()
     ..sort(
@@ -149,7 +209,27 @@ class DocumentSelectionBinding {
       .getSelectedContent()
       ?.plainText;
   MarkstreamSelection? get selection {
-    final segments = selectedSegments;
+    final replacements = <MarkdownNode, MarkdownNode>{};
+    final segments = [...selectedSegments];
+    for (final projection in projections) {
+      final text = projection.text;
+      if (text == null || text.isEmpty) continue;
+      final node = projection.node();
+      final lines = text.split('\n');
+      replacements[node] = ParagraphNode(
+        span: node.span,
+        children: [
+          for (var i = 0; i < lines.length; i++) ...[
+            if (i > 0) LineBreakNode(span: node.span, hard: true),
+            TextNode(span: node.span, text: lines[i]),
+          ],
+        ],
+      );
+      // Provenance identifies the source block, never a fabricated mapping
+      // between generated field characters and characters in source code.
+      segments.add(TextSegment(text: text, sourceSpan: node.span, node: node));
+    }
+    segments.sort((a, b) => a.sourceSpan.start.compareTo(b.sourceSpan.start));
     if (segments.isEmpty) return null;
     return MarkstreamSelection(
       document: document,
@@ -157,6 +237,7 @@ class DocumentSelectionBinding {
       content: selection_slice.selectedDocument(
         document,
         segments,
+        replacements: replacements,
         visible: {
           for (final fragment in fragments) fragment.widget.node,
           for (final fragment in fragments)

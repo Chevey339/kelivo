@@ -433,7 +433,13 @@ class _SourceBody extends StatelessWidget {
     final source = lines.join('\n');
     final spans = (language.isEmpty || language == 'plaintext')
         ? <InlineSpan>[TextSpan(text: source, style: textStyle)]
-        : highlightSpans(source, language, theme, textStyle);
+        : highlightSpans(
+            source,
+            language,
+            theme,
+            textStyle,
+            boldText: MediaQuery.boldTextOf(context),
+          );
     final span = TextSpan(style: textStyle, children: spans);
     final textScaler = MediaQuery.textScalerOf(context);
     return LayoutBuilder(
@@ -592,15 +598,30 @@ List<InlineSpan> highlightSpans(
   String source,
   String language,
   Map<String, TextStyle> theme,
-  TextStyle base,
-) {
+  TextStyle base, {
+  bool boldText = false,
+}) {
+  if (boldText) base = base.copyWith(fontWeight: FontWeight.bold);
   try {
     final result = highlight.parse(source, language: language);
     final nodes = result.nodes;
     if (nodes == null || nodes.isEmpty) {
       return <InlineSpan>[TextSpan(text: source, style: base)];
     }
-    return _convertHighlightNodes(nodes, theme, base);
+    // Resolve raw syntax weights once, before nested nodes inherit them.
+    final syntaxStyles = theme.map((name, style) {
+      final weight = style.fontWeight;
+      final resolved = boldText
+          ? FontWeight.bold
+          : weight == null
+          ? null
+          : AppFontWeights.normalize(weight);
+      return MapEntry(
+        name,
+        resolved == weight ? style : style.copyWith(fontWeight: resolved),
+      );
+    });
+    return _convertHighlightNodes(nodes, syntaxStyles, base);
   } catch (_) {
     return <InlineSpan>[TextSpan(text: source, style: base)];
   }

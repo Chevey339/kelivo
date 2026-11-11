@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../desktop/window_title_bar.dart';
+import '../../../desktop/widgets/desktop_pointer_surface.dart';
 import '../widgets/browser_desktop_toolbar.dart';
 import '../widgets/browser_glass.dart';
 
@@ -21,6 +22,7 @@ class BrowserDesktopLayout extends StatelessWidget {
     this.tabActions,
     this.embedded = false,
     this.underlapHeader = false,
+    this.showTabBar = true,
   });
 
   final Widget tabBar;
@@ -30,6 +32,7 @@ class BrowserDesktopLayout extends StatelessWidget {
   final Widget? findBar;
   final Widget? tabActions;
   final bool embedded;
+  final bool showTabBar;
 
   /// Enable only after the native viewport supplies a matching obscured inset.
   /// Without it, reserve the header height so fixed website headers stay usable.
@@ -42,6 +45,9 @@ class BrowserDesktopLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final windows = defaultTargetPlatform == TargetPlatform.windows;
     final mac = defaultTargetPlatform == TargetPlatform.macOS;
+    final chromeHeight = showTabBar
+        ? headerHeight
+        : BrowserDesktopToolbar.height;
     final body = Column(
       children: [
         if (windows && !embedded) const WindowTitleBar(),
@@ -51,44 +57,41 @@ class BrowserDesktopLayout extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Positioned.fill(
-                  top: underlapHeader ? 0 : headerHeight,
+                  top: underlapHeader ? 0 : chromeHeight,
                   child: content,
                 ),
                 Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: BrowserGlass(
-                    key: const ValueKey('browserDesktopHeader'),
-                    radius: 0,
-                    clear: true,
-                    elevated: false,
-                    child: Column(
+                  child: _header(
+                    Column(
                       children: [
-                        SizedBox(
-                          height: tabHeight,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              if (!embedded && !windows)
-                                const DragToMoveArea(
-                                  key: ValueKey('browserWindowDragArea'),
-                                  child: ColoredBox(color: Color(0x01000000)),
+                        if (showTabBar)
+                          SizedBox(
+                            height: tabHeight,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                if (!embedded && !windows)
+                                  const DragToMoveArea(
+                                    key: ValueKey('browserWindowDragArea'),
+                                    child: ColoredBox(color: Color(0x01000000)),
+                                  ),
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    left: mac && !embedded ? 96 : 0,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(child: tabBar),
+                                      if (tabActions != null) tabActions!,
+                                    ],
+                                  ),
                                 ),
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  left: mac && !embedded ? 96 : 0,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(child: tabBar),
-                                    if (tabActions != null) tabActions!,
-                                  ],
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
                         toolbar,
                       ],
                     ),
@@ -96,7 +99,7 @@ class BrowserDesktopLayout extends StatelessWidget {
                 ),
                 if (agentStatus != null || findBar != null)
                   Positioned(
-                    top: headerHeight + 12,
+                    top: chromeHeight + 12,
                     left: 14,
                     right: 14,
                     child: Column(
@@ -133,4 +136,17 @@ class BrowserDesktopLayout extends StatelessWidget {
     );
     return embedded ? body : SafeArea(child: body);
   }
+
+  Widget _header(Widget child) => showTabBar
+      ? BrowserGlass(
+          key: const ValueKey('browserDesktopHeader'),
+          radius: 0,
+          clear: true,
+          elevated: false,
+          child: child,
+        )
+      : DesktopPointerSurface(
+          key: const ValueKey('browserDesktopHeader'),
+          child: child,
+        );
 }

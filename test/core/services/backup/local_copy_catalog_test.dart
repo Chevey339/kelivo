@@ -2,12 +2,29 @@ import 'dart:io';
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
+import 'package:Kelivo/core/database/private_data_storage.dart';
 import 'package:Kelivo/core/services/backup/local_copy_catalog.dart';
 import 'package:Kelivo/core/services/backup/local_snapshot_store.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+
+class _IosPaths extends PathProviderPlatform {
+  _IosPaths(this.root);
+  final Directory root;
+
+  @override
+  Future<String?> getApplicationSupportPath() async =>
+      p.join(root.path, 'Support');
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async =>
+      p.join(root.path, 'Documents');
+}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('LocalCopyCatalog', () {
     late Directory root;
     late LocalSnapshotStore store;
@@ -103,6 +120,75 @@ void main() {
     test('空目录返回空列表而不是抛错', () async {
       expect(await catalog.list(), isEmpty);
       expect(await catalog.totalBytes(), 0);
+    });
+
+    group('retained iOS database', () {
+      late Directory source, target;
+      late PathProviderPlatform previousPaths;
+      setUp(() async {
+        previousPaths = PathProviderPlatform.instance;
+        PathProviderPlatform.instance = _IosPaths(root);
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        source = await Directory(p.join(root.path, 'Documents')).create();
+        target = Directory(p.join(root.path, 'Support', 'kelivo-data'));
+        await File(
+          p.join(source.path, 'kelivo.db'),
+        ).writeAsString('old conversations');
+        await PrivateDataStorage.prepare(source: source, target: target);
+        catalog = LocalCopyCatalog(appDataDirectory: target);
+      });
+      tearDown(() {
+        PathProviderPlatform.instance = previousPaths;
+        debugDefaultTargetPlatformOverride = null;
+      });
+
+      test(
+        'lists a deletable retained source and removes it through the catalog',
+        () async {
+          final copy = (await catalog.list()).single;
+          expect(copy.discovered, isTrue);
+          expect(copy.canDelete, isTrue);
+          await catalog.delete(copy);
+          expect(await catalog.list(), isEmpty);
+          expect(
+            await File(p.join(target.path, 'kelivo.db')).readAsString(),
+            'old conversations',
+          );
+        },
+      );
+
+      test('rechecks activation after the list has been displayed', () async {
+        final copy = (await catalog.list()).single;
+        await File(p.join(target.path, PrivateDataStorage.readyName)).delete();
+        await expectLater(catalog.delete(copy), throwsA(isA<StateError>()));
+        expect((await catalog.list()).single.canDelete, isFalse);
+        expect(await copy.file.readAsString(), 'old conversations');
+      });
+
+      test(
+        'recovery catalogs and other discovered copies remain protected',
+        () async {
+          final recovery = LocalCopyCatalog(
+            appDataDirectory: target,
+            includeActiveDatabase: true,
+          );
+          for (final copy in await recovery.list()) {
+            expect(copy.canDelete, isFalse);
+            await expectLater(
+              recovery.delete(copy),
+              throwsA(isA<StateError>()),
+            );
+          }
+          final other = File(p.join(source.path, 'kelivo (2).db'));
+          await other.writeAsString('another copy');
+          final copy = (await catalog.list()).firstWhere(
+            (copy) => copy.file.path == other.path,
+          );
+          expect(copy.canDelete, isFalse);
+          await expectLater(catalog.delete(copy), throwsA(isA<StateError>()));
+          expect(await other.readAsString(), 'another copy');
+        },
+      );
     });
   });
 }

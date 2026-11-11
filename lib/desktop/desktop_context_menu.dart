@@ -1,10 +1,11 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:ui' as ui;
 import '../icons/lucide_adapter.dart';
 import '../shared/widgets/ios_tactile.dart';
 import '../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'desktop_overlay_backdrop.dart';
 
 /// Simple anchored context menu for desktop.
 /// Shows a Material menu near the cursor or an anchor widget with a subtle animation.
@@ -12,17 +13,21 @@ class DesktopContextMenuItem {
   final IconData? icon;
   final String? svgAsset;
   final String label;
+  final String? subtitle;
   final VoidCallback? onTap;
   final bool danger;
   final bool checked;
+  final bool startsGroup;
 
   const DesktopContextMenuItem({
     this.icon,
     this.svgAsset,
     required this.label,
+    this.subtitle,
     this.onTap,
     this.danger = false,
     this.checked = false,
+    this.startsGroup = false,
   });
 }
 
@@ -32,6 +37,7 @@ Future<void> showDesktopContextMenuAt(
   required Offset globalPosition,
   required List<DesktopContextMenuItem> items,
   Color? backgroundColor,
+  bool compact = false,
 }) async {
   // Match the navigator used by showGeneralDialog, including nested panes.
   final overlay = Navigator.of(context, rootNavigator: true).overlay;
@@ -39,36 +45,8 @@ Future<void> showDesktopContextMenuAt(
   final overlayBox = overlay.context.findRenderObject() as RenderBox?;
   if (overlayBox == null) return;
 
-  const double minMenuWidth = 160;
-  const double maxMenuWidth = 360;
-  final double menuWidth = _estimateMenuWidth(
-    context,
-    items,
-    minMenuWidth,
-    maxMenuWidth,
-  );
-  final screen = overlayBox.size;
-  final double menuMaxHeight = screen.height * 0.5; // scroll if exceeds
-  final double estMenuHeight = (items.length * 44.0).clamp(44.0, menuMaxHeight);
-  const double gap = 8; // offset from cursor
   final cs = Theme.of(context).colorScheme;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final padding = MediaQuery.of(overlay.context).padding;
-  final minX = padding.left + 8;
-  final maxX = screen.width - padding.right - menuWidth - 8;
-  final minY = padding.top + 8;
-  final maxY = screen.height - padding.bottom - estMenuHeight - 8;
-
   final local = overlayBox.globalToLocal(globalPosition);
-  double x = (local.dx + gap).clamp(minX, maxX);
-  // Decide above/below based on available space
-  final availableBelow = screen.height - padding.bottom - local.dy - 8;
-  final availableAbove = local.dy - padding.top - 8;
-  final placeAbove =
-      availableBelow < estMenuHeight && availableAbove > availableBelow;
-  double y = placeAbove
-      ? (local.dy - gap - estMenuHeight).clamp(minY, maxY)
-      : (local.dy + gap).clamp(minY, maxY);
 
   await showGeneralDialog<void>(
     context: context,
@@ -77,6 +55,52 @@ Future<void> showDesktopContextMenuAt(
     barrierDismissible: true,
     barrierColor: cs.scrim.withValues(alpha: 0.06),
     pageBuilder: (ctx, _, __) {
+      const double minMenuWidth = 160;
+      const double maxMenuWidth = 360;
+      final double estimatedWidth = _estimateMenuWidth(
+        ctx,
+        items,
+        minMenuWidth,
+        maxMenuWidth,
+      );
+      final screen = MediaQuery.sizeOf(ctx);
+      final padding = MediaQuery.paddingOf(ctx);
+      final menuWidth = math.min(
+        estimatedWidth,
+        math.max(0.0, screen.width - padding.horizontal - 16),
+      );
+      final double menuMaxHeight = screen.height * 0.5; // scroll if exceeds
+      final double estMenuHeight = items
+          .fold<double>(
+            0,
+            (sum, item) =>
+                sum +
+                _menuItemHeight(
+                  ctx,
+                  subtitle: item.subtitle,
+                  compact: compact,
+                ) +
+                (item.startsGroup ? 9 : 0),
+          )
+          .clamp(44.0, menuMaxHeight);
+      const double gap = 8; // offset from cursor
+      final cs = Theme.of(ctx).colorScheme;
+      final isDark = Theme.of(ctx).brightness == Brightness.dark;
+      final minX = padding.left + 8;
+      final maxX = screen.width - padding.right - menuWidth - 8;
+      final minY = padding.top + 8;
+      final maxY = screen.height - padding.bottom - estMenuHeight - 8;
+
+      double x = (local.dx + gap).clamp(minX, maxX);
+      // Decide above/below based on available space
+      final availableBelow = screen.height - padding.bottom - local.dy - 8;
+      final availableAbove = local.dy - padding.top - 8;
+      final placeAbove =
+          availableBelow < estMenuHeight && availableAbove > availableBelow;
+      double y = placeAbove
+          ? (local.dy - gap - estMenuHeight).clamp(minY, maxY)
+          : (local.dy + gap).clamp(minY, maxY);
+
       return Material(
         type: MaterialType.transparency,
         child: Stack(
@@ -105,8 +129,8 @@ Future<void> showDesktopContextMenuAt(
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: BackdropFilter(
-                          filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                        child: DesktopOverlayBackdrop(
+                          sigma: 14,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               color:
@@ -121,18 +145,36 @@ Future<void> showDesktopContextMenuAt(
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    for (final it in items)
+                                    for (final it in items) ...[
+                                      if (it.startsGroup)
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          child: Divider(
+                                            height: 9,
+                                            thickness: 0.5,
+                                            color: cs.outlineVariant.withValues(
+                                              alpha: 0.3,
+                                            ),
+                                          ),
+                                        ),
                                       _GlassMenuItem(
+                                        compact: compact,
                                         icon: it.icon,
                                         svgAsset: it.svgAsset,
                                         label: it.label,
+                                        subtitle: it.subtitle,
                                         danger: it.danger,
                                         checked: it.checked,
-                                        onTap: () {
-                                          Navigator.of(ctx).pop();
-                                          it.onTap?.call();
-                                        },
+                                        onTap: it.onTap == null
+                                            ? null
+                                            : () {
+                                                Navigator.of(ctx).pop();
+                                                it.onTap!();
+                                              },
                                       ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -152,6 +194,16 @@ Future<void> showDesktopContextMenuAt(
   );
 }
 
+double _menuItemHeight(
+  BuildContext context, {
+  String? subtitle,
+  required bool compact,
+}) {
+  if (subtitle != null) return 60;
+  if (!compact) return 44;
+  return math.max(36, MediaQuery.textScalerOf(context).scale(20) + 12);
+}
+
 double _estimateMenuWidth(
   BuildContext context,
   List<DesktopContextMenuItem> items,
@@ -168,10 +220,20 @@ double _estimateMenuWidth(
   );
   for (final it in items) {
     final tp = TextPainter(
-      text: TextSpan(text: it.label, style: textStyle),
+      text: TextSpan(
+        text: it.label,
+        style: textStyle,
+        children: [
+          if (it.subtitle != null)
+            TextSpan(
+              text: '\n${it.subtitle}',
+              style: textStyle.copyWith(fontSize: 11.5),
+            ),
+        ],
+      ),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),
-      maxLines: 1,
+      maxLines: it.subtitle == null ? 1 : 2,
     )..layout(maxWidth: maxW);
     double width = 12 /*left*/ + tp.width + 12 /*right*/;
     if (it.icon != null || it.svgAsset != null) {
@@ -249,16 +311,20 @@ class _GlassMenuItem extends StatefulWidget {
     this.icon,
     this.svgAsset,
     required this.label,
+    this.subtitle,
     this.onTap,
     this.danger = false,
     this.checked = false,
+    this.compact = false,
   });
   final IconData? icon;
   final String? svgAsset;
   final String label;
+  final String? subtitle;
   final VoidCallback? onTap;
   final bool danger;
   final bool checked;
+  final bool compact;
 
   @override
   State<_GlassMenuItem> createState() => _GlassMenuItemState();
@@ -276,25 +342,33 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
     final ic = widget.danger
         ? Theme.of(context).colorScheme.error
         : cs.onSurface.withValues(alpha: 0.9);
-    final bg = _hover
+    final bg = _hover && widget.onTap != null
         ? (cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
+      cursor: widget.onTap == null
+          ? MouseCursor.defer
+          : SystemMouseCursors.click,
       child: IosCardPress(
         focusable: true,
         borderRadius: BorderRadius.zero,
         baseColor: Colors.transparent,
-        onTap: () {
-          try {
-            Haptics.light();
-          } catch (_) {}
-          widget.onTap?.call();
-        },
+        onTap: widget.onTap == null
+            ? null
+            : () {
+                try {
+                  Haptics.light();
+                } catch (_) {}
+                widget.onTap?.call();
+              },
         child: Container(
-          height: 44,
+          height: _menuItemHeight(
+            context,
+            subtitle: widget.subtitle,
+            compact: widget.compact,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(color: bg),
@@ -313,16 +387,34 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
                 const SizedBox(width: 10),
               ],
               Expanded(
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    fontWeight: AppFontWeights.medium,
-                    fontSize: 14.5,
-                    color: fg,
-                    decoration: TextDecoration.none,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        fontWeight: AppFontWeights.medium,
+                        fontSize: 14.5,
+                        color: fg,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    if (widget.subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.subtitle!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 11.5,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (widget.checked) ...[

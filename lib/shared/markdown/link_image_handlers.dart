@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'markdown_image_sources.dart';
+
 import 'package:flutter/material.dart';
+import 'package:crypto/crypto.dart';
 import 'package:markstream/markstream.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
@@ -10,7 +14,10 @@ import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/shared/widgets/scroll_layout_anchor.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+import 'package:Kelivo/utils/svg_image_provider.dart';
+import 'package:open_filex/open_filex.dart';
 
 /// Source is read lazily when opening the gallery, avoiding another parse on
 /// every streaming frame. Existing image widgets only rebuild for a new scope.
@@ -20,16 +27,19 @@ class MarkdownLinkScope extends InheritedWidget {
     required super.child,
     required this.source,
     this.conversationId,
+    this.imageStorage,
   });
   final String source;
   final String? conversationId;
+  final PageStorageBucket? imageStorage;
   static MarkdownLinkScope? of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<MarkdownLinkScope>();
   static MarkdownLinkScope? read(BuildContext context) =>
       context.getInheritedWidgetOfExactType<MarkdownLinkScope>();
   @override
   bool updateShouldNotify(MarkdownLinkScope oldWidget) =>
-      conversationId != oldWidget.conversationId;
+      conversationId != oldWidget.conversationId ||
+      !identical(imageStorage, oldWidget.imageStorage);
 }
 
 class KelivoLinkHandler implements LinkHandler {
@@ -74,78 +84,6 @@ class KelivoLinkHandler implements LinkHandler {
   }
 }
 
-/// Local paths with spaces are parsed directly, without changing source spans.
-/// Standard links, escaped labels and URL/title parsing remain in the core.
-class LocalImagePathSyntax extends InlineSyntax {
-  const LocalImagePathSyntax();
-  static final _local = RegExp(r'^(?:/|file://|[A-Za-z]:[\\/])');
-  @override
-  Set<int> get startCharacters => const {33};
-  @override
-  InlineSyntaxMatch? match(InlineSyntaxContext context, int offset) {
-    final text = context.text;
-    if (!text.startsWith('![', offset)) return null;
-    var closeLabel = offset + 2;
-    while (closeLabel < text.length && text[closeLabel] != ']') {
-      if (text[closeLabel] == '\n' || text[closeLabel] == '\r') return null;
-      if (text[closeLabel] == '\\') closeLabel++;
-      closeLabel++;
-    }
-    if (closeLabel >= text.length || !text.startsWith('](', closeLabel)) {
-      return null;
-    }
-    final start = closeLabel + 2;
-    var end = start, depth = 0;
-    String? quote;
-    while (end < text.length) {
-      final c = text[end];
-      if (c == '\n' || c == '\r') return null;
-      if (quote != null) {
-        if (c == '\\') {
-          end += 2;
-          continue;
-        }
-        if (c == quote) quote = null;
-        end++;
-        continue;
-      }
-      if ((c == '"' || c == "'") && end > start && text[end - 1] == ' ') {
-        quote = c;
-        end++;
-        continue;
-      }
-      if (c == '(') depth++;
-      if (c == ')') {
-        if (depth == 0) break;
-        depth--;
-      }
-      end++;
-    }
-    if (end >= text.length) return null;
-    var destination = text.substring(start, end).trim();
-    if (!_local.hasMatch(destination) || !destination.contains(' ')) {
-      return null;
-    }
-    String? title;
-    final titleMatch = RegExp(r'''\s+["'](.*)["']$''').firstMatch(destination);
-    if (titleMatch != null) {
-      title = titleMatch[1];
-      destination = destination.substring(0, titleMatch.start).trimRight();
-    }
-    return InlineSyntaxMatch(
-      end: end + 1,
-      node: ImageNode(
-        span: context.span(offset, end + 1),
-        children: InlineParser(
-          options: context.options,
-        ).parseFragments(context.textNodes(offset + 2, closeLabel)),
-        destination: destination,
-        title: title,
-      ),
-    );
-  }
-}
-
 class KelivoImageBuilder implements ImageBuilder {
   const KelivoImageBuilder();
   static final _dimensions = RegExp(r'^(?:(\d+)(?:x(\d+))?|x(\d+))$');
@@ -166,7 +104,13 @@ class KelivoImageBuilder implements ImageBuilder {
   }
 }
 
-ImageProvider? markdownImageProvider(String source) {
+ImageProvider? markdownImageProvider(
+  String source, {
+  Color currentColor = const Color(0xff000000),
+}) {
+  if (isSvgImageSource(source)) {
+    return SvgImageProvider(source, currentColor: currentColor);
+  }
   if (source.startsWith('http://') || source.startsWith('https://')) {
     return NetworkImage(source);
   }
@@ -202,20 +146,107 @@ class _MarkdownImage extends StatefulWidget {
 class _MarkdownImageState extends State<_MarkdownImage> {
   Future<File?>? _file;
   String? _conversationId;
+  late String _sourceId = sha256.convert(utf8.encode(widget.url)).toString();
+  PageStorageBucket? _storage;
+  double? _aspect;
+  (String, Color?)? _providerSource;
+  ImageProvider? _provider;
+  ImageProvider? _listenedProvider;
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+
+  Object get _aspectId => ('markdown-image-aspect', _conversationId, _sourceId);
+
+  void _syncAspect({bool sourceChanged = false}) {
+    final storage =
+        MarkdownLinkScope.read(context)?.imageStorage ??
+        PageStorage.maybeOf(context);
+    if (!sourceChanged && identical(storage, _storage)) return;
+    _stopListening();
+    _listenedProvider = null;
+    _storage = storage;
+    _aspect = storage?.readState(context, identifier: _aspectId) as double?;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final conversationId = MarkdownLinkScope.of(context)?.conversationId;
-    if (_file == null || conversationId != _conversationId) {
+    final changed = conversationId != _conversationId;
+    if (_file == null || changed) {
       _conversationId = conversationId;
       _resolve();
     }
+    _syncAspect(sourceChanged: changed);
   }
 
   @override
   void didUpdateWidget(_MarkdownImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) _resolve();
+    final changed = oldWidget.url != widget.url;
+    if (changed) {
+      _sourceId = sha256.convert(utf8.encode(widget.url)).toString();
+      _resolve();
+    }
+    _syncAspect(sourceChanged: changed);
+  }
+
+  void _stopListening() {
+    if (_stream != null && _listener != null) {
+      _stream!.removeListener(_listener!);
+    }
+    _stream = null;
+    _listener = null;
+  }
+
+  @override
+  void dispose() {
+    _stopListening();
+    super.dispose();
+  }
+
+  void _listenForAspect(ImageProvider provider) {
+    if (_listenedProvider == provider) return;
+    _stopListening();
+    _listenedProvider = provider;
+    _stream = provider.resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener(
+      (info, synchronous) {
+        final aspect = info.image.width / info.image.height;
+        info.dispose();
+        // Geometry needs only the first frame. Leave animated-image playback
+        // and TickerMode handling to Image's own listener.
+        _stopListening();
+        if (!mounted || !aspect.isFinite || aspect <= 0) return;
+        _storage?.writeState(context, aspect, identifier: _aspectId);
+        if (_aspect == aspect) return;
+        if (synchronous) {
+          _aspect = aspect;
+        } else {
+          preserveScrollLayoutAnchor(context);
+          setState(() => _aspect = aspect);
+        }
+      },
+      // Image's errorBuilder owns the visible failure state.
+      onError: (Object error, StackTrace? stack) => _stopListening(),
+    );
+    _stream!.addListener(_listener!);
+  }
+
+  ({double? width, double? height}) _displaySize(BoxConstraints constraints) {
+    final available = constraints.maxWidth.isFinite
+        ? constraints.maxWidth
+        : null;
+    final requestedWidth = widget.width ?? available;
+    final width = requestedWidth == null || available == null
+        ? requestedWidth
+        : math.min(requestedWidth, available);
+    final height =
+        widget.height != null && widget.width != null && width != null
+        ? widget.height! * width / widget.width!
+        : widget.height ??
+              (width != null && _aspect != null ? width / _aspect! : null);
+    return (width: width, height: height);
   }
 
   void _resolve() {
@@ -225,7 +256,23 @@ class _MarkdownImageState extends State<_MarkdownImage> {
             context,
             widget.url,
             conversationId: _conversationId,
-          );
+          ).then((file) {
+            if (mounted) preserveScrollLayoutAnchor(context);
+            return file;
+          });
+  }
+
+  ImageProvider? _imageProvider(String source) {
+    final color = isSvgImageSource(source) ? widget.theme.proseInk : null;
+    final input = (source, color);
+    if (_providerSource != input || _provider == null) {
+      _providerSource = input;
+      _provider = markdownImageProvider(
+        source,
+        currentColor: color ?? widget.theme.proseInk,
+      );
+    }
+    return _provider;
   }
 
   Widget _broken() => ColoredBox(
@@ -238,26 +285,35 @@ class _MarkdownImageState extends State<_MarkdownImage> {
   @override
   Widget build(BuildContext context) {
     if (_file == null) {
-      return _image(widget.url, markdownImageProvider(widget.url));
+      return _image(widget.url, _imageProvider(widget.url));
     }
     return FutureBuilder<File?>(
       future: _file,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const SizedBox(
-            width: 36,
-            height: 36,
-            child: Center(
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
+          // File resolution runs again after recycling. Preserve the decoded
+          // aspect (or explicit dimensions) while the file is being located.
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final size = _displaySize(constraints);
+              return SizedBox(
+                width: size.width ?? 36,
+                height: size.height ?? 36,
+                child: const Center(
+                  child: SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            },
           );
         }
         final file = snapshot.data;
-        return file == null ? _broken() : _image(file.path, FileImage(file));
+        return file == null
+            ? _broken()
+            : _image(file.path, _imageProvider(file.path));
       },
     );
   }
@@ -270,24 +326,27 @@ class _MarkdownImageState extends State<_MarkdownImage> {
         onTap: () => _open(url),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final available = constraints.maxWidth.isFinite
-                ? constraints.maxWidth
-                : null;
-            final requestedWidth = widget.width ?? available;
-            final width = requestedWidth == null || available == null
-                ? requestedWidth
-                : math.min(requestedWidth, available);
-            final height =
-                widget.height != null && widget.width != null && width != null
-                ? widget.height! * width / widget.width!
-                : widget.height;
+            final width = _displaySize(constraints).width;
             final cacheWidth = width == null
                 ? null
                 : math.max(
                     1,
                     (width * MediaQuery.devicePixelRatioOf(context)).ceil(),
                   );
+            final resized = ResizeImage.resizeIfNeeded(
+              cacheWidth,
+              null,
+              provider,
+            );
+            // Observe the same decoded stream as Image, without decoding a
+            // second full-resolution copy or retaining image pixels in storage.
+            _listenForAspect(resized);
+            final height = _displaySize(constraints).height;
             return Container(
+              width: width,
+              // File resolution and pixel decoding are separate async stages.
+              // Keep the loading extent until the first decoded aspect arrives.
+              height: height ?? (_aspect == null ? 36 : null),
               foregroundDecoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(widget.theme.imageRadius),
                 border: Border.all(
@@ -296,11 +355,30 @@ class _MarkdownImageState extends State<_MarkdownImage> {
                 ),
               ),
               child: Image(
-                image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
+                image: resized,
                 width: width,
                 height: height,
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stack) => _broken(),
+                errorBuilder: (context, error, stack) => isSvgImageSource(url)
+                    ? GestureDetector(
+                        onTap: () async {
+                          if (url.startsWith('http://') ||
+                              url.startsWith('https://')) {
+                            await const KelivoLinkHandler().open(
+                              context,
+                              LinkNode(
+                                span: const SourceSpan(0, 0),
+                                children: const [],
+                                destination: url,
+                              ),
+                            );
+                          } else if (!url.startsWith('data:')) {
+                            await OpenFilex.open(SandboxPathResolver.fix(url));
+                          }
+                        },
+                        child: _broken(),
+                      )
+                    : _broken(),
               ),
             );
           },
@@ -313,31 +391,27 @@ class _MarkdownImageState extends State<_MarkdownImage> {
     final source = MarkdownLinkScope.read(context)?.source;
     final urls = <String>[];
     if (source != null) {
-      final pending = <MarkdownNode>[
-        MarkdownParser(
-          inlineSyntaxes: const [LocalImagePathSyntax()],
-        ).parse(source),
-      ];
-      while (pending.isNotEmpty) {
-        final node = pending.removeLast();
-        final destination = node is ImageNode
-            ? node.destination
-            : node is HtmlElementNode && node.tag == 'img'
-            ? node.attributes['src']
-            : null;
-        if (destination != null &&
-            (node is ImageNode || isSafeHtmlUrl(destination, image: true)) &&
-            KelivoLink.tryParse(destination) == null) {
-          urls.add(destination);
-        }
-        pending.addAll(node.children.reversed);
-      }
+      urls.addAll(
+        markdownImageSources(
+          source,
+        ).where((url) => KelivoLink.tryParse(url) == null),
+      );
     }
     if (!urls.contains(url)) urls.insert(0, url);
     Navigator.of(context).push(
       PageRouteBuilder<void>(
-        pageBuilder: (_, __, ___) =>
-            ImageViewerPage(images: urls, initialIndex: urls.indexOf(url)),
+        pageBuilder: (_, __, ___) => ImageViewerPage(
+          images: urls,
+          initialIndex: urls.indexOf(url),
+          imageProviders: {
+            for (final source in urls)
+              if (isSvgImageSource(source))
+                source: SvgImageProvider(
+                  source,
+                  currentColor: widget.theme.proseInk,
+                ),
+          },
+        ),
         transitionDuration: const Duration(milliseconds: 360),
         reverseTransitionDuration: const Duration(milliseconds: 280),
         transitionsBuilder: (_, animation, __, child) => FadeTransition(

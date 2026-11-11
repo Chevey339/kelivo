@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/conversation_mcp_settings.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Tristate;
@@ -65,6 +66,22 @@ class _FakeChatService extends ChatService {
   @override
   Conversation? getConversation(String id) =>
       conversation?.id == id ? conversation : null;
+
+  @override
+  Future<void> setConversationMcpServers(
+    String conversationId,
+    List<String>? ids,
+  ) async {
+    final current = getConversation(conversationId)!;
+    conversation = current.copyWith(
+      mcpServerIds: ids ?? [],
+      extras: ConversationMcpSettings.updateExtras(
+        current.extras,
+        override: ids != null,
+      ),
+    );
+    notifyListeners();
+  }
 
   @override
   Future<void> updateConversationExtras(
@@ -217,6 +234,7 @@ void main() {
                               context,
                               anchorKey: anchor,
                               assistantId: assistantId,
+                              conversationId: conversation?.id,
                               supportsModelTools: true,
                             ),
                             child: const Text('Open tools'),
@@ -240,18 +258,32 @@ void main() {
 
   for (final desktop in [false, true]) {
     testWidgets(
-      'keyboard folds workspace and announces state desktop=$desktop',
+      desktop
+          ? 'desktop tools popover omits workspace controls'
+          : 'keyboard folds workspace and announces state on mobile',
       (tester) async {
         final semantics = tester.ensureSemantics();
         await tester.runAsync(
           () => uiPreferences.setStringList(
             'display_chat_tools_expanded_groups_v1',
-            ['mcp'],
+            ['mcp', if (desktop) 'workspace'],
           ),
         );
         final l10n = await pumpSheet(tester, desktop: desktop);
         await tester.pumpAndSettle();
         final title = find.text(l10n.workspacesTitle);
+        if (desktop) {
+          final position = tester
+              .state<ScrollableState>(find.byType(Scrollable).first)
+              .position;
+          position.jumpTo(position.maxScrollExtent);
+          await tester.pumpAndSettle();
+          expect(title, findsNothing);
+          expect(find.byType(WorkspaceSection), findsNothing);
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+          return;
+        }
         await tester.scrollUntilVisible(
           title,
           250,
@@ -465,6 +497,125 @@ void main() {
     await tester.pumpAndSettle();
     expect(assistants.getById(assistantId)!.mcpServerIds, isEmpty);
   });
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'MCP customization stays in this conversation (desktop: $desktop)',
+      (tester) async {
+        await tester.runAsync(
+          () => assistants.updateAssistant(
+            assistants
+                .getById(assistantId)!
+                .copyWith(mcpServerIds: ['s1'], allowConversationMcp: true),
+          ),
+        );
+        final conversation = Conversation(
+          id: 'custom',
+          title: 'Custom',
+          assistantId: assistantId,
+        );
+        final l10n = await pumpSheet(
+          tester,
+          conversation: conversation,
+          desktop: desktop,
+          servers: [_server('s1', 'Alpha'), _server('s2', 'Beta')],
+        );
+        await tester.pumpAndSettle();
+        final chat =
+            tester.element(find.byType(Scaffold)).read<ChatService>()
+                as _FakeChatService;
+        final inheritKey = ValueKey(
+          desktop ? 'desktop-tools-mcp-inherit' : 'chat-tools-mcp-inherit',
+        );
+        if (desktop) {
+          await tester.scrollUntilVisible(find.byKey(inheritKey), 250);
+          await tester.pumpAndSettle();
+        }
+        expect(find.byKey(inheritKey), findsOneWidget);
+        expect(find.textContaining(l10n.mcpSelectionInherited), findsWidgets);
+        final beta = find.byKey(
+          desktop
+              ? const ValueKey('desktop-tools-mcp-s2')
+              : ChatToolsSheet.mcpServerKey('s2'),
+        );
+        await tester.ensureVisible(beta);
+        await tester.tap(beta);
+        await tester.pumpAndSettle();
+        expect(chat.conversation!.mcpServerIds, ['s1', 's2']);
+        expect(ConversationMcpSettings.isOverridden(chat.conversation), isTrue);
+        expect(assistants.getById(assistantId)!.mcpServerIds, ['s1']);
+        expect(find.textContaining(l10n.mcpSelectionCustom), findsWidgets);
+
+        await tester.tap(
+          find.byKey(
+            ValueKey(
+              desktop ? 'desktop-tools-mcp-clear' : 'chat-tools-mcp-clear',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(chat.conversation!.mcpServerIds, isEmpty);
+        expect(ConversationMcpSettings.isOverridden(chat.conversation), isTrue);
+        if (desktop) {
+          await tester.tap(find.text('Open tools'));
+          await tester.pumpAndSettle();
+        }
+        final custom = chat.conversation!;
+        await tester.runAsync(
+          () => assistants.updateAssistant(
+            assistants
+                .getById(assistantId)!
+                .copyWith(allowConversationMcp: false),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(inheritKey), findsNothing);
+        expect(
+          ConversationMcpSettings.effectiveServerIds(
+            assistants.getById(assistantId),
+            chat.conversation,
+          ),
+          ['s1'],
+        );
+        await tester.runAsync(
+          () => assistants.updateAssistant(
+            assistants
+                .getById(assistantId)!
+                .copyWith(allowConversationMcp: true),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(chat.conversation, same(custom));
+        expect(
+          ConversationMcpSettings.effectiveServerIds(
+            assistants.getById(assistantId),
+            chat.conversation,
+          ),
+          isEmpty,
+        );
+        if (desktop) {
+          await tester.scrollUntilVisible(find.byKey(inheritKey), 250);
+        } else {
+          await tester.ensureVisible(find.byKey(inheritKey));
+        }
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(inheritKey));
+        await tester.pumpAndSettle();
+        expect(
+          ConversationMcpSettings.isOverridden(chat.conversation),
+          isFalse,
+        );
+        expect(
+          ConversationMcpSettings.effectiveServerIds(
+            assistants.getById(assistantId),
+            chat.conversation,
+          ),
+          ['s1'],
+        );
+        expect(assistants.getById(assistantId)!.mcpServerIds, ['s1']);
+      },
+    );
+  }
 
   testWidgets('workspace group hosts the workspace section', (tester) async {
     await pumpSheet(tester);

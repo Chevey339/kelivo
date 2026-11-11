@@ -1,3 +1,5 @@
+import '../../chat/widgets/compression_template_library.dart';
+import '../../home/widgets/model_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -7,9 +9,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
 import '../utils/ocr_model_capability.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -191,6 +191,9 @@ class DefaultModelPage extends StatelessWidget {
               }
             },
             configAction: () => _showCompressPromptSheet(context),
+            footer: const _ThinkingSwitchRow(
+              task: _BackgroundModelTask.compress,
+            ),
           ),
           const SizedBox(height: 16),
           _ModelCard(
@@ -605,116 +608,7 @@ class DefaultModelPage extends StatelessWidget {
   }
 
   Future<void> _showCompressPromptSheet(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final settings = context.read<SettingsProvider>();
-    final controller = TextEditingController(text: settings.compressPrompt);
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.overlaySurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 12,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _ThinkingSwitchRow(task: _BackgroundModelTask.compress),
-                const SizedBox(height: 18),
-                Text(
-                  l10n.defaultModelPagePromptLabel,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: AppFontWeights.semibold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: controller,
-                  maxLines: 8,
-                  decoration: InputDecoration(
-                    hintText: l10n.defaultModelPageCompressPromptHint,
-                    filled: true,
-                    fillColor: ctx.appColors.surfaceFill,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.primary.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () async {
-                        await settings.resetCompressPrompt();
-                        await settings.resetCompressGenerationThinkingEnabled();
-                        controller.text = settings.compressPrompt;
-                      },
-                      child: Text(l10n.defaultModelPageResetDefault),
-                    ),
-                    const Spacer(),
-                    FilledButton(
-                      onPressed: () async {
-                        await settings.setCompressPrompt(
-                          controller.text.trim(),
-                        );
-                        if (ctx.mounted) Navigator.of(ctx).pop();
-                      },
-                      child: Text(l10n.defaultModelPageSave),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.defaultModelPageCompressVars('{content}', '{locale}'),
-                  style: TextStyle(
-                    color: cs.onSurface.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    await showCompressionTemplateLibrary(context);
   }
 
   Future<void> _showSuggestionPromptSheet(BuildContext context) async {
@@ -848,6 +742,7 @@ class _ModelCard extends StatelessWidget {
     this.resetTooltip,
     this.onDisable,
     this.configAction,
+    this.footer,
   });
 
   final IconData icon;
@@ -864,6 +759,7 @@ class _ModelCard extends StatelessWidget {
   final VoidCallback? onReset;
   final VoidCallback? onDisable;
   final VoidCallback? configAction;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -1000,16 +896,16 @@ class _ModelCard extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        _BrandAvatar(
-                          name: modelDisplay ?? (providerName ?? '?'),
+                        CurrentModelIcon(
+                          providerKey: effectiveProvider,
+                          modelId: effectiveModelId,
                           size: 24,
+                          iconScale: .62,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             modelDisplay ?? (providerName ?? '-'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: AppFontWeights.semibold,
@@ -1022,6 +918,7 @@ class _ModelCard extends StatelessWidget {
                 );
               },
             ),
+            if (footer != null) ...[const SizedBox(height: 12), footer!],
           ],
         ),
       ),
@@ -1029,64 +926,6 @@ class _ModelCard extends StatelessWidget {
   }
 }
 
-class _BrandAvatar extends StatelessWidget {
-  const _BrandAvatar({required this.name, this.size = 20});
-  final String name;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    Widget inner;
-    if (asset != null) {
-      if (asset.endsWith('.svg')) {
-        final dark = Theme.of(context).brightness == Brightness.dark;
-        final ColorFilter? tint =
-            (dark && BrandAssets.assetNeedsDarkInvert(asset))
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null;
-        inner = SvgPicture.asset(
-          asset,
-          width: size * 0.62,
-          height: size * 0.62,
-          colorFilter: tint,
-        );
-      } else {
-        inner = Image.asset(
-          asset,
-          width: size * 0.62,
-          height: size * 0.62,
-          fit: BoxFit.contain,
-        );
-      }
-    } else {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
-        ),
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: inner,
-    );
-  }
-}
-
-/// Toggles whether the chat model picker writes to the conversation or to the
-/// current assistant. Conversation pins survive being switched off, so the
-/// wording promises a scope change, not a reset.
 class _PerChatModelCard extends StatelessWidget {
   const _PerChatModelCard({required this.value, required this.onChanged});
 

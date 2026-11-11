@@ -10,23 +10,37 @@ Kelivo is a cross-platform LLM chat client built with Flutter, targeting iOS, An
 - **Desktop / mobile split**: most UI pages have separate desktop and mobile layouts (e.g. `home_desktop_layout.dart` / `home_mobile_layout.dart`). Desktop-only code lives in `lib/desktop/`. Use `ResponsiveHelper` from `lib/shared/responsive/` to branch by screen type.
 - **State management**: Provider (`lib/core/providers/`).
 - **Database**: Drift (`lib/core/database/`). Schema versions tracked in `drift_schemas/`.
-- **Localization**: ARB-based (`lib/l10n/`), English template (`app_en.arb`). Run `flutter gen-l10n` after editing ARB files and commit the generated output.
+- **Localization**: edit `lib/l10n/app_en.arb` and `app_zh.arb` for product changes. Give every English key an `@key.description` explaining its UI location, meaning, and placeholders; update that description when the meaning changes. Keep both source key sets identical. Run `python3 tool/l10n/translate.py sync`, then `python3 tool/l10n/translate.py check`; commit the translated ARBs, translation state, and generated Dart output. The tool synchronizes `app_zh_Hans.arb` and translates the other languages from both sources plus the descriptions. For credentials, adding languages, or translation corrections, read [the localization workflow](tool/l10n/README.md). Inspect affected keys and tool summaries instead of loading every language file into the agent context.
 
 ## Pre-commit checklist
 
 Format changed Dart files with `dart format`, including files under `lib/`,
-`test/`, `integration_test/`, `dependencies/markstream/lib/`, and
-`dependencies/markstream/test/`. Then run both packages before every commit;
-all checks must pass:
+`test/`, `integration_test/`, `tool/`, `dependencies/markstream/lib/`, and
+`dependencies/markstream/test/`. For code changes, run static analysis before
+committing:
 
 ```bash
-dart analyze --fatal-infos lib test integration_test
-flutter test
-(cd dependencies/markstream && flutter pub get && dart analyze --fatal-infos && flutter test)
+flutter pub get --directory tool/l10n --enforce-lockfile
+dart analyze --fatal-infos lib test integration_test tool
+(cd dependencies/markstream && flutter pub get && dart analyze --fatal-infos)
 ```
 
-CI (`pr-check.yml`) enforces the same gates on every PR. Root-package checks
-do not cover the `markstream` path package.
+For ordinary changes, run only the test files or directories covering the
+changed behavior and affected callers, using `flutter test <test paths>`.
+If `markstream` is affected, also run its relevant tests from
+`dependencies/markstream`; root-package checks do not cover this path package.
+
+Run the full test suites locally only when merging a major feature, such as a
+cross-feature integration or broad architectural change:
+
+```bash
+flutter test
+(cd dependencies/markstream && flutter pub get && flutter test)
+```
+
+All required checks must pass. Documentation-only changes do not require Dart
+analysis or Flutter tests. CI (`pr-check.yml`) still runs static analysis and
+the full test suites for both packages on every PR.
 
 ## Benchmarks are not tests
 

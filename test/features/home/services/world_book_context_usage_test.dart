@@ -39,16 +39,14 @@ class _Chat extends ChatService {
   Future<void> Function()? afterExtrasWrite;
 
   @override
-  Future<List<ChatMessage>> loadSelectedContextMessages(
+  Future<List<ChatMessage>> loadRawSelectedContextMessages(
     String id, {
-    required int truncateIndex,
     required int limit,
     String? throughRevisionId,
     bool includeFollowingAssistant = false,
   }) async {
-    final messages = await super.loadSelectedContextMessages(
+    final messages = await super.loadRawSelectedContextMessages(
       id,
-      truncateIndex: truncateIndex,
       limit: limit,
       throughRevisionId: throughRevisionId,
       includeFollowingAssistant: includeFollowingAssistant,
@@ -85,7 +83,10 @@ class _Generation extends Fake implements GenerationController {
   @override
   Map<String, dynamic>? buildCustomBody(Assistant? assistant) => null;
   @override
-  McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) => _Routes();
+  McpToolRouteSnapshot captureMcpToolRoutes(
+    Assistant? assistant, {
+    String? conversationId,
+  }) => _Routes();
   @override
   List<Map<String, dynamic>> buildToolDefinitions(
     SettingsProvider settings,

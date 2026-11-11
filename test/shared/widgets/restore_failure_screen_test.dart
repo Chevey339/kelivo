@@ -59,8 +59,9 @@ Future<void> settleDiagnostics(WidgetTester tester) async {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 50));
   }
+  await tester.pumpAndSettle();
   expect(
     loading(),
     isFalse,
@@ -193,14 +194,19 @@ void main() {
         find.text(l10n.backupRestoreDirectoryBlockedTitle),
         findsOneWidget,
       );
+      expect(find.text(r'C:\app\workspaces'), findsNothing);
+      await tester.tap(find.text('Show technical details'));
+      await tester.pumpAndSettle();
       expect(find.text(r'C:\app\workspaces'), findsOneWidget);
       expect(find.text(l10n.backupRestoreFailureRestartButton), findsNothing);
       expect(find.text(l10n.startupRecoverySnapshotTitle), findsNothing);
       expect(find.text(l10n.startupRecoverySectionDataTitle), findsNothing);
+      await tester.ensureVisible(find.text(l10n.backupRestoreContinueButton));
       await tester.tap(find.text(l10n.backupRestoreContinueButton));
       await tester.pump();
       expect(retries, 1);
       expect(restarts, 0);
+      await tester.ensureVisible(find.text(l10n.backupRestoreContinueButton));
       await tester.tap(find.text(l10n.backupRestoreContinueButton));
       expect(retries, 1);
       await tester.pumpWidget(const SizedBox());
@@ -226,14 +232,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Restore requires attention'), findsOneWidget);
-    expect(find.textContaining('chat data was not opened'), findsOneWidget);
+    expect(find.text('Let’s recover your chats'), findsOneWidget);
+    expect(find.textContaining('paused loading your data'), findsOneWidget);
     expect(find.text('Restart Kelivo'), findsOneWidget);
 
-    // The failure itself is on screen, not just a type name.
+    // The first screen guides recovery; diagnostics remain accessible.
     expect(
       find.textContaining('StateError: restore_startup_receipt'),
-      findsOneWidget,
+      findsNothing,
+    );
+    await tester.tap(find.text('Show technical details'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('StateError: restore_startup_receipt'),
+      findsWidgets,
     );
     expect(find.text('restore_startup_receipt'), findsOneWidget);
     expect(find.text('Restore gate'), findsOneWidget);
@@ -285,7 +297,7 @@ void main() {
     expect(find.textContaining('another app process'), findsOneWidget);
     expect(find.text('Restart Kelivo'), findsOneWidget);
     // A lease conflict is not a data problem, so no file-level actions.
-    expect(find.text('Danger zone'), findsNothing);
+    expect(find.text('Other options'), findsNothing);
   });
 
   group('with a data directory', () {
@@ -352,13 +364,13 @@ void main() {
           ),
         );
         await settleDiagnostics(tester);
-        expect(find.text('Previous data detected'), findsOneWidget);
+        expect(find.text('Let’s recover your chats'), findsOneWidget);
         expect(
           find.textContaining('has not created an empty database'),
           findsOneWidget,
         );
         expect(find.textContaining('Found 1 validated copies'), findsOneWidget);
-        expect(find.text('Choose a snapshot'), findsOneWidget);
+        expect(find.text('Choose a copy to recover'), findsOneWidget);
         expect(
           await tester.runAsync(
             () => Directory('${directory.path}/snapshots').exists(),
@@ -389,7 +401,7 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(find.text('Choose a snapshot'), findsNothing);
+        expect(find.text('Choose a copy to recover'), findsNothing);
         expect(
           await tester.runAsync(
             () => File(
@@ -426,8 +438,12 @@ void main() {
           ),
         );
         await settleDiagnostics(tester);
-        expect(find.text('Current chat history is empty'), findsOneWidget);
-        final action = find.text('Keep current data and continue');
+        expect(find.text('Let’s recover your chats'), findsOneWidget);
+        expect(find.text('Continue with an empty chat list'), findsNothing);
+        await tester.ensureVisible(find.text('Other options'));
+        await tester.tap(find.text('Other options'));
+        await tester.pumpAndSettle();
+        final action = find.text('Continue with an empty chat list');
         await tester.ensureVisible(action);
         await tester.tap(action);
         await tester.pumpAndSettle();
@@ -444,7 +460,13 @@ void main() {
         expect(restarts, 0);
         await tester.tap(action);
         await tester.pumpAndSettle();
-        await tester.tap(action.last);
+        final confirm = find
+            .widgetWithText(TextButton, 'Continue with an empty chat list')
+            .last;
+        expect(tester.widget<TextButton>(confirm).onPressed, isNull);
+        await tester.tap(find.byType(Checkbox));
+        await tester.pumpAndSettle();
+        await tester.tap(confirm);
         for (var n = 0; n < 100 && restarts == 0; n++) {
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 20)),
@@ -498,7 +520,7 @@ void main() {
           ),
         );
         await settleDiagnostics(tester);
-        final button = find.text('Choose a snapshot');
+        final button = find.text('Choose a copy to recover');
         expect(tester.getRect(button).bottom, lessThan(844));
         expect(tester.takeException(), isNull);
         Future<void> capture(String stage) async {
@@ -527,7 +549,7 @@ void main() {
         await capture('page');
         await tester.tap(button);
         await tester.pumpAndSettle();
-        expect(find.text('2 chats · 42 messages'), findsOneWidget);
+        expect(find.text('2 chats · 42 messages'), findsWidgets);
         expect(
           tester.getRect(find.byType(AlertDialog)).right,
           lessThanOrEqualTo(390),
@@ -547,18 +569,24 @@ void main() {
         );
         await pumpScreen(tester);
         await settleDiagnostics(tester);
-        expect(find.text('Choose a snapshot'), findsOneWidget);
+        expect(find.text('Choose a copy to recover'), findsOneWidget);
         expect(
-          tester.getTopLeft(find.text('Choose a snapshot')).dy,
-          lessThan(tester.getTopLeft(find.text('What failed')).dy),
+          tester.getTopLeft(find.text('Choose a copy to recover')).dy,
+          lessThan(tester.getTopLeft(find.text('Show technical details')).dy),
         );
-        await tester.tap(find.text('Choose a snapshot'));
+        await tester.tap(find.text('Choose a copy to recover'));
         await tester.pumpAndSettle();
-        expect(find.text('2 chats · 42 messages'), findsOneWidget);
-        await tester.tap(find.text('2 chats · 42 messages'));
+        expect(find.text('2 chats · 42 messages'), findsWidgets);
+        await tester.tap(find.text('2 chats · 42 messages').last);
         await tester.pumpAndSettle();
         expect(find.text('Restore this copy?'), findsOneWidget);
-        expect(find.textContaining('2026-09-10 12:00'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.textContaining('2026-09-10 12:00'),
+          ),
+          findsOneWidget,
+        );
         expect(
           find.textContaining('Changes made after this snapshot'),
           findsOneWidget,
@@ -592,10 +620,10 @@ void main() {
         );
       });
       await pumpScreen(tester);
-      await tester.tap(find.text('Choose a snapshot'));
+      await tester.tap(find.text('Choose a copy to recover'));
       await tester.pumpAndSettle();
       expect(
-        tester.getTopLeft(find.text('2 chats · 42 messages')).dy,
+        tester.getTopLeft(find.text('2 chats · 42 messages').last).dy,
         lessThan(tester.getTopLeft(find.text('0 chats · 0 messages')).dy),
       );
       await tester.tap(find.text('Cancel'));
@@ -632,7 +660,7 @@ void main() {
         });
         final chooseButton = tester.widget<FilledButton>(
           find.ancestor(
-            of: find.text('Choose a snapshot'),
+            of: find.text('Choose a copy to recover'),
             matching: find.byWidgetPredicate(
               (widget) => widget is FilledButton,
             ),
@@ -645,7 +673,7 @@ void main() {
           restore = (chooseButton.onPressed! as Future<void> Function())();
         });
         await tester.pumpAndSettle();
-        await tester.tap(find.text('2 chats · 42 messages'));
+        await tester.tap(find.text('2 chats · 42 messages').last);
         await tester.runAsync(() => Future<void>.delayed(Duration.zero));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Restore'));
@@ -657,10 +685,10 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(
-          find.textContaining('Could not prepare the snapshot restore'),
+          find.textContaining('The restore could not be completed'),
           findsOneWidget,
         );
-        expect(find.text('Choose a snapshot'), findsOneWidget);
+        expect(find.text('Choose a copy to recover'), findsOneWidget);
         expect(restarts, 0);
         expect(
           Directory('${directory.path}/.kelivo_restore').existsSync(),
@@ -678,7 +706,7 @@ void main() {
           find.textContaining('No database snapshots were found'),
           findsOneWidget,
         );
-        expect(find.text('Choose a snapshot'), findsNothing);
+        expect(find.text('Choose a copy to recover'), findsNothing);
       },
     );
 
@@ -698,7 +726,7 @@ void main() {
         ),
       );
       await settleDiagnostics(tester);
-      expect(find.text('Choose a snapshot'), findsNothing);
+      expect(find.text('Choose a copy to recover'), findsNothing);
       expect(find.text('Restore from a database snapshot'), findsNothing);
     });
 
@@ -706,26 +734,33 @@ void main() {
       await pumpScreen(tester);
 
       expect(find.text('Export a copy of my data'), findsOneWidget);
+      expect(find.text('Check database integrity'), findsNothing);
+      expect(find.text('Repair and restart'), findsNothing);
+      await tester.tap(find.text('Show technical details'));
+      await tester.pumpAndSettle();
       expect(find.text('Check database integrity'), findsOneWidget);
       expect(find.text('Repair and restart'), findsOneWidget);
       // Reset must never be one stray tap away.
-      expect(find.text('Reset data'), findsNothing);
+      expect(find.text('Start with an empty chat list'), findsNothing);
 
-      await tester.tap(find.text('Danger zone'));
+      await tester.tap(find.text('Other options'));
       await tester.pumpAndSettle();
-      expect(find.text('Reset data'), findsOneWidget);
+      expect(find.text('Start with an empty chat list'), findsOneWidget);
     });
 
     testWidgets('keeps reset behind an explicit acknowledgement', (
       tester,
     ) async {
       await pumpScreen(tester);
-      await tester.tap(find.text('Danger zone'));
+      await tester.tap(find.text('Other options'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Reset data'));
+      await tester.tap(find.text('Start with an empty chat list'));
       await tester.pumpAndSettle();
 
-      final confirm = find.widgetWithText(TextButton, 'Reset and restart');
+      final confirm = find.widgetWithText(
+        TextButton,
+        'Keep copies and start fresh',
+      );
       expect(confirm, findsOneWidget);
       expect(tester.widget<TextButton>(confirm).onPressed, isNull);
 

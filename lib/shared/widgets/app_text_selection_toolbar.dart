@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/settings_provider.dart';
+import 'android_text_selection_toolbar.dart';
 import 'ios_text_selection_toolbar.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Platform selection menus whose desktop labels use the application font.
 class AppTextSelectionToolbar extends StatelessWidget {
@@ -14,12 +16,20 @@ class AppTextSelectionToolbar extends StatelessWidget {
     required this.buttonItems,
     required this.selectionContext,
     required this.onDismiss,
+    this.keepOpenOnSelectAll = true,
+    this.separatorsBefore = const {},
+    this.shortcuts = const {},
   });
 
   final TextSelectionToolbarAnchors anchors;
   final List<ContextMenuButtonItem> buttonItems;
   final BuildContext selectionContext;
   final VoidCallback onDismiss;
+
+  /// Whether Android retains the current menu and callbacks for Select All.
+  final bool keepOpenOnSelectAll;
+  final Set<ContextMenuButtonItem> separatorsBefore;
+  final Map<ContextMenuButtonItem, String> shortcuts;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +45,15 @@ class AppTextSelectionToolbar extends StatelessWidget {
         buttonItems: buttonItems,
         selectionContext: selectionContext,
         onDismiss: onDismiss,
+      );
+    }
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidTextSelectionToolbar(
+        anchors: anchors,
+        buttonItems: buttonItems,
+        selectionContext: selectionContext,
+        onDismiss: onDismiss,
+        keepOpenOnSelectAll: keepOpenOnSelectAll,
       );
     }
     if (platform != TargetPlatform.macOS &&
@@ -55,20 +74,34 @@ class AppTextSelectionToolbar extends StatelessWidget {
       fontFamilyFallback: appStyle?.fontFamilyFallback,
       fontSize: 14,
       letterSpacing: -0.15,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeights.regular,
     );
     return AdaptiveTextSelectionToolbar(
       anchors: anchors,
       children: [
-        for (final item in buttonItems)
+        for (final item in buttonItems) ...[
+          if (separatorsBefore.contains(item))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Container(
+                height: 1,
+                color: platform == TargetPlatform.macOS
+                    ? CupertinoColors.separator.resolveFrom(context)
+                    : theme.dividerColor,
+              ),
+            ),
           if (platform == TargetPlatform.macOS)
-            _MacSelectionButton(item: item, style: style)
+            _MacSelectionButton(
+              item: item,
+              style: style,
+              shortcut: shortcuts[item],
+            )
           else
             DesktopTextSelectionToolbarButton(
               onPressed: item.onPressed,
-              child: Text(
-                AdaptiveTextSelectionToolbar.getButtonLabel(context, item),
-                overflow: TextOverflow.ellipsis,
+              child: _SelectionButtonLabel(
+                item: item,
+                shortcut: shortcuts[item],
                 style: style.copyWith(
                   color: theme.brightness == Brightness.dark
                       ? Colors.white
@@ -76,16 +109,22 @@ class AppTextSelectionToolbar extends StatelessWidget {
                 ),
               ),
             ),
+        ],
       ],
     );
   }
 }
 
 class _MacSelectionButton extends StatefulWidget {
-  const _MacSelectionButton({required this.item, required this.style});
+  const _MacSelectionButton({
+    required this.item,
+    required this.style,
+    this.shortcut,
+  });
 
   final ContextMenuButtonItem item;
   final TextStyle style;
+  final String? shortcut;
 
   @override
   State<_MacSelectionButton> createState() => _MacSelectionButtonState();
@@ -101,9 +140,9 @@ class _MacSelectionButtonState extends State<_MacSelectionButton> {
       onExit: (_) => setState(() => _hovered = false),
       child: CupertinoDesktopTextSelectionToolbarButton(
         onPressed: widget.item.onPressed,
-        child: Text(
-          AdaptiveTextSelectionToolbar.getButtonLabel(context, widget.item),
-          overflow: TextOverflow.ellipsis,
+        child: _SelectionButtonLabel(
+          item: widget.item,
+          shortcut: widget.shortcut,
           style: widget.style.copyWith(
             color: _hovered
                 ? CupertinoTheme.of(context).primaryContrastingColor
@@ -117,6 +156,34 @@ class _MacSelectionButtonState extends State<_MacSelectionButton> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SelectionButtonLabel extends StatelessWidget {
+  const _SelectionButtonLabel({
+    required this.item,
+    required this.style,
+    this.shortcut,
+  });
+  final ContextMenuButtonItem item;
+  final TextStyle style;
+  final String? shortcut;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Text(
+      AdaptiveTextSelectionToolbar.getButtonLabel(context, item),
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    );
+    if (shortcut == null) return label;
+    return Row(
+      children: [
+        Expanded(child: label),
+        const SizedBox(width: 12),
+        Text(shortcut!, style: style.copyWith(fontSize: 12)),
+      ],
     );
   }
 }

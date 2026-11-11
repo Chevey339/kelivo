@@ -68,65 +68,73 @@ RoHelper::RoHelper(RO_INIT_TYPE init_type)
   mFpWindowsCompareStringOrdinal = &::WindowsCompareStringOrdinal;
   mFpCreateDispatcherQueueController = &::CreateDispatcherQueueController;
   mWinRtAvailable = true;
+  mInitializationResult = S_OK;
 #else
 
   mComBaseModule = LoadLibraryA("ComBase.dll");
 
   if (mComBaseModule == nullptr) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
   if (!AssignProcAddress(mComBaseModule, "WindowsCreateStringReference",
                          mFpWindowsCreateStringReference)) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
   if (!AssignProcAddress(mComBaseModule, "RoGetActivationFactory",
                          mFpGetActivationFactory)) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
   if (!AssignProcAddress(mComBaseModule, "WindowsCompareStringOrdinal",
                          mFpWindowsCompareStringOrdinal)) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
   if (!AssignProcAddress(mComBaseModule, "WindowsDeleteString",
                          mFpWindowsDeleteString)) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
   if (!AssignProcAddress(mComBaseModule, "RoInitialize", mFpRoInitialize)) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
   if (!AssignProcAddress(mComBaseModule, "RoUninitialize", mFpRoUninitialize)) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
   mCoreMessagingModule = LoadLibraryA("coremessaging.dll");
 
   if (mCoreMessagingModule == nullptr) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
   if (!AssignProcAddress(mCoreMessagingModule,
                          "CreateDispatcherQueueController",
                          mFpCreateDispatcherQueueController)) {
+    mInitializationResult = HRESULT_FROM_WIN32(GetLastError());
     return;
   }
 
-  auto result = RoInitialize(init_type);
-
-  if (SUCCEEDED(result) || result == S_FALSE || result == RPC_E_CHANGED_MODE) {
-    mWinRtAvailable = true;
-  }
+  mInitializationResult = RoInitialize(init_type);
+  mNeedsUninitialize = SUCCEEDED(mInitializationResult);
+  mWinRtAvailable = mNeedsUninitialize;
 #endif
 }
 
 RoHelper::~RoHelper() {
 #ifndef WINUWP
-  if (mWinRtAvailable) {
+  if (mNeedsUninitialize) {
     RoUninitialize();
   }
 

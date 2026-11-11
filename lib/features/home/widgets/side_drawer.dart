@@ -48,6 +48,7 @@ import '../../assistant/widgets/assistant_select_sheet.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
 import 'dart:async';
+import '../../chat/widgets/context_compression_status.dart';
 import '../../../features/search/services/global_session_search_service.dart';
 import '../controllers/chat_actions.dart';
 import '../utils/model_display_helper.dart';
@@ -56,6 +57,7 @@ import 'assistant_entry_actions.dart';
 import 'sidebar_selection_bars.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/animations/status_animation.dart';
 
 class SideDrawer extends StatefulWidget {
   const SideDrawer({
@@ -101,7 +103,11 @@ class SideDrawer extends StatefulWidget {
   final ValueChanged<String>? onGlobalSearchQueryChanged;
   final VoidCallback? onEnterGlobalSearch;
   final VoidCallback? onExitGlobalSearch;
-  final Future<void> Function(String conversationId, String messageId)?
+  final Future<void> Function(
+    String conversationId,
+    String messageId,
+    String? surfaceKey,
+  )?
   onOpenGlobalSearchResult;
 
   /// Number of times the conversation-list area has (re)built. The sidebar
@@ -641,7 +647,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         return AlertDialog(
           title: Text(l10n.sideDrawerMenuDelete),
           content: Text(
-            '${l10n.sideDrawerMenuDelete} "${chat.title}"?\n\n${l10n.composerDraftDeleteNotice}',
+            '${l10n.sideDrawerDeleteConfirmContent(chat.title)}\n\n${l10n.composerDraftDeleteNotice}',
           ),
           actions: [
             TextButton(
@@ -1312,6 +1318,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       await widget.onOpenGlobalSearchResult?.call(
                         result.conversationId,
                         result.firstMatchedMessageId,
+                        result.matchedSurfaceKey,
                       );
                     },
                     child: AnimatedContainer(
@@ -2977,6 +2984,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           );
 
     if (widget.embedded) {
+      if (_isDesktop) {
+        return Material(
+          type: MaterialType.transparency,
+          child: SizedBox(width: widget.embeddedWidth ?? 300, child: inner),
+        );
+      }
       return ClipRect(
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
@@ -4360,6 +4373,14 @@ class _ChatTileState extends State<_ChatTile> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final compression = context.select<ChatService, ContextTaskIndicator?>(
+      (service) => contextTaskIndicator(
+        service.contextCompression.taskFor(widget.chat.id),
+        inputPaused:
+            service.contextCompression.isInputPaused?.call(widget.chat.id) ??
+            false,
+      ),
+    );
     // Per-tile current-conversation subscription (cache plan measure 16):
     // switching the open chat rebuilds only the affected tiles, not the list.
     final isCurrent = context.select<ChatService, bool>(
@@ -4483,6 +4504,10 @@ class _ChatTileState extends State<_ChatTile> {
                         ),
                       ),
                     ],
+                    if (compression != null) ...[
+                      const SizedBox(width: 6),
+                      ContextTaskStatusIcon(status: compression),
+                    ],
                     ToolPermissionBadge(conversationId: widget.chat.id),
                     if (widget.loading) ...[
                       const SizedBox(width: 8),
@@ -4499,41 +4524,31 @@ class _ChatTileState extends State<_ChatTile> {
   }
 }
 
-class _LoadingDot extends StatefulWidget {
-  @override
-  State<_LoadingDot> createState() => _LoadingDotState();
-}
-
-class _LoadingDotState extends State<_LoadingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
+class _LoadingDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return FadeTransition(
-      opacity: _anim,
-      child: Container(
-        width: 9,
-        height: 9,
-        decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+    return RepaintBoundary(
+      child: StatusAnimation(
+        duration: const Duration(milliseconds: 1800),
+        initialValue: 0.5,
+        builder: (context, progress) => AnimatedBuilder(
+          animation: progress,
+          builder: (context, _) => Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(
+                alpha:
+                    cs.primary.a *
+                    Curves.easeInOut.transform(
+                      1 - (progress.value * 2 - 1).abs(),
+                    ),
+              ),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -4638,6 +4653,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
             final double pad = 4;
             final double segW = (constraints.maxWidth - pad * 2) / 2;
             return Container(
+              key: const ValueKey('desktopSidebarTabsSurface'),
               decoration: BoxDecoration(
                 color: context.appColors.surfaceFill,
                 borderRadius: BorderRadius.circular(16),

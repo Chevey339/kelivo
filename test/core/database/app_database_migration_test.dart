@@ -30,7 +30,7 @@ void main() {
   test(
     'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      const unpublished = <int>[4, 5, 6, 7, 8, 9, 10, 11, 42];
+      const unpublished = <int>[4, 6, 7, 8, 9, 10, 11, 42];
       for (final schemaVersion in unpublished) {
         expect(
           AppDatabase.publishedSchemaVersions,
@@ -49,6 +49,7 @@ void main() {
         database.execute('CREATE TABLE intermediate_only (value TEXT);');
         database.userVersion = schemaVersion;
         database.close();
+        final originalBytes = await file.readAsBytes();
 
         await expectLater(
           DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
@@ -56,11 +57,14 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              'database_schema_too_new',
+              schemaVersion > AppDatabase.currentSchemaVersion
+                  ? 'database_schema_too_new'
+                  : 'database_schema_version',
             ),
           ),
         );
 
+        expect(await file.readAsBytes(), originalBytes);
         final after = sqlite.sqlite3.open(
           file.path,
           mode: sqlite.OpenMode.readOnly,

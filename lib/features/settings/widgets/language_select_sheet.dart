@@ -81,14 +81,25 @@ const List<LanguageOption> supportedLanguages = [
     flag: '🇪🇸',
   ),
   // LanguageOption(code: 'pt', displayName: 'Portuguese', displayNameZh: 'Português', flag: '🇵🇹'),
-  // LanguageOption(code: 'ru', displayName: 'Russian', displayNameZh: 'Русский', flag: '🇷🇺'),
+  LanguageOption(
+    code: 'ru',
+    displayName: 'Russian',
+    displayNameZh: 'Русский',
+    flag: '🇷🇺',
+  ),
+  LanguageOption(
+    code: 'tr',
+    displayName: 'Turkish',
+    displayNameZh: 'Türkçe',
+    flag: '🇹🇷',
+  ),
   // LanguageOption(code: 'ar', displayName: 'Arabic', displayNameZh: 'العربية', flag: '🇸🇦'),
   // LanguageOption(code: 'hi', displayName: 'Hindi', displayNameZh: 'हिन्दी', flag: '🇮🇳'),
   // LanguageOption(code: 'th', displayName: 'Thai', displayNameZh: 'ไทย', flag: '🇹🇭'),
   // LanguageOption(code: 'vi', displayName: 'Vietnamese', displayNameZh: 'Tiếng Việt', flag: '🇻🇳'),
 ];
 
-String _displayNameFor(AppLocalizations l10n, String languageCode) {
+String languageDisplayName(AppLocalizations l10n, String languageCode) {
   switch (languageCode) {
     case 'zh-CN':
       return l10n.languageDisplaySimplifiedChinese;
@@ -100,6 +111,10 @@ String _displayNameFor(AppLocalizations l10n, String languageCode) {
       return l10n.languageDisplayJapanese;
     case 'ko':
       return l10n.languageDisplayKorean;
+    case 'ru':
+      return l10n.languageDisplayRussian;
+    case 'tr':
+      return l10n.languageDisplayTurkish;
     case 'fr':
       return l10n.languageDisplayFrench;
     case 'de':
@@ -137,7 +152,7 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
     ...supportedLanguages.map(
       (lang) => DesktopContextMenuItem(
         icon: null,
-        label: '${lang.flag} ${_displayNameFor(l10n, lang.code)}',
+        label: '${lang.flag} ${languageDisplayName(l10n, lang.code)}',
         onTap: () => selected = lang,
       ),
     ),
@@ -303,27 +318,6 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
   }
 
   String _getLanguageDisplayName(AppLocalizations l10n, String languageCode) {
-    switch (languageCode) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return languageCode;
-    }
+    return languageDisplayName(l10n, languageCode);
   }
 }

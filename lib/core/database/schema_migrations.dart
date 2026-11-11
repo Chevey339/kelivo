@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -39,8 +40,8 @@ typedef DatabaseUpgradeOutcome = ({
 ///    - `dart run drift_dev schema steps drift_schemas/app_database/ lib/core/database/schema_versions.dart`
 ///    Already-published `drift_schema_vN.json` files are frozen: never re-dump
 ///    one in place, or the migration it anchors stops describing what shipped.
-/// 4. Add the `fromNToN+1` callback to the `stepByStep` call in
-///    `AppDatabase.migration`.
+/// 4. Add the callback between adjacent published snapshot versions to the
+///    `stepByStep` call in `AppDatabase.migration`.
 /// 5. Append the new column names to the matching list in
 ///    `ChatDatabaseRepository._validateRawSchema`.
 ///
@@ -143,6 +144,29 @@ final class SchemaMigrations {
   /// Whether a file at [version] can and must be upgraded before use.
   static bool needsUpgrade(int version) =>
       isPublished(version) && version < AppDatabase.currentSchemaVersion;
+
+  /// Space for the retained pre-upgrade copy and the migration's journal.
+  /// Read the file header rather than opening the source with SQLite: even a
+  /// read-only SQLite connection may create/update shared-memory sidecars.
+  /// An older/unknown header is conservative when the newest page is in WAL.
+  static Future<int> additionalUpgradeBytes(File file) async {
+    if (!await file.exists()) return 0;
+    final input = await file.open();
+    try {
+      final header = await input.read(100);
+      if (header.length == 100 &&
+          String.fromCharCodes(header.take(16)) == 'SQLite format 3\u0000') {
+        final version = ByteData.sublistView(header).getUint32(60);
+        if (version >= AppDatabase.currentSchemaVersion) return 0;
+      }
+    } finally {
+      await input.close();
+    }
+    var bytes = await file.length();
+    final wal = File('${file.path}-wal');
+    if (await wal.exists()) bytes += await wal.length();
+    return bytes * 2;
+  }
 
   /// Reads `PRAGMA user_version` without otherwise touching [file].
   static int readSchemaVersion(File file) {

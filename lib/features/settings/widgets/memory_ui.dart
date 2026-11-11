@@ -814,6 +814,85 @@ Future<T?> showMemoryOptionPicker<T>(
     );
   }
 
+  return _showMemoryPicker<T>(
+    context,
+    title: title,
+    contentBuilder: optionsCard,
+  );
+}
+
+/// Multi-select uses the same presentation as the single-option picker.
+/// Changes stay local until the user confirms, including an empty selection.
+Future<Set<T>?> showMemoryMultiOptionPicker<T>(
+  BuildContext context, {
+  required String title,
+  required String description,
+  required List<MemoryPickerOption<T>> options,
+  required Set<T> selected,
+}) {
+  final values = selected.toSet();
+  return _showMemoryPicker<Set<T>>(
+    context,
+    title: title,
+    contentBuilder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) {
+        final cs = Theme.of(ctx).colorScheme;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: 16),
+            MemorySectionCard(
+              children: [
+                for (var i = 0; i < options.length; i++) ...[
+                  _MemoryOptionRow<T>(
+                    label: options[i].label,
+                    subtitle: options[i].subtitle,
+                    selected: values.contains(options[i].value),
+                    multiSelect: true,
+                    onTap: () => setState(() {
+                      if (!values.remove(options[i].value)) {
+                        values.add(options[i].value);
+                      }
+                    }),
+                  ),
+                  if (i != options.length - 1)
+                    Divider(
+                      height: 1,
+                      thickness: 0.6,
+                      indent: 14,
+                      endIndent: 14,
+                      color: cs.outlineVariant.withValues(alpha: 0.18),
+                    ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            MemorySheetActions(
+              onCancel: () => Navigator.of(ctx).pop(),
+              onConfirm: () => Navigator.of(ctx).pop(values),
+              confirmLabel: AppLocalizations.of(ctx)!.userProfileSave,
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+Future<T?> _showMemoryPicker<T>(
+  BuildContext context, {
+  required String title,
+  required WidgetBuilder contentBuilder,
+}) {
   if (PlatformUtils.isDesktopTarget) {
     return showDialog<T>(
       context: context,
@@ -874,7 +953,7 @@ Future<T?> showMemoryOptionPicker<T>(
                   constraints: BoxConstraints(maxHeight: maxHeight - 56),
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                    child: optionsCard(ctx),
+                    child: contentBuilder(ctx),
                   ),
                 ),
               ],
@@ -925,7 +1004,9 @@ Future<T?> showMemoryOptionPicker<T>(
                   ),
                 ),
                 const SizedBox(height: 12),
-                Flexible(child: SingleChildScrollView(child: optionsCard(ctx))),
+                Flexible(
+                  child: SingleChildScrollView(child: contentBuilder(ctx)),
+                ),
               ],
             ),
           ),
@@ -941,11 +1022,13 @@ class _MemoryOptionRow<T> extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.subtitle,
+    this.multiSelect = false,
   });
 
   final String label;
   final String? subtitle;
   final bool selected;
+  final bool multiSelect;
   final VoidCallback onTap;
 
   @override
@@ -996,7 +1079,14 @@ class _MemoryOptionRow<T> extends StatelessWidget {
                       ),
                     ),
             ),
-            if (selected) Icon(Lucide.Check, size: 18, color: cs.primary),
+            if (multiSelect)
+              IosCheckbox(
+                value: selected,
+                semanticLabel: label,
+                onChanged: (_) => onTap(),
+              )
+            else if (selected)
+              Icon(Lucide.Check, size: 18, color: cs.primary),
           ],
         ),
       ),

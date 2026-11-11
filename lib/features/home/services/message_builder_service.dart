@@ -1,3 +1,8 @@
+import '../../../core/models/native_compaction.dart';
+import '../../../core/services/api/request_image_context.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../intelligent_ui/host/ui_user_context_parts.dart';
+import '../../intelligent_ui/models/ui_context_attachment.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
@@ -10,6 +15,7 @@ import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/context_operation.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/world_book.dart';
@@ -40,7 +46,7 @@ import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/providers/claude/claude_container.dart';
 import '../../../core/services/api/providers/claude/claude_history.dart';
 import '../../../core/services/api/providers/claude/claude_thinking_recovery.dart';
-import '../../../core/services/api/providers/google/gemini_thought_signature.dart';
+import '../../../core/services/api/providers/google_gemini.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
@@ -48,6 +54,35 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import 'ocr_service.dart';
 import 'assistant_tool_history.dart';
 import '../../../core/services/api/providers/openai/responses_history.dart';
+
+void _removeGoogleToolSignatures(Map<String, dynamic> message) {
+  void removeFromMetadata(Map<String, dynamic> target) {
+    final metadata = target['metadata'];
+    if (metadata is! Map) return;
+    final google = metadata['google'];
+    if (google is! Map) return;
+    final part = google['part'];
+    if (part is! Map) return;
+    // Copy only the changed maps so replay never alters persisted tool data.
+    target['metadata'] = {
+      ...metadata,
+      'google': {
+        ...google,
+        'part': Map<String, dynamic>.from(part)
+          ..remove('thoughtSignature')
+          ..remove('thought_signature'),
+      },
+    };
+  }
+
+  removeFromMetadata(message);
+  final calls = message['tool_calls'];
+  if (calls is List) {
+    for (final call in calls.cast<Map<String, dynamic>>()) {
+      removeFromMetadata(call);
+    }
+  }
+}
 
 /// Result of §7.6 memory-prefix resolution.
 ///
@@ -145,6 +180,12 @@ class MessageBuilderService {
   /// Build context (used for accessing providers via context.read)
   final BuildContext contextProvider;
 
+  String _quotedContent(ChatMessage message) => message.quotes.isEmpty
+      ? message.content
+      : message.quotedContent(
+          AppLocalizations.of(contextProvider)!.selectionQuoteMarker,
+        );
+
   /// OCR handler for processing images (optional, injected from home_page)
   final Future<String?> Function(
     List<String> imagePaths, {
@@ -199,18 +240,22 @@ class MessageBuilderService {
         ? <ChatMessage>[]
         : await chatService.loadSelectedContextMessages(
             conversation.id,
-            truncateIndex: conversation.truncateIndex,
             limit: limit,
           );
     if (history.any((m) => m.isStreaming)) throw StateError('in_flight');
     final messages = <Map<String, dynamic>>[];
-    var remaining = 32000;
-    for (final message in history.reversed) {
+    final summaries = history.where(ContextOperation.isSummary).toList();
+    var remaining =
+        (32000 - summaries.fold<int>(0, (sum, m) => sum + m.content.length))
+            .clamp(0, 32000);
+    for (final message in history.reversed.where(
+      (m) => !ContextOperation.isSummary(m),
+    )) {
       if (message.role != 'user' && message.role != 'assistant') continue;
       if (remaining <= 0) break;
       final raw = message.role == 'assistant'
           ? ThinkingTagParser.parseWithRanges(message.content).visibleContent
-          : message.content;
+          : _quotedContent(message);
       if (raw.trim().isEmpty) continue;
       final text = truncateHeadTailUtf16Safe(
         raw,
@@ -220,6 +265,10 @@ class MessageBuilderService {
       remaining -= text.length;
       messages.insert(0, {'role': message.role, 'content': text});
     }
+    messages.insertAll(0, [
+      for (final summary in summaries)
+        {'role': 'user', 'content': summary.content},
+    ]);
     if (conversation == null) {
       for (final message in assistant.presetMessages) {
         messages.add({'role': message.role, 'content': message.content});
@@ -241,6 +290,9 @@ class MessageBuilderService {
     );
     if (conversation?.summary?.trim().isNotEmpty == true &&
         conversation!.truncateIndex < 0 &&
+        chatService
+            .contextOperationsFor(conversation.id)
+            .every((op) => op.revoked) &&
         conversation.lastSummarizedMessageCount ==
             await chatService.resolveMessageCount(conversation.id)) {
       _appendToSystemMessage(
@@ -323,10 +375,11 @@ class MessageBuilderService {
 
   /// Build API messages list from current conversation state.
   ///
-  /// Applies truncation and version collapsing. Attachments come from parts.
-  /// [preserveToolTurns] keeps OpenAI-compatible tool rounds ordered.
+  /// Receives projected history and collapses versions. Attachments come from parts.
+  /// [preserveToolTurns] replays each persisted tool round as its own turn.
   /// [responsesScope] selects native Responses replay for matching artifacts.
   /// [claudeSource] keeps ordinary Claude blocks on their original model.
+  /// [googleProviderId] limits Gemini signatures to their original provider.
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -335,22 +388,50 @@ class MessageBuilderService {
     bool preserveToolTurns = false,
     ResponsesReplayScope? responsesScope,
     ({String providerId, String modelId})? claudeSource,
+    String? googleProviderId,
   }) {
-    final tIndex = currentConversation?.truncateIndex ?? -1;
-    final List<ChatMessage> sourceAll =
-        (tIndex >= 0 && tIndex <= messages.length)
-        ? messages.sublist(tIndex)
-        : List.of(messages);
-    final List<ChatMessage> source = collapseVersions(
-      sourceAll,
-      versionSelections,
-    );
+    final source = collapseVersions(messages, versionSelections);
 
     final out = <Map<String, dynamic>>[];
 
+    void identify(Map<String, dynamic> message, String id) {
+      message[imageContextOwnerKey] = id;
+      if (message['role'] == 'tool') {
+        message['metadata'] = <String, dynamic>{
+          ...?(message['metadata'] as Map?)?.cast<String, dynamic>(),
+          imageContextOwnerKey: id,
+          '_kelivo_image_call': message['tool_call_id'],
+        };
+      }
+    }
+
     final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
-      if (includeToolMessages && !preserveToolTurns && m.role == 'assistant') {
+      final native = NativeCompactionPayload.forMessage(m);
+      if (native != null) {
+        out.add({
+          'role': 'user',
+          'content': '',
+          '_contextSummary': true,
+          imageContextOwnerKey: m.id,
+          nativeCompactionMessageKey: native.toJson(),
+        });
+        continue;
+      }
+      final messageStart = out.length;
+      final matchesClaudeSource =
+          claudeSource != null &&
+          m.providerId == claudeSource.providerId &&
+          m.modelId == claudeSource.modelId;
+      final omitClaudeSignatures = claudeSource != null && !matchesClaudeSource;
+      final omitGoogleSignatures =
+          m.role == 'assistant' &&
+          googleProviderId != null &&
+          m.providerId != googleProviderId;
+      if (includeToolMessages &&
+          !preserveToolTurns &&
+          m.role == 'assistant' &&
+          !omitClaudeSignatures) {
         thinkingRecovery.readArtifact(
           _providerArtifact(m, claudeThinkingRecoveryArtifactKind),
         );
@@ -366,6 +447,7 @@ class MessageBuilderService {
         );
         if (history != null) {
           for (final message in history) {
+            identify(message, m.id);
             ContextSegmentTags.replaceWithSingle(
               message,
               source: message['role'] == 'tool'
@@ -380,7 +462,7 @@ class MessageBuilderService {
           continue;
         }
       }
-      var content = m.content;
+      var content = _quotedContent(m);
       var hasClaudeToolTurn = false;
       // Signed native blocks belong to the provider/model that produced them.
       // Tool turns carry their artifact on the tool-call message below.
@@ -388,9 +470,7 @@ class MessageBuilderService {
           includeToolMessages &&
               !preserveToolTurns &&
               m.role == 'assistant' &&
-              claudeSource != null &&
-              m.providerId == claudeSource.providerId &&
-              m.modelId == claudeSource.modelId &&
+              matchesClaudeSource &&
               chatService.getToolEventsForMessage(m).isEmpty
           ? _providerArtifact(m, claudeTurnArtifactKind)
           : null;
@@ -403,6 +483,7 @@ class MessageBuilderService {
       if (includeToolMessages && m.role == 'assistant' && preserveToolTurns) {
         final history = buildAssistantToolHistory(m.parts);
         for (final message in history.messages) {
+          identify(message, m.id);
           ContextSegmentTags.replaceWithSingle(
             message,
             source: message['role'] == 'tool'
@@ -434,6 +515,10 @@ class MessageBuilderService {
 
             for (int i = 0; i < events.length; i++) {
               final e = events[i];
+              final metadata = e['metadata'] is Map
+                  ? Map<String, dynamic>.from(e['metadata'] as Map)
+                  : null;
+              if (omitClaudeSignatures) metadata?.remove('anthropic');
               final name = (e['name'] ?? '').toString().trim();
               if (name.isEmpty) continue;
               final rawId = (e['id'] ?? '').toString().trim();
@@ -455,10 +540,9 @@ class MessageBuilderService {
                 'id': id,
                 'type': 'function',
                 'function': {'name': name, 'arguments': argumentsJson},
-                if (e['metadata'] is Map || e['server'] == true)
+                if (metadata != null || e['server'] == true)
                   'metadata': {
-                    if (e['metadata'] is Map)
-                      ...(e['metadata'] as Map).cast<String, dynamic>(),
+                    ...?metadata,
                     if (e['server'] == true) 'server': true,
                   },
               });
@@ -469,8 +553,7 @@ class MessageBuilderService {
                 'name': name,
                 'tool_call_id': id,
                 'content': toolResultContentForModel(c?.toString()),
-                if (e['metadata'] is Map)
-                  'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
+                if (metadata != null) 'metadata': metadata,
               });
             }
 
@@ -480,17 +563,18 @@ class MessageBuilderService {
                 'content': '\n\n',
                 'tool_calls': calls,
               };
-              final turn = _providerArtifact(m, claudeTurnArtifactKind);
+              final turn = omitClaudeSignatures
+                  ? null
+                  : _providerArtifact(m, claudeTurnArtifactKind);
               if (turn != null && turn.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeTurnKey] = turn;
                 hasClaudeToolTurn = claudeSource != null;
               }
               // Also here: a turn that ran code and then said nothing has no
               // final message below to carry the container.
-              final container = _providerArtifact(
-                m,
-                claudeContainerArtifactKind,
-              );
+              final container = omitClaudeSignatures
+                  ? null
+                  : _providerArtifact(m, claudeContainerArtifactKind);
               if (container != null && container.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeContainerKey] =
                     container;
@@ -518,10 +602,21 @@ class MessageBuilderService {
                   length: (toolMessage['content'] ?? '').toString().length,
                 );
               }
+              identify(assistantToolMessage, m.id);
               out.add(assistantToolMessage);
+              for (final toolMessage in toolMessages) {
+                identify(toolMessage, m.id);
+              }
               out.addAll(toolMessages);
             }
           }
+        }
+      }
+
+      if (omitGoogleSignatures) {
+        content = extractGeminiThoughtMeta(content).cleanedText;
+        for (final message in out.skip(messageStart)) {
+          _removeGoogleToolSignatures(message);
         }
       }
 
@@ -542,12 +637,22 @@ class MessageBuilderService {
       final role = m.role == 'assistant' ? 'assistant' : 'user';
       final message = <String, dynamic>{'role': role, 'content': content};
       if (role == 'user') {
-        message[internalRevisionIdKey] = m.id;
+        if (ContextOperation.isSummary(m)) {
+          message['_contextSummary'] = true;
+        } else {
+          message[internalRevisionIdKey] = m.id;
+        }
+        final frozenUi = UiUserContextParts.read(m.parts).context;
+        if (frozenUi != null) {
+          message[multimodalInternalLiteralTextKey] = frozenUi.exactText;
+        }
       } else {
         if (plainClaudeTurn?.isNotEmpty == true) {
           message[multimodalInternalClaudeTurnKey] = plainClaudeTurn;
         }
-        final container = _providerArtifact(m, claudeContainerArtifactKind);
+        final container = omitClaudeSignatures
+            ? null
+            : _providerArtifact(m, claudeContainerArtifactKind);
         if (container != null && container.isNotEmpty) {
           message[multimodalInternalClaudeContainerKey] = container;
         }
@@ -555,7 +660,9 @@ class MessageBuilderService {
           m,
           geminiThoughtSignatureArtifactKind,
         );
-        if (signature != null && signature.isNotEmpty) {
+        if (!omitGoogleSignatures &&
+            signature != null &&
+            signature.isNotEmpty) {
           message[multimodalInternalGeminiThoughtSignatureKey] = signature;
         }
       }
@@ -579,6 +686,7 @@ class MessageBuilderService {
         source: ContextSource.chatHistory,
         length: content.length,
       );
+      identify(message, m.id);
       out.add(message);
     }
 
@@ -671,6 +779,7 @@ class MessageBuilderService {
   void stripInternalRevisionIds(List<Map<String, dynamic>> apiMessages) {
     for (final message in apiMessages) {
       message.remove(internalRevisionIdKey);
+      message.remove('_contextSummary');
       message.remove(kelivoContextSegmentsKey);
     }
   }
@@ -785,10 +894,13 @@ class MessageBuilderService {
     ChatMessage message, {
     bool includeMediaFilePathsAsImages = true,
   }) {
+    final contextParts = message.role == 'user'
+        ? UiUserContextParts.read(message.parts)
+        : null;
     final images = <String>[];
     final docs = <DocumentAttachment>[];
     final textParts = <String>[];
-    for (final part in message.parts) {
+    for (final part in contextParts?.body ?? message.parts) {
       if (part is TextPart) {
         textParts.add(part.text);
       } else if (part is ImagePart) {
@@ -817,8 +929,12 @@ class MessageBuilderService {
     }
     return ChatInputData(
       text: textParts.join().trim(),
+      quotes: message.quotes,
       imagePaths: images,
       documents: docs,
+      uiContext: contextParts?.context == null
+          ? null
+          : UiContextAttachment.history(contextParts!.context!),
     );
   }
 
@@ -887,6 +1003,7 @@ class MessageBuilderService {
     bool sandboxDataFiles = false,
     bool nativePdfInput = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
+    bool useWorkspaceForDocuments = true,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -920,7 +1037,10 @@ class MessageBuilderService {
           if (path.isNotEmpty) mediaPaths.add(path);
           continue;
         }
-        if (workspaceAttachments.containsKey(document.path)) continue;
+        if (useWorkspaceForDocuments &&
+            workspaceAttachments.containsKey(document.path)) {
+          continue;
+        }
         if (sandboxDataFiles &&
             isSandboxDataFile(fileName: document.fileName, mime: mime)) {
           continue;
@@ -947,6 +1067,11 @@ class MessageBuilderService {
   /// carrying one is not frozen: the frozen prompt is provider-neutral, and a
   /// later regeneration on a provider without a sandbox needs the text back.
   ///
+  /// Workspace attachment paths are added to their owning messages after
+  /// prompt freezing and memory refresh, using the current workspace mapping.
+  /// [useWorkspaceForDocuments] requires read_file or shell; paths remain
+  /// visible even when the available tools cannot read document contents.
+  ///
   /// Returns the image paths from the last user message (for API call).
   /// [previewOnly] reads frozen prompts and resolves memory without writing
   /// prompts or triggering document extraction / OCR for unfrozen attachments.
@@ -960,7 +1085,16 @@ class MessageBuilderService {
     bool nativePdfInput = false,
     bool previewOnly = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
+    bool useWorkspaceForDocuments = true,
   }) async {
+    late final quoteMarker = lookupAppLocalizations(
+      basicLocaleListResolution(
+        settings.isFollowingSystemLocale
+            ? WidgetsBinding.instance.platformDispatcher.locales
+            : [settings.appLocale],
+        AppLocalizations.supportedLocales,
+      ),
+    ).selectionQuoteMarker;
     final bool ocrActive =
         settings.ocrEnabled &&
         settings.ocrModelProvider != null &&
@@ -1139,6 +1273,7 @@ class MessageBuilderService {
     // the context log would otherwise have that text treated as an internal
     // block and stripped off their message.
     final snapshotRevisionIds = <String>{};
+    final workspaceAttachmentPrompts = <int, String>{};
 
     for (int i = 0; i < apiMessages.length; i++) {
       if (!isPersistedUserMessage(apiMessages[i])) continue;
@@ -1154,11 +1289,33 @@ class MessageBuilderService {
           ? parseInputFromMessage(chatMessageForParts)
           : parseInputFromApiMap(apiMessages[i]);
       final hasNativePdf = nativePdfRevisionIds.contains(revisionId);
-      final hasWorkspaceDocuments = parsedUser.documents.any(
-        (d) =>
-            workspaceAttachments.containsKey(d.path) &&
-            !(nativePdfInput && isPdfMime(_effectiveAttachmentMime(d))),
-      );
+      final workspaceFiles = StringBuffer();
+      final attachmentPaths = <String>{
+        for (final document in parsedUser.documents) document.path,
+        ...parsedUser.imagePaths,
+      };
+      for (final path in attachmentPaths) {
+        final local = workspaceAttachments[path];
+        if (local == null) continue;
+        workspaceFiles
+          ..writeln('Attached file: ${local.name}')
+          ..writeln('Path: ${local.modelPath} (${local.size} bytes)');
+        if (useWorkspaceForDocuments) {
+          workspaceFiles.writeln(
+            'Use workspace file tools to inspect it as needed.',
+          );
+        }
+      }
+      if (workspaceFiles.isNotEmpty) {
+        workspaceAttachmentPrompts[i] = workspaceFiles.toString().trimRight();
+      }
+      final hasWorkspaceDocuments =
+          useWorkspaceForDocuments &&
+          parsedUser.documents.any(
+            (d) =>
+                workspaceAttachments.containsKey(d.path) &&
+                !(nativePdfInput && isPdfMime(_effectiveAttachmentMime(d))),
+          );
       // A local workspace already owns these documents. Do not additionally
       // upload them to a provider's code-execution sandbox.
       if (hasWorkspaceDocuments) {
@@ -1297,7 +1454,9 @@ class MessageBuilderService {
 
       // Apply replace-only regexes at send-time on user text.
       final replacedUserText = applyAssistantRegexes(
-        parsedUser.text,
+        parsedUser.quotes.isEmpty
+            ? parsedUser.text
+            : parsedUser.quotedText(quoteMarker),
         assistant: assistant,
         scope: AssistantRegexScope.user,
         target: AssistantRegexTransformTarget.send,
@@ -1305,21 +1464,20 @@ class MessageBuilderService {
 
       // Attachments travel via internalMediaPathsKey / lastUserImagePaths —
       // never re-embed legacy attachment markers into content.
-      final cleanedUser = replacedUserText.trim();
+      final ordinaryUser = replacedUserText.trim();
+      final frozenUi = parsedUser.uiContext?.text.exactText;
+      final cleanedUser = frozenUi == null
+          ? ordinaryUser
+          : '$frozenUi\n\n$ordinaryUser';
 
       final filePrompts = StringBuffer();
       var leftToSandbox = false;
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (nativePdfInput && isPdfMime(effectiveMime)) continue;
-        final local = workspaceAttachments[d.path];
-        if (local != null) {
+        if (useWorkspaceForDocuments &&
+            workspaceAttachments.containsKey(d.path)) {
           leftToSandbox = true;
-          filePrompts.writeln('Attached file: ${d.fileName}');
-          filePrompts.writeln('Path: ${local.modelPath} (${local.size} bytes)');
-          filePrompts.writeln(
-            'Use workspace file tools to inspect it as needed.',
-          );
           continue;
         }
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
@@ -1426,6 +1584,17 @@ class MessageBuilderService {
       snapshotRevisionIds: snapshotRevisionIds
         ..addAll(injectionPass.snapshotCarriers),
     );
+
+    // Keep execution paths out of frozen prompts so rebinding a workspace can
+    // resolve them again. Only the owning message receives each descriptor;
+    // later uploads do not change the system prompt or earlier message text.
+    for (final entry in workspaceAttachmentPrompts.entries) {
+      final message = apiMessages[entry.key];
+      final body = message['content'] as String;
+      message['content'] = body.isEmpty
+          ? entry.value
+          : '$body\n\n${entry.value}';
+    }
 
     return lastUserImagePaths ?? <String>[];
   }
@@ -1613,9 +1782,8 @@ class MessageBuilderService {
       pass?.snapshotCarriers.add(message.id);
     }
 
-    final templ = (assistant?.messageTemplate ?? '{{ message }}').trim().isEmpty
-        ? '{{ message }}'
-        : (assistant!.messageTemplate);
+    final template = assistant?.messageTemplate ?? '';
+    final templ = template.trim().isEmpty ? '{{ message }}' : template;
     final templated = PromptTransformer.applyMessageTemplate(
       templ,
       role: 'user',
@@ -1762,8 +1930,7 @@ class MessageBuilderService {
       assistantId: assistant.id,
       lang: lang,
       maxItems: maxItems,
-      fullInjectionTypes:
-          resolvedSettings?.memoryFullInjectionTypes ?? const {},
+      fullInjectionTypes: assistant.memoryFullInjectionTypes,
     );
   }
 
@@ -1884,6 +2051,7 @@ class MessageBuilderService {
     Assistant? assistant,
     String modelId, {
     Conversation? conversation,
+    DateTime? promptTime,
   }) {
     final prompt = ConversationPromptSettings.fromExtras(
       conversation?.extras ?? const {},
@@ -1895,6 +2063,7 @@ class MessageBuilderService {
         modelId: modelId,
         modelName: modelId,
         userNickname: contextProvider.read<UserProvider>().name,
+        now: promptTime,
       );
       final sys = PromptTransformer.replacePlaceholders(prompt, vars);
       final sysMessage = <String, dynamic>{'role': 'system', 'content': sys};
@@ -2077,7 +2246,6 @@ class MessageBuilderService {
     Assistant? assistant, {
     String? conversationId,
     WorkspaceToolContext? workspaceContext,
-    List<AttachmentInfo> attachments = const [],
   }) async {
     try {
       final environmentProvider = contextProvider.read<EnvironmentProvider?>();
@@ -2094,7 +2262,6 @@ class MessageBuilderService {
       final environment = await environmentProvider?.loadExecutionConfig();
       final fragment = WorkspaceToolsService.buildPromptFragment(
         ctx,
-        attachments: attachments,
         environmentVariableNames: environment?.variables.keys ?? const [],
       );
       if (fragment.trim().isEmpty) return;
@@ -2133,6 +2300,7 @@ class MessageBuilderService {
       final fragment = buildAvailableSkillsFragment(
         skills,
         skillsModelRoot: skillsModelRoot,
+        selectedSkillIds: override ?? assistant?.skillIds ?? const [],
       );
       if (fragment.trim().isEmpty) return;
       _appendToSystemMessage(
@@ -2153,6 +2321,9 @@ class MessageBuilderService {
     bool persistActivation = true,
     void Function(int before, int after)? onActivationPersisted,
   }) async {
+    final compressionDefaults = contextProvider
+        .read<SettingsProvider>()
+        .compressionDefaults;
     try {
       List<WorldBook> books = const <WorldBook>[];
       try {
@@ -2193,21 +2364,59 @@ class MessageBuilderService {
       if (usesTiming &&
           conversation != null &&
           historyMessages != null &&
-          historyMessages.isNotEmpty &&
           chatService.initialized) {
-        final fullHistory = await chatService.loadSelectedContextMessages(
+        // Context summaries replace request content, not the real-message clock.
+        // Locate the last persisted source group so regeneration cannot count
+        // future turns. An unsubmitted input in a usage preview follows that
+        // prefix; a summary-only preview still represents the current history.
+        final requestHistory = historyMessages
+            .where((message) => !ContextOperation.isSummary(message))
+            .toList();
+        final selected = await chatService.loadSelectedMessageProjections(
           conversation.id,
-          truncateIndex: -1,
-          limit: await chatService.resolveMessageCount(conversation.id),
-          throughRevisionId: historyMessages.last.id,
         );
-        if (fullHistory.isNotEmpty) {
-          historyMessages = fullHistory.where(isChatMessage).toList();
-        }
+        final selectedByGroup = {
+          for (final message in selected)
+            ContextHistory.group(message): message,
+        };
+        final lastRecorded = requestHistory.lastIndexWhere(
+          (message) =>
+              selectedByGroup.containsKey(ContextHistory.group(message)),
+        );
+        final cutoff = lastRecorded < 0
+            ? null
+            : selectedByGroup[ContextHistory.group(
+                requestHistory[lastRecorded],
+              )];
+        final fullHistory = await chatService.loadRawSelectedContextMessages(
+          conversation.id,
+          limit: await chatService.resolveMessageCount(conversation.id),
+          throughRevisionId: cutoff?.id,
+        );
+        historyMessages = [
+          ...fullHistory.where(isChatMessage),
+          ...requestHistory.skip(lastRecorded + 1),
+        ];
       }
+      final scanSummary = conversation == null
+          ? true
+          : (await chatService.compressionConfig(
+              conversation.id,
+              compressionDefaults,
+            )).summaryInWorldBookScan;
       final result = WorldBookActivation.evaluate(
         books: books,
-        scanMessages: apiMessages,
+        scanMessages: scanSummary
+            ? apiMessages
+            : apiMessages
+                  .where(
+                    (message) =>
+                        !(message[imageContextOwnerKey]?.toString().startsWith(
+                              ContextOperation.summaryPrefix,
+                            ) ??
+                            false),
+                  )
+                  .toList(),
         history: historyMessages == null
             ? [
                 for (final message in apiMessages)
@@ -2222,6 +2431,9 @@ class MessageBuilderService {
                   {
                     'role': message.role,
                     'content': message.content,
+                    'quotes': [
+                      for (final quote in message.quotes) quote.toJson(),
+                    ],
                     'attachments': [
                       for (final part in message.parts)
                         if (part is ImagePart || part is FilePart)
@@ -2521,22 +2733,23 @@ class MessageBuilderService {
   ) {
     if ((assistant?.limitContextMessages ?? false) &&
         (assistant?.contextMessageSize ?? 0) > 0) {
-      final int keep = (assistant!.contextMessageSize).clamp(
+      final keep = assistant!.contextMessageSize.clamp(
         Assistant.minContextMessageSize,
         Assistant.maxContextMessageSize,
       );
-      int startIdx = 0;
-      if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
-        startIdx = 1;
-      }
-      var cut = apiMessages.length - keep;
-      if (cut <= startIdx) return;
-      // Message count is a soft bound: keep the user request and its entire
-      // assistant/tool exchange instead of starting midway through a turn.
-      while (cut > startIdx && apiMessages[cut]['role'] != 'user') {
+      final counted = apiMessages
+          .where((message) => message['_contextSummary'] != true)
+          .toList();
+      final start = counted.isNotEmpty && counted.first['role'] == 'system'
+          ? 1
+          : 0;
+      var cut = counted.length - keep;
+      if (cut <= start) return;
+      while (cut > start && counted[cut]['role'] != 'user') {
         cut--;
       }
-      apiMessages.removeRange(startIdx, cut);
+      final removed = counted.sublist(start, cut).toSet();
+      apiMessages.removeWhere(removed.contains);
     }
   }
 
@@ -2551,7 +2764,10 @@ class MessageBuilderService {
       final s = (apiMessages[i]['content'] ?? '').toString();
       if (s.isNotEmpty) {
         apiMessages[i]['content'] =
-            await MarkdownMediaSanitizer.inlineLocalImagesToBase64(s);
+            await MarkdownMediaSanitizer.inlineLocalImagesToBase64(
+              s,
+              literalText: internalLiteralText(apiMessages[i]),
+            );
       }
     }
   }

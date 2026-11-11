@@ -50,6 +50,67 @@ class _LocalOAuthClient implements HttpClient {
 }
 
 void main() {
+  test(
+    'preparation rejects a disabled model before building context',
+    () async {
+      final storage = await createBusinessTestHarness(
+        initial: {
+          'assistants_v1': jsonEncode([
+            const Assistant(id: 'a', name: 'A').toJson(),
+          ]),
+        },
+      );
+      final assistants = AssistantProvider(preferences: storage.preferences);
+      final settings = SettingsProvider(storage.preferences);
+      final chat = ChatService();
+      addTearDown(assistants.dispose);
+      addTearDown(settings.dispose);
+      addTearDown(chat.dispose);
+      await Future.wait([assistants.loaded, settings.loaded]);
+      await settings.setProviderConfig(
+        'p',
+        ProviderConfig(
+          id: 'p',
+          enabled: true,
+          name: 'P',
+          apiKey: '',
+          baseUrl: 'https://example.test',
+          models: ['hide'],
+          disabledModels: {'hide'},
+        ),
+      );
+      final executor = ScheduledTaskTextExecutor(
+        chat: chat,
+        assistants: assistants,
+        settings: settings,
+        busy: (_) => false,
+        promptConfiguration: (_) => null,
+        buildContext: (_, _, _, _) async =>
+            throw StateError('must not build context'),
+      );
+      final task = ScheduledTask(
+        id: 'task',
+        name: 'Task',
+        prompt: 'Prompt',
+        assistantId: 'a',
+        hour: 8,
+        minute: 0,
+        modelProvider: 'p',
+        modelId: 'hide',
+      );
+      await expectLater(
+        executor.revision(task),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'model_missing',
+          ),
+        ),
+      );
+    },
+  );
+
   for (final template in <String?>[
     null,
     '只说正文。时间 {{scheduled_time}}，时差 {{utc_offset}}。Use tools.',

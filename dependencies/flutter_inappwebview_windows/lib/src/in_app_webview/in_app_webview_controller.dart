@@ -68,6 +68,7 @@ class WindowsInAppWebViewController extends PlatformInAppWebViewController
   // List of properties to be saved and restored for keep alive feature
   Map<String, JavaScriptHandlerCallback> _javaScriptHandlersMap =
       HashMap<String, JavaScriptHandlerCallback>();
+  int _workspacePendingCalls = 0;
   Map<UserScriptInjectionTime, List<UserScript>> _userScripts = {
     UserScriptInjectionTime.AT_DOCUMENT_START: <UserScript>[],
     UserScriptInjectionTime.AT_DOCUMENT_END: <UserScript>[]
@@ -1425,7 +1426,57 @@ class WindowsInAppWebViewController extends PlatformInAppWebViewController
       case "onCallJsHandler":
         String handlerName = call.arguments["handlerName"];
         // decode args to json
-        List<dynamic> args = jsonDecode(call.arguments["args"]);
+        final String encodedArgs = call.arguments["args"];
+        if (handlerName == 'kelivoWorkspaceStorage') {
+          final origin = call.arguments['sourceOrigin'];
+          if (origin is! String ||
+              origin.isEmpty ||
+              call.arguments['isMainFrame'] != true) {
+            throw PlatformException(code: 'storage_access_denied');
+          }
+          if (_workspacePendingCalls >= 8 ||
+              encodedArgs.length > 6 * 2 * 1024 * 1024 + 4096) {
+            throw PlatformException(code: 'storage_busy');
+          }
+          _workspacePendingCalls++;
+          try {
+            final Object? args = encodedArgs.length > 65536
+                ? await compute<String, dynamic>(jsonDecode, encodedArgs)
+                : jsonDecode(encodedArgs);
+            if (args is! List || args.length != 1 || args.single is! Map) {
+              throw PlatformException(code: 'storage_invalid_request');
+            }
+            final callback = _javaScriptHandlersMap[handlerName];
+            if (callback == null) {
+              throw PlatformException(code: 'storage_access_denied');
+            }
+            final envelope = {
+              'origin': origin,
+              'isMainFrame': true,
+              'message': args.single,
+            };
+            final result = await callback([envelope]);
+            final data = result is Map ? result['result'] : null;
+            final encoded = data is Map &&
+                    data['content'] is String &&
+                    (data['content'] as String).length > 65536
+                ? await compute<Object?, String>(jsonEncode, result)
+                : jsonEncode(result);
+            // Rebinding can happen while the worker encodes a large read.
+            // This internal phase only validates context; it must not repeat
+            // the operation or accept a flag from caller-controlled JSON.
+            if (await callback([
+                  {...envelope, 'validateReply': true}
+                ]) !=
+                true) {
+              throw PlatformException(code: 'storage_document_changed');
+            }
+            return encoded;
+          } finally {
+            _workspacePendingCalls--;
+          }
+        }
+        List<dynamic> args = jsonDecode(encodedArgs);
 
         _debugLog(handlerName, args);
 

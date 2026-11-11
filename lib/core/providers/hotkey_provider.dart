@@ -1,5 +1,4 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
@@ -35,6 +34,60 @@ class HotkeyProvider extends ChangeNotifier {
   static const _prefsKeyEnabled = 'desktop_hotkeys_enabled_v1'; // id -> bool
 
   final Map<String, AppHotkey> _items = {
+    'toggle_side_panel': AppHotkey(
+      id: 'toggle_side_panel',
+      l10nLabelKey: 'hotkeyToggleSidePanel',
+      defaultWinLinux: 'ctrl+alt+b',
+      defaultMac: 'cmd+alt+b',
+    ),
+    'side_panel_new_web': AppHotkey(
+      id: 'side_panel_new_web',
+      l10nLabelKey: 'hotkeySidePanelNewWeb',
+      defaultWinLinux: 'ctrl+t',
+      defaultMac: 'cmd+t',
+    ),
+    'side_panel_files': AppHotkey(
+      id: 'side_panel_files',
+      l10nLabelKey: 'hotkeySidePanelFiles',
+      defaultWinLinux: 'ctrl+shift+e',
+      defaultMac: 'cmd+shift+e',
+    ),
+    'side_panel_expand': AppHotkey(
+      id: 'side_panel_expand',
+      l10nLabelKey: 'hotkeySidePanelExpand',
+      defaultWinLinux: 'ctrl+shift+f',
+      defaultMac: 'cmd+shift+f',
+    ),
+    'side_panel_reopen_tab': AppHotkey(
+      id: 'side_panel_reopen_tab',
+      l10nLabelKey: 'hotkeySidePanelReopenTab',
+      defaultWinLinux: 'ctrl+shift+t',
+      defaultMac: 'cmd+shift+t',
+    ),
+    'side_panel_next_tab': AppHotkey(
+      id: 'side_panel_next_tab',
+      l10nLabelKey: 'hotkeySidePanelNextTab',
+      defaultWinLinux: 'ctrl+tab',
+      defaultMac: 'ctrl+tab',
+    ),
+    'side_panel_previous_tab': AppHotkey(
+      id: 'side_panel_previous_tab',
+      l10nLabelKey: 'hotkeySidePanelPreviousTab',
+      defaultWinLinux: 'ctrl+shift+tab',
+      defaultMac: 'ctrl+shift+tab',
+    ),
+    'side_panel_address': AppHotkey(
+      id: 'side_panel_address',
+      l10nLabelKey: 'hotkeySidePanelAddress',
+      defaultWinLinux: 'ctrl+l',
+      defaultMac: 'cmd+l',
+    ),
+    'side_panel_focus': AppHotkey(
+      id: 'side_panel_focus',
+      l10nLabelKey: 'hotkeySidePanelFocus',
+      defaultWinLinux: 'f6',
+      defaultMac: 'f6',
+    ),
     // Toggle app visibility (no default)
     'toggle_app_visibility': AppHotkey(
       id: 'toggle_app_visibility',
@@ -94,6 +147,10 @@ class HotkeyProvider extends ChangeNotifier {
   };
 
   final Map<String, HotKey> _registered = <String, HotKey>{};
+
+  final _recordingOwners = <Object>{};
+  void beginRecording(Object owner) => _recordingOwners.add(owner);
+  void endRecording(Object owner) => _recordingOwners.remove(owner);
 
   bool _initialized = false;
   bool get initialized => _initialized;
@@ -207,9 +264,12 @@ class HotkeyProvider extends ChangeNotifier {
     }
     _registered.clear();
 
-    // Register each enabled item with valid command
+    // Register each enabled app-wide item with a valid command.
     for (final e in _items.values) {
       if (!e.enabled) continue;
+      // Address focus belongs to the side panel's focus subtree. Registering
+      // it here also claims Ctrl/Cmd+L while the chat selection owns focus.
+      if (e.id == 'side_panel_address') continue;
       final cmd = e.command;
       if (cmd == null || cmd.trim().isEmpty) continue;
       final scope = (e.id == 'toggle_app_visibility')
@@ -231,7 +291,35 @@ class HotkeyProvider extends ChangeNotifier {
   }
 
   void _invoke(String id) {
+    if (_recordingOwners.isNotEmpty) return;
     switch (id) {
+      case 'toggle_side_panel':
+        HotkeyEventBus.instance.fire(HotkeyAction.toggleSidePanel);
+        break;
+      case 'side_panel_new_web':
+        HotkeyEventBus.instance.fire(HotkeyAction.sidePanelNewWeb);
+        break;
+      case 'side_panel_files':
+        HotkeyEventBus.instance.fire(HotkeyAction.sidePanelFiles);
+        break;
+      case 'side_panel_expand':
+        HotkeyEventBus.instance.fire(HotkeyAction.sidePanelExpand);
+        break;
+      case 'side_panel_reopen_tab':
+        HotkeyEventBus.instance.fire(HotkeyAction.sidePanelReopenTab);
+        break;
+      case 'side_panel_next_tab':
+        HotkeyEventBus.instance.fire(HotkeyAction.sidePanelNextTab);
+        break;
+      case 'side_panel_previous_tab':
+        HotkeyEventBus.instance.fire(HotkeyAction.sidePanelPreviousTab);
+        break;
+      case 'side_panel_address':
+        HotkeyEventBus.instance.fire(HotkeyAction.sidePanelAddress);
+        break;
+      case 'side_panel_focus':
+        HotkeyEventBus.instance.fire(HotkeyAction.sidePanelFocus);
+        break;
       case 'toggle_app_visibility':
         HotkeyEventBus.instance.fire(HotkeyAction.toggleAppVisibility);
         break;
@@ -254,6 +342,55 @@ class HotkeyProvider extends ChangeNotifier {
         HotkeyEventBus.instance.fire(HotkeyAction.toggleLeftPanelTopics);
         break;
     }
+  }
+
+  static String canonicalCommand(String command) {
+    final parts = command
+        .toLowerCase()
+        .split('+')
+        .map(
+          (part) => switch (part.trim()) {
+            'control' => 'ctrl',
+            'meta' => 'cmd',
+            'option' => 'alt',
+            final value =>
+              value.startsWith('key') && value.length == 4
+                  ? value.substring(3)
+                  : value,
+          },
+        )
+        .toSet();
+    return [
+      ...['ctrl', 'cmd', 'alt', 'shift'].where(parts.contains),
+      ...parts.where((part) => !{'ctrl', 'cmd', 'alt', 'shift'}.contains(part)),
+    ].join('+');
+  }
+
+  Map<String, String> get nativeCommands => {
+    for (final item in _items.values)
+      if (item.id != 'toggle_app_visibility' &&
+          item.enabled &&
+          (item.command ?? '').isNotEmpty)
+        canonicalCommand(item.command!): item.id,
+  };
+
+  void invoke(String id) => _invoke(id);
+
+  /// Uses the same configured command for a focus-scoped Flutter handler.
+  ShortcutActivator? shortcutFor(String id) {
+    final item = _items[id]!;
+    if (!item.enabled || item.command == null) return null;
+    final hotkey = _parseCommandToHotKey(item.command!);
+    if (hotkey == null) return null;
+    final modifiers = hotkey.modifiers ?? const [];
+    return SingleActivator(
+      hotkey.logicalKey,
+      control: modifiers.contains(HotKeyModifier.control),
+      meta: modifiers.contains(HotKeyModifier.meta),
+      alt: modifiers.contains(HotKeyModifier.alt),
+      shift: modifiers.contains(HotKeyModifier.shift),
+      includeRepeats: false,
+    );
   }
 
   // ===== Helpers for parsing/displaying hotkey strings =====
@@ -289,6 +426,12 @@ class HotkeyProvider extends ChangeNotifier {
         case 'shift':
           modifiers.add(HotKeyModifier.shift);
           break;
+        case 'tab':
+          keyboardKey = LogicalKeyboardKey.tab;
+          break;
+        case 'f6':
+          keyboardKey = LogicalKeyboardKey.f6;
+          break;
         case ',':
         case 'comma':
           keyboardKey = LogicalKeyboardKey.comma;
@@ -315,7 +458,7 @@ class HotkeyProvider extends ChangeNotifier {
     }
     if (keyboardKey == null) return null;
     // Require at least one modifier (avoid single-key capture)
-    if (modifiers.isEmpty) return null;
+    if (modifiers.isEmpty && keyboardKey != LogicalKeyboardKey.f6) return null;
     return HotKey(key: keyboardKey, modifiers: modifiers, scope: scope);
   }
 

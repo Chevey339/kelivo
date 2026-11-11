@@ -21,6 +21,7 @@ import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
+import '../../../core/services/backup/backup_task_progress.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../backup_task_runner.dart';
 import 'local_snapshots_page.dart';
@@ -69,18 +70,13 @@ class BackupPage extends StatefulWidget {
 }
 
 class _BackupPageState extends State<BackupPage> {
-  String? _backupPassword;
   List<BackupFileItem> _remote = const <BackupFileItem>[];
   List<BackupFileItem> _remoteS3 = const <BackupFileItem>[];
 
   Future<bool?> _confirmCherryImport(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final locale = Localizations.localeOf(context);
-    final isZh = locale.languageCode.startsWith('zh');
-    final String body = isZh
-        ? '此功能目前仍处于实验阶段。\n目前仅能导入助手，对话内容，供应商和文件，\n一些供应商需要在baseurl后面添加/v1 or /v1beta。 \n为确保数据安全，建议在导入前先执行备份。\n是否已知晓并继续选择文件？'
-        : 'This feature is experimental.\nTo keep your data safe, it is recommended to back up before importing.\nProceed to choose a file?';
+    final body = l10n.backupPageCherryImportWarning;
 
     return showModalBottomSheet<bool>(
       context: context,
@@ -333,10 +329,10 @@ class _BackupPageState extends State<BackupPage> {
                     ),
                     _iosDivider(context),
                     BackupEncryptionTile(
-                      password: _backupPassword,
+                      enabled: settings.backupEncryptionEnabled,
                       onChanged: vm.busy || s3Vm.busy
                           ? null
-                          : (value) => setState(() => _backupPassword = value),
+                          : settings.setBackupEncryptionPassword,
                     ),
                   ],
                 ),
@@ -784,7 +780,9 @@ class _BackupPageState extends State<BackupPage> {
                                 title: l10n.backupPageBackupNow,
                                 task: (handle) async {
                                   final ok = await vm.backup(
-                                    password: _backupPassword,
+                                    password: await backupPasswordForExport(
+                                      context,
+                                    ),
                                     onProgress: handle.report,
                                     cancelToken: handle.cancelToken,
                                   );
@@ -1229,7 +1227,9 @@ class _BackupPageState extends State<BackupPage> {
                                 title: l10n.backupPageBackupNow,
                                 task: (handle) async {
                                   final ok = await s3Vm.backup(
-                                    password: _backupPassword,
+                                    password: await backupPasswordForExport(
+                                      context,
+                                    ),
                                     onProgress: handle.report,
                                     cancelToken: handle.cancelToken,
                                   );
@@ -1276,6 +1276,7 @@ class _BackupPageState extends State<BackupPage> {
             context,
             icon: Lucide.Export,
             label: l10n.backupPageExportToFile,
+            subtitle: l10n.backupPageExportToFileSubtitle,
             onTap: () => _doExport(context, vm),
           ),
           _iosDivider(context),
@@ -1301,6 +1302,20 @@ class _BackupPageState extends State<BackupPage> {
           ),
         ],
       ),
+      if (Platform.isIOS)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Text(
+            l10n.backupPageIosSystemBackupNote,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+        ),
     ];
   }
 
@@ -1418,7 +1433,7 @@ class _BackupPageState extends State<BackupPage> {
       ),
       task: (handle) async {
         file = await vm.exportToFile(
-          password: _backupPassword,
+          password: await backupPasswordForExport(context),
           onProgress: handle.report,
           cancelToken: handle.cancelToken,
         );
@@ -1432,10 +1447,32 @@ class _BackupPageState extends State<BackupPage> {
       final isMobile = Platform.isAndroid || Platform.isIOS;
       if (isMobile) {
         try {
-          final saved = await NativeFileSave.saveFileFromPath(
+          Future<bool> save() => NativeFileSave.saveFileFromPath(
             sourcePath: exported.path,
             fileName: exported.uri.pathSegments.last,
+            requireOutsideAppContainer: Platform.isIOS,
+            dialogTitle: l10n.backupPageChooseBackupFolder,
           );
+          var saved = false;
+          if (Platform.isIOS) {
+            await runBackupTask(
+              context,
+              title: l10n.backupPageExportToFile,
+              task: (handle) async {
+                handle.report(
+                  const BackupProgress(
+                    phase: BackupPhase.finalizing,
+                    processed: 0,
+                    cancellable: false,
+                  ),
+                );
+                saved = await save();
+                if (!saved) throw const BackupCancelledException();
+              },
+            );
+          } else {
+            saved = await save();
+          }
           if (saved && context.mounted) {
             await context
                 .read<BackupReminderProvider>()
@@ -1445,7 +1482,7 @@ class _BackupPageState extends State<BackupPage> {
           if (!context.mounted) return;
           showAppSnackBar(
             context,
-            message: e.toString(),
+            message: backupRestoreErrorMessage(l10n, e),
             type: NotificationType.error,
           );
         }
@@ -2079,6 +2116,7 @@ Widget _iosNavRow(
   required String label,
   VoidCallback? onTap,
   String? detailText,
+  String? subtitle,
 }) {
   final cs = Theme.of(context).colorScheme;
   final interactive = onTap != null;
@@ -2098,11 +2136,27 @@ Widget _iosNavRow(
                 SizedBox(width: 36, child: Icon(icon, size: 20, color: c)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(fontSize: 15, color: c),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(fontSize: 15, color: c),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 if (detailText != null)

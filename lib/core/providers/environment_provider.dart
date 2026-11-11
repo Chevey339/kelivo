@@ -16,6 +16,7 @@ class EnvironmentProvider extends ChangeNotifier {
   static const String variablesKey = 'environment_variables_v1';
   static const String privacyModeKey = 'environment_privacy_mode_v1';
   static const String rootfsSelectionKey = 'environment_rootfs_selection_v1';
+  static const String nativeShellPathKey = 'environment_native_shell_path_v1';
   static const String prootOptionsKey = 'environment_proot_options_v1';
 
   EnvironmentProvider({required this.preferences, this.proxySettings}) {
@@ -161,6 +162,20 @@ class EnvironmentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String _nativeShellPath = '';
+  String get nativeShellPath => _nativeShellPath;
+
+  Future<void> setNativeShellPath(String value) async {
+    await loaded;
+    final path = value.trim();
+    if (path.contains('\u0000') || path.contains('\n') || path.contains('\r')) {
+      throw const FormatException('Invalid shell path');
+    }
+    await preferences.setString(nativeShellPathKey, path);
+    _nativeShellPath = path;
+    notifyListeners();
+  }
+
   Future<void> setProotOptions({
     required String shell,
     required String arguments,
@@ -225,6 +240,7 @@ class EnvironmentProvider extends ChangeNotifier {
     if (!preferences.isLoaded) {
       await preferences.load();
     }
+    _nativeShellPath = preferences.getString(nativeShellPathKey) ?? '';
     _privacyMode = preferences.getBool(privacyModeKey) ?? true;
     final rawVariables = preferences.getString(variablesKey);
     if (rawVariables != null && rawVariables.isNotEmpty) {

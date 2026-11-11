@@ -612,19 +612,13 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    m.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13.5),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 300),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: ModelCapsulesRow(model: m),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(m.displayName, style: TextStyle(fontSize: 13.5)),
+                      const SizedBox(height: 4),
+                      ModelCapsulesRow(model: m),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),

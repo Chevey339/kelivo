@@ -11,6 +11,85 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
+    'completed calls release working buffers and retain late results and metadata',
+    () {
+      final handler = StreamChunkHandler();
+      final blocks = <Map<String, dynamic>>[
+        {'signature': 'pending'},
+      ];
+      for (var i = 0; i < 1000; i++) {
+        handler.handle(
+          ToolCallStart(
+            id: '$i',
+            toolName: 'write_file',
+            metadata: i == 0 ? {'blocks': blocks} : null,
+          ),
+        );
+        handler.handle(
+          ToolCallDelta(id: '$i', inputDelta: '{"text":"long file contents"}'),
+        );
+        handler.handle(ToolCallEnd('$i'));
+        handler.handle(ToolCallResult(id: '$i', output: 'done'));
+      }
+      expect(handler.pendingToolBufferCount, 0);
+      handler.handle(const ToolCallResult(id: '0', output: 'corrected result'));
+      expect(handler.pendingToolBufferCount, 0);
+      blocks.single['signature'] = 'final';
+      handler.handle(const Finish());
+      final payload = jsonDecode(
+        (handler.parts.first as ToolCallPart).payloadJson,
+      );
+      expect(payload['arguments'], {'text': 'long file contents'});
+      expect(payload['content'], 'corrected result');
+      expect(payload['metadata']['blocks'][0]['signature'], 'final');
+      expect(handler.parts, hasLength(1000));
+    },
+  );
+
+  test('long tool arguments encode only at read and protocol boundaries', () {
+    final metadata = _CountingMetadata();
+    final handler = StreamChunkHandler();
+    handler.handle(
+      ToolCallStart(
+        id: 'patch',
+        toolName: 'apply_patch',
+        metadata: {'provider': metadata},
+      ),
+    );
+    handler.handle(const ToolCallDelta(id: 'patch', inputDelta: '{"patch":"'));
+    for (var i = 0; i < 10000; i++) {
+      handler.handle(const ToolCallDelta(id: 'patch', inputDelta: 'line\\n'));
+    }
+    expect(metadata.encodes, 0);
+    final preview = handler.parts.single as ToolCallPart;
+    expect(metadata.encodes, 1);
+    expect(identical(handler.parts.single, preview), isTrue);
+    handler.handle(const ToolCallDelta(id: 'patch', inputDelta: '"}'));
+    handler.handle(const ToolCallEnd('patch'));
+    expect(metadata.encodes, 2);
+    expect(handler.toolPayload('patch')!['arguments'], {
+      'patch': 'line\n' * 10000,
+    });
+    expect(metadata.encodes, 2);
+    final completed = handler.parts.single;
+    handler.handle(const TextDelta(id: 'body', text: 'done'));
+    expect(identical(handler.parts.first, completed), isTrue);
+    expect(metadata.encodes, 2);
+    // Providers can finish replay metadata after the arguments have ended.
+    metadata.signature = 'final';
+    handler.handle(const Finish());
+    expect(metadata.encodes, 3);
+    final payload = jsonDecode(
+      (handler.parts.first as ToolCallPart).payloadJson,
+    );
+    expect(payload['metadata']['provider']['signature'], 'final');
+    expect(
+      jsonDecode(preview.payloadJson)['arguments'],
+      startsWith('{"patch":'),
+    );
+  });
+
+  test(
     'response boundaries close text ids and retain only that round metadata',
     () {
       const details = [
@@ -655,6 +734,19 @@ void main() {
     expect((handler.parts[3] as TextPart).text, 'after');
   });
 
+  test('resuming keeps empty reasoning positions for timing overlays', () {
+    final handler = StreamChunkHandler(
+      seed: const [ReasoningPart(''), TextPart('answer')],
+    );
+    handler.handle(const ReasoningStart(id: 'next'));
+    handler.handle(const ReasoningDelta(id: 'next', text: 'next summary'));
+    expect(handler.parts, const [
+      ReasoningPart(''),
+      TextPart('answer'),
+      ReasoningPart('next summary'),
+    ]);
+  });
+
   test(
     'handleResult after seed appends the new round instead of replacing',
     () {
@@ -782,4 +874,13 @@ void main() {
     final now = DateTime(2026, 8, 31, 12);
     expect(pending.deadlineAt(now), now.add(const Duration(seconds: 5)));
   });
+}
+
+class _CountingMetadata {
+  int encodes = 0;
+  String signature = 'pending';
+  Map<String, dynamic> toJson() {
+    encodes++;
+    return {'signature': signature};
+  }
 }

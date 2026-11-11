@@ -39,6 +39,25 @@ void main() {
       }
     });
 
+    test('syncs and renames paths beyond the Win32 MAX_PATH limit', () async {
+      final directory = Directory(
+        p.joinAll([
+          root.path,
+          ...List.generate(24, (index) => 'nested-folder-$index'),
+        ]),
+      );
+      await directory.create(recursive: true);
+      final source = File(p.join(directory.path, 'source.bin'));
+      final target = p.join(directory.path, 'target.bin');
+      expect(source.path.length, greaterThan(260));
+      await source.writeAsBytes([8, 9, 10]);
+      await durability.syncFile(source, fullBarrier: true);
+      await durability.syncDirectory(directory, fullBarrier: true);
+      await durability.renameAndSync(source: source, targetPath: target);
+      expect(await source.exists(), isFalse);
+      expect(await File(target).readAsBytes(), [8, 9, 10]);
+    });
+
     test(
       'renames files across directories and persists both parents',
       () async {

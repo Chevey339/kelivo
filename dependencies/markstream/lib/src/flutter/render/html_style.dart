@@ -3,6 +3,16 @@ import 'package:flutter/material.dart';
 import '../../core/ast/nodes.dart';
 import '../theme/markstream_theme.dart';
 
+TextStyle highlightedTextStyle(TextStyle base, MarkstreamTheme theme) =>
+    base.copyWith(
+      color: theme.brightness == Brightness.dark
+          ? const Color(0xffffedb0)
+          : const Color(0xff302600),
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xff665214)
+          : const Color(0xffffdf73),
+    );
+
 /// The native subset accepts paint/text properties, never browser CSS or URLs.
 TextStyle htmlTextStyle(
   HtmlElementNode node,
@@ -29,10 +39,7 @@ TextStyle htmlTextStyle(
     case 's' || 'del':
       decoration(TextDecoration.lineThrough);
     case 'mark':
-      style = style.copyWith(
-        color: const Color(0xff302600),
-        backgroundColor: const Color(0xffffdf73),
-      );
+      style = highlightedTextStyle(style, theme);
     case 'font':
       style = style.copyWith(color: htmlColor(node.attributes['color']));
   }
@@ -52,10 +59,14 @@ TextStyle htmlTextStyle(
         if (value == 'bold' || value == 'bolder') {
           style = style.copyWith(fontWeight: theme.strongWeight);
         } else if (value == 'normal') {
-          style = style.copyWith(fontWeight: FontWeight.normal);
+          style = style.copyWith(
+            fontWeight: theme.fontWeightResolver(FontWeight.normal),
+          );
         } else if (weight != null && weight >= 100 && weight <= 900) {
           style = style.copyWith(
-            fontWeight: FontWeight.values[(weight ~/ 100) - 1],
+            fontWeight: theme.fontWeightResolver(
+              FontWeight.values[(weight ~/ 100) - 1],
+            ),
           );
         }
       case 'font-style':

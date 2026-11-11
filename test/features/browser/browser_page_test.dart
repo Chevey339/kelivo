@@ -1,3 +1,4 @@
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -1218,6 +1219,97 @@ void main() {
     },
   );
 
+  for (final nativeInsets in [false, true]) {
+    browserTestWidgets(
+      'iOS webpage footer stays above expanded and collapsed controls (native insets: $nativeInsets)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+        addTearDown(tester.view.resetViewPadding);
+        const channel = MethodChannel('app.browser_window');
+        final insets = <Map<dynamic, dynamic>>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          (call) async {
+            if (call.method == 'supportsBrowserViewportInsets') {
+              return nativeInsets;
+            }
+            if (call.method == 'setBrowserViewportInsets') {
+              insets.add(call.arguments as Map<dynamic, dynamic>);
+              return true;
+            }
+            if (call.method == 'getBrowserReduceTransparency') return false;
+            return null;
+          },
+        );
+        addTearDown(() {
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          );
+        });
+        await service.initialize();
+        final tab = await service.createTab(url: 'https://example.com');
+        await mount(tester);
+        final engine = engines[tab.id]!;
+        final viewport = find.byKey(const ValueKey('fakeNativeView'));
+        final original = tester.getRect(viewport);
+        final state = tester.state(find.byType(_EngineView));
+
+        Future<void> checkFooter() async {
+          final bounds = tester.getRect(viewport);
+          final bottomInset = nativeInsets
+              ? (insets.last['bottom'] as num).toDouble()
+              : 0.0;
+          final contentBottom = bounds.bottom - bottomInset;
+          final progress = tester
+              .widget<BrowserAddressBar>(find.byType(BrowserAddressBar))
+              .collapseProgress;
+          expect(contentBottom, closeTo(746 + 34 * progress, .001));
+          expect(
+            contentBottom,
+            lessThanOrEqualTo(
+              tester.getRect(find.byType(BrowserAddressBar)).top,
+            ),
+          );
+          expect(
+            tester
+                .getRect(find.byKey(const ValueKey('browserMobileBottomEdge')))
+                .top,
+            contentBottom,
+          );
+          final taps = engine.humanPointerDowns;
+          for (final x in [20.0, bounds.center.dx, bounds.right - 20]) {
+            await tester.tapAt(Offset(x, contentBottom - 2));
+          }
+          expect(engine.humanPointerDowns, taps + 3);
+          if (nativeInsets) expect(bounds, original);
+          expect(tester.state(find.byType(_EngineView)), same(state));
+        }
+
+        await checkFooter();
+        for (final offset in [160.0, 4000.0, 3980.0]) {
+          engine.onChanged(_scroll(offset));
+          await tester.pump();
+          for (var frame = 0; frame < 12; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+            await checkFooter();
+          }
+          await tester.pumpAndSettle();
+          await checkFooter();
+        }
+        expect(engine.viewMounts, 1);
+        expect(engine.viewDisposals, 0);
+        if (nativeInsets) {
+          expect(insets.first['top'], 59);
+          expect(insets.first['bottom'], 98);
+          expect(insets.any((value) => value['bottom'] == 64), isTrue);
+          expect(insets.last['bottom'], 98);
+        }
+      },
+    );
+  }
+
   browserTestWidgets(
     'address keyboard preserves viewport through dismiss and yields to webpage input',
     (tester) async {
@@ -1261,7 +1353,7 @@ void main() {
       await tester.tapAt(tester.getCenter(viewport));
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
-      expect(tester.getRect(viewport).height, before.height - 300);
+      expect(tester.getRect(viewport).height, before.height - (300 - 34));
       expect(tester.state(find.byType(_EngineView)), same(state));
       expect(engines[tab.id]!.viewMounts, 1);
       expect(tester.takeException(), isNull);
@@ -1313,7 +1405,7 @@ void main() {
       // still receives normal viewport avoidance without an extra page tap.
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pump();
-      expect(tester.getRect(viewport).height, before.height - 300);
+      expect(tester.getRect(viewport).height, before.height - (300 - 34));
       expect(tester.takeException(), isNull);
     },
   );
@@ -1399,7 +1491,10 @@ void main() {
           tester.getRect(find.byType(BrowserAddressBar)).bottom,
           closeTo(lowerBoundary - 10, .001),
         );
-        expect(tester.getRect(viewport).height, before.height - inset);
+        expect(
+          tester.getRect(viewport).height,
+          before.height - (inset > 34 ? inset - 34 : 0),
+        );
         expect(tester.state(find.byType(_EngineView)), same(state));
         if (inset > 0) {
           engine.onChanged(_scroll(400 + inset));
@@ -1799,6 +1894,7 @@ void main() {
       );
       await mount(tester, conversationId: 'chat-a');
       await service.selectTab(other.id);
+      service.takeOver(sessionId: 'chat-a');
       final pending = Completer<void>();
       final action = service.runAgentAction<void>(
         sessionId: 'chat-b',
@@ -1813,12 +1909,22 @@ void main() {
       try {
         await tester.pumpAndSettle();
         expect(find.text('AI is working'), findsOneWidget);
+        await tester.tap(find.byTooltip('More').last);
+        await tester.pumpAndSettle();
+        expect(find.text('Allow to continue'), findsNothing);
+        await tester.tapAt(const Offset(8, 80));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Take over'));
         await tester.pumpAndSettle();
-        expect(service.pausedAgentSessionId, 'chat-b');
+        expect(service.agentPauseFor('chat-b'), isNotNull);
         expect(find.text('AI actions paused'), findsOneWidget);
         pending.complete();
         expect(await outcome, isA<StateError>());
+        await tester.tap(find.text('Allow to continue'));
+        await tester.pumpAndSettle();
+        expect(service.agentPauseFor('chat-b'), isNull);
+        expect(service.agentPauseFor('chat-a'), isNotNull);
+        expect(find.text('AI actions paused'), findsNothing);
       } finally {
         if (!pending.isCompleted) pending.complete();
       }
@@ -2775,7 +2881,7 @@ void main() {
         final labels = tester.widgetList<Text>(host).toList();
         expect(labels, hasLength(progress > 0 && progress < 1 ? 2 : 1));
         for (final text in labels) {
-          expect(text.style!.fontWeight, FontWeight.w500);
+          expect(text.style!.fontWeight, AppFontWeights.medium);
           expect(text.style!.fontSize, 16);
         }
       }
@@ -3178,6 +3284,31 @@ void main() {
       await tester.pumpAndSettle();
       expect(target(), 1);
       expect(engine.viewMounts, 1);
+    },
+  );
+
+  browserTestWidgets(
+    'inset animation metrics do not reverse an active collapse gesture',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await service.initialize();
+      final tab = await service.createTab(url: 'https://example.com');
+      await mount(tester);
+      final engine = engines[tab.id]!;
+      double target() => tester
+          .widget<BrowserChromeTransition>(find.byType(BrowserChromeTransition))
+          .progress;
+      engine.onChanged(_scroll(3000, gestureDelta: 30));
+      await tester.pumpAndSettle();
+      expect(target(), 1);
+      // Changing the native bottom inset also updates content size and offset.
+      // That KVO event has no new finger movement, even before touch release.
+      engine.onChanged(_scroll(3156, gestureDelta: 0));
+      await tester.pumpAndSettle();
+      expect(target(), 1);
+      engine.onChanged(_scroll(3156, gestureDelta: 12));
+      await tester.pumpAndSettle();
+      expect(target(), 0, reason: 'real edge input still expands navigation');
     },
   );
 

@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'package:Kelivo/features/side_panel/desktop_side_panel_controller.dart';
 import 'dart:io';
 
 import 'package:Kelivo/core/database/app_database.dart';
@@ -126,14 +126,7 @@ void main() {
                   onOpenChat: () => setLocal(() => page = _SmokePage.chat),
                   onToggleBar: () {
                     setLocal(() {});
-                    final open = context
-                        .read<SettingsProvider>()
-                        .desktopWorkspaceBarOpen;
-                    unawaited(
-                      context
-                          .read<SettingsProvider>()
-                          .setDesktopWorkspaceBarOpen(!open),
-                    );
+                    DesktopSidePanelController.instance.toggle();
                   },
                   onOpenPopover: () {
                     final conversationListenable = ValueNotifier<String?>(
@@ -237,7 +230,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey<String>('smoke-toggle-bar')));
     await tester.runAsync(() async {
-      await settings.setDesktopWorkspaceBarOpen(true);
+      DesktopSidePanelController.instance.open(kind: SidePanelTabKind.files);
     });
     await _pumpUi(tester);
     expect(find.byType(DesktopWorkspaceBar), findsOneWidget);
@@ -284,7 +277,7 @@ class _SmokeShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final open = context.watch<SettingsProvider>().desktopWorkspaceBarOpen;
+    final open = DesktopSidePanelController.instance.isOpen;
     return Scaffold(
       body: Column(
         children: [
@@ -341,7 +334,7 @@ class _SmokeShell extends StatelessWidget {
                 ),
                 if (open)
                   SizedBox(
-                    width: DesktopWorkspaceBar.width,
+                    width: DesktopSidePanelController.defaultWidth,
                     child: DesktopWorkspaceBar(conversationId: conversationId),
                   ),
               ],

@@ -60,10 +60,14 @@ public class FindInteractionController: NSObject, Disposable {
             return
         }
         
-        if find != "" {
-            let startSearch = "window.\(JAVASCRIPT_BRIDGE_NAME)._findAllAsync('\(find)');"
-            webView.evaluateJavaScript(startSearch, completionHandler: completionHandler)
+        if find.isEmpty {
+            clearMatches(completionHandler: completionHandler)
+            return
         }
+        // Search text is data, including IME apostrophes, backslashes and newlines.
+        let arguments = Util.JSONStringify(value: [find])
+        let startSearch = "window.\(JAVASCRIPT_BRIDGE_NAME)._findAllAsync(\(arguments)[0]);"
+        webView.evaluateJavaScript(startSearch, completionHandler: completionHandler)
     }
 
     public func findNext(forward: Bool, completionHandler: ((Any?, Error?) -> Void)?) {

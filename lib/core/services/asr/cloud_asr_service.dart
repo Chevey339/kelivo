@@ -69,7 +69,7 @@ class CloudAsrService {
       case OpenAiRealtimeAsrOptions():
         return _startOpenAi(options);
       case AudioTranscriptionAsrOptions():
-        final endpoint = _audioTranscriptionEndpoint(options.baseUrl);
+        final endpoint = _audioTranscriptionEndpoint(options);
         return _AudioTranscriptionAsrSession(
           options: options,
           endpoint: endpoint,
@@ -80,6 +80,14 @@ class CloudAsrService {
       case DashScopeAsrOptions():
         return _startDashScope(options);
       case QwenAudioAsrOptions():
+        if (options.mode == QwenAudioAsrMode.transcription) {
+          return _QwenAudioHttpAsrSession(
+            options: options,
+            client: httpClient ?? http.Client(),
+            ownsClient: httpClient == null,
+            completionTimeout: completionTimeout,
+          );
+        }
         return _startQwenAudio(options);
       case VolcengineAsrOptions():
         return _startVolcengine(options);
@@ -105,7 +113,7 @@ class CloudAsrService {
   }
 
   Future<CloudAsrSession> _startQwenAudio(QwenAudioAsrOptions options) async {
-    final uri = _webSocketUri(options.websocketUrl, 'Qwen Audio');
+    final uri = _webSocketUri(options.endpointUrl, 'Qwen Audio');
     final socket = await _connect(
       label: 'Qwen Audio',
       apiKey: options.apiKey,
@@ -816,17 +824,21 @@ class _RealtimeAsrSession implements CloudAsrSession {
   }
 }
 
-class _AudioTranscriptionAsrSession implements CloudAsrSession {
-  _AudioTranscriptionAsrSession({
-    required this._options,
-    required this._endpoint,
+abstract class _SegmentedHttpAsrSession implements CloudAsrSession {
+  _SegmentedHttpAsrSession({
+    required this._label,
+    required this._apiKey,
+    required this._sampleRate,
+    required this._segmentDurationSec,
     required this._client,
     required this._ownsClient,
     required this._completionTimeout,
   });
 
-  final AudioTranscriptionAsrOptions _options;
-  final Uri _endpoint;
+  final String _label;
+  final String _apiKey;
+  final int _sampleRate;
+  final int _segmentDurationSec;
   final http.Client _client;
   final bool _ownsClient;
   final Duration _completionTimeout;
@@ -840,8 +852,11 @@ class _AudioTranscriptionAsrSession implements CloudAsrSession {
   bool _closed = false;
   AsrException? _terminalError;
 
-  String get _label =>
-      _options.kind == AsrServiceKind.groq ? 'Groq' : 'Mistral';
+  http.BaseRequest _buildRequest(Uint8List pcm, Future<void> abortTrigger);
+
+  String? _readTranscript(Object? decoded);
+
+  String get _transcript => _transcripts.join(' ');
 
   @override
   Stream<String> get partialTranscripts => _partialController.stream;
@@ -849,9 +864,9 @@ class _AudioTranscriptionAsrSession implements CloudAsrSession {
   // Bound each upload even when one capture chunk crosses the segment limit.
   int get _segmentByteLimit {
     const maximumBytes = 6 * 1024 * 1024;
-    final seconds = _options.segmentDurationSec;
+    final seconds = _segmentDurationSec;
     if (seconds <= 0) return maximumBytes;
-    return (_options.sampleRate * 2 * seconds).clamp(2, maximumBytes);
+    return (_sampleRate * 2 * seconds).clamp(2, maximumBytes);
   }
 
   @override
@@ -884,7 +899,7 @@ class _AudioTranscriptionAsrSession implements CloudAsrSession {
     _ensureActive();
     try {
       await _flushSegment();
-      final result = _transcripts.join(' ');
+      final result = _transcript;
       await _cleanup();
       return result;
     } catch (error) {
@@ -893,43 +908,12 @@ class _AudioTranscriptionAsrSession implements CloudAsrSession {
   }
 
   Future<void> _flushSegment() async {
-    var pcm = _pcm.takeBytes();
+    final pcm = _pcm.takeBytes();
     if (pcm.isEmpty) return;
     if (pcm.length.isOdd) {
       throw AsrException('$_label ASR received an incomplete PCM16 sample');
     }
-    if (_options.kind == AsrServiceKind.groq) {
-      // Groq requires at least 10ms, even for the final slice of a recording.
-      // Preserve every captured sample and pad a shorter tail with silence.
-      final minimumBytes = ((_options.sampleRate + 99) ~/ 100) * 2;
-      if (pcm.length < minimumBytes) {
-        pcm = Uint8List(minimumBytes)..setAll(0, pcm);
-      }
-    }
-    final request =
-        http.AbortableMultipartRequest(
-            'POST',
-            _endpoint,
-            abortTrigger: _abort.future,
-          )
-          ..headers[HttpHeaders.authorizationHeader] =
-              'Bearer ${_options.apiKey.trim()}'
-          ..fields['model'] = _options.model.trim()
-          ..files.add(
-            http.MultipartFile.fromBytes(
-              'file',
-              _pcm16MonoToWav(pcm, _options.sampleRate),
-              filename: 'recording.wav',
-              contentType: MediaType('audio', 'wav'),
-            ),
-          );
-    final language = _options.language.trim();
-    if (language.isNotEmpty && language.toLowerCase() != 'auto') {
-      request.fields['language'] = language;
-    }
-    if (_options.kind == AsrServiceKind.groq) {
-      request.fields['response_format'] = 'json';
-    }
+    final request = _buildRequest(pcm, _abort.future);
     final http.Response response;
     try {
       response = await Future.any<http.Response>([
@@ -956,13 +940,14 @@ class _AudioTranscriptionAsrSession implements CloudAsrSession {
     } catch (_) {
       throw AsrException('$_label ASR returned invalid JSON');
     }
-    if (decoded is! Map || decoded['text'] is! String) {
+    final transcript = _readTranscript(decoded);
+    if (transcript == null) {
       throw AsrException('$_label ASR response did not contain a transcript');
     }
-    final text = (decoded['text'] as String).trim();
+    final text = transcript.trim();
     if (text.isEmpty) return;
     _transcripts.add(text);
-    _partialController.add(_transcripts.join(' '));
+    _partialController.add(_transcript);
   }
 
   @override
@@ -983,7 +968,7 @@ class _AudioTranscriptionAsrSession implements CloudAsrSession {
     final exception = AsrException(
       _redact(
         error is AsrException ? error.message : '$_label ASR request failed',
-        _options.apiKey.trim(),
+        _apiKey.trim(),
       ),
     );
     _terminalError = exception;
@@ -999,6 +984,158 @@ class _AudioTranscriptionAsrSession implements CloudAsrSession {
     if (!_abort.isCompleted) _abort.complete();
     if (_ownsClient) _client.close();
     await _partialController.close();
+  }
+}
+
+class _AudioTranscriptionAsrSession extends _SegmentedHttpAsrSession {
+  _AudioTranscriptionAsrSession({
+    required AudioTranscriptionAsrOptions options,
+    required this._endpoint,
+    required super.client,
+    required super.ownsClient,
+    required super.completionTimeout,
+  }) : _options = options,
+       super(
+         label: switch (options.kind) {
+           AsrServiceKind.groq => 'Groq',
+           AsrServiceKind.mistral => 'Mistral',
+           AsrServiceKind.elevenLabs => 'ElevenLabs',
+           _ => throw ArgumentError.value(options.kind, 'kind'),
+         },
+         apiKey: options.apiKey,
+         sampleRate: options.sampleRate,
+         segmentDurationSec: options.segmentDurationSec,
+       );
+
+  final AudioTranscriptionAsrOptions _options;
+  final Uri _endpoint;
+
+  @override
+  http.BaseRequest _buildRequest(Uint8List pcm, Future<void> abortTrigger) {
+    // Keep every captured sample and pad short tails to the API's minimum.
+    final minimumDurationMs = switch (_options.kind) {
+      AsrServiceKind.groq => 10,
+      AsrServiceKind.elevenLabs => 100,
+      _ => 0,
+    };
+    final minimumBytes =
+        ((_options.sampleRate * minimumDurationMs + 999) ~/ 1000) * 2;
+    if (pcm.length < minimumBytes) {
+      pcm = Uint8List(minimumBytes)..setAll(0, pcm);
+    }
+    final isElevenLabs = _options.kind == AsrServiceKind.elevenLabs;
+    final request =
+        http.AbortableMultipartRequest(
+            'POST',
+            _endpoint,
+            abortTrigger: abortTrigger,
+          )
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              _pcm16MonoToWav(pcm, _options.sampleRate),
+              filename: 'recording.wav',
+              contentType: MediaType('audio', 'wav'),
+            ),
+          );
+    if (isElevenLabs) {
+      request.headers['xi-api-key'] = _options.apiKey.trim();
+      request.fields['model_id'] = _options.model.trim();
+      request.fields['tag_audio_events'] = 'false';
+      request.fields['timestamps_granularity'] = 'none';
+    } else {
+      request.headers[HttpHeaders.authorizationHeader] =
+          'Bearer ${_options.apiKey.trim()}';
+      request.fields['model'] = _options.model.trim();
+    }
+    final language = _options.language.trim();
+    if (language.isNotEmpty && language.toLowerCase() != 'auto') {
+      request.fields[isElevenLabs ? 'language_code' : 'language'] = language;
+    }
+    if (_options.kind == AsrServiceKind.groq) {
+      request.fields['response_format'] = 'json';
+    }
+    return request;
+  }
+
+  @override
+  String? _readTranscript(Object? decoded) =>
+      decoded is Map && decoded['text'] is String
+      ? decoded['text'] as String
+      : null;
+}
+
+class _QwenAudioHttpAsrSession extends _SegmentedHttpAsrSession {
+  _QwenAudioHttpAsrSession({
+    required QwenAudioAsrOptions options,
+    required super.client,
+    required super.ownsClient,
+    required super.completionTimeout,
+  }) : _options = options,
+       super(
+         label: 'Qwen Audio',
+         apiKey: options.apiKey,
+         sampleRate: options.sampleRate,
+         segmentDurationSec: options.segmentDurationSec,
+       );
+
+  final QwenAudioAsrOptions _options;
+
+  @override
+  int get _segmentByteLimit =>
+      super._segmentByteLimit.clamp(2, _options.sampleRate * 2 * 300);
+
+  @override
+  String get _transcript => _transcripts.fold('', combineQwenAudioTranscript);
+
+  @override
+  http.BaseRequest _buildRequest(Uint8List pcm, Future<void> abortTrigger) {
+    final wav = _pcm16MonoToWav(pcm, _options.sampleRate);
+    final language = _options.language.trim();
+    return http.AbortableRequest(
+        'POST',
+        Uri.parse(_options.endpointUrl),
+        abortTrigger: abortTrigger,
+      )
+      ..headers.addAll({
+        HttpHeaders.authorizationHeader: 'Bearer ${_options.apiKey.trim()}',
+        HttpHeaders.contentTypeHeader: 'application/json',
+        'X-DashScope-SSE': 'disable',
+        if (_options.workspaceId.trim().isNotEmpty)
+          'X-DashScope-WorkSpace': _options.workspaceId.trim(),
+      })
+      ..body = jsonEncode({
+        'model': _options.model.trim(),
+        'input': {
+          'messages': [
+            {
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'input_audio',
+                  'input_audio': {
+                    'data': 'data:audio/wav;base64,${base64Encode(wav)}',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        'parameters': {
+          'format': 'wav',
+          'sample_rate': _options.sampleRate.toString(),
+          if (language.isNotEmpty && language.toLowerCase() != 'auto')
+            'language_hints': [language],
+        },
+      });
+  }
+
+  @override
+  String? _readTranscript(Object? decoded) {
+    final output = decoded is Map ? decoded['output'] : null;
+    return output is Map && output['text'] is String
+        ? output['text'] as String
+        : null;
   }
 }
 
@@ -1609,19 +1746,27 @@ bool _isQwenAudioSentenceEnd(Map<String, dynamic> sentence) {
 
 /// Joins Qwen Audio finalized/partial segments.
 ///
-/// Inserts a space for Latin text boundaries (including when the previous
-/// segment ends with Latin punctuation) while leaving CJK sentence joins
-/// unspaced.
+/// Inserts word separators across scripts that use spaces, including after
+/// punctuation. Chinese, Japanese and Thai boundaries remain unspaced.
 @visibleForTesting
 String combineQwenAudioTranscript(String prefix, String next) {
   if (prefix.isEmpty) return next;
   if (next.isEmpty) return prefix;
   if (RegExp(r'^\s').hasMatch(next)) return '$prefix$next';
-  final prefixEndsLatinWord = RegExp(r'[A-Za-z0-9]$').hasMatch(prefix);
-  final prefixEndsLatinPunct = RegExp(r'''[.!?…,;:'")\]]$''').hasMatch(prefix);
-  final nextStartsLatinWord = RegExp(r'^[A-Za-z0-9]').hasMatch(next);
-  final needsSpace =
-      nextStartsLatinWord && (prefixEndsLatinWord || prefixEndsLatinPunct);
+  final unspacedScript = RegExp(
+    r'[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]',
+    unicode: true,
+  );
+  if (unspacedScript.hasMatch(String.fromCharCode(prefix.runes.last)) ||
+      unspacedScript.hasMatch(String.fromCharCode(next.runes.first))) {
+    return '$prefix$next';
+  }
+  final prefixEndsWordOrPunctuation = RegExp(
+    r'''[\p{L}\p{M}\p{N}\p{Pe}\p{Pf}.!?…,;:'"،؛؟।॥]$''',
+    unicode: true,
+  ).hasMatch(prefix);
+  final nextStartsWord = RegExp(r'^[\p{L}\p{N}]', unicode: true).hasMatch(next);
+  final needsSpace = nextStartsWord && prefixEndsWordOrPunctuation;
   return needsSpace ? '$prefix $next' : '$prefix$next';
 }
 
@@ -1761,19 +1906,18 @@ Uri _webSocketUri(String value, String label) {
   return uri;
 }
 
-Uri _audioTranscriptionEndpoint(String value) {
-  final uri = Uri.tryParse(value.trim());
+Uri _audioTranscriptionEndpoint(AudioTranscriptionAsrOptions options) {
+  final uri = Uri.tryParse(options.baseUrl.trim());
   if (uri == null ||
       (uri.scheme != 'http' && uri.scheme != 'https') ||
       uri.host.isEmpty) {
     throw const AsrException('Audio transcription base URL is invalid');
   }
-  final path = uri.path.replaceFirst(RegExp(r'/+$'), '');
-  return uri.replace(
-    path: path.endsWith('/audio/transcriptions')
-        ? path
-        : '$path/audio/transcriptions',
-  );
+  final isElevenLabs = options.kind == AsrServiceKind.elevenLabs;
+  final suffix = isElevenLabs ? '/speech-to-text' : '/audio/transcriptions';
+  var path = uri.path.replaceFirst(RegExp(r'/+$'), '');
+  if (isElevenLabs && path.isEmpty) path = '/v1';
+  return uri.replace(path: path.endsWith(suffix) ? path : '$path$suffix');
 }
 
 Uri _mimoEndpoint(String value) {
@@ -1974,6 +2118,11 @@ String _responseError(String body) {
       if (decoded['message'] != null) {
         return decoded['message'].toString().trim();
       }
+      final detail = decoded['detail'];
+      if (detail is Map && detail['message'] is String) {
+        return (detail['message'] as String).trim();
+      }
+      if (detail is String) return detail.trim();
     }
   } catch (_) {
     // Do not include arbitrary response bodies in errors; they may echo secrets.

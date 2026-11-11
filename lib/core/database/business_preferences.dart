@@ -27,8 +27,11 @@ final class BusinessPreferences {
   _syntheticIdentities = {};
   Future<void>? _loadFuture;
   Future<void> _writeTail = Future<void>.value();
+  Future<void>? _mutationTail;
   bool _isLoaded = false;
   bool _writesBlockedForRestore = false;
+  bool _closed = false;
+  Future<void>? _closeFuture;
 
   bool get isLoaded => _isLoaded;
 
@@ -55,7 +58,10 @@ final class BusinessPreferences {
   /// Drains accepted writes, runs one live restore, and keeps this process
   /// read-only after a successful commit. Restore callers already require a
   /// cold restart, so late background writes must not overwrite restored data.
-  Future<T> runWithRestoreWriteFence<T>(Future<T> Function() operation) async {
+  Future<T> runWithRestoreWriteFence<T>(
+    Future<T> Function() operation, {
+    bool Function()? canResumeOnError,
+  }) async {
     if (_writesBlockedForRestore) {
       throw StateError('business_preferences_restore_fence');
     }
@@ -64,14 +70,46 @@ final class BusinessPreferences {
     try {
       return await operation();
     } catch (_) {
-      _writesBlockedForRestore = false;
+      // A receipt may already be durable when publication reports a late IO
+      // error. Accept writes again only when the caller proves no cutover is due.
+      if (canResumeOnError?.call() ?? true) _writesBlockedForRestore = false;
       rethrow;
     }
   }
 
   /// Awaits every write accepted so far. Desktop exit hooks flush through this
   /// so the serialized queue reaches SQLite before the process exits.
-  Future<void> flushPendingWrites() => _writeTail;
+  Future<void> flushPendingWrites() async {
+    await _mutationTail;
+    await _writeTail;
+  }
+
+  /// Drain accepted mutations before closing the shared database. Late timers
+  /// and callbacks may still run while the desktop engine is terminating.
+  Future<void> close() => _closeFuture ??= Future<void>.microtask(() async {
+    await _mutationTail;
+    _closed = true;
+    await _writeTail;
+  });
+
+  /// Shared by assistant-related stores and assistant duplication. Lock the
+  /// whole read-modify-write operation, not just its final SQLite write.
+  Future<T> runExclusiveMutation<T>(Future<T> Function() operation) async {
+    if (_closeFuture != null) throw StateError('business_preferences_closed');
+    final result = (_mutationTail ?? Future<void>.value()).then(
+      (_) => operation(),
+    );
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    _mutationTail = tail;
+    try {
+      return await result;
+    } finally {
+      if (identical(_mutationTail, tail)) _mutationTail = null;
+    }
+  }
 
   Object? get(String key) => _copyForRead(_values[key]);
 
@@ -83,7 +121,7 @@ final class BusinessPreferences {
 
   int? getInt(String key) => _values[key] as int?;
 
-  double? getDouble(String key) => _values[key] as double?;
+  double? getDouble(String key) => (_values[key] as num?)?.toDouble();
 
   String? getString(String key) => _values[key] as String?;
 
@@ -122,39 +160,62 @@ final class BusinessPreferences {
     });
   }
 
-  Future<bool> _setValue(String key, Object value) async {
+  Future<bool> _setValue(String key, Object value) => setMany({key: value});
+
+  /// Publishes the cache only after every write has committed successfully.
+  Future<bool> setMany(Map<String, Object> values) async {
+    final updates = values.map(
+      (key, value) => MapEntry(key, _copyForStorage(value)),
+    );
     await load();
     return _serialize(() async {
-      final kind = _entityKindForKey(key);
-      if (kind != null) {
-        final next = Map<String, Object>.from(_values)..[key] = value;
-        var routed = BusinessSettingsRouter.normalizeAndRoute(next);
-        if (kind != BusinessEntityKind.provider && key == kind.sourceKey) {
-          final rows = _restoreSyntheticIdentities(
-            kind,
-            value,
-            routed.entities[kind]!,
-          );
-          routed = BusinessSnapshot(
-            entities: <BusinessEntityKind, List<BusinessEntityValue>>{
-              ...routed.entities,
-              kind: rows,
-            },
-            preferences: routed.preferences,
-          );
+      final kinds = <BusinessEntityKind>{};
+      final preferenceUpdates = <String, Object>{};
+      for (final entry in updates.entries) {
+        final kind = _entityKindForKey(entry.key);
+        if (kind == null) {
+          _validatePreferenceKey(entry.key);
+          preferenceUpdates[entry.key] = entry.value;
+        } else {
+          kinds.add(kind);
         }
-        await _repository.synchronizeEntities(kind, routed.entities[kind]!);
-        _applyRuntimeEntity(kind, routed);
-      } else {
-        _validatePreferenceKey(key);
-        await _repository.setPreference(key, value);
-        _values[key] = _copyForStorage(value);
       }
+      final next = {..._values, ...updates};
+      final normalized = kinds.isEmpty
+          ? null
+          : BusinessSettingsRouter.normalizeAndRoute(next);
+      final entities = <BusinessEntityKind, List<BusinessEntityValue>>{
+        for (final kind in kinds)
+          kind: kind == BusinessEntityKind.provider
+              ? normalized!.entities[kind]!
+              : _restoreSyntheticIdentities(
+                  kind,
+                  next[kind.sourceKey]!,
+                  normalized!.entities[kind]!,
+                ),
+      };
+      await _repository.writeBatch(
+        entities: entities,
+        preferences: preferenceUpdates,
+      );
+      if (normalized != null) {
+        final routed = BusinessSnapshot(
+          entities: {...normalized.entities, ...entities},
+          preferences: normalized.preferences,
+        );
+        for (final kind in kinds) {
+          _applyRuntimeEntity(kind, routed);
+        }
+      }
+      _values.addAll(preferenceUpdates);
       return true;
     });
   }
 
   Future<T> _serialize<T>(Future<T> Function() operation) {
+    if (_closed) {
+      return Future<T>.error(StateError('business_preferences_closed'));
+    }
     if (_writesBlockedForRestore) {
       return Future<T>.error(StateError('business_preferences_restore_fence'));
     }

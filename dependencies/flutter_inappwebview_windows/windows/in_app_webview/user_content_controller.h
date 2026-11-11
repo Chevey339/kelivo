@@ -62,6 +62,7 @@ namespace flutter_inappwebview_plugin
     struct ExecutionContext {
       std::string uniqueId;
       std::string frameId;
+      std::string origin;
     };
     std::map<int, ExecutionContext> executionContexts_;
     struct PendingScripts {

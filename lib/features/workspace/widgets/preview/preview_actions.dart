@@ -13,6 +13,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/utils/save_file_picker.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/utils/platform_utils.dart';
+import 'package:Kelivo/utils/windows_explorer.dart';
 
 bool get canRevealPreviewFileInFileManager =>
     !kIsWeb && PlatformUtils.isDesktopTarget;
@@ -136,9 +137,11 @@ Future<void> revealPreviewFileInFileManager(
     }
     if (Platform.isWindows) {
       // Explorer can return a nonzero exit code even when reveal succeeds.
-      await Process.start('explorer', <String>[
-        '/select,$hostPath',
-      ], mode: ProcessStartMode.detached);
+      await Process.start(
+        'explorer',
+        windowsExplorerArguments(hostPath, isDirectory: false),
+        mode: ProcessStartMode.detached,
+      );
       return;
     }
     throw UnsupportedError('Reveal is only supported on desktop');

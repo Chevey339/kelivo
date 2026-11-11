@@ -64,8 +64,9 @@ class BrowserGlassBackdrop extends InheritedTheme {
       BrowserGlassBackdrop(native: native, child: child);
 }
 
-/// Optical browser chrome. UIKit composites real glass over WKWebView on iOS;
-/// Impeller refracts the Flutter scene (including Android's texture WebView).
+/// Optical browser chrome. UIKit composites system glass on iOS 26 or blur on
+/// earlier versions over WKWebView. Impeller refracts the Flutter scene
+/// (including Android's texture WebView).
 /// Neither path takes WebView screenshots. Contents remain sharp above it.
 class BrowserGlass extends StatefulWidget {
   const BrowserGlass({
@@ -412,7 +413,9 @@ class _BrowserGlassState extends State<BrowserGlass>
       builder: (context, _) => DecoratedBox(
         key: const ValueKey('browserMaterialCover'),
         decoration: BoxDecoration(
-          color: solidColor.withValues(alpha: opacity * _cover.value),
+          color: solidColor.withValues(
+            alpha: solidColor.a * opacity * _cover.value,
+          ),
           borderRadius: corners,
           border: Border.all(
             color: solidBorder.withValues(

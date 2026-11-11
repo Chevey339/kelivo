@@ -1,0 +1,26 @@
+import 'app_database.dart';
+
+-- This is a derived, content-bearing index. It never owns user input state.
+CREATE VIRTUAL TABLE gen_ui_surface_search USING fts5(
+  search_text
+);
+
+CREATE TRIGGER gen_ui_state_search_insert
+AFTER INSERT ON gen_ui_surface_state_rows BEGIN
+  INSERT INTO gen_ui_surface_search(rowid, search_text)
+    VALUES (new.rowid, new.search_text);
+END;
+
+-- View/input-only updates do not retokenize the semantic projection.
+CREATE TRIGGER gen_ui_state_search_update
+AFTER UPDATE OF search_text ON gen_ui_surface_state_rows
+WHEN old.search_text != new.search_text BEGIN
+  DELETE FROM gen_ui_surface_search WHERE rowid = old.rowid;
+  INSERT INTO gen_ui_surface_search(rowid, search_text)
+    VALUES (new.rowid, new.search_text);
+END;
+
+CREATE TRIGGER gen_ui_state_search_delete
+AFTER DELETE ON gen_ui_surface_state_rows BEGIN
+  DELETE FROM gen_ui_surface_search WHERE rowid = old.rowid;
+END;

@@ -6,19 +6,21 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/services/browser/browser_engine.dart';
 
-/// Keeps page content below the header until the actual WKWebView confirms its
-/// native obscured inset. Fixed/sticky website headers then remain WebKit-owned.
+/// Keeps page content clear of browser controls until the actual WKWebView
+/// confirms its native insets. Fixed/sticky website elements remain WebKit-owned.
 class BrowserViewportInsets extends StatefulWidget {
   const BrowserViewportInsets({
     super.key,
     required this.tabId,
     required this.top,
+    this.bottom = 0,
     required this.builder,
     this.viewIdentity,
   });
 
   final String? tabId;
   final double top;
+  final double bottom;
 
   /// Changes when the same tab replaces a terminated/evicted native runtime.
   final Object? viewIdentity;
@@ -42,6 +44,8 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
   final _owner = 'browser-insets-${_nextOwner++}';
   Timer? _retry;
   int _generation = 0;
+  int _latestRequest = 0;
+  bool _applyScheduled = false;
   int _attempts = 0;
   bool _supported = false;
   bool _applied = false;
@@ -139,9 +143,11 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
       _applied = false;
       // Retained renderers keep their obscured inset even while another tab
       // (including the start page) is active. The owner releases them together
-      // when its host is disposed; native updates apply a new top to all leases.
+      // when its host is disposed; native updates apply insets to all leases.
     }
-    if (_supported && !_applied) _synchronize();
+    if (_supported && (!_applied || oldWidget.bottom != widget.bottom)) {
+      _synchronize();
+    }
   }
 
   void _synchronize() {
@@ -150,9 +156,11 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
     }
     _retry?.cancel();
     _attempts = 0;
-    final generation = ++_generation;
+    if (_applyScheduled) return;
+    _applyScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && generation == _generation) unawaited(_apply(generation));
+      _applyScheduled = false;
+      if (mounted) unawaited(_apply(_generation));
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
@@ -163,12 +171,14 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
     }
     final tabId = widget.tabId;
     if (tabId == null) return;
+    final request = ++_latestRequest;
     try {
       final applied =
           await _channel.invokeMethod<bool>('setBrowserViewportInsets', {
             'owner': _owner,
             'marker': browserTabUserScriptMarker(tabId),
             'top': widget.top,
+            'bottom': widget.bottom,
           }) ??
           false;
       if (!mounted || generation != _generation) return;
@@ -179,6 +189,9 @@ class _BrowserViewportInsetsState extends State<BrowserViewportInsets> {
             _retainedUnderlap = false;
           });
         }
+      } else if (request != _latestRequest) {
+        // A later animation frame has already sent the current geometry.
+        return;
       } else if (++_attempts < 20) {
         // Platform view creation is asynchronous. Retry only while attaching;
         // steady-state frames never traverse the native view hierarchy.

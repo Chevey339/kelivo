@@ -16,6 +16,7 @@ import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../shared/widgets/snackbar.dart';
 import 'widgets/desktop_form_dialog.dart';
+import 'widgets/desktop_adaptive_panes.dart';
 
 Future<bool?> showDesktopModelSpecEditDialog(
   BuildContext context, {
@@ -100,6 +101,7 @@ class _ModelSpecEditDialogBody extends StatefulWidget {
 class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
   late final ModelSpecFormController _controller;
   _SpecSection _section = _SpecSection.basic;
+  bool _showDetail = true;
 
   @override
   void initState() {
@@ -141,7 +143,6 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
     return CallbackShortcuts(
@@ -187,38 +188,32 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
                     onClose: () => Navigator.of(context).maybePop(false),
                   ),
                   Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          width: 188,
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                            children: [
-                              for (final item in sections)
-                                DesktopFormDialogNavItem(
-                                  key: ValueKey('model-spec-nav-${item.name}'),
-                                  label: _sectionLabel(l10n, item),
-                                  subtitle: _sectionSubtitle(l10n, item, spec),
-                                  selected: item == section,
-                                  enabled: _sectionEnabled(item, spec),
-                                  onTap: () => setState(() => _section = item),
-                                ),
-                            ],
-                          ),
-                        ),
-                        VerticalDivider(
-                          width: 1,
-                          thickness: 0.5,
-                          color: cs.outlineVariant.withValues(alpha: 0.12),
-                        ),
-                        Expanded(
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                            children: [_sectionBody(section)],
-                          ),
-                        ),
-                      ],
+                    child: DesktopAdaptivePanes(
+                      sidebarWidth: 188,
+                      showDetail: _showDetail,
+                      onBack: () => setState(() => _showDetail = false),
+                      backLabel: _sectionLabel(l10n, section),
+                      sidebar: ListView(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                        children: [
+                          for (final item in sections)
+                            DesktopFormDialogNavItem(
+                              key: ValueKey('model-spec-nav-${item.name}'),
+                              label: _sectionLabel(l10n, item),
+                              subtitle: _sectionSubtitle(l10n, item, spec),
+                              selected: item == section,
+                              enabled: _sectionEnabled(item, spec),
+                              onTap: () => setState(() {
+                                _section = item;
+                                _showDetail = true;
+                              }),
+                            ),
+                        ],
+                      ),
+                      detail: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        children: [_sectionBody(section)],
+                      ),
                     ),
                   ),
                   DesktopFormDialogFooter(
@@ -242,7 +237,10 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
 
   Widget _sectionBody(_SpecSection section) {
     return switch (section) {
-      _SpecSection.basic => BasicSection(controller: _controller),
+      _SpecSection.basic => BasicSection(
+        controller: _controller,
+        desktop: true,
+      ),
       _SpecSection.modalities => ModalityAbilitySection(
         controller: _controller,
       ),

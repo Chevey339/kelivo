@@ -90,6 +90,19 @@ void main() {
       expect(appended, [1]);
       expect(chunks.whereType<ToolCallStart>(), hasLength(1));
       expect(chunks.whereType<ToolCallResult>().single.output, 'res-call_1');
+      // The boundary separates the calls from the results and later rounds.
+      expect(
+        chunks
+            .where(
+              (c) =>
+                  c is TextDelta ||
+                  c is ToolCallEnd ||
+                  c is AssistantRoundEnd ||
+                  c is ToolCallResult,
+            )
+            .map((c) => c.runtimeType),
+        [TextDelta, ToolCallEnd, AssistantRoundEnd, ToolCallResult, TextDelta],
+      );
       expect(chunks.whereType<Finish>(), hasLength(1));
     },
   );
@@ -156,6 +169,7 @@ void main() {
 
     expect(sends, 2);
     expect(chunks.whereType<TextDelta>(), hasLength(2));
+    expect(chunks.whereType<AssistantRoundEnd>(), isEmpty);
     expect(chunks.whereType<Finish>(), hasLength(1));
   });
 

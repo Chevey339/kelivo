@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
+import 'package:markstream/src/flutter/render/html_style.dart';
 
 void main() {
   final light = ColorScheme.fromSeed(seedColor: Colors.blue);
@@ -52,7 +53,7 @@ void main() {
     );
   });
   test(
-    'app font families propagate while heading and chrome weights follow tokens',
+    'app font families and platform-adjusted weights propagate to all text',
     () {
       final theme = MarkstreamTheme.fromColorScheme(
         light,
@@ -65,22 +66,34 @@ void main() {
         ),
         codeFontFamily: 'AppMono',
         cjk: true,
-        medium: FontWeight.w400,
-        semibold: FontWeight.w500,
-        strong: FontWeight.w600,
+        fontWeightResolver: (weight) => switch (weight) {
+          FontWeight.w500 => FontWeight.w400,
+          FontWeight.w600 => FontWeight.w500,
+          FontWeight.w700 => FontWeight.w600,
+          _ => weight,
+        },
       );
       expect(theme.body.fontFamily, 'AppFont');
       expect(theme.body.height, 1.55);
       expect(theme.body.letterSpacing, 0);
       expect(theme.blockSpacing, 18);
-      expect(theme.headings.first.fontWeight, FontWeight.w700);
+      expect(theme.headings.first.fontWeight, FontWeight.w600);
       expect(theme.strongWeight, FontWeight.w600);
       expect(theme.link.fontSize, isNull);
-      expect(theme.headings[1].fontWeight, FontWeight.w600);
+      expect(theme.headings.map((style) => style.fontWeight), [
+        FontWeight.w600,
+        FontWeight.w500,
+        FontWeight.w500,
+        FontWeight.w400,
+        FontWeight.w400,
+        FontWeight.w400,
+      ]);
+      expect(theme.chrome.label.fontWeight, FontWeight.w400);
       expect(theme.details.summary.fontWeight, FontWeight.w400);
       expect(theme.table.heading.fontFamily, 'AppFont');
-      expect(theme.table.heading.fontWeight, FontWeight.w600);
+      expect(theme.table.heading.fontWeight, FontWeight.w500);
       expect(theme.code.text.fontFamily, 'AppMono');
+      expect(theme.monospace, theme.code.text);
       expect(theme.code.text.fontFamilyFallback, ['AppCjk']);
       expect(theme.inlineCode.text.fontFamilyFallback, ['AppCjk']);
       expect(theme.inlineCode.text.fontFamily, 'AppMono');
@@ -98,6 +111,42 @@ void main() {
       );
       expect(minimal.body.fontSize, 15.5);
       expect(minimal.body.color, light.onSurface);
+    },
+  );
+  test(
+    'font weight resolver survives theme copies and resolves numeric HTML',
+    () {
+      final theme = MarkstreamTheme.fromColorScheme(
+        light,
+        bodyStyle: const TextStyle(color: Colors.purple),
+        fontWeightResolver: (weight) => switch (weight) {
+          FontWeight.w500 => FontWeight.w400,
+          FontWeight.w600 ||
+          FontWeight.w700 ||
+          FontWeight.w800 ||
+          FontWeight.w900 => FontWeight.w500,
+          _ => weight,
+        },
+      );
+      for (final copy in [theme, theme.copyWith(), theme.blockContentTheme]) {
+        for (final (source, expected) in [
+          ('300', FontWeight.w300),
+          ('normal', FontWeight.w400),
+          ('500', FontWeight.w400),
+          ('600', FontWeight.w500),
+          ('700', FontWeight.w500),
+          ('900', FontWeight.w500),
+          ('bold', FontWeight.w500),
+        ]) {
+          final node = HtmlElementNode(
+            span: const SourceSpan(0, 0),
+            tag: 'span',
+            attributes: {'style': 'font-weight: $source'},
+            children: const [],
+          );
+          expect(htmlTextStyle(node, copy.body, copy).fontWeight, expected);
+        }
+      }
     },
   );
   test(
@@ -164,18 +213,36 @@ void main() {
         first.copyWith(
           colors: first.colors.copyWith(),
           chrome: first.chrome.copyWith(),
+          monospace: first.monospace.copyWith(),
           inlineCode: first.inlineCode.copyWith(),
+          keyboard: first.keyboard.copyWith(),
           quote: first.quote.copyWith(),
           task: first.task.copyWith(),
           table: first.table.copyWith(),
+          code: first.code.copyWith(chrome: first.code.chrome.copyWith()),
           details: first.details.copyWith(),
         ),
         first,
       );
       for (final changed in [
+        first.copyWith(
+          monospace: first.monospace.copyWith(fontFamily: 'OtherMono'),
+        ),
+        first.copyWith(
+          code: first.code.copyWith(
+            chrome: first.code.chrome.copyWith(height: 40),
+          ),
+        ),
+        first.copyWith(code: first.code.copyWith(bodyPadding: EdgeInsets.zero)),
+        first.copyWith(
+          code: first.code.copyWith(titlePadding: EdgeInsets.zero),
+        ),
+        first.copyWith(code: first.code.copyWith(actionSpacing: 16)),
+        first.copyWith(fontWeightResolver: (_) => FontWeight.w400),
         first.copyWith(colors: first.colors.copyWith(border: Colors.red)),
         first.copyWith(chrome: first.chrome.copyWith(height: 40)),
         first.copyWith(inlineCode: first.inlineCode.copyWith(opticalCenter: 8)),
+        first.copyWith(keyboard: first.keyboard.copyWith(opticalCenter: 8)),
         first.copyWith(quote: first.quote.copyWith(textColor: Colors.red)),
         first.copyWith(task: first.task.copyWith(strokeWidth: 2)),
         first.copyWith(

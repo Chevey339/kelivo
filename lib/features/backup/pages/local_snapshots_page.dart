@@ -163,6 +163,7 @@ class _LocalSnapshotsPageState extends State<LocalSnapshotsPage> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _CopyCard(
                   copy: copy,
+                  enabled: !vm.working,
                   onRestore: () => _restore(context, vm, copy),
                   onExport: () => _export(context, vm, copy),
                   onDelete: () => _delete(context, vm, copy),
@@ -579,6 +580,7 @@ Future<bool?> _confirm(
 class _CopyCard extends StatelessWidget {
   const _CopyCard({
     required this.copy,
+    required this.enabled,
     required this.onRestore,
     required this.onExport,
     required this.onDelete,
@@ -586,6 +588,7 @@ class _CopyCard extends StatelessWidget {
   });
 
   final LocalCopy copy;
+  final bool enabled;
   final VoidCallback onRestore;
   final VoidCallback onExport;
   final VoidCallback onDelete;
@@ -675,6 +678,7 @@ class _CopyCard extends StatelessWidget {
                       icon: Lucide.RotateCcw,
                       label: l10n.localSnapshotActionRestore,
                       fontSize: 13,
+                      enabled: enabled,
                       onTap: onRestore,
                     ),
                   ),
@@ -684,16 +688,18 @@ class _CopyCard extends StatelessWidget {
                       icon: Lucide.Share2,
                       label: l10n.localSnapshotActionExport,
                       fontSize: 13,
+                      enabled: enabled,
                       onTap: onExport,
                     ),
                   ),
-                  if (!copy.discovered) const SizedBox(width: 8),
-                  if (!copy.discovered)
+                  if (copy.canDelete) const SizedBox(width: 8),
+                  if (copy.canDelete)
                     Expanded(
                       child: IosTileButton(
                         icon: Lucide.Trash2,
                         label: l10n.localSnapshotActionDelete,
                         fontSize: 13,
+                        enabled: enabled,
                         backgroundColor: cs.error,
                         onTap: onDelete,
                       ),
@@ -709,6 +715,7 @@ class _CopyCard extends StatelessWidget {
                         ? l10n.localSnapshotActionUnpin
                         : l10n.localSnapshotActionPin,
                     fontSize: 13,
+                    enabled: enabled,
                     onTap: onTogglePin!,
                   ),
                 ),

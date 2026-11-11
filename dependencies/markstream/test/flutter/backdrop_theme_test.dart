@@ -101,6 +101,40 @@ void main() {
         expect(a.colors.copyWith(fillBlockOpaque: Colors.red), isNot(a.colors));
       }
     });
+    test('block ink stays paired with its surface ($brightness)', () {
+      final bodyInk = dark ? Colors.black : Colors.white;
+      for (final backdrop in MarkstreamBackdrop.values) {
+        final theme = MarkstreamTheme.fromColorScheme(
+          scheme,
+          bodyStyle: TextStyle(color: bodyInk),
+          backdrop: backdrop,
+        );
+        expect(theme.body.color, bodyInk);
+        expect(theme.code.text.color, scheme.onSurface);
+        expect(theme.table.heading.color, scheme.onSurface);
+        expect(theme.colors.ink, scheme.onSurface);
+        final inheritedInk = backdrop == MarkstreamBackdrop.plain
+            ? scheme.onSurface
+            : bodyInk;
+        expect(theme.proseInk, inheritedInk);
+        expect(
+          theme.quote.textColor,
+          inheritedInk.withValues(alpha: dark ? .70 : .72),
+        );
+        expect(theme.headings.last.color, theme.quote.textColor);
+        expect(
+          theme.task.checkedText.color,
+          inheritedInk.withValues(alpha: theme.colors.ink3.a),
+        );
+        final content = theme.blockContentTheme;
+        expect(content.body.color, scheme.onSurface);
+        expect(content.proseInk, scheme.onSurface);
+        expect(content.headings.first.color, scheme.onSurface);
+        expect(content.quote.textColor, content.colors.ink2);
+        expect(content.task.checkedText.color, content.colors.ink3);
+        expect(content.blockContentTheme, same(content));
+      }
+    });
     testWidgets(
       'wallpaper table capture composites an opaque header ($brightness)',
       (tester) async {
@@ -158,4 +192,57 @@ void main() {
       },
     );
   }
+
+  testWidgets('cached details use the latest document with their own ink', (
+    tester,
+  ) async {
+    final source = ValueNotifier(
+      '<details>\n<summary>Fold</summary>\n\nInside\n\n</details>\n\nTail',
+    );
+    addTearDown(source.dispose);
+    final scheme = ColorScheme.fromSeed(seedColor: Colors.blue);
+    final theme = MarkstreamTheme.fromColorScheme(
+      scheme,
+      bodyStyle: const TextStyle(color: Colors.white),
+      backdrop: MarkstreamBackdrop.wallpaper,
+    );
+    DocumentNode? renderedDocument;
+    Color? renderedInk;
+    final extensions = MarkstreamExtensions(
+      nodeBuilders: NodeBuilderRegistry(
+        blocks: {
+          ParagraphNode: (context, node, rendering) {
+            final text = toPlainText(node);
+            if (text == 'Inside') {
+              renderedDocument = rendering.document;
+              renderedInk = rendering.theme.body.color;
+            }
+            return Text(text, style: rendering.theme.body);
+          },
+        },
+      ),
+    );
+    await tester.pumpWidget(
+      host(
+        ValueListenableBuilder<String>(
+          valueListenable: source,
+          builder: (_, value, _) => MarkstreamView(
+            source: value,
+            streaming: true,
+            theme: theme,
+            extensions: extensions,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(renderedDocument, isNull);
+    source.value += '\n\nNew tail';
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fold'));
+    await tester.pumpAndSettle();
+    expect(renderedDocument?.source, source.value);
+    expect(renderedInk, scheme.onSurface);
+    expect(tester.takeException(), isNull);
+  });
 }

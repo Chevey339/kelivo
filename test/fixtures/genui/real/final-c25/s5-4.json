@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "39f1c336545c2aecca0093dcbcaa54ca446e557d",
+  "task": "s5-4",
+  "response": "关闭开关后，明细字段会被隐藏，但其中的值仍会保留，并且不参与必填校验；只有显示时才校验明细。点击按钮只会生成可编辑的检查草稿，不会自动发送。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form,ask])\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\nform = Form(children=[toggle,nameField,detailField], title=\"补充意见\")\ntoggle = Switch(label=\"填写明细\", bind=$on)\nnameField = TextField(label=\"姓名\", bind=$name, required=true, placeholder=\"请输入姓名\")\ndetailField = TextField(label=\"明细\", bind=$detail, required=true, visible=$on)\nask = Button(label=\"准备检查草稿\", form=form, action=Ask(text=\"请检查此补充意见表单；这是可编辑草稿，尚未发送。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}))\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: Supplemental-feedback Form matches all bindings, conditional validation and exact Ask context. The visible button/prose say editable draft and not automatically sent."
+  }
+}

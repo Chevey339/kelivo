@@ -6,7 +6,7 @@ enum Modality { text, image, audio, video, pdf }
 
 enum ModelAbility { tool, reasoning, structuredOutput }
 
-enum ReasoningLevel { auto, off, minimal, low, medium, high, xhigh, max }
+enum ReasoningLevel { auto, off, on, minimal, low, medium, high, xhigh, max }
 
 enum ReasoningDialect {
   none,
@@ -15,6 +15,7 @@ enum ReasoningDialect {
   openrouterReasoning,
   anthropicBudget,
   anthropicAdaptiveEffort,
+  anthropicBetweenTools,
   anthropicEffort,
   geminiThinkingBudget,
   geminiThinkingLevel,

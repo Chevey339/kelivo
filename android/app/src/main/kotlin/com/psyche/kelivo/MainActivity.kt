@@ -11,6 +11,7 @@ import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.android.FlutterSurfaceView
+import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import com.psyche.kelivo.workspace.WorkspacePlugin
 import io.flutter.plugin.common.MethodChannel
@@ -25,6 +26,7 @@ class MainActivity : FlutterActivity() {
     private val kelivo get() = application as KelivoApplication
     private var reusedEngine = false
     private val highRefreshRate by lazy { HighRefreshRateController(window) }
+    private var selectionMenu: AndroidSelectionMenu? = null
 
     override fun provideFlutterEngine(context: android.content.Context): FlutterEngine {
         reusedEngine = kelivo.hasEngine
@@ -51,9 +53,16 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onStop() {
+        selectionMenu?.dismiss()
         highRefreshRate.stop()
         kelivo.backgroundRuntime.setForeground(false)
         super.onStop()
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (selectionMenu?.handleBack() == true) return
+        super.onBackPressed()
     }
 
     private companion object {
@@ -110,6 +119,9 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
          super.configureFlutterEngine(flutterEngine)
         kelivo.messageInput.attachActivity(this)
+        selectionMenu = AndroidSelectionMenu(flutterEngine.dartExecutor.binaryMessenger) {
+            findViewById<FlutterView>(FlutterActivity.FLUTTER_VIEW_ID)
+        }
         incomingShareHandler = IncomingShareHandler(this, flutterEngine.dartExecutor.binaryMessenger)
          OAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
          kelivo.backgroundRuntime.attachActivity(this)
@@ -128,6 +140,11 @@ class MainActivity : FlutterActivity() {
         }
         fileSaveChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, fileSaveChannelName)
         fileSaveChannel?.setMethodCallHandler { call, result ->
+            // DartMessenger may have queued this handler before it was removed.
+            if (fileSaveChannel == null) {
+                result.error("cancelled", "The file picker was closed.", null)
+                return@setMethodCallHandler
+            }
             when (call.method) {
                 "saveFileFromPath" -> handleSaveFileFromPath(call.arguments, result)
                 "createWritableFile" -> handleCreateWritableFile(call.arguments, result)
@@ -171,15 +188,22 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    override fun onDestroy() {
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        // The shared engine can move to another Activity before this one is
+        // destroyed. Remove these handlers during detach, before its new host
+        // registers replacements on the same messenger.
         kelivo.messageInput.detachActivity(this)
+        selectionMenu?.dispose()
+        selectionMenu = null
         deviceLocalToolsHandler?.detachActivity(this)
         kelivo.backgroundRuntime.detachActivity(this)
         OAuthHandler.detachActivity(this)
         processTextChannel?.setMethodCallHandler(null)
+        processTextChannel = null
         fileSaveChannel?.setMethodCallHandler(null)
+        fileSaveChannel = null
         deviceStorageChannel?.setMethodCallHandler(null)
-        highRefreshRate.dispose()
+        deviceStorageChannel = null
         finishPendingSave(pendingSaveResult) {
             it.error("cancelled", "The file picker was closed.", null)
         }
@@ -195,9 +219,16 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        // Submitted writes and cleanup finish, but this detached host is done.
         writableFileExecutor.shutdown()
         incomingShareHandler?.dispose()
+        incomingShareHandler = null
         workspacePlugin?.detachActivity(this)
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun onDestroy() {
+        highRefreshRate.dispose()
         super.onDestroy()
     }
  

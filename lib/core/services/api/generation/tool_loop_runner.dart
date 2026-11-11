@@ -1,3 +1,4 @@
+import '../request_history_context.dart';
 import 'dart:async';
 
 import '../../../../utils/mcp_structured_image.dart';
@@ -20,7 +21,11 @@ Stream<StreamChunk> _withRequestUsage(
   var startsRequest = true;
   await for (final chunk in source) {
     if (chunk is Usage) {
-      yield Usage(chunk.usage, startsRequest: startsRequest);
+      yield Usage(
+        chunk.usage,
+        startsRequest: startsRequest,
+        estimated: chunk.estimated,
+      );
       startsRequest = false;
     } else {
       yield chunk;
@@ -104,6 +109,7 @@ Stream<StreamChunk> runClientToolFollowUps({
   bool emitCalls = false,
   TokenUsage? Function()? usageOf,
 }) async* {
+  RequestHistoryContext.current?.roundCompleted();
   var calls = List<EmitToolCall>.from(initialCalls);
   while (calls.isNotEmpty) {
     final usage = usageOf?.call();
@@ -132,6 +138,7 @@ Stream<StreamChunk> runClientToolFollowUps({
       retryRound?.call(sendFollowUp) ?? sendFollowUp(),
       usageOf,
     );
+    RequestHistoryContext.current?.roundCompleted();
     calls = takeCallsAfterRound();
   }
   yield* finish();
@@ -157,20 +164,23 @@ Stream<StreamChunk> runProviderToolRounds({
       retryRound?.call(sendRound) ?? sendRound(),
       usageOf,
     );
+    RequestHistoryContext.current?.roundCompleted();
     final calls = takeCalls();
     if (calls.isEmpty && !continueWithoutCalls()) {
       yield* finish();
       return;
     }
     final executed = <ExecutedClientTool>[];
-    if (executeAfterRound && calls.isNotEmpty && onToolCall != null) {
-      final usage = usageOf?.call();
-      final totalTokens = usage?.totalTokens ?? 0;
-      if (emitCalls) {
-        yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
-      }
+    final execute = executeAfterRound && calls.isNotEmpty ? onToolCall : null;
+    final usage = usageOf?.call();
+    final totalTokens = usage?.totalTokens ?? 0;
+    if (execute != null && emitCalls) {
+      yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
+    }
+    if (calls.isNotEmpty) yield const AssistantRoundEnd();
+    if (execute != null) {
       for (final call in calls) {
-        executed.add(await _executeClientTool(call, onToolCall));
+        executed.add(await _executeClientTool(call, execute));
       }
       yield* emitToolResults(
         [for (final item in executed) _emitExecuted(item)],

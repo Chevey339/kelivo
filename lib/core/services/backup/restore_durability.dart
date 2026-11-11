@@ -5,6 +5,7 @@ import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
 import 'restore_diagnostic_exception.dart';
+import '../../../utils/windows_file_path.dart';
 
 abstract interface class RestoreDurability {
   Future<void> restrictFile(File file);
@@ -425,7 +426,9 @@ final class _WindowsRestoreDurability implements RestoreDurability {
         expectedType) {
       throw FileSystemException('restore_durability_path_type', entity.path);
     }
-    final nativePath = entity.absolute.path.toNativeUtf16();
+    final nativePath = extendedWindowsFilePath(
+      entity.absolute.path,
+    ).toNativeUtf16();
     late final int handle;
     var openError = 0;
     try {
@@ -497,8 +500,8 @@ final class _WindowsRestoreDurability implements RestoreDurability {
         FileSystemEntityType.notFound) {
       throw FileSystemException('restore_durability_target_exists', target);
     }
-    final nativeSource = sourcePath.toNativeUtf16();
-    final nativeTarget = target.toNativeUtf16();
+    final nativeSource = extendedWindowsFilePath(sourcePath).toNativeUtf16();
+    final nativeTarget = extendedWindowsFilePath(target).toNativeUtf16();
     try {
       // MOVEFILE_WRITE_THROUGH is the only durability primitive used here.
       // Same-volume rename and directory metadata remain Windows acceptance

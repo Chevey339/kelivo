@@ -30,8 +30,10 @@ linter:
 # https://dart.dev/guides/language/analysis-options
 analyzer:
   exclude:
+    - dependencies/flutter_inappwebview_*/**
     - dependencies/flutter_math_fork/**
     - dependencies/flutter_tts/**
+    - dependencies/liquid_glass_widgets/**
     - build/**
     - android/**
     - ios/**

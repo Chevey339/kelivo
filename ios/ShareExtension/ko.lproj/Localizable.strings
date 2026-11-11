@@ -1,0 +1,9 @@
+"saved" = "Kelivo에 저장됨";
+"savedMessage" = "Kelivo를 열어 이 초안을 검토하고 전송하세요.";
+"partialMessage" = "일부 파일을 저장하지 못했습니다. Kelivo를 열어 수신된 내용을 확인하세요.";
+"done" = "완료";
+"failed" = "저장할 수 없음";
+"failedMessage" = "파일을 사용할 수 있고 저장 공간이 충분한지 확인한 후 다시 시도하세요. 최대 32개 파일을 지원합니다.";
+"importing" = "가져오는 중";
+"cancel" = "취소";
+"opening" = "Kelivo 여는 중…";

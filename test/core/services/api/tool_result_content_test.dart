@@ -1,3 +1,6 @@
+import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/services/mcp/mcp_image_snapshot.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -37,6 +40,119 @@ void main() {
       kMcpResultMetadataKey: mcpResultMetadata([image.path]),
     };
   });
+
+  test(
+    'missing sources do not create another empty restoration result',
+    () async {
+      final entry = ChatContextImage(
+        identity: const ContextImageIdentity('a', 'tool:drawing'),
+        uri: image.path,
+        source: ContextImageSource.tool,
+        label: 'drawing',
+      );
+      final context = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [entry],
+      );
+      await image.delete();
+      final body = await context.project({
+        'input': [
+          {
+            'role': 'user',
+            'content': [
+              {'type': 'input_image', 'image_url': entry.reference},
+            ],
+          },
+        ],
+      });
+      expect(jsonEncode(body), contains('unavailable'));
+      expect(jsonEncode(body), isNot(contains('Use read_chat_image')));
+      expect(context.readImage(entry.handle).metadata, isNull);
+    },
+  );
+
+  test(
+    'adding an MCP image again retains the snapshot path boundary',
+    () async {
+      final private = await File(
+        '${directory.path}/images/upload.png',
+      ).writeAsBytes(await image.readAsBytes());
+      final entry = ChatContextImage(
+        identity: const ContextImageIdentity('a', 'tool:untrusted'),
+        uri: private.path,
+        source: ContextImageSource.tool,
+        label: 'untrusted',
+      );
+      final context = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [entry],
+      );
+      expect(await context.attachmentPath(entry.handle), isNull);
+    },
+  );
+
+  test(
+    'explicit MIME survives local materialization and independent restoration',
+    () async {
+      final photo = await File(
+        '${directory.path}/upload',
+      ).writeAsBytes(img.encodeJpg(img.Image(width: 3, height: 2)));
+      final entry = ChatContextImage(
+        identity: const ContextImageIdentity('u', 'part:0'),
+        uri: photo.path,
+        mime: 'image/jpg',
+        source: ContextImageSource.user,
+        label: 'photo',
+      );
+      final context = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [entry],
+        targetMessageId: 'a',
+      );
+      Map<String, dynamic> body(String ref) => {
+        'messages': [
+          {
+            'role': 'user',
+            'content': [
+              {
+                'type': 'image',
+                'source': {
+                  'type': 'base64',
+                  'media_type': 'image/jpeg',
+                  'data': ref.substring(ref.indexOf(',') + 1),
+                },
+              },
+            ],
+          },
+        ],
+      };
+      final sent = await context.project(body(entry.reference));
+      expect(
+        sent['messages'][0]['content'][0]['source']['media_type'],
+        'image/jpeg',
+      );
+      final restored = context.readImage(entry.handle);
+      final refs = context.toolReferences(
+        'read_chat_image',
+        [entry.uri],
+        restored.metadata,
+        'read',
+      );
+      final independent = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [context.images.last],
+      );
+      final replay = await independent.project(body(refs.single));
+      expect(
+        replay['messages'][0]['content'][0]['source']['media_type'],
+        'image/jpeg',
+      );
+      expect(
+        replay['messages'][0]['content'][0]['source']['data'],
+        sent['messages'][0]['content'][0]['source']['data'],
+      );
+    },
+  );
 
   tearDown(() async {
     PathProviderPlatform.instance = originalPaths;
@@ -121,6 +237,105 @@ void main() {
       }
       expect(requests, 3);
       expect(await Directory('${directory.path}/images').list().length, 1);
+    },
+  );
+
+  test(
+    'URL replay snapshots the first bytes per occurrence across requests',
+    () async {
+      final first = await image.readAsBytes();
+      final second = img.encodePng(img.Image(width: 5, height: 5));
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      var requests = 0;
+      server.listen((request) async {
+        requests++;
+        request.response.headers.contentType = ContentType('image', 'png');
+        request.response.add(requests == 1 ? first : second);
+        await request.response.close();
+      });
+      final uri = 'http://127.0.0.1:${server.port}/changing.png';
+      final concurrent = await Future.wait([
+        McpImageSnapshot.readDataUrl(uri, cacheKey: 'first-occurrence'),
+        McpImageSnapshot.readDataUrl(uri, cacheKey: 'first-occurrence'),
+      ]);
+      expect(concurrent, [dataUrl, dataUrl]);
+      expect(
+        await McpImageSnapshot.readDataUrl(uri, cacheKey: 'first-occurrence'),
+        dataUrl,
+      );
+      expect(requests, 1);
+      expect(
+        await McpImageSnapshot.readDataUrl(uri, cacheKey: 'new-occurrence'),
+        isNot(dataUrl),
+      );
+      expect(requests, 2);
+    },
+  );
+
+  test(
+    'restoring an old URL reuses its original snapshot at the new occurrence',
+    () async {
+      final bytes = await image.readAsBytes();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      var fetches = 0;
+      server.listen((request) async {
+        fetches++;
+        request.response.add(
+          fetches == 1 ? bytes : img.encodePng(img.Image(width: 9, height: 9)),
+        );
+        await request.response.close();
+      });
+      final original = ChatContextImage(
+        identity: const ContextImageIdentity('old', 'tool:first'),
+        uri: 'http://127.0.0.1:${server.port}/changing.png',
+        source: ContextImageSource.tool,
+        label: 'drawing',
+      );
+      final context = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [original],
+        targetMessageId: 'new',
+      );
+      Map<String, dynamic> body(String ref) => {
+        'input': [
+          {
+            'type': 'function_call_output',
+            'call_id': 'c',
+            'output': [
+              {'type': 'input_image', 'image_url': ref},
+            ],
+          },
+        ],
+      };
+      final first = await context.project(body(original.reference));
+      final recalled = context.readImage(original.handle);
+      await context.run(() async* {
+        final result = await ToolResultContent.read(
+          'read_chat_image',
+          recalled.content,
+          metadata: recalled.metadata,
+          toolCallId: 'second',
+        );
+        final restored = await context.project(body(result.imageUrls.single));
+        expect(
+          (restored['input'] as List).single['output'],
+          (first['input'] as List).single['output'],
+        );
+        expect(context.images.last.materializationKey, original.key);
+        yield 0;
+      }).drain<void>();
+      expect(fetches, 1);
+      final restarted = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: List.of(context.images),
+      );
+      expect(
+        (await restarted.project(body(context.images.last.reference)))['input'],
+        first['input'],
+      );
+      expect(fetches, 1);
     },
   );
 

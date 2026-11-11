@@ -13,7 +13,10 @@ namespace flutter_inappwebview_plugin
   CustomSchemeResponse::CustomSchemeResponse(const flutter::EncodableMap& map)
     : data(get_fl_map_value<std::vector<uint8_t>>(map, "data")),
     contentType(get_fl_map_value<std::string>(map, "contentType")),
-    contentEncoding(get_fl_map_value<std::string>(map, "contentEncoding"))
+    contentEncoding(get_fl_map_value<std::string>(map, "contentEncoding")),
+    headers(fl_map_contains_not_null(map, "headers")
+      ? get_fl_map_value<std::string, std::string>(map, "headers", {})
+      : std::map<std::string, std::string>{})
   {}
 
   flutter::EncodableMap CustomSchemeResponse::toEncodableMap() const
@@ -21,7 +24,8 @@ namespace flutter_inappwebview_plugin
     return flutter::EncodableMap{
       {"data", make_fl_value(data)},
       {"contentType", make_fl_value(contentType)},
-      {"contentEncoding", make_fl_value(contentEncoding)}
+      {"contentEncoding", make_fl_value(contentEncoding)},
+      {"headers", make_fl_value(std::make_optional(headers))}
     };
   }
 
@@ -51,6 +55,9 @@ namespace flutter_inappwebview_plugin
         }
         responseHeaders->AppendHeader(L"Cache-Control", L"no-store");
         responseHeaders->AppendHeader(L"X-Content-Type-Options", L"nosniff");
+        for (const auto& [name, value] : headers) {
+          responseHeaders->AppendHeader(utf8_to_wide(name).c_str(), utf8_to_wide(value).c_str());
+        }
       }
 
       webResourceResponse->AddRef();

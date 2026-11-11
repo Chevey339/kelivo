@@ -79,6 +79,7 @@ final class InlineParser {
       final container =
           node is EmphasisNode ||
           node is StrikethroughNode ||
+          node is HighlightNode ||
           node is LinkNode ||
           node is ImageNode ||
           node is NamedInlineNode;
@@ -104,9 +105,11 @@ final class InlineParser {
         pending.add((node, true));
         for (final child in children.reversed) pending.add((child, false));
       } else {
-        converted[node] = replaceChildren(node, [
-          for (final child in parsed[node]!) converted[child]!,
-        ]) as InlineNode;
+        converted[node] =
+            replaceChildren(node, [
+                  for (final child in parsed[node]!) converted[child]!,
+                ])
+                as InlineNode;
       }
     }
     return List.unmodifiable([for (final root in roots) converted[root]!]);
@@ -248,6 +251,7 @@ final class _InlineSession {
             36,
             58,
             126,
+            61,
           }.contains(c) &&
           !syntaxes.any((syntax) => syntax.startCharacters.contains(c))) {
         i++;
@@ -400,10 +404,11 @@ final class _InlineSession {
         consumed = true;
       } else if (c == 42 ||
           c == 95 && options.underscoreEmphasis ||
-          c == 126 && options.strikethrough) {
+          c == 126 && options.strikethrough ||
+          c == 61 && options.highlight) {
         final start = i;
         while (i < text.length && text.codeUnitAt(i) == c) i++;
-        if (c == 126 && i - start != 2) {
+        if ((c == 126 || c == 61) && i - start != 2) {
           _literal(start, i);
           run = i;
           continue;
@@ -547,7 +552,9 @@ final class _InlineSession {
         }
         result.addAll(mapped.slice(cursor, node.text.length));
         converted[node] = result;
-      } else if (node is EmphasisNode || node is StrikethroughNode) {
+      } else if (node is EmphasisNode ||
+          node is StrikethroughNode ||
+          node is HighlightNode) {
         if (!visited) {
           pending.add((node, true));
           for (final child in node.children.cast<InlineNode>().reversed)
@@ -555,8 +562,9 @@ final class _InlineSession {
         } else {
           converted[node] = [
             replaceChildren(node, [
-              for (final child in node.children) ...converted[child]!,
-            ]) as InlineNode,
+                  for (final child in node.children) ...converted[child]!,
+                ])
+                as InlineNode,
           ];
         }
       } else {
@@ -697,6 +705,7 @@ final class _InlineSession {
       while (opener != null && opener.index > minimum) {
         final odd =
             closer.character != 126 &&
+            closer.character != 61 &&
             (opener.canClose || closer.canOpen) &&
             (opener.length + closer.length) % 3 == 0 &&
             (opener.length % 3 != 0 || closer.length % 3 != 0);
@@ -718,6 +727,8 @@ final class _InlineSession {
       final wrapped = _Part(
         closer.character == 126
             ? StrikethroughNode(span: input.span(a, b), children: children)
+            : closer.character == 61
+            ? HighlightNode(span: input.span(a, b), children: children)
             : EmphasisNode(
                 span: input.span(a, b),
                 children: children,
@@ -771,6 +782,12 @@ final class _InlineSession {
             final start = opener.part.end - used;
             final node = opener.character == 126
                 ? StrikethroughNode(
+                    span: input.span(start, text.length),
+                    children: children,
+                    closed: false,
+                  )
+                : opener.character == 61
+                ? HighlightNode(
                     span: input.span(start, text.length),
                     children: children,
                     closed: false,

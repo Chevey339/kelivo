@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class ThemePalette {
   final String id;
-  final String zhName;
-  final String enName;
+  final String? customName;
   final ColorScheme light;
   final ColorScheme dark;
 
   const ThemePalette({
     required this.id,
-    required this.zhName,
-    required this.enName,
+    this.customName,
     required this.light,
     required this.dark,
   });
 
-  String get displayNameZh => zhName;
-  String get displayNameEn => enName;
+  String displayName(AppLocalizations l10n) => switch (id) {
+    ThemePalettes.defaultId => l10n.themePaletteDefault,
+    ThemePalettes.blueId => l10n.themePaletteBlue,
+    ThemePalettes.greenId => l10n.themePaletteGreen,
+    ThemePalettes.purpleId => l10n.themePalettePurple,
+    ThemePalettes.yellowId => l10n.themePaletteYellow,
+    ThemePalettes.smokyRoseId => l10n.themePaletteSmokyRose,
+    ThemePalettes.terracottaId => l10n.themePaletteTerracotta,
+    ThemePalettes.monochromeId => l10n.themePaletteMonochrome,
+    ThemePalettes.docThemeId => l10n.themePaletteDocument,
+    _ =>
+      (customName?.isNotEmpty ?? false) ? customName! : l10n.themePaletteCustom,
+  };
 }
 
 class ThemePalettes {
@@ -32,8 +42,6 @@ class ThemePalettes {
 
   static const ThemePalette defaultPalette = ThemePalette(
     id: defaultId,
-    zhName: '默认',
-    enName: 'Default',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF4D5C92),
@@ -99,8 +107,6 @@ class ThemePalettes {
   // Blue palette: derived from provided logs
   static const ThemePalette blue = ThemePalette(
     id: blueId,
-    zhName: '海霄蓝',
-    enName: 'Aether Blue',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF3E5E98),
@@ -166,8 +172,6 @@ class ThemePalettes {
   // Green palette
   static const ThemePalette green = ThemePalette(
     id: greenId,
-    zhName: '竹影绿',
-    enName: 'Bamboo Green',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF166C47),
@@ -233,8 +237,6 @@ class ThemePalettes {
   // Purple palette
   static const ThemePalette purple = ThemePalette(
     id: purpleId,
-    zhName: '暮紫韵',
-    enName: 'Twilight Purple',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF5D5698),
@@ -300,8 +302,6 @@ class ThemePalettes {
   // Yellow palette
   static const ThemePalette yellow = ThemePalette(
     id: yellowId,
-    zhName: '琥珀金',
-    enName: 'Amber Gold',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF855304),
@@ -367,8 +367,6 @@ class ThemePalettes {
   // New: Smoky Rose palette — exact values from logs
   static const ThemePalette smokyRose = ThemePalette(
     id: smokyRoseId,
-    zhName: '暮霭玫',
-    enName: 'Smoky Rose',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF824E6C),
@@ -434,8 +432,6 @@ class ThemePalettes {
   // New: Terracotta Clay palette — exact values from logs
   static const ThemePalette terracotta = ThemePalette(
     id: terracottaId,
-    zhName: '陶砂红',
-    enName: 'Terracotta Clay',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF8B4E3B),
@@ -500,8 +496,6 @@ class ThemePalettes {
 
   static const ThemePalette monochrome = ThemePalette(
     id: monochromeId,
-    zhName: '纸墨灰',
-    enName: 'Frost Gray',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF000000),
@@ -567,8 +561,6 @@ class ThemePalettes {
   // New: Document Theme palette based on provided spec
   static const ThemePalette docTheme = ThemePalette(
     id: docThemeId,
-    zhName: '樱桃绿',
-    enName: 'Verdant Mint',
     light: ColorScheme(
       brightness: Brightness.light,
       primary: Color(0xFF00B96B),

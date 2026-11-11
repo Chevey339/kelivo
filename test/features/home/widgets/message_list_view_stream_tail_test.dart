@@ -1,6 +1,8 @@
 import "../../../support/business_test_harness.dart";
 
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/message_part_snapshot.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
@@ -14,6 +16,8 @@ import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:markstream/markstream.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +27,171 @@ const _streamingId = 'probe-streaming';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets(
+    'long tool reply stays lazy inside the production message viewport',
+    (tester) async {
+      final key = GlobalKey<_ProbeHarnessState>();
+      await tester.pumpWidget(_ProbeHarness(key: key));
+      final state = key.currentState!;
+      final builder = MessagePartSnapshotBuilder(arrivalOrdered: true);
+      final parts = <MessagePart>[
+        for (var i = 0; i < 1000; i++)
+          ToolCallPart(
+            '{"id":"long-$i","name":"mcp_read_file","content":"done"}',
+          ),
+        const TextPart('tail'),
+      ];
+      Future<void> frames() async {
+        for (var i = 0; i < 30; i++) {
+          await tester.pump(const Duration(milliseconds: 30));
+        }
+      }
+
+      state.pushParts(builder.update(parts));
+      await frames();
+      state.scrollController.jumpTo(
+        state.scrollController.position.maxScrollExtent,
+      );
+      await frames();
+      expect(find.byKey(const ValueKey('tool-id:long-999')), findsOneWidget);
+      final mounted = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget.key is ValueKey<String> &&
+                (widget.key as ValueKey<String>).value.startsWith(
+                  'tool-id:long-',
+                ),
+          )
+          .evaluate()
+          .length;
+      expect(mounted, lessThan(150));
+      state.scrollController.jumpTo(
+        state.scrollController.position.maxScrollExtent / 2,
+      );
+      state.scrollCtrl.handleUserScrollIntent();
+      await frames();
+      final before = state.scrollController.offset;
+      parts[1000] = const TextPart('tail with more text');
+      state.pushParts(builder.update(parts, changed: {1000}));
+      await frames();
+      expect(
+        state.scrollController.offset,
+        moreOrLessEquals(before, epsilon: 1),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  for (final input in ['touch', 'wheel', 'keyboard']) {
+    testWidgets(
+      '$input scroll up stays put through idle and more stream output',
+      (tester) async {
+        tester.view.physicalSize = const Size(1170, 2100);
+        tester.view.devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
+        Future<void> pumpFrames() async {
+          for (var frame = 0; frame < 20; frame++) {
+            await tester.pump(const Duration(milliseconds: 20));
+          }
+        }
+
+        final key = GlobalKey<_ProbeHarnessState>();
+        await tester.pumpWidget(_ProbeHarness(key: key));
+        await pumpFrames();
+        final state = key.currentState!;
+        final content = List.filled(
+          40,
+          'Streaming content for scroll testing.',
+        ).join('\n\n');
+        state.pushStreamTick(visibleContent: content, targetContent: content);
+        await pumpFrames();
+        final position = state.scrollController.position;
+        expect(position.extentAfter, lessThan(1));
+
+        final timeline = find.byType(MessageListView);
+        switch (input) {
+          case 'touch':
+            await tester.drag(timeline, const Offset(0, 30));
+          case 'wheel':
+            await tester.sendEventToBinding(
+              PointerScrollEvent(
+                position: tester.getCenter(timeline),
+                scrollDelta: const Offset(0, -12),
+              ),
+            );
+          case 'keyboard':
+            tester
+                .widget<Focus>(
+                  find.byKey(const ValueKey('timeline-keyboard-scroll-region')),
+                )
+                .focusNode!
+                .requestFocus();
+            await tester.pump();
+            await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        }
+        await pumpFrames();
+        expect(position.extentAfter, greaterThan(1));
+        if (input != 'keyboard') {
+          expect(position.extentAfter, lessThanOrEqualTo(56));
+        }
+        final readingOffset = position.pixels;
+        await tester.pump(const Duration(minutes: 2));
+        expect(state.scrollCtrl.autoStickToBottom, isFalse);
+
+        final updated = '$content\n\nMore streaming content.';
+        state.pushStreamTick(visibleContent: updated, targetContent: updated);
+        await pumpFrames();
+        expect(position.pixels, moreOrLessEquals(readingOffset, epsilon: 1));
+
+        state.finishStreaming(updated);
+        state.scrollCtrl.stickToBottomAfterGeneration();
+        await pumpFrames();
+        expect(position.pixels, moreOrLessEquals(readingOffset, epsilon: 1));
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('wheel scroll cancels the generation-finish pin before layout', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1170, 2100);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final key = GlobalKey<_ProbeHarnessState>();
+    await tester.pumpWidget(_ProbeHarness(key: key));
+    await tester.pump(const Duration(milliseconds: 100));
+    final state = key.currentState!;
+    final content = List.filled(
+      40,
+      'Content before generation ends.',
+    ).join('\n\n');
+    state.pushStreamTick(visibleContent: content, targetContent: content);
+    for (var frame = 0; frame < 20; frame++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    final position = state.scrollController.position;
+    expect(position.extentAfter, lessThan(1));
+
+    state.finishStreaming(content);
+    state.scrollCtrl.stickToBottomAfterGeneration();
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: tester.getCenter(find.byType(MessageListView)),
+        scrollDelta: const Offset(0, -12),
+      ),
+    );
+    final readingOffset = position.pixels;
+    expect(position.extentAfter, greaterThan(1));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(position.pixels, moreOrLessEquals(readingOffset, epsilon: 1));
+    expect(state.scrollCtrl.autoStickToBottom, isFalse);
+    await tester.pump(const Duration(seconds: 1));
+    expect(position.pixels, moreOrLessEquals(readingOffset, epsilon: 1));
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('生成结束时尾部高度变化被布局阶段吸收，不再跳一下再滑回底部', (tester) async {
@@ -128,7 +297,6 @@ class _ProbeHarnessState extends State<_ProbeHarness> {
       scrollController: scrollController,
       onStateChanged: () {},
       getAutoScrollEnabled: () => true,
-      getAutoScrollIdleSeconds: () => 3,
       isGenerating: () => generating,
     );
     streamingNotifier.getNotifier(_streamingId);
@@ -144,6 +312,21 @@ class _ProbeHarnessState extends State<_ProbeHarness> {
         for (final message in messages)
           if (message.id == _streamingId)
             message.copyWith(content: targetContent)
+          else
+            message,
+      ];
+    });
+    scrollCtrl.autoScrollToBottomIfNeeded();
+  }
+
+  void pushParts(List<MessagePart> parts) {
+    final text = parts.whereType<TextPart>().map((part) => part.text).join();
+    streamingNotifier.updateContent(_streamingId, text, 10, parts: parts);
+    setState(() {
+      messages = [
+        for (final message in messages)
+          if (message.id == _streamingId)
+            message.copyWith(parts: parts)
           else
             message,
       ];

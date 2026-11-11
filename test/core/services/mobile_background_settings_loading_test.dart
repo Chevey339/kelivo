@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/models/mobile_background_settings.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/mobile_background.dart';
@@ -47,6 +48,48 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
   });
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+    for (final theme in [ThemeMode.light, ThemeMode.dark]) {
+      test('restored integer opacity permits repeated generation on '
+          '${platform.name} in ${theme.name} mode', () async {
+        await storage.repository.setPreference(
+          'display_chat_input_background_opacity_dark_v1',
+          0,
+        );
+        await storage.repository.setPreference(
+          'display_chat_input_background_opacity_light_v1',
+          0.9500000000000002,
+        );
+        await storage.repository.setPreference('theme_mode_v1', theme.name);
+        final settings = SettingsProvider(
+          BusinessPreferences(storage.repository),
+        );
+        addTearDown(settings.dispose);
+        background.dispose();
+        background = MobileBackgroundCoordinator(
+          platform: platform,
+          channel: channel,
+        );
+
+        for (var attempt = 0; attempt < 2; attempt++) {
+          await background.configureFromSettings(settings, l10n);
+          await background.start(
+            id: 'run-$attempt',
+            conversationId: 'chat',
+            title: 'Chat',
+            cancel: () async {},
+          );
+        }
+
+        expect(settings.themeMode, theme);
+        expect(settings.chatInputBackgroundOpacityDark, 0.0);
+        expect(settings.chatInputBackgroundOpacityLight, 0.9500000000000002);
+        expect(background.settings.privacyMode, isTrue);
+        expect(background.activeTaskIds, {'run-0', 'run-1'});
+      });
+    }
+  }
 
   testWidgets('saved privacy loads after the last frame before backgrounding', (
     tester,

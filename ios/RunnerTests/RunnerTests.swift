@@ -164,6 +164,137 @@ class IncomingShareHandlerTests: XCTestCase {
   }
 }
 
+@MainActor
+final class AppBackupPolicyTests: XCTestCase {
+  private func withContainer(_ body: (URL) throws -> Void) throws {
+    let container = FileManager.default.temporaryDirectory
+      .appendingPathComponent("backup-policy-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: container) }
+    for name in ["Documents", "Library"] {
+      try FileManager.default.createDirectory(
+        at: container.appendingPathComponent(name), withIntermediateDirectories: true)
+    }
+    try body(container)
+  }
+
+  private func isExcluded(_ directory: URL) throws -> Bool {
+    try URL(fileURLWithPath: directory.path)
+      .resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true
+  }
+
+  func testExistingDatabasesSnapshotsAndFilesArePreserved() throws {
+    try withContainer { container in
+      let paths = [
+        "Documents/kelivo 2.db", "Documents/kelivo 2.db-wal",
+        "Documents/snapshots 2/kelivo-snapshot-1.zip", "Documents/images/old.png",
+        "Documents/upload/attachment.pdf",
+        "Library/Application Support/kelivo-data/kelivo.db",
+        "Library/Application Support/kelivo-data/kelivo.db-wal",
+        "Library/Application Support/.kelivo_database_history.json",
+        "Library/Preferences/app.plist",
+      ]
+      for path in paths {
+        let file = container.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(path.utf8).write(to: file)
+      }
+      try AppBackupPolicy.apply(in: container)
+      for name in ["Documents", "Library"] {
+        XCTAssertTrue(try isExcluded(container.appendingPathComponent(name)))
+      }
+      for path in paths {
+        XCTAssertEqual(try Data(contentsOf: container.appendingPathComponent(path)), Data(path.utf8))
+      }
+    }
+  }
+
+  func testNewFilesAndAtomicReplacementKeepRootExclusion() throws {
+    try withContainer { container in
+      try AppBackupPolicy.apply(in: container)
+      for name in ["Documents", "Library"] {
+        let directory = container.appendingPathComponent(name)
+        let file = directory.appendingPathComponent("restored.db")
+        try Data("original".utf8).write(to: file)
+        try Data("restored".utf8).write(to: file, options: .atomic)
+        XCTAssertTrue(try isExcluded(directory))
+        XCTAssertEqual(try Data(contentsOf: file), Data("restored".utf8))
+        // A directory returned by a system restore may lack the attribute.
+        var mutableDirectory = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = false
+        try mutableDirectory.setResourceValues(values)
+      }
+      try AppBackupPolicy.apply(in: container)
+      for name in ["Documents", "Library"] {
+        XCTAssertTrue(try isExcluded(container.appendingPathComponent(name)))
+      }
+    }
+  }
+
+  func testInvalidRootIsPreservedAndOtherRootStillExcluded() throws {
+    try withContainer { container in
+      let invalid = container.appendingPathComponent("Documents")
+      try FileManager.default.removeItem(at: invalid)
+      try Data("preserve me".utf8).write(to: invalid)
+      XCTAssertThrowsError(try AppBackupPolicy.apply(in: container))
+      XCTAssertEqual(try Data(contentsOf: invalid), Data("preserve me".utf8))
+      XCTAssertTrue(try isExcluded(container.appendingPathComponent("Library")))
+    }
+  }
+
+  func testDoesNotFollowRootSymlinks() throws {
+    try withContainer { container in
+      let external = container.appendingPathComponent("external", isDirectory: true)
+      try FileManager.default.createDirectory(at: external, withIntermediateDirectories: true)
+      try FileManager.default.removeItem(at: container.appendingPathComponent("Documents"))
+      try FileManager.default.createSymbolicLink(
+        at: container.appendingPathComponent("Documents"), withDestinationURL: external)
+      XCTAssertThrowsError(try AppBackupPolicy.apply(in: container))
+      XCTAssertFalse(try isExcluded(external))
+      XCTAssertTrue(try isExcluded(container.appendingPathComponent("Library")))
+    }
+  }
+
+  func testMissingRootIsNotRecreatedAndReturnedDataCanBeExcluded() throws {
+    try withContainer { container in
+      let documents = container.appendingPathComponent("Documents")
+      let returning = container.appendingPathComponent("returning-documents")
+      let fileName = "kelivo 2.db"
+      let original = Data("old database that returns later".utf8)
+      try original.write(to: documents.appendingPathComponent(fileName))
+      try FileManager.default.moveItem(at: documents, to: returning)
+      XCTAssertThrowsError(try AppBackupPolicy.apply(in: container))
+      XCTAssertFalse(FileManager.default.fileExists(atPath: documents.path))
+      XCTAssertTrue(try isExcluded(container.appendingPathComponent("Library")))
+      try FileManager.default.moveItem(at: returning, to: documents)
+      try AppBackupPolicy.apply(in: container)
+      XCTAssertTrue(try isExcluded(documents))
+      XCTAssertEqual(try Data(contentsOf: documents.appendingPathComponent(fileName)), original)
+    }
+  }
+
+  func testAppLaunchExcludesTheActualContainer() throws {
+    let container = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+    for name in ["Documents", "Library"] {
+      XCTAssertTrue(try isExcluded(container.appendingPathComponent(name)))
+    }
+  }
+
+  func testForegroundReappliesTheActualContainerPolicy() throws {
+    let container = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+    defer { try? AppBackupPolicy.apply(in: container) }
+    var documents = container.appendingPathComponent("Documents")
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = false
+    try documents.setResourceValues(values)
+    XCTAssertFalse(try isExcluded(documents))
+    let delegate = try XCTUnwrap(UIApplication.shared.delegate as? AppDelegate)
+    delegate.applicationDidBecomeActive(UIApplication.shared)
+    XCTAssertTrue(try isExcluded(documents))
+  }
+}
+
 class RunnerTests: XCTestCase {
 
   @MainActor

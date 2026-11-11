@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/api/native_input_attachments.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -214,8 +216,8 @@ List<String> _imagePayloads(dynamic value) {
       out.add(Uri.parse(value['image_url']['url'] as String).data!.contentText);
     } else if (value['type'] == 'image' && value['source'] is Map) {
       out.add(value['source']['data'] as String);
-    } else if (value['inlineData'] is Map) {
-      out.add(value['inlineData']['data'] as String);
+    } else if (value['inlineData'] is Map || value['inline_data'] is Map) {
+      out.add((value['inlineData'] ?? value['inline_data'])['data'] as String);
     } else {
       for (final item in value.values) {
         out.addAll(_imagePayloads(item));
@@ -381,6 +383,405 @@ void main() {
       expect(merged.reasoningTokens, 0);
     },
   );
+
+  for (final api in _Api.values) {
+    for (final stream in [false, true]) {
+      test(
+        '${api.name} stream=$stream exposes recall only after an image arrives',
+        () async {
+          final file = File('${imageRoot.path}/images/mcp_img_recall.png');
+          await file.writeAsBytes(
+            img.encodePng(img.Image(width: 2, height: 2)),
+          );
+          final requests = <Map<String, dynamic>>[];
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          var first = true;
+          server.listen((request) async {
+            final body =
+                jsonDecode(await utf8.decoder.bind(request).join())
+                    as Map<String, dynamic>;
+            requests.add(body);
+            final callTool = first;
+            first = false;
+            final isStream =
+                body['stream'] == true ||
+                request.uri.path.contains('streamGenerateContent');
+            request.response.headers.contentType = isStream
+                ? ContentType('text', 'event-stream')
+                : ContentType.json;
+            request.response.write(
+              isStream
+                  ? _sse(api, callTool)
+                  : jsonEncode(_response(api, callTool)),
+            );
+            await request.response.close();
+          });
+          final model = _model(api);
+          final config = ProviderConfig(
+            id: 'recall-test',
+            name: 'recall-test',
+            enabled: true,
+            apiKey: 'test-key',
+            baseUrl: 'http://127.0.0.1:${server.port}',
+            providerType: switch (api) {
+              _Api.chat || _Api.responses => ProviderKind.openai,
+              _Api.claude => ProviderKind.claude,
+              _ => ProviderKind.google,
+            },
+            useResponseApi: api == _Api.responses,
+            vertexAI: api == _Api.vertexClaude,
+            projectId: api == _Api.vertexClaude ? 'test' : null,
+            location: api == _Api.vertexClaude ? 'global' : null,
+            modelOverrides: {
+              model: {
+                'input': ['text', 'image'],
+                'abilities': ['tool'],
+              },
+            },
+          );
+          final candidates = [
+            ..._imageTools('view_image'),
+            ..._imageTools('read_chat_image'),
+          ];
+          final original = jsonEncode(candidates);
+          for (final allowRecall in [true, false]) {
+            requests.clear();
+            first = true;
+            final context = RequestImageContext(
+              settings: ImageContextSettings(allowRecall: allowRecall),
+              images: [],
+            );
+            final chunks = await ChatApiService.sendMessageStream(
+              config: config,
+              modelId: model,
+              stream: stream,
+              messages: const [
+                {'role': 'user', 'content': 'Inspect plot.png.'},
+              ],
+              tools: candidates,
+              imageContext: context,
+              onToolCall: (name, args, {toolCallId}) async => ClientToolResult(
+                'Image',
+                metadata: {
+                  ...const WorkspaceToolMetadata(
+                    tool: 'view_image',
+                    status: 'ok',
+                  ).toJson(),
+                  kMcpResultMetadataKey: mcpResultMetadata([file.path]),
+                },
+              ),
+            ).toList();
+            expect(chunks.isGenerationDone, isTrue);
+            expect(requests, hasLength(2));
+            expect(
+              jsonEncode(requests.first['tools']),
+              isNot(contains('read_chat_image')),
+            );
+            expect(
+              jsonEncode(requests.last['tools']).contains('read_chat_image'),
+              allowRecall,
+            );
+            expect(_imagePayloads(requests.last), isNotEmpty);
+            expect(context.images, isNotEmpty);
+            expect(jsonEncode(candidates), original);
+          }
+          requests.clear();
+          first = false;
+          await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: model,
+            stream: stream,
+            messages: const [
+              {'role': 'user', 'content': 'Hello'},
+            ],
+            tools: _imageTools('read_chat_image'),
+            imageContext: RequestImageContext(
+              settings: const ImageContextSettings(),
+              images: [],
+            ),
+          ).drain<void>();
+          expect(requests, hasLength(1));
+          expect(requests.single, isNot(contains('tools')));
+          expect(requests.single, isNot(contains('tool_choice')));
+          expect(requests.single, isNot(contains('toolConfig')));
+        },
+      );
+    }
+  }
+
+  for (final api in _Api.values) {
+    test(
+      '${api.name} preserves the original mixed Markdown request before eviction',
+      () async {
+        final png = img.encodePng(img.Image(width: 4, height: 4));
+        final file = File('${imageRoot.path}/images/attachment.png');
+        await file.writeAsBytes(png);
+        final remote = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => remote.close(force: true));
+        var remoteRequests = 0;
+        remote.listen((request) async {
+          remoteRequests++;
+          request.response.headers.contentType = ContentType('image', 'png');
+          request.response.add(png);
+          await request.response.close();
+        });
+        final url = 'http://127.0.0.1:${remote.port}/remote.png';
+        final raw =
+            'before ![remote diagram]($url) ![local diagram](${file.path}) after';
+        final messages = <Map<String, dynamic>>[
+          {'role': 'user', 'content': raw, imageContextOwnerKey: 'user'},
+        ];
+        final imageContext = RequestImageContext(
+          settings: const ImageContextSettings(),
+          images: [],
+          latestUserId: 'user',
+          inlineRemoteUsers: api == _Api.vertexClaude,
+        );
+        await imageContext.prepareMessages(
+          messages,
+          [],
+          parseMarkdownImages: true,
+          allowRemoteImages:
+              api == _Api.chat ||
+              api == _Api.responses ||
+              api == _Api.vertexClaude,
+        );
+        expect(remoteRequests, 0);
+        final requests = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          requests.add(
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>,
+          );
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(jsonEncode(_response(api, false)));
+          await request.response.close();
+        });
+        final config = ProviderConfig(
+          id: 'markdown',
+          name: 'markdown',
+          enabled: true,
+          apiKey: 'key',
+          baseUrl: 'http://127.0.0.1:${server.port}',
+          providerType: switch (api) {
+            _Api.chat || _Api.responses => ProviderKind.openai,
+            _Api.claude => ProviderKind.claude,
+            _ => ProviderKind.google,
+          },
+          useResponseApi: api == _Api.responses,
+          vertexAI: api == _Api.vertexClaude,
+          projectId: api == _Api.vertexClaude ? 'test' : null,
+          location: api == _Api.vertexClaude ? 'global' : null,
+          modelOverrides: {
+            _model(api): {
+              'input': ['text', 'image'],
+              'abilities': ['tool'],
+            },
+          },
+        );
+        for (final managed in [true, false]) {
+          await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: _model(api),
+            messages: managed
+                ? messages
+                : [
+                    {'role': 'user', 'content': raw},
+                  ],
+            imageContext: managed ? imageContext : null,
+            stream: false,
+          ).toList();
+        }
+        expect(requests, hasLength(2));
+        expect(jsonEncode(requests.first), jsonEncode(requests.last));
+        expect(jsonEncode(requests.first), contains('![remote diagram]($url)'));
+        expect(jsonEncode(requests.first), isNot(contains('_kelivo_image_')));
+      },
+    );
+  }
+
+  for (final api in _Api.values) {
+    for (final stream in [false, true]) {
+      test(
+        '${api.name} stream=$stream applies the image budget on the wire in every round',
+        () async {
+          final file = File('${imageRoot.path}/images/mcp_img_budget.png');
+          final png = img.encodePng(img.Image(width: 4, height: 4));
+          await file.writeAsBytes(png);
+          final user = ChatMessage(
+            id: 'user',
+            role: 'user',
+            conversationId: 'chat',
+            parts: [ImagePart(uri: file.path)],
+          );
+          final metadata = {
+            kMcpResultMetadataKey: mcpResultMetadata([file.path]),
+          };
+          final old = ChatMessage(
+            id: 'old',
+            role: 'assistant',
+            conversationId: 'chat',
+            parts: [
+              for (var i = 0; i < 12; i++)
+                ToolCallPart(
+                  jsonEncode({
+                    'id': 'previous_$i',
+                    'name': 'view_image',
+                    'content': 'old text $i',
+                    'metadata': metadata,
+                  }),
+                ),
+            ],
+          );
+          final messages = <Map<String, dynamic>>[
+            {
+              'role': 'user',
+              'content': 'Inspect ![](${file.path})',
+              imageContextOwnerKey: user.id,
+            },
+            for (var i = 0; i < 12; i++) ...[
+              {
+                'role': 'assistant',
+                'content': '',
+                'tool_calls': [
+                  {
+                    'id': 'previous_$i',
+                    'type': 'function',
+                    'function': {
+                      'name': 'view_image',
+                      'arguments': '{"path":"plot.png"}',
+                    },
+                  },
+                ],
+              },
+              {
+                'role': 'tool',
+                'tool_call_id': 'previous_$i',
+                'name': 'view_image',
+                'content': 'old text $i',
+                'metadata': {...metadata, imageContextOwnerKey: old.id},
+              },
+            ],
+          ];
+          final baselineMessages = (jsonDecode(jsonEncode(messages)) as List)
+              .cast<Map<String, dynamic>>();
+          final imageContext = RequestImageContext(
+            settings: const ImageContextSettings(),
+            images: RequestImageContext.collect([user, old]),
+            latestUserId: user.id,
+            targetMessageId: 'active',
+          );
+          await imageContext.prepareMessages(
+            messages,
+            [],
+            parseMarkdownImages: true,
+            allowRemoteImages: true,
+          );
+          expect(
+            (await imageContext.preview()).where((im) => im.included).length,
+            13,
+          );
+          final requests = <Map<String, dynamic>>[];
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          server.listen((request) async {
+            final body =
+                jsonDecode(await utf8.decoder.bind(request).join())
+                    as Map<String, dynamic>;
+            requests.add(body);
+            final streaming =
+                body['stream'] == true ||
+                request.uri.path.contains('streamGenerateContent');
+            request.response.headers.contentType = streaming
+                ? ContentType('text', 'event-stream')
+                : ContentType.json;
+            request.response.write(
+              streaming
+                  ? _sse(api, requests.length == 1)
+                  : jsonEncode(_response(api, requests.length == 1)),
+            );
+            await request.response.close();
+          });
+          final model = _model(api);
+          final config = ProviderConfig(
+            id: 'budget',
+            name: 'budget',
+            enabled: true,
+            apiKey: 'key',
+            baseUrl: 'http://127.0.0.1:${server.port}',
+            providerType: switch (api) {
+              _Api.chat || _Api.responses => ProviderKind.openai,
+              _Api.claude => ProviderKind.claude,
+              _ => ProviderKind.google,
+            },
+            useResponseApi: api == _Api.responses,
+            vertexAI: api == _Api.vertexClaude,
+            projectId: api == _Api.vertexClaude ? 'test' : null,
+            location: api == _Api.vertexClaude ? 'global' : null,
+            modelOverrides: {
+              model: {
+                'input': ['text', 'image'],
+                'abilities': ['tool'],
+              },
+            },
+          );
+          await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: model,
+            messages: messages,
+            imageContext: imageContext,
+            userImagePaths: imageContext.preparePaths([file.path]),
+            tools: _imageTools('view_image'),
+            stream: stream,
+            onToolCall: (_, args, {toolCallId}) async =>
+                ClientToolResult('latest screenshot', metadata: metadata),
+          ).toList();
+          expect(requests.length, 2);
+          expect(_imagePayloads(requests[0]).length, 13);
+          final historyKey = api == _Api.responses
+              ? 'input'
+              : api == _Api.gemini || api == _Api.gemini3
+              ? 'contents'
+              : 'messages';
+          expect(
+            jsonEncode((requests[1][historyKey] as List).first),
+            jsonEncode((requests[0][historyKey] as List).first),
+            reason: 'tool continuation preserves the original user prefix',
+          );
+          expect(
+            _imagePayloads(requests[1]).length,
+            5,
+            reason: 'one user attachment and four tool observations',
+          );
+          for (final body in requests) {
+            expect(jsonEncode(body), isNot(contains('kelivo-image-ref:')));
+            expect(jsonEncode(body), isNot(contains(imageContextOwnerKey)));
+            for (var i = 0; i < 12; i++) {
+              expect(jsonEncode(body), contains('old text $i'));
+            }
+          }
+          expect('omitted'.allMatches(jsonEncode(requests[1])).length, 9);
+          await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: model,
+            messages: baselineMessages,
+            userImagePaths: [file.path],
+            tools: _imageTools('view_image'),
+            stream: stream,
+            onToolCall: (_, args, {toolCallId}) async => 'done',
+          ).toList();
+          expect(
+            jsonEncode(requests.last),
+            jsonEncode(requests.first),
+            reason: 'no eviction preserves the exact original payload',
+          );
+        },
+      );
+    }
+  }
 
   for (final api in _Api.values) {
     for (final (stream, mcp, browser) in [

@@ -178,12 +178,7 @@ void main() {
         final run = live
             ? registry.start('tc-shell', 'shell', command: 'download')
             : null;
-        addTearDown(() {
-          for (final run in registry.all) {
-            run.dispose();
-          }
-          registry.dispose();
-        });
+        addTearDown(registry.dispose);
         final part = _shellPart(
           command: 'download',
           stdout: '10%\r\x1b[32m 100%  \x1b[0m\r\n',

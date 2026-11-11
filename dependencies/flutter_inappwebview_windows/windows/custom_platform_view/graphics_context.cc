@@ -7,46 +7,33 @@ namespace flutter_inappwebview_plugin
 {
   GraphicsContext::GraphicsContext(rx::RoHelper* rohelper) : rohelper_(rohelper)
   {
-    device_ = CreateD3DDevice();
+    device_ = CreateD3DDevice(initializationResult_);
     if (!device_) {
       return;
     }
 
     device_->GetImmediateContext(device_context_.put());
-    if (FAILED(CreateDirect3D11DeviceFromDXGIDevice(
+    initializationResult_ = CreateDirect3D11DeviceFromDXGIDevice(
       device_.try_as<IDXGIDevice>().get(),
-      (IInspectable**)device_winrt_.put()))) {
-      return;
-    }
-
-    valid_ = true;
+      (IInspectable**)device_winrt_.put());
   }
 
-  winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor>
-    GraphicsContext::CreateCompositor()
+  HRESULT GraphicsContext::CreateCompositor(
+    winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor>& compositor)
   {
     HSTRING className;
     HSTRING_HEADER classNameHeader;
 
-    if (FAILED(rohelper_->GetStringReference(
+    auto hr = rohelper_->GetStringReference(
       RuntimeClass_Windows_UI_Composition_Compositor, &className,
-      &classNameHeader))) {
-      return nullptr;
-    }
+      &classNameHeader);
+    if (FAILED(hr)) return hr;
 
     winrt::com_ptr<IActivationFactory> af;
-    if (FAILED(rohelper_->GetActivationFactory(
-      className, __uuidof(IActivationFactory), af.put_void()))) {
-      return nullptr;
-    }
-
-    winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> compositor;
-    if (FAILED(af->ActivateInstance(
-      reinterpret_cast<IInspectable**>(compositor.put())))) {
-      return nullptr;
-    }
-
-    return compositor;
+    hr = rohelper_->GetActivationFactory(
+      className, __uuidof(IActivationFactory), af.put_void());
+    if (FAILED(hr)) return hr;
+    return af->ActivateInstance(reinterpret_cast<IInspectable**>(compositor.put()));
   }
 
   winrt::com_ptr<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>

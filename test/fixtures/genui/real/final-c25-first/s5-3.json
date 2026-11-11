@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "80f455ea308cab4dc35fba96aa160489835d3dc1",
+  "task": "s5-3",
+  "response": "关闭开关时，明细字段会隐藏，其值仍保留，且不参与必填校验，因此仍可生成检查草稿。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form,ask])\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\nform = Form(children=[toggle,nameField,detailField], title=\"旅行同行人条件\")\ntoggle = Switch(label=\"需要同行人明细\", bind=$on)\nnameField = TextField(label=\"同行人姓名\", bind=$name, required=true)\ndetailField = TextField(label=\"同行人明细\", bind=$detail, required=true, visible=$on)\nask = Button(label=\"准备检查草稿\", form=form, action=Ask(text=\"请检查此旅行同行人条件表单，核对姓名与明细条件，并指出需要补充或确认的内容。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}))\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: companion name and conditional detail map correctly, name remains required, and the form-associated Ask uses the exact context for a review draft. Requested placeholder defaults are not presented as a real traveler record."
+  }
+}

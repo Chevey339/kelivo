@@ -1,4 +1,5 @@
 import 'package:markstream/markstream_core.dart';
+import '../../../utils/source_text_map.dart';
 
 /// Splits assistant markdown into paragraph chunks, one per bubble.
 ///
@@ -12,18 +13,49 @@ import 'package:markstream/markstream_core.dart';
 ///
 /// Returns a single-element list holding [text] unchanged when there is
 /// nothing to split.
-List<String> splitAssistantParagraphs(String text) {
-  if (text.trim().isEmpty) return <String>[text];
+List<String> splitAssistantParagraphs(String text) => [
+  for (final paragraph in splitAssistantParagraphsWithSource(text))
+    paragraph.text,
+];
+
+/// Display text retains the existing normalization; [span] also preserves the
+/// exact original interval for widgets whose identity belongs to source text.
+class AssistantParagraph {
+  const AssistantParagraph(this.text, this.span, {this._sourceMap});
+  final String text;
+  final SourceSpan span;
+  final SourceTextMap? _sourceMap;
+  SourceTextMap get sourceMap =>
+      _sourceMap ?? SourceTextMap.identity(text.length, offset: span.start);
+}
+
+List<AssistantParagraph> splitAssistantParagraphsWithSource(String text) {
+  final whole = AssistantParagraph(text, SourceSpan(0, text.length));
+  if (text.trim().isEmpty) return [whole];
 
   final lines = text.split('\n');
-  final chunks = <String>[];
+  final chunks = <AssistantParagraph>[];
   final current = <String>[];
   final structure = MarkdownStructure(text);
   var offset = 0;
+  var currentStart = 0, currentEnd = 0;
 
   void flush() {
-    final chunk = current.join('\n').trim();
-    if (chunk.isNotEmpty) chunks.add(chunk);
+    final raw = current.join('\n');
+    final chunk = raw.trim();
+    final trimStart = raw.length - raw.trimLeft().length;
+    if (chunk.isNotEmpty) {
+      chunks.add(
+        AssistantParagraph(
+          chunk,
+          SourceSpan(currentStart, currentEnd),
+          sourceMap: SourceTextMap.identity(
+            chunk.length,
+            offset: currentStart + trimStart,
+          ),
+        ),
+      );
+    }
     current.clear();
   }
 
@@ -40,11 +72,13 @@ List<String> splitAssistantParagraphs(String text) {
       flush();
       continue;
     }
+    if (current.isEmpty) currentStart = lineStart;
+    currentEnd = lineStart + line.length;
     current.add(line);
   }
   flush();
 
-  if (chunks.length < 2) return <String>[text];
+  if (chunks.length < 2) return [whole];
   return _mergeRelatedChunks(chunks);
 }
 
@@ -61,11 +95,24 @@ bool _continuesBlock(List<String> lines, int from) {
   return false;
 }
 
-List<String> _mergeRelatedChunks(List<String> chunks) {
-  final merged = <String>[];
+List<AssistantParagraph> _mergeRelatedChunks(List<AssistantParagraph> chunks) {
+  final merged = <AssistantParagraph>[];
   for (final chunk in chunks) {
-    if (merged.isNotEmpty && _shouldMerge(merged.last, chunk)) {
-      merged[merged.length - 1] = '${merged.last}\n\n$chunk';
+    if (merged.isNotEmpty && _shouldMerge(merged.last.text, chunk.text)) {
+      final previous = merged.last;
+      final gap = chunk.span.start - previous.span.end;
+      merged[merged.length - 1] = AssistantParagraph(
+        '${merged.last.text}\n\n${chunk.text}',
+        SourceSpan(merged.last.span.start, chunk.span.end),
+        sourceMap: SourceTextMap.join([
+          previous.sourceMap,
+          SourceTextMap.identity(
+            gap,
+            offset: previous.span.end,
+          ).replace([(0, gap, 2)]),
+          chunk.sourceMap,
+        ]),
+      );
       continue;
     }
     merged.add(chunk);

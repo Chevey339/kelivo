@@ -175,7 +175,6 @@ void main() {
 
       final context = await service.loadSelectedContextMessages(
         conversationId,
-        truncateIndex: -1,
         limit: limit,
       );
       expect(context.first.id, ids.first);

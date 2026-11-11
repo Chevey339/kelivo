@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../../core/models/avatar_config.dart';
 import '../../../core/models/mcp_presentation.dart';
 import '../../../core/services/mcp/mcp_icon_cache.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../../../shared/widgets/emoji_picker_dialog.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../provider/widgets/avatar_input_dialog.dart';
 import '../../provider/widgets/provider_icon_picker.dart';
 import 'mcp_text_dialog.dart';
 
@@ -63,25 +65,34 @@ Future<void> showMcpIconPicker(
         if (asset == null) return;
         icon = McpServerIcon(type: McpIconType.asset, value: asset);
       case AvatarSource.url:
-      case AvatarSource.lobehub:
-        final isUrl = choice == AvatarSource.url;
         final value = await _input(
           context,
           desktop: desktop,
-          title: isUrl
-              ? l10n.sideDrawerImageUrlDialogTitle
-              : l10n.providerAvatarLobehubDialogTitle,
-          hint: isUrl
-              ? l10n.sideDrawerImageUrlDialogHint
-              : l10n.providerAvatarLobehubDialogHint,
-          valid: (value) => isUrl
-              ? McpIconCache.isWebUri(Uri.tryParse(value))
-              : RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9-]*$').hasMatch(value),
+          title: l10n.sideDrawerImageUrlDialogTitle,
+          hint: l10n.sideDrawerImageUrlDialogHint,
+          valid: (value) => McpIconCache.isWebUri(Uri.tryParse(value)),
         );
         if (value == null) return;
+        icon = McpServerIcon(type: McpIconType.url, value: value);
+      case AvatarSource.lobehub:
+        final avatar = await showAvatarInputDialog(
+          context,
+          type: AvatarType.lobehub,
+          desktop: desktop ?? ResponsiveHelper.isDesktop(context),
+          initial: currentIcon?.type == McpIconType.lobehub
+              ? AvatarConfig(
+                  type: AvatarType.lobehub,
+                  value: currentIcon!.value,
+                  monochrome: currentIcon.monochrome,
+                )
+              : null,
+          keyPrefix: 'mcp-lobehub-icon',
+        );
+        if (avatar == null) return;
         icon = McpServerIcon(
-          type: isUrl ? McpIconType.url : McpIconType.lobehub,
-          value: value,
+          type: McpIconType.lobehub,
+          value: avatar.value,
+          monochrome: avatar.monochrome,
         );
     }
     if (context.mounted) await onSelected(icon);

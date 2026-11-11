@@ -19,6 +19,7 @@
 #include "ish/kernel/init.h"
 #include "ish/kernel/task.h"
 #include "ish/kernel/calls.h"
+#include "ish/kernel/mm.h"
 #include "ish/kernel/fs.h"
 #include "ish/fs/fake.h"
 #include "ish/fs/tty.h"
@@ -31,6 +32,8 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <mach/mach.h>
+#include <os/proc.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -48,6 +51,65 @@ static NSString *const kDnsSubdir = @"KelivoWorkspace/dns";
 static const char *kPublicDns[] = {"1.1.1.1", "8.8.8.8", "223.5.5.5"};
 
 extern void (*exit_hook)(struct task *task, int code);
+
+// iSH's commitment ledger counts V8 pages before they become resident, which
+// can exceed its fixed cap before Node runs JavaScript. Feed app headroom instead,
+// as OpenMinis does; iSH owns the pressure thresholds and stale-feed checks.
+static dispatch_queue_t kelivo_memory_queue;
+static bool kelivo_memory_pressure_critical;
+
+// Called only on kelivo_memory_queue so pressure changes and snapshots publish
+// in order, including synchronous refreshes requested by guest allocations.
+static void kelivo_update_memory_status(void) {
+    task_vm_info_data_t info;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) != KERN_SUCCESS)
+        return;
+    if (info.phys_footprint == 0) return;
+#if TARGET_OS_SIMULATOR
+    // The simulator has no per-app jetsam allowance. Use the same host RAM
+    // budget as iSH's macOS CLI instead of os_proc_available_memory().
+    uint64_t hostMemory = NSProcessInfo.processInfo.physicalMemory;
+    uint64_t limit = hostMemory - hostMemory / 5;
+    uint64_t available = limit > info.phys_footprint ? limit - info.phys_footprint : 0;
+#else
+    uint64_t available = os_proc_available_memory();
+    uint64_t limit = info.phys_footprint + available;
+#endif
+    // Zero headroom is a real exhaustion signal, not a failed measurement.
+    ish_set_memory_status(limit, available, kelivo_memory_pressure_critical);
+}
+
+static void kelivo_refresh_memory_status(void) {
+    dispatch_sync(kelivo_memory_queue, ^{ kelivo_update_memory_status(); });
+}
+
+static void kelivo_start_memory_monitor(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        kelivo_memory_queue = dispatch_queue_create("psyche.kelivo.workspace.ish.memory", DISPATCH_QUEUE_SERIAL);
+        static dispatch_source_t timer;
+        timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, kelivo_memory_queue);
+        dispatch_source_set_timer(timer, DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC, 50 * NSEC_PER_MSEC);
+        dispatch_source_set_event_handler(timer, ^{ kelivo_update_memory_status(); });
+        dispatch_resume(timer);
+
+        static dispatch_source_t pressure;
+        pressure = dispatch_source_create(DISPATCH_SOURCE_TYPE_MEMORYPRESSURE, 0,
+            DISPATCH_MEMORYPRESSURE_NORMAL | DISPATCH_MEMORYPRESSURE_WARN |
+                DISPATCH_MEMORYPRESSURE_CRITICAL, kelivo_memory_queue);
+        dispatch_source_set_event_handler(pressure, ^{
+            kelivo_memory_pressure_critical =
+                (dispatch_source_get_data(pressure) & DISPATCH_MEMORYPRESSURE_CRITICAL) != 0;
+            kelivo_update_memory_status();
+        });
+        dispatch_resume(pressure);
+    });
+    // A suspended process may resume a guest before its timer runs. Refresh
+    // at the allocation boundary too, without bypassing stale/pressure checks.
+    ish_set_memory_refresh_hook(kelivo_refresh_memory_status);
+    kelivo_refresh_memory_status();
+}
 
 #if !TARGET_OS_SIMULATOR
 extern const char *sock_tmp_prefix;
@@ -217,7 +279,12 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
 }
 
 - (void)performOnSpawnQueue:(void (^)(void))block {
-    dispatch_sync(_spawnQueue, block);
+    dispatch_sync(_spawnQueue, ^{
+        // Refresh synchronously after suspension, before a new command can
+        // encounter the kernel's two-second stale-feed limit.
+        if (_isBooted) kelivo_refresh_memory_status();
+        block();
+    });
 }
 
 #pragma mark - Boot
@@ -231,6 +298,7 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
     int err;
     KelivoISHInstallCrashGuards();
     KelivoISHInstallDieGuard();
+    kelivo_start_memory_monitor();
 
     _rootPath = rootPath;
     _dataPath = [rootPath stringByAppendingPathComponent:@"data"];

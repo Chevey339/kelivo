@@ -5,6 +5,7 @@ import WebKit
 class MainFlutterWindow: NSWindow {
   private let systemPower = DesktopSystemPowerState()
   private var powerChannel: FlutterMethodChannel?
+  private var browserShortcutCommands: Set<String> = ["cmd+f", "cmd+l", "cmd+t", "cmd+w", "cmd+r"]
   private var browserChromeChannel: FlutterMethodChannel?
   private var browserShortcutMonitor: Any?
   private var sidebarResizeChannel: FlutterMethodChannel?
@@ -22,6 +23,7 @@ class MainFlutterWindow: NSWindow {
   private var sidebarCursorFocusObserver: Any?
   private var sidebarCursorPoint: NSPoint?
   private let browserInsetLeases = BrowserViewportInsetLeases()
+  private let trafficLightSize: CGFloat = 12
   private var trafficLightConstraints: [(top: NSLayoutConstraint, left: NSLayoutConstraint)] = []
 
   deinit {
@@ -39,7 +41,7 @@ class MainFlutterWindow: NSWindow {
   private let autosaveName = NSWindow.FrameAutosaveName("KelivoMainWindowFrame")
 
   // Minimum reasonable content size to ensure the window is visible and usable.
-  private let minContentSize = NSSize(width: 960, height: 640)
+  private let minContentSize = NSSize(width: 360, height: 640)
 
   // Clamp a size within min bounds and the given screen's visible frame
   private func clampedSize(_ size: NSSize, for screen: NSScreen?) -> NSSize {
@@ -90,6 +92,9 @@ class MainFlutterWindow: NSWindow {
   // Layout helper: re-position the traffic light buttons
   private func layoutTrafficLightButton(titlebarView: NSView, button: NSButton, offsetTop: CGFloat, offsetLeft: CGFloat) {
     button.translatesAutoresizingMaskIntoConstraints = false
+    // Scale the native artwork along with its frame instead of clipping it.
+    button.setFrameSize(NSSize(width: trafficLightSize, height: trafficLightSize))
+    button.setBoundsSize(button.intrinsicContentSize)
     let top = NSLayoutConstraint(
       item: button,
       attribute: .top,
@@ -108,7 +113,11 @@ class MainFlutterWindow: NSWindow {
       multiplier: 1,
       constant: offsetLeft
     )
-    NSLayoutConstraint.activate([top, left])
+    NSLayoutConstraint.activate([
+      top, left,
+      button.widthAnchor.constraint(equalToConstant: trafficLightSize),
+      button.heightAnchor.constraint(equalToConstant: trafficLightSize),
+    ])
     trafficLightConstraints.append((top: top, left: left))
   }
 
@@ -282,10 +291,10 @@ class MainFlutterWindow: NSWindow {
   }
 
   private func setBrowserChrome(_ enabled: Bool) {
-    // Center the 14-point system buttons within the browser's 44-point tab row.
+    // Center the compact system buttons within the browser's 44-point tab row.
     // Restore the existing app layout when its route closes.
     for (index, constraints) in trafficLightConstraints.enumerated() {
-      constraints.top.constant = enabled ? 15 : 14
+      constraints.top.constant = enabled ? (44 - trafficLightSize) / 2 : 14
       constraints.left.constant = enabled ? 20 + CGFloat(index) * 24 : 12 + CGFloat(index) * 18
     }
     standardWindowButton(.closeButton)?.superview?.layoutSubtreeIfNeeded()
@@ -302,13 +311,28 @@ class MainFlutterWindow: NSWindow {
     // route; the Dart host disables it while another route covers the browser.
     browserShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
       [weak self] event in
-      guard let self = self, event.window === self, self.isKeyWindow,
-            event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-              .subtracting(.capsLock) == .command,
-            let key = event.charactersIgnoringModifiers?.lowercased(),
-            ["f", "l", "t", "w", "r"].contains(key) else { return event }
+      guard let self = self, event.window === self, self.isKeyWindow else { return event }
+      let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
+      let key: String
+      switch event.keyCode {
+      case 43: key = "comma"
+      case 33: key = "bracketleft"
+      case 30: key = "bracketright"
+      case 48: key = "tab"
+      case 53: key = "escape"
+      case 97: key = "f6"
+      default: key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+      }
+      var parts: [String] = []
+      if flags.contains(.control) { parts.append("ctrl") }
+      if flags.contains(.command) { parts.append("cmd") }
+      if flags.contains(.option) { parts.append("alt") }
+      if flags.contains(.shift) { parts.append("shift") }
+      parts.append(key == "," ? "comma" : key == "[" ? "bracketleft" : key == "]" ? "bracketright" : key)
+      let command = parts.joined(separator: "+")
+      guard self.browserShortcutCommands.contains(command) else { return event }
       if !event.isARepeat {
-        self.browserChromeChannel?.invokeMethod("shortcut", arguments: key)
+        self.browserChromeChannel?.invokeMethod("shortcut", arguments: command)
       }
       // Consume the original event, including autorepeat, so neither the
       // native main menu nor Flutter's fallback shortcuts execute it twice.
@@ -404,6 +428,11 @@ class MainFlutterWindow: NSWindow {
       }
       if call.method == "releaseBrowserViewportInsets" {
         if let owner = call.arguments as? String { self?.releaseBrowserInsets(owner: owner) }
+        result(nil)
+        return
+      }
+      if call.method == "setBrowserShortcutCommands", let commands = call.arguments as? [String] {
+        self?.browserShortcutCommands = Set(commands)
         result(nil)
         return
       }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../features/chat/widgets/frosted/chat_frosted_backdrop.dart';
+import 'widgets/desktop_pane_surface.dart';
+
 /// A custom Windows title bar implemented in Flutter.
 ///
 /// - Provides a drag area for moving the window
@@ -52,18 +55,8 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final brightness = theme.brightness;
-    final Color bg = theme.scaffoldBackgroundColor;
-    return Container(
+    final titleBar = SizedBox(
       height: 40,
-      decoration: BoxDecoration(
-        color: bg,
-        // border: Border(
-        //   bottom: BorderSide(
-        //     color: cs.outlineVariant.withOpacity(0.25),
-        //     width: 0.5,
-        //   ),
-        // ),
-      ),
       child: Row(
         children: [
           const SizedBox(width: 6),
@@ -92,5 +85,12 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
         ],
       ),
     );
+    // Sample the shared desktop wallpaper just like the adjacent sidebars.
+    // Keep the standalone window's solid surface when no wallpaper is present.
+    final wallpaper =
+        ChatFrostedBackdropScope.maybeOf(context)?.backgroundActive ?? false;
+    return wallpaper
+        ? DesktopPaneSurface(child: titleBar)
+        : ColoredBox(color: theme.scaffoldBackgroundColor, child: titleBar);
   }
 }

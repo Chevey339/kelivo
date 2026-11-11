@@ -18,10 +18,13 @@ final class BackupDecryptionException implements Exception {
   String toString() => 'backup_decryption_failed';
 }
 
-/// Version 2: KELIVENC (8 bytes), version (1), salt (16), nonce prefix (8),
+/// KELIVENC (8 bytes), version (1), salt (16), nonce prefix (8),
 /// plaintext length (8, big endian), followed by 1 MiB AES-256-GCM chunks.
 /// Each chunk has a 16-byte tag; even an empty file has one authenticated chunk.
-/// The key is PBKDF2-HMAC-SHA256(UTF-8 password, salt, 600000, 32).
+/// New archives use version 3: Argon2id v1.3, 19 MiB, 2 passes, 1 lane,
+/// and a 32-byte key. Version 2 remains readable using PBKDF2-HMAC-SHA256
+/// (600000 iterations, 32-byte key), as shipped in Kelivo 1.3.2.
+/// KDF costs are fixed by the format version, never taken from untrusted input.
 /// Nonces are prefix || uint32_be(index); AAD is header || uint32_be(index).
 /// Binding the total length and index prevents truncation and reordering.
 /// Version 1 was an unreleased whole-file stream and is deliberately rejected.
@@ -122,7 +125,7 @@ abstract final class BackupEncryption {
         final random = Random.secure();
         header = Uint8List(_headerLength)
           ..setRange(0, _magic.length, _magic)
-          ..[8] = 2
+          ..[8] = 3
           ..setRange(9, 33, List.generate(24, (_) => random.nextInt(256)));
         ByteData.sublistView(header).setUint64(33, plaintextLength, Endian.big);
       } else {
@@ -130,7 +133,7 @@ abstract final class BackupEncryption {
         if (!_hasMagic(header)) {
           throw const FormatException('backup_encryption_header');
         }
-        if (header[8] != 2) {
+        if (header[8] != 2 && header[8] != 3) {
           throw const FormatException('backup_encryption_version');
         }
         plaintextLength = ByteData.sublistView(
@@ -145,9 +148,7 @@ abstract final class BackupEncryption {
           inputLength != _headerLength + plaintextLength + chunks * 16) {
         throw const FormatException('backup_encryption_size');
       }
-      final kdf = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
-        ..init(Pbkdf2Parameters(header.sublist(9, 25), 600000, 32));
-      key = kdf.process(password);
+      key = _deriveKey(password, header.sublist(9, 25), header[8]);
       ctx.throwIfCancelled();
       output = File(args.destination).openSync(mode: FileMode.write);
       if (args.encrypt) output.writeFromSync(header);
@@ -194,6 +195,29 @@ abstract final class BackupEncryption {
       output?.closeSync();
       if (!complete && output != null) File(args.destination).deleteSync();
     }
+  }
+
+  // Keep the Argon2 workspace local to derivation so it is not retained during
+  // archive processing. The whole operation runs on the cancellable worker.
+  static Uint8List _deriveKey(Uint8List password, Uint8List salt, int version) {
+    if (version == 2) {
+      final kdf = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
+        ..init(Pbkdf2Parameters(salt, 600000, 32));
+      return kdf.process(password);
+    }
+    final kdf = Argon2BytesGenerator()
+      ..init(
+        Argon2Parameters(
+          Argon2Parameters.ARGON2_id,
+          salt,
+          desiredKeyLength: 32,
+          memory: 19 * 1024, // KiB, not bytes.
+          iterations: 2,
+          lanes: 1,
+          version: Argon2Parameters.ARGON2_VERSION_13,
+        ),
+      );
+    return kdf.process(password);
   }
 
   static Uint8List _readExactly(RandomAccessFile input, int length) {

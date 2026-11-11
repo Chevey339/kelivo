@@ -1,3 +1,4 @@
+import '../widgets/desktop_labeled_control.dart';
 import 'dart:io';
 
 import 'package:Kelivo/shared/widgets/ios_time_picker.dart';
@@ -44,7 +45,6 @@ class DesktopBackupPane extends StatefulWidget {
 }
 
 class _DesktopBackupPaneState extends State<DesktopBackupPane> {
-  String? _backupPassword;
   // Local form controllers
   late TextEditingController _url;
   late TextEditingController _username;
@@ -251,6 +251,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final webdavVm = context.watch<BackupProvider>();
@@ -343,10 +344,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             },
                     ),
                     BackupEncryptionTile(
-                      password: _backupPassword,
+                      enabled: settings.backupEncryptionEnabled,
                       onChanged: busy
                           ? null
-                          : (value) => setState(() => _backupPassword = value),
+                          : settings.setBackupEncryptionPassword,
                     ),
                   ],
                 ),
@@ -563,7 +564,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title: l10n.backupPageBackupNow,
                                       task: (handle) async {
                                         final ok = await backupProvider.backup(
-                                          password: _backupPassword,
+                                          password:
+                                              await backupPasswordForExport(
+                                                context,
+                                              ),
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
                                         );
@@ -859,7 +863,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       task: (handle) async {
                                         final ok = await s3BackupProvider
                                             .backup(
-                                              password: _backupPassword,
+                                              password:
+                                                  await backupPasswordForExport(
+                                                    context,
+                                                  ),
                                               onProgress: handle.report,
                                               cancelToken: handle.cancelToken,
                                             );
@@ -921,6 +928,25 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ),
             ],
           ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: Text(
+              l10n.backupPageExportToFileSubtitle,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ),
+          if (Platform.isIOS)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Text(
+                l10n.backupPageIosSystemBackupNote,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+            ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -945,7 +971,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           ),
                       task: (handle) async {
                         file = await backupProvider.exportToFile(
-                          password: _backupPassword,
+                          password: await backupPasswordForExport(context),
                           onProgress: handle.report,
                           cancelToken: handle.cancelToken,
                         );
@@ -1785,20 +1811,16 @@ class _ItemRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: vpad),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: cs.onSurface.withValues(alpha: 0.88),
-              ),
-            ),
+      child: DesktopLabeledControl(
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: cs.onSurface.withValues(alpha: 0.88),
           ),
-          const SizedBox(width: 12),
-          Align(alignment: Alignment.centerRight, child: trailing),
-        ],
+        ),
+        control: trailing,
+        controlWidth: 420,
       ),
     );
   }

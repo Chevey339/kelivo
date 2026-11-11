@@ -3,6 +3,186 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
+class GenUiSurfaceSearch extends Table
+    with
+        TableInfo<GenUiSurfaceSearch, GenUiSurfaceSearchData>,
+        VirtualTableInfo<GenUiSurfaceSearch, GenUiSurfaceSearchData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GenUiSurfaceSearch(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _searchTextMeta = const VerificationMeta(
+    'searchText',
+  );
+  late final GeneratedColumn<String> searchText = GeneratedColumn<String>(
+    'search_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: '',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [searchText];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'gen_ui_surface_search';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GenUiSurfaceSearchData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('search_text')) {
+      context.handle(
+        _searchTextMeta,
+        searchText.isAcceptableOrUnknown(data['search_text']!, _searchTextMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_searchTextMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => const {};
+  @override
+  GenUiSurfaceSearchData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GenUiSurfaceSearchData(
+      searchText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}search_text'],
+      )!,
+    );
+  }
+
+  @override
+  GenUiSurfaceSearch createAlias(String alias) {
+    return GenUiSurfaceSearch(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+  @override
+  String get moduleAndArgs => 'fts5(search_text)';
+}
+
+class GenUiSurfaceSearchData extends DataClass
+    implements Insertable<GenUiSurfaceSearchData> {
+  final String searchText;
+  const GenUiSurfaceSearchData({required this.searchText});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['search_text'] = Variable<String>(searchText);
+    return map;
+  }
+
+  GenUiSurfaceSearchCompanion toCompanion(bool nullToAbsent) {
+    return GenUiSurfaceSearchCompanion(searchText: Value(searchText));
+  }
+
+  factory GenUiSurfaceSearchData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GenUiSurfaceSearchData(
+      searchText: serializer.fromJson<String>(json['search_text']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'search_text': serializer.toJson<String>(searchText),
+    };
+  }
+
+  GenUiSurfaceSearchData copyWith({String? searchText}) =>
+      GenUiSurfaceSearchData(searchText: searchText ?? this.searchText);
+  GenUiSurfaceSearchData copyWithCompanion(GenUiSurfaceSearchCompanion data) {
+    return GenUiSurfaceSearchData(
+      searchText: data.searchText.present
+          ? data.searchText.value
+          : this.searchText,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenUiSurfaceSearchData(')
+          ..write('searchText: $searchText')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => searchText.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GenUiSurfaceSearchData && other.searchText == this.searchText);
+}
+
+class GenUiSurfaceSearchCompanion
+    extends UpdateCompanion<GenUiSurfaceSearchData> {
+  final Value<String> searchText;
+  final Value<int> rowid;
+  const GenUiSurfaceSearchCompanion({
+    this.searchText = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GenUiSurfaceSearchCompanion.insert({
+    required String searchText,
+    this.rowid = const Value.absent(),
+  }) : searchText = Value(searchText);
+  static Insertable<GenUiSurfaceSearchData> custom({
+    Expression<String>? searchText,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (searchText != null) 'search_text': searchText,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GenUiSurfaceSearchCompanion copyWith({
+    Value<String>? searchText,
+    Value<int>? rowid,
+  }) {
+    return GenUiSurfaceSearchCompanion(
+      searchText: searchText ?? this.searchText,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (searchText.present) {
+      map['search_text'] = Variable<String>(searchText.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenUiSurfaceSearchCompanion(')
+          ..write('searchText: $searchText, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ConversationRowsTable extends ConversationRows
     with TableInfo<$ConversationRowsTable, ConversationRow> {
   @override
@@ -2280,6 +2460,505 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
           ..write('updatedAt: $updatedAt, ')
           ..write('senderId: $senderId, ')
           ..write('extrasJson: $extrasJson, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $GenUiSurfaceStateRowsTable extends GenUiSurfaceStateRows
+    with TableInfo<$GenUiSurfaceStateRowsTable, GenUiSurfaceStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GenUiSurfaceStateRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _revisionIdMeta = const VerificationMeta(
+    'revisionId',
+  );
+  @override
+  late final GeneratedColumn<String> revisionId = GeneratedColumn<String>(
+    'revision_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES message_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _surfaceKeyMeta = const VerificationMeta(
+    'surfaceKey',
+  );
+  @override
+  late final GeneratedColumn<String> surfaceKey = GeneratedColumn<String>(
+    'surface_key',
+    aliasedName,
+    false,
+    check: () => surfaceKey.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceHashMeta = const VerificationMeta(
+    'sourceHash',
+  );
+  @override
+  late final GeneratedColumn<String> sourceHash = GeneratedColumn<String>(
+    'source_hash',
+    aliasedName,
+    false,
+    check: () => sourceHash.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stateVersionMeta = const VerificationMeta(
+    'stateVersion',
+  );
+  @override
+  late final GeneratedColumn<int> stateVersion = GeneratedColumn<int>(
+    'state_version',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>(
+      "typeof(state_version) = 'integer' AND state_version > 0",
+    ),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _stateJsonMeta = const VerificationMeta(
+    'stateJson',
+  );
+  @override
+  late final GeneratedColumn<String> stateJson = GeneratedColumn<String>(
+    'state_json',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>(
+      'length(CAST(state_json AS BLOB)) <= ${UiBudgets.stateBytes} AND '
+      'CASE WHEN json_valid(state_json) THEN '
+      "json_type(state_json) IS 'object' AND "
+      "json_type(state_json, '\$.inputs') IS 'object' AND "
+      "json_type(state_json, '\$.view') IS 'object' ELSE 0 END",
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{"inputs":{},"view":{}}'),
+  );
+  static const VerificationMeta _searchTextMeta = const VerificationMeta(
+    'searchText',
+  );
+  @override
+  late final GeneratedColumn<String> searchText = GeneratedColumn<String>(
+    'search_text',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>(
+      'length(CAST(search_text AS BLOB)) <= ${UiBudgets.searchTextBytes}',
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>(
+        $GenUiSurfaceStateRowsTable.$converterupdatedAt,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    revisionId,
+    surfaceKey,
+    sourceHash,
+    stateVersion,
+    stateJson,
+    searchText,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'gen_ui_surface_state_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GenUiSurfaceStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('revision_id')) {
+      context.handle(
+        _revisionIdMeta,
+        revisionId.isAcceptableOrUnknown(data['revision_id']!, _revisionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_revisionIdMeta);
+    }
+    if (data.containsKey('surface_key')) {
+      context.handle(
+        _surfaceKeyMeta,
+        surfaceKey.isAcceptableOrUnknown(data['surface_key']!, _surfaceKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_surfaceKeyMeta);
+    }
+    if (data.containsKey('source_hash')) {
+      context.handle(
+        _sourceHashMeta,
+        sourceHash.isAcceptableOrUnknown(data['source_hash']!, _sourceHashMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceHashMeta);
+    }
+    if (data.containsKey('state_version')) {
+      context.handle(
+        _stateVersionMeta,
+        stateVersion.isAcceptableOrUnknown(
+          data['state_version']!,
+          _stateVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('state_json')) {
+      context.handle(
+        _stateJsonMeta,
+        stateJson.isAcceptableOrUnknown(data['state_json']!, _stateJsonMeta),
+      );
+    }
+    if (data.containsKey('search_text')) {
+      context.handle(
+        _searchTextMeta,
+        searchText.isAcceptableOrUnknown(data['search_text']!, _searchTextMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {revisionId, surfaceKey};
+  @override
+  GenUiSurfaceStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GenUiSurfaceStateRow(
+      revisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}revision_id'],
+      )!,
+      surfaceKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}surface_key'],
+      )!,
+      sourceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_hash'],
+      )!,
+      stateVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}state_version'],
+      )!,
+      stateJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}state_json'],
+      )!,
+      searchText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}search_text'],
+      )!,
+      updatedAt: $GenUiSurfaceStateRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $GenUiSurfaceStateRowsTable createAlias(String alias) {
+    return $GenUiSurfaceStateRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class GenUiSurfaceStateRow extends DataClass
+    implements Insertable<GenUiSurfaceStateRow> {
+  final String revisionId;
+  final String surfaceKey;
+  final String sourceHash;
+  final int stateVersion;
+  final String stateJson;
+  final String searchText;
+  final DateTime updatedAt;
+  const GenUiSurfaceStateRow({
+    required this.revisionId,
+    required this.surfaceKey,
+    required this.sourceHash,
+    required this.stateVersion,
+    required this.stateJson,
+    required this.searchText,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['revision_id'] = Variable<String>(revisionId);
+    map['surface_key'] = Variable<String>(surfaceKey);
+    map['source_hash'] = Variable<String>(sourceHash);
+    map['state_version'] = Variable<int>(stateVersion);
+    map['state_json'] = Variable<String>(stateJson);
+    map['search_text'] = Variable<String>(searchText);
+    {
+      map['updated_at'] = Variable<int>(
+        $GenUiSurfaceStateRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  GenUiSurfaceStateRowsCompanion toCompanion(bool nullToAbsent) {
+    return GenUiSurfaceStateRowsCompanion(
+      revisionId: Value(revisionId),
+      surfaceKey: Value(surfaceKey),
+      sourceHash: Value(sourceHash),
+      stateVersion: Value(stateVersion),
+      stateJson: Value(stateJson),
+      searchText: Value(searchText),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory GenUiSurfaceStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GenUiSurfaceStateRow(
+      revisionId: serializer.fromJson<String>(json['revisionId']),
+      surfaceKey: serializer.fromJson<String>(json['surfaceKey']),
+      sourceHash: serializer.fromJson<String>(json['sourceHash']),
+      stateVersion: serializer.fromJson<int>(json['stateVersion']),
+      stateJson: serializer.fromJson<String>(json['stateJson']),
+      searchText: serializer.fromJson<String>(json['searchText']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'revisionId': serializer.toJson<String>(revisionId),
+      'surfaceKey': serializer.toJson<String>(surfaceKey),
+      'sourceHash': serializer.toJson<String>(sourceHash),
+      'stateVersion': serializer.toJson<int>(stateVersion),
+      'stateJson': serializer.toJson<String>(stateJson),
+      'searchText': serializer.toJson<String>(searchText),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  GenUiSurfaceStateRow copyWith({
+    String? revisionId,
+    String? surfaceKey,
+    String? sourceHash,
+    int? stateVersion,
+    String? stateJson,
+    String? searchText,
+    DateTime? updatedAt,
+  }) => GenUiSurfaceStateRow(
+    revisionId: revisionId ?? this.revisionId,
+    surfaceKey: surfaceKey ?? this.surfaceKey,
+    sourceHash: sourceHash ?? this.sourceHash,
+    stateVersion: stateVersion ?? this.stateVersion,
+    stateJson: stateJson ?? this.stateJson,
+    searchText: searchText ?? this.searchText,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  GenUiSurfaceStateRow copyWithCompanion(GenUiSurfaceStateRowsCompanion data) {
+    return GenUiSurfaceStateRow(
+      revisionId: data.revisionId.present
+          ? data.revisionId.value
+          : this.revisionId,
+      surfaceKey: data.surfaceKey.present
+          ? data.surfaceKey.value
+          : this.surfaceKey,
+      sourceHash: data.sourceHash.present
+          ? data.sourceHash.value
+          : this.sourceHash,
+      stateVersion: data.stateVersion.present
+          ? data.stateVersion.value
+          : this.stateVersion,
+      stateJson: data.stateJson.present ? data.stateJson.value : this.stateJson,
+      searchText: data.searchText.present
+          ? data.searchText.value
+          : this.searchText,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenUiSurfaceStateRow(')
+          ..write('revisionId: $revisionId, ')
+          ..write('surfaceKey: $surfaceKey, ')
+          ..write('sourceHash: $sourceHash, ')
+          ..write('stateVersion: $stateVersion, ')
+          ..write('stateJson: $stateJson, ')
+          ..write('searchText: $searchText, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    revisionId,
+    surfaceKey,
+    sourceHash,
+    stateVersion,
+    stateJson,
+    searchText,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GenUiSurfaceStateRow &&
+          other.revisionId == this.revisionId &&
+          other.surfaceKey == this.surfaceKey &&
+          other.sourceHash == this.sourceHash &&
+          other.stateVersion == this.stateVersion &&
+          other.stateJson == this.stateJson &&
+          other.searchText == this.searchText &&
+          other.updatedAt == this.updatedAt);
+}
+
+class GenUiSurfaceStateRowsCompanion
+    extends UpdateCompanion<GenUiSurfaceStateRow> {
+  final Value<String> revisionId;
+  final Value<String> surfaceKey;
+  final Value<String> sourceHash;
+  final Value<int> stateVersion;
+  final Value<String> stateJson;
+  final Value<String> searchText;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const GenUiSurfaceStateRowsCompanion({
+    this.revisionId = const Value.absent(),
+    this.surfaceKey = const Value.absent(),
+    this.sourceHash = const Value.absent(),
+    this.stateVersion = const Value.absent(),
+    this.stateJson = const Value.absent(),
+    this.searchText = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GenUiSurfaceStateRowsCompanion.insert({
+    required String revisionId,
+    required String surfaceKey,
+    required String sourceHash,
+    this.stateVersion = const Value.absent(),
+    this.stateJson = const Value.absent(),
+    this.searchText = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : revisionId = Value(revisionId),
+       surfaceKey = Value(surfaceKey),
+       sourceHash = Value(sourceHash),
+       updatedAt = Value(updatedAt);
+  static Insertable<GenUiSurfaceStateRow> custom({
+    Expression<String>? revisionId,
+    Expression<String>? surfaceKey,
+    Expression<String>? sourceHash,
+    Expression<int>? stateVersion,
+    Expression<String>? stateJson,
+    Expression<String>? searchText,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (revisionId != null) 'revision_id': revisionId,
+      if (surfaceKey != null) 'surface_key': surfaceKey,
+      if (sourceHash != null) 'source_hash': sourceHash,
+      if (stateVersion != null) 'state_version': stateVersion,
+      if (stateJson != null) 'state_json': stateJson,
+      if (searchText != null) 'search_text': searchText,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GenUiSurfaceStateRowsCompanion copyWith({
+    Value<String>? revisionId,
+    Value<String>? surfaceKey,
+    Value<String>? sourceHash,
+    Value<int>? stateVersion,
+    Value<String>? stateJson,
+    Value<String>? searchText,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return GenUiSurfaceStateRowsCompanion(
+      revisionId: revisionId ?? this.revisionId,
+      surfaceKey: surfaceKey ?? this.surfaceKey,
+      sourceHash: sourceHash ?? this.sourceHash,
+      stateVersion: stateVersion ?? this.stateVersion,
+      stateJson: stateJson ?? this.stateJson,
+      searchText: searchText ?? this.searchText,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (revisionId.present) {
+      map['revision_id'] = Variable<String>(revisionId.value);
+    }
+    if (surfaceKey.present) {
+      map['surface_key'] = Variable<String>(surfaceKey.value);
+    }
+    if (sourceHash.present) {
+      map['source_hash'] = Variable<String>(sourceHash.value);
+    }
+    if (stateVersion.present) {
+      map['state_version'] = Variable<int>(stateVersion.value);
+    }
+    if (stateJson.present) {
+      map['state_json'] = Variable<String>(stateJson.value);
+    }
+    if (searchText.present) {
+      map['search_text'] = Variable<String>(searchText.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $GenUiSurfaceStateRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenUiSurfaceStateRowsCompanion(')
+          ..write('revisionId: $revisionId, ')
+          ..write('surfaceKey: $surfaceKey, ')
+          ..write('sourceHash: $sourceHash, ')
+          ..write('stateVersion: $stateVersion, ')
+          ..write('stateJson: $stateJson, ')
+          ..write('searchText: $searchText, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12081,10 +12760,25 @@ class ExtensionEntityRowsCompanion extends UpdateCompanion<ExtensionEntityRow> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final GenUiSurfaceSearch genUiSurfaceSearch = GenUiSurfaceSearch(this);
   late final $ConversationRowsTable conversationRows = $ConversationRowsTable(
     this,
   );
   late final $MessageRowsTable messageRows = $MessageRowsTable(this);
+  late final $GenUiSurfaceStateRowsTable genUiSurfaceStateRows =
+      $GenUiSurfaceStateRowsTable(this);
+  late final Trigger genUiStateSearchInsert = Trigger(
+    'CREATE TRIGGER gen_ui_state_search_insert AFTER INSERT ON gen_ui_surface_state_rows BEGIN INSERT INTO gen_ui_surface_search ("rowid", search_text) VALUES (new."rowid", new.search_text);END',
+    'gen_ui_state_search_insert',
+  );
+  late final Trigger genUiStateSearchUpdate = Trigger(
+    'CREATE TRIGGER gen_ui_state_search_update AFTER UPDATE OF search_text ON gen_ui_surface_state_rows WHEN old.search_text != new.search_text BEGIN DELETE FROM gen_ui_surface_search WHERE "rowid" = old."rowid";INSERT INTO gen_ui_surface_search ("rowid", search_text) VALUES (new."rowid", new.search_text);END',
+    'gen_ui_state_search_update',
+  );
+  late final Trigger genUiStateSearchDelete = Trigger(
+    'CREATE TRIGGER gen_ui_state_search_delete AFTER DELETE ON gen_ui_surface_state_rows BEGIN DELETE FROM gen_ui_surface_search WHERE "rowid" = old."rowid";END',
+    'gen_ui_state_search_delete',
+  );
   late final $ConversationMcpServerRowsTable conversationMcpServerRows =
       $ConversationMcpServerRowsTable(this);
   late final $ChatStorageMetaRowsTable chatStorageMetaRows =
@@ -12207,8 +12901,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    genUiSurfaceSearch,
     conversationRows,
     messageRows,
+    genUiSurfaceStateRows,
+    genUiStateSearchInsert,
+    genUiStateSearchUpdate,
+    genUiStateSearchDelete,
     conversationMcpServerRows,
     chatStorageMetaRows,
     messagePartRows,
@@ -12265,6 +12964,39 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
+        'message_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('gen_ui_surface_state_rows', kind: UpdateKind.delete),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'gen_ui_surface_state_rows',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [TableUpdate('gen_ui_surface_search', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'gen_ui_surface_state_rows',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [
+        TableUpdate('gen_ui_surface_search', kind: UpdateKind.delete),
+        TableUpdate('gen_ui_surface_search', kind: UpdateKind.insert),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'gen_ui_surface_state_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('gen_ui_surface_search', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
         'conversation_rows',
         limitUpdateKind: UpdateKind.delete,
       ),
@@ -12312,6 +13044,151 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ]);
 }
 
+typedef $GenUiSurfaceSearchCreateCompanionBuilder =
+    GenUiSurfaceSearchCompanion Function({
+      required String searchText,
+      Value<int> rowid,
+    });
+typedef $GenUiSurfaceSearchUpdateCompanionBuilder =
+    GenUiSurfaceSearchCompanion Function({
+      Value<String> searchText,
+      Value<int> rowid,
+    });
+
+class $GenUiSurfaceSearchFilterComposer
+    extends Composer<_$AppDatabase, GenUiSurfaceSearch> {
+  $GenUiSurfaceSearchFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get searchText => $composableBuilder(
+    column: $table.searchText,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GenUiSurfaceSearchOrderingComposer
+    extends Composer<_$AppDatabase, GenUiSurfaceSearch> {
+  $GenUiSurfaceSearchOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get searchText => $composableBuilder(
+    column: $table.searchText,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GenUiSurfaceSearchAnnotationComposer
+    extends Composer<_$AppDatabase, GenUiSurfaceSearch> {
+  $GenUiSurfaceSearchAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get searchText => $composableBuilder(
+    column: $table.searchText,
+    builder: (column) => column,
+  );
+}
+
+class $GenUiSurfaceSearchTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GenUiSurfaceSearch,
+          GenUiSurfaceSearchData,
+          $GenUiSurfaceSearchFilterComposer,
+          $GenUiSurfaceSearchOrderingComposer,
+          $GenUiSurfaceSearchAnnotationComposer,
+          $GenUiSurfaceSearchCreateCompanionBuilder,
+          $GenUiSurfaceSearchUpdateCompanionBuilder,
+          (
+            GenUiSurfaceSearchData,
+            BaseReferences<
+              _$AppDatabase,
+              GenUiSurfaceSearch,
+              GenUiSurfaceSearchData
+            >,
+          ),
+          GenUiSurfaceSearchData,
+          PrefetchHooks Function()
+        > {
+  $GenUiSurfaceSearchTableManager(_$AppDatabase db, GenUiSurfaceSearch table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GenUiSurfaceSearchFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $GenUiSurfaceSearchOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $GenUiSurfaceSearchAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> searchText = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GenUiSurfaceSearchCompanion(
+                searchText: searchText,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String searchText,
+                Value<int> rowid = const Value.absent(),
+              }) => GenUiSurfaceSearchCompanion.insert(
+                searchText: searchText,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<GenUiSurfaceSearch, GenUiSurfaceSearchData>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    GenUiSurfaceSearch,
+                    GenUiSurfaceSearchData
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GenUiSurfaceSearchProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GenUiSurfaceSearch,
+      GenUiSurfaceSearchData,
+      $GenUiSurfaceSearchFilterComposer,
+      $GenUiSurfaceSearchOrderingComposer,
+      $GenUiSurfaceSearchAnnotationComposer,
+      $GenUiSurfaceSearchCreateCompanionBuilder,
+      $GenUiSurfaceSearchUpdateCompanionBuilder,
+      (
+        GenUiSurfaceSearchData,
+        BaseReferences<
+          _$AppDatabase,
+          GenUiSurfaceSearch,
+          GenUiSurfaceSearchData
+        >,
+      ),
+      GenUiSurfaceSearchData,
+      PrefetchHooks Function()
+    >;
 typedef $$ConversationRowsTableCreateCompanionBuilder =
     ConversationRowsCompanion Function({
       required String id,
@@ -13139,6 +14016,31 @@ final class $$MessageRowsTableReferences
     );
   }
 
+  static MultiTypedResultKey<
+    $GenUiSurfaceStateRowsTable,
+    List<GenUiSurfaceStateRow>
+  >
+  _genUiSurfaceStateRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.genUiSurfaceStateRows,
+        aliasName: 'message_rows__id__gen_ui_surface_state_rows__revision_id',
+      );
+
+  $$GenUiSurfaceStateRowsTableProcessedTableManager
+  get genUiSurfaceStateRowsRefs {
+    final manager = $$GenUiSurfaceStateRowsTableTableManager(
+      $_db,
+      $_db.genUiSurfaceStateRows,
+    ).filter((f) => f.revisionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _genUiSurfaceStateRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$MessageAssetRowsTable, List<MessageAssetRow>>
   _messageAssetRowsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.messageAssetRows,
@@ -13324,6 +14226,32 @@ class $$MessageRowsTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> genUiSurfaceStateRowsRefs(
+    Expression<bool> Function($$GenUiSurfaceStateRowsTableFilterComposer f) f,
+  ) {
+    final $$GenUiSurfaceStateRowsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.genUiSurfaceStateRows,
+          getReferencedColumn: (t) => t.revisionId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenUiSurfaceStateRowsTableFilterComposer(
+                $db: $db,
+                $table: $db.genUiSurfaceStateRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
   }
 
   Expression<bool> messageAssetRowsRefs(
@@ -13639,6 +14567,32 @@ class $$MessageRowsTableAnnotationComposer
     return composer;
   }
 
+  Expression<T> genUiSurfaceStateRowsRefs<T extends Object>(
+    Expression<T> Function($$GenUiSurfaceStateRowsTableAnnotationComposer a) f,
+  ) {
+    final $$GenUiSurfaceStateRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.genUiSurfaceStateRows,
+          getReferencedColumn: (t) => t.revisionId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenUiSurfaceStateRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.genUiSurfaceStateRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
   Expression<T> messageAssetRowsRefs<T extends Object>(
     Expression<T> Function($$MessageAssetRowsTableAnnotationComposer a) f,
   ) {
@@ -13707,6 +14661,7 @@ class $$MessageRowsTableTableManager
           MessageRow,
           PrefetchHooks Function({
             bool conversationId,
+            bool genUiSurfaceStateRowsRefs,
             bool messageAssetRowsRefs,
             bool assetReferenceDirtyRowsRefs,
           })
@@ -13833,12 +14788,14 @@ class $$MessageRowsTableTableManager
           prefetchHooksCallback:
               ({
                 conversationId = false,
+                genUiSurfaceStateRowsRefs = false,
                 messageAssetRowsRefs = false,
                 assetReferenceDirtyRowsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
+                    if (genUiSurfaceStateRowsRefs) db.genUiSurfaceStateRows,
                     if (messageAssetRowsRefs) db.messageAssetRows,
                     if (assetReferenceDirtyRowsRefs) db.assetReferenceDirtyRows,
                   ],
@@ -13878,6 +14835,26 @@ class $$MessageRowsTableTableManager
                       },
                   getPrefetchedDataCallback: (items) async {
                     return [
+                      if (genUiSurfaceStateRowsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          MessageRow,
+                          $MessageRowsTable,
+                          GenUiSurfaceStateRow,
+                          $GenUiSurfaceStateRowsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$MessageRowsTableReferences
+                              ._genUiSurfaceStateRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MessageRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).genUiSurfaceStateRowsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'revision_id',
+                          typedResults: items,
+                        ),
                       if (messageAssetRowsRefs)
                         await $_getPrefetchedDataByColumns<
                           MessageRow,
@@ -13940,9 +14917,399 @@ typedef $$MessageRowsTableProcessedTableManager =
       MessageRow,
       PrefetchHooks Function({
         bool conversationId,
+        bool genUiSurfaceStateRowsRefs,
         bool messageAssetRowsRefs,
         bool assetReferenceDirtyRowsRefs,
       })
+    >;
+typedef $$GenUiSurfaceStateRowsTableCreateCompanionBuilder =
+    GenUiSurfaceStateRowsCompanion Function({
+      required String revisionId,
+      required String surfaceKey,
+      required String sourceHash,
+      Value<int> stateVersion,
+      Value<String> stateJson,
+      Value<String> searchText,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$GenUiSurfaceStateRowsTableUpdateCompanionBuilder =
+    GenUiSurfaceStateRowsCompanion Function({
+      Value<String> revisionId,
+      Value<String> surfaceKey,
+      Value<String> sourceHash,
+      Value<int> stateVersion,
+      Value<String> stateJson,
+      Value<String> searchText,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$GenUiSurfaceStateRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $GenUiSurfaceStateRowsTable,
+          GenUiSurfaceStateRow
+        > {
+  $$GenUiSurfaceStateRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MessageRowsTable _revisionIdTable(_$AppDatabase db) => db.messageRows
+      .createAlias('gen_ui_surface_state_rows__revision_id__message_rows__id');
+
+  $$MessageRowsTableProcessedTableManager get revisionId {
+    final $_column = $_itemColumn<String>('revision_id')!;
+
+    final manager = $$MessageRowsTableTableManager(
+      $_db,
+      $_db.messageRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_revisionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$GenUiSurfaceStateRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $GenUiSurfaceStateRowsTable> {
+  $$GenUiSurfaceStateRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get surfaceKey => $composableBuilder(
+    column: $table.surfaceKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceHash => $composableBuilder(
+    column: $table.sourceHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get stateVersion => $composableBuilder(
+    column: $table.stateVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stateJson => $composableBuilder(
+    column: $table.stateJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get searchText => $composableBuilder(
+    column: $table.searchText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$MessageRowsTableFilterComposer get revisionId {
+    final $$MessageRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.revisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GenUiSurfaceStateRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $GenUiSurfaceStateRowsTable> {
+  $$GenUiSurfaceStateRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get surfaceKey => $composableBuilder(
+    column: $table.surfaceKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceHash => $composableBuilder(
+    column: $table.sourceHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get stateVersion => $composableBuilder(
+    column: $table.stateVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stateJson => $composableBuilder(
+    column: $table.stateJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get searchText => $composableBuilder(
+    column: $table.searchText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MessageRowsTableOrderingComposer get revisionId {
+    final $$MessageRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.revisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GenUiSurfaceStateRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GenUiSurfaceStateRowsTable> {
+  $$GenUiSurfaceStateRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get surfaceKey => $composableBuilder(
+    column: $table.surfaceKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceHash => $composableBuilder(
+    column: $table.sourceHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get stateVersion => $composableBuilder(
+    column: $table.stateVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get stateJson =>
+      $composableBuilder(column: $table.stateJson, builder: (column) => column);
+
+  GeneratedColumn<String> get searchText => $composableBuilder(
+    column: $table.searchText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$MessageRowsTableAnnotationComposer get revisionId {
+    final $$MessageRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.revisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GenUiSurfaceStateRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GenUiSurfaceStateRowsTable,
+          GenUiSurfaceStateRow,
+          $$GenUiSurfaceStateRowsTableFilterComposer,
+          $$GenUiSurfaceStateRowsTableOrderingComposer,
+          $$GenUiSurfaceStateRowsTableAnnotationComposer,
+          $$GenUiSurfaceStateRowsTableCreateCompanionBuilder,
+          $$GenUiSurfaceStateRowsTableUpdateCompanionBuilder,
+          (GenUiSurfaceStateRow, $$GenUiSurfaceStateRowsTableReferences),
+          GenUiSurfaceStateRow,
+          PrefetchHooks Function({bool revisionId})
+        > {
+  $$GenUiSurfaceStateRowsTableTableManager(
+    _$AppDatabase db,
+    $GenUiSurfaceStateRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GenUiSurfaceStateRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$GenUiSurfaceStateRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$GenUiSurfaceStateRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> revisionId = const Value.absent(),
+                Value<String> surfaceKey = const Value.absent(),
+                Value<String> sourceHash = const Value.absent(),
+                Value<int> stateVersion = const Value.absent(),
+                Value<String> stateJson = const Value.absent(),
+                Value<String> searchText = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GenUiSurfaceStateRowsCompanion(
+                revisionId: revisionId,
+                surfaceKey: surfaceKey,
+                sourceHash: sourceHash,
+                stateVersion: stateVersion,
+                stateJson: stateJson,
+                searchText: searchText,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String revisionId,
+                required String surfaceKey,
+                required String sourceHash,
+                Value<int> stateVersion = const Value.absent(),
+                Value<String> stateJson = const Value.absent(),
+                Value<String> searchText = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => GenUiSurfaceStateRowsCompanion.insert(
+                revisionId: revisionId,
+                surfaceKey: surfaceKey,
+                sourceHash: sourceHash,
+                stateVersion: stateVersion,
+                stateJson: stateJson,
+                searchText: searchText,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $GenUiSurfaceStateRowsTable,
+                    GenUiSurfaceStateRow
+                  >(table),
+                  $$GenUiSurfaceStateRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({revisionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (revisionId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.revisionId,
+                                referencedTable:
+                                    $$GenUiSurfaceStateRowsTableReferences
+                                        ._revisionIdTable(db),
+                                referencedColumn:
+                                    $$GenUiSurfaceStateRowsTableReferences
+                                        ._revisionIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$GenUiSurfaceStateRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GenUiSurfaceStateRowsTable,
+      GenUiSurfaceStateRow,
+      $$GenUiSurfaceStateRowsTableFilterComposer,
+      $$GenUiSurfaceStateRowsTableOrderingComposer,
+      $$GenUiSurfaceStateRowsTableAnnotationComposer,
+      $$GenUiSurfaceStateRowsTableCreateCompanionBuilder,
+      $$GenUiSurfaceStateRowsTableUpdateCompanionBuilder,
+      (GenUiSurfaceStateRow, $$GenUiSurfaceStateRowsTableReferences),
+      GenUiSurfaceStateRow,
+      PrefetchHooks Function({bool revisionId})
     >;
 typedef $$ConversationMcpServerRowsTableCreateCompanionBuilder =
     ConversationMcpServerRowsCompanion Function({
@@ -20665,10 +22032,14 @@ typedef $$ExtensionEntityRowsTableProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $GenUiSurfaceSearchTableManager get genUiSurfaceSearch =>
+      $GenUiSurfaceSearchTableManager(_db, _db.genUiSurfaceSearch);
   $$ConversationRowsTableTableManager get conversationRows =>
       $$ConversationRowsTableTableManager(_db, _db.conversationRows);
   $$MessageRowsTableTableManager get messageRows =>
       $$MessageRowsTableTableManager(_db, _db.messageRows);
+  $$GenUiSurfaceStateRowsTableTableManager get genUiSurfaceStateRows =>
+      $$GenUiSurfaceStateRowsTableTableManager(_db, _db.genUiSurfaceStateRows);
   $$ConversationMcpServerRowsTableTableManager get conversationMcpServerRows =>
       $$ConversationMcpServerRowsTableTableManager(
         _db,

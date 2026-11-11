@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/conversation_mcp_settings.dart';
 import '../../../core/services/api/reasoning/reasoning_level_options.dart';
 import '../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../core/services/api/reasoning/reasoning_selection.dart';
@@ -26,6 +27,7 @@ import '../../../features/workspace/workspace_navigation.dart';
 import '../../../theme/design_tokens.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
+import '../../chat/widgets/context_operations_panel.dart';
 
 /// Callback for checking if a model supports tool calling.
 typedef IsToolModelCallback = bool Function(String providerKey, String modelId);
@@ -65,11 +67,15 @@ class ChatInputSection extends StatelessWidget {
     this.onOpenSkills,
     this.onOpenSearch,
     this.onConfigureReasoning,
+    this.reasoningButtonKey,
     this.onOpenContextUsage,
     this.onSend,
     this.onStop,
     this.hasQueuedInput = false,
     this.queuedPreviewText,
+    this.queuedStatusLabel,
+    this.queuedSubtitle,
+    this.queuedPaused = false,
     this.onCancelQueuedInput,
     this.onExpandedChanged,
     this.onQuickPhrase,
@@ -85,6 +91,7 @@ class ChatInputSection extends StatelessWidget {
     this.onLongPressLearning,
     this.onClearContext,
     this.onCompressContext,
+    this.onContextOperations,
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
@@ -112,11 +119,15 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onOpenSkills;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
+  final GlobalKey? reasoningButtonKey;
   final VoidCallback? onOpenContextUsage;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
   final VoidCallback? onStop;
   final bool hasQueuedInput;
   final String? queuedPreviewText;
+  final String? queuedStatusLabel;
+  final String? queuedSubtitle;
+  final bool queuedPaused;
   final VoidCallback? onCancelQueuedInput;
   final ValueChanged<bool>? onExpandedChanged;
   final VoidCallback? onQuickPhrase;
@@ -132,6 +143,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressLearning;
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
+  final VoidCallback? onContextOperations;
   final String? conversationId;
 
   /// The model this conversation sends with, already resolved through
@@ -174,9 +186,9 @@ class ChatInputSection extends StatelessWidget {
           );
 
     // Enforce model capabilities: disable MCP selection if model doesn't
-    // support tools. Skipped while the conversation overrides the model —
-    // these writes land on the assistant and would leak across conversations.
-    if (!chatModelIsConversationOverride) {
+    // support tools. Skip this when model or MCP selection can be scoped to
+    // a conversation: these writes would affect the shared assistant defaults.
+    if (!chatModelIsConversationOverride && a?.allowConversationMcp != true) {
       _enforceModelCapabilities(context, settings, ap, a, pk, mid);
     }
 
@@ -191,7 +203,6 @@ class ChatInputSection extends StatelessWidget {
     }
 
     final bar = ChatInputBar(
-      key: inputBarKey,
       chatModelProviderKey: pk,
       chatModelId: mid,
       onMore: onMore,
@@ -221,6 +232,7 @@ class ChatInputSection extends StatelessWidget {
       mediaController: mediaController,
       asrProvider: asr,
       onConfigureReasoning: onConfigureReasoning,
+      reasoningButtonKey: reasoningButtonKey,
       onOpenContextUsage: onOpenContextUsage,
       reasoningActive: isReasoningEnabled(effectiveReasoning),
       reasoning: effectiveReasoning,
@@ -236,6 +248,9 @@ class ChatInputSection extends StatelessWidget {
       sendButtonTooltip: sendButtonTooltip,
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
+      queuedStatusLabel: queuedStatusLabel,
+      queuedSubtitle: queuedSubtitle,
+      queuedPaused: queuedPaused,
       onCancelQueuedInput: onCancelQueuedInput,
       onExpandedChanged: onExpandedChanged,
       showToolsButton: supportsModelTools,
@@ -271,16 +286,23 @@ class ChatInputSection extends StatelessWidget {
       showMoreButton: !isTablet,
       onClearContext: isTablet ? onClearContext : null,
       onCompressContext: isTablet ? onCompressContext : null,
+      onContextOperations: isTablet ? onContextOperations : null,
       backgroundImageActive: backgroundImageActive,
       inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
     );
 
-    if (!showEnvChip || !workspaceBound) return bar;
+    final showTask = conversationId != null && onContextOperations != null;
     return Column(
+      key: inputBarKey,
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (showTask)
+          ContextTaskBar(
+            conversationId: conversationId!,
+            onOpen: onContextOperations!,
+          ),
         if (showEnvChip && workspaceBound)
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -397,7 +419,14 @@ class ChatInputSection extends StatelessWidget {
     if (workspaceBound) return true;
     if ((a?.localToolIds ?? const <String>[]).isNotEmpty) return true;
     final connected = context.watch<McpProvider>().connectedServers;
-    final selected = a?.mcpServerIds ?? const <String>[];
+    final selected = a?.allowConversationMcp == true && conversationId != null
+        ? context.select<ChatService, List<String>>(
+            (chat) => ConversationMcpSettings.effectiveServerIds(
+              a,
+              chat.getConversation(conversationId!),
+            ),
+          )
+        : a?.mcpServerIds ?? const <String>[];
     if (selected.isEmpty || connected.isEmpty) return false;
     return connected.any((s) => selected.contains(s.id));
   }

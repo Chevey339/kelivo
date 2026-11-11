@@ -131,14 +131,13 @@ void main() {
     final call = decoder.functionCallById('call_1')!;
     expect(call.name, 'lookup');
     expect(call.args, <String, dynamic>{'q': 'kelivo'});
-    expect(call.thoughtSigKey, 'thoughtSignature');
-    expect(call.thoughtSigVal, 'sig-1');
+    expect(call.part['thoughtSignature'], 'sig-1');
     expect(decoder.isClientFunctionCall('call_1'), isTrue);
     expect(
       result.chunks
           .whereType<ToolCallStart>()
           .single
-          .metadata!['google']['thoughtSigVal'],
+          .metadata!['google']['part']['thoughtSignature'],
       'sig-1',
     );
     expect(
@@ -359,11 +358,8 @@ void main() {
     expect(decoder.streamComplete, isTrue);
   });
 
-  test('records Gemini 3 model parts and skips malformed JSON', () {
-    final decoder = GoogleStreamDecoder(
-      isGemini3: true,
-      persistThoughtSigs: true,
-    );
+  test('records model parts and skips malformed JSON', () {
+    final decoder = GoogleStreamDecoder(persistThoughtSigs: true);
     decoder.accept(const SseEvent(data: 'not-json'));
     decoder.accept(
       _event(
@@ -388,10 +384,7 @@ void main() {
       // A google_search round answers with toolCall, toolResponse and only then
       // the text part that carries the turn's own signature. Replaying the
       // toolCall's signature on a text part is rejected as invalid.
-      final decoder = GoogleStreamDecoder(
-        isGemini3: true,
-        persistThoughtSigs: true,
-      );
+      final decoder = GoogleStreamDecoder(persistThoughtSigs: true);
       decoder.accept(
         _event(
           _candidate(

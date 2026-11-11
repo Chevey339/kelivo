@@ -5,16 +5,22 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'selection_edge_initialization.dart';
+import 'selection_rect_collection.dart';
 
 /// Preserves inline widget identity while the paragraph's selectable fragments
 /// change. Plain text keeps Flutter's ordinary Text rendering path.
 Widget buildSelectableText(Text text) {
+  if (text.textSpan == null) return text;
   var embedded = false;
   text.textSpan?.visitChildren((span) {
     if (span is WidgetSpan) embedded = true;
     return !embedded;
   });
-  return embedded ? _SelectableRichText(text) : text;
+  return Builder(
+    builder: (context) => embedded || MediaQuery.boldTextOf(context)
+        ? _SelectableRichText(text)
+        : text,
+  );
 }
 
 class _SelectableRichText extends Text {
@@ -77,7 +83,8 @@ class _SelectableParagraphState extends State<_SelectableParagraph> {
     var style = text.style == null || text.style!.inherit
         ? defaults.style.merge(text.style)
         : text.style!;
-    if (MediaQuery.boldTextOf(context)) {
+    final boldText = MediaQuery.boldTextOf(context);
+    if (boldText) {
       style = style.merge(const TextStyle(fontWeight: FontWeight.bold));
     }
     final height = MediaQuery.maybeLineHeightScaleFactorOverrideOf(context);
@@ -89,10 +96,15 @@ class _SelectableParagraphState extends State<_SelectableParagraph> {
       locale: text.locale,
       children: text.textSpan == null ? null : [text.textSpan!],
     );
-    if (height != null || letterSpacing != null || wordSpacing != null) {
-      span = _withSpacing(
+    if (boldText ||
+        height != null ||
+        letterSpacing != null ||
+        wordSpacing != null) {
+      span = _withAccessibilityStyle(
         span,
         TextStyle(
+          // Explicit HTML and syntax weights must not undo system bold text.
+          fontWeight: boldText ? FontWeight.bold : null,
           height: height,
           letterSpacing: letterSpacing,
           wordSpacing: wordSpacing,
@@ -154,29 +166,30 @@ class _SelectableParagraphState extends State<_SelectableParagraph> {
   }
 }
 
-TextSpan _withSpacing(TextSpan span, TextStyle spacing) => TextSpan(
-  text: span.text,
-  style: span.style?.merge(spacing) ?? spacing,
-  children: span.children
-      ?.map(
-        (child) => child.runtimeType == TextSpan
-            ? _withSpacing(child as TextSpan, spacing)
-            : child,
-      )
-      .toList(),
-  recognizer: span.recognizer,
-  mouseCursor: span.mouseCursor,
-  onEnter: span.onEnter,
-  onExit: span.onExit,
-  semanticsLabel: span.semanticsLabel,
-  semanticsIdentifier: span.semanticsIdentifier,
-  locale: span.locale,
-  spellOut: span.spellOut,
-);
+TextSpan _withAccessibilityStyle(TextSpan span, TextStyle overrides) =>
+    TextSpan(
+      text: span.text,
+      style: span.style?.merge(overrides) ?? overrides,
+      children: span.children
+          ?.map(
+            (child) => child.runtimeType == TextSpan
+                ? _withAccessibilityStyle(child as TextSpan, overrides)
+                : child,
+          )
+          .toList(),
+      recognizer: span.recognizer,
+      mouseCursor: span.mouseCursor,
+      onEnter: span.onEnter,
+      onExit: span.onExit,
+      semanticsLabel: span.semanticsLabel,
+      semanticsIdentifier: span.semanticsIdentifier,
+      locale: span.locale,
+      spellOut: span.spellOut,
+    );
 
 class _ParagraphSelectionDelegate
     extends MultiSelectableSelectionContainerDelegate
-    with SelectionEdgeInitialization {
+    with SelectionEdgeInitialization, SelectionRectCollection {
   _ParagraphSelectionDelegate(this._paragraph) {
     addListener(WidgetsBinding.instance.ensureVisualUpdate);
   }

@@ -2,6 +2,15 @@ import 'dart:async';
 
 /// App-wide hotkey actions broadcast bus.
 enum HotkeyAction {
+  toggleSidePanel,
+  sidePanelNewWeb,
+  sidePanelFiles,
+  sidePanelExpand,
+  sidePanelReopenTab,
+  sidePanelNextTab,
+  sidePanelPreviousTab,
+  sidePanelAddress,
+  sidePanelFocus,
   toggleAppVisibility,
   closeWindow,
   openSettings,

@@ -91,6 +91,7 @@ class StreamingContentNotifier {
     List<MessagePart>? parts,
     String? reasoningText,
     DateTime? reasoningStartAt,
+    bool forceRebuild = false,
     List<int>? contentSplitOffsets,
     List<int>? reasoningCountAtSplit,
     List<int>? toolCountAtSplit,
@@ -108,6 +109,7 @@ class StreamingContentNotifier {
         parts: parts ?? current.parts,
         reasoningText: reasoningText,
         reasoningStartAt: reasoningStartAt,
+        uiVersion: current.uiVersion + (forceRebuild ? 1 : 0),
         contentSplitOffsets: contentSplitOffsets ?? current.contentSplitOffsets,
         reasoningCountAtSplit:
             reasoningCountAtSplit ?? current.reasoningCountAtSplit,

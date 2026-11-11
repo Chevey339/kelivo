@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "80f455ea308cab4dc35fba96aa160489835d3dc1",
+  "task": "s5-4",
+  "response": "关闭「启用补充明细」时，明细输入框会隐藏，但 `$detail` 仍保留“保留内容”这一值，并且不参与必填校验；名称始终必填。点击按钮只会生成一份可编辑的检查草稿，供你确认后自行发送，不会自动提交。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form,ask])\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\nform = Form(children=[toggle,nameField,detailField], title=\"补充意见\")\ntoggle = Switch(bind=$on, label=\"启用补充明细\")\nnameField = TextField(bind=$name, label=\"名称\", required=true)\ndetailField = TextField(bind=$detail, label=\"明细\", required=true, visible=$on)\nask = Button(label=\"准备检查草稿\", form=form, action=Ask(text=\"请检查这份补充意见表单的填写内容，指出需要补充或澄清的地方。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}))\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: the supplement form keeps required name and conditional detail behavior, and its exact Ask context prepares an editable draft for the user to send. Only blank/placeholder defaults are shown; no factual-data provenance claim is made."
+  }
+}

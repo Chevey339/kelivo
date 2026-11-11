@@ -255,7 +255,8 @@ void _writeAutoSurfaceFlags(
     reasoning.putIfAbsent('summary', () => 'auto');
     return;
   }
-  if (dialect == ReasoningDialect.anthropicAdaptiveEffort) {
+  if (dialect == ReasoningDialect.anthropicAdaptiveEffort ||
+      dialect == ReasoningDialect.anthropicBetweenTools) {
     if (!body.containsKey('thinking')) {
       body['thinking'] = <String, dynamic>{
         'type': 'adaptive',
@@ -292,6 +293,7 @@ void _stripDialectOwnedKeys(
       body.remove('reasoning_effort');
     case ReasoningDialect.anthropicBudget:
     case ReasoningDialect.anthropicAdaptiveEffort:
+    case ReasoningDialect.anthropicBetweenTools:
     case ReasoningDialect.anthropicEffort:
       body.remove('thinking');
       body.remove('output_config');
@@ -345,6 +347,8 @@ void _writeDialect(
       _writeAnthropicBudget(body, resolution);
     case ReasoningDialect.anthropicAdaptiveEffort:
       _writeAnthropicAdaptive(body, resolution);
+    case ReasoningDialect.anthropicBetweenTools:
+      _writeAnthropicAdaptive(body, resolution, offType: 'between_tools');
     case ReasoningDialect.anthropicEffort:
       _writeAnthropicEffort(body, resolution);
     case ReasoningDialect.geminiThinkingBudget:
@@ -378,9 +382,12 @@ void _writeOpenAi(
   ReasoningResolution resolution,
   ReasoningTransport transport,
 ) {
-  final effort = resolution.effective == ReasoningLevel.off
-      ? 'none'
-      : resolution.effective.name;
+  final effort = switch (resolution.effective) {
+    ReasoningLevel.off => 'none',
+    // Ollama maps recognized compatibility efforts to true for boolean models.
+    ReasoningLevel.on => 'high',
+    final level => level.name,
+  };
   if (_usesResponsesEnvelope(dialect, transport)) {
     body['reasoning'] = <String, dynamic>{'effort': effort, 'summary': 'auto'};
   } else {
@@ -429,11 +436,12 @@ void _writeAnthropicBudget(
 
 void _writeAnthropicAdaptive(
   Map<String, dynamic> body,
-  ReasoningResolution resolution,
-) {
+  ReasoningResolution resolution, {
+  String offType = 'disabled',
+}) {
   final effective = resolution.effective;
   if (effective == ReasoningLevel.off) {
-    body['thinking'] = <String, dynamic>{'type': 'disabled'};
+    body['thinking'] = <String, dynamic>{'type': offType};
     return;
   }
   body['thinking'] = <String, dynamic>{

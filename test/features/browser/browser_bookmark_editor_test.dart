@@ -1,3 +1,4 @@
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/features/browser/widgets/browser_text_field.dart';
 import 'dart:ui' as ui;
 
@@ -137,7 +138,7 @@ void main() {
     expect(style.color, pageTheme.colorScheme.onSurface);
     expect(style.decoration, TextDecoration.none);
     expect(style.fontSize, 17);
-    expect(style.fontWeight, FontWeight.w600);
+    expect(style.fontWeight, AppFontWeights.semibold);
     expect(style.letterSpacing, 1.4);
     expect(tester.takeException(), isNull);
   });

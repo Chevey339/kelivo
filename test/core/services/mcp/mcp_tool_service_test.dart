@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/conversation_mcp_settings.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -38,6 +40,161 @@ Future<Directory> _prepareImageDirectory() async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = null;
+
+  test(
+    'conversation MCP routes keep schema, approval and execution in the same scope',
+    () async {
+      final provider = _RecordingMcpProvider([
+        for (final id in ['default', 'custom'])
+          McpServerConfig(
+            id: id,
+            name: id,
+            enabled: true,
+            transport: McpTransportType.http,
+            tools: [
+              McpToolConfig(
+                name: 'echo',
+                enabled: true,
+                needsApproval: id == 'custom',
+              ),
+            ],
+          ),
+      ]);
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final service = McpToolService();
+      addTearDown(provider.dispose);
+      addTearDown(assistants.dispose);
+      addTearDown(service.dispose);
+      await assistants.loaded;
+      final id = await assistants.addAssistant(name: 'MCP');
+      await assistants.updateAssistant(
+        assistants
+            .getById(id)!
+            .copyWith(mcpServerIds: ['default'], allowConversationMcp: true),
+      );
+      final custom = Conversation(
+        id: 'custom-chat',
+        title: 'Custom',
+        assistantId: id,
+        mcpServerIds: ['custom'],
+        extras: const {ConversationMcpSettings.overrideKey: true},
+      );
+      final inherited = Conversation(title: 'Inherited', assistantId: id);
+      final routes = service.captureRoutesForAssistant(
+        provider,
+        assistants,
+        assistantId: id,
+        conversation: custom,
+      );
+      expect(
+        service
+            .listAvailableToolsForAssistant(
+              provider,
+              assistants,
+              id,
+              conversation: custom,
+              routeSnapshot: routes,
+            )
+            .map((tool) => tool.name),
+        ['echo'],
+      );
+      expect(
+        service.toolNeedsApprovalForAssistant(
+          provider,
+          assistants,
+          assistantId: id,
+          conversation: custom,
+          toolName: 'echo',
+          routeSnapshot: routes,
+        ),
+        isTrue,
+      );
+      expect(
+        await service.callToolTextForAssistant(
+          provider,
+          assistants,
+          assistantId: id,
+          conversation: custom,
+          toolName: 'echo',
+          routeSnapshot: routes,
+        ),
+        'custom:echo',
+      );
+      expect(
+        await service.callToolTextForAssistant(
+          provider,
+          assistants,
+          assistantId: id,
+          conversation: inherited,
+          toolName: 'echo',
+        ),
+        'default:echo',
+      );
+      await assistants.updateAssistant(
+        assistants.getById(id)!.copyWith(mcpServerIds: []),
+      );
+      expect(
+        await service.callToolTextForAssistant(
+          provider,
+          assistants,
+          assistantId: id,
+          conversation: custom,
+          toolName: 'echo',
+          routeSnapshot: routes,
+        ),
+        'custom:echo',
+      );
+      final disabled = custom.copyWith(mcpServerIds: []);
+      expect(
+        service.listAvailableToolsForAssistant(
+          provider,
+          assistants,
+          id,
+          conversation: disabled,
+        ),
+        isEmpty,
+      );
+      expect(
+        service.isToolEnabledForAssistant(
+          provider,
+          assistants,
+          assistantId: id,
+          conversation: disabled,
+          toolName: 'echo',
+          routeSnapshot: routes,
+        ),
+        isFalse,
+      );
+      expect(
+        await service.callToolTextForAssistant(
+          provider,
+          assistants,
+          assistantId: id,
+          conversation: disabled,
+          toolName: 'echo',
+          routeSnapshot: routes,
+        ),
+        isEmpty,
+      );
+      await assistants.updateAssistant(
+        assistants.getById(id)!.copyWith(allowConversationMcp: false),
+      );
+      expect(
+        service.isToolEnabledForAssistant(
+          provider,
+          assistants,
+          assistantId: id,
+          conversation: custom,
+          toolName: 'echo',
+          routeSnapshot: routes,
+        ),
+        isFalse,
+      );
+      expect(provider.calls, hasLength(3));
+    },
+  );
 
   test(
     'qualifies duplicate tool names and routes each to its server',

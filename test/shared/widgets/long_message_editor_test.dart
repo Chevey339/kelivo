@@ -1,6 +1,7 @@
 import 'package:Kelivo/shared/widgets/long_message_editor.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../support/android_selection_menu_mock.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:re_editor/re_editor.dart';
@@ -246,9 +247,11 @@ void main() {
     expect(text.text, source);
   });
 
-  testWidgets('short messages keep the default selection toolbar', (
+  testWidgets('short messages keep platform copy and cut actions', (
     tester,
   ) async {
+    final nativeMenu = AndroidSelectionMenuMock();
+    addTearDown(nativeMenu.dispose);
     final text = TextEditingController(text: 'short message');
     addTearDown(text.dispose);
     await show(tester, text);
@@ -257,8 +260,7 @@ void main() {
     await tester.pump();
     tester.state<EditableTextState>(find.byType(EditableText)).showToolbar();
     await tester.pump();
-    expect(find.text('Copy'), findsOneWidget);
-    expect(find.text('Cut'), findsOneWidget);
+    expect(nativeMenu.labels, containsAll(['Copy', 'Cut']));
   });
 
   testWidgets(

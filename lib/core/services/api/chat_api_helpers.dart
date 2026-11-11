@@ -114,6 +114,12 @@ String mimeFromPath(String path) {
   return inferMediaMimeFromSource(path, fallbackMime: 'image/png');
 }
 
+String normalizeClaudeImageMime(String mime) {
+  final normalized = mime.trim().toLowerCase();
+  if (normalized == 'image/jpg') return 'image/jpeg';
+  return normalized;
+}
+
 String mimeFromDataUrl(String dataUrl) {
   try {
     final start = dataUrl.indexOf(':');
@@ -172,6 +178,9 @@ Future<ParsedTextAndImages> parseTextAndImages(
   // Those carry a payload a text-only request has no use for.
   bool keepDisallowedImageText = true,
   bool skipImageParsing = false,
+  String? literalText,
+  Map<String, String> imageReferences = const {},
+  bool validateRemoteImages = true,
 }) async {
   if (raw.isEmpty) return const ParsedTextAndImages('', <ImageRef>[]);
   // Utility / text-only prompts (title, summary, compress) must keep
@@ -183,9 +192,36 @@ Future<ParsedTextAndImages> parseTextAndImages(
   // Custom attachment markers are intentionally not recognized here.
   // Attachments arrive via structured parts / media-path keys.
   final images = <ImageRef>[];
+  void addImage(String kind, String source, int offset) {
+    final reference = imageReferences[source];
+    images.add(
+      ImageRef(
+        reference == null ? kind : 'data',
+        reference ?? source,
+        offset: offset,
+      ),
+    );
+  }
+
   final buf = StringBuffer();
+  final literalRanges = literalText == null || literalText.isEmpty
+      ? <Match>[]
+      : literalText.allMatches(raw).toList();
+  var literalIndex = 0;
   int i = 0;
   while (i < raw.length) {
+    while (literalIndex < literalRanges.length &&
+        literalRanges[literalIndex].end <= i) {
+      literalIndex++;
+    }
+    final literal = literalIndex < literalRanges.length
+        ? literalRanges[literalIndex]
+        : null;
+    if (literal != null && i >= literal.start) {
+      buf.write(raw.substring(i, literal.end));
+      i = literal.end;
+      continue;
+    }
     // Skip fenced code blocks (``` or ~~~): content inside is never an image.
     if ((raw.startsWith('```', i) || raw.startsWith('~~~', i)) &&
         (i == 0 || raw[i - 1] == '\n')) {
@@ -249,7 +285,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
         raw.codeUnitAt(i) == 0x21 &&
         raw.codeUnitAt(i + 1) == 0x5B) {
       final m1 = mdImg.matchAsPrefix(raw, i);
-      if (m1 != null) {
+      if (m1 != null && (literal == null || m1.end <= literal.start)) {
         final full = raw.substring(m1.start, m1.end);
         final url = (m1.group(1) ?? '').trim();
         if (url.isEmpty) {
@@ -259,7 +295,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
         }
         if (url.startsWith('data:')) {
           if (allowDataImages) {
-            images.add(ImageRef('data', url));
+            addImage('data', url, m1.start);
           } else if (keepDisallowedImageText) {
             buf.write(full);
           }
@@ -272,13 +308,13 @@ Future<ParsedTextAndImages> parseTextAndImages(
             i = m1.end;
             continue;
           }
-          final ok = await _isValidRemoteImageUrl(url);
+          final ok = !validateRemoteImages || await _isValidRemoteImageUrl(url);
           if (!ok) {
             buf.write(full);
             i = m1.end;
             continue;
           }
-          images.add(ImageRef('url', url));
+          addImage('url', url, m1.start);
           if (keepRemoteMarkdownText) {
             buf.write(full);
           }
@@ -308,7 +344,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
           i = m1.end;
           continue;
         }
-        images.add(ImageRef('path', url));
+        addImage('path', url, m1.start);
         i = m1.end;
         continue;
       }
@@ -318,7 +354,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
     // Do not indexOf the remaining suffix on every line — that is O(n²)
     // when a Markdown image sits near the end of a long document.
     var j = i;
-    while (j < raw.length) {
+    while (j < raw.length && (literal == null || j < literal.start)) {
       final c = raw.codeUnitAt(j);
       if (c == 0x0A || c == 0x60) break;
       if (c == 0x21 && j + 1 < raw.length && raw.codeUnitAt(j + 1) == 0x5B) {
@@ -582,7 +618,8 @@ class ImageRef {
   final String kind; // 'data' | 'path' | 'url'
   final String src;
   final String? mime;
-  const ImageRef(this.kind, this.src, {this.mime});
+  final int? offset;
+  const ImageRef(this.kind, this.src, {this.mime, this.offset});
 }
 
 class ParsedTextAndImages {

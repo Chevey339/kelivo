@@ -22,6 +22,21 @@ import java.util.concurrent.atomic.AtomicReference
 class ExecShutdownTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun hostLauncherPreservesArgumentsWithoutEvaluatingThem() {
+        val argument = "spaces ' \" \$HOME \$(exit 9);\nnext"
+        val process = ProcessBuilder(workspaceExecArgv(listOf("/usr/bin/printf", "%s", argument), "/bin/sh")).start()
+        assertEquals(argument, process.inputStream.bufferedReader().readText())
+        assertTrue(process.waitFor(5, TimeUnit.SECONDS))
+        assertEquals(0, process.exitValue())
+    }
+
+    @Test fun hostLauncherExecKeepsTheTrackedPid() {
+        val process = ProcessBuilder(workspaceExecArgv(listOf("/bin/sh", "-c", "printf '%s' \"\$\$\""), "/bin/sh")).start()
+        assertEquals(processPid(process), process.inputStream.bufferedReader().readText().toLong())
+        assertTrue(process.waitFor(5, TimeUnit.SECONDS))
+        assertEquals(0, process.exitValue())
+    }
+
     @Test fun failedStopStillReportsTimeoutAndRemainsTrackedForCleanup() {
         val events = WorkspaceEvents()
         val exit = AtomicReference<Map<*, *>>()
@@ -35,7 +50,7 @@ class ExecShutdownTest {
         val stopRequested = CountDownLatch(1)
         val process = AtomicReference<Process>()
         val rejectStop = AtomicBoolean(true)
-        val runner = ExecRunner(events, stopProcess = {
+        val runner = ExecRunner(events, hostShell = "/bin/sh", stopProcess = {
             process.set(it)
             stopRequested.countDown()
             if (rejectStop.get()) throw IOException("cannot inspect PRoot readiness")

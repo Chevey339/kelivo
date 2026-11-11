@@ -1,24 +1,31 @@
 import 'package:flutter/foundation.dart';
 import 'chat_input_data.dart';
+import 'quote_ref.dart';
+import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 
 /// The editor value, before the send path trims text or filters attachments.
 class ComposerDraftInput {
   const ComposerDraftInput({
     this.text = '',
+    this.quotes = const [],
     this.selectionBase = -1,
     this.selectionExtent = -1,
     this.images = const [],
     this.documents = const [],
     this.allowImagesApiRouting = true,
+    this.uiContext,
   });
 
   final String text;
+  final List<QuoteRef> quotes;
   final int selectionBase;
   final int selectionExtent;
   final List<DraftImage> images;
   final List<DocumentAttachment> documents;
   final bool allowImagesApiRouting;
-  bool get isEmpty => text.isEmpty && images.isEmpty && documents.isEmpty;
+  final UiContextAttachment? uiContext;
+  bool get isEmpty =>
+      text.isEmpty && images.isEmpty && documents.isEmpty && uiContext == null;
   Iterable<String> get paths sync* {
     yield* images.map((image) => image.path);
     yield* documents.map((document) => document.path);
@@ -26,37 +33,47 @@ class ComposerDraftInput {
 
   ComposerDraftInput copyWith({
     String? text,
+    List<QuoteRef>? quotes,
     int? selectionBase,
     int? selectionExtent,
     List<DraftImage>? images,
     List<DocumentAttachment>? documents,
+    UiContextAttachment? uiContext,
+    bool clearUiContext = false,
   }) => ComposerDraftInput(
     text: text ?? this.text,
+    quotes: quotes ?? this.quotes,
     selectionBase: selectionBase ?? this.selectionBase,
     selectionExtent: selectionExtent ?? this.selectionExtent,
     images: images ?? this.images,
     documents: documents ?? this.documents,
     allowImagesApiRouting: allowImagesApiRouting,
+    uiContext: clearUiContext ? null : uiContext ?? this.uiContext,
   );
 
   ChatInputData toInput({DraftSubmission? submission}) => ChatInputData(
     text: text,
+    quotes: quotes,
     imagePaths: images.map((image) => image.path).toList(),
     documents: documents,
     allowImagesApiRouting: allowImagesApiRouting,
     draftSubmission: submission,
+    uiContext: uiContext,
   );
 
   factory ComposerDraftInput.fromInput(ChatInputData input) =>
       ComposerDraftInput(
         text: input.text,
+        quotes: input.quotes,
         images: [for (final path in input.imagePaths) DraftImage(path: path)],
         documents: List.of(input.documents),
         allowImagesApiRouting: input.allowImagesApiRouting,
+        uiContext: input.uiContext,
       );
 
   Map<String, dynamic> toJson() => {
     'text': text,
+    'quotes': quotes.map((quote) => quote.toJson()).toList(),
     'selectionBase': selectionBase,
     'selectionExtent': selectionExtent,
     'images': images.map((image) => image.toJson()).toList(),
@@ -65,11 +82,13 @@ class ComposerDraftInput {
         {'path': doc.path, 'fileName': doc.fileName, 'mime': doc.mime},
     ],
     'allowImagesApiRouting': allowImagesApiRouting,
+    'uiContext': uiContext?.toJson(),
   };
 
   factory ComposerDraftInput.fromJson(Map<String, dynamic> json) =>
       ComposerDraftInput(
         text: json['text'] as String,
+        quotes: QuoteRef.decodeList(json['quotes']),
         selectionBase: json['selectionBase'] as int,
         selectionExtent: json['selectionExtent'] as int,
         images: [
@@ -85,13 +104,20 @@ class ComposerDraftInput {
             ),
         ],
         allowImagesApiRouting: json['allowImagesApiRouting'] as bool,
+        uiContext: json['uiContext'] == null
+            ? null
+            : UiContextAttachment.fromJson(
+                Map<String, dynamic>.from(json['uiContext'] as Map),
+              ),
       );
 
   bool sameValue(ComposerDraftInput other) =>
       text == other.text &&
+      listEquals(quotes, other.quotes) &&
       selectionBase == other.selectionBase &&
       selectionExtent == other.selectionExtent &&
       allowImagesApiRouting == other.allowImagesApiRouting &&
+      uiContext == other.uiContext &&
       listEquals(
         images
             .map((image) => (image.path, image.processing, image.failed))

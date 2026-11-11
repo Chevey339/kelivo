@@ -13,6 +13,7 @@ class IosTextButton extends StatefulWidget {
     this.color,
     this.fontSize = 14,
     this.padding = const EdgeInsets.symmetric(horizontal: 10),
+    this.mainAxisAlignment = MainAxisAlignment.center,
   });
 
   final String label;
@@ -21,6 +22,7 @@ class IosTextButton extends StatefulWidget {
   final Color? color;
   final double fontSize;
   final EdgeInsets padding;
+  final MainAxisAlignment mainAxisAlignment;
 
   @override
   State<IosTextButton> createState() => _IosTextButtonState();
@@ -79,10 +81,12 @@ class _IosTextButtonState extends State<IosTextButton> {
               padding: widget.padding,
               child: TweenAnimationBuilder<Color?>(
                 tween: ColorTween(end: foreground),
-                duration: const Duration(milliseconds: 120),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 120),
                 builder: (context, color, _) => Row(
                   mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: widget.mainAxisAlignment,
                   children: [
                     if (widget.icon != null) ...[
                       Icon(widget.icon, size: 17, color: color),
@@ -91,7 +95,11 @@ class _IosTextButtonState extends State<IosTextButton> {
                     Flexible(
                       child: Text(
                         widget.label,
-                        textAlign: TextAlign.center,
+                        textAlign: switch (widget.mainAxisAlignment) {
+                          MainAxisAlignment.start => TextAlign.start,
+                          MainAxisAlignment.end => TextAlign.end,
+                          _ => TextAlign.center,
+                        },
                         style: TextStyle(
                           color: color,
                           decoration: _focused

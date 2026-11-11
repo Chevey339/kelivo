@@ -117,140 +117,180 @@ namespace flutter_inappwebview_plugin
     this->inAppBrowser = inAppBrowser;
   }
 
-  void InAppWebView::createInAppWebViewEnv(const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment, const std::shared_ptr<InAppWebViewSettings> initialSettings, std::function<void(wil::com_ptr<ICoreWebView2Environment> webViewEnv,
-    wil::com_ptr<ICoreWebView2Controller> webViewController,
-    wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController)> completionHandler, wil::com_ptr<ICoreWebView2Environment> popupEnvironment)
+  void InAppWebView::createInAppWebViewEnv(const FlutterInappwebviewWindowsPlugin* plugin,
+    const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment,
+    const std::shared_ptr<InAppWebViewSettings> initialSettings,
+    std::function<void(HRESULT, const std::string&, wil::com_ptr<ICoreWebView2Environment>,
+      wil::com_ptr<ICoreWebView2Controller>, wil::com_ptr<ICoreWebView2CompositionController>)> completionHandler,
+    wil::com_ptr<ICoreWebView2Environment> popupEnvironment)
   {
-    auto callback = [parentWindow, willBeSurface, completionHandler, initialSettings](HRESULT result, wil::com_ptr<ICoreWebView2Environment> env) -> HRESULT
-      {
-        if (failedAndLog(result) || !env) {
-          completionHandler(nullptr, nullptr, nullptr);
-          return E_FAIL;
-        }
-
-        wil::com_ptr<ICoreWebView2Environment3> webViewEnv3;
-        wil::com_ptr<ICoreWebView2Environment10> webViewEnv10;
-        wil::com_ptr<ICoreWebView2ControllerOptions> options;
-        if (initialSettings && succeededOrLog(env->QueryInterface(IID_PPV_ARGS(&webViewEnv10))) && succeededOrLog(webViewEnv10->CreateCoreWebView2ControllerOptions(&options))) {
-          options->put_IsInPrivateModeEnabled(initialSettings->incognito);
-        }
-        else {
-          webViewEnv10 = nullptr;
-          options = nullptr;
-          failedLog(env->QueryInterface(IID_PPV_ARGS(&webViewEnv3)));
-        }
-        if (willBeSurface && (webViewEnv10 || webViewEnv3)) {
-          if (webViewEnv10 && options) {
-            failedLog(webViewEnv10->CreateCoreWebView2CompositionControllerWithOptions(parentWindow, options.get(), Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
-              [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2CompositionController> compositionController) -> HRESULT
-              {
-                wil::com_ptr<ICoreWebView2Controller3> webViewController = compositionController.try_query<ICoreWebView2Controller3>();
-
-                if (failedAndLog(result) || !webViewController) {
-                  completionHandler(nullptr, nullptr, nullptr);
-                  return E_FAIL;
-                }
-
-                ICoreWebView2Controller3* webViewController3;
-                if (succeededOrLog(webViewController->QueryInterface(IID_PPV_ARGS(&webViewController3)))) {
-                  webViewController3->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);
-                  webViewController3->put_ShouldDetectMonitorScaleChanges(FALSE);
-                  webViewController3->put_RasterizationScale(1.0);
-                }
-
-                completionHandler(std::move(env), std::move(webViewController), std::move(compositionController));
-                return S_OK;
-              }
-            ).Get()));
-          }
-          else {
-            failedLog(webViewEnv3->CreateCoreWebView2CompositionController(parentWindow, Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
-              [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2CompositionController> compositionController) -> HRESULT
-              {
-                wil::com_ptr<ICoreWebView2Controller3> webViewController = compositionController.try_query<ICoreWebView2Controller3>();
-
-                if (failedAndLog(result) || !webViewController) {
-                  completionHandler(nullptr, nullptr, nullptr);
-                  return E_FAIL;
-                }
-
-                ICoreWebView2Controller3* webViewController3;
-                if (succeededOrLog(webViewController->QueryInterface(IID_PPV_ARGS(&webViewController3)))) {
-                  webViewController3->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);
-                  webViewController3->put_ShouldDetectMonitorScaleChanges(FALSE);
-                  webViewController3->put_RasterizationScale(1.0);
-                }
-
-                completionHandler(std::move(env), std::move(webViewController), std::move(compositionController));
-                return S_OK;
-              }
-            ).Get()));
-          }
-        }
-        else {
-          if (webViewEnv10 && options) {
-            failedLog(webViewEnv10->CreateCoreWebView2ControllerWithOptions(parentWindow, options.get(), Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-              [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2Controller> controller) -> HRESULT
-              {
-                if (failedAndLog(result) || !controller) {
-                  completionHandler(nullptr, nullptr, nullptr);
-                  return E_FAIL;
-                }
-
-                completionHandler(std::move(env), std::move(controller), nullptr);
-                return S_OK;
-              }).Get()));
-          }
-          else {
-            failedLog(env->CreateCoreWebView2Controller(parentWindow, Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-              [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2Controller> controller) -> HRESULT
-              {
-                if (failedAndLog(result) || !controller) {
-                  completionHandler(nullptr, nullptr, nullptr);
-                  return E_FAIL;
-                }
-
-                completionHandler(std::move(env), std::move(controller), nullptr);
-                return S_OK;
-              }).Get()));
-          }
-        }
+    auto completed = std::make_shared<bool>(false);
+    auto finish = [alive = plugin->alive, completed, completionHandler](HRESULT hr,
+      const std::string& stage, wil::com_ptr<ICoreWebView2Environment> environment,
+      wil::com_ptr<ICoreWebView2Controller> controller,
+      wil::com_ptr<ICoreWebView2CompositionController> composition) {
+      if (!*alive || *completed || FAILED(hr)) {
+        if (controller) controller->Close();
+        controller = nullptr;
+        composition = nullptr;
+        environment = nullptr;
+      }
+      if (!*alive || *completed) return;
+      *completed = true;
+      completionHandler(hr, stage, std::move(environment), std::move(controller), std::move(composition));
+    };
+    auto callback = [alive = plugin->alive, parentWindow, willBeSurface, finish, initialSettings](
+      HRESULT result, wil::com_ptr<ICoreWebView2Environment> env) -> HRESULT {
+      if (!*alive) return S_OK;
+      if (FAILED(result)) {
+        finish(result, "CreateCoreWebView2EnvironmentWithOptions", nullptr, nullptr, nullptr);
         return S_OK;
-      };
+      }
 
-    HRESULT hr;
-    if (popupEnvironment) {
-      hr = callback(S_OK, popupEnvironment);
-    }
+      wil::com_ptr<ICoreWebView2Environment10> env10;
+      wil::com_ptr<ICoreWebView2ControllerOptions> options;
+      if (initialSettings && SUCCEEDED(env->QueryInterface(IID_PPV_ARGS(&env10)))) {
+        result = env10->CreateCoreWebView2ControllerOptions(&options);
+        if (FAILED(result)) {
+          finish(result, "CreateCoreWebView2ControllerOptions", nullptr, nullptr, nullptr);
+          return S_OK;
+        }
+        result = options->put_IsInPrivateModeEnabled(initialSettings->incognito);
+        if (FAILED(result)) {
+          finish(result, "put_IsInPrivateModeEnabled", nullptr, nullptr, nullptr);
+          return S_OK;
+        }
+      }
+
+      if (willBeSurface) {
+        const std::string stage = env10 && options
+          ? "CreateCoreWebView2CompositionControllerWithOptions" : "CreateCoreWebView2CompositionController";
+        auto handler = Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
+          [env, finish, stage](HRESULT hr, ICoreWebView2CompositionController* composition) -> HRESULT {
+            wil::com_ptr<ICoreWebView2Controller3> controller;
+            if (FAILED(hr)) {
+              finish(hr, stage, nullptr, nullptr, nullptr);
+              return S_OK;
+            }
+            hr = composition->QueryInterface(IID_PPV_ARGS(&controller));
+            if (FAILED(hr)) {
+              // Close even runtimes which do not expose ICoreWebView2Controller3.
+              wil::com_ptr<ICoreWebView2Controller> base;
+              if (SUCCEEDED(composition->QueryInterface(IID_PPV_ARGS(&base)))) base->Close();
+              finish(hr, "QueryInterface(ICoreWebView2Controller3)", nullptr, nullptr, nullptr);
+              return S_OK;
+            }
+            std::string failedStage = "put_BoundsMode";
+            hr = controller->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);
+            if (SUCCEEDED(hr)) {
+              failedStage = "put_ShouldDetectMonitorScaleChanges";
+              hr = controller->put_ShouldDetectMonitorScaleChanges(FALSE);
+            }
+            if (SUCCEEDED(hr)) {
+              failedStage = "put_RasterizationScale";
+              hr = controller->put_RasterizationScale(1.0);
+            }
+            finish(hr, failedStage, env, controller,
+              wil::com_ptr<ICoreWebView2CompositionController>(composition));
+            return S_OK;
+          });
+        if (env10 && options) {
+          result = env10->CreateCoreWebView2CompositionControllerWithOptions(parentWindow, options.get(), handler.Get());
+        }
+        else {
+          wil::com_ptr<ICoreWebView2Environment3> env3;
+          result = env->QueryInterface(IID_PPV_ARGS(&env3));
+          if (FAILED(result)) {
+            finish(result, "QueryInterface(ICoreWebView2Environment3)", nullptr, nullptr, nullptr);
+            return S_OK;
+          }
+          result = env3->CreateCoreWebView2CompositionController(parentWindow, handler.Get());
+        }
+        if (FAILED(result)) finish(result, stage, nullptr, nullptr, nullptr);
+      }
+      else {
+        const std::string stage = env10 && options
+          ? "CreateCoreWebView2ControllerWithOptions" : "CreateCoreWebView2Controller";
+        auto handler = Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+          [env, finish, stage](HRESULT hr, ICoreWebView2Controller* controller) -> HRESULT {
+            finish(hr, stage, env, wil::com_ptr<ICoreWebView2Controller>(controller), nullptr);
+            return S_OK;
+          });
+        result = env10 && options
+          ? env10->CreateCoreWebView2ControllerWithOptions(parentWindow, options.get(), handler.Get())
+          : env->CreateCoreWebView2Controller(parentWindow, handler.Get());
+        if (FAILED(result)) finish(result, stage, nullptr, nullptr, nullptr);
+      }
+      return S_OK;
+    };
+
+    if (popupEnvironment) callback(S_OK, popupEnvironment);
     else if (webViewEnvironment && webViewEnvironment->getEnvironment()) {
-      hr = callback(S_OK, webViewEnvironment->getEnvironment());
+      callback(S_OK, webViewEnvironment->getEnvironment());
     }
     else {
       auto options = Make<CoreWebView2EnvironmentOptions>();
       registerKelivoScheme(options.Get());
-      hr = CreateCoreWebView2EnvironmentWithOptions(
-        nullptr, nullptr, options.Get(),
+      const auto hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, options.Get(),
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(callback).Get());
-    }
-
-    if (failedAndLog(hr)) {
-      completionHandler(nullptr, nullptr, nullptr);
+      if (FAILED(hr)) finish(hr, "CreateCoreWebView2EnvironmentWithOptions", nullptr, nullptr, nullptr);
     }
   }
 
   void InAppWebView::initChannel(const std::optional<std::variant<std::string, int64_t>> viewId, const std::optional<std::string> channelName)
   {
+    // Unregister before a replacement can install the same channel name.
+    channelDelegate.reset();
     if (viewId.has_value()) {
       id = viewId.value();
     }
-    channelDelegate = channelName.has_value() ? std::make_unique<WebViewChannelDelegate>(this, plugin->registrar->messenger(), channelName.value()) :
-      std::make_unique<WebViewChannelDelegate>(this, plugin->registrar->messenger());
+    channelDelegate = channelName.has_value() ? std::make_unique<WebViewChannelDelegate>(this, plugin->messenger(), channelName.value()) :
+      std::make_unique<WebViewChannelDelegate>(this, plugin->messenger());
   }
 
   void InAppWebView::prepare(const InAppWebViewCreationParams& params)
   {
     if (!webView) {
       return;
+    }
+
+    if (!browserShortcutRegistered_) {
+      const auto hr = webViewController->add_AcceleratorKeyPressed(
+        Callback<ICoreWebView2AcceleratorKeyPressedEventHandler>(
+          [this, alive = alive_](ICoreWebView2Controller*, ICoreWebView2AcceleratorKeyPressedEventArgs* args) -> HRESULT {
+            if (!*alive || !plugin || !*plugin->alive || !plugin->browserShortcutsEnabled) return S_OK;
+            HWND host = nullptr;
+            webViewController->get_ParentWindow(&host);
+            if (!host || GetAncestor(host, GA_ROOT) != GetForegroundWindow()) return S_OK;
+            COREWEBVIEW2_KEY_EVENT_KIND kind;
+            args->get_KeyEventKind(&kind);
+            if (kind != COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN && kind != COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN) return S_OK;
+            UINT key = 0;
+            args->get_VirtualKey(&key);
+            std::string command;
+            if (GetKeyState(VK_CONTROL) & 0x8000) command += "ctrl+";
+            if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000) command += "cmd+";
+            if (GetKeyState(VK_MENU) & 0x8000) command += "alt+";
+            if (GetKeyState(VK_SHIFT) & 0x8000) command += "shift+";
+            if (key >= 'A' && key <= 'Z') command += static_cast<char>(key - 'A' + 'a');
+            else if (key == VK_TAB) command += "tab";
+            else if (key == VK_F6) command += "f6";
+            else if (key == VK_ESCAPE) command += "escape";
+            else if (key == VK_OEM_COMMA) command += "comma";
+            else if (key == VK_OEM_4) command += "bracketleft";
+            else if (key == VK_OEM_6) command += "bracketright";
+            else return S_OK;
+            if (!plugin->browserShortcutCommands.count(command)) return S_OK;
+            // WebView2 requires the handled decision synchronously. Deliver only
+            // accepted commands to Dart, leaving editing keys with the page.
+            args->put_Handled(TRUE);
+            COREWEBVIEW2_PHYSICAL_KEY_STATUS status{};
+            args->get_PhysicalKeyStatus(&status);
+            if (!status.WasKeyDown) plugin->browserWindowChannel->InvokeMethod(
+              "shortcut", std::make_unique<flutter::EncodableValue>(command));
+            return S_OK;
+          }).Get(), &browserShortcutToken_);
+      browserShortcutRegistered_ = SUCCEEDED(hr);
     }
 
     wil::com_ptr<ICoreWebView2Settings> webView2Settings;
@@ -488,15 +528,22 @@ namespace flutter_inappwebview_plugin
       Callback<ICoreWebView2NavigationStartingEventHandler>(
         [this](ICoreWebView2* sender, ICoreWebView2NavigationStartingEventArgs* args)
         {
+          wil::unique_cotaskmem_string uri = nullptr;
+          std::optional<std::string> url = SUCCEEDED(args->get_Uri(&uri)) ? wide_to_utf8(uri.get()) : std::optional<std::string>{};
+          const bool networkNavigation = url.has_value() &&
+            (starts_with(url.value(), std::string{ "http://" }) || starts_with(url.value(), std::string{ "https://" }));
+          // Cancel offline-app navigations before they replace the document
+          // with a Chromium error page and discard its storage bridge.
+          if (settings->blockNetworkLoads && networkNavigation) {
+            args->put_Cancel(TRUE);
+            return S_OK;
+          }
           isLoading_ = true;
 
           if (!channelDelegate) {
             args->put_Cancel(false);
             return S_OK;
           }
-
-          wil::unique_cotaskmem_string uri = nullptr;
-          std::optional<std::string> url = SUCCEEDED(args->get_Uri(&uri)) ? wide_to_utf8(uri.get()) : std::optional<std::string>{};
 
           wil::unique_cotaskmem_string requestMethod = nullptr;
           wil::com_ptr<ICoreWebView2HttpRequestHeaders> requestHeaders = nullptr;
@@ -579,8 +626,9 @@ namespace flutter_inappwebview_plugin
             navigationActions_[navigationId] = navigationAction;
           }
 
-          // if shouldOverrideUrlLoading is not used, then call onLoadStart and onProgressChanged here
-          if (!settings->useShouldOverrideUrlLoading) {
+          // CDP Fetch only pauses HTTP(S) documents. Registered custom schemes
+          // and NavigateToString must still start a fresh Dart navigation.
+          if (!settings->useShouldOverrideUrlLoading || !networkNavigation) {
             channelDelegate->onLoadStart(url);
             channelDelegate->onProgressChanged(0);
           }
@@ -895,7 +943,7 @@ namespace flutter_inappwebview_plugin
                     {
                       wil::com_ptr<ICoreWebView2WebResourceResponse> nativeResponse;
                       nativeResponse.attach(response->toWebView2Response(environment));
-                      if (nativeResponse) resourceArgs->put_Response(nativeResponse.get());
+                      if (nativeResponse) failedLog(resourceArgs->put_Response(nativeResponse.get()));
                       failedLog(deferral->Complete());
                       return false;
                     };
@@ -913,17 +961,26 @@ namespace flutter_inappwebview_plugin
 
             if (settings->useShouldInterceptRequest) {
               auto callback = std::make_unique<WebViewChannelDelegate::ShouldInterceptRequestCallback>();
-              auto defaultBehaviour = [this, deferral, args](const std::optional<std::shared_ptr<WebResourceResponse>> response)
+              auto defaultBehaviour = [deferral, resourceArgs, environment](const std::optional<std::shared_ptr<WebResourceResponse>> response)
                 {
+                  // An enabled interceptor must not permit network traffic if
+                  // its Dart handler fails or disappears during view handoff.
+                  wil::com_ptr<ICoreWebView2WebResourceResponse> denied;
+                  if (environment && SUCCEEDED(environment->CreateWebResourceResponse(
+                    nullptr, 403, L"Forbidden", L"Cache-Control: no-store\r\nContent-Type: text/plain", &denied))) {
+                    resourceArgs->put_Response(denied.get());
+                  }
                   failedLog(deferral->Complete());
                 };
-              callback->nonNullSuccess = [this, deferral, args](const std::shared_ptr<WebResourceResponse> response)
+              callback->nonNullSuccess = [deferral, resourceArgs, environment](const std::shared_ptr<WebResourceResponse> response)
                 {
-                  args->put_Response(response->toWebView2Response(webViewEnv));
+                  wil::com_ptr<ICoreWebView2WebResourceResponse> nativeResponse;
+                  nativeResponse.attach(response->toWebView2Response(environment));
+                  if (nativeResponse) failedLog(resourceArgs->put_Response(nativeResponse.get()));
                   failedLog(deferral->Complete());
                   return false;
                 };
-              callback->nullSuccess = [this, deferral, args, isCustomScheme, onLoadResourceWithCustomSchemeCallback]()
+              callback->nullSuccess = [deferral, isCustomScheme, onLoadResourceWithCustomSchemeCallback]()
                 {
                   if (isCustomScheme) {
                     onLoadResourceWithCustomSchemeCallback();
@@ -934,7 +991,7 @@ namespace flutter_inappwebview_plugin
                   return false;
                 };
               callback->defaultBehaviour = defaultBehaviour;
-              callback->error = [this, defaultBehaviour](const std::string& error_code, const std::string& error_message, const flutter::EncodableValue* error_details)
+              callback->error = [defaultBehaviour](const std::string& error_code, const std::string& error_message, const flutter::EncodableValue* error_details)
                 {
                   debugLog(error_code + ", " + error_message);
                   defaultBehaviour(std::nullopt);
@@ -1141,8 +1198,9 @@ namespace flutter_inappwebview_plugin
   void InAppWebView::goBackOrForward(const int64_t& steps)
   {
     getCopyBackForwardList(
-      [this, steps](std::unique_ptr<WebHistory> webHistory)
+      [this, alive = alive_, steps](std::unique_ptr<WebHistory> webHistory)
       {
+        if (!*alive) return;
         if (webHistory && webHistory->currentIndex.has_value() && webHistory->list.has_value()) {
           auto currentIndex = webHistory->currentIndex.value();
           auto items = &webHistory->list.value();
@@ -1255,8 +1313,9 @@ namespace flutter_inappwebview_plugin
     }
 
     userContentController->createContentWorld(contentWorld,
-      [=](const int& contextId)
+      [=, alive = alive_](const int& contextId)
       {
+        if (!*alive) return;
         nlohmann::json parameters = {
           {"expression", source},
           { "returnByValue", true }
@@ -1267,15 +1326,18 @@ namespace flutter_inappwebview_plugin
         }
 
         auto hr = webView->CallDevToolsProtocolMethod(L"Runtime.evaluate", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-          [this, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+          [this, alive, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
           {
+            if (!*alive) return S_OK;
             nlohmann::json result;
             if (succeededOrLog(errorCode)) {
               nlohmann::json json = nlohmann::json::parse(wide_to_utf8(returnObjectAsJson));
               result = json["result"].contains("value") ? json["result"]["value"] : nlohmann::json{};
               if (json.contains("exceptionDetails")) {
                 nlohmann::json exceptionDetails = json["exceptionDetails"];
-                auto errorMessage = exceptionDetails.contains("exception") && exceptionDetails["exception"].contains("value")
+                auto errorMessage = exceptionDetails.contains("exception") && exceptionDetails["exception"].contains("description")
+                  ? exceptionDetails["exception"]["description"].get<std::string>() :
+                  exceptionDetails.contains("exception") && exceptionDetails["exception"].contains("value")
                   ? exceptionDetails["exception"]["value"].dump() :
                   (result["value"].is_null() ? exceptionDetails["text"].get<std::string>() : result["value"].dump());
                 result = nlohmann::json{};
@@ -1308,8 +1370,9 @@ namespace flutter_inappwebview_plugin
     }
 
     userContentController->createContentWorld(contentWorld,
-      [=](const int& contextId)
+      [=, alive = alive_](const int& contextId)
       {
+        if (!*alive) return;
         std::vector<std::string> functionArgumentNamesList;
         std::vector<std::string> functionArgumentValuesList;
 
@@ -1334,8 +1397,9 @@ namespace flutter_inappwebview_plugin
         }
 
         auto hr = webView->CallDevToolsProtocolMethod(L"Runtime.evaluate", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-          [this, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+          [this, alive, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
           {
+            if (!*alive) return S_OK;
             nlohmann::json result = {
               {"value", nlohmann::json{}},
               {"error", nlohmann::json{}}
@@ -1345,7 +1409,9 @@ namespace flutter_inappwebview_plugin
               result["value"] = json["result"].contains("value") ? json["result"]["value"] : nlohmann::json{};
               if (json.contains("exceptionDetails")) {
                 nlohmann::json exceptionDetails = json["exceptionDetails"];
-                auto errorMessage = exceptionDetails.contains("exception") && exceptionDetails["exception"].contains("value")
+                auto errorMessage = exceptionDetails.contains("exception") && exceptionDetails["exception"].contains("description")
+                  ? exceptionDetails["exception"]["description"].get<std::string>() :
+                  exceptionDetails.contains("exception") && exceptionDetails["exception"].contains("value")
                   ? exceptionDetails["exception"]["value"].dump() :
                   (result["value"].is_null() ? exceptionDetails["text"].get<std::string>() : result["value"].dump());
                 result["value"] = nlohmann::json{};
@@ -1884,6 +1950,7 @@ namespace flutter_inappwebview_plugin
   {
     debugLog("dealloc InAppWebView");
     *alive_ = false;
+    if (browserShortcutRegistered_ && webViewController) webViewController->remove_AcceleratorKeyPressed(browserShortcutToken_);
     if (screenshotQueue_) screenshotQueue_->cancel();
     if (plugin && plugin->inAppWebViewManager) {
       auto& pending = plugin->inAppWebViewManager->windowWebViews;
@@ -1900,14 +1967,19 @@ namespace flutter_inappwebview_plugin
       failedLog(webView->Stop());
     }
     HWND parentWindow = nullptr;
-    if (webViewCompositionController && webViewController && succeededOrLog(webViewController->get_ParentWindow(&parentWindow))) {
-      // if it's an InAppWebView (so webViewCompositionController will be not a nullptr!),
-      // then destroy the Window created with it
-      DestroyWindow(parentWindow);
+    if (webViewCompositionController) {
+      if (webViewController) webViewController->get_ParentWindow(&parentWindow);
+      failedLog(webViewCompositionController->put_RootVisualTarget(nullptr));
     }
     if (webViewController) {
       failedLog(webViewController->Close());
     }
+    surface_ = nullptr;
+    webView = nullptr;
+    webViewCompositionController = nullptr;
+    webViewController = nullptr;
+    webViewEnv = nullptr;
+    if (parentWindow) DestroyWindow(parentWindow);
     navigationActions_.clear();
     inAppBrowser = nullptr;
     plugin = nullptr;

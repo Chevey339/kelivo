@@ -1,3 +1,5 @@
+import '../../../side_panel/desktop_side_panel_controller.dart';
+import '../../../../utils/platform_utils.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -86,6 +88,11 @@ Future<void> showFilePreview(
   FilePreviewKind? kind,
   bool autoLoad = true,
 }) async {
+  final panel = DesktopSidePanelController.instance;
+  if (PlatformUtils.isDesktopTarget && panel.isAvailable) {
+    panel.openPreview(file.path);
+    return;
+  }
   if (!file.existsSync()) {
     final l10n = AppLocalizations.of(context)!;
     showAppSnackBar(
@@ -113,7 +120,11 @@ Future<void> showFilePreview(
     return;
   }
 
-  final body = _previewBody(kind: resolvedKind, file: file, autoLoad: autoLoad);
+  final body = buildFilePreviewBody(
+    kind: resolvedKind,
+    file: file,
+    autoLoad: autoLoad,
+  );
   if (desktop) {
     final height = MediaQuery.sizeOf(context).height * 0.8;
     await showAppDialog<void>(
@@ -145,7 +156,7 @@ Future<void> showFilePreview(
   );
 }
 
-Widget _previewBody({
+Widget buildFilePreviewBody({
   required FilePreviewKind kind,
   required File file,
   bool autoLoad = true,

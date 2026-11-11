@@ -1,3 +1,5 @@
+import '../../request_history_context.dart';
+import '../../request_image_context.dart';
 import 'dart:convert';
 
 import '../../../../models/model_spec.dart';
@@ -156,6 +158,7 @@ class ClaudeHistory {
     this.skipImageParsing = false,
     this.canImageInput = true,
     this.userImagePaths,
+    this.downloadRemoteImage,
   });
 
   /// Only Anthropic runs a server tool or decrypts what one returned, so
@@ -168,6 +171,10 @@ class ClaudeHistory {
   final bool canImageInput;
   final NativeInputAttachments nativeInputs;
   final List<String>? userImagePaths;
+
+  /// Vertex requires base64 images, including authenticated Google media.
+  /// Other Messages endpoints retain remote references as text.
+  final Future<String> Function(String url)? downloadRemoteImage;
 
   /// The container the conversation's last code execution ran in, stored
   /// against that assistant message. The latest one wins. Set by [build].
@@ -225,6 +232,10 @@ class ClaudeHistory {
     // here and open the following user message, so the model still sees them.
     final carriedImages = <Map<String, dynamic>>[];
     _ReplayedTurn? turn;
+    final turnSources = Expando<String>();
+    final resultSources = <String, String>{};
+    final lastUserIndex = lastUserInputIndex(messages);
+    final hasOwners = messages.any((m) => m.containsKey(imageContextOwnerKey));
 
     /// A result is sent only once the call it answers has been: the API
     /// rejects one pointing at a `tool_use` that is not in the history.
@@ -236,7 +247,15 @@ class ClaudeHistory {
         if (replayedClientCalls.contains(id)) taken.add(result);
         return true;
       });
-      if (taken.isNotEmpty) out.add({'role': 'user', 'content': taken});
+      if (taken.isNotEmpty) {
+        out.add({
+          'role': 'user',
+          'content': taken,
+          if (resultSources[taken.first['tool_use_id']]
+              case final String source)
+            historySourceKey: source,
+        });
+      }
     }
 
     /// Emits the next response of [turn], behind the client results of the
@@ -258,6 +277,8 @@ class ClaudeHistory {
         final message = <String, dynamic>{
           'role': 'assistant',
           'content': blocks,
+          if (turnSources[turn] case final String source)
+            historySourceKey: source,
         };
         out.add(message);
         turn.messages.add(message);
@@ -302,7 +323,12 @@ class ClaudeHistory {
         (last['content'] as List).add({'type': 'text', 'text': rest});
       } else {
         flushResults();
-        out.add({'role': 'assistant', 'content': rest});
+        out.add({
+          'role': 'assistant',
+          'content': rest,
+          if (m[historySourceKey] != null)
+            historySourceKey: m[historySourceKey],
+        });
       }
     }
 
@@ -324,10 +350,13 @@ class ClaudeHistory {
         ).where((doc) => isSandboxDataFile(fileName: doc.name, mime: doc.mime));
         dataFiles.addAll(files);
         unseenDataFiles.addAll(files);
-        if (i == messages.length - 1) turnDataFiles.addAll(files);
+        if (i == lastUserIndex) turnDataFiles.addAll(files);
       }
       if (role == 'tool') {
         final id = (m['tool_call_id'] ?? '').toString();
+        if (m[historySourceKey] case final String source) {
+          resultSources[id] = source;
+        }
         // A server tool replayed as its own blocks already carries its result.
         if (id.isNotEmpty && !(turn?.serverToolIds.contains(id) ?? false)) {
           pendingResults.add({
@@ -337,6 +366,7 @@ class ClaudeHistory {
               (m['name'] ?? '').toString(),
               (m['content'] ?? '').toString(),
               metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+              toolCallId: m['tool_call_id']?.toString(),
               canImageInput: canImageInput,
             )).claudeContent,
           });
@@ -372,6 +402,9 @@ class ClaudeHistory {
         final toolCalls = m['tool_calls'] as List;
         turn = _readTurn(m, toolCalls);
         if (turn != null) {
+          if (m[historySourceKey] case final String source) {
+            turnSources[turn] = source;
+          }
           if (turn.responses.isNotEmpty) emitResponse(turn);
         } else {
           // Nothing recorded of the turn: rebuild it from the calls.
@@ -385,7 +418,12 @@ class ClaudeHistory {
             if (block != null) blocks.add(block);
           }
           if (blocks.isNotEmpty) {
-            out.add({'role': 'assistant', 'content': blocks});
+            out.add({
+              'role': 'assistant',
+              'content': blocks,
+              if (m[historySourceKey] != null)
+                historySourceKey: m[historySourceKey],
+            });
             replayedClientCalls.addAll(toolUseIdsInBlocks(blocks));
           }
         }
@@ -395,6 +433,9 @@ class ClaudeHistory {
       if (role == 'assistant') {
         final plainTurn = _readTurn(m, const []);
         if (plainTurn != null) {
+          if (m[historySourceKey] case final String source) {
+            turnSources[plainTurn] = source;
+          }
           while (plainTurn.emitted < plainTurn.responses.length) {
             emitResponse(plainTurn);
           }
@@ -403,14 +444,16 @@ class ClaudeHistory {
         }
       }
 
-      out.add(
-        await _plainMessage(
-          m,
-          role,
-          isLast: i == messages.lastIndexWhere((m) => m['role'] == 'user'),
-          carriedImages: carriedImages,
-        ),
+      final plainMessage = await _plainMessage(
+        m,
+        role,
+        isLast: i == lastUserIndex,
+        carriedImages: isUserInputMessage(m, hasOwners: hasOwners)
+            ? carriedImages
+            : <Map<String, dynamic>>[],
       );
+      RequestHistoryContext.mark(m, [plainMessage]);
+      out.add(plainMessage);
     }
 
     if (turn != null && turn.emitted < turn.responses.length) {
@@ -619,21 +662,37 @@ class ClaudeHistory {
     final text = <Map<String, dynamic>>[];
     final images = <Map<String, dynamic>>[];
     final seenSources = <String>{};
-    String normalizeSrc(String src) {
-      if (src.startsWith('http') || src.startsWith('data:')) return src;
-      try {
-        return SandboxPathResolver.fix(src);
-      } catch (_) {
-        return src;
-      }
-    }
+    String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
     Future<void> addClaudeImage(String source, {String? explicitMime}) async {
       final normalized = normalizeSrc(source);
       if (!seenSources.add(normalized)) return;
       if (source.startsWith('http://') || source.startsWith('https://')) {
-        // Preserve prior official-Claude behavior for remote URLs.
-        text.add({'type': 'text', 'text': source});
+        final download = downloadRemoteImage;
+        if (download == null) {
+          text.add({'type': 'text', 'text': source});
+          return;
+        }
+        try {
+          final mime = normalizeClaudeImageMime(
+            explicitMime?.trim().isNotEmpty == true
+                ? explicitMime!
+                : mimeFromPath(Uri.parse(source).path),
+          );
+          images.add({
+            'type': 'image',
+            'source': {
+              'type': 'base64',
+              'media_type': mime,
+              'data': await download(source),
+            },
+          });
+        } catch (_) {
+          text.add({
+            'type': 'text',
+            'text': '(image failed to download) $source',
+          });
+        }
         return;
       }
       if (source.startsWith('data:')) {
@@ -670,6 +729,8 @@ class ClaudeHistory {
 
     final parsed = await parseTextAndImages(
       raw,
+      literalText: internalLiteralText(m),
+      imageReferences: internalImageReferences(m),
       allowRemoteImages: true,
       allowLocalImages: true,
       keepRemoteMarkdownText: true,
@@ -710,12 +771,6 @@ class ClaudeHistory {
     }
     return (text: text, images: images);
   }
-}
-
-String normalizeClaudeImageMime(String mime) {
-  final normalized = mime.trim().toLowerCase();
-  if (normalized == 'image/jpg') return 'image/jpeg';
-  return normalized;
 }
 
 bool isClaudeSupportedImageMime(String mime) {

@@ -84,10 +84,9 @@ quantization error; the 8-bit B channel alone has a half-step of about `0.059pt`
 No new PSO, per-radius cache, image readback, or render pass is introduced.
 
 This Flutter model is separate from Kelivo's iOS passive native-glass adapter.
-The native adapter uses system glass on iOS 26 and a guarded legacy backdrop
-mesh on earlier supported iOS versions; its provenance and runtime checks are
-documented in `ios/Runner/BrowserGlass/UPSTREAM.md`. Android's texture WebView
-supplies the Flutter backdrop input normally.
+The native adapter uses system glass on iOS 26 and public UIKit blur on earlier
+iOS versions. Android's texture WebView supplies the Flutter backdrop input
+normally.
 
 
 ### Browser edge work bound (2026-10-18)

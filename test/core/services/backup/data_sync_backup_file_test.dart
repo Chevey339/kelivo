@@ -1,6 +1,7 @@
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -12,6 +13,7 @@ import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
@@ -40,6 +42,7 @@ import 'package:Kelivo/core/services/backup/restore_previous_plan.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 const _withoutAssets = WebDavConfig(
@@ -107,6 +110,30 @@ class _FailingRestoreChatService extends ChatService {
   }) async {
     replaceCalls++;
     throw StateError('chat replacement failed');
+  }
+}
+
+class _PausedSnapshotChatService extends ChatService {
+  final snapshotStarted = Completer<void>();
+  final resumeSnapshot = Completer<void>();
+  Object? snapshotFailure;
+
+  @override
+  Future<ChatDatabaseSnapshotInfo> createBackupDatabaseSnapshot(
+    File destinationFile, {
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+    Duration timeout = const Duration(minutes: 10),
+  }) async {
+    if (!snapshotStarted.isCompleted) snapshotStarted.complete();
+    await resumeSnapshot.future;
+    if (snapshotFailure case final error?) throw error;
+    return super.createBackupDatabaseSnapshot(
+      destinationFile,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+      timeout: timeout,
+    );
   }
 }
 
@@ -185,6 +212,33 @@ class _CandidateCleanupChatService extends ChatService {
 
 Future<String> _fileSha256(File file) async {
   return (await sha256.bind(file.openRead()).first).toString();
+}
+
+Future<File> _repackBackupFixture(
+  File source, {
+  Map<String, List<int>> replacements = const {},
+  Set<String> removed = const {},
+}) async {
+  final original = ZipDecoder().decodeBytes(await source.readAsBytes());
+  final repacked = Archive();
+  try {
+    for (final entry in original) {
+      if (entry.isFile &&
+          !removed.contains(entry.name) &&
+          !replacements.containsKey(entry.name)) {
+        repacked.add(ArchiveFile.bytes(entry.name, entry.readBytes()!));
+      }
+    }
+    for (final entry in replacements.entries) {
+      repacked.add(ArchiveFile.bytes(entry.key, entry.value));
+    }
+    return await File(
+      '${source.path}.edited.zip',
+    ).writeAsBytes(ZipEncoder().encode(repacked));
+  } finally {
+    original.clearSync();
+    repacked.clearSync();
+  }
 }
 
 Future<Map<String, ({int bytes, String sha256})>>
@@ -1342,6 +1396,177 @@ void main() {
       );
     }
 
+    for (final automaticCleanup in [true, false]) {
+      test(
+        'packing preserves attachments during cleanup (automatic=$automaticCleanup)',
+        () async {
+          SandboxPathResolver.debugSetDirs(
+            docsDir: root.path,
+            supportDir: root.path,
+          );
+          addTearDown(() => SandboxPathResolver.debugSetDirs());
+          // Settings are packed before attachments. Keep the real ZIP worker
+          // busy long enough for the concurrent database/file cleanup to run.
+          await businessRepository.setPreference(
+            'backup_test_padding',
+            'x' * (16 * 1024 * 1024),
+          );
+          final file = File('${root.path}/upload/expired-attachment.txt');
+          final chat = ChatService();
+          Future<void>? maintenance;
+          try {
+            await chat.init();
+            await file.parent.create(recursive: true);
+            await file.writeAsString('attachment bytes at backup start');
+            final conversation = await chat.createConversation(title: 'Old');
+            await chat.addMessage(
+              conversationId: conversation.id,
+              role: 'user',
+              parts: [
+                FilePart(
+                  uri: SandboxPathResolver.canonicalize(file.path),
+                  name: 'expired-attachment.txt',
+                  mime: 'text/plain',
+                ),
+              ],
+            );
+            if (automaticCleanup) {
+              await chat.deleteConversation(conversation.id);
+            }
+            expect(await file.exists(), isTrue);
+            final sync = DataSync(
+              businessRepository: businessRepository,
+              chatService: chat,
+            );
+            final backup = await sync.prepareBackupFile(
+              const WebDavConfig(),
+              onProgress: (progress) {
+                if (progress.phase == BackupPhase.packing) {
+                  maintenance ??= automaticCleanup
+                      ? chat.runAssetMaintenance(
+                          now: DateTime.now().toUtc().add(
+                            const Duration(days: 8),
+                          ),
+                        )
+                      : StorageUsageService.deleteUploadFiles(
+                          [file.path],
+                          images: false,
+                        ).then<void>((removed) => expect(removed, 1));
+                }
+              },
+            );
+            addTearDown(() => DataSync.cleanupTemporaryBackupFile(backup));
+            expect(maintenance, isNotNull);
+            await maintenance;
+            expect(await file.exists(), isFalse);
+            final input = InputFileStream(backup.path);
+            final archive = ZipDecoder().decodeStream(input);
+            try {
+              final attachment = archive.findFile(
+                'upload/expired-attachment.txt',
+              );
+              expect(attachment, isNotNull);
+              expect(
+                utf8.decode(attachment!.readBytes()!),
+                'attachment bytes at backup start',
+              );
+            } finally {
+              archive.clearSync();
+              input.closeSync();
+            }
+          } finally {
+            await maintenance;
+            await chat.close();
+          }
+        },
+      );
+    }
+
+    test('queued backup cancellation leaves later exports usable', () async {
+      final chat = _PausedSnapshotChatService();
+      await chat.init();
+      addTearDown(chat.close);
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: chat,
+      );
+      final first = sync.prepareBackupFile(const WebDavConfig());
+      await chat.snapshotStarted.future;
+      final token = BackupCancelToken();
+      addTearDown(token.dispose);
+      final preparing = Completer<void>();
+      try {
+        final cancelled = sync.prepareBackupFile(
+          const WebDavConfig(),
+          cancelToken: token,
+          onProgress: (progress) {
+            if (progress.phase == BackupPhase.preparing &&
+                !preparing.isCompleted) {
+              preparing.complete();
+            }
+          },
+        );
+        final rejected = expectLater(
+          cancelled,
+          throwsA(isA<BackupCancelledException>()),
+        );
+        await preparing.future;
+        token.cancel();
+        await rejected.timeout(const Duration(seconds: 3));
+      } finally {
+        chat.resumeSnapshot.complete();
+        final backup = await first;
+        await DataSync.cleanupTemporaryBackupFile(backup);
+      }
+      try {
+        final backup = await sync.prepareBackupFile(const WebDavConfig());
+        expect(await backup.exists(), isTrue);
+        await DataSync.cleanupTemporaryBackupFile(backup);
+      } finally {
+        await chat.close();
+      }
+    });
+
+    test(
+      'attachment deletion waits for a cancelled snapshot worker to exit',
+      () async {
+        final chat = _PausedSnapshotChatService();
+        await chat.init();
+        addTearDown(chat.close);
+        final exited = Completer<void>();
+        chat.snapshotFailure = BackupCancelledException(
+          isolateExited: false,
+          isolateExit: exited.future,
+        );
+        final file = File('${root.path}/upload/retained.txt');
+        await file.parent.create(recursive: true);
+        await file.writeAsString('still in use by worker');
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chat,
+        );
+        final backup = sync.prepareBackupFile(const WebDavConfig());
+        final rejected = expectLater(
+          backup,
+          throwsA(isA<BackupCancelledException>()),
+        );
+        await chat.snapshotStarted.future;
+        chat.resumeSnapshot.complete();
+        await rejected;
+        final deleting = StorageUsageService.deleteUploadFiles([
+          file.path,
+        ], images: false);
+        try {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          expect(await file.exists(), isTrue);
+        } finally {
+          exited.complete();
+          expect(await deleting, 1);
+        }
+        expect(await file.exists(), isFalse);
+      },
+    );
+
     test(
       'packs files as deflated zip entries and removes staging files',
       () async {
@@ -1707,6 +1932,13 @@ void main() {
           isEmpty,
         );
       }
+      final retry = await sync.prepareBackupFile(
+        const WebDavConfig(
+          scope: BackupScope(excluded: {BackupCategory.chats}),
+        ),
+      );
+      expect(await retry.exists(), isTrue);
+      await DataSync.cleanupTemporaryBackupFile(retry);
     });
 
     test('cancel after pack worker success does not return the zip', () async {
@@ -2029,6 +2261,33 @@ void main() {
 
       expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
     });
+
+    test(
+      'saved encryption preference rejects export without a password',
+      () async {
+        final preferences = BusinessPreferences(businessRepository);
+        await preferences.setBool('backup_encryption_enabled_v1', true);
+        final chat = ChatService();
+        addTearDown(chat.dispose);
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          businessPreferences: preferences,
+          chatService: chat,
+        );
+        await expectLater(
+          sync.prepareBackupFile(_withoutChatsOrAssets),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'backup_password_required',
+            ),
+          ),
+        );
+        expect(await Directory('${root.path}/tmp').exists(), isFalse);
+        expect(preferences.getBool('backup_encryption_enabled_v1'), isTrue);
+      },
+    );
 
     test(
       'encrypted export retries before restoring and cleans plaintext',
@@ -3633,14 +3892,190 @@ void main() {
       expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
     });
 
+    for (final mode in RestoreMode.values) {
+      test(
+        'imports a manually edited backup with stale metadata in ${mode.name} mode',
+        () async {
+          final fixture = await _createSqliteBackupFixture(
+            root: root,
+            prefix: 'manually_edited',
+            settings: const {},
+            includeFiles: true,
+            assetContent: 'original attachment',
+            extraEntries: const {'upload/removed.txt': 'removed attachment'},
+          );
+          final databaseFile = File(
+            '${root.path}/manually_edited_database.sqlite',
+          );
+          final database = sqlite.sqlite3.open(databaseFile.path);
+          try {
+            database.execute('PRAGMA foreign_keys = ON;');
+            database.execute("UPDATE conversation_rows SET title = 'Cleaned';");
+            database.execute('DELETE FROM message_rows;');
+          } finally {
+            database.close();
+          }
+          final edited = await _repackBackupFixture(
+            fixture,
+            replacements: {
+              'database/kelivo.db': await databaseFile.readAsBytes(),
+              'settings.json': utf8.encode(
+                jsonEncode({'edited_setting': 'edited'}),
+              ),
+              'upload/fixture.txt': utf8.encode('edited'),
+              'upload/added.txt': utf8.encode('added attachment'),
+              '.DS_Store': [1, 2],
+              '__MACOSX/._manifest.json': [3, 4],
+            },
+            removed: const {'upload/removed.txt'},
+          );
+          final chatService = ChatService();
+          await chatService.init();
+          addTearDown(chatService.close);
+          final existing = await chatService.createConversation(title: 'Local');
+
+          await DataSync(
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ).restoreFromLocalFile(edited, const WebDavConfig(), mode: mode);
+
+          if (mode == RestoreMode.overwrite) {
+            final run = await _singleRestoreRunDirectory(root);
+            final candidate = Directory('${run.path}/candidate');
+            final manifest =
+                jsonDecode(
+                      await File(
+                        '${candidate.path}/manifest.json',
+                      ).readAsString(),
+                    )
+                    as Map;
+            expect((manifest['database'] as Map)['messageCount'], 0);
+            final entries = manifest['entries'] as Map;
+            expect(
+              entries.keys,
+              unorderedEquals([
+                'database/kelivo.db',
+                'upload/fixture.txt',
+                'upload/added.txt',
+              ]),
+            );
+            for (final name in entries.keys.cast<String>()) {
+              final file = File('${candidate.path}/$name');
+              expect((entries[name] as Map)['bytes'], await file.length());
+              expect((entries[name] as Map)['sha256'], await _fileSha256(file));
+            }
+            await chatService.close();
+            final terminal = await _recoverAcrossColdRestart(
+              appDataDirectory: root,
+            );
+            expect(terminal?.state, RestoreReceiptState.committed);
+            await chatService.init();
+            expect(chatService.getConversation(existing.id), isNull);
+          } else {
+            expect(chatService.getConversation(existing.id), isNotNull);
+            expect(
+              (await BusinessRestoreService(
+                businessRepository,
+              ).exportSettings())['edited_setting'],
+              'edited',
+            );
+          }
+          expect(
+            chatService.getConversation('fixture-conversation')?.title,
+            'Cleaned',
+          );
+          expect(
+            await chatService.loadMessages('fixture-conversation'),
+            isEmpty,
+          );
+          expect(
+            await File('${root.path}/upload/fixture.txt').readAsString(),
+            'edited',
+          );
+          expect(
+            await File('${root.path}/upload/added.txt').readAsString(),
+            'added attachment',
+          );
+          expect(
+            await File('${root.path}/upload/removed.txt').exists(),
+            isFalse,
+          );
+          expect(await File('${root.path}/.DS_Store').exists(), isFalse);
+        },
+      );
+    }
+
+    test('rebuilds missing manifest entries and record counts', () async {
+      final fixture = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'missing_inventory',
+        settings: const {},
+      );
+      final manifest =
+          jsonDecode(
+                await File(
+                  '${root.path}/missing_inventory_manifest.json',
+                ).readAsString(),
+              )
+              as Map<String, dynamic>;
+      manifest.remove('entries');
+      (manifest['database'] as Map).remove('conversationCount');
+      (manifest['database'] as Map).remove('messageCount');
+      final edited = await _repackBackupFixture(
+        fixture,
+        replacements: {'manifest.json': utf8.encode(jsonEncode(manifest))},
+      );
+
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      ).restoreFromLocalFile(edited, _withoutAssets);
+
+      final run = await _singleRestoreRunDirectory(root);
+      final candidate =
+          jsonDecode(
+                await File(
+                  '${run.path}/candidate/manifest.json',
+                ).readAsString(),
+              )
+              as Map;
+      expect((candidate['database'] as Map)['conversationCount'], 1);
+      expect((candidate['database'] as Map)['messageCount'], 1);
+      expect((candidate['entries'] as Map).keys, ['database/kelivo.db']);
+    });
+
+    test('accepts a stale SQLite manifest hash', () async {
+      final fixture = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'stale_hash',
+        settings: const {},
+        databaseSha256: List.filled(64, '0').join(),
+      );
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      ).restoreFromLocalFile(fixture, _withoutAssets);
+      expect(
+        (await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        ))?.receipt.state,
+        RestoreReceiptState.prepared,
+      );
+    });
+
     test(
-      'rejects a SQLite manifest hash mismatch before changing live data',
+      'rejects a corrupt SQLite payload before changing live data',
       () async {
         final fixture = await _createSqliteBackupFixture(
           root: root,
           prefix: 'bad_hash',
           settings: const {'preserved_setting': 'imported'},
-          databaseSha256: List.filled(64, '0').join(),
+        );
+        final corrupt = await _repackBackupFixture(
+          fixture,
+          replacements: {
+            'database/kelivo.db': [1, 2, 3],
+          },
         );
         await BusinessRestoreService(
           businessRepository,
@@ -3657,8 +4092,8 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: chatService,
-          ).restoreFromLocalFile(fixture, _withoutAssets),
-          throwsA(isA<FormatException>()),
+          ).restoreFromLocalFile(corrupt, _withoutAssets),
+          throwsA(anything),
         );
 
         expect(
@@ -3667,6 +4102,10 @@ void main() {
         );
         expect(chatService.getConversation(existing.id), isNotNull);
         expect(chatService.getConversation('fixture-conversation'), isNull);
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
       },
     );
 
@@ -3786,6 +4225,85 @@ void main() {
         expect(chatService.getConversation('legacy-fallback'), isNull);
       },
     );
+
+    for (final entryName in ['manifest.json', 'settings.json']) {
+      test(
+        'rejects corrupt ZIP bytes in $entryName before restoring',
+        () async {
+          final manifest = {
+            'format': 'kelivo-backup',
+            'formatVersion': 2,
+            'payloadKind': 'settings-only',
+            'createdAtUtc': '2026-07-09T00:00:00.000Z',
+            'appVersion': entryName == 'manifest.json' ? 'original' : 'test',
+            'includeChats': false,
+            'includeFiles': false,
+            'secretsIncluded': true,
+          };
+          final archive = Archive()
+            ..add(
+              ArchiveFile.string('manifest.json', jsonEncode(manifest))
+                ..compression = CompressionType.none,
+            )
+            ..add(
+              ArchiveFile.string(
+                'settings.json',
+                jsonEncode({
+                  'crc_setting': entryName == 'settings.json'
+                      ? 'original'
+                      : 'test',
+                }),
+              )..compression = CompressionType.none,
+            );
+          final bytes = ZipEncoder().encode(archive);
+          final marker = utf8.encode('original');
+          var changed = false;
+          for (
+            var offset = 0;
+            offset <= bytes.length - marker.length;
+            offset++
+          ) {
+            if (_containsContiguousBytes(
+              bytes.sublist(offset, offset + marker.length),
+              marker,
+            )) {
+              bytes[offset] = 'O'.codeUnitAt(0);
+              changed = true;
+              break;
+            }
+          }
+          expect(changed, isTrue);
+          final corrupt = await File(
+            '${root.path}/crc_corrupt.zip',
+          ).writeAsBytes(bytes);
+          final before = await BusinessRestoreService(
+            businessRepository,
+          ).exportSettings();
+
+          await expectLater(
+            DataSync(
+              businessRepository: businessRepository,
+              chatService: ChatService(),
+            ).restoreFromLocalFile(corrupt, _withoutChatsOrAssets),
+            throwsA(
+              isA<FormatException>().having(
+                (error) => error.message,
+                'message',
+                'zip_entry_crc',
+              ),
+            ),
+          );
+          expect(
+            await BusinessRestoreService(businessRepository).exportSettings(),
+            before,
+          );
+          expect(
+            await RestoreStartupGate.inspect(appDataDirectory: root),
+            isNull,
+          );
+        },
+      );
+    }
 
     test('rejects case-folded duplicate ZIP paths before restoring', () async {
       final firstSettings = File('${root.path}/duplicate_settings_one.json');
@@ -5275,11 +5793,7 @@ void main() {
         final restored = chatService.getConversation('conversation')!;
         expect(restored.truncateIndex, 2);
         expect(
-          await chatService.loadSelectedContextMessages(
-            restored.id,
-            truncateIndex: restored.truncateIndex,
-            limit: 10,
-          ),
+          await chatService.loadSelectedContextMessages(restored.id, limit: 10),
           isEmpty,
         );
         final missingBeforeKept = chatService.getConversation(
@@ -5289,7 +5803,6 @@ void main() {
         expect(
           await chatService.loadSelectedContextMessages(
             missingBeforeKept.id,
-            truncateIndex: missingBeforeKept.truncateIndex,
             limit: 10,
           ),
           isEmpty,
@@ -5301,7 +5814,6 @@ void main() {
         expect(
           await chatService.loadSelectedContextMessages(
             duplicateBeforeTruncate.id,
-            truncateIndex: duplicateBeforeTruncate.truncateIndex,
             limit: 10,
           ),
           isEmpty,
@@ -5311,7 +5823,6 @@ void main() {
         expect(
           (await chatService.loadSelectedContextMessages(
             crossReuse.id,
-            truncateIndex: crossReuse.truncateIndex,
             limit: 10,
           )).map((message) => message.id),
           ['cross-h', 'later-g'],

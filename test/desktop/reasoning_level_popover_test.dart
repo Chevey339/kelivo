@@ -112,7 +112,7 @@ Future<void> _pumpPopover(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('desktop popover lists spec levels and writes the choice', (
+  testWidgets('desktop popover slider writes the choice and stays open', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -133,15 +133,12 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-reasoning-popover')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(EffortSlider), findsNothing);
+    expect(find.byType(EffortSlider), findsOneWidget);
     expect(find.byKey(const ValueKey('reasoning-stop-auto')), findsOneWidget);
     expect(find.byKey(const ValueKey('reasoning-stop-off')), findsNothing);
     expect(find.byKey(const ValueKey('reasoning-row-custom')), findsNothing);
     expect(find.byKey(const ValueKey('reasoning-stop-high')), findsOneWidget);
-    expect(find.text('Auto'), findsWidgets);
-    expect(find.text('Low'), findsWidgets);
-    expect(find.text('Medium'), findsWidgets);
-    expect(find.text('High'), findsWidgets);
+
     expect(find.text('mid'), findsNothing);
 
     await tester.tapAt(
@@ -153,6 +150,7 @@ void main() {
       settings.reasoningChoiceFor('Test', 'kelivo-test-effort'),
       const ReasoningRequest(ReasoningLevel.high),
     );
+    expect(find.byType(EffortSlider), findsOneWidget);
   });
 
   testWidgets('budget dialect popover shows a custom row and off before auto', (
@@ -176,14 +174,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-reasoning-popover')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(EffortSlider), findsNothing);
+    expect(find.byType(EffortSlider), findsOneWidget);
     final off = tester.getTopLeft(
       find.byKey(const ValueKey('reasoning-stop-off')),
     );
     final auto = tester.getTopLeft(
       find.byKey(const ValueKey('reasoning-stop-auto')),
     );
-    expect(off.dy, lessThan(auto.dy));
+    expect(off.dx, lessThan(auto.dx));
     expect(find.byKey(const ValueKey('reasoning-row-custom')), findsOneWidget);
   });
 }
