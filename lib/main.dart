@@ -1203,7 +1203,8 @@ class MyApp extends StatelessWidget {
                   child: _selectHome(),
                 ),
                 builder: (ctx, child) {
-                  final bright = Theme.of(ctx).brightness;
+                  final appTheme = Theme.of(ctx);
+                  final bright = appTheme.brightness;
                   final overlay = bright == Brightness.dark
                       ? const SystemUiOverlayStyle(
                           statusBarColor: Colors.transparent,
@@ -1268,6 +1269,7 @@ class MyApp extends StatelessWidget {
                         coordinator.configureFromSettings(
                           backgroundSettings,
                           l10n,
+                          overlayProgressColor: appTheme.colorScheme.primary,
                         ),
                       );
                     });

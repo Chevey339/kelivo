@@ -70,6 +70,7 @@ class MobileBackgroundCoordinator extends ChangeNotifier
   MobileBackgroundStatus status = const MobileBackgroundStatus();
   String? lastError;
   AppLocalizations? _l10n;
+  int? _overlayProgressColor;
   bool _initialized = false;
   bool _foreground = true;
   bool get isForeground => _foreground;
@@ -106,21 +107,32 @@ class MobileBackgroundCoordinator extends ChangeNotifier
   /// Read them after loading, without requiring another widget rebuild.
   Future<void> configureFromSettings(
     SettingsProvider settings,
-    AppLocalizations l10n,
-  ) async {
+    AppLocalizations l10n, {
+    Color? overlayProgressColor,
+  }) async {
     await settings.loaded;
-    await configure(settings.mobileBackground, l10n);
+    await configure(
+      settings.mobileBackground,
+      l10n,
+      overlayProgressColor: overlayProgressColor,
+    );
   }
 
   Future<void> configure(
     MobileBackgroundSettings settings,
-    AppLocalizations l10n,
-  ) async {
+    AppLocalizations l10n, {
+    Color? overlayProgressColor,
+  }) async {
+    // Settings-only updates retain the latest resolved Flutter theme color.
+    final progressColor =
+        overlayProgressColor?.toARGB32() ?? _overlayProgressColor;
     final changed =
         jsonEncode(_settings.toJson()) != jsonEncode(settings.toJson()) ||
-        _l10n?.localeName != l10n.localeName;
+        _l10n?.localeName != l10n.localeName ||
+        _overlayProgressColor != progressColor;
     _settings = settings;
     _l10n = l10n;
+    _overlayProgressColor = progressColor;
     await initialize();
     if (changed) {
       if (platform == TargetPlatform.iOS &&
@@ -269,6 +281,7 @@ class MobileBackgroundCoordinator extends ChangeNotifier
     'settings': {
       ..._settings.toJson(),
       'completionSeconds': _settings.completionVisibility.seconds,
+      'overlayProgressColor': _overlayProgressColor,
     },
     'tasks': _tasks.values.map(_taskMap).toList(),
     'terminal': terminal,
