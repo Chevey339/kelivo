@@ -28,6 +28,7 @@ import 'package:Kelivo/features/home/pages/home_page.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/features/home/widgets/chat_selection_app_bar.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
+import 'package:Kelivo/features/home/widgets/side_drawer.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
 import 'package:flutter/material.dart';
@@ -397,6 +398,13 @@ void main() {
           );
           expect(scaffold().globalSearchMode, isTrue);
           expect(scaffold().tabletSidebarOpen, isTrue);
+          BuildContext sidebarContext() => tester.element(
+            find.descendant(
+              of: find.byKey(const ValueKey('desktop-chat-sidebar')),
+              matching: find.byType(SideDrawer),
+            ),
+          );
+          expect(TickerMode.valuesOf(sidebarContext()).enabled, isTrue);
           final searchField = find.byWidgetPredicate(
             (widget) =>
                 widget is TextField &&
@@ -422,6 +430,7 @@ void main() {
           await tester.pumpAndSettle();
           if (scaffold().tabletSidebarOpen) scaffold().onToggleSidebar();
           await tester.pumpAndSettle();
+          expect(TickerMode.valuesOf(sidebarContext()).enabled, isFalse);
           final field = find
               .descendant(
                 of: find.byType(ChatInputBar),

@@ -65,6 +65,46 @@ void expectAbove(WidgetTester tester, Object upper, Object lower) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets(
+    'pending tools use bounded status animation and settle on finish',
+    (tester) async {
+      Widget message(bool loading) => _buildHarness(
+        child: ChatMessageWidget(
+          message: ChatMessage(
+            id: 'waiting-tool',
+            role: 'assistant',
+            conversationId: 'c',
+            content: '',
+            isStreaming: loading,
+          ),
+          showModelIcon: false,
+          toolParts: [
+            ToolUIPart(
+              id: 'remote-tool',
+              toolName: 'remote_lookup',
+              arguments: const {'query': 'test'},
+              loading: loading,
+              content: loading ? null : 'Finished',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(message(true));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(LoadingIndicator), findsWidgets);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(tester.binding.transientCallbackCount, 0);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      await tester.pumpWidget(message(false));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoadingIndicator), findsNothing);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('empty reasoning card follows activity without text changes', (
     tester,
   ) async {

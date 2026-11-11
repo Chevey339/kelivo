@@ -198,10 +198,13 @@ class HomeDesktopScaffold extends StatelessWidget {
                   excluding: !tabletSidebarOpen,
                   child: IgnorePointer(
                     ignoring: !tabletSidebarOpen,
-                    child: _buildLeftSidebar(
-                      context,
-                      topicsOnRight,
-                      sidebarWidth,
+                    child: TickerMode(
+                      enabled: tabletSidebarOpen,
+                      child: _buildLeftSidebar(
+                        context,
+                        topicsOnRight,
+                        sidebarWidth,
+                      ),
                     ),
                   ),
                 ),

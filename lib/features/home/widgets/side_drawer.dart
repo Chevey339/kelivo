@@ -57,6 +57,7 @@ import 'assistant_entry_actions.dart';
 import 'sidebar_selection_bars.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/animations/status_animation.dart';
 
 class SideDrawer extends StatefulWidget {
   const SideDrawer({
@@ -4523,41 +4524,31 @@ class _ChatTileState extends State<_ChatTile> {
   }
 }
 
-class _LoadingDot extends StatefulWidget {
-  @override
-  State<_LoadingDot> createState() => _LoadingDotState();
-}
-
-class _LoadingDotState extends State<_LoadingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
+class _LoadingDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return FadeTransition(
-      opacity: _anim,
-      child: Container(
-        width: 9,
-        height: 9,
-        decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+    return RepaintBoundary(
+      child: StatusAnimation(
+        duration: const Duration(milliseconds: 1800),
+        initialValue: 0.5,
+        builder: (context, progress) => AnimatedBuilder(
+          animation: progress,
+          builder: (context, _) => Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(
+                alpha:
+                    cs.primary.a *
+                    Curves.easeInOut.transform(
+                      1 - (progress.value * 2 - 1).abs(),
+                    ),
+              ),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
       ),
     );
   }
