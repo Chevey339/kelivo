@@ -4408,6 +4408,7 @@ class ChatService extends ChangeNotifier {
         completionTokens: message.completionTokens,
         cachedTokens: message.cachedTokens,
         durationMs: message.durationMs,
+        firstResponseMs: message.firstResponseMs,
         firstTokenMs: message.firstTokenMs,
         reasoningTokens: message.reasoningTokens,
         cacheWriteTokens: message.cacheWriteTokens,

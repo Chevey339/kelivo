@@ -4003,6 +4003,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                   finishUsage?.cacheWriteTokens ??
                                   widget.message.cacheWriteTokens,
                               durationMs: widget.message.durationMs,
+                              firstResponseMs: widget.message.firstResponseMs,
                               firstTokenMs: widget.message.firstTokenMs,
                               totalCompletionTokens:
                                   widget.message.completionTokens,

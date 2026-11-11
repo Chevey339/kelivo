@@ -762,10 +762,11 @@ class StreamController {
 
   /// A reasoning item can be active without a public summary.
   void handleReasoningStart(String id, StreamingState state) {
+    final receivedAt = state.reasoningReceivedAt.remove(id) ?? DateTime.now();
     if (!state.ctx.supportsReasoning || state.finishHandled) return;
-    state.reasoningStartAt ??= DateTime.now();
+    state.reasoningStartAt ??= receivedAt;
     if (!state.ctx.streamOutput) return;
-    _beginReasoning(id, state);
+    _beginReasoning(id, state, startedAt: receivedAt);
     _scheduleReasoningUpdate(state, activityChanged: true);
     streamingContentNotifier.notifyToolHeightChanged(state.messageId);
   }
@@ -789,9 +790,13 @@ class StreamController {
     streamingContentNotifier.notifyToolHeightChanged(state.messageId);
   }
 
-  ReasoningSegmentData _beginReasoning(String id, StreamingState state) {
+  ReasoningSegmentData _beginReasoning(
+    String id,
+    StreamingState state, {
+    DateTime? startedAt,
+  }) {
     final messageId = state.messageId;
-    final now = DateTime.now();
+    final now = startedAt ?? DateTime.now();
     final initialExpanded = !getSettingsProvider().autoCollapseThinking;
     final reasoning = _reasoning.putIfAbsent(
       messageId,
@@ -1577,6 +1582,7 @@ class GenerationContext {
     this.ocrActive = false,
     this.generateTitleOnFinish = true,
     this.generationRunId,
+    this.isContinuation = false,
     this.scheduled = false,
     this.scheduledNotify = true,
     this.scheduledPreview = true,
@@ -1605,6 +1611,9 @@ class GenerationContext {
   final bool ocrActive;
   final bool generateTitleOnFinish;
   final String? generationRunId;
+
+  /// This request resumes an existing message after a recovered tool answer.
+  final bool isContinuation;
   final bool scheduled;
   final bool scheduledNotify, scheduledPreview;
 }
@@ -1614,6 +1623,7 @@ class StreamingState {
   StreamingState(this.ctx, {this.responsesTurnPrefix, this.claudeTurnPrefix})
     : _content = StreamTextBuffer(ctx.assistantMessage.content),
       totalTokens = ctx.assistantMessage.totalTokens ?? 0,
+      firstResponseMs = ctx.assistantMessage.firstResponseMs,
       firstTokenMs = ctx.assistantMessage.firstTokenMs,
       _previousUsage = ctx.assistantMessage.tokenUsage,
       partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
@@ -1649,7 +1659,9 @@ class StreamingState {
   bool titleQueued = false;
   DateTime? requestStartedAt;
   DateTime? requestFinishedAt;
+  int? firstResponseMs;
   int? firstTokenMs;
+  final Map<String, DateTime> reasoningReceivedAt = {};
 
   /// Whole-generation elapsed time, including waiting and reasoning. A tool
   /// answer can resume the same message, so keep time spent in earlier runs.
@@ -1667,10 +1679,15 @@ class StreamingState {
     return elapsed < 0 ? null : elapsed;
   }
 
-  void recordFirstOutput(StreamChunk chunk) {
-    if (firstTokenMs != null ||
-        requestFinishedAt != null ||
-        ctx.assistantMessage.durationMs != null) {
+  /// Capture arrival before queued database work or UI updates can delay it.
+  void recordStreamArrival(StreamChunk chunk) {
+    if (requestFinishedAt != null || !ctx.streamOutput) return;
+    final receivedAt = DateTime.now();
+    if (chunk is ReasoningStart) {
+      reasoningReceivedAt.putIfAbsent(chunk.id, () => receivedAt);
+    }
+    if ((firstResponseMs != null && firstTokenMs != null) ||
+        ctx.isContinuation) {
       return;
     }
     final hasOutput = switch (chunk) {
@@ -1684,7 +1701,11 @@ class StreamingState {
       GeneratedFile(:final uri) => uri.isNotEmpty,
       _ => false,
     };
-    if (hasOutput) firstTokenMs = _requestElapsedMs(DateTime.now());
+    if (hasOutput || chunk is ReasoningStart) {
+      final elapsed = _requestElapsedMs(receivedAt);
+      firstResponseMs ??= elapsed;
+      if (hasOutput) firstTokenMs ??= elapsed;
+    }
   }
 
   /// Freeze before UI draining, persistence or cancellation cleanup.

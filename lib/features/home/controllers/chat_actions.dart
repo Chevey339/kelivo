@@ -491,8 +491,12 @@ class ChatActions {
       _activeAssistantMessages.messageIds;
 
   @visibleForTesting
-  void debugTrackActiveMessage(ChatMessage message) {
+  void debugTrackActiveMessage(
+    ChatMessage message, {
+    stream_ctrl.StreamingState? state,
+  }) {
     _activeAssistantMessages.put(message);
+    if (state != null) _streamingStates[message.id] = state;
   }
 
   /// Rebuild retry countdown UI from surviving [StreamingState] after the
@@ -595,6 +599,7 @@ class ChatActions {
       cacheWriteTokens: state.totalUsage?.cacheWriteTokens,
       finishUsage: state.usage,
       durationMs: state.durationMs,
+      firstResponseMs: state.firstResponseMs,
       firstTokenMs: state.firstTokenMs,
     );
   }
@@ -918,7 +923,7 @@ class ChatActions {
     StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) {
-    state.recordFirstOutput(chunk);
+    state.recordStreamArrival(chunk);
     return _handleStreamChunk(chunk, state);
   }
 
@@ -2110,6 +2115,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: false,
+        isContinuation: true,
       );
 
       if (!_activeAssistantMessages.isActive(streamingMessage)) {
@@ -2833,7 +2839,7 @@ class ChatActions {
 
       final sub = listenSequentiallyToStream<StreamChunk>(
         stream: stream,
-        onReceived: state.recordFirstOutput,
+        onReceived: state.recordStreamArrival,
         onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),

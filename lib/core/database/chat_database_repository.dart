@@ -6929,6 +6929,7 @@ class ChatDatabaseRepository {
             reasoningTokens: message.reasoningTokens,
             cacheWriteTokens: message.cacheWriteTokens,
             finishUsage: message.finishUsage,
+            firstResponseMs: message.firstResponseMs,
             firstTokenMs: message.firstTokenMs,
             quotes: message.quotes,
           ),
@@ -8165,6 +8166,7 @@ class ChatDatabaseRepository {
       completionTokens: row.completionTokens,
       cachedTokens: row.cachedTokens,
       durationMs: row.durationMs,
+      firstResponseMs: _tokenExtraInt(extras, _firstResponseMsExtraKey),
       firstTokenMs: _tokenExtraInt(extras, _firstTokenMsExtraKey),
       reasoningTokens: _tokenExtraInt(extras, _reasoningTokensExtraKey),
       cacheWriteTokens: _tokenExtraInt(extras, _cacheWriteTokensExtraKey),
@@ -8494,6 +8496,7 @@ class ChatDatabaseRepository {
           reasoningTokens: message.reasoningTokens,
           cacheWriteTokens: message.cacheWriteTokens,
           finishUsage: message.finishUsage,
+          firstResponseMs: message.firstResponseMs,
           firstTokenMs: message.firstTokenMs,
           quotes: message.quotes,
         ),
@@ -8552,6 +8555,7 @@ class ChatDatabaseRepository {
   static const _cacheWriteTokensExtraKey = 'tokens.cacheWrite';
   static const _finishUsageExtraKey = 'tokens.finish';
   static const _firstTokenMsExtraKey = 'timing.firstTokenMs';
+  static const _firstResponseMsExtraKey = 'timing.firstResponseMs';
 
   static int? _tokenExtraInt(Map<String, dynamic> extras, String key) {
     final value = extras[key];
@@ -8577,6 +8581,7 @@ class ChatDatabaseRepository {
     int? reasoningTokens,
     int? cacheWriteTokens,
     TokenUsage? finishUsage,
+    int? firstResponseMs,
     int? firstTokenMs,
     List<QuoteRef>? quotes,
   }) {
@@ -8589,6 +8594,9 @@ class ChatDatabaseRepository {
     }
     if (finishUsage != null) {
       extras[_finishUsageExtraKey] = finishUsage.toJson();
+    }
+    if (firstResponseMs != null) {
+      extras[_firstResponseMsExtraKey] = firstResponseMs;
     }
     if (firstTokenMs != null) {
       extras[_firstTokenMsExtraKey] = firstTokenMs;

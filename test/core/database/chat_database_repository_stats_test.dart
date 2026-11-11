@@ -176,6 +176,7 @@ void main() {
         reasoningTokens: 5,
         finishUsage: finish,
         durationMs: 5000,
+        firstResponseMs: 500,
         firstTokenMs: 1250,
       );
       await repository.putMigrationBatch(
@@ -188,19 +189,24 @@ void main() {
         (await repository.getMessage('m'))!.finishUsage!.toJson(),
         finish.toJson(),
       );
+      expect((await repository.getMessage('m'))!.firstResponseMs, 500);
       expect((await repository.getMessage('m'))!.firstTokenMs, 1250);
       // The JSON path is also used by message exports and backups.
       final exported = ChatMessage.fromJson(
         message.toJson(),
       ).copyWith(content: 'edited');
+      expect(exported.firstResponseMs, 500);
       expect(exported.firstTokenMs, 1250);
       await repository.updateMessage(exported);
-      await repository.updateMessage(exported.copyWith(firstTokenMs: 1500));
+      await repository.updateMessage(
+        exported.copyWith(firstResponseMs: 600, firstTokenMs: 1500),
+      );
       await repository.updateMessageFields('m', translation: 'translation');
       await repository.close();
       repository = ChatDatabaseRepository.open(file: file);
       final restored = (await repository.getMessage('m'))!;
       expect(restored.finishUsage!.toJson(), finish.toJson());
+      expect(restored.firstResponseMs, 600);
       expect(restored.firstTokenMs, 1500);
       expect(restored.durationMs, 5000);
       expect(restored.totalTokens, 350);

@@ -8598,8 +8598,13 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '$value초 (첫 토큰)';
+  String tokenDetailFirstResponse(String value) {
+    return '$value초 (첫 응답)';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '$value초 (첫 출력)';
   }
 
   @override

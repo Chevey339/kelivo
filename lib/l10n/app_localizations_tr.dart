@@ -8905,8 +8905,13 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '${value}s (ilk token)';
+  String tokenDetailFirstResponse(String value) {
+    return '${value}sn (ilk yanıt)';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '${value}sn (ilk çıktı)';
   }
 
   @override

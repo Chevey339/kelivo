@@ -2425,7 +2425,7 @@ void main() {
     }
 
     for (final mode in ['plain', 'fromMessages', 'withVersions']) {
-      test('fork preserves total and finish usage ($mode)', () async {
+      test('fork preserves usage and response timing ($mode)', () async {
         final service = createService();
         final source = await service.createConversation(title: 'Source');
         const finish = TokenUsage(
@@ -2444,6 +2444,8 @@ void main() {
           cacheWriteTokens: 30,
           reasoningTokens: 5,
           finishUsage: finish,
+          firstResponseMs: 500,
+          firstTokenMs: 1250,
         );
         await service.addMessageDirectly(source.id, message);
 
@@ -2464,6 +2466,8 @@ void main() {
           expect(copied.conversationId, fork.id);
           expect(copied.finishUsage?.toJson(), finish.toJson());
           expect(copied.tokenUsage.toJson(), message.tokenUsage.toJson());
+          expect(copied.firstResponseMs, 500);
+          expect(copied.firstTokenMs, 1250);
         }
 
         expectUsage((await service.loadMessages(fork.id)).single);

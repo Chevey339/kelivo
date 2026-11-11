@@ -4088,14 +4088,23 @@
     },
     "description": "Row in the token detail popup showing total generation duration in seconds; {value} is the formatted number."
   },
-  "tokenDetailFirstToken": "{value}s (first token)",
-  "@tokenDetailFirstToken": {
+  "tokenDetailFirstResponse": "{value}s (first response)",
+  "@tokenDetailFirstResponse": {
     "placeholders": {
       "value": {
         "type": "String"
       }
     },
-    "description": "Row in the token detail popup showing time to first token in seconds; {value} is the formatted number."
+    "description": "Row in the token detail popup showing seconds from request preparation to the first client-received reasoning-start event or non-empty output, whichever arrives first. This is response activity, not the server's hidden reasoning-token time. {value} is the formatted duration in seconds."
+  },
+  "tokenDetailFirstOutput": "{value}s (first output)",
+  "@tokenDetailFirstOutput": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Row in the token detail popup showing seconds from request preparation to the first non-empty content received, such as a public reasoning summary, answer text, tool input, image or file. A reasoning-start event alone does not count. {value} is the formatted duration in seconds."
   },
   "tokenDetailTotalTokens": "{count} tokens",
   "@tokenDetailTotalTokens": {

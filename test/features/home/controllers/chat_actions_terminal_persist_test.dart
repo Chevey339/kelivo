@@ -252,6 +252,7 @@ void main() {
       expect(segments, hasLength(2));
       expect(segments.every((segment) => segment.finishedAt == null), isTrue);
       expect(state.firstTokenMs, isNull);
+      expect(state.firstResponseMs, isNotNull);
       switch (terminal) {
         case 'complete':
           await actions.debugFinishStreaming(state);
@@ -265,6 +266,7 @@ void main() {
             state.ctx.assistantMessage.copyWith(
               parts: state.partsHandler.parts,
             ),
+            state: state,
           );
           await actions.cancelStreamingById(state.conversationId);
       }
@@ -274,6 +276,7 @@ void main() {
       expect(saved.reasoningText, isEmpty);
       expect(saved.reasoningFinishedAt, isNotNull);
       expect(saved.firstTokenMs, isNull);
+      expect(saved.firstResponseMs, state.firstResponseMs);
       expect(
         actions.streamController.streamingContentNotifier.hasNotifier(
           state.messageId,
@@ -399,6 +402,7 @@ void main() {
         expect(saved.finishUsage!.totalTokens, 230);
         expect(saved.finishUsage!.reasoningTokens, 0);
         expect(saved.isStreaming, isFalse);
+        expect(saved.firstResponseMs, firstTokenMs);
         expect(saved.firstTokenMs, firstTokenMs);
         expect(saved.durationMs, inInclusiveRange(30000, 31000));
         expect(state.durationMs, saved.durationMs);

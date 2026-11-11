@@ -8969,8 +8969,13 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '$value с (первый токен)';
+  String tokenDetailFirstResponse(String value) {
+    return '$value с (первый ответ)';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '$value с (первый вывод)';
   }
 
   @override

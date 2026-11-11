@@ -136,8 +136,12 @@ class ChatMessage extends HiveObject {
   @HiveField(19)
   final int? durationMs;
 
-  /// Request start to first streamed output, including reasoning or tool input.
-  /// Null when first-token timing was not observed (for example, non-streaming).
+  /// Request start to the first reasoning-start event or non-empty output.
+  /// Measures client-observed response activity, not a hidden reasoning token.
+  final int? firstResponseMs;
+
+  /// Request start to first non-empty streamed output, including a public
+  /// reasoning summary or tool input. Null when no output timing was observed.
   final int? firstTokenMs;
 
   @HiveField(20)
@@ -181,6 +185,7 @@ class ChatMessage extends HiveObject {
     this.completionTokens,
     this.cachedTokens,
     this.durationMs,
+    this.firstResponseMs,
     this.firstTokenMs,
     this.reasoningTokens,
     this.cacheWriteTokens,
@@ -341,6 +346,7 @@ class ChatMessage extends HiveObject {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? firstResponseMs,
     int? firstTokenMs,
     int? reasoningTokens,
     int? cacheWriteTokens,
@@ -377,6 +383,7 @@ class ChatMessage extends HiveObject {
         completionTokens: completionTokens ?? this.completionTokens,
         cachedTokens: cachedTokens ?? this.cachedTokens,
         durationMs: durationMs ?? this.durationMs,
+        firstResponseMs: firstResponseMs ?? this.firstResponseMs,
         firstTokenMs: firstTokenMs ?? this.firstTokenMs,
         reasoningTokens: reasoningTokens ?? this.reasoningTokens,
         cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
@@ -421,6 +428,7 @@ class ChatMessage extends HiveObject {
       'completionTokens': completionTokens,
       'cachedTokens': cachedTokens,
       'durationMs': durationMs,
+      'firstResponseMs': firstResponseMs,
       'firstTokenMs': firstTokenMs,
       'reasoningTokens': reasoningTokens,
       'cacheWriteTokens': cacheWriteTokens,
@@ -480,6 +488,7 @@ class ChatMessage extends HiveObject {
       cachedTokens: json['cachedTokens'] as int?,
       durationMs: json['durationMs'] as int?,
       firstTokenMs: json['firstTokenMs'] as int?,
+      firstResponseMs: json['firstResponseMs'] as int?,
       reasoningTokens: json['reasoningTokens'] as int?,
       cacheWriteTokens: json['cacheWriteTokens'] as int?,
       finishUsage: json['finishUsage'] is Map

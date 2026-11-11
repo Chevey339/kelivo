@@ -20,7 +20,10 @@ void main() {
   StreamingState buildState(
     List<MessagePart> parts, {
     int? durationMs,
+    int? firstResponseMs,
     int? firstTokenMs,
+    bool streamOutput = true,
+    bool isContinuation = false,
   }) {
     final settings = SettingsProvider(createBusinessTestPreferences());
     return StreamingState(
@@ -32,6 +35,7 @@ void main() {
           conversationId: 'conversation-1',
           isStreaming: true,
           durationMs: durationMs,
+          firstResponseMs: firstResponseMs,
           firstTokenMs: firstTokenMs,
         ),
         apiMessages: const [],
@@ -51,7 +55,8 @@ void main() {
         toolDefs: const [],
         supportsReasoning: true,
         enableReasoning: true,
-        streamOutput: true,
+        streamOutput: streamOutput,
+        isContinuation: isContinuation,
       ),
     );
   }
@@ -62,25 +67,27 @@ void main() {
     for (final chunk in <StreamChunk>[
       const Usage(TokenUsage(promptTokens: 100)),
       const TextStart('text'),
-      const ReasoningStart(id: 'reasoning'),
       const TextDelta(id: 'text', text: ''),
       const ReasoningDelta(id: 'reasoning', text: '', details: []),
       const RetryAttemptStart(),
     ]) {
-      state.recordFirstOutput(chunk);
+      state.recordStreamArrival(chunk);
     }
     expect(state.firstTokenMs, isNull);
+    expect(state.firstResponseMs, isNull);
 
-    state.recordFirstOutput(
+    state.recordStreamArrival(
       const ReasoningDelta(id: 'reasoning', text: 'think'),
     );
     final firstTokenMs = state.firstTokenMs;
     expect(firstTokenMs, inInclusiveRange(2000, 3000));
+    expect(state.firstResponseMs, firstTokenMs);
     state.requestStartedAt = state.requestStartedAt!.subtract(
       const Duration(seconds: 30),
     );
-    state.recordFirstOutput(const TextDelta(id: 'text', text: 'answer'));
+    state.recordStreamArrival(const TextDelta(id: 'text', text: 'answer'));
     expect(state.firstTokenMs, firstTokenMs);
+    expect(state.firstResponseMs, firstTokenMs);
     state.finishRequestTiming();
     expect(state.durationMs, inInclusiveRange(32000, 33000));
     final finishedAt = state.requestFinishedAt;
@@ -88,7 +95,33 @@ void main() {
     expect(state.requestFinishedAt, finishedAt);
   });
 
+  for (final output in <StreamChunk>[
+    const ReasoningDelta(id: 'reasoning', text: 'summary'),
+    const TextDelta(id: 'text', text: 'answer without a summary'),
+  ]) {
+    test('reasoning start precedes delayed ${output.runtimeType}', () async {
+      final state = buildState(
+        const [],
+      )..requestStartedAt = DateTime.now().subtract(const Duration(seconds: 2));
+      state.recordStreamArrival(const ReasoningStart(id: 'reasoning'));
+      final firstResponseMs = state.firstResponseMs;
+      expect(firstResponseMs, inInclusiveRange(2000, 3000));
+      expect(state.firstTokenMs, isNull);
+
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+      state.recordStreamArrival(output);
+      final firstTokenMs = state.firstTokenMs;
+      expect(firstTokenMs, greaterThan(firstResponseMs!));
+      expect(state.firstResponseMs, firstResponseMs);
+      state.recordStreamArrival(const ReasoningStart(id: 'next-round'));
+      state.recordStreamArrival(const TextDelta(id: 'next', text: 'later'));
+      expect(state.firstResponseMs, firstResponseMs);
+      expect(state.firstTokenMs, firstTokenMs);
+    });
+  }
+
   for (final firstOutput in <StreamChunk>[
+    const ReasoningStart(id: 'reasoning'),
     const TextDelta(id: 'text', text: 'answer'),
     const ReasoningDelta(id: 'reasoning', text: 'thinking'),
   ]) {
@@ -96,18 +129,27 @@ void main() {
       'first ${firstOutput.runtimeType} excludes a queued database wait',
       () async {
         final state = buildState(const [])..requestStartedAt = DateTime.now();
+        final controller = StreamController(
+          onStateChanged: () {},
+          getSettingsProvider: () => state.ctx.settings,
+          getCurrentConversationId: () => state.conversationId,
+        );
+        addTearDown(controller.dispose);
         final source = async.StreamController<StreamChunk>(sync: true);
         final databaseWrite = async.Completer<void>();
         final done = async.Completer<void>();
         final processed = <StreamChunk>[];
         final subscription = ChatActions.listenSequentiallyToStream<StreamChunk>(
           stream: source.stream,
-          onReceived: state.recordFirstOutput,
+          onReceived: state.recordStreamArrival,
           onData: (chunk) async {
             // Model the database transition that holds TextStart/Usage in the
             // production handler. Later model output still arrives meanwhile.
             processed.add(chunk);
             if (chunk is TextStart) await databaseWrite.future;
+            if (chunk is ReasoningStart) {
+              controller.handleReasoningStart(chunk.id, state);
+            }
           },
           onError: (error, stackTrace) async =>
               done.completeError(error, stackTrace),
@@ -120,7 +162,8 @@ void main() {
             .difference(state.requestStartedAt!)
             .inMilliseconds;
         source.add(firstOutput);
-        final recordedWhileBlocked = state.firstTokenMs;
+        final recordedWhileBlocked = state.firstResponseMs;
+        final reasoningReceivedAt = state.reasoningReceivedAt['reasoning'];
         expect(processed, hasLength(1));
         await Future<void>.delayed(const Duration(milliseconds: 250));
         databaseWrite.complete();
@@ -130,10 +173,24 @@ void main() {
 
         expect(processed, hasLength(3));
         expect(
-          state.firstTokenMs,
+          state.firstResponseMs,
           inInclusiveRange(receivedMs, receivedMs + 20),
         );
-        expect(recordedWhileBlocked, state.firstTokenMs);
+        expect(recordedWhileBlocked, state.firstResponseMs);
+        if (firstOutput is ReasoningStart) {
+          expect(state.firstTokenMs, isNull);
+          expect(
+            controller.getReasoningData(state.messageId)!.startAt,
+            reasoningReceivedAt,
+          );
+          expect(
+            controller.getReasoningSegments(state.messageId)!.single.startAt,
+            reasoningReceivedAt,
+          );
+          expect(state.reasoningReceivedAt, isEmpty);
+        } else {
+          expect(state.firstTokenMs, state.firstResponseMs);
+        }
       },
     );
   }
@@ -141,12 +198,14 @@ void main() {
   test('tool input can be the first output without counting a bare start', () {
     final state = buildState(const [])
       ..requestStartedAt = DateTime.now().subtract(const Duration(seconds: 1));
-    state.recordFirstOutput(const ToolCallStart(id: 'tool'));
+    state.recordStreamArrival(const ToolCallStart(id: 'tool'));
     expect(state.firstTokenMs, isNull);
-    state.recordFirstOutput(
+    expect(state.firstResponseMs, isNull);
+    state.recordStreamArrival(
       const ToolCallDelta(id: 'tool', inputDelta: '{"query":'),
     );
     expect(state.firstTokenMs, inInclusiveRange(1000, 2000));
+    expect(state.firstResponseMs, state.firstTokenMs);
   });
 
   test(
@@ -155,21 +214,53 @@ void main() {
       final state = buildState(
         const [TextPart('before')],
         durationMs: 30000,
+        firstResponseMs: 500,
         firstTokenMs: 1500,
+        isContinuation: true,
       )..requestStartedAt = DateTime(2026, 9, 27);
       state.requestFinishedAt = state.requestStartedAt!.add(
         const Duration(seconds: 5),
       );
-      state.recordFirstOutput(const TextDelta(id: 'text', text: 'after'));
+      state.recordStreamArrival(const TextDelta(id: 'text', text: 'after'));
       expect(state.durationMs, 35000);
       expect(state.firstTokenMs, 1500);
+      expect(state.firstResponseMs, 500);
     },
   );
 
-  test('unknown original latency remains unknown on continuation', () {
-    final state = buildState(const [TextPart('before')], durationMs: 30000)
+  for (final durationMs in <int?>[null, 30000]) {
+    test('unknown original latency stays unknown on continuation '
+        '(duration=$durationMs)', () {
+      final state = buildState(
+        const [TextPart('before')],
+        durationMs: durationMs,
+        isContinuation: true,
+      )..requestStartedAt = DateTime.now();
+      state.recordStreamArrival(const ReasoningStart(id: 'reasoning'));
+      state.recordStreamArrival(const TextDelta(id: 'text', text: 'after'));
+      expect(state.firstTokenMs, isNull);
+      expect(state.firstResponseMs, isNull);
+    });
+  }
+
+  test('a resumed message does not invent a missing first response', () {
+    final state = buildState(
+      const [TextPart('before')],
+      firstTokenMs: 1500,
+      isContinuation: true,
+    )..requestStartedAt = DateTime.now();
+    state.recordStreamArrival(const ReasoningStart(id: 'reasoning'));
+    state.recordStreamArrival(const TextDelta(id: 'text', text: 'after'));
+    expect(state.firstResponseMs, isNull);
+    expect(state.firstTokenMs, 1500);
+  });
+
+  test('non-streaming output does not record either latency', () {
+    final state = buildState(const [], streamOutput: false)
       ..requestStartedAt = DateTime.now();
-    state.recordFirstOutput(const TextDelta(id: 'text', text: 'after'));
+    state.recordStreamArrival(const ReasoningStart(id: 'reasoning'));
+    state.recordStreamArrival(const TextDelta(id: 'text', text: 'answer'));
+    expect(state.firstResponseMs, isNull);
     expect(state.firstTokenMs, isNull);
   });
 
@@ -178,21 +269,25 @@ void main() {
       ..requestStartedAt = DateTime.now().subtract(const Duration(seconds: 1));
     state.finishRequestTiming();
     final duration = state.durationMs;
-    state.recordFirstOutput(const TextDelta(id: 'text', text: 'late'));
+    state.recordStreamArrival(const TextDelta(id: 'text', text: 'late'));
+    state.recordStreamArrival(const ReasoningStart(id: 'late-reasoning'));
     expect(state.firstTokenMs, isNull);
+    expect(state.firstResponseMs, isNull);
     expect(state.durationMs, duration);
   });
 
   test('unknown starts and clock rollback do not create negative timing', () {
     final state = buildState(const []);
-    state.recordFirstOutput(const TextDelta(id: 'text', text: 'answer'));
+    state.recordStreamArrival(const TextDelta(id: 'text', text: 'answer'));
     expect(state.durationMs, isNull);
     expect(state.firstTokenMs, isNull);
+    expect(state.firstResponseMs, isNull);
     state.requestStartedAt = DateTime.now().add(const Duration(days: 1));
-    state.finishRequestTiming();
-    state.recordFirstOutput(const TextDelta(id: 'text', text: 'answer'));
+    state.recordStreamArrival(const ReasoningStart(id: 'reasoning'));
+    state.recordStreamArrival(const TextDelta(id: 'text', text: 'answer'));
     expect(state.durationMs, isNull);
     expect(state.firstTokenMs, isNull);
+    expect(state.firstResponseMs, isNull);
   });
 
   test('StreamingState seeds partsHandler from the assistant message', () {

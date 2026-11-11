@@ -8840,8 +8840,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '${value}s (first token)';
+  String tokenDetailFirstResponse(String value) {
+    return '${value}s (first response)';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '${value}s (first output)';
   }
 
   @override

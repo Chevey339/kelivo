@@ -15979,11 +15979,17 @@ abstract class AppLocalizations {
   /// **'{value}s'**
   String tokenDetailDuration(String value);
 
-  /// Row in the token detail popup showing time to first token in seconds; {value} is the formatted number.
+  /// Row in the token detail popup showing seconds from request preparation to the first client-received reasoning-start event or non-empty output, whichever arrives first. This is response activity, not the server's hidden reasoning-token time. {value} is the formatted duration in seconds.
   ///
   /// In en, this message translates to:
-  /// **'{value}s (first token)'**
-  String tokenDetailFirstToken(String value);
+  /// **'{value}s (first response)'**
+  String tokenDetailFirstResponse(String value);
+
+  /// Row in the token detail popup showing seconds from request preparation to the first non-empty content received, such as a public reasoning summary, answer text, tool input, image or file. A reasoning-start event alone does not count. {value} is the formatted duration in seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{value}s (first output)'**
+  String tokenDetailFirstOutput(String value);
 
   /// Label showing the total token count, used in the token display widget and stats usage chart; {count} is the number.
   ///

@@ -8472,8 +8472,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '${value}s（首字）';
+  String tokenDetailFirstResponse(String value) {
+    return '${value}s（首响应）';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '${value}s（首输出）';
   }
 
   @override
@@ -24379,8 +24384,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '${value}s（首字）';
+  String tokenDetailFirstResponse(String value) {
+    return '${value}s（首响应）';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '${value}s（首输出）';
   }
 
   @override
@@ -40287,8 +40297,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '${value}s（首字）';
+  String tokenDetailFirstResponse(String value) {
+    return '${value}s（首次回應）';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '${value}s（首次輸出）';
   }
 
   @override

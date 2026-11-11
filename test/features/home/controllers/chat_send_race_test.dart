@@ -1455,6 +1455,11 @@ void main() {
           () => !controller.chatController.isConversationLoading(convo.id),
           'recovered streaming to finish',
         );
+        final continued = (await service.loadMessages(
+          convo.id,
+        )).singleWhere((message) => message.id == reply.id);
+        expect(continued.firstResponseMs, isNull);
+        expect(continued.firstTokenMs, isNull);
         final requestMessages = (streamRequests.single['messages'] as List)
             .cast<Map>();
         final result = requestMessages.singleWhere((m) => m['role'] == 'tool');
