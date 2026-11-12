@@ -156,8 +156,8 @@ void main() {
     expect(compressionsOpened, 1);
     expect(clears, 1);
 
-    await tester.ensureVisible(find.text('Context operations'));
-    await tester.tap(find.text('Context operations'));
+    await tester.ensureVisible(find.text('Compression and clear history'));
+    await tester.tap(find.text('Compression and clear history'));
     expect(operationsOpened, 1);
 
     expect(find.byType(ContextUsageHeader), findsOneWidget);
@@ -222,7 +222,9 @@ void main() {
     expect(tester.takeException(), isNull);
 
     expect(
-      find.text('Update failed · previous result is stale'),
+      find.text(
+        'Couldn’t refresh. Showing the previous result, which may be out of date.',
+      ),
       findsOneWidget,
     );
     await tester.ensureVisible(find.byTooltip('Retry'));

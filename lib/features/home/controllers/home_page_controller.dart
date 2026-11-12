@@ -947,6 +947,10 @@ class HomePageController extends ChangeNotifier {
     };
     _viewModel.onError = (error) {
       final l10n = AppLocalizations.of(_context)!;
+      final compressionFailure =
+          error != 'compression_near_limit' &&
+          (error.contains('compression_') ||
+              error.contains('native_compaction_'));
       showAppSnackBar(
         _context,
         message: error == 'compression_near_limit'
@@ -955,6 +959,12 @@ class HomePageController extends ChangeNotifier {
         type: error == 'compression_near_limit'
             ? NotificationType.info
             : NotificationType.error,
+        actionLabel: compressionFailure
+            ? l10n.ttsServicesDialogErrorTitle
+            : null,
+        onAction: compressionFailure
+            ? () => showCompressionErrorDetails(_context, error)
+            : null,
       );
     };
     _viewModel.onWarning = (warning) {

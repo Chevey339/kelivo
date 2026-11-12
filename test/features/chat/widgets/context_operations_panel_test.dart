@@ -186,7 +186,10 @@ void main() {
     await pumpUntil(
       tester,
       () =>
-          find.text('Saved history: 60 messages').evaluate().isNotEmpty &&
+          find
+              .text(AppLocalizationsEn().contextOperationsStored(60))
+              .evaluate()
+              .isNotEmpty &&
           find.text('Loading...').evaluate().isEmpty,
     );
   }
@@ -230,7 +233,10 @@ void main() {
     await pumpUntil(
       tester,
       () =>
-          find.text('Saved history: 60 messages').evaluate().isNotEmpty &&
+          find
+              .text(AppLocalizationsEn().contextOperationsStored(60))
+              .evaluate()
+              .isNotEmpty &&
           find.text('Loading...').evaluate().isEmpty,
     );
     await tester.pump(const Duration(seconds: 1));
@@ -658,7 +664,7 @@ void main() {
           addTearDown(() => chat.contextCompression.removeListener(observe));
           String? opened;
           await pumpTaskEntry(tester, onOpenConversation: (id) => opened = id);
-          expect(find.text('Dismiss status'), findsNothing);
+          expect(find.text('Dismiss'), findsNothing);
           expect(chat.contextCompression.taskFor(id), isNotNull);
           await tester.tap(
             openResult ? find.text('Open new chat') : closePanel,
@@ -869,11 +875,12 @@ void main() {
       ContextOperation? opened;
       await pumpPanel(tester, onOpen: (op) => opened = op);
       await tester.pumpAndSettle();
-      expect(find.text('Saved history: 60 messages'), findsOneWidget);
       expect(
-        find.text(
-          'History for the next request: 1 summaries + 50 original messages',
-        ),
+        find.text(AppLocalizationsEn().contextOperationsStored(60)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(AppLocalizationsEn().contextOperationsEffective(1, 50)),
         findsOneWidget,
       );
       final record = find.byKey(ValueKey('context-operation-${operation.id}'));
@@ -893,17 +900,13 @@ void main() {
       await pumpUntil(
         tester,
         () => find
-            .text(
-              'History for the next request: 0 summaries + 60 original messages',
-            )
+            .text(AppLocalizationsEn().contextOperationsEffective(0, 60))
             .evaluate()
             .isNotEmpty,
       );
       await tester.pumpAndSettle();
       expect(
-        find.text(
-          'History for the next request: 0 summaries + 60 original messages',
-        ),
+        find.text(AppLocalizationsEn().contextOperationsEffective(0, 60)),
         findsOneWidget,
       );
       expect(find.textContaining('Undone'), findsOneWidget);
@@ -978,7 +981,7 @@ void main() {
       );
       expect(find.text('Retry'), findsOneWidget);
       await tester.runAsync(() async {
-        await tester.tap(find.text('Dismiss status'));
+        await tester.tap(find.text('Dismiss'));
         await until(() => chat.contextCompression.taskFor(id) == null);
       });
       await tester.pumpAndSettle();

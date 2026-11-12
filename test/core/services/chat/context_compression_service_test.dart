@@ -167,7 +167,7 @@ void main() {
         expect(task.error, error.toString());
         expect(
           compressionErrorLabel(AppLocalizationsZh(), task.error!),
-          '压缩请求超时（已等待 10 分钟）',
+          AppLocalizationsZh().compressionRequestTimedOut(10),
         );
         final after = await chat.loadContextSnapshot(id);
         expect(after.operations, isEmpty);

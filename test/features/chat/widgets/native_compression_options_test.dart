@@ -164,6 +164,8 @@ void main() {
         matching: find.byType(TextField),
       );
       Future<void> flip() async {
+        FocusManager.instance.primaryFocus?.unfocus();
+        await settleCompressionOptions(tester);
         await tester.ensureVisible(toggle);
         await settleCompressionOptions(tester);
         await tester.tap(toggle);

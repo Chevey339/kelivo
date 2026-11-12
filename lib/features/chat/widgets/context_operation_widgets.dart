@@ -17,7 +17,7 @@ import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../utils/platform_utils.dart';
 import '../pages/context_summary_editor_page.dart';
-import 'context_compression_status.dart';
+import 'compression_error_notice.dart';
 import 'context_dialog.dart';
 export 'context_node_divider.dart';
 
@@ -134,12 +134,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
       if (mounted && saved) widget.onClose();
     } catch (error) {
       if (mounted) {
-        setState(
-          () => _error = compressionErrorLabel(
-            AppLocalizations.of(context)!,
-            error.toString(),
-          ),
-        );
+        setState(() => _error = error.toString());
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -184,7 +179,9 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
         if (widget.onViewBoundary != null)
           ActionSheetItem(
             icon: LucideIcons.locate,
-            label: l10n.contextViewBoundary,
+            label: widget.operation.isClear
+                ? l10n.contextViewBoundary
+                : l10n.quoteJumpToSource,
             onTap: widget.onViewBoundary!,
           ),
         if (widget.onContinueNewChat != null)
@@ -513,10 +510,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              _error!,
-              style: TextStyle(fontSize: 12, color: cs.error),
-            ),
+            child: CompressionErrorNotice(error: _error!),
           ),
       ],
     );

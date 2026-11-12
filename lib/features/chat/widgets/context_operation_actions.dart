@@ -19,6 +19,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'context_compression_status.dart';
+import 'compression_error_notice.dart';
 import 'context_dialog.dart';
 import 'context_impact_dialog.dart';
 import 'context_operation_widgets.dart';
@@ -508,6 +509,11 @@ Future<void> showContextOperationDetails(
                             error.toString(),
                           ),
                           type: NotificationType.error,
+                          actionLabel: l10n.ttsServicesDialogErrorTitle,
+                          onAction: () => showCompressionErrorDetails(
+                            context,
+                            error.toString(),
+                          ),
                         );
                       }
                     },
@@ -531,8 +537,10 @@ Future<void> showContextCompressionMenu(
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final failed = !task.active;
-  final details = failed
-      ? compressionErrorLabel(l10n, task.error ?? l10n.contextTaskInterrupted)
+  final details = task.error != null
+      ? compressionErrorLabel(l10n, task.error!)
+      : failed
+      ? compressionStatusLabel(l10n, task)
       : task.totalParts == 0
       ? compressionDividerLabel(l10n, task)
       : l10n.compressTaskElapsed(
@@ -544,7 +552,7 @@ Future<void> showContextCompressionMenu(
     if (task.phase == CompressionPhase.review)
       ActionSheetItem(
         icon: LucideIcons.filePenLine,
-        label: l10n.contextTaskReview,
+        label: l10n.contextViewGenerated,
         onTap: () => showCompressionReview(
           context,
           chat: chat,
@@ -552,17 +560,29 @@ Future<void> showContextCompressionMenu(
           onRecompress: onAdjust,
         ),
       ),
+    if (task.phase == CompressionPhase.review)
+      if (compressionRecoveryTarget(task.error, native: task.options.native)
+          case final target?)
+        ActionSheetItem(
+          icon: LucideIcons.slidersHorizontal,
+          label: target.label(l10n),
+          onTap: onAdjust,
+        ),
     if (failed) ...[
-      ActionSheetItem(
-        icon: LucideIcons.sparkles,
-        label: l10n.compressTaskRetry,
-        onTap: onRetry,
-      ),
-      ActionSheetItem(
-        icon: LucideIcons.package2,
-        label: l10n.compressTaskAdjustRetry,
-        onTap: onAdjust,
-      ),
+      for (final action in compressionRecoveryActions(
+        l10n,
+        error: task.error,
+        native: task.options.native,
+        onRetry: onRetry,
+        onAdjust: onAdjust,
+      ))
+        ActionSheetItem(
+          icon: action.onTap == onRetry
+              ? LucideIcons.rotateCw
+              : LucideIcons.slidersHorizontal,
+          label: action.label,
+          onTap: action.onTap,
+        ),
       ActionSheetItem(
         icon: LucideIcons.x,
         label: l10n.compressTaskAbandon,
@@ -575,6 +595,12 @@ Future<void> showContextCompressionMenu(
         label: l10n.contextTaskCancel,
         destructive: true,
         onTap: () => chat.contextCompression.cancel(task.conversationId),
+      ),
+    if (task.error != null)
+      ActionSheetItem(
+        icon: LucideIcons.info,
+        label: l10n.ttsServicesDialogErrorTitle,
+        onTap: () => showCompressionErrorDetails(context, task.error!),
       ),
   ];
   if (PlatformUtils.isDesktopTarget) {
@@ -596,6 +622,32 @@ Future<void> showContextCompressionMenu(
     await showMobileActionSheet(context, title: details, items: items);
   }
 }
+
+Future<void> showCompressionErrorDetails(BuildContext context, String error) =>
+    _showContextContent(
+      context,
+      title: AppLocalizations.of(context)!.ttsServicesDialogErrorTitle,
+      builder: (detailContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (PlatformUtils.isDesktopTarget)
+            Text(AppLocalizations.of(context)!.ttsServicesDialogErrorTitle),
+          Flexible(
+            child: SingleChildScrollView(
+              child: CompressionErrorNotice(
+                error: error,
+                initiallyExpanded: true,
+              ),
+            ),
+          ),
+          IosTextButton(
+            label: AppLocalizations.of(context)!.contextTaskDismiss,
+            onPressed: () => Navigator.of(detailContext).pop(),
+          ),
+        ],
+      ),
+    );
 
 Future<void> showContextOperations(
   BuildContext context, {

@@ -153,16 +153,6 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
   }
 }
 
-String _compressContextErrorMessage(AppLocalizations l10n, String error) {
-  return switch (error) {
-    'no_messages' => l10n.compressContextNoMessages,
-    'no_conversation' => l10n.compressContextNoConversation,
-    'no_model' => l10n.compressContextNoModel,
-    'empty_summary' => l10n.compressContextEmptySummary,
-    _ => '${l10n.compressContextFailed}: $error',
-  };
-}
-
 class _HomePageState extends State<HomePage>
     with TickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
   // ============================================================================
@@ -410,6 +400,7 @@ class _HomePageState extends State<HomePage>
         void options() => _showCompressContextOptions(
           targetConversationId: task.conversationId,
           initialOptions: task.options,
+          initialError: task.error,
           reviewPending: false,
         );
         switch (phase) {
@@ -459,7 +450,7 @@ class _HomePageState extends State<HomePage>
                   ? l10n.compressionPreviewOnly
                   : compressionErrorLabel(l10n, task.error!),
               type: NotificationType.warning,
-              actionLabel: l10n.compressAdjust,
+              actionLabel: l10n.contextViewGenerated,
               onAction: () => showCompressionReview(
                 context,
                 chat: chat,
@@ -469,30 +460,21 @@ class _HomePageState extends State<HomePage>
             );
           case CompressionPhase.failed:
           case CompressionPhase.interrupted:
-            final stale = task.error?.contains('context_changed') ?? false;
-            final nothing = task.error?.contains('no_messages') ?? false;
-            final reason = compressionErrorLabel(
+            final action = compressionRecoveryActions(
               l10n,
-              task.error ?? l10n.contextTaskInterrupted,
-            ).split('\n').first;
+              error: task.error,
+              native: task.options.native,
+              onRetry: retry,
+              onAdjust: options,
+            ).first;
             showAppSnackBar(
               context,
-              message: stale
-                  ? l10n.compressStaleSnack
-                  : nothing
-                  ? l10n.compressNothingNew
-                  : l10n.compressFailedSnack(
-                      reason.length > 160
-                          ? '${reason.substring(0, 160)}…'
-                          : reason,
-                    ),
+              message: task.error == null
+                  ? compressionStatusLabel(l10n, task)
+                  : compressionErrorLabel(l10n, task.error!),
               type: NotificationType.warning,
-              actionLabel: nothing
-                  ? l10n.compressAdjust
-                  : stale
-                  ? l10n.compressRegenerate
-                  : l10n.compressTaskRetry,
-              onAction: nothing ? options : retry,
+              actionLabel: action.label,
+              onAction: action.onTap,
             );
           default:
             break;
@@ -1224,6 +1206,8 @@ class _HomePageState extends State<HomePage>
         onAdjust: () => _showCompressContextOptions(
           targetConversationId: task.conversationId,
           initialOptions: task.options,
+          initialError: task.error,
+          reviewPending: false,
         ),
       ),
       contextOperations: contextOperations,
@@ -2008,6 +1992,7 @@ class _HomePageState extends State<HomePage>
       onAdjust: (task) => _showCompressContextOptions(
         targetConversationId: id,
         initialOptions: task.options,
+        initialError: task.error,
         reviewPending: false,
       ),
       onOpenConversation: _controller.switchConversationAnimated,
@@ -2017,6 +2002,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _showCompressContextOptions({
     String? targetConversationId,
     CompressContextOptions? initialOptions,
+    String? initialError,
     bool reviewPending = true,
   }) async {
     final chat = context.read<ChatService>();
@@ -2033,6 +2019,7 @@ class _HomePageState extends State<HomePage>
         onRecompress: () => _showCompressContextOptions(
           targetConversationId: conversation.id,
           initialOptions: pending.options,
+          initialError: pending.error,
           reviewPending: false,
         ),
       );
@@ -2076,6 +2063,7 @@ class _HomePageState extends State<HomePage>
         },
         messageWindow: messageWindow,
         initialOptions: initialOptions,
+        initialError: initialError,
       ),
     );
     if (options == null || !mounted) return;
@@ -2084,13 +2072,21 @@ class _HomePageState extends State<HomePage>
       targetConversationId: conversation.id,
     );
     if (error != null && mounted) {
+      final l10n = AppLocalizations.of(context)!;
+      final target = compressionRecoveryTarget(error, native: options.native);
       showAppSnackBar(
         context,
-        message: _compressContextErrorMessage(
-          AppLocalizations.of(context)!,
-          error,
-        ),
+        message: compressionErrorLabel(l10n, error),
         type: NotificationType.warning,
+        actionLabel: target?.label(l10n) ?? l10n.ttsServicesDialogErrorTitle,
+        onAction: () => target == null
+            ? showCompressionErrorDetails(context, error)
+            : _showCompressContextOptions(
+                targetConversationId: conversation.id,
+                initialOptions: options,
+                initialError: error,
+                reviewPending: false,
+              ),
       );
     }
   }

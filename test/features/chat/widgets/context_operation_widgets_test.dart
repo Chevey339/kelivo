@@ -251,6 +251,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  check('automatic and explicit previews retain unknown error details', (
+    tester,
+  ) async {
+    await prepare(tester, TargetPlatform.macOS);
+    final l10n = AppLocalizationsEn();
+    final failure = StateError('preview_read_failed: disk I/O error');
+    await tester.pumpWidget(
+      app(
+        CompressContextOptionsDialog(
+          loadHistory: () async => CompressionHistory.fromMessages([
+            for (var i = 0; i < 10; i++)
+              ChatMessage(
+                id: 'u$i',
+                role: 'user',
+                content: 'Turn $i',
+                conversationId: 'chat',
+              ),
+          ], const []),
+          previewRequest: (_, _) async => throw failure,
+        ),
+      ),
+    );
+    await settleCompressionOptions(tester);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    Future<void> viewDetails() async {
+      final show = find.text(l10n.startupRecoveryShowDetails);
+      await tester.ensureVisible(show);
+      await tester.tap(show);
+      await tester.pumpAndSettle();
+      final raw = find.text(failure.toString());
+      await tester.ensureVisible(raw);
+      expect(raw.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+
+    await viewDetails();
+    await tester.ensureVisible(find.text(l10n.compressionMore));
+    await tester.tap(find.text(l10n.compressionMore));
+    await settleCompressionOptions(tester);
+    await tester.ensureVisible(find.text(l10n.compressionPreviewAction));
+    await tester.tap(find.text(l10n.compressionPreviewAction));
+    await tester.pumpAndSettle();
+    await viewDetails();
+  });
+
   for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
     check(
       'imported native details have source navigation but no undo on $platform',
@@ -533,9 +579,13 @@ void main() {
   });
 
   for (final platform in [TargetPlatform.android, TargetPlatform.macOS]) {
-    check(
-      'summary budget errors preserve edits and are localized on $platform',
-      (tester) async {
+    for (final failure in [
+      'context_budget_exceeded',
+      'SQLITE_FULL: database or disk is full',
+    ]) {
+      check('summary save failure $failure preserves edits on $platform', (
+        tester,
+      ) async {
         await prepare(tester, platform);
         var closed = 0;
         final saved = <String>[];
@@ -549,7 +599,7 @@ void main() {
                 onSave: (summary) async {
                   saved.add(summary);
                   if (saved.length == 1) {
-                    throw StateError('context_budget_exceeded');
+                    throw StateError(failure);
                   }
                   return true;
                 },
@@ -563,7 +613,11 @@ void main() {
         await tester.tap(find.text('Save'));
         await tester.pumpAndSettle();
         expect(
-          find.text(AppLocalizationsEn().compressOverSnack),
+          find.text(
+            failure == 'context_budget_exceeded'
+                ? AppLocalizationsEn().compressOverSnack
+                : AppLocalizationsEn().compressContextFailed,
+          ),
           findsOneWidget,
         );
         expect(
@@ -571,14 +625,23 @@ void main() {
           'over budget draft',
         );
         expect(closed, 0);
+        final details = find.text(
+          AppLocalizationsEn().startupRecoveryShowDetails,
+        );
+        await tester.ensureVisible(details);
+        await tester.tap(details);
+        await tester.pumpAndSettle();
+        final raw = find.text(StateError(failure).toString());
+        await tester.ensureVisible(raw);
+        expect(raw.hitTestable(), findsOneWidget);
         await tester.enterText(find.byType(TextField), 'shorter draft');
         await tester.tap(find.text('Save'));
         await tester.pumpAndSettle();
         expect(saved, ['over budget draft', 'shorter draft']);
         expect(closed, 1);
         expect(tester.takeException(), isNull);
-      },
-    );
+      });
+    }
   }
 
   check('desktop edits are explicit and empty summaries disable save', (
@@ -727,7 +790,7 @@ void main() {
     task.phase = CompressionPhase.failed;
     task.error = 'Network interrupted';
     await pump();
-    expect(find.text('Compression failed'), findsOneWidget);
+    expect(find.text('Compression didn’t finish'), findsOneWidget);
     expect(find.byIcon(LucideIcons.circleAlert), findsOneWidget);
     expect(find.text('Retry'), findsNothing);
     for (final state in [
@@ -741,10 +804,13 @@ void main() {
     task.phase = CompressionPhase.failed;
     task.error = 'context_changed';
     await pump();
-    expect(find.text('Compression failed'), findsOneWidget);
+    expect(find.text('Compression didn’t finish'), findsOneWidget);
     task.phase = CompressionPhase.review;
     await pump();
-    expect(find.text('Review the summary before applying'), findsOneWidget);
+    expect(
+      find.text('Please review the summary before using it.'),
+      findsOneWidget,
+    );
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.byIcon(LucideIcons.pause), findsOneWidget);
   });
@@ -900,10 +966,12 @@ void main() {
       await settleCompressionOptions(tester);
       expect(scope, findsNothing);
       expect(keep, findsNothing);
+      await tester.ensureVisible(find.text(l10n.compressionAutoOn));
       await tester.tap(find.text(l10n.compressionAutoOn));
       await settleCompressionOptions(tester);
       expect(tester.widget<TextField>(keep).controller!.text, '2');
       expect(find.text(l10n.compressionAutoKeepHint), findsOneWidget);
+      await tester.ensureVisible(find.text(l10n.compressionAutoOff));
       await tester.tap(find.text(l10n.compressionAutoOff));
       await tester.tap(find.byIcon(LucideIcons.chevronLeft));
       await settleCompressionOptions(tester);
@@ -1080,26 +1148,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  check('boundary action invokes navigation from summary details', (
-    tester,
-  ) async {
-    await prepare(tester, TargetPlatform.android);
-    var jumps = 0;
-    await tester.pumpWidget(
-      app(
-        ContextOperationContent(
-          operation: op,
-          onClose: () {},
-          onViewBoundary: () => jumps++,
+  for (final kind in ContextOperationKind.values) {
+    check('boundary navigation uses the operation kind: $kind', (tester) async {
+      await prepare(tester, TargetPlatform.android);
+      var jumps = 0;
+      final l10n = AppLocalizationsEn();
+      await tester.pumpWidget(
+        app(
+          ContextOperationContent(
+            operation: ContextOperation(
+              id: op.id,
+              kind: kind,
+              anchorGroupId: op.anchorGroupId,
+              appliedAfterGroupId: op.appliedAfterGroupId,
+              sourceGroups: op.sourceGroups,
+              dependencies: op.dependencies,
+              createdAt: op.createdAt,
+              summary: op.summary,
+            ),
+            onClose: () {},
+            onViewBoundary: () => jumps++,
+          ),
         ),
-      ),
-    );
-    await tester.tap(find.text('More'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Jump to boundary'));
-    await tester.pumpAndSettle();
-    expect(jumps, 1);
-  });
+      );
+      await tester.tap(find.text(l10n.contextMore));
+      await tester.pumpAndSettle();
+      final label = kind == ContextOperationKind.clear
+          ? l10n.contextViewBoundary
+          : l10n.quoteJumpToSource;
+      expect(
+        find.text(
+          kind == ContextOperationKind.clear
+              ? l10n.quoteJumpToSource
+              : l10n.contextViewBoundary,
+        ),
+        findsNothing,
+      );
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+      expect(jumps, 1);
+    });
+  }
 
   for (final brightness in Brightness.values) {
     for (final size in [const Size(320, 440), const Size(1000, 720)]) {

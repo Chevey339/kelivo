@@ -31,11 +31,7 @@ class ContextImpactDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final count =
-        affectedIds.length -
-        (kind == ContextImpactKind.edit && affectedIds.contains(targetId)
-            ? 1
-            : 0);
+    final count = affectedIds.length - (affectedIds.contains(targetId) ? 1 : 0);
     final title = switch (kind) {
       ContextImpactKind.undo => l10n.contextImpactUndoTitle,
       ContextImpactKind.clear => l10n.contextImpactClearTitle,
@@ -184,25 +180,25 @@ class ContextImpactDialog extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: ContextDialogActionButton(
-                  label: l10n.homePageCancel,
-                  onTap: () => Navigator.of(context).pop(false),
-                ),
+              ContextDialogActionButton(
+                label: kind == ContextImpactKind.edit
+                    ? count == 0
+                          ? l10n.messageEditPageSave
+                          : l10n.contextImpactSaveConfirm(count)
+                    : count == 0
+                    ? l10n.contextImpactUndoOne
+                    : l10n.contextImpactConfirm(count),
+                primary: true,
+                maxLines: null,
+                onTap: () => Navigator.of(context).pop(true),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ContextDialogActionButton(
-                  label: kind == ContextImpactKind.edit
-                      ? count == 0
-                            ? l10n.messageEditPageSave
-                            : l10n.contextImpactSaveConfirm(count)
-                      : l10n.contextImpactConfirm(count),
-                  primary: true,
-                  onTap: () => Navigator.of(context).pop(true),
-                ),
+              const SizedBox(height: 10),
+              ContextDialogActionButton(
+                label: l10n.homePageCancel,
+                onTap: () => Navigator.of(context).pop(false),
               ),
             ],
           ),

@@ -1,4 +1,5 @@
 import 'context_dialog.dart';
+import 'compression_error_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -354,30 +355,36 @@ class _ContextOperationsPanelState extends State<ContextOperationsPanel> {
             Text(l10n.compressionUsageUnknown(task.unknownUsageAttempts)),
           if (task.error != null) ...[
             const SizedBox(height: 6),
-            Text(
-              compressionErrorLabel(l10n, task.error!),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
+            CompressionErrorNotice(error: task.error!),
           ],
           Wrap(
             spacing: 8,
             children: [
               if (task.phase == CompressionPhase.review)
                 IosTextButton(
-                  label: l10n.compressAdjust,
+                  label: l10n.contextViewGenerated,
                   onPressed: () => widget.onReview(task),
                 ),
+              if (task.phase == CompressionPhase.review)
+                if (compressionRecoveryTarget(
+                      task.error,
+                      native: task.options.native,
+                    )
+                    case final target?)
+                  IosTextButton(
+                    label: target.label(l10n),
+                    onPressed: () => widget.onAdjust(task),
+                  ),
               if (task.phase == CompressionPhase.failed ||
                   task.phase == CompressionPhase.interrupted) ...[
-                IosTextButton(
-                  label: l10n.compressTaskRetry,
-                  onPressed: () => widget.onRetry(task),
-                ),
-                IosTextButton(
-                  label: l10n.compressTaskAdjustRetry,
-                  onPressed: () => widget.onAdjust(task),
-                ),
+                for (final action in compressionRecoveryActions(
+                  l10n,
+                  error: task.error,
+                  native: task.options.native,
+                  onRetry: () => widget.onRetry(task),
+                  onAdjust: () => widget.onAdjust(task),
+                ))
+                  IosTextButton(label: action.label, onPressed: action.onTap),
               ],
               if (task.resultConversationId != null)
                 IosTextButton(

@@ -2410,35 +2410,39 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressContext => '컨텍스트 압축';
 
   @override
-  String get compressContextDesc => '검토하고 되돌릴 수 있는 요약 생성';
+  String get compressContextDesc =>
+      '이전 채팅을 요약으로 만듭니다. 원본은 채팅에 그대로 남아 있으며 언제든지 취소할 수 있습니다.';
 
   @override
-  String get clearContextDesc => '컨텍스트 경계 표시';
+  String get clearContextDesc =>
+      '여기서 새로 시작합니다. 이전 메시지는 채팅에 남아 있지만 모델에 전송되지 않습니다.';
 
   @override
   String get contextManagement => '컨텍스트 관리';
 
   @override
-  String get compressContextFailed => '컨텍스트 압축 실패';
+  String get compressContextFailed => '압축이 완료되지 않았습니다';
 
   @override
-  String get compressContextNoMessages => '압축할 메시지가 없습니다';
+  String get compressContextNoMessages => '이 채팅에는 압축할 내용이 없습니다.';
 
   @override
-  String get compressContextNoConversation => '압축할 대화가 없습니다';
+  String get compressContextNoConversation => '압축할 대화가 없습니다.';
 
   @override
-  String get compressContextNoModel => '압축 모델이 구성되지 않았습니다';
+  String get compressContextNoModel =>
+      '압축에 사용할 모델이 설정되지 않았습니다. 설정에서 빠른 모델을 선택하세요.';
 
   @override
-  String get compressContextEmptySummary => '압축 결과가 빈 요약을 반환했습니다';
+  String get compressContextEmptySummary =>
+      '모델이 요약을 생성하지 않았습니다. 다른 모델을 사용하거나 옵션을 변경한 후 다시 시도하세요.';
 
   @override
   String get compressContextOptionsTitle => '컨텍스트 압축';
 
   @override
   String get compressContextOptionsDesc =>
-      '이 대화에 편집 가능하고 되돌릴 수 있는 요약을 생성합니다. 원본 메시지는 유지됩니다.';
+      '이전 메시지를 요약으로 만들면 다음에 모델이 보게 되는 것은 이 요약입니다. 원본 채팅은 유지되며 요약을 편집하거나 취소할 수 있습니다.';
 
   @override
   String get compressContextKeepStart => '이전 기록';
@@ -2468,11 +2472,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressContextKeepRecentMessages => '최근 턴 유지';
 
   @override
-  String get compressContextKeepCountLabel => '최근 사용자 메시지 수';
+  String get compressContextKeepCountLabel => '유지할 최근 사용자 메시지 수';
 
   @override
   String get compressContextKeepAllMessages =>
-      '유지 수가 모든 메시지를 포함하므로 압축할 내용이 없습니다';
+      '유지할 메시지 수가 전체 채팅을 포함하므로 압축할 내용이 남아 있지 않습니다.';
 
   @override
   String compressContextEstimatePreview(
@@ -2482,7 +2486,7 @@ class AppLocalizationsKo extends AppLocalizations {
     int maxTokens,
     int totalTokens,
   ) {
-    return '$summarized자를 요약하고 $kept자를 그대로 유지 → 약 $minTokens–$maxTokens 토큰 (원본 약 $totalTokens 토큰)';
+    return '$summarized자를 요약하고 $kept자를 그대로 유지합니다. 압축 후 약 $minTokens–$maxTokens 토큰(원본 약 $totalTokens 토큰)';
   }
 
   @override
@@ -3321,10 +3325,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextUsageTitle => '컨텍스트 창';
 
   @override
-  String get contextUsageStateExact => '정확 (마지막 응답 기준)';
+  String get contextUsageStateExact => '정확함(마지막 응답 기준)';
 
   @override
-  String get contextUsageStateExactCalibrated => '정확 (분류는 추정치 비율로 조정)';
+  String get contextUsageStateExactCalibrated => '총량은 정확하며, 항목별 내역은 비율로 추정됩니다';
 
   @override
   String get contextUsageStateEstimated => '추정';
@@ -3336,28 +3340,29 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextUsageStateComputing => '계산 중…';
 
   @override
-  String get contextUsageStateFailed => '계산 실패';
+  String get contextUsageStateFailed => '사용량을 계산하지 못했습니다. 다시 시도하세요.';
 
   @override
-  String get contextUsageStateFailedWithPrevious => '업데이트 실패 · 이전 결과가 오래됨';
+  String get contextUsageStateFailedWithPrevious =>
+      '새로 고치지 못했습니다. 이전 결과를 표시 중이며 오래된 정보일 수 있습니다.';
 
   @override
-  String get contextUsageUnavailable => '사용량을 사용할 수 없음';
+  String get contextUsageUnavailable => '지금은 사용량을 표시할 수 없습니다.';
 
   @override
   String contextUsagePartialSummary(String tokens) {
-    return '추정 $tokens + 알 수 없는 압축';
+    return '$tokens 추정, 서버 측 사용량은 알 수 없음';
   }
 
   @override
-  String get contextUsageBucketNativeCompaction => '네이티브 압축';
+  String get contextUsageBucketNativeCompaction => '서버 측 압축';
 
   @override
   String get contextUsageUnknownTokens => '알 수 없음';
 
   @override
   String contextUsageLastRequestInput(String tokens) {
-    return '마지막 요청 입력(측정됨): $tokens';
+    return '마지막으로 실제 모델에 전송된 양: $tokens';
   }
 
   @override
@@ -3411,7 +3416,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get contextUsageNoWindow => '컨텍스트 창 없음';
+  String get contextUsageNoWindow => '아직 컨텍스트 한도가 설정되지 않았습니다.';
 
   @override
   String get contextUsageSetWindow => '컨텍스트 창 설정';
@@ -3719,14 +3724,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get defaultModelPageCompressModelSubtitle =>
-      '대화 컨텍스트를 압축하는 데 사용되며, 빠른 모델을 권장합니다';
+      '긴 대화를 요약하는 데 사용하는 모델입니다. 보통 빠른 모델이면 충분합니다.';
 
   @override
-  String get defaultModelPageCompressPromptHint => '컨텍스트 압축용 프롬프트 템플릿을 입력하세요';
+  String get defaultModelPageCompressPromptHint => '압축 시 사용할 프롬프트를 입력하세요';
 
   @override
   String defaultModelPageCompressVars(String contentVar, String localeVar) {
-    return '변수: 대화 내용: $contentVar, 언어: $localeVar';
+    return '변수: 대화 내용 $contentVar, 언어 $localeVar';
   }
 
   @override
@@ -14385,13 +14390,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get genuiClearSelection => '선택 지우기';
 
   @override
-  String get chatInputBarQueuedPausedReason => '압축이 완료되지 않아 전송이 일시 중지되었습니다';
+  String get chatInputBarQueuedPausedReason => '압축이 아직 진행 중이라 자동으로 전송되지 않습니다.';
 
   @override
-  String get contextChanged => '기록이 변경되었습니다. 이 작업을 다시 열어 현재 범위를 확인해 주세요.';
+  String get contextChanged => '채팅 내용이 변경되었습니다. 다시 열어 처리할 범위를 확인한 후 계속하세요.';
 
   @override
-  String get contextOperationSuperseded => '이후 요약에 포함됨';
+  String get contextOperationSuperseded => '이후 요약으로 대체됨';
 
   @override
   String get compressIncludeAttachments => '첨부 텍스트 및 도구 결과';
@@ -14402,11 +14407,12 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get compressOverSnack => '요약이 컨텍스트 한도를 초과하여 적용되지 않았습니다.';
+  String get compressOverSnack =>
+      '요약이 여전히 너무 길어 한도를 초과하므로 사용되지 않았습니다. 다시 압축하거나 컨텍스트가 더 큰 모델로 전환하세요.';
 
   @override
   String get contextSummaryHint =>
-      '이것은 이후 요청에 사용되는 요약입니다. 변경 사항을 저장해도 기존 답변은 다시 작성되지 않습니다. 첨부 파일은 사용 가능한 텍스트만 사용하며 이미지는 다시 해석되지 않습니다.';
+      '다음에 모델이 보게 되는 것은 이 요약입니다. 저장은 요약만 변경하며 이미 생성된 응답은 변경하지 않습니다. 첨부 파일은 이미 추출된 텍스트만 사용하며 이미지는 다시 읽지 않습니다.';
 
   @override
   String get compressAdvanced => '고급';
@@ -14416,22 +14422,23 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get contextBudgetExceeded =>
-      '예상 컨텍스트가 이 모델의 한도를 초과합니다. 요약을 줄이거나 다시 압축하거나 컨텍스트가 더 큰 모델을 선택해 주세요.';
+      '현재 요약으로는 다음 메시지가 모델의 한도를 초과합니다. 요약을 줄이거나 다시 압축하거나 컨텍스트가 더 큰 모델로 전환하세요.';
 
   @override
   String get contextManualSupplement => '수동으로 편집한 요약을 보충으로 포함';
 
   @override
-  String get contextDetailEdited => '수동 편집됨';
+  String get contextDetailEdited => '수동으로 편집됨';
 
   @override
   String get contextSourceLabel => '요약 입력';
 
   @override
-  String get contextImpactSourceTitle => '압축된 원본을 수정할까요?';
+  String get contextImpactSourceTitle => '이미 요약에 포함된 원문을 수정하시겠습니까?';
 
   @override
-  String get chatInputBarQueuedCompressionFailed => '압축에 실패하여 전송이 일시 중지되었습니다';
+  String get chatInputBarQueuedCompressionFailed =>
+      '압축에 실패하여 이 메시지는 자동으로 전송되지 않습니다.';
 
   @override
   String contextTokenInfo(int before, int after) {
@@ -14450,7 +14457,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolPermissionRequestApproval => '승인 요청';
 
   @override
-  String get compressNothingNew => '마지막 요약 이후 새로 압축할 내용이 없습니다';
+  String get compressNothingNew => '지난번 압축 이후 새로 압축할 내용이 없습니다.';
 
   @override
   String get browserActionScreenshot => '페이지 캡처';
@@ -14482,7 +14489,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String contextImpactSaveConfirm(int count) {
-    return '저장하고 노드 $count개 실행 취소';
+    return '저장하고 이후 관련 작업 $count개 취소';
   }
 
   @override
@@ -14499,7 +14506,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get contextTaskApplying => '요약 적용 중';
+  String get contextTaskApplying => '이 요약을 사용하는 중';
 
   @override
   String get storageSpaceImagesHint =>
@@ -14513,11 +14520,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get worldBookMoveEntries => '이동…';
 
   @override
-  String get compressReread => '이미 압축된 원본 메시지 다시 읽기';
+  String get compressReread => '압축된 원문 다시 보기';
 
   @override
   String get chatInputBarQueuedPausedHold =>
-      '대기 중인 내용이 일시 중지되어 있습니다. 편집하거나 보내려면 대기열을 취소하세요';
+      '전송이 일시 중지되었습니다. 편집하거나 바로 전송하려면 대기열을 취소하세요.';
 
   @override
   String get contextSummaryTitle => '컨텍스트 요약';
@@ -14532,16 +14539,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get browserAgentTimedOut => '작업 시간 초과, AI 일시 중지됨';
 
   @override
-  String get compressCancelledSnack => '압축이 취소되었습니다. 현재 컨텍스트는 변경되지 않았습니다.';
+  String get compressCancelledSnack => '취소되었습니다. 컨텍스트는 변경되지 않았습니다.';
 
   @override
-  String get contextImpactClearTitle => '이전 지우기를 실행 취소할까요?';
+  String get contextImpactClearTitle => '이전 지우기를 취소하시겠습니까?';
 
   @override
-  String get compressTaskWaitingApproval => '도구 승인 대기 중';
+  String get compressTaskWaitingApproval => '도구 승인을 기다리는 중입니다';
 
   @override
-  String get contextTaskFailed => '압축 실패';
+  String get contextTaskFailed => '압축이 완료되지 않았습니다';
 
   @override
   String get wsDeniedSkillsReadonly => '스킬 폴더는 읽기 전용입니다.';
@@ -14554,14 +14561,15 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 대화가 매번 묻지 않고 이 기기의 파일에 접근하고, 명령을 실행하며, 활성화된 온라인 도구를 사용할 수 있도록 허용합니다.';
 
   @override
-  String get compressStaleSnack => '채팅 내용이 변경되어 요약이 적용되지 않았습니다.';
+  String get compressStaleSnack =>
+      '압축이 끝나기 전에 채팅이 변경되어 이번 결과는 사용되지 않았습니다. 원하시면 다시 압축하세요.';
 
   @override
   String get worldBookCopyEntries => '복사…';
 
   @override
   String get contextEditEmpty =>
-      '요약은 비워 둘 수 없습니다. 이전 기록을 모두 제외하려면 \'컨텍스트 지우기\'를 사용하세요.';
+      '요약은 비워 둘 수 없습니다. 이전 채팅을 제외하려면 \'컨텍스트 지우기\'를 사용하세요.';
 
   @override
   String get toolApprovalDenyWithReason => '이유와 함께 거부…';
@@ -14576,7 +14584,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get storageSpaceImageTypeLabel => '유형';
 
   @override
-  String get contextImpactUndoTitle => '이전 압축을 실행 취소할까요?';
+  String get contextImpactUndoTitle => '이전 압축을 취소할까요?';
 
   @override
   String get contextOriginalMessages => '원본 메시지 보기';
@@ -14597,7 +14605,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressTaskAdjustRetry => '옵션 조정 후 재시도';
 
   @override
-  String get contextDetailLegacy => '이전 버전 지우기 위치에서 변환됨';
+  String get contextDetailLegacy => '이전 버전의 지우기 기록에서 이어짐';
 
   @override
   String get contextDetailCurrent => '현재 컨텍스트';
@@ -14619,11 +14627,11 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String contextDetailParts(int count) {
-    return '$count개 구간';
+    return '자동으로 $count개 부분으로 분할됨';
   }
 
   @override
-  String get contextEditPending => '저장됨, 현재 응답이 끝난 후 적용됩니다';
+  String get contextEditPending => '저장되었습니다. 현재 답변이 끝난 후에 적용됩니다.';
 
   @override
   String get contextTaskRetry => '압축 다시 시도';
@@ -14657,10 +14665,10 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get branchInheritNote => '이 지점 이전에 활성화된 컨텍스트 노드만 상속합니다';
+  String get branchInheritNote => '새 분기는 이 지점 이전까지 유효했던 요약과 원문만 가져옵니다.';
 
   @override
-  String get contextTaskInterrupted => '압축이 중단되었습니다. 입력 내용은 보존됩니다';
+  String get contextTaskInterrupted => '압축이 중단되었습니다. 입력하신 내용은 그대로 남아 있습니다.';
 
   @override
   String get storageSpaceImageTypeAll => '전체';
@@ -14693,7 +14701,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolPermissionSaveFailed => '저장하지 못했습니다. 권한은 변경되지 않았습니다.';
 
   @override
-  String get compressDiscardedSnack => '컨텍스트를 비웠습니다. 진행 중이던 압축은 폐기되었습니다.';
+  String get compressDiscardedSnack =>
+      '컨텍스트가 지워졌습니다. 진행 중이던 압축은 취소되어 사용되지 않았습니다.';
 
   @override
   String get browserActionSelect => '옵션 선택';
@@ -14702,7 +14711,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolPermissionTitle => '권한';
 
   @override
-  String get contextDetailNext => '다음 요청';
+  String get contextDetailNext => '다음 전송';
 
   @override
   String get contextTaskCancel => '압축 취소';
@@ -14712,7 +14721,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get chatInputBarQueuedCompressionCancelled =>
-      '압축이 취소되어 자동으로 전송되지 않습니다';
+      '압축이 취소되어 이 메시지는 자동으로 전송되지 않습니다.';
 
   @override
   String get toolPermissionResetSnack =>
@@ -14725,10 +14734,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextDetailContinueNewChat => '새 채팅에서 계속';
 
   @override
-  String get contextTaskPaused => '전송이 일시 중지됨 — 편집하려면 대기열을 취소하세요';
+  String get contextTaskPaused => '전송이 일시 중지되었습니다. 계속 편집하려면 대기열을 취소하세요.';
 
   @override
-  String get contextTaskReview => '적용하기 전에 요약을 검토하세요';
+  String get contextTaskReview => '사용하기 전에 요약을 확인해 주세요.';
 
   @override
   String compressApproxTokens(String value) {
@@ -14740,7 +14749,7 @@ class AppLocalizationsKo extends AppLocalizations {
       '삭제하기 전에 해당 설정에서 이 아바타, 배경 또는 아이콘을 변경하거나 제거하세요.';
 
   @override
-  String get compressRereadLastLayer => '최근 계층 펼치기';
+  String get compressRereadLastLayer => '마지막 압축 이전의 원문 보기';
 
   @override
   String get contextRestoreOperation => '작업 복원';
@@ -14749,7 +14758,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextOriginalHistory => '이 구간의 전체 원문 메시지 다시 읽기';
 
   @override
-  String get contextImpactEditTitle => '이전 요약을 저장할까요?';
+  String get contextImpactEditTitle => '이 이전 요약을 저장할까요?';
 
   @override
   String get contextOpenNewChat => '새 채팅 열기';
@@ -14758,7 +14767,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get wsPathChanged => '승인 대기 중에 대상이 변경되었습니다.';
 
   @override
-  String get contextEditUnknownPreview => '사용량을 확인할 수 없습니다. 저장 전에 다시 확인합니다.';
+  String get contextEditUnknownPreview =>
+      '지금은 사용량을 추정할 수 없습니다. 저장 전에 다시 확인합니다.';
 
   @override
   String get contextTaskWait => '현재 응답과 도구 실행이 끝나기를 기다리는 중';
@@ -14769,11 +14779,11 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get wsContextChanged => '대화 컨텍스트가 변경되어 요청이 만료되었습니다.';
+  String get wsContextChanged => '대화가 변경되어 이 요청이 취소되었습니다.';
 
   @override
   String contextChangeImpact(int count) {
-    return '이 변경으로 영향을 받는 컨텍스트 작업 $count개도 실행 취소됩니다. 원본 메시지는 유지됩니다. 계속할까요?';
+    return '이렇게 하면 이후 관련된 압축 또는 지우기 $count건도 함께 취소됩니다. 원본 채팅은 유지됩니다. 계속할까요?';
   }
 
   @override
@@ -14785,23 +14795,24 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get contextSummaryNotSmaller => '요약이 입력보다 짧지 않습니다. 적용하기 전에 검토하세요.';
+  String get contextSummaryNotSmaller =>
+      '요약이 원문보다 짧지 않습니다. 사용할지 결정하기 전에 확인해 주세요.';
 
   @override
   String get storageSpaceImageTypeTool => '도구 이미지';
 
   @override
-  String get contextPreviousHistory => '최근 압축 계층 원문 다시 읽기';
+  String get contextPreviousHistory => '마지막 압축 이전의 원문 다시 보기';
 
   @override
-  String get contextDetailRead => '실제 읽기';
+  String get contextDetailRead => '실제로 읽히는 내용';
 
   @override
   String get contextViewGenerated => '생성된 요약 보기';
 
   @override
   String get contextImpactDeleteDescription =>
-      '원문을 삭제하고 관련 요약을 함께 취소하여 제거된 내용이 다시 전송되지 않도록 합니다. 다른 메시지와 독립 노드는 변경되지 않습니다.';
+      '이 원문을 삭제하면 관련 요약과 이를 의존하는 이후 압축도 함께 취소되어, 삭제된 내용이 다시 전송되지 않습니다. 다른 메시지는 영향을 받지 않습니다.';
 
   @override
   String get storageSpaceImageTypeAvatar => '아바타 및 배경';
@@ -14810,7 +14821,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextDetailAfterUndo => '취소 후';
 
   @override
-  String get contextOperationUndo => '이 컨텍스트 작업 취소';
+  String get contextOperationUndo => '이 작업 취소';
 
   @override
   String contextHistoryWindowNote(int count) {
@@ -14819,7 +14830,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get contextOverLimitWarning =>
-      '취소하면 모델 컨텍스트 한도를 초과할 수 있습니다. 다시 압축하는 것을 권장합니다. 취소는 가능하며, 전송 전에 다시 확인합니다.';
+      '취소하면 내용이 모델의 한도를 초과할 수 있습니다. 취소는 가능하며, 전송 전에 다시 확인합니다. 필요하면 다시 압축하세요.';
 
   @override
   String get storageSpaceImageTypeChat => '채팅 이미지';
@@ -14836,14 +14847,14 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get contextOperationHidden => '이후 삭제로 분리됨';
+  String get contextOperationHidden => '이후에 지우기가 이미 적용되어 이 작업은 더 이상 적용되지 않습니다.';
 
   @override
-  String get contextUndoClearTooltip => '이 삭제 취소';
+  String get contextUndoClearTooltip => '이 지우기 취소';
 
   @override
   String compressKeepDescription(int count) {
-    return '최근 사용자 메시지 $count개와 그 답변 및 도구 과정을 유지하고, 이전 내용은 요약으로 대체합니다. 첨부 파일만 있는 메시지도 하나로 계산합니다.';
+    return '최근 사용자 메시지 $count개와 그 답변 및 도구 활동을 유지합니다. 이전 기록은 요약으로 대체됩니다. 첨부 파일만 있는 메시지도 각각 1개로 계산됩니다.';
   }
 
   @override
@@ -14851,7 +14862,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String contextEditPreview(String value) {
-    return '저장 후 약 $value tokens. 입력 중에는 현재 적용된 내용에 영향을 주지 않습니다.';
+    return '저장 후 약 $value 토큰입니다. 편집해도 현재 사용 중인 내용은 즉시 변경되지 않습니다.';
   }
 
   @override
@@ -14866,25 +14877,26 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get contextDetailReplaced => '대체된 범위';
+  String get contextDetailReplaced => '요약으로 대체된 부분';
 
   @override
   String get displaySettingsPageAutoScrollEnabledLabel => '켜기';
 
   @override
-  String get contextChangeTitle => '컨텍스트 영향 확인';
+  String get contextChangeTitle => '이 변경의 영향을 확인하세요';
 
   @override
   String get contextDetailTitle => '압축 요약';
 
   @override
-  String get compressModelGlobal => '전역 설정 · 이번 시작 후 고정';
+  String get compressModelGlobal => '설정의 모델을 사용하며, 세션 중에는 변경되지 않습니다.';
 
   @override
   String get wsDeniedMountReadonly => '읽기 전용 마운트라 쓸 수 없습니다.';
 
   @override
-  String get compressRereadDesc => '여러 번 압축으로 손실된 정보를 처리하며, 이번 사용량이 증가합니다';
+  String get compressRereadDesc =>
+      '채팅이 여러 번 압축된 경우 원문을 다시 확인하여 세부 정보 손실을 줄입니다. 이번에는 토큰을 더 사용합니다.';
 
   @override
   String get toolApprovalSwitchToFullAccess => '완전 액세스로 전환';
@@ -14893,19 +14905,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressUsageInput => '이번 요약 입력';
 
   @override
-  String get contextDetailSummaryLabel => '이후 요청에 실제 사용되는 요약';
+  String get contextDetailSummaryLabel => '이후 모델에 전달될 요약';
 
   @override
-  String get contextImpactDeleteTitle => '압축된 원문을 삭제할까요?';
+  String get contextImpactDeleteTitle => '이미 압축된 원문을 삭제할까요?';
 
   @override
-  String get compressAdvancedOff => '원문 다시 읽기 끔';
+  String get compressAdvancedOff => '원문 다시 보기: 꺼짐';
 
   @override
-  String get contextOperationActive => '현재 적용됨';
+  String get contextOperationActive => '현재 사용 중';
 
   @override
-  String get compressAdvancedOn => '원문 다시 읽기 켬';
+  String get compressAdvancedOn => '원문 다시 보기: 켜짐';
 
   @override
   String get contextTaskMerging => '요약 병합 중';
@@ -14920,21 +14932,21 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get contextClearDetails =>
-      '이전 채팅 기록은 이후 요청에 포함되지 않습니다. 시스템 프롬프트, 메모리 및 도구 정의는 계속 적용됩니다.';
+      '이제부터 이전 채팅은 모델에 전송되지 않습니다. 어시스턴트의 시스템 지침, 메모리, 도구는 계속 적용됩니다.';
 
   @override
   String get compressCopyResult => '결과 복사';
 
   @override
-  String get contextDetailInUse => '현재 직접 사용';
+  String get contextDetailInUse => '현재 사용 중';
 
   @override
   String get contextImpactDescription =>
-      '관련 요약이 함께 취소됩니다. 원본 채팅 메시지는 유지되며 모델을 자동으로 호출하지 않습니다. 독립적인 컨텍스트 노드는 변경되지 않습니다.';
+      '관련 요약이 함께 취소됩니다. 원본 채팅은 유지되며 모델은 다시 호출되지 않습니다. 다른 무관한 요약은 그대로 유지됩니다.';
 
   @override
   String get compressIncludeAttachmentsDesc =>
-      '사용 가능한 첨부 텍스트와 전체 도구 기록을 원래 순서대로 포함합니다. 이미지는 다시 분석하지 않습니다.';
+      '이미 추출된 첨부 텍스트와 전체 도구 기록을 원래 순서대로 포함합니다. 이미지는 다시 읽지 않습니다.';
 
   @override
   String worldBookEntriesMoved(int count) {
@@ -14943,17 +14955,17 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get contextImpactSourceDescription =>
-      '확인하면 원문을 변경하고, 이를 요약한 요약 및 의존 후속 노드를 함께 취소합니다. 다른 메시지와 독립 노드는 유지되며 모델을 자동으로 호출하지 않습니다.';
+      '확인하면 이 원문이 변경되고, 이를 사용한 요약과 그 요약에 의존하는 이후 압축이 취소됩니다. 다른 채팅은 영향을 받지 않으며 모델은 다시 호출되지 않습니다.';
 
   @override
   String get contextEditTitle => '요약 편집';
 
   @override
-  String get compressUsageNext => '적용 후 다음 요청';
+  String get compressUsageNext => '적용 후, 다음 전송';
 
   @override
   String get contextSummaryEmpty =>
-      '요약은 비워 둘 수 없습니다. 기록을 제외하려면 컨텍스트 지우기를 사용하세요.';
+      '요약은 비워 둘 수 없습니다. 이전 채팅을 포함하지 않으려면 \'컨텍스트 비우기\'를 사용하세요.';
 
   @override
   String get toolApprovalDenied => '거부됨';
@@ -14963,20 +14975,20 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String compressIncludeManual(int count) {
-    return '수동 편집 포함 · $count';
+    return '직접 추가한 $count개 항목 포함';
   }
 
   @override
   String contextBudgetInfo(int used, String limit) {
-    return '다음 요청 예상(출력 예약 포함): $used / $limit 토큰';
+    return '다음 전송은 약 $used / $limit 토큰을 사용합니다(답변 공간 포함).';
   }
 
   @override
-  String get contextTaskDismiss => '상태 닫기';
+  String get contextTaskDismiss => '닫기';
 
   @override
   String contextUndoBudgetInfo(int used) {
-    return '실행 취소 후 예상: 출력 예약 포함 약 $used 토큰';
+    return '취소 후 약 $used 토큰(답변 공간 포함)';
   }
 
   @override
@@ -14986,14 +14998,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get worldBookSelectionDone => '완료';
 
   @override
-  String get contextDividerFailed => '압축 실패';
+  String get contextDividerFailed => '압축이 완료되지 않았습니다';
 
   @override
   String get toolPermissionUnboundHint =>
       '작업 공간이 연결되지 않음: 이 설정으로는 파일 또는 셸 도구가 활성화되지 않습니다.';
 
   @override
-  String get contextChangeWaiting => '현재 응답과 도구 실행이 끝난 후 이 변경이 적용됩니다.';
+  String get contextChangeWaiting => '현재 답변과 도구 사용이 끝난 후 이 변경 사항이 적용됩니다.';
 
   @override
   String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
@@ -15014,7 +15026,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String contextImpactConfirm(int count) {
-    return '$count개 노드 실행 취소';
+    return '이후 관련 작업 $count개도 함께 취소';
   }
 
   @override
@@ -15057,7 +15069,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextTaskCancelled => '압축이 취소되었습니다';
 
   @override
-  String get contextDetailClearTitle => '컨텍스트 지워짐';
+  String get contextDetailClearTitle => '컨텍스트가 비워졌습니다';
 
   @override
   String get contextImpactKeep => '변경 없음';
@@ -15066,7 +15078,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get contextImpactUndoAlso => '함께 실행 취소';
 
   @override
-  String get contextClearMarker => '컨텍스트 지워짐';
+  String get contextClearMarker => '컨텍스트가 비워졌습니다';
 
   @override
   String get toolPermissionScopeThisChat => '이 대화만';
@@ -15507,43 +15519,44 @@ class AppLocalizationsKo extends AppLocalizations {
   String get imageContextUpdateFailed => '변경 사항을 저장할 수 없습니다. 다시 시도하세요.';
 
   @override
-  String get contextOperationsTitle => '컨텍스트 작업';
+  String get contextOperationsTitle => '압축 및 기록 비우기';
 
   @override
   String get contextOperationsLoadMore => '더 보기';
 
   @override
-  String get contextOperationsDescription => '압축 작업, 요약 및 컨텍스트 경계 관리';
+  String get contextOperationsDescription =>
+      '압축 및 비우기 기록을 확인하고 필요하면 취소할 수 있습니다.';
 
   @override
-  String get contextOperationsEmpty => '아직 컨텍스트 작업이 없습니다.';
+  String get contextOperationsEmpty => '아직 압축 또는 비우기 기록이 없습니다.';
 
   @override
   String contextOperationsStored(int count) {
-    return '저장된 기록: 메시지 $count개';
+    return '저장된 채팅: 메시지 $count개';
   }
 
   @override
   String contextOperationsEffective(int summaries, int messages) {
-    return '다음 요청의 기록: 요약 $summaries개 + 원본 메시지 $messages개';
+    return '다음 전송에는 요약 $summaries개와 원문 메시지 $messages개가 포함됩니다.';
   }
 
   @override
   String get contextOperationsScope =>
-      '현재 기록 제한이 적용됩니다. 시스템 프롬프트, 메모리, 도구 및 전송되지 않은 입력은 이 컨텍스트에 추가됩니다. 기록을 열어 요약, 원본 범위를 확인하거나 작업을 취소할 수 있습니다.';
+      '현재 기록 개수 한도를 기준으로 계산했습니다. 시스템 지침, 메모리, 도구, 아직 전송하지 않은 입력은 별도로 컨텍스트에 추가됩니다. 기록을 열면 요약, 해당 원문 범위를 확인하거나 취소할 수 있습니다.';
 
   @override
-  String get contextOperationsLoadFailed => '컨텍스트 개요를 불러올 수 없습니다. 다시 시도하세요.';
+  String get contextOperationsLoadFailed => '이 기록을 불러올 수 없습니다. 다시 시도해 주세요.';
 
   @override
   String get compressNewConversation => '새 채팅으로 압축';
 
   @override
   String get compressNewConversationDescription =>
-      '요약과 유지된 메시지로 새 채팅을 만듭니다. 원본 채팅은 변경되지 않습니다. 끄면 현재 위치에서 압축합니다.';
+      '켜면 요약과 유지된 메시지로 새 채팅을 만들고 원래 채팅은 변경하지 않습니다. 끄면 현재 채팅에서 바로 압축합니다.';
 
   @override
-  String get contextViewBoundary => '경계로 이동';
+  String get contextViewBoundary => '컨텍스트가 비워진 위치로 이동';
 
   @override
   String get contextFixedStart => '고정 컨텍스트 시작';
@@ -15630,7 +15643,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionMore => '추가 설정';
 
   @override
-  String get compressionFocus => '이번 실행 중점';
+  String get compressionFocus => '이번에 중점적으로 남길 내용';
 
   @override
   String get compressionFocusHint => '선택 사항: 핵심 결정, 진행 상황 또는 캐릭터 세부 정보';
@@ -15646,7 +15659,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionGlobalDescription =>
-      '전역 기본값을 따르는 대화에 적용됩니다. 대화별 재정의는 변경되지 않습니다.';
+      '전역 기본값을 따르는 대화에만 적용됩니다. 별도 설정이 있는 대화는 변경되지 않습니다.';
 
   @override
   String get compressionAutoTitle => '자동 압축';
@@ -15662,45 +15675,45 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionNearLimit =>
-      '컨텍스트가 예상 용량에 근접했습니다. 계속 대화하거나 수동으로 압축할 수 있습니다.';
+      '이 대화가 모델이 기억할 수 있는 한도에 가까워졌습니다. 계속 보내거나 먼저 압축할 수 있습니다.';
 
   @override
   String get compressionKeepTurns => '최근 유지';
 
   @override
-  String get compressionKeepHint => '한 턴에는 사용자 메시지와 그에 대한 답변 및 도구 내용이 포함됩니다.';
+  String get compressionKeepHint => '한 턴은 사용자 메시지 하나와 그 뒤의 답변 및 도구 내용을 포함합니다.';
 
   @override
-  String get compressionLength => '요약 목표 (토큰)';
+  String get compressionLength => '요약 길이(토큰)';
 
   @override
-  String get compressionTrigger => '시작 기준';
+  String get compressionTrigger => '사용량 도달 시';
 
   @override
-  String get compressionTarget => '압축 후 목표';
+  String get compressionTarget => '압축 목표';
 
   @override
-  String get compressionWindow => '계획 창';
+  String get compressionWindow => '요약 모델 용량';
 
   @override
-  String get compressionRequests => '최대 호출';
+  String get compressionRequests => '최대 요청 수';
 
   @override
   String get compressionReference => '세계관 책과 과거 기억 참조';
 
   @override
   String get compressionReferenceHint =>
-      '선택한 기록에 대해서만 세계관 책을 트리거하고, 그 안에 저장된 기억 스냅샷을 사용합니다. 참조는 인물 이름과 규칙을 이해하기 위한 것이며, 사건이 이미 발생했거나 캐릭터가 알고 있음을 의미하지 않습니다.';
+      '이번에 압축할 기록만을 기준으로 세계관을 찾고, 당시 저장된 메모리를 사용합니다. 이 내용은 모델이 인물 이름과 규칙을 이해하도록 돕기 위한 것일 뿐, 해당 사건이 발생했다거나 캐릭터가 이미 알고 있다는 의미가 아닙니다.';
 
   @override
-  String get compressionToolReferences => '이미 읽은 도구 결과를 참조로 대체';
+  String get compressionToolReferences => '이미 읽은 도구 결과는 참조만 유지';
 
   @override
   String get compressionToolReferencesHint =>
-      '도구 사용이 가능할 때만 적용됩니다. 최신 미확인 결과는 유지하며, 원본 기록을 읽기 전용으로 다시 조회할 수 있습니다.';
+      '도구를 사용할 수 있을 때만 적용됩니다. 최신 미확인 결과는 전체 유지되고, 이미 읽은 결과는 참조로만 남아 필요할 때 원본 기록을 다시 볼 수 있지만 수정할 수는 없습니다.';
 
   @override
-  String get compressionSummaryScan => '요약을 세계관 키워드 매칭에 포함';
+  String get compressionSummaryScan => '압축된 요약도 세계관 키워드 매칭에 사용';
 
   @override
   String get compressionChatModel => '현재 대화 모델 따르기';
@@ -15715,11 +15728,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionTry => '요약 시험 생성 · 모델 토큰 사용';
 
   @override
-  String get compressionPreviewOnly => '후보만 생성되었습니다. 검토 후 적용하세요.';
+  String get compressionPreviewOnly => '먼저 미리보기를 생성합니다. 확인한 후 사용할지 결정하세요.';
 
   @override
   String get compressionTemplateChanged =>
-      '새 템플릿은 이후 요약에 적용됩니다. 기존 요약은 그대로 유지되며, 원문에서 다시 생성하여 세부 내용을 복원할 수 있습니다.';
+      '새 템플릿은 앞으로 생성되는 요약에만 적용됩니다. 이미 생성된 요약은 그대로 유지됩니다. 세부 내용을 채우려면 원문에서 다시 생성하세요.';
 
   @override
   String compressionRange(int count, int turns) {
@@ -15728,7 +15741,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String compressionCalls(int count) {
-    return '모델 호출 $count회';
+    return '모델 요청 $count회';
   }
 
   @override
@@ -15741,28 +15754,28 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String compressionUsageUnknown(int count) {
-    return '$count회 호출에서 사용량이 반환되지 않았으며, 무료로 간주할 수 없습니다.';
+    return '$count회 요청이 사용량 데이터를 반환하지 않았습니다. 무료였다는 뜻은 아닙니다.';
   }
 
   @override
   String get compressionBudgetError =>
-      '예상 호출 수가 상한을 초과했습니다. 상한을 높이거나 더 큰 요약 모델을 선택하세요. 부분 요약은 적용되지 않았습니다.';
+      '현재 한도보다 더 많은 모델 요청이 필요하므로 컨텍스트가 변경되지 않았습니다. 최대 요청 수를 높이거나 컨텍스트가 더 큰 모델로 전환하세요.';
 
   @override
   String get compressionIncomplete =>
-      '요약이 잘리거나 거부되어 적용되지 않았습니다. 출력 상한 또는 모델을 조정하세요.';
+      '요약이 중단되었거나 거부되어 컨텍스트가 변경되지 않았습니다. 출력 한도를 높이거나 다른 모델을 사용해 보세요.';
 
   @override
   String get compressionReferenceTooLarge =>
-      '템플릿, 참조 또는 작업 요약이 요약 모델 예산을 가득 채웠습니다. 참조를 줄이거나 더 큰 모델을 선택하세요.';
+      '참고 자료가 이미 이 모델의 용량을 채워 요약할 공간이 없습니다. 참고 자료를 줄이거나 컨텍스트가 더 큰 모델로 전환하세요.';
 
   @override
   String get compressionReferenceChanged =>
-      '참조된 배경이 변경되었습니다. 후보를 검토하거나 다시 생성하세요.';
+      '참조한 배경이 변경되었습니다. 이 요약을 검토하거나 새로 생성하세요.';
 
   @override
   String get compressionTargetNotReached =>
-      '후보가 전체 요청을 자동 시작 기준 아래로 낮추지 못해 원래 컨텍스트가 유지되었습니다.';
+      '압축 후에도 사용량이 자동 시작 지점보다 높아 원래 컨텍스트가 유지되었습니다. 요약을 더 줄이거나 시작 지점을 높이세요.';
 
   @override
   String get compressionTemplateMissing =>
@@ -15799,32 +15812,34 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionLanguageConversation => '대화 따르기';
 
   @override
-  String get compressionLanguageLegacy => '원래 템플릿 언어 동작 유지';
+  String get compressionLanguageLegacy => '원본 템플릿의 언어 설정 유지';
 
   @override
-  String get compressionLanguageHint => '언어 이름 또는 코드, 또는 conversation / legacy';
+  String get compressionLanguageHint =>
+      '언어 이름이나 코드를 입력하세요. conversation(대화 따르기) 또는 legacy(원본 템플릿 유지)를 사용할 수도 있습니다.';
 
   @override
-  String get compressionVariables => '지원되는 변수; 누락 시 기록이 자동으로 추가됩니다:';
+  String get compressionVariables =>
+      '다음 변수를 사용할 수 있습니다. 프롬프트에 기록이 포함되지 않으면 자동으로 추가됩니다:';
 
   @override
   String get compressionDeleteTemplate =>
-      '대체 템플릿을 선택하고 이 템플릿을 삭제할까요? 승인된 요약과 레시피 스냅샷은 계속 읽을 수 있습니다.';
+      '대체 템플릿을 선택하고 이 템플릿을 삭제할까요? 이미 사용 중인 요약과 레시피에 저장된 사본은 유지됩니다.';
 
   @override
   String compressionTemplateReferences(int count) {
-    return '$count개 대화 개별 설정에서 사용 중입니다.';
+    return '$count개 채팅에서 개별 재정의로 사용 중입니다.';
   }
 
   @override
   String get compressionSaveRecipe => '현재 설정을 레시피로 저장';
 
   @override
-  String get compressionBindModel => '선택한 요약 모델 포함';
+  String get compressionBindModel => '현재 선택한 요약 모델도 함께 저장';
 
   @override
   String get compressionRecipeHint =>
-      '레시피는 자동 압축을 켜지 않습니다. 가져오기는 라이브러리에 추가만 하고 바로 적용하지 않습니다.';
+      '레시피를 저장하거나 가져와도 자동 압축이 켜지지 않으며 현재 채팅에 적용되지 않습니다. 레시피가 라이브러리에 추가될 뿐입니다.';
 
   @override
   String get compressionImport => 'JSON 가져오기';
@@ -15840,10 +15855,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionInvalidSettings =>
-      '값을 확인하세요: 목표는 트리거보다 낮아야 하고, 호출 수와 토큰 한도는 양수여야 합니다.';
+      '다음 값을 확인하세요: 압축 대상은 시작 지점보다 낮아야 하며, 요청 및 토큰 한도는 0보다 커야 합니다.';
 
   @override
-  String get compressionOverflowAction => '한 번 압축한 후 실패한 응답 재시도';
+  String get compressionOverflowAction => '한 번 압축한 후 실패한 응답 다시 시도';
 
   @override
   String compressionPlannedCalls(int count, int limit) {
@@ -15855,7 +15870,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String compressionRecipeReferences(int count) {
-    return '$count개 레시피가 각각 독립적인 템플릿 스냅샷을 유지합니다.';
+    return '$count개 레시피가 그 시점의 템플릿 사본을 각각 보관합니다.';
   }
 
   @override
@@ -15938,7 +15953,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionCallUnit => '회';
 
   @override
-  String get compressionRequestTimeout => '압축 요청 시간 제한';
+  String get compressionRequestTimeout => '압축 요청 시간 초과';
 
   @override
   String get compressionMinuteUnit => '분';
@@ -15948,18 +15963,18 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionRequestTimeoutHint =>
-      '양수 분 단위로 입력하세요. 비워 두면 기존 동작을 유지합니다(네이티브 압축: 5분). 각 요약 세그먼트와 병합 요청은 개별적으로 시간이 측정됩니다.';
+      '0보다 큰 분 단위 숫자를 입력하세요. 비워 두면 현재 기본값(서버 측 압축은 5분)이 유지됩니다. 부분별로 요약할 때는 각 부분과 병합에 별도로 시간이 적용됩니다.';
 
   @override
   String compressionRequestTimedOut(num minutes) {
-    return '압축 요청 시간 초과 ($minutes분 대기)';
+    return '압축이 $minutes분 후 중단되었으며 컨텍스트는 변경되지 않았습니다. 다시 시도하거나 시간 초과를 늘리세요.';
   }
 
   @override
   String get compressionAdvancedOptions => '압축 세부 정보';
 
   @override
-  String get compressionAdvancedHint => '참조 내용, 원문 다시 읽기, 호출 제한';
+  String get compressionAdvancedHint => '참고 자료, 원문 다시 보기 여부, 요청 한도';
 
   @override
   String get compressionAutomaticWindow => '자동';
@@ -15968,14 +15983,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionAutoOffHint => '필요할 때 압축 페이지에서 수동으로 시작할 수 있습니다.';
 
   @override
-  String get compressionAutoNotifyHint => '임계값에 가까워지면 알려드리며, 압축 시점은 직접 결정합니다.';
+  String get compressionAutoNotifyHint =>
+      '사용량이 한도에 가까워지면 알림을 받고, 압축 시점은 직접 결정합니다.';
 
   @override
   String get compressionAutoOnHint =>
-      '임계값에 도달하면 이전 기록을 자동으로 요약합니다. 추가 모델 사용량이 발생합니다.';
+      '사용량이 설정한 비율에 도달하면 이전 기록이 자동으로 요약됩니다. 추가 모델 토큰이 사용됩니다.';
 
   @override
-  String get compressionBudgetHint => '백분율은 현재 사용 가능한 입력 예산을 기준으로 합니다.';
+  String get compressionBudgetHint => '이 백분율은 아직 사용 가능한 입력 용량을 기준으로 계산됩니다.';
 
   @override
   String get compressionPreviewAction => '로컬 미리보기';
@@ -15988,23 +16004,23 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionScopeKeepHint =>
-      '최근 턴은 원문으로 유지하고 이전 기록을 요약합니다. 이 턴 수는 자동 압축에도 사용됩니다.';
+      '최근 몇 턴은 원문 그대로 유지하고 이전 기록을 요약합니다. 자동 압축도 같은 턴 수를 사용합니다.';
 
   @override
   String get compressionScopeAllHint =>
-      '최근 턴을 포함해 현재 컨텍스트의 모든 기록을 요약합니다. 원본 메시지는 계속 확인할 수 있습니다.';
+      '현재 컨텍스트의 모든 기록을 요약하며 최근 원문을 따로 유지하지 않습니다. 원본 메시지는 여전히 볼 수 있습니다.';
 
   @override
   String get compressionScopeStartHint =>
-      '문자 예산 내에서 이전의 완전한 메시지를 선택합니다. 선택되지 않은 기록은 원문으로 유지됩니다.';
+      '글자 수 한도 내에서 이전의 완전한 메시지를 압축합니다. 선택되지 않은 메시지는 원문으로 유지됩니다.';
 
   @override
   String get compressionScopeRecentHint =>
-      '문자 예산 내에서 최근의 완전한 메시지를 선택합니다. 선택되지 않은 기록은 원문으로 유지됩니다.';
+      '글자 수 한도 내에서 최근의 완전한 메시지를 압축합니다. 선택되지 않은 메시지는 원문으로 유지됩니다.';
 
   @override
   String get compressionAutoKeepHint =>
-      '자동 압축은 수동 범위와 관계없이 항상 최근 턴을 유지합니다. 이 턴 수는 수동 압축과 공유됩니다.';
+      '자동 압축은 수동 실행에서 선택한 범위와 관계없이 항상 최근 원문을 유지합니다. 턴 수는 수동 압축과 공유됩니다.';
 
   @override
   String get requestBudgetTitle => '이미지 및 요청 예산';
@@ -16099,50 +16115,49 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get compressionNativeTitle => 'OpenAI 네이티브 압축 사용';
+  String get compressionNativeTitle => 'OpenAI 서버 측 압축 사용';
 
   @override
   String get compressionNativeHint =>
-      '현재 대화 모델과 Responses를 사용합니다. 이 대화에서 자동 압축이 켜져 있으면 네이티브 방식도 사용하며, 지원 여부는 서비스에서 결정합니다.';
+      '현재 채팅 모델을 사용하며 압축은 서버에서 이루어집니다. 이 채팅에서 자동 압축이 켜져 있으면 이 방식도 사용됩니다. 공급자가 OpenAI의 Responses API를 지원해야 합니다.';
 
   @override
   String get compressionNativeScopeHint =>
-      '최근 턴은 그대로 유지하고 이전 기록을 압축합니다. 이 턴 수는 네이티브 자동 압축에도 사용되며, 텍스트 요약의 유지 턴 수는 변경되지 않습니다.';
+      '최근 몇 턴은 원문 그대로 유지하고 이전 기록을 서버 측 압축으로 보냅니다. 서버 측 자동 압축도 같은 턴 수를 사용하며, 텍스트 요약의 턴 수는 변경되지 않습니다.';
 
   @override
-  String get compressionNativeLabel => '네이티브 압축';
+  String get compressionNativeLabel => '서버 측 압축';
 
   @override
   String get compressionNativeDescription =>
-      '서비스에서 반환된 네이티브 컨텍스트가 이후 요청을 위해 로컬에 저장되었습니다. 텍스트로 보거나 편집할 수 없습니다. 원본 메시지는 유지되며 이 압축을 취소할 수 있습니다.';
+      '서버의 압축 결과가 로컬에 저장되며 다음 전송에 사용됩니다. 텍스트로 보거나 편집할 수 없습니다. 원본 메시지는 유지되며 이 압축을 취소할 수 있습니다.';
 
   @override
   String get compressionNativeIncomplete =>
-      '서비스에서 완전한 네이티브 압축 결과를 반환하지 않았습니다. 원본 컨텍스트는 변경되지 않았습니다.';
+      '서버가 완전한 압축 결과를 반환하지 않았습니다. 원래 컨텍스트는 변경되지 않았습니다.';
 
   @override
   String get compressionNativeScopeChanged =>
-      '이 네이티브 컨텍스트는 다른 연결 또는 계정에 속합니다. 원래 연결로 계속하거나, 원본이 포함된 대화에서 압축을 취소하거나 텍스트 요약을 생성하세요.';
+      '이 서버 측 결과는 다른 연결이나 계정에 속합니다. 계속하려면 원래 연결로 전환하거나, 원문이 남아 있는 채팅에서 이 압축을 취소하고 텍스트 요약을 생성하세요.';
 
   @override
-  String get compressionNativeTokenHint =>
-      '네이티브 컨텍스트의 토큰 사용량은 서비스 통계를 기준으로 합니다.';
+  String get compressionNativeTokenHint => '서버 측 압축의 토큰 사용량은 서버에서 보고됩니다.';
 
   @override
   String get compressionNativeCopyHint =>
-      '새 대화에는 완전한 네이티브 압축 결과와 유지된 최근 대화만 저장됩니다. 원본은 원래 대화에 남아 있으며 여기서 취소하여 복원할 수 없습니다.';
+      '새 채팅에는 완전한 서버 측 결과와 유지한 최근 턴만 포함됩니다. 원문은 원래 채팅에 남아 있으며 여기서 취소해도 복원할 수 없습니다.';
 
   @override
   String get compressionNativeInputOverride =>
-      '사용자 지정 input 필드가 네이티브 압축 데이터를 덮어씁니다. 계속하기 전에 공급자, 모델 또는 어시스턴트 설정에서 input 매개변수를 제거하세요.';
+      '모델 또는 어시스턴트 설정의 사용자 지정 input 매개변수가 서버 측 결과를 덮어씁니다. 계속하기 전에 해당 매개변수를 제거하세요.';
 
   @override
   String get compressionNativeAllHint =>
-      '최근 꼬리를 따로 유지하지 않고 현재 컨텍스트의 전체 기록을 네이티브 압축에 제출합니다. 원본 메시지는 계속 확인할 수 있습니다.';
+      '현재 표시되는 모든 기록을 서버 측 압축으로 보내고, 최근 원문은 별도로 보관하지 않습니다. 원본 메시지는 계속 확인할 수 있습니다.';
 
   @override
   String get compressionNativeAutoHint =>
-      '임계값에 도달하면 현재 대화 모델로 네이티브 압축을 수행한 후 계속 전송합니다. 실패하면 원본 컨텍스트를 유지하며 텍스트 요약으로 전환하지 않습니다.';
+      '사용량이 설정한 비율에 도달하면 현재 대화 모델로 서버 측 압축을 수행한 후 전송을 계속합니다. 실패하면 원본 컨텍스트를 유지하며 텍스트 요약으로 대체하지 않습니다.';
 
   @override
   String get languageDisplayRussian => '러시아어';
@@ -16190,26 +16205,26 @@ class AppLocalizationsKo extends AppLocalizations {
   String get themePaletteCustom => '사용자 지정';
 
   @override
-  String get compressionNativeImported => '네이티브 컨텍스트 로드됨';
+  String get compressionNativeImported => '서버 측 압축 결과 불러옴';
 
   @override
   String get compressionNativeImportedDescription =>
-      '이 대화는 완전한 네이티브 압축 결과와 유지된 최근 대화로 시작합니다. 이 결과는 텍스트로 읽거나 편집할 수 없습니다. 이전 원본은 원래 대화에 남아 있으므로 여기서 취소하여 복원할 수 없습니다.';
+      '이 대화는 서버 측 압축 결과와 최근 몇 턴으로 시작합니다. 압축 결과는 텍스트로 보거나 수정할 수 없습니다. 이전 원문은 원래 대화에 남아 있으며 여기서 실행 취소로 복원할 수 없습니다.';
 
   @override
   String get compressionNativeOpenSource => '원래 대화 열기';
 
   @override
   String get compressionNativeOriginalsUnavailable =>
-      '이 대화에는 로드된 네이티브 컨텍스트에 해당하는 원본이 없습니다. 네이티브 압축으로 계속하거나, 원래 대화로 돌아가 원본을 확인하거나 텍스트 요약을 생성하세요.';
+      '이 대화에는 불러온 서버 측 압축 결과에 대응하는 원문이 없습니다. 서버 측 압축을 계속 사용하거나, 원래 대화로 돌아가 원문을 확인하거나 텍스트 요약을 생성할 수 있습니다.';
 
   @override
   String get compressionNativeTemporaryCopyHint =>
-      '새 임시 대화에는 완전한 네이티브 압축 결과와 유지된 최근 대화만 보관됩니다. 원본 임시 대화를 떠나면 해당 대화와 이전되지 않은 원문이 삭제되며, 여기서 복원할 수 없습니다.';
+      '새 임시 대화에는 완전한 서버 측 압축 결과와 최근 턴만 유지됩니다. 원래 임시 대화를 떠나면 해당 대화와 이전되지 않은 원문은 삭제되며 여기서 복원할 수 없습니다.';
 
   @override
   String get compressionNativeSourceUnavailable =>
-      '이 대화에는 완전한 네이티브 압축 결과와 유지된 최근 대화가 보관되어 있습니다. 원본 대화는 더 이상 사용할 수 없습니다. 여기로 복사되지 않은 원문은 복원할 수 없으며, 네이티브 결과는 텍스트로 읽거나 편집할 수 없습니다.';
+      '이 대화에는 완전한 서버 측 압축 결과와 유지한 최근 턴이 저장되어 있습니다. 원래 대화는 더 이상 사용할 수 없습니다. 여기로 복사되지 않은 원문은 복원할 수 없으며, 압축 결과는 텍스트로 보거나 수정할 수 없습니다.';
 
   @override
   String get modelDetailSheetImageGenerationModel => '이미지 모델';
@@ -16289,7 +16304,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionOutputBudgetHint =>
-      '추론과 요약 본문을 포함합니다. 비워 두면 요약 목표를 사용하며, 사고를 켤 때 이 한도만 높여도 요약 목표 길이는 늘어나지 않습니다. 실제 한도는 여전히 모델 출력 한도의 제약을 받습니다.';
+      '사고 과정과 요약 본문을 포함합니다. 비워 두면 요약 목표 길이와 같습니다. 사고가 켜져 있으면 요약 목표 길이를 늘리지 않고 이 한도를 높일 수 있습니다. 모델 자체의 출력 한도는 여전히 적용됩니다.';
 
   @override
   String get responseOutputLimitReached =>
