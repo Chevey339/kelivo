@@ -10629,6 +10629,18 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось завершить настройку песочницы.';
 
   @override
+  String get workspaceEnvErrorRepairInterrupted =>
+      'Исправление песочницы было прервано. Существующая песочница сохранена. Повторите попытку, чтобы завершить исправление.';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout =>
+      'Время ожидания исправления песочницы истекло. Проверьте подключение к сети и повторите попытку. Существующая песочница сохранена.';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      'Не удалось подтвердить, что исправление песочницы остановилось в пределах отведённого времени. Полностью закройте и снова откройте Kelivo, прежде чем повторять попытку. Существующая песочница сохранена.';
+
+  @override
   String get workspaceEnvErrorCancelled => 'Установка отменена.';
 
   @override

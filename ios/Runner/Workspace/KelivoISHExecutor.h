@@ -16,7 +16,8 @@ typedef void (^KelivoISHDoneHandler)(NSDictionary<NSString *, id> *result);
 @interface KelivoISHExecutor : NSObject
 
 /// Fork `/bin/sh -c <command>` with separate pipes. `done` is invoked once
-/// with exitCode, timedOut, durationMs, cancelled, interrupted.
+/// with exitCode, timedOut, durationMs, cancelled, interrupted,
+/// terminationConfirmed (the process exited or never started).
 + (BOOL)startCommand:(NSString *)command
                runId:(NSString *)runId
                binds:(NSArray<NSDictionary<NSString *, id> *> *)binds

@@ -10168,6 +10168,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get workspaceEnvErrorPatchFailed => '샌드박스 설정을 완료할 수 없습니다.';
 
   @override
+  String get workspaceEnvErrorRepairInterrupted =>
+      '샌드박스 복구가 중단되었습니다. 기존 샌드박스는 유지되었습니다. 복구를 완료하려면 다시 시도하세요.';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout =>
+      '샌드박스 복구 시간이 초과되었습니다. 네트워크 연결을 확인한 후 다시 시도하세요. 기존 샌드박스는 유지되었습니다.';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      '제한 시간 내에 샌드박스 복구가 중지되었는지 확인하지 못했습니다. 다시 시도하기 전에 Kelivo를 완전히 종료한 후 다시 여세요. 기존 샌드박스는 유지되었습니다.';
+
+  @override
   String get workspaceEnvErrorCancelled => '설치가 취소되었습니다.';
 
   @override

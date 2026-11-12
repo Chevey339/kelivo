@@ -5028,6 +5028,9 @@
   "workspaceEnvCleanupIncomplete": "The sandbox is ready, but some old files could not be removed. They still take up storage space.",
   "workspaceEnvErrorResetFailed": "Could not finish resetting the sandbox. Please try again.",
   "workspaceEnvErrorPatchFailed": "Could not finish setting up the sandbox.",
+  "workspaceEnvErrorRepairInterrupted": "Sandbox repair was interrupted. The existing sandbox has been kept. Retry to finish the repair.",
+  "workspaceEnvErrorRepairTimeout": "Sandbox repair timed out. Check your network connection and retry. The existing sandbox has been kept.",
+  "workspaceEnvRepairRestartBanner": "Could not confirm that sandbox repair stopped within the time limit. Fully close and reopen Kelivo before retrying. The existing sandbox has been kept.",
   "workspaceEnvErrorCancelled": "Installation was cancelled.",
   "workspaceEnvErrorGeneric": "Something went wrong installing the sandbox.",
   "workspaceEnvChipInstall": "Install sandbox",
@@ -16961,6 +16964,15 @@
   },
   "@workspaceEnvErrorPatchFailed": {
     "description": "Error message for 'patch_failed', stating sandbox setup could not be finished."
+  },
+  "@workspaceEnvErrorRepairInterrupted": {
+    "description": "Error shown in the iOS workspace environment details after an interrupted or cancelled sandbox repair, including recovery on app startup. Explains that the existing filesystem was retained and the user can retry the in-place repair. No placeholders."
+  },
+  "@workspaceEnvErrorRepairTimeout": {
+    "description": "Error shown in the iOS workspace environment details when sandbox repair exceeds its time limit and the command has stopped. Explains that the existing filesystem was retained and suggests checking the network before retrying the in-place repair. No placeholders."
+  },
+  "@workspaceEnvRepairRestartBanner": {
+    "description": "Banner in iOS workspace environment details when a cancelled or timed-out repair command has not confirmed it stopped. Requires a full app restart before retrying so package transactions cannot overlap, and reassures that the existing filesystem was retained. No placeholders."
   },
   "@workspaceEnvErrorCancelled": {
     "description": "Message for the 'cancelled' code and cancelled dependency installs, stating installation was cancelled."

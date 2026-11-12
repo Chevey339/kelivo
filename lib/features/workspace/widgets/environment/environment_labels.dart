@@ -183,6 +183,10 @@ String workspaceEnvErrorMessage(AppLocalizations l10n, String? code) {
       return l10n.workspaceEnvErrorResetFailed;
     case 'patch_failed':
       return l10n.workspaceEnvErrorPatchFailed;
+    case 'patch_interrupted':
+      return l10n.workspaceEnvErrorRepairInterrupted;
+    case 'patch_timeout':
+      return l10n.workspaceEnvErrorRepairTimeout;
     case 'cancelled':
       return l10n.workspaceEnvErrorCancelled;
     case 'invalid_rootfs':

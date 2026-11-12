@@ -18739,6 +18739,24 @@ abstract class AppLocalizations {
   /// **'Could not finish setting up the sandbox.'**
   String get workspaceEnvErrorPatchFailed;
 
+  /// Error shown in the iOS workspace environment details after an interrupted or cancelled sandbox repair, including recovery on app startup. Explains that the existing filesystem was retained and the user can retry the in-place repair. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox repair was interrupted. The existing sandbox has been kept. Retry to finish the repair.'**
+  String get workspaceEnvErrorRepairInterrupted;
+
+  /// Error shown in the iOS workspace environment details when sandbox repair exceeds its time limit and the command has stopped. Explains that the existing filesystem was retained and suggests checking the network before retrying the in-place repair. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox repair timed out. Check your network connection and retry. The existing sandbox has been kept.'**
+  String get workspaceEnvErrorRepairTimeout;
+
+  /// Banner in iOS workspace environment details when a cancelled or timed-out repair command has not confirmed it stopped. Requires a full app restart before retrying so package transactions cannot overlap, and reassures that the existing filesystem was retained. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not confirm that sandbox repair stopped within the time limit. Fully close and reopen Kelivo before retrying. The existing sandbox has been kept.'**
+  String get workspaceEnvRepairRestartBanner;
+
   /// Message for the 'cancelled' code and cancelled dependency installs, stating installation was cancelled.
   ///
   /// In en, this message translates to:

@@ -10019,6 +10019,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
 
   @override
+  String get workspaceEnvErrorRepairInterrupted => '沙盒修复已中断，现有沙盒已保留。请重试以完成修复。';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout => '沙盒修复超时，请检查网络连接后重试。现有沙盒已保留。';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      '未能在限定时间内确认沙盒修复已停止。请完全退出并重新打开 Kelivo 后重试。现有沙盒已保留。';
+
+  @override
   String get workspaceEnvErrorCancelled => '安装已取消。';
 
   @override
@@ -25932,6 +25942,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
+
+  @override
+  String get workspaceEnvErrorRepairInterrupted => '沙盒修复已中断，现有沙盒已保留。请重试以完成修复。';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout => '沙盒修复超时，请检查网络连接后重试。现有沙盒已保留。';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      '未能在限定时间内确认沙盒修复已停止。请完全退出并重新打开 Kelivo 后重试。现有沙盒已保留。';
 
   @override
   String get workspaceEnvErrorCancelled => '安装已取消。';
@@ -41848,6 +41868,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvErrorPatchFailed => '無法完成沙箱設定。';
+
+  @override
+  String get workspaceEnvErrorRepairInterrupted => '沙盒修復已中斷，現有沙盒已保留。請重試以完成修復。';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout => '沙盒修復逾時，請檢查網路連線後重試。現有沙盒已保留。';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      '未能在限定時間內確認沙盒修復已停止。請完全關閉並重新開啟 Kelivo 後重試。現有沙盒已保留。';
 
   @override
   String get workspaceEnvErrorCancelled => '安裝已取消。';

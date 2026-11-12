@@ -149,6 +149,7 @@ void main() {
           'exitCode': 137,
           'timedOut': false,
           'interrupted': true,
+          'terminationConfirmed': true,
           'durationMs': 40,
         });
         return <String, Object?>{'started': true};
@@ -190,6 +191,7 @@ void main() {
 
     final exit = events.whereType<CommandExited>().single;
     expect(exit.interrupted, isTrue);
+    expect(exit.terminationConfirmed, isTrue);
     expect(exit.exitCode, 137);
     expect(exit.cancelled, isFalse);
     expect(exit.timedOut, isFalse);

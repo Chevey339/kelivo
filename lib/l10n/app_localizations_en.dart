@@ -10470,6 +10470,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not finish setting up the sandbox.';
 
   @override
+  String get workspaceEnvErrorRepairInterrupted =>
+      'Sandbox repair was interrupted. The existing sandbox has been kept. Retry to finish the repair.';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout =>
+      'Sandbox repair timed out. Check your network connection and retry. The existing sandbox has been kept.';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      'Could not confirm that sandbox repair stopped within the time limit. Fully close and reopen Kelivo before retrying. The existing sandbox has been kept.';
+
+  @override
   String get workspaceEnvErrorCancelled => 'Installation was cancelled.';
 
   @override

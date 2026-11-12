@@ -98,6 +98,7 @@ class CommandExited extends CommandEvent {
     required this.cancelled,
     required this.interrupted,
     required this.duration,
+    this.terminationConfirmed = false,
   });
 
   final int exitCode;
@@ -105,6 +106,10 @@ class CommandExited extends CommandEvent {
   final bool cancelled;
   final bool interrupted;
   final Duration duration;
+
+  /// Explicit runtime confirmation that the process exited or never started.
+  /// An output stream can also close after an unsuccessful attempt to kill it.
+  final bool terminationConfirmed;
 }
 
 class RuntimeStatus {

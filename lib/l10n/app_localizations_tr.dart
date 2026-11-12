@@ -10538,6 +10538,18 @@ class AppLocalizationsTr extends AppLocalizations {
   String get workspaceEnvErrorPatchFailed => 'Sandbox kurulumu tamamlanamadı.';
 
   @override
+  String get workspaceEnvErrorRepairInterrupted =>
+      'Sandbox onarımı kesintiye uğradı. Mevcut sandbox korundu. Onarımı tamamlamak için yeniden deneyin.';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout =>
+      'Sandbox onarımı zaman aşımına uğradı. Ağ bağlantınızı kontrol edip yeniden deneyin. Mevcut sandbox korundu.';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      'Sandbox onarımının zaman sınırı içinde durduğu doğrulanamadı. Yeniden denemeden önce Kelivo\'yu tamamen kapatıp yeniden açın. Mevcut sandbox korundu.';
+
+  @override
   String get workspaceEnvErrorCancelled => 'Yükleme iptal edildi.';
 
   @override
