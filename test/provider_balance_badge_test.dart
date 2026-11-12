@@ -27,76 +27,83 @@ Future<void> _settleBalance(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('only automatically queries balance while provider is enabled', (
-    tester,
-  ) async {
-    final overrides = _CountingHttpOverrides();
-    final previousOverrides = HttpOverrides.current;
-    HttpOverrides.global = overrides;
-    addTearDown(() => HttpOverrides.global = previousOverrides);
-    ProviderBalanceBadge.clearCacheFor('MaruCode');
-    addTearDown(() => ProviderBalanceBadge.clearCacheFor('MaruCode'));
+  for (final kind in ProviderKind.values) {
+    testWidgets(
+      '${kind.name} only automatically queries balance while provider is enabled',
+      (tester) async {
+        final overrides = _CountingHttpOverrides();
+        final previousOverrides = HttpOverrides.current;
+        HttpOverrides.global = overrides;
+        addTearDown(() => HttpOverrides.global = previousOverrides);
+        ProviderBalanceBadge.clearCacheFor('MaruCode');
+        addTearDown(() => ProviderBalanceBadge.clearCacheFor('MaruCode'));
 
-    late SettingsProvider settings;
-    await tester.runAsync(() async {
-      final harness = await createBusinessTestHarness();
-      settings = SettingsProvider(harness.preferences);
-      await settings.loaded;
-    });
-    addTearDown(settings.dispose);
+        late SettingsProvider settings;
+        await tester.runAsync(() async {
+          final harness = await createBusinessTestHarness();
+          settings = SettingsProvider(harness.preferences);
+          await settings.loaded;
+          await settings.setProviderConfig(
+            'MaruCode',
+            settings.getProviderConfig('MaruCode').copyWith(providerType: kind),
+          );
+        });
+        addTearDown(settings.dispose);
 
-    final config = settings.getProviderConfig('MaruCode');
-    expect(config.enabled, isFalse);
-    expect(config.balanceEnabled, isTrue);
+        final config = settings.getProviderConfig('MaruCode');
+        expect(config.enabled, isFalse);
+        expect(config.balanceEnabled, isTrue);
 
-    await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: settings,
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(
-            body: ProviderBalanceBadge(
-              providerKey: 'MaruCode',
-              displayName: 'MaruCode',
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: settings,
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const Scaffold(
+                body: ProviderBalanceBadge(
+                  providerKey: 'MaruCode',
+                  displayName: 'MaruCode',
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(overrides.attempts, 0);
-    expect(find.byType(Icon), findsNothing);
+        );
+        await tester.pumpAndSettle();
+        expect(overrides.attempts, 0);
+        expect(find.byType(Icon), findsNothing);
 
-    await tester.runAsync(
-      () => settings.setProviderConfig(
-        'MaruCode',
-        config.copyWith(enabled: true),
-      ),
-    );
-    await _settleBalance(tester);
-    expect(overrides.attempts, 1);
-    expect(find.text('!'), findsOneWidget);
+        await tester.runAsync(
+          () => settings.setProviderConfig(
+            'MaruCode',
+            config.copyWith(enabled: true),
+          ),
+        );
+        await _settleBalance(tester);
+        expect(overrides.attempts, 1);
+        expect(find.text('!'), findsOneWidget);
 
-    await tester.runAsync(
-      () => settings.setProviderConfig(
-        'MaruCode',
-        config.copyWith(enabled: true, apiKey: 'changed-key'),
-      ),
+        await tester.runAsync(
+          () => settings.setProviderConfig(
+            'MaruCode',
+            config.copyWith(enabled: true, apiKey: 'changed-key'),
+          ),
+        );
+        await tester.pump();
+        await tester.runAsync(
+          () => settings.setProviderConfig(
+            'MaruCode',
+            config.copyWith(enabled: false, apiKey: 'changed-key'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(minutes: 1));
+        expect(overrides.attempts, 1);
+        expect(find.byType(Icon), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
     );
-    await tester.pump();
-    await tester.runAsync(
-      () => settings.setProviderConfig(
-        'MaruCode',
-        config.copyWith(enabled: false, apiKey: 'changed-key'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.pump(const Duration(minutes: 1));
-    expect(overrides.attempts, 1);
-    expect(find.byType(Icon), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+  }
 
   testWidgets(
     'refreshes for request edits, coalesces typing and cancels on dispose',

@@ -6385,7 +6385,7 @@ class ProviderConfig {
   final KeyManagementConfig? keyManagement;
   // AIhubmix promo header opt-in
   final bool? aihubmixAppCodeEnabled;
-  // OpenAI-compatible provider account balance query.
+  // Provider account balance query, independent of the chat API format.
   final bool? balanceEnabled;
   final String? balanceApiPath;
   final String? balanceResultPath;

@@ -2238,10 +2238,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   List<Widget> _buildHeader(BuildContext context, ProviderConfig cfg) {
     final cs = Theme.of(context).colorScheme;
     final sp = context.read<SettingsProvider>();
-    final kind = ProviderConfig.classify(
-      widget.providerKey,
-      explicitType: cfg.providerType,
-    );
     return [
       SizedBox(
         height: 36,
@@ -2276,8 +2272,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                       icon: lucide.Lucide.Settings,
                       onTap: () => _showProviderSettingsDialog(context),
                     ),
-                    if (kind == ProviderKind.openai &&
-                        cfg.balanceEnabled == true) ...[
+                    if (cfg.balanceEnabled == true) ...[
                       const SizedBox(width: 8),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 120),
@@ -3135,295 +3130,289 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                row(
-                                  l10n.providerDetailPageBalanceInfo,
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: IosSwitch(
-                                      key: const ValueKey(
-                                        'provider-balance-enabled',
-                                      ),
-                                      value: balanceEnabledNow,
-                                      onChanged: (v) async {
-                                        final old = spWatch.getProviderConfig(
-                                          widget.providerKey,
-                                          defaultName: widget.displayName,
-                                        );
-                                        await spWatch.setProviderConfig(
-                                          widget.providerKey,
-                                          old.copyWith(balanceEnabled: v),
-                                        );
-                                        ProviderBalanceBadge.clearCacheFor(
-                                          widget.providerKey,
-                                        );
-                                        if (mounted) setState(() {});
-                                      },
+                              ],
+                              row(
+                                l10n.providerDetailPageBalanceInfo,
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: IosSwitch(
+                                    key: const ValueKey(
+                                      'provider-balance-enabled',
                                     ),
+                                    value: balanceEnabledNow,
+                                    onChanged: (v) async {
+                                      final old = spWatch.getProviderConfig(
+                                        widget.providerKey,
+                                        defaultName: widget.displayName,
+                                      );
+                                      await spWatch.setProviderConfig(
+                                        widget.providerKey,
+                                        old.copyWith(balanceEnabled: v),
+                                      );
+                                      ProviderBalanceBadge.clearCacheFor(
+                                        widget.providerKey,
+                                      );
+                                      if (mounted) setState(() {});
+                                    },
                                   ),
                                 ),
-                                AnimatedCrossFade(
-                                  firstChild: const SizedBox.shrink(),
-                                  secondChild: Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        row(
-                                          l10n.providerDetailPageBalanceApiPathLabel,
-                                          TextField(
-                                            key: const ValueKey(
-                                              'provider-balance-api-path',
-                                            ),
-                                            controller: _balanceApiPathCtrl,
-                                            style: TextStyle(fontSize: 13),
-                                            decoration: _proxyInputDecoration(
-                                              ctx,
-                                            ),
-                                            onChanged: (_) async {
-                                              if (_balanceApiPathCtrl
-                                                  .value
-                                                  .composing
-                                                  .isValid) {
-                                                return;
-                                              }
-                                              final old = spWatch
-                                                  .getProviderConfig(
-                                                    widget.providerKey,
-                                                    defaultName:
-                                                        widget.displayName,
-                                                  );
-                                              await spWatch.setProviderConfig(
-                                                widget.providerKey,
-                                                old.copyWith(
-                                                  balanceApiPath:
-                                                      _balanceApiPathCtrl.text
-                                                          .trim(),
-                                                ),
-                                              );
-                                              ProviderBalanceBadge.clearCacheFor(
-                                                widget.providerKey,
-                                              );
-                                            },
+                              ),
+                              AnimatedCrossFade(
+                                firstChild: const SizedBox.shrink(),
+                                secondChild: Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      row(
+                                        l10n.providerDetailPageBalanceApiPathLabel,
+                                        TextField(
+                                          key: const ValueKey(
+                                            'provider-balance-api-path',
                                           ),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        ProviderBalanceRequestEditor(
-                                          method: cfgNow.balanceMethod,
-                                          headers: cfgNow.balanceHeaders,
-                                          bodyController: _balanceBodyCtrl,
-                                          onMethodChanged: (value) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceMethod: value,
-                                              ),
-                                            );
-                                            ProviderBalanceBadge.clearCacheFor(
-                                              widget.providerKey,
-                                            );
-                                          },
-                                          onHeadersChanged: (headers) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceHeaders: headers,
-                                              ),
-                                            );
-                                            ProviderBalanceBadge.clearCacheFor(
-                                              widget.providerKey,
-                                            );
-                                          },
-                                          onBodyChanged: (_) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceBody:
-                                                    _balanceBodyCtrl.text,
-                                              ),
-                                            );
-                                            ProviderBalanceBadge.clearCacheFor(
-                                              widget.providerKey,
-                                            );
-                                          },
-                                        ),
-                                        const SizedBox(height: 4),
-                                        row(
-                                          l10n.providerDetailPageBalanceResultPathLabel,
-                                          TextField(
-                                            key: const ValueKey(
-                                              'provider-balance-result-path',
-                                            ),
-                                            controller: _balanceResultPathCtrl,
-                                            style: TextStyle(fontSize: 13),
-                                            decoration: _proxyInputDecoration(
-                                              ctx,
-                                            ),
-                                            onChanged: (_) async {
-                                              if (_balanceResultPathCtrl
-                                                  .value
-                                                  .composing
-                                                  .isValid) {
-                                                return;
-                                              }
-                                              final old = spWatch
-                                                  .getProviderConfig(
-                                                    widget.providerKey,
-                                                    defaultName:
-                                                        widget.displayName,
-                                                  );
-                                              await spWatch.setProviderConfig(
-                                                widget.providerKey,
-                                                old.copyWith(
-                                                  balanceResultPath:
-                                                      _balanceResultPathCtrl
-                                                          .text
-                                                          .trim(),
-                                                ),
-                                              );
-                                              ProviderBalanceBadge.clearCacheFor(
-                                                widget.providerKey,
-                                              );
-                                            },
+                                          controller: _balanceApiPathCtrl,
+                                          style: TextStyle(fontSize: 13),
+                                          decoration: _proxyInputDecoration(
+                                            ctx,
                                           ),
+                                          onChanged: (_) async {
+                                            if (_balanceApiPathCtrl
+                                                .value
+                                                .composing
+                                                .isValid) {
+                                              return;
+                                            }
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                  defaultName:
+                                                      widget.displayName,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                balanceApiPath:
+                                                    _balanceApiPathCtrl.text
+                                                        .trim(),
+                                              ),
+                                            );
+                                            ProviderBalanceBadge.clearCacheFor(
+                                              widget.providerKey,
+                                            );
+                                          },
                                         ),
-                                        const SizedBox(height: 4),
-                                        row(
-                                          l10n.providerDetailPageBalanceTitle,
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.end,
-                                            children: [
-                                              Flexible(
-                                                child: Align(
-                                                  alignment:
-                                                      Alignment.centerRight,
-                                                  child: ConstrainedBox(
-                                                    constraints:
-                                                        const BoxConstraints(
-                                                          minWidth: 72,
-                                                          maxWidth: 120,
-                                                        ),
-                                                    child: ProviderBalanceBadge(
-                                                      providerKey:
-                                                          widget.providerKey,
-                                                      displayName:
-                                                          widget.displayName,
-                                                      color: cs.primary,
-                                                    ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ProviderBalanceRequestEditor(
+                                        method: cfgNow.balanceMethod,
+                                        headers: cfgNow.balanceHeaders,
+                                        bodyController: _balanceBodyCtrl,
+                                        onMethodChanged: (value) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(balanceMethod: value),
+                                          );
+                                          ProviderBalanceBadge.clearCacheFor(
+                                            widget.providerKey,
+                                          );
+                                        },
+                                        onHeadersChanged: (headers) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              balanceHeaders: headers,
+                                            ),
+                                          );
+                                          ProviderBalanceBadge.clearCacheFor(
+                                            widget.providerKey,
+                                          );
+                                        },
+                                        onBodyChanged: (_) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              balanceBody:
+                                                  _balanceBodyCtrl.text,
+                                            ),
+                                          );
+                                          ProviderBalanceBadge.clearCacheFor(
+                                            widget.providerKey,
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(height: 4),
+                                      row(
+                                        l10n.providerDetailPageBalanceResultPathLabel,
+                                        TextField(
+                                          key: const ValueKey(
+                                            'provider-balance-result-path',
+                                          ),
+                                          controller: _balanceResultPathCtrl,
+                                          style: TextStyle(fontSize: 13),
+                                          decoration: _proxyInputDecoration(
+                                            ctx,
+                                          ),
+                                          onChanged: (_) async {
+                                            if (_balanceResultPathCtrl
+                                                .value
+                                                .composing
+                                                .isValid) {
+                                              return;
+                                            }
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                  defaultName:
+                                                      widget.displayName,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                balanceResultPath:
+                                                    _balanceResultPathCtrl.text
+                                                        .trim(),
+                                              ),
+                                            );
+                                            ProviderBalanceBadge.clearCacheFor(
+                                              widget.providerKey,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      row(
+                                        l10n.providerDetailPageBalanceTitle,
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            Flexible(
+                                              child: Align(
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: ConstrainedBox(
+                                                  constraints:
+                                                      const BoxConstraints(
+                                                        minWidth: 72,
+                                                        maxWidth: 120,
+                                                      ),
+                                                  child: ProviderBalanceBadge(
+                                                    providerKey:
+                                                        widget.providerKey,
+                                                    displayName:
+                                                        widget.displayName,
+                                                    color: cs.primary,
                                                   ),
                                                 ),
                                               ),
-                                              const SizedBox(width: 6),
-                                              Tooltip(
-                                                message: l10n
-                                                    .providerDetailPageBalanceResetDefaultsTooltip,
-                                                child: _IconBtn(
-                                                  icon: lucide.Lucide.RotateCcw,
-                                                  color: cs.onSurface
-                                                      .withValues(alpha: 0.78),
-                                                  onTap: () async {
-                                                    _syncControllerText(
-                                                      _balanceBodyCtrl,
-                                                      balanceDefaults
-                                                          .balanceBody,
-                                                    );
-                                                    _syncControllerText(
-                                                      _balanceApiPathCtrl,
-                                                      balanceDefaults
-                                                              .balanceApiPath ??
-                                                          '',
-                                                    );
-                                                    _syncControllerText(
-                                                      _balanceResultPathCtrl,
-                                                      balanceDefaults
-                                                              .balanceResultPath ??
-                                                          '',
-                                                    );
-                                                    final old = spWatch
-                                                        .getProviderConfig(
-                                                          widget.providerKey,
-                                                          defaultName: widget
-                                                              .displayName,
-                                                        );
-                                                    await spWatch.setProviderConfig(
-                                                      widget.providerKey,
-                                                      old.copyWith(
-                                                        balanceMethod:
-                                                            balanceDefaults
-                                                                .balanceMethod,
-                                                        balanceHeaders:
-                                                            balanceDefaults
-                                                                .balanceHeaders,
-                                                        balanceBody:
-                                                            balanceDefaults
-                                                                .balanceBody,
-                                                        balanceEnabled:
-                                                            balanceDefaults
-                                                                .balanceEnabled ??
-                                                            false,
-                                                        balanceApiPath:
-                                                            _balanceApiPathCtrl
-                                                                .text
-                                                                .trim(),
-                                                        balanceResultPath:
-                                                            _balanceResultPathCtrl
-                                                                .text
-                                                                .trim(),
-                                                      ),
-                                                    );
-                                                    ProviderBalanceBadge.clearCacheFor(
-                                                      widget.providerKey,
-                                                    );
-                                                    if (mounted) {
-                                                      setState(() {});
-                                                    }
-                                                  },
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Tooltip(
+                                              message: l10n
+                                                  .providerDetailPageBalanceResetDefaultsTooltip,
+                                              child: _IconBtn(
+                                                icon: lucide.Lucide.RotateCcw,
+                                                color: cs.onSurface.withValues(
+                                                  alpha: 0.78,
                                                 ),
+                                                onTap: () async {
+                                                  _syncControllerText(
+                                                    _balanceBodyCtrl,
+                                                    balanceDefaults.balanceBody,
+                                                  );
+                                                  _syncControllerText(
+                                                    _balanceApiPathCtrl,
+                                                    balanceDefaults
+                                                            .balanceApiPath ??
+                                                        '',
+                                                  );
+                                                  _syncControllerText(
+                                                    _balanceResultPathCtrl,
+                                                    balanceDefaults
+                                                            .balanceResultPath ??
+                                                        '',
+                                                  );
+                                                  final old = spWatch
+                                                      .getProviderConfig(
+                                                        widget.providerKey,
+                                                        defaultName:
+                                                            widget.displayName,
+                                                      );
+                                                  await spWatch.setProviderConfig(
+                                                    widget.providerKey,
+                                                    old.copyWith(
+                                                      balanceMethod:
+                                                          balanceDefaults
+                                                              .balanceMethod,
+                                                      balanceHeaders:
+                                                          balanceDefaults
+                                                              .balanceHeaders,
+                                                      balanceBody:
+                                                          balanceDefaults
+                                                              .balanceBody,
+                                                      balanceEnabled:
+                                                          balanceDefaults
+                                                              .balanceEnabled ??
+                                                          false,
+                                                      balanceApiPath:
+                                                          _balanceApiPathCtrl
+                                                              .text
+                                                              .trim(),
+                                                      balanceResultPath:
+                                                          _balanceResultPathCtrl
+                                                              .text
+                                                              .trim(),
+                                                    ),
+                                                  );
+                                                  ProviderBalanceBadge.clearCacheFor(
+                                                    widget.providerKey,
+                                                  );
+                                                  if (mounted) {
+                                                    setState(() {});
+                                                  }
+                                                },
                                               ),
-                                              const SizedBox(width: 4),
-                                              Tooltip(
-                                                message: _balanceLoading
-                                                    ? l10n.providerDetailPageBalanceQuerying
-                                                    : l10n.providerDetailPageBalanceQueryButton,
-                                                child: _IconBtn(
-                                                  icon: _balanceLoading
-                                                      ? lucide.Lucide.Loader
-                                                      : lucide
-                                                            .Lucide
-                                                            .RefreshCcwDot,
-                                                  color: cs.primary,
-                                                  onTap: () =>
-                                                      _queryProviderBalance(
-                                                        context,
-                                                      ),
-                                                ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Tooltip(
+                                              message: _balanceLoading
+                                                  ? l10n.providerDetailPageBalanceQuerying
+                                                  : l10n.providerDetailPageBalanceQueryButton,
+                                              child: _IconBtn(
+                                                icon: _balanceLoading
+                                                    ? lucide.Lucide.Loader
+                                                    : lucide
+                                                          .Lucide
+                                                          .RefreshCcwDot,
+                                                color: cs.primary,
+                                                onTap: () =>
+                                                    _queryProviderBalance(
+                                                      context,
+                                                    ),
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                  crossFadeState: balanceEnabledNow
-                                      ? CrossFadeState.showSecond
-                                      : CrossFadeState.showFirst,
-                                  duration: const Duration(milliseconds: 180),
-                                  sizeCurve: Curves.easeOutCubic,
                                 ),
-                              ],
+                                crossFadeState: balanceEnabledNow
+                                    ? CrossFadeState.showSecond
+                                    : CrossFadeState.showFirst,
+                                duration: const Duration(milliseconds: 180),
+                                sizeCurve: Curves.easeOutCubic,
+                              ),
                               const SizedBox(height: 4),
                               if (_isAihubmix(cfgNow))
                                 row(

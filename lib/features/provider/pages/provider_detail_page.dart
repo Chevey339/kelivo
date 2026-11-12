@@ -865,7 +865,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   },
                 ),
               ),
-            if (_kind == ProviderKind.openai) _buildBalanceEntry(context),
+            _buildBalanceEntry(context),
             if (_kind == ProviderKind.google)
               _iosRow(
                 context,
