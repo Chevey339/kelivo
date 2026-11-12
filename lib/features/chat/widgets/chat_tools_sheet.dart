@@ -226,7 +226,7 @@ class _ChatToolsSheetState extends State<ChatToolsSheet> {
 ///
 /// The header borrows the tile's own geometry so the sheet reads as three
 /// columns and nothing else: the disclosure chevron sits in the tiles' 20px
-/// icon column, the title on their label baseline, and the folded summary ends
+/// icon column, the title on their label baseline, and the summary ends
 /// on the same right edge as every switch and chevron below it.
 class _ToolsGroup extends StatelessWidget {
   const _ToolsGroup({
@@ -307,9 +307,7 @@ class _ToolsGroup extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (!expanded &&
-                        summaryText != null &&
-                        summaryText.isNotEmpty)
+                    if (summaryText != null && summaryText.isNotEmpty)
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 160),
                         child: Text(
@@ -668,7 +666,7 @@ class _WorkspaceGroup extends StatelessWidget {
       key: ChatToolsSheet.workspaceGroupKey,
       title: l10n.workspacesTitle,
       // Only read while folded, where the section's own first row is hidden.
-      summary: _boundName(context),
+      summary: expanded ? null : _boundName(context),
       expanded: expanded,
       onToggle: onToggle,
       children: [

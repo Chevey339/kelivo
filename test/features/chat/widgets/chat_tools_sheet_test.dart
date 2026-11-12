@@ -467,7 +467,7 @@ void main() {
     expect(find.text(l10n.assistantEditPageLocalToolsTab), findsOneWidget);
   });
 
-  testWidgets('unfolding a group swaps its summary for the rows', (
+  testWidgets('unfolding local tools keeps the count alongside the rows', (
     tester,
   ) async {
     final l10n = await pumpSheet(tester);
@@ -479,8 +479,8 @@ void main() {
 
     expect(
       find.text(count),
-      findsNothing,
-      reason: 'an open group shows its rows instead of a summary',
+      findsOneWidget,
+      reason: 'the enabled count stays visible while choosing tools',
     );
     expect(
       find.byKey(ChatToolsSheet.localToolKey(LocalToolNames.timeInfo)),
@@ -542,7 +542,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The count is the folded header's summary, so fold the group to read it.
+    expect(
+      find.text('2/${availableLocalToolIds().length + 1}'),
+      findsOneWidget,
+      reason: 'the count updates while the local tools remain expanded',
+    );
+
     await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
     await tester.pumpAndSettle();
     expect(
@@ -557,9 +562,14 @@ void main() {
   });
 
   testWidgets('MCP servers toggle the assistant selection', (tester) async {
-    await pumpSheet(tester, servers: [_server('s1', 'Alpha')]);
+    final l10n = await pumpSheet(tester, servers: [_server('s1', 'Alpha')]);
 
-    expect(find.byKey(ChatToolsSheet.mcpGroupKey), findsOneWidget);
+    final header = find.byKey(ChatToolsSheet.mcpGroupKey);
+    expect(header, findsOneWidget);
+    expect(
+      find.descendant(of: header, matching: find.text('0/1')),
+      findsOneWidget,
+    );
     final row = find.byKey(ChatToolsSheet.mcpServerKey('s1'));
     expect(row, findsOneWidget);
     expect(find.text('Alpha'), findsOneWidget);
@@ -576,9 +586,29 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 100)),
     );
     await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: header, matching: find.text('1/1')),
+      findsOneWidget,
+    );
     await tester.tap(row);
     await tester.pumpAndSettle();
     expect(assistants.getById(assistantId)!.mcpServerIds, isEmpty);
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: header, matching: find.text('0/1')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text(l10n.mcpAssistantSheetTitle));
+    await tester.pumpAndSettle();
+    expect(row, findsNothing);
+    expect(
+      find.descendant(of: header, matching: find.text('0/1')),
+      findsOneWidget,
+    );
   });
 
   for (final desktop in [false, true]) {
@@ -616,6 +646,12 @@ void main() {
         }
         expect(find.byKey(inheritKey), desktop ? findsOneWidget : findsNothing);
         expect(find.textContaining(l10n.mcpSelectionInherited), findsWidgets);
+        if (!desktop) {
+          expect(
+            find.text('${l10n.mcpSelectionInherited} · 1/2'),
+            findsOneWidget,
+          );
+        }
         final beta = find.byKey(
           desktop
               ? const ValueKey('desktop-tools-mcp-s2')
@@ -628,6 +664,9 @@ void main() {
         expect(ConversationMcpSettings.isOverridden(chat.conversation), isTrue);
         expect(assistants.getById(assistantId)!.mcpServerIds, ['s1']);
         expect(find.textContaining(l10n.mcpSelectionCustom), findsWidgets);
+        if (!desktop) {
+          expect(find.text('${l10n.mcpSelectionCustom} · 2/2'), findsOneWidget);
+        }
 
         await tester.tap(
           find.byKey(
@@ -639,6 +678,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(chat.conversation!.mcpServerIds, isEmpty);
         expect(ConversationMcpSettings.isOverridden(chat.conversation), isTrue);
+        if (!desktop) {
+          expect(find.text('${l10n.mcpSelectionCustom} · 0/2'), findsOneWidget);
+        }
         if (desktop) {
           await tester.tap(find.text('Open tools'));
           await tester.pumpAndSettle();
@@ -696,6 +738,12 @@ void main() {
           ['s1'],
         );
         expect(assistants.getById(assistantId)!.mcpServerIds, ['s1']);
+        if (!desktop) {
+          expect(
+            find.text('${l10n.mcpSelectionInherited} · 1/2'),
+            findsOneWidget,
+          );
+        }
       },
     );
   }
@@ -708,12 +756,32 @@ void main() {
     expect(find.byKey(WorkspaceSection.bindKey), findsOneWidget);
   });
 
-  testWidgets('folding the workspace group hides its rows', (tester) async {
-    final l10n = await pumpSheet(tester);
+  testWidgets('workspace name appears once when expanded or folded', (
+    tester,
+  ) async {
+    final workspace = (await tester.runAsync(
+      () => workspaces.create(name: 'Test workspace'),
+    ))!;
+    final l10n = await pumpSheet(
+      tester,
+      conversation: Conversation(
+        title: 'Chat',
+        extras: WorkspaceBinding(workspaceId: workspace.id).applyTo({}),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(workspace.name), findsOneWidget);
+    expect(find.byType(WorkspaceSection), findsOneWidget);
 
     await tester.tap(find.text(l10n.workspacesTitle));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(WorkspaceSection.bindKey), findsNothing);
+    expect(find.byType(WorkspaceSection), findsNothing);
+    expect(find.text(workspace.name), findsOneWidget);
+
+    await tester.tap(find.text(l10n.workspacesTitle));
+    await tester.pumpAndSettle();
+    expect(find.byType(WorkspaceSection), findsOneWidget);
+    expect(find.text(workspace.name), findsOneWidget);
   });
 }
