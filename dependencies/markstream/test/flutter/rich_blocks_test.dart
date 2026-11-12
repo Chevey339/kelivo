@@ -304,6 +304,68 @@ void main() {
     );
   });
   testWidgets(
+    'virtual code shares full-source syntax and inherits styles across chunks',
+    (tester) async {
+      final code = List.generate(1200, (i) => 'line$i 中😀').join('\n');
+      final highlighter = _Highlighter();
+      await tester.pumpWidget(
+        host(
+          MarkstreamView(
+            source: '```html\n$code\n```',
+            codeHighlighter: highlighter,
+          ),
+          selectable: true,
+        ),
+      );
+      expect(highlighter.requests, hasLength(1));
+      expect(highlighter.requests.single.$1, code);
+      // A single syntax scope spans every rendering chunk, with nested emphasis.
+      highlighter.requests.single.$2.complete(
+        TextSpan(
+          style: const TextStyle(color: Colors.red),
+          children: [
+            TextSpan(
+              text: code,
+              style: const TextStyle(fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      final first = paragraph('line0');
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const ValueKey('markstream-virtualized-code')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      tester
+          .state<ScrollableState>(scrollable)
+          .position
+          .jumpTo(first.preferredLineHeight * 195);
+      await tester.pumpAndSettle();
+      final next = paragraph('line200');
+      expect(next.text.toPlainText(), startsWith('line200 中😀\nline201 中😀'));
+      final styles = <TextStyle>[];
+      next.text.visitChildren((span) {
+        if (span is TextSpan &&
+            span.text?.isNotEmpty == true &&
+            span.style != null)
+          styles.add(span.style!);
+        return true;
+      });
+      expect(styles, isNotEmpty);
+      expect(
+        styles.every(
+          (s) => s.color == Colors.red && s.fontStyle == FontStyle.italic,
+        ),
+        isTrue,
+      );
+      expect(highlighter.requests, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
     'an early expansion follows a growing code anchor across remount',
     (tester) async {
       final store = CodeExpansionState();

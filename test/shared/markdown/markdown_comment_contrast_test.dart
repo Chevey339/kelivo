@@ -18,8 +18,8 @@ double contrast(Color foreground, Color background) {
   return a >= b ? (a + .05) / (b + .05) : (b + .05) / (a + .05);
 }
 
-Color commentColor(MarkstreamTheme theme) {
-  final span = KelivoCodeHighlighter.forTheme(theme).highlight(
+Future<Color> commentColor(MarkstreamTheme theme) async {
+  final span = await KelivoCodeHighlighter.forTheme(theme).highlight(
     '// comment',
     language: 'dart',
     style: theme.code.text,
@@ -35,18 +35,21 @@ Color commentColor(MarkstreamTheme theme) {
       .color!;
 }
 
-void main() {
+void main() async {
   for (final dark in [false, true]) {
     final scheme = dark
         ? ThemePalettes.defaultPalette.dark
         : ThemePalettes.defaultPalette.light;
     test(
       'default palette contrast guards across all mask steps, dark=$dark',
-      () {
+      () async {
         final plain = MarkstreamTheme.fromColorScheme(scheme);
-        expect(commentColor(plain), Color(dark ? 0xff9da5b0 : 0xff57606a));
         expect(
-          contrast(commentColor(plain), plain.colors.fillBlockOpaque),
+          await commentColor(plain),
+          Color(dark ? 0xff9da5b0 : 0xff57606a),
+        );
+        expect(
+          contrast(await commentColor(plain), plain.colors.fillBlockOpaque),
           greaterThanOrEqualTo(4.5),
         );
         for (var step = 0; step <= 40; step++) {
@@ -55,7 +58,10 @@ void main() {
             backdrop: MarkstreamBackdrop.wallpaper,
             maskStrength: step / 20,
           );
-          expect(commentColor(theme), Color(dark ? 0xffbdc5d0 : 0xff4a525c));
+          expect(
+            await commentColor(theme),
+            Color(dark ? 0xffbdc5d0 : 0xff4a525c),
+          );
           for (final background in [
             Colors.black,
             Colors.white,
@@ -69,7 +75,7 @@ void main() {
               reason: label,
             );
             expect(
-              contrast(commentColor(theme), block),
+              contrast(await commentColor(theme), block),
               greaterThanOrEqualTo(4.5),
               reason: label,
             );
@@ -94,18 +100,19 @@ void main() {
     ]) {
       test(
         'muted classes retain emphasis and source: ${source.$1}, dark=$dark',
-        () {
+        () async {
           final theme = MarkstreamTheme.fromColorScheme(scheme);
-          final result = KelivoCodeHighlighter.forTheme(theme).highlight(
+          final result = await KelivoCodeHighlighter.forTheme(theme).highlight(
             source.$2,
             language: source.$1,
             style: theme.code.text,
             brightness: theme.brightness,
           );
           expect(result.toPlainText(), source.$2);
+          final mutedColor = await commentColor(theme);
           final muted = spans(
             result,
-          ).where((s) => s.style?.color == commentColor(theme));
+          ).where((s) => s.style?.color == mutedColor);
           expect(muted, isNotEmpty);
           for (final span in muted) {
             if (source.$1 != 'bash') {
@@ -121,7 +128,7 @@ void main() {
   }
   test(
     'backdrop restyling reuses cached syntax and canonical highlighters',
-    () {
+    () async {
       debugResetHighlightNodeCache();
       for (final backdrop in MarkstreamBackdrop.values) {
         final theme = MarkstreamTheme.fromColorScheme(
@@ -136,7 +143,7 @@ void main() {
           ),
           isTrue,
         );
-        final result = highlighter.highlight(
+        final result = await highlighter.highlight(
           '// comment\nfinal x = "text";',
           language: 'dart',
           style: theme.code.text,

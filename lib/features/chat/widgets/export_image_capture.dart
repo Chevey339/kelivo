@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:markstream/markstream.dart';
 
 import '../utils/export_image_processor.dart';
 
@@ -130,6 +131,8 @@ Future<ProcessedExportImage> captureExportWidget(
       await WidgetsBinding.instance.endOfFrame;
     }
     await Future<void>.delayed(const Duration(milliseconds: 500));
+    await MarkstreamCodeContent.waitForHighlighting(contentKey.currentContext!);
+    await WidgetsBinding.instance.endOfFrame;
     final content = contentKey.currentContext!.findRenderObject()! as RenderBox;
     final size = content.size;
     if (size.isEmpty) throw StateError('Empty export content');

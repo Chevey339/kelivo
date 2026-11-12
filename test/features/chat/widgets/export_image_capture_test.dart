@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:markstream/markstream.dart';
 import 'package:Kelivo/features/chat/utils/export_image_processor.dart';
 import 'package:Kelivo/features/chat/widgets/export_image_capture.dart';
 import 'package:Kelivo/features/chat/widgets/image_preview_sheet.dart';
@@ -10,7 +11,81 @@ import 'package:Kelivo/features/chat/widgets/message_export_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'dart:io';
 
+class _PendingHighlighter implements CodeHighlighter {
+  final result = Completer<TextSpan>();
+  @override
+  Future<TextSpan> highlight(
+    String source, {
+    required String language,
+    required TextStyle style,
+    required Brightness brightness,
+  }) => result.future;
+}
+
 void main() {
+  testWidgets(
+    'image export waits for its code syntax before capturing pixels',
+    (tester) async {
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (value) {
+              context = value;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      final highlighter = _PendingHighlighter();
+      var capturing = false;
+      ProcessedExportImage? result;
+      Object? failure;
+      unawaited(
+        captureExportWidget(
+              context,
+              MarkstreamView(
+                source: '```dart\nconst value = 1;\n```',
+                exporting: true,
+                codeHighlighter: highlighter,
+              ),
+              theme: ThemeData(),
+              width: 240,
+              pixelRatio: 1,
+              onProgress: (progress) {
+                capturing |= progress.stage == ExportImageStage.capturing;
+              },
+            )
+            .then((value) {
+              result = value;
+            })
+            .catchError((Object error) {
+              failure = error;
+            }),
+      );
+      for (var i = 0; i < 80; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(capturing, isFalse);
+      highlighter.result.complete(
+        const TextSpan(
+          text: 'const value = 1;',
+          style: TextStyle(color: Color(0xff11ee77)),
+        ),
+      );
+      for (var i = 0; i < 400 && result == null && failure == null; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      expect(failure, isNull);
+      expect(result, isNotNull);
+      final image = img.decodePng(result!.pngBytes)!;
+      expect(image.any((p) => p.r == 17 && p.g == 238 && p.b == 119), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets(
     'export progress shows real slice counts and indeterminate encoding',
     (tester) async {
