@@ -30,10 +30,8 @@ class ToolResultContent {
     }
     final imageUris = mcpResultImageUris(readMcpResultMetadata(metadata));
     if (imageUris.isEmpty) return ToolResultContent(content);
-    if (name == 'read_chat_image' &&
-        (imageContext == null ||
-            !RequestImageContext.isReadImageResult(name, metadata) ||
-            !imageUris.every(imageContext.ownsUri))) {
+    if (RequestImageContext.isReadImageResult(name, metadata) &&
+        (imageContext == null || !imageUris.every(imageContext.ownsUri))) {
       return const ToolResultContent(
         'Image is unavailable in the current conversation context.',
       );

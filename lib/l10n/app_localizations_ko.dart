@@ -9513,6 +9513,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolSchemaSettingsGroupSearch => '검색';
 
   @override
+  String get toolSchemaSettingsGroupImages => '이미지';
+
+  @override
   String get toolSchemaSettingsGroupMemory => '메모리';
 
   @override
@@ -15429,7 +15432,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get imageContextAllowRecallDescription =>
-      '모델이 필요할 때 이 대화의 이미지를 가져올 수 있도록 합니다. 이 기능을 끄더라도 자동 이미지 관리는 변경되지 않습니다.';
+      'view_image가 필요할 때 이 대화의 이전 이미지를 다시 불러올 수 있도록 합니다. 이 기능을 끄더라도 메시지와 함께 직접 전송된 이미지, 자동 이미지 관리, 작업 공간 파일 접근에는 영향을 주지 않습니다.';
 
   @override
   String get imageContextTitle => '이미지 컨텍스트';

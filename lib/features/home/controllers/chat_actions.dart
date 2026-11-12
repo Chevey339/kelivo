@@ -1,3 +1,4 @@
+import '../../../core/services/tools/view_image_tool.dart';
 import '../../../core/models/image_context.dart';
 import '../../chat/utils/image_context_budget_error.dart';
 import '../../chat/utils/image_generation_error.dart';
@@ -2626,7 +2627,9 @@ class ChatActions {
         ctx.onToolCall != null &&
         spec.abilities.contains(ModelAbility.tool) &&
         ctx.toolDefs.any(
-          (tool) => (tool['function'] as Map?)?['name'] != 'read_chat_image',
+          (tool) =>
+              (tool['function'] as Map?)?['name'] != 'view_image' ||
+              ViewImageTool.supportsFiles(tool),
         );
     if (canRead) {
       final reader = ChatContextReader(() async {

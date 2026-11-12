@@ -66,7 +66,7 @@ void main() {
         ],
       });
       expect(jsonEncode(body), contains('unavailable'));
-      expect(jsonEncode(body), isNot(contains('Use read_chat_image')));
+      expect(jsonEncode(body), isNot(contains('Use view_image')));
       expect(context.readImage(entry.handle).metadata, isNull);
     },
   );
@@ -133,7 +133,7 @@ void main() {
       );
       final restored = context.readImage(entry.handle);
       final refs = context.toolReferences(
-        'read_chat_image',
+        'view_image',
         [entry.uri],
         restored.metadata,
         'read',
@@ -313,7 +313,7 @@ void main() {
       final recalled = context.readImage(original.handle);
       await context.run(() async* {
         final result = await ToolResultContent.read(
-          'read_chat_image',
+          'view_image',
           recalled.content,
           metadata: recalled.metadata,
           toolCallId: 'second',

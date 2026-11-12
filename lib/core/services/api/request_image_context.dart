@@ -3,7 +3,10 @@ import 'request_history_context.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
+
+import 'package:crypto/crypto.dart';
 
 import '../../../features/intelligent_ui/host/ui_user_context_parts.dart';
 import '../../models/chat_message.dart';
@@ -16,6 +19,7 @@ import '../../utils/chat_image_result.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../mcp/mcp_image_snapshot.dart';
+import '../tools/view_image_tool.dart';
 import 'chat_api_helpers.dart';
 
 /// Kept out of prompts and removed before a provider serializes a request.
@@ -153,6 +157,8 @@ class RequestImageContext {
   final _byHandle = <String, ChatContextImage>{};
   final _loads = <String, Future<String?>>{};
   final _sizes = <String, Future<int?>>{};
+  final _localImageHashes = <String, Future<Digest?>>{};
+  final _inlineImageHashes = <String, Future<Digest?>>{};
   final _unavailableSources = <String>{};
   final _parsedText = Expando<String>();
 
@@ -242,7 +248,11 @@ class RequestImageContext {
             final call = (event['id'] ?? 'part:$ordinal').toString();
             for (var i = 0; i < uris.length; i++) {
               final restored = readChatImageMetadata(name, metadata);
-              if (name == 'read_chat_image' && restored == null) continue;
+              if (name == 'view_image' &&
+                  metadata?['chatImage'] != null &&
+                  restored == null) {
+                continue;
+              }
               out.add(
                 ChatContextImage(
                   identity: ContextImageIdentity(message.id, 'tool:$call', i),
@@ -511,7 +521,11 @@ class RequestImageContext {
     String? callId,
   ) {
     final restored = readChatImageMetadata(name, metadata);
-    if (name == 'read_chat_image' && restored == null) return [];
+    if (name == 'view_image' &&
+        metadata?['chatImage'] != null &&
+        restored == null) {
+      return [];
+    }
     final owner =
         metadata?[imageContextOwnerKey]?.toString() ?? targetMessageId;
     final call =
@@ -581,7 +595,7 @@ class RequestImageContext {
             !allowedMessages.contains(source.identity.messageId))) {
       return ClientToolResult(
         'Image is unavailable in the current conversation context. '
-        '${hasRecallableImages ? 'Call read_chat_image without image_id to list available images.' : 'Ask the user to attach it again.'}',
+        '${hasRecallableImages ? 'Call view_image without image_id to list available images.' : 'Ask the user to attach it again.'}',
       );
     }
     return ClientToolResult(
@@ -619,7 +633,7 @@ class RequestImageContext {
         canImageInput && viewImageUris.contains(_byHandle[handle]?.uri)
         ? 'Use view_image on the attached Path when needed.'
         : hasRecallableImages
-        ? 'Use read_chat_image with this image_id when needed.'
+        ? 'Use view_image with this image_id when needed.'
         : 'Ask the user to attach it again if needed.';
     return '[Image $handle omitted. $instruction]';
   }
@@ -693,6 +707,69 @@ class RequestImageContext {
     return stat.type == FileSystemEntityType.file
         ? ImageContextPlanner.base64Bytes(stat.size)
         : null;
+  });
+
+  /// Native compaction can retain encoded pixels without their local reference.
+  /// Only compare local candidates of matching size. If any readable image is
+  /// definitely absent, recall is still needed and no content hashing is needed.
+  Future<void> _includeInlineImageSources(
+    Set<String> externalUrls,
+    Set<String> included,
+  ) async {
+    final inlineBySize = <int, List<String>>{};
+    for (final url in externalUrls) {
+      if (!url.startsWith('data:image/')) continue;
+      final comma = url.indexOf(',');
+      if (comma < 0 || !url.substring(0, comma).endsWith(';base64')) continue;
+      inlineBySize.putIfAbsent(wireImageBytes(url), () => []).add(url);
+    }
+    if (inlineBySize.isEmpty) return;
+
+    final candidates = <int, List<ChatContextImage>>{};
+    for (final image in images) {
+      final sourceKey = image.materializationKey ?? image.key;
+      if (included.contains(sourceKey) || _isUnavailable(image)) continue;
+      // Do not fetch remote images merely to discover whether they are visible.
+      if (image.uri.startsWith('data:') || isRemoteHttpUrl(image.uri)) return;
+      try {
+        final size = await estimatedBytes(image);
+        if (size == null || !inlineBySize.containsKey(size)) return;
+        candidates.putIfAbsent(size, () => []).add(image);
+      } on FileSystemException {
+        return;
+      }
+    }
+    for (final group in candidates.entries) {
+      final inlineHashes = (await Future.wait([
+        for (final url in inlineBySize[group.key]!)
+          _inlineImageHashes.putIfAbsent(url, () => _hashInlineImage(url)),
+      ])).whereType<Digest>().toSet();
+      for (final image in group.value) {
+        final sourceKey = image.materializationKey ?? image.key;
+        final hash = await _localImageHashes.putIfAbsent(sourceKey, () async {
+          try {
+            final file = await _localAssetFile(image);
+            return file == null
+                ? null
+                : await sha256.bind(file.openRead()).first;
+          } on FileSystemException {
+            return null;
+          }
+        });
+        if (hash == null || !inlineHashes.contains(hash)) return;
+        included.add(sourceKey);
+      }
+    }
+  }
+
+  // Capture only the immutable URL, never the generation's context/asset cache.
+  static Future<Digest?> _hashInlineImage(String url) => Isolate.run(() {
+    try {
+      return sha256.convert(UriData.parse(url).contentAsBytes());
+    } on FormatException {
+      // Opaque provider content must still be sent unchanged.
+      return null;
+    }
   });
 
   Future<Set<String>> historyOmissions() async {
@@ -1094,6 +1171,12 @@ class RequestImageContext {
     // The deterministic history replay owns eviction. The final wire check is
     // a hard guard, so a changing text size cannot silently resurrect images.
     final toolNotes = <String, List<String>>{};
+    final externalUrls = external.values.toSet();
+    final includedImageSources = <String>{
+      for (final image in images)
+        if (externalUrls.contains(image.uri))
+          image.materializationKey ?? image.key,
+    };
     lastRequestImageCount = 0;
     final projected = _mapBody(body, (part, url) {
       final handle = referenceHandle(url);
@@ -1105,6 +1188,7 @@ class RequestImageContext {
       final resolved = urls[handle];
       if (entry != null && !omitted.contains(entry.key) && resolved != null) {
         lastRequestImageCount++;
+        includedImageSources.add(entry.materializationKey ?? entry.key);
         return _replaceImage(part, resolved);
       }
       final text = omittedText(
@@ -1185,7 +1269,23 @@ class RequestImageContext {
       );
       projected['messages'] = messages;
     }
-    final projectedTools = _projectTools(projected, this);
+    if (canRecall &&
+        body['tools'] is List &&
+        (body['tools'] as List).any(
+          (tool) => tool is Map && _containsRecallTool(tool),
+        ) &&
+        images.any(
+          (image) => !includedImageSources.contains(
+            image.materializationKey ?? image.key,
+          ),
+        )) {
+      await _includeInlineImageSources(externalUrls, includedImageSources);
+    }
+    final projectedTools = _projectTools(
+      projected,
+      this,
+      includedImageSources: includedImageSources,
+    );
     return _validateProjectedBody(
       projectedTools,
       preserveSources: preserveSources,
@@ -1260,8 +1360,18 @@ class RequestImageContext {
   static List<Map<String, dynamic>> toolsForRequest(
     List<Map<String, dynamic>> tools, {
     required RequestImageContext? imageContext,
+    Set<String> includedImageSources = const {},
   }) {
-    if (imageContext?.hasRecallableImages == true) return tools;
+    if (imageContext?.canRecall == true &&
+        imageContext!.images.any(
+          (image) =>
+              !imageContext._isUnavailable(image) &&
+              !includedImageSources.contains(
+                image.materializationKey ?? image.key,
+              ),
+        )) {
+      return tools;
+    }
     return [
       for (final tool in tools)
         if (_withoutRecallTool(tool) case final filtered?) filtered,
@@ -1269,12 +1379,21 @@ class RequestImageContext {
   }
 
   static bool _isRecallTool(Map tool) =>
-      tool['name'] == 'read_chat_image' ||
-      (tool['function'] is Map &&
-          tool['function']['name'] == 'read_chat_image');
+      tool['name'] == 'view_image' ||
+      (tool['function'] is Map && tool['function']['name'] == 'view_image');
+
+  static bool _containsRecallTool(Map tool) =>
+      _isRecallTool(tool) ||
+      ['function_declarations', 'functionDeclarations'].any(
+        (key) =>
+            tool[key] is List &&
+            (tool[key] as List).any(
+              (declaration) => declaration is Map && _isRecallTool(declaration),
+            ),
+      );
 
   static Map<String, dynamic>? _withoutRecallTool(Map<String, dynamic> tool) {
-    if (_isRecallTool(tool)) return null;
+    if (_isRecallTool(tool)) return ViewImageTool.withoutHistory(tool);
     var result = tool;
     for (final key in ['function_declarations', 'functionDeclarations']) {
       final declarations = tool[key];
@@ -1284,7 +1403,13 @@ class RequestImageContext {
       }
       final filtered = [
         for (final declaration in declarations)
-          if (declaration is! Map || !_isRecallTool(declaration)) declaration,
+          if (declaration is! Map)
+            declaration
+          else if (ViewImageTool.withoutHistory(
+                declaration.cast<String, dynamic>(),
+              )
+              case final kept?)
+            kept,
       ];
       result = {...result}..remove(key);
       if (filtered.isNotEmpty) result[key] = filtered;
@@ -1294,13 +1419,15 @@ class RequestImageContext {
 
   static Map<String, dynamic> _projectTools(
     Map<String, dynamic> body,
-    RequestImageContext? imageContext,
-  ) {
+    RequestImageContext? imageContext, {
+    Set<String> includedImageSources = const {},
+  }) {
     final candidates = body['tools'];
     if (candidates is! List) return body;
     final tools = toolsForRequest(
       candidates.cast<Map<String, dynamic>>(),
       imageContext: imageContext,
+      includedImageSources: includedImageSources,
     );
     if (tools.length == candidates.length &&
         Iterable<int>.generate(
@@ -1315,7 +1442,9 @@ class RequestImageContext {
     } else {
       result['tools'] = tools;
       final choice = result['tool_choice'];
-      if (choice is Map && _isRecallTool(choice)) {
+      if (choice is Map &&
+          _isRecallTool(choice) &&
+          !tools.any(_containsRecallTool)) {
         result.remove('tool_choice');
       }
     }

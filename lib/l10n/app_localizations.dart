@@ -17551,6 +17551,12 @@ abstract class AppLocalizations {
   /// **'Search'**
   String get toolSchemaSettingsGroupSearch;
 
+  /// Group heading in the mobile and desktop tool descriptions settings for the unified view_image tool, which can inspect conversation images or permitted workspace image files.
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get toolSchemaSettingsGroupImages;
+
   /// Group heading for memory-related built-in tools in the tool schema settings.
   ///
   /// In en, this message translates to:
@@ -18361,7 +18367,7 @@ abstract class AppLocalizations {
   /// **'Read file'**
   String get workspaceToolTitleReadFile;
 
-  /// Title for the view_image tool card.
+  /// Title for the view_image tool card and the image viewing entry in mobile and desktop chat tool menus.
   ///
   /// In en, this message translates to:
   /// **'View image'**
@@ -28074,16 +28080,16 @@ abstract class AppLocalizations {
   /// **'Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.'**
   String get recoveryCopiesNeedUpdate;
 
-  /// Setting card label in the image context panel; toggles whether the model may recall historical images.
+  /// Label for the conversation image recall switch in the image context panel and mobile/desktop chat tool menus. Controls the historical-image capability of view_image.
   ///
   /// In en, this message translates to:
   /// **'Allow the model to recall images'**
   String get imageContextAllowRecall;
 
-  /// Description under the recall setting; explains the model can retrieve conversation images on demand, independent of automatic management.
+  /// Description under the conversation image recall switch. Explains that view_image can retrieve historical chat images; disabling this does not disable direct vision on message attachments, automatic image management, or separately controlled workspace file access. Keep the tool name view_image unchanged.
   ///
   /// In en, this message translates to:
-  /// **'Let the model retrieve images from this conversation when needed. Turning this off does not change automatic image management.'**
+  /// **'Let view_image retrieve historical images from this conversation when needed. Turning this off does not affect images sent directly with messages, automatic image management, or workspace file access.'**
   String get imageContextAllowRecallDescription;
 
   /// Title/label for the image context feature, used in the context usage popover and context management sheet.

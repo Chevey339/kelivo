@@ -9959,6 +9959,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get toolSchemaSettingsGroupSearch => 'Поиск';
 
   @override
+  String get toolSchemaSettingsGroupImages => 'Изображения';
+
+  @override
   String get toolSchemaSettingsGroupMemory => 'Память';
 
   @override
@@ -10394,7 +10397,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get workspaceToolTitleReadFile => 'Прочитать файл';
 
   @override
-  String get workspaceToolTitleViewImage => 'Просмотреть изображение';
+  String get workspaceToolTitleViewImage => 'Просмотр изображения';
 
   @override
   String get workspaceToolTitleWriteFile => 'Записать файл';
@@ -16200,7 +16203,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get imageContextAllowRecallDescription =>
-      'Позволяет модели при необходимости получать изображения из этого чата. Отключение не влияет на автоматическое управление изображениями.';
+      'Разрешить view_image при необходимости извлекать исторические изображения из этого чата. Отключение не влияет на изображения, отправленные напрямую с сообщениями, автоматическое управление изображениями или доступ к файлам рабочей области.';
 
   @override
   String get imageContextTitle => 'Контекст изображений';

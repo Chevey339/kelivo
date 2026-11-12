@@ -9805,6 +9805,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolSchemaSettingsGroupSearch => 'Search';
 
   @override
+  String get toolSchemaSettingsGroupImages => 'Images';
+
+  @override
   String get toolSchemaSettingsGroupMemory => 'Memory';
 
   @override
@@ -15914,7 +15917,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imageContextAllowRecallDescription =>
-      'Let the model retrieve images from this conversation when needed. Turning this off does not change automatic image management.';
+      'Let view_image retrieve historical images from this conversation when needed. Turning this off does not affect images sent directly with messages, automatic image management, or workspace file access.';
 
   @override
   String get imageContextTitle => 'Image context';

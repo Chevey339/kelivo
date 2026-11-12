@@ -9872,6 +9872,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get toolSchemaSettingsGroupSearch => 'Arama';
 
   @override
+  String get toolSchemaSettingsGroupImages => 'Görseller';
+
+  @override
   String get toolSchemaSettingsGroupMemory => 'Bellek';
 
   @override
@@ -16005,11 +16008,11 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get imageContextAllowRecall =>
-      'Modelin görselleri hatırlamasına izin ver';
+      'Modelin görselleri geri çağırmasına izin ver';
 
   @override
   String get imageContextAllowRecallDescription =>
-      'Modelin gerektiğinde bu sohbetten görselleri almasına izin verin. Bunu kapatmak otomatik görsel yönetimini değiştirmez.';
+      'view_image aracının gerektiğinde bu sohbetten geçmiş görselleri almasına izin verir. Bunu kapatmak, mesajlarla doğrudan gönderilen görselleri, otomatik görsel yönetimini veya çalışma alanı dosya erişimini etkilemez.';
 
   @override
   String get imageContextTitle => 'Görsel bağlamı';

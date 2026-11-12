@@ -13,6 +13,7 @@ abstract final class BuiltInToolNames {
     SearchToolService.toolName,
     WebFetchToolService.toolName,
     'builtin_search',
+    // Prevent MCP tools from impersonating already saved image observations.
     'read_chat_image',
     'read_chat_context',
     ...MemoryTools.allToolNames,

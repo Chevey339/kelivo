@@ -1,3 +1,4 @@
+import '../../../core/services/tools/view_image_tool.dart';
 import '../../../core/models/native_compaction.dart';
 import '../../../core/models/compression_config.dart';
 import '../../../core/services/api/native_compaction_context.dart';
@@ -646,13 +647,8 @@ class MessageGenerationService {
       budget: cfg.requestBudgetForModel(modelId),
       historyBudget: cfg.defaultRequestBudget,
       canImageInput: spec.supportsImageInput,
-      canRecall: packed.toolDefs.any(
-        (t) => (t['function'] as Map?)?['name'] == 'read_chat_image',
-      ),
-      viewImageUris:
-          packed.toolDefs.any(
-            (t) => (t['function'] as Map?)?['name'] == 'view_image',
-          )
+      canRecall: packed.toolDefs.any(ViewImageTool.supportsHistory),
+      viewImageUris: packed.toolDefs.any(ViewImageTool.supportsFiles)
           ? {for (final file in packed.workspaceAttachments) file.sourceUri}
           : {},
     );

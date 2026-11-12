@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
+import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:image/image.dart' as img;
 // ignore: depend_on_referenced_packages
@@ -14,11 +16,18 @@ import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/services/api/tool_result_content.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/mcp_provider.dart';
+import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/features/home/services/tool_handler_service.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/mcp/mcp_image_snapshot.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 import '../../../support/claude_test_api.dart' show FakePathProviderPlatform;
+import '../../../support/business_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -72,7 +81,7 @@ void main() {
       upload: upload,
       event: {
         'id': 'read',
-        'name': 'read_chat_image',
+        'name': 'view_image',
         'arguments': {'image_id': context.images.single.handle},
         'content': result.content,
         'metadata': result.metadata,
@@ -83,6 +92,95 @@ void main() {
   Future<void> collectDueAssets() => service.runAssetMaintenance(
     now: DateTime.now().toUtc().add(const Duration(days: 8)),
   );
+
+  testWidgets('the live tool handler lists and reads a persisted attachment', (
+    tester,
+  ) async {
+    final source = (await tester.runAsync(uploadAndRead))!;
+    final target = (await tester.runAsync(
+      () => service.addMessage(
+        conversationId: source.upload.conversationId,
+        role: 'assistant',
+        content: '',
+      ),
+    ))!;
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    final mcp = McpProvider(preferences: createBusinessTestPreferences());
+    final tools = McpToolService();
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(assistants.dispose);
+    addTearDown(mcp.dispose);
+    addTearDown(tools.dispose);
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await assistants.loaded;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<ChatService>.value(value: service),
+          ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+          ChangeNotifierProvider<McpProvider>.value(value: mcp),
+          ChangeNotifierProvider<McpToolService>.value(value: tools),
+        ],
+        child: const SizedBox.shrink(),
+      ),
+    );
+    final handler =
+        ToolHandlerService(
+          contextProvider: tester.element(find.byType(SizedBox)),
+        ).buildToolCallHandler(
+          settings,
+          null,
+          conversationId: source.upload.conversationId,
+        )!;
+    final context = RequestImageContext(
+      settings: const ImageContextSettings(),
+      images: RequestImageContext.collect([source.upload]),
+      targetMessageId: target.id,
+    );
+    await tester.runAsync(
+      () => context.run(() async* {
+        final listed = ClientToolResult.fromHandler(
+          await handler('view_image', {}),
+        );
+        final images = (jsonDecode(listed.content) as Map)['images'] as List;
+        expect(images, hasLength(1));
+        final imageId = images.single['image_id'];
+        final guessed = ClientToolResult.fromHandler(
+          await handler('view_image', {'image_id': 'img_1'}),
+        );
+        expect(guessed.metadata, isNull);
+        final read = ClientToolResult.fromHandler(
+          await handler('view_image', {'image_id': imageId}),
+        );
+        expect(read.metadata, isNotNull);
+        final pixels = await ToolResultContent.read(
+          'view_image',
+          read.content,
+          metadata: read.metadata,
+        );
+        expect(pixels.imageUrls, hasLength(1));
+        final request = await context.project({
+          'input': [
+            {
+              'type': 'function_call_output',
+              'call_id': 'read',
+              'output': [
+                {'type': 'input_image', 'image_url': pixels.imageUrls.single},
+              ],
+            },
+          ],
+        });
+        expect(
+          request['input'][0]['output'][0]['image_url'],
+          startsWith('data:image/png;base64,'),
+        );
+        yield 0;
+      }).drain<void>(),
+    );
+  });
 
   for (final writer in ['parts', 'events', 'upsert']) {
     test(
@@ -102,7 +200,7 @@ void main() {
           await service.upsertToolEvent(
             saved.id,
             id: 'read',
-            name: 'read_chat_image',
+            name: 'view_image',
             arguments: source.event['arguments'] as Map<String, dynamic>,
             content: source.event['content'] as String,
             metadata: source.event['metadata'] as Map<String, dynamic>,
@@ -120,6 +218,28 @@ void main() {
       },
     );
   }
+
+  test(
+    'renaming the viewer preserves ownership of saved observations',
+    () async {
+      final source = await uploadAndRead();
+      final saved = await service.addMessage(
+        conversationId: source.upload.conversationId,
+        role: 'assistant',
+        parts: [
+          ToolCallPart(
+            jsonEncode({...source.event, 'name': 'read_chat_image'}),
+          ),
+        ],
+      );
+      final images = RequestImageContext.collect([saved]);
+      expect(images.single.materializationKey, contains(source.upload.id));
+      expect(images.single.workspaceSnapshot, isTrue);
+      await service.deleteMessage(source.upload.id);
+      await collectDueAssets();
+      expect(await source.file.exists(), isTrue);
+    },
+  );
 
   for (final preserveVersions in [false, true]) {
     test(
@@ -318,7 +438,7 @@ void main() {
         ToolCallPart(
           jsonEncode({
             'id': 'read',
-            'name': 'read_chat_image',
+            'name': 'view_image',
             'content': read.content,
             'metadata': read.metadata,
           }),

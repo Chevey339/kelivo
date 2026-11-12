@@ -9369,6 +9369,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolSchemaSettingsGroupSearch => '搜索';
 
   @override
+  String get toolSchemaSettingsGroupImages => '图片';
+
+  @override
   String get toolSchemaSettingsGroupMemory => '记忆';
 
   @override
@@ -15105,7 +15108,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get imageContextAllowRecallDescription =>
-      '允许模型按需读取本对话中的图片。关闭后不影响历史图片的自动管理。';
+      '允许模型通过 view_image 按需回读本对话的历史图片。关闭后不影响随消息直接发送的图片、历史图片自动管理及工作区文件访问。';
 
   @override
   String get imageContextTitle => '图片上下文';
@@ -25312,6 +25315,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get toolSchemaSettingsGroupSearch => '搜索';
 
   @override
+  String get toolSchemaSettingsGroupImages => '图片';
+
+  @override
   String get toolSchemaSettingsGroupMemory => '记忆';
 
   @override
@@ -31048,7 +31054,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get imageContextAllowRecallDescription =>
-      '允许模型按需读取本对话中的图片。关闭后不影响历史图片的自动管理。';
+      '允许模型通过 view_image 按需回读本对话的历史图片。关闭后不影响随消息直接发送的图片、历史图片自动管理及工作区文件访问。';
 
   @override
   String get imageContextTitle => '图片上下文';
@@ -41256,6 +41262,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get toolSchemaSettingsGroupSearch => '搜尋';
 
   @override
+  String get toolSchemaSettingsGroupImages => '圖片';
+
+  @override
   String get toolSchemaSettingsGroupMemory => '記憶';
 
   @override
@@ -46994,11 +47003,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '部分副本來自更新版本的 Kelivo，請升級 App 後再還原。這些副本仍然保留。';
 
   @override
-  String get imageContextAllowRecall => '允許模型重新讀取歷史圖片';
+  String get imageContextAllowRecall => '允許模型回讀歷史圖片';
 
   @override
   String get imageContextAllowRecallDescription =>
-      '允許模型按需讀取本對話中的圖片。關閉後不影響歷史圖片的自動管理。';
+      '允許模型透過 view_image 按需回讀本對話的歷史圖片。關閉後不影響隨訊息直接傳送的圖片、歷史圖片自動管理及工作區檔案存取。';
 
   @override
   String get imageContextTitle => '圖片上下文';

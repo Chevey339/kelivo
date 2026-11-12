@@ -26,6 +26,7 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 import 'tools_sheet_row.dart';
+import 'image_recall_control.dart';
 import '../../mcp/widgets/mcp_server_avatar.dart';
 import '../../mcp/utils/mcp_tool_groups.dart';
 
@@ -182,6 +183,7 @@ class _ChatToolsSheetState extends State<ChatToolsSheet> {
                           SliverToBoxAdapter(
                             child: _LocalToolsGroup(
                               assistantId: widget.assistantId,
+                              conversationId: widget.conversationId,
                               expanded: _expanded.contains(_ToolsGroupId.local),
                               onToggle: () => _toggleGroup(_ToolsGroupId.local),
                             ),
@@ -351,11 +353,13 @@ class _ToolsGroup extends StatelessWidget {
 class _LocalToolsGroup extends StatelessWidget {
   const _LocalToolsGroup({
     required this.assistantId,
+    required this.conversationId,
     required this.expanded,
     required this.onToggle,
   });
 
   final String assistantId;
+  final String? conversationId;
   final bool expanded;
   final VoidCallback onToggle;
 
@@ -382,42 +386,60 @@ class _LocalToolsGroup extends StatelessWidget {
     final enabled = assistant.localToolIds.toSet();
     final enabledCount = ids.where(enabled.contains).length;
 
-    return _ToolsGroup(
-      key: ChatToolsSheet.localGroupKey,
-      isFirst: true,
-      title: l10n.assistantEditPageLocalToolsTab,
-      summary: '$enabledCount/${ids.length}',
-      expanded: expanded,
-      onToggle: onToggle,
-      children: [
-        for (final id in ids)
-          ToolsSheetRow(
-            key: ChatToolsSheet.localToolKey(id),
-            icon: localToolIcon(id),
-            label: localToolTitle(l10n, id),
-            selected: enabled.contains(id),
-            onTap: () => unawaited(
-              setLocalToolEnabled(
-                context,
-                assistant: assistant,
-                toolId: id,
-                value: !enabled.contains(id),
-              ),
-            ),
-            trailing: IosSwitch(
-              value: enabled.contains(id),
-              semanticLabel: localToolTitle(l10n, id),
-              onChanged: (value) => unawaited(
+    return ImageRecallControl(
+      assistantId: assistantId,
+      conversationId: conversationId,
+      builder: (imageEnabled, onImageChanged) => _ToolsGroup(
+        key: ChatToolsSheet.localGroupKey,
+        isFirst: true,
+        title: l10n.assistantEditPageLocalToolsTab,
+        summary: '${enabledCount + (imageEnabled ? 1 : 0)}/${ids.length + 1}',
+        expanded: expanded,
+        onToggle: onToggle,
+        children: [
+          for (final id in ids)
+            ToolsSheetRow(
+              key: ChatToolsSheet.localToolKey(id),
+              icon: localToolIcon(id),
+              label: localToolTitle(l10n, id),
+              selected: enabled.contains(id),
+              onTap: () => unawaited(
                 setLocalToolEnabled(
                   context,
                   assistant: assistant,
                   toolId: id,
-                  value: value,
+                  value: !enabled.contains(id),
+                ),
+              ),
+              trailing: IosSwitch(
+                value: enabled.contains(id),
+                semanticLabel: localToolTitle(l10n, id),
+                onChanged: (value) => unawaited(
+                  setLocalToolEnabled(
+                    context,
+                    assistant: assistant,
+                    toolId: id,
+                    value: value,
+                  ),
                 ),
               ),
             ),
+          ToolsSheetRow(
+            key: const ValueKey('chat-tools-view-image'),
+            icon: Lucide.Image,
+            label: l10n.workspaceToolTitleViewImage,
+            selected: imageEnabled,
+            onTap: onImageChanged == null
+                ? null
+                : () => onImageChanged(!imageEnabled),
+            trailing: IosSwitch(
+              value: imageEnabled,
+              semanticLabel: l10n.workspaceToolTitleViewImage,
+              onChanged: onImageChanged,
+            ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }
