@@ -16541,6 +16541,24 @@ class AppLocalizationsTr extends AppLocalizations {
   String get compressionCallUnit => 'çağrı';
 
   @override
+  String get compressionRequestTimeout => 'Sıkıştırma isteği zaman aşımı';
+
+  @override
+  String get compressionMinuteUnit => 'dk';
+
+  @override
+  String get compressionRequestTimeoutDefault => 'Varsayılan';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      'Pozitif bir dakika değeri girin. Boş bırakılırsa mevcut davranış korunur (yerel sıkıştırma: 5 dakika). Her özet segmenti ve birleştirme isteği ayrı ayrı zamanlanır.';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return 'Sıkıştırma isteği zaman aşımına uğradı ($minutes dk beklendi)';
+  }
+
+  @override
   String get compressionAdvancedOptions => 'Sıkıştırma ayrıntıları';
 
   @override

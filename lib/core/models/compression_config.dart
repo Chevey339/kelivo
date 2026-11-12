@@ -21,6 +21,7 @@ class CompressionConfig {
     this.summaryTokens = 4096,
     this.maxOutputTokens,
     this.maxRequestAttempts = 8,
+    this.requestTimeoutMinutes,
     this.planningWindow,
     this.includeReference = true,
     this.replaceConsumedTools = false,
@@ -43,6 +44,15 @@ class CompressionConfig {
   /// Total generation budget, including reasoning. Null uses the summary target.
   final int? maxOutputTokens;
   final int maxRequestAttempts;
+
+  /// Per model invocation. Null preserves each compression mode's default.
+  final num? requestTimeoutMinutes;
+  Duration? get requestTimeout => requestTimeoutMinutes == null
+      ? null
+      : Duration(
+          microseconds:
+              (requestTimeoutMinutes! * Duration.microsecondsPerMinute).ceil(),
+        );
   final int? planningWindow;
   final bool includeReference;
   final bool replaceConsumedTools;
@@ -65,6 +75,7 @@ class CompressionConfig {
     'summaryTokens': summaryTokens,
     'maxOutputTokens': maxOutputTokens,
     'maxRequestAttempts': maxRequestAttempts,
+    'requestTimeoutMinutes': requestTimeoutMinutes,
     'planningWindow': planningWindow,
     'includeReference': includeReference,
     'replaceConsumedTools': replaceConsumedTools,
@@ -87,6 +98,7 @@ class CompressionConfig {
       summaryTokens: json['summaryTokens'] as int? ?? 4096,
       maxOutputTokens: json['maxOutputTokens'] as int?,
       maxRequestAttempts: json['maxRequestAttempts'] as int? ?? 8,
+      requestTimeoutMinutes: json['requestTimeoutMinutes'] as num?,
       planningWindow: json['planningWindow'] as int?,
       includeReference: json['includeReference'] as bool? ?? true,
       replaceConsumedTools: json['replaceConsumedTools'] as bool? ?? false,
@@ -114,6 +126,12 @@ class CompressionConfig {
                 config.maxOutputTokens! > 1048576)) ||
         config.maxRequestAttempts < 1 ||
         config.maxRequestAttempts > 128 ||
+        (config.requestTimeoutMinutes != null &&
+            (!config.requestTimeoutMinutes!.isFinite ||
+                config.requestTimeoutMinutes! <= 0 ||
+                !(config.requestTimeoutMinutes! *
+                        Duration.microsecondsPerMinute)
+                    .isFinite)) ||
         (config.planningWindow != null && config.planningWindow! < 1024) ||
         (config.providerId == null) != (config.modelId == null)) {
       throw const FormatException('Invalid compression settings');

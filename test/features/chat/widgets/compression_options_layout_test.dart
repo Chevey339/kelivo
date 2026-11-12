@@ -552,6 +552,8 @@ void main() {
         expect(settings.compressionDefaults.templateId, 'code');
         expect(selected!.where((t) => t.name == 'Project notes'), isEmpty);
         // Resetting the override immediately restores the current chat model.
+        await tester.ensureVisible(find.text(l10n.compressionChatModel).first);
+        await settleCompressionOptions(tester);
         await tester.tap(find.text(l10n.compressionChatModel).first);
         await settleCompressionOptions(tester);
         expect(find.text('Claude Sonnet 4'), findsOneWidget);

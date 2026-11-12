@@ -8151,6 +8151,31 @@
   "compressionRecipeCreateHint": "Save a recipe from More settings to reuse a configuration.",
   "compressionTurnUnit": "turns",
   "compressionCallUnit": "calls",
+  "compressionRequestTimeout": "Compression request timeout",
+  "@compressionRequestTimeout": {
+    "description": "Numeric field label in Compress context > More settings, shown for both summary and native compression. Sets the total waiting limit of each individual model request."
+  },
+  "compressionMinuteUnit": "min",
+  "@compressionMinuteUnit": {
+    "description": "Minute unit suffix beside the compression request timeout numeric input. Keep it short to fit a narrow field suffix."
+  },
+  "compressionRequestTimeoutDefault": "Default",
+  "@compressionRequestTimeoutDefault": {
+    "description": "Placeholder for an empty compression request timeout input. Empty preserves the current behavior of each mode, including the native compression default of five minutes."
+  },
+  "compressionRequestTimeoutHint": "Enter a positive number of minutes. Blank keeps the existing behavior (native compression: 5 minutes). Each summary segment and merge request is timed separately.",
+  "@compressionRequestTimeoutHint": {
+    "description": "Help text below the compression request timeout input in More settings. The value may contain decimals and limits total wait per model invocation, not idle time or the whole multi-request task."
+  },
+  "compressionRequestTimedOut": "Compression request timed out (waited {minutes} min)",
+  "@compressionRequestTimedOut": {
+    "description": "Compression task failure shown when the total deadline cancels a model request, distinct from user cancellation. minutes is the elapsed request limit in minutes, possibly fractional. Users can increase the timeout in More settings and retry.",
+    "placeholders": {
+      "minutes": {
+        "type": "num"
+      }
+    }
+  },
   "compressionAdvancedOptions": "Compression details",
   "compressionAdvancedHint": "References, original-history rereading and request limits",
   "compressionAutomaticWindow": "Auto",

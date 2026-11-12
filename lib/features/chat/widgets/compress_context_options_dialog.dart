@@ -93,6 +93,7 @@ class _CompressContextOptionsDialogState
   final _target = TextEditingController();
   final _window = TextEditingController();
   final _attempts = TextEditingController();
+  final _requestTimeout = TextEditingController();
   final _maxChars = TextEditingController();
   String? _planKey;
   Future<CompressionRequestPreview?>? _planFuture;
@@ -292,6 +293,7 @@ class _CompressContextOptionsDialogState
     _target.text = '${(_config.targetInputRatio * 100).round()}';
     _window.text = _config.planningWindow?.toString() ?? '';
     _attempts.text = '${_config.maxRequestAttempts}';
+    _requestTimeout.text = _config.requestTimeoutMinutes?.toString() ?? '';
   }
 
   Future<void> _load() async {
@@ -364,6 +366,7 @@ class _CompressContextOptionsDialogState
       _target,
       _window,
       _attempts,
+      _requestTimeout,
       _maxChars,
     ]) {
       controller.dispose();
@@ -383,7 +386,12 @@ class _CompressContextOptionsDialogState
         ? null
         : int.parse(_window.text),
     'maxRequestAttempts': int.parse(_attempts.text),
+    'requestTimeoutMinutes': _timeoutMinutes(),
   });
+
+  num? _timeoutMinutes() => _requestTimeout.text.trim().isEmpty
+      ? null
+      : num.parse(_requestTimeout.text.trim());
   CompressContextOptions _options({
     bool trial = false,
     bool regenerate = false,
@@ -430,6 +438,7 @@ class _CompressContextOptionsDialogState
               enabled: true,
             ).keepUserTurns,
             'nativeTriggerInputRatio': double.parse(_nativeTrigger.text) / 100,
+            'requestTimeoutMinutes': _timeoutMinutes(),
             'planningWindow': _window.text.trim().isEmpty
                 ? null
                 : int.parse(_window.text),
@@ -441,6 +450,7 @@ class _CompressContextOptionsDialogState
       'nativeTriggerInputRatio',
       'mode',
       'planningWindow',
+      'requestTimeoutMinutes',
     };
     final original = _config.toJson();
     final changed = {
@@ -455,15 +465,15 @@ class _CompressContextOptionsDialogState
       final previous = _native
           ? await chat.compressionOverrides(widget.conversationId!)
           : _overrides;
-      await chat.setCompressionOverrides(widget.conversationId!, {
-        ...previous,
-        ...changed,
-      });
+      final overrides = {...previous, ...changed};
+      await chat.setCompressionOverrides(widget.conversationId!, overrides);
+      _overrides = overrides;
     } else {
       await settings.setCompressionDefaults(
         _native ? settings.compressionDefaults.withOverrides(changed) : values,
       );
     }
+    _config = values;
     if (_native) {
       await settings.setNativeCompression(_nativeValues(enabled: true));
     } else {
@@ -695,11 +705,13 @@ class _CompressContextOptionsDialogState
     TextEditingController controller, {
     String? hint,
     String? unit,
+    bool allowDecimal = false,
   }) => CompressionNumberRow(
     label: label,
     controller: controller,
     hint: hint,
     unit: unit,
+    allowDecimal: allowDecimal,
     onChanged: (_) => setState(() {}),
   );
 
@@ -1240,6 +1252,30 @@ class _CompressContextOptionsDialogState
                         ),
                       ),
                   ]),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: SectionCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _number(
+                            l10n.compressionRequestTimeout,
+                            _requestTimeout,
+                            hint: l10n.compressionRequestTimeoutDefault,
+                            unit: l10n.compressionMinuteUnit,
+                            allowDecimal: true,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                            child: Text(
+                              l10n.compressionRequestTimeoutHint,
+                              style: hintStyle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   if (!_native)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -1448,7 +1484,12 @@ class _CompressContextOptionsDialogState
                 ? () async {
                     try {
                       await _saveSettings();
-                      if (mounted) setState(() => _advanced = false);
+                      if (mounted) {
+                        setState(() {
+                          _advanced = false;
+                          _error = null;
+                        });
+                      }
                     } catch (_) {
                       if (mounted) {
                         setState(

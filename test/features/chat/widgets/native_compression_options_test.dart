@@ -90,6 +90,7 @@ void main() {
             keepRecentUserTurns: 2,
             templateId: 'code',
             summaryTokens: 8192,
+            requestTimeoutMinutes: 7,
           ),
         );
       });
@@ -190,6 +191,22 @@ void main() {
       );
       await tester.ensureVisible(trigger);
       await tester.enterText(trigger, '50');
+      final timeout = find.descendant(
+        of: find.widgetWithText(
+          IosFormTextField,
+          l10n.compressionRequestTimeout,
+        ),
+        matching: find.byType(TextField),
+      );
+      expect(tester.widget<TextField>(timeout).controller!.text, '7');
+      expect(find.text(l10n.compressionAdvancedOptions), findsNothing);
+      await tester.ensureVisible(timeout);
+      await tester.enterText(timeout, '0');
+      await tester.tap(find.text(l10n.multiKeyPageSave));
+      await settleCompressionOptions(tester);
+      expect(find.text(l10n.compressionInvalidSettings), findsOneWidget);
+      await tester.ensureVisible(timeout);
+      await tester.enterText(timeout, '10.5');
       await tester.tap(find.text(l10n.multiKeyPageSave));
       for (var i = 0; i < 100 && trigger.evaluate().isNotEmpty; i++) {
         await tester.runAsync(
@@ -237,6 +254,7 @@ void main() {
         expect(config.nativeEnabled, isTrue);
         expect(config.nativeKeepRecentUserTurns, 3);
         expect(config.nativeTriggerInputRatio, .5);
+        expect(config.requestTimeout, const Duration(minutes: 10, seconds: 30));
         expect(config.triggerInputRatio, .8);
         expect(config.targetInputRatio, .6);
         expect(config.keepRecentUserTurns, 2);
@@ -259,6 +277,31 @@ void main() {
       await tester.tap(find.text(l10n.compressionMore));
       await settleCompressionOptions(tester);
       expect(tester.widget<TextField>(trigger).controller!.text, '80');
+      expect(tester.widget<TextField>(timeout).controller!.text, '10.5');
+      expect(find.text(l10n.compressionAdvancedOptions), findsOneWidget);
+      await tester.ensureVisible(timeout);
+      await tester.enterText(timeout, '');
+      await tester.tap(find.text(l10n.multiKeyPageSave));
+      await tester.runAsync(() async {
+        for (var i = 0; i < 100; i++) {
+          final values = await chat.compressionOverrides(conversationId);
+          if (values.containsKey('requestTimeoutMinutes') &&
+              values['requestTimeoutMinutes'] == null) {
+            return;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        fail('cleared timeout was not saved');
+      });
+      await settleCompressionOptions(tester);
+      await tester.runAsync(() async {
+        final config = await chat.compressionConfig(
+          conversationId,
+          settings.compressionDefaults,
+        );
+        expect(config.requestTimeout, isNull);
+        expect(settings.compressionDefaults.requestTimeoutMinutes, 7);
+      });
       expect(tester.takeException(), isNull);
       await tester.tap(find.text(l10n.homePageCancel));
       await settleCompressionOptions(tester);

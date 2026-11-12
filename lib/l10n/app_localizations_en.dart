@@ -16446,6 +16446,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressionCallUnit => 'calls';
 
   @override
+  String get compressionRequestTimeout => 'Compression request timeout';
+
+  @override
+  String get compressionMinuteUnit => 'min';
+
+  @override
+  String get compressionRequestTimeoutDefault => 'Default';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      'Enter a positive number of minutes. Blank keeps the existing behavior (native compression: 5 minutes). Each summary segment and merge request is timed separately.';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return 'Compression request timed out (waited $minutes min)';
+  }
+
+  @override
   String get compressionAdvancedOptions => 'Compression details';
 
   @override

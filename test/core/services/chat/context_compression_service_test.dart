@@ -1,5 +1,8 @@
 import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/models/native_compaction.dart';
+import 'package:Kelivo/core/services/api/request_timeout.dart';
+import 'package:Kelivo/features/chat/widgets/context_compression_status.dart';
+import 'package:Kelivo/l10n/app_localizations_zh.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
@@ -143,6 +146,48 @@ void main() {
   );
 
   for (final native in [false, true]) {
+    test(
+      'timeout is a retryable failure and preserves history: native=$native',
+      () async {
+        final before = await chat.loadContextSnapshot(id);
+        const error = RequestTimeoutException(Duration(minutes: 10));
+        await compression.start(
+          id,
+          native
+              ? nativeRequest((_, _) async => throw error)
+              : request((_, _) async => throw error),
+        );
+        await until(
+          () => compression.taskFor(id)!.phase == CompressionPhase.failed,
+        );
+        final task = compression.taskFor(id)!;
+        expect(task.phase, CompressionPhase.failed);
+        expect(task.cancelRequested, isFalse);
+        expect(task.active, isFalse);
+        expect(task.error, error.toString());
+        expect(
+          compressionErrorLabel(AppLocalizationsZh(), task.error!),
+          '压缩请求超时（已等待 10 分钟）',
+        );
+        final after = await chat.loadContextSnapshot(id);
+        expect(after.operations, isEmpty);
+        expect(
+          after.messages.map((m) => m.id),
+          before.messages.map((m) => m.id),
+        );
+        expect(task.candidate, isNull);
+        await compression.start(
+          id,
+          native
+              ? nativeRequest((_, _) async => nativePayload('retry'))
+              : request((_, _) async => 'short summary'),
+        );
+        await until(
+          () => compression.taskFor(id)!.phase == CompressionPhase.completed,
+        );
+      },
+    );
+
     for (final fails in [false, true]) {
       test(
         'finished tasks release source callbacks: native=$native failed=$fails',

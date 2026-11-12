@@ -6,6 +6,7 @@ import 'generation/model_request_attempts.dart';
 import '../../models/compress_context_options.dart' show isContextLengthError;
 import 'request_history_context.dart';
 import 'request_image_context.dart';
+import 'request_timeout.dart';
 import '../auth/provider_oauth_service.dart';
 import '../auth/codex_turn_state.dart';
 import 'dart:async';
@@ -56,16 +57,18 @@ class ChatApiService {
     RequestImageContext? imageContext,
     Map<String, String>? extraHeaders,
     bool Function()? isCancelled,
+    Duration? requestTimeout,
   }) async {
     final token = CancelToken();
     _activeCancelTokens.remove(requestId)?.cancel('replaced');
     _activeCancelTokens[requestId] = token;
-    final timeout = Timer(
-      const Duration(minutes: 5),
-      () => token.cancel('timeout'),
+    final timeout = cancelOnRequestTimeout(
+      token,
+      requestTimeout ?? const Duration(minutes: 5),
     );
     http.Client? client;
     void check() {
+      checkRequestTimeout(token);
       if (token.isCancelled || (isCancelled?.call() ?? false)) {
         throw StateError('cancelled');
       }
@@ -94,6 +97,7 @@ class ChatApiService {
       client = ProviderOAuthService.instance.authenticatedClient(
         providerHttpClient(config, cancelToken: token, logRequests: false),
         config,
+        cancelToken: token,
       );
       final authenticatedClient = client;
       Future<NativeCompactionPayload> sendCompact() => requestNativeCompaction(
@@ -113,8 +117,11 @@ class ChatApiService {
           : imageContext.run(() => Stream.fromFuture(sendCompact())).first);
       check();
       return result;
+    } catch (_) {
+      checkRequestTimeout(token);
+      rethrow;
     } finally {
-      timeout.cancel();
+      timeout?.cancel();
       client?.close();
       if (identical(_activeCancelTokens[requestId], token)) {
         _activeCancelTokens.remove(requestId);
@@ -332,6 +339,7 @@ class ChatApiService {
     AutoRetryOptions? retryOverride,
     RequestImageContext? imageContext,
     RequestHistoryContext? historyContext,
+    Duration? requestTimeout,
   }) async* {
     final sessionToken = CancelToken();
     final toolCancellation = ToolCallCancellation(
@@ -346,6 +354,7 @@ class ChatApiService {
       } catch (_) {}
       _activeCancelTokens[rid] = sessionToken;
     }
+    final timeout = cancelOnRequestTimeout(sessionToken, requestTimeout);
     try {
       config = await Future.any<ProviderConfig>([
         ProviderOAuthService.instance.resolve(config),
@@ -355,6 +364,7 @@ class ChatApiService {
           ),
         ),
       ]);
+      checkRequestTimeout(sessionToken);
       if (sessionToken.isCancelled) return;
       if (textOnly) config = _textOnlyConfig(config, modelId);
       if (config.oauthProvider == OAuthProvider.chatgpt) stream = true;
@@ -502,8 +512,17 @@ class ChatApiService {
             ),
           ),
         ),
-      );
+      ).handleError((Object error, StackTrace stack) {
+        // Errors forwarded by yield* do not enter the surrounding catch.
+        checkRequestTimeout(sessionToken);
+        Error.throwWithStackTrace(error, stack);
+      });
+      checkRequestTimeout(sessionToken);
+    } catch (_) {
+      checkRequestTimeout(sessionToken);
+      rethrow;
     } finally {
+      timeout?.cancel();
       if (rid.isNotEmpty) {
         final cur = _activeCancelTokens[rid];
         if (identical(cur, sessionToken)) {
@@ -582,6 +601,7 @@ class ChatApiService {
       ),
       config,
       codexTurnState: codexTurnState,
+      cancelToken: cancelToken,
     );
     try {
       if (useZhipuLayoutParsing) {
@@ -762,6 +782,7 @@ class ChatApiService {
     AutoRetryOptions? retryOverride,
     void Function(RetryPending? pending)? onRetry,
     void Function(Usage update)? onUsage,
+    Duration? requestTimeout,
   }) async {
     final handler = StreamChunkHandler(
       onRetry: onRetry == null ? null : (pending) => onRetry(pending),
@@ -789,6 +810,7 @@ class ChatApiService {
       parseMarkdownImageLinks: parseMarkdownImageLinks,
       textOnly: textOnly,
       retryOverride: retryOverride,
+      requestTimeout: requestTimeout,
     )) {
       if (chunk is RetryAttemptStart) {
         onRetry?.call(null);

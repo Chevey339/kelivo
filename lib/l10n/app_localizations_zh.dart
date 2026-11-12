@@ -15593,6 +15593,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionCallUnit => '次';
 
   @override
+  String get compressionRequestTimeout => '压缩请求超时';
+
+  @override
+  String get compressionMinuteUnit => '分钟';
+
+  @override
+  String get compressionRequestTimeoutDefault => '默认';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      '输入正数，单位为分钟。留空沿用现有行为（原生压缩默认 5 分钟）。分段摘要的每段生成和合并请求分别计时。';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return '压缩请求超时（已等待 $minutes 分钟）';
+  }
+
+  @override
   String get compressionAdvancedOptions => '压缩细节';
 
   @override
@@ -31516,6 +31534,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get compressionCallUnit => '次';
+
+  @override
+  String get compressionRequestTimeout => '压缩请求超时';
+
+  @override
+  String get compressionMinuteUnit => '分钟';
+
+  @override
+  String get compressionRequestTimeoutDefault => '默认';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      '输入正数，单位为分钟。留空沿用现有行为（原生压缩默认 5 分钟）。分段摘要的每段生成和合并请求分别计时。';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return '压缩请求超时（已等待 $minutes 分钟）';
+  }
 
   @override
   String get compressionAdvancedOptions => '压缩细节';
@@ -47448,6 +47484,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get compressionCallUnit => '次';
+
+  @override
+  String get compressionRequestTimeout => '壓縮請求逾時';
+
+  @override
+  String get compressionMinuteUnit => '分鐘';
+
+  @override
+  String get compressionRequestTimeoutDefault => '預設';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      '輸入正數，單位為分鐘。留空沿用現有行為（原生壓縮預設 5 分鐘）。分段摘要的每段生成和合併請求分別計時。';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return '壓縮請求逾時（已等待 $minutes 分鐘）';
+  }
 
   @override
   String get compressionAdvancedOptions => '壓縮細節';

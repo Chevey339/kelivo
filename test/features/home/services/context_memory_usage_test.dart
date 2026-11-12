@@ -399,6 +399,153 @@ void main() {
     runEstimate: <T>(T Function() computation) async => computation(),
   );
 
+  testWidgets(
+    'manual and automatic compression share the resolved request timeout',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        final previousHttp = HttpOverrides.current;
+        HttpOverrides.global = null;
+        addTearDown(() => HttpOverrides.global = previousHttp);
+        await seedUser('history to compress');
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          await request.drain<void>();
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode(
+              request.uri.path.endsWith('/compact')
+                  ? {
+                      'output': [
+                        {
+                          'type': 'compaction',
+                          'id': 'compact',
+                          'encrypted_content': 'state',
+                        },
+                      ],
+                    }
+                  : {
+                      'choices': [
+                        {
+                          'message': {
+                            'role': 'assistant',
+                            'content': 'summary',
+                          },
+                          'finish_reason': 'stop',
+                        },
+                      ],
+                    },
+            ),
+          );
+          await request.response.close();
+        });
+        await settings.setProviderConfig(
+          'Test',
+          settings
+              .getProviderConfig('Test')
+              .copyWith(baseUrl: 'http://127.0.0.1:${server.port}/v1'),
+        );
+        await settings.setCompressionDefaults(
+          const CompressionConfig(requestTimeoutMinutes: 7),
+        );
+        final g = generation();
+        final controller = ChatController(chatService: chat);
+        final vm = HomeViewModel(
+          chatService: chat,
+          messageBuilderService: builder,
+          messageGenerationService: g,
+          generationController: g.generationController,
+          streamController: g.streamController,
+          chatController: controller,
+          contextProvider: context,
+          getTitleForLocale: (_) => 'title',
+        );
+        try {
+          for (final native in [false, true]) {
+            for (final automatic in [false, true]) {
+              Future<CompressionConfig> resolved({
+                CompressionConfig? override,
+              }) async {
+                final request = await vm.buildCompressionRequest(
+                  'one',
+                  options: CompressContextOptions(
+                    mode: CompressContextLimitMode.unlimited,
+                    native: native,
+                  ),
+                  automatic: automatic,
+                  configOverride: override,
+                );
+                expect(request.automatic, automatic);
+                if (request.config.requestTimeoutMinutes == 10) {
+                  final deadlines = <Duration>[];
+                  await runZoned(
+                    () async {
+                      if (native) {
+                        await request.compactNative!(
+                          selectCompressionHistory(
+                            chat.storedMessages,
+                            [],
+                            request.options,
+                          ),
+                          'timeout-settings',
+                        );
+                      } else {
+                        await request.generate!(
+                          'summarize',
+                          'timeout-settings',
+                          128,
+                          (_) {},
+                        );
+                      }
+                    },
+                    zoneSpecification: ZoneSpecification(
+                      createTimer: (self, parent, zone, duration, callback) {
+                        if (duration == const Duration(minutes: 5) ||
+                            duration == const Duration(minutes: 10)) {
+                          deadlines.add(duration);
+                        }
+                        return parent.createTimer(zone, duration, callback);
+                      },
+                    ),
+                  );
+                  expect(deadlines, [const Duration(minutes: 10)]);
+                }
+                return request.config;
+              }
+
+              await chat.setCompressionOverrides('one', {});
+              expect(
+                (await resolved()).requestTimeout,
+                const Duration(minutes: 7),
+              );
+              await chat.setCompressionOverrides('one', {
+                'requestTimeoutMinutes': 10,
+              });
+              expect(
+                (await resolved()).requestTimeout,
+                const Duration(minutes: 10),
+              );
+              expect(
+                (await resolved(
+                  override: const CompressionConfig(requestTimeoutMinutes: 3),
+                )).requestTimeout,
+                const Duration(minutes: 3),
+              );
+              await chat.setCompressionOverrides('one', {
+                'requestTimeoutMinutes': null,
+              });
+              expect((await resolved()).requestTimeout, isNull);
+            }
+          }
+        } finally {
+          vm.dispose();
+          controller.dispose();
+        }
+      });
+    },
+  );
+
   testWidgets('compression preview excludes retained text and dynamic references', (
     tester,
   ) async {

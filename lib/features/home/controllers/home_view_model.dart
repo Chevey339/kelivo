@@ -1475,6 +1475,12 @@ class HomeViewModel extends ChangeNotifier {
       assistant,
       conversation: conversation,
     );
+    final preferences =
+        configOverride ??
+        await _chatService.compressionConfig(
+          conversationId,
+          settings.compressionDefaults,
+        );
     if (options.native) {
       // A tool loop owns its original connection even if the user selects
       // another model while that turn is still running.
@@ -1505,7 +1511,7 @@ class HomeViewModel extends ChangeNotifier {
         automatic: automatic,
         ownsContinuation: ownsContinuation,
         acceptCandidate: acceptCandidate,
-        config: configOverride ?? const CompressionConfig(),
+        config: preferences,
         model: '$provider / $model',
         quoteMarker: quoteMarker,
         beforeMessageId: beforeMessageId,
@@ -1526,16 +1532,11 @@ class HomeViewModel extends ChangeNotifier {
             conversationId: conversationId,
             extraHeaders: _generationController.buildCustomHeaders(assistant),
             isCancelled: cancelled,
+            requestTimeout: preferences.requestTimeout,
           );
         },
       );
     }
-    final preferences =
-        configOverride ??
-        await _chatService.compressionConfig(
-          conversationId,
-          settings.compressionDefaults,
-        );
     final model = resolveCompressContextModel(
       compressProvider: preferences.providerId,
       compressModelId: preferences.modelId,
@@ -1606,6 +1607,7 @@ class HomeViewModel extends ChangeNotifier {
             textOnly: true,
             maxTokens: maxTokens,
             retryOverride: const AutoRetryOptions.defaults(),
+            requestTimeout: preferences.requestTimeout,
             onUsage: (update) => onUsage(update.usage),
             messages: [
               {'role': 'user', 'content': prompt},

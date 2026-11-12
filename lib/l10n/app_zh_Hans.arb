@@ -6034,6 +6034,18 @@
   "compressionRecipeCreateHint": "在「更多设置」中将当前配置保存为方案。",
   "compressionTurnUnit": "轮",
   "compressionCallUnit": "次",
+  "compressionRequestTimeout": "压缩请求超时",
+  "compressionMinuteUnit": "分钟",
+  "compressionRequestTimeoutDefault": "默认",
+  "compressionRequestTimeoutHint": "输入正数，单位为分钟。留空沿用现有行为（原生压缩默认 5 分钟）。分段摘要的每段生成和合并请求分别计时。",
+  "compressionRequestTimedOut": "压缩请求超时（已等待 {minutes} 分钟）",
+  "@compressionRequestTimedOut": {
+    "placeholders": {
+      "minutes": {
+        "type": "num"
+      }
+    }
+  },
   "compressionAdvancedOptions": "压缩细节",
   "compressionAdvancedHint": "参考内容、原文回读与调用限制",
   "compressionAutomaticWindow": "自动",

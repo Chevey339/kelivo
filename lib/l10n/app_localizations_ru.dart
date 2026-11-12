@@ -16739,6 +16739,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionCallUnit => 'вызовов';
 
   @override
+  String get compressionRequestTimeout => 'Тайм-аут запроса сжатия';
+
+  @override
+  String get compressionMinuteUnit => 'мин';
+
+  @override
+  String get compressionRequestTimeoutDefault => 'По умолчанию';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      'Введите положительное число минут. Пустое поле сохраняет текущее поведение (нативное сжатие: 5 минут). Каждый сегмент сводки и запрос объединения учитываются по отдельности.';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return 'Тайм-аут запроса сжатия (ожидание $minutes мин)';
+  }
+
+  @override
   String get compressionAdvancedOptions => 'Детали сжатия';
 
   @override

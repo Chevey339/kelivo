@@ -46,6 +46,16 @@ String compressionStatusLabel(
 };
 
 String compressionErrorLabel(AppLocalizations l10n, String error) {
+  final timeout = RegExp(r'^request_timeout:(\d+)$').firstMatch(error);
+  if (timeout != null) {
+    final microseconds = int.tryParse(timeout.group(1)!);
+    if (microseconds != null) {
+      final minutes = microseconds / Duration.microsecondsPerMinute;
+      return l10n.compressionRequestTimedOut(
+        minutes == minutes.truncateToDouble() ? minutes.toInt() : minutes,
+      );
+    }
+  }
   if (error.contains('native_compaction_originals_unavailable')) {
     return l10n.compressionNativeOriginalsUnavailable;
   }

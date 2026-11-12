@@ -15935,6 +15935,24 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionCallUnit => '회';
 
   @override
+  String get compressionRequestTimeout => '압축 요청 시간 제한';
+
+  @override
+  String get compressionMinuteUnit => '분';
+
+  @override
+  String get compressionRequestTimeoutDefault => '기본값';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      '양수 분 단위로 입력하세요. 비워 두면 기존 동작을 유지합니다(네이티브 압축: 5분). 각 요약 세그먼트와 병합 요청은 개별적으로 시간이 측정됩니다.';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return '압축 요청 시간 초과 ($minutes분 대기)';
+  }
+
+  @override
   String get compressionAdvancedOptions => '압축 세부 정보';
 
   @override
