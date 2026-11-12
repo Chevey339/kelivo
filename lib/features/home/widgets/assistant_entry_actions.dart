@@ -16,6 +16,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../assistant/pages/assistant_settings_edit_page.dart';
 import '../../assistant/pages/tags_manager_page.dart';
 import '../../assistant/widgets/tags_manager_dialog.dart';
+import '../../assistant/widgets/assistant_copy_dialog.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -71,17 +72,7 @@ class AssistantEntryActions {
     BuildContext context,
     Assistant assistant,
   ) async {
-    final l10n = AppLocalizations.of(context)!;
-    final newId = await context.read<AssistantProvider>().duplicateAssistant(
-      assistant.id,
-      l10n: l10n,
-    );
-    if (!context.mounted || newId == null) return;
-    showAppSnackBar(
-      context,
-      message: l10n.assistantSettingsCopySuccess,
-      type: NotificationType.success,
-    );
+    await copyAssistantWithScope(context, assistant.id);
   }
 
   static Future<void> _showAssistantItemMenuDesktop({

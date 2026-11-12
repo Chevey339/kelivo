@@ -24,6 +24,7 @@ abstract final class MemoryBlockBuilder {
     required Map<MemoryType, int> totalByType,
     required MemoryPromptLang lang,
     required int maxItems,
+    Set<MemoryType> fullInjectionTypes = const {},
   }) {
     final out = StringBuffer();
     for (final type in _typeOrder) {
@@ -34,7 +35,7 @@ abstract final class MemoryBlockBuilder {
       }
 
       final total = totalByType[type] ?? list.length;
-      final summary = total > maxItems;
+      final summary = !fullInjectionTypes.contains(type) && total > maxItems;
       List<MemoryEntry> selected;
       if (!summary) {
         selected = List<MemoryEntry>.from(list);

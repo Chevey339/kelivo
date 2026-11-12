@@ -564,6 +564,7 @@ class AsrProvider extends ChangeNotifier {
     null => 16000,
     SherpaOnnxAsrOptions() => options.sampleRate,
     OpenAiRealtimeAsrOptions() => options.sampleRate,
+    AudioTranscriptionAsrOptions() => options.sampleRate,
     DashScopeAsrOptions() => options.sampleRate,
     QwenAudioAsrOptions() => options.sampleRate,
     VolcengineAsrOptions() => 16000,

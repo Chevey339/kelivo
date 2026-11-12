@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
+import 'package:Kelivo/core/database/startup_failure_report.dart';
 
 void main() {
   group('RestorePlatformDurability', () {
@@ -36,6 +37,25 @@ void main() {
         expect((await file.stat()).mode & 0x1ff, 0x180);
         expect((await root.stat()).mode & 0x1ff, 0x1c0);
       }
+    });
+
+    test('syncs and renames paths beyond the Win32 MAX_PATH limit', () async {
+      final directory = Directory(
+        p.joinAll([
+          root.path,
+          ...List.generate(24, (index) => 'nested-folder-$index'),
+        ]),
+      );
+      await directory.create(recursive: true);
+      final source = File(p.join(directory.path, 'source.bin'));
+      final target = p.join(directory.path, 'target.bin');
+      expect(source.path.length, greaterThan(260));
+      await source.writeAsBytes([8, 9, 10]);
+      await durability.syncFile(source, fullBarrier: true);
+      await durability.syncDirectory(directory, fullBarrier: true);
+      await durability.renameAndSync(source: source, targetPath: target);
+      expect(await source.exists(), isFalse);
+      expect(await File(target).readAsBytes(), [8, 9, 10]);
     });
 
     test(
@@ -73,7 +93,19 @@ void main() {
           source: File(p.join(target, 'item')),
           targetPath: collision.path,
         ),
-        throwsA(isA<FileSystemException>()),
+        throwsA(
+          isA<FileSystemException>().having(
+            (error) => StartupFailureReport.capture(
+              stage: StartupFailureStage.restoreGate,
+              error: error,
+            ).causes.single.details,
+            'rename paths',
+            allOf(
+              containsPair('source path', p.join(target, 'item')),
+              containsPair('target path', collision.path),
+            ),
+          ),
+        ),
       );
       expect(await collision.readAsString(), 'existing');
     });

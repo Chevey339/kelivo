@@ -6,6 +6,57 @@ import 'package:Kelivo/core/services/workspace/workspace_tool_metadata.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 void main() {
+  test('empty proxy authentication does not mask ordinary punctuation', () {
+    final result = EnvironmentOutputRedactor(
+      EnvironmentExecutionConfig(
+        variables: {'http_proxy': 'http://:@proxy.test:8080'},
+      ),
+    ).redact(const ClientToolResult('status: ok; path: /workspace'));
+    expect(result.content, 'status: ok; path: /workspace');
+  });
+
+  test('masks proxy credential forms from the execution snapshot', () {
+    const user = 'proxy@user';
+    const password = 'pass:word/秘密';
+    final userInfo =
+        '${Uri.encodeComponent(user)}:${Uri.encodeComponent(password)}';
+    final auth = base64Encode(utf8.encode('$user:$password'));
+    final config = EnvironmentExecutionConfig(
+      variables: {'HTTPS_PROXY': 'http://$userInfo@proxy.test:8080'},
+    );
+    final text =
+        'Proxy-Authorization: Basic $auth\n$userInfo\n$user\n$password';
+    final result = EnvironmentOutputRedactor(
+      config,
+    ).redact(ClientToolResult(text));
+    for (final value in [auth, userInfo, user, password]) {
+      expect(result.content, isNot(contains(value)));
+    }
+    final visible = EnvironmentOutputRedactor(
+      EnvironmentExecutionConfig(
+        variables: config.variables,
+        privacyMode: false,
+      ),
+    ).redact(ClientToolResult(text));
+    expect(visible.content, text);
+  });
+
+  test(
+    'short proxy auth tokens are masked without masking every short word',
+    () {
+      final config = EnvironmentExecutionConfig(
+        variables: {'http_proxy': 'http://a:b@proxy.test:8080'},
+      );
+      final result = EnvironmentOutputRedactor(
+        config,
+      ).redact(const ClientToolResult('Proxy-Authorization: Basic YTpi\nabc'));
+      expect(
+        result.content,
+        startsWith('Proxy-Authorization: Basic [REDACTED]\nabc'),
+      );
+    },
+  );
+
   test(
     'redacts nested escaped JSON without damaging the payload or local preview',
     () {

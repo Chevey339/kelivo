@@ -585,22 +585,10 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                           ),
                           _CopyAssistantIcon(
                             onCopy: () async {
-                              final assistantProvider = context
-                                  .read<AssistantProvider>();
-                              final l10n = AppLocalizations.of(context)!;
-                              final newId = await assistantProvider
-                                  .duplicateAssistant(
-                                    widget.item.id,
-                                    l10n: l10n,
-                                  );
-                              if (!context.mounted) return;
-                              if (newId != null) {
-                                showAppSnackBar(
-                                  context,
-                                  message: l10n.assistantSettingsCopySuccess,
-                                  type: NotificationType.success,
-                                );
-                              }
+                              await copyAssistantWithScope(
+                                context,
+                                widget.item.id,
+                              );
                             },
                           ),
                           _DeleteAssistantIcon(

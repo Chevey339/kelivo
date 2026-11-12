@@ -103,11 +103,11 @@ class NativeInputAttachments {
         parts.add(
           remote
               ? {
-                  'file_data': {'file_uri': ref.uri, 'mime_type': wireMime},
+                  'fileData': {'fileUri': ref.uri, 'mimeType': wireMime},
                 }
               : {
-                  'inline_data': {
-                    'mime_type': wireMime,
+                  'inlineData': {
+                    'mimeType': wireMime,
                     'data': await _base64(ref.uri),
                   },
                 },

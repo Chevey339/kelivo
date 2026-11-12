@@ -1,0 +1,23 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-23",
+  "testedCommit": "66148048a16bf3cce98c9a4d66ebe24065296da0",
+  "task": "s5-1",
+  "response": "已按要求生成表单：`$on` 控制明细字段的显示与隐藏，`$detail` 的值在隐藏期间仍然保留；当隐藏时，`detailField` 不参与必填校验。`ask` 关联到 `root`，它的 context 只包含 name、enabled、detail 三项；点击 `ask` 只会生成可编辑草稿，不会自动发送。\n\n```\nui 1 catalog \"kelivo.native/1\"\nroot = Form(children=[toggle, nameField, detailField, ask], title=\"公司发票条件表单\")\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\ntoggle = Switch(label=\"启用发票明细\", bind=$on)\nnameField = TextField(label=\"公司名称\", bind=$name, required=true, placeholder=\"请输入公司名称\", maxLength=120)\ndetailField = TextField(label=\"发票明细\", bind=$detail, required=true, visible=$on, multiline=true, placeholder=\"填写开票明细，例如项目、金额、税率\", maxLength=500)\nask = Button(label=\"检查此表单\", variant=\"primary\", form=root, action=Ask(text=\"请检查这份公司发票条件表单，并准备一份可编辑的修改草稿；不要声称已经发送。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}))\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": false,
+    "failures": [
+      "one_closed_top_level_ui_block_required"
+    ]
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "coding-agent",
+    "accepted": false,
+    "notes": "Coding-agent inspection: the fence has no kelivo-ui language tag, and the requested Form ID form is replaced with root. The response therefore fails the native envelope and exact task-identifier contracts despite describing draft-only Ask behavior."
+  }
+}

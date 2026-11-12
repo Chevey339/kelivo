@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -36,6 +38,7 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
   static final Map<String, String> _cache = <String, String>{};
 
   String? _cacheKey;
+  Timer? _queryTimer;
   String _value = '~';
   String? _error;
 
@@ -51,31 +54,49 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
     _syncQuery();
   }
 
+  @override
+  void dispose() {
+    _queryTimer?.cancel();
+    super.dispose();
+  }
+
   void _syncQuery({bool notify = true}) {
     final settings = context.read<SettingsProvider>();
     final config = settings.getProviderConfig(
       widget.providerKey,
       defaultName: widget.displayName,
     );
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    if (!config.enabled ||
-        kind != ProviderKind.openai ||
-        config.balanceEnabled != true) {
+    if (!config.enabled || config.balanceEnabled != true) {
+      _queryTimer?.cancel();
+      _cacheKey = null;
       return;
     }
 
     final key = [
       config.id,
+      config.baseUrl,
       config.balanceApiPath ?? '',
       config.balanceResultPath ?? '',
+      config.balanceMethod,
+      Object.hashAll(
+        config.balanceHeaders.map(
+          (row) => Object.hash(row['name'], row['value']),
+        ),
+      ),
+      config.balanceBody.hashCode,
       config.apiKey.hashCode,
       config.multiKeyEnabled,
-      config.apiKeys?.length ?? 0,
+      Object.hashAll(
+        config.apiKeys?.map(
+              (key) =>
+                  Object.hash(key.key, key.isEnabled, key.status, key.priority),
+            ) ??
+            const [],
+      ),
+      config.keyManagement?.strategy,
     ].join('|');
     if (_cacheKey == key) return;
+    _queryTimer?.cancel();
     _cacheKey = key;
 
     final cached = _cache[key];
@@ -102,7 +123,11 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
     } else {
       reset();
     }
-    _fetch(config, key);
+    // Settings save on each keystroke; wait for an editing pause before querying.
+    _queryTimer = Timer(const Duration(milliseconds: 500), () {
+      _queryTimer = null;
+      if (mounted && _cacheKey == key) _fetch(config, key);
+    });
   }
 
   Future<void> _fetch(ProviderConfig config, String key) async {
@@ -130,13 +155,7 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
       widget.providerKey,
       defaultName: widget.displayName,
     );
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    if (!config.enabled ||
-        kind != ProviderKind.openai ||
-        config.balanceEnabled != true) {
+    if (!config.enabled || config.balanceEnabled != true) {
       return const SizedBox.shrink();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {

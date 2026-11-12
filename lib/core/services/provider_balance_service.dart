@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io' show HttpException;
 
+import 'package:http/http.dart' as http;
+
 import '../providers/settings_provider.dart';
 import 'api/provider_request_headers.dart';
 import 'api_key_manager.dart';
@@ -98,15 +100,6 @@ class ProviderBalanceService {
   const ProviderBalanceService._();
 
   static Future<String> fetchBalance(ProviderConfig config) async {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    if (kind != ProviderKind.openai) {
-      throw const ProviderBalanceException(
-        'Balance is only supported for OpenAI-compatible providers',
-      );
-    }
     if (config.balanceEnabled != true) {
       throw const ProviderBalanceException('Balance query is disabled');
     }
@@ -114,14 +107,44 @@ class ProviderBalanceService {
     final apiPath = (config.balanceApiPath ?? '/credits').trim();
     final resultPath = (config.balanceResultPath ?? 'data.total_usage').trim();
     final uri = _balanceUri(config.baseUrl, apiPath);
-    final client = providerHttpClient(config);
+    final method = config.balanceMethod;
+    if (method != 'GET' && method != 'POST') {
+      throw ProviderBalanceException(
+        'Unsupported balance HTTP method: $method',
+      );
+    }
+    // Custom balance payloads can contain credentials under arbitrary names.
+    final client = providerHttpClient(config, logRequests: false);
     try {
       final apiKey = _effectiveApiKey(config);
-      final headers = <String, String>{
+      final request = http.Request(method, uri);
+      final hasBody = method == 'POST' && config.balanceBody.trim().isNotEmpty;
+      request.headers.addAll({
         if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
         ...providerDefaultHeaders(config),
-      };
-      final response = await client.get(uri, headers: headers);
+        if (hasBody) 'Content-Type': 'application/json',
+      });
+      for (final header in config.balanceHeaders) {
+        final name = (header['name'] ?? '').trim();
+        if (name.isEmpty) continue;
+        final value = (header['value'] ?? '')
+            .replaceAll('{{apiKey}}', apiKey)
+            .trim();
+        // http.Request headers are case insensitive, including removals.
+        if (value.isEmpty) {
+          request.headers.remove(name);
+        } else {
+          request.headers[name] = value;
+        }
+      }
+      if (hasBody) {
+        request.bodyBytes = utf8.encode(
+          config.balanceBody.replaceAll('{{apiKey}}', apiKey),
+        );
+      }
+      final response = await http.Response.fromStream(
+        await client.send(request),
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw ProviderBalanceException(
           'HTTP ${response.statusCode}: ${response.body}',

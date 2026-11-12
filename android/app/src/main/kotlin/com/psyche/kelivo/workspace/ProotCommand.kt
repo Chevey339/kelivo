@@ -1,5 +1,7 @@
 package com.psyche.kelivo.workspace
 
+import android.os.Process
+import android.system.Os
 import java.io.File
 
 data class BindMount(
@@ -20,6 +22,11 @@ object ProotCommand {
     const val TALLOC_LIB = "libtalloc.so"
     const val TALLOC_SONAME = "libtalloc.so.2"
     const val BASH_EVAL = "cd -- \"\$1\" && eval \"\$2\""
+
+    internal fun defaultKernelRelease(
+        is64BitProcess: Boolean = Process.is64Bit(),
+        readKernelRelease: () -> String = { Os.uname().release },
+    ): String? = if (is64BitProcess) null else readKernelRelease()
 
     fun validateGuestCwd(cwd: String): String {
         val trimmed = cwd.trim()
@@ -42,6 +49,7 @@ object ProotCommand {
         extraArgs: List<String> = emptyList(),
         shell: String? = null,
         includeLibraryPath: Boolean = File(nativeLibDir, TALLOC_LIB).isFile,
+        kernelRelease: String? = defaultKernelRelease(),
     ): ProotLaunch {
         val guestCwd = validateGuestCwd(cwd)
         require(extraArgs.none { it.contains('\u0000') }) { "PRoot argument contains a NUL byte" }
@@ -54,6 +62,17 @@ object ProotCommand {
             "--root-id",
             "--link2symlink",
             "--kill-on-exit",
+        )
+        // Some Android vendor kernels expose a broken 32-bit time64 vDSO
+        // (Kelivo #1231). PRoot's -k hides it from guest libc. Keep the real
+        // kernel version and respect an explicitly configured override.
+        val hasKernelOverride = extraArgs.any {
+            it == "-k" || it.startsWith("-k ") || it.startsWith("--kernel-release=")
+        }
+        if (kernelRelease != null && !hasKernelOverride) {
+            argv += "--kernel-release=$kernelRelease"
+        }
+        argv += listOf(
             *extraArgs.toTypedArray(),
             "-r",
             rootfsDir.absolutePath,

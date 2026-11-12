@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/services/backup/restore_startup_gate.dart';
 import '../../l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Shown while the startup gate converges a published restore.
 ///
@@ -36,11 +37,16 @@ class RestoreProgressScreen extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2.5),
                   ),
                   const SizedBox(height: 28),
-                  Text(
-                    l10n.restoreProgressTitle,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                  ValueListenableBuilder<RestoreStartupStage>(
+                    valueListenable: stage,
+                    builder: (context, value, _) => Text(
+                      value == RestoreStartupStage.protectingData
+                          ? l10n.recoveryProtectingTitle
+                          : l10n.restoreProgressTitle,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: AppFontWeights.semibold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -74,6 +80,7 @@ class RestoreProgressScreen extends StatelessWidget {
 
   static String _stageLabel(AppLocalizations l10n, RestoreStartupStage stage) =>
       switch (stage) {
+        RestoreStartupStage.protectingData => l10n.recoveryProtectingData,
         RestoreStartupStage.checkingBackup =>
           l10n.restoreProgressStageCheckingBackup,
         RestoreStartupStage.preservingCurrentData =>

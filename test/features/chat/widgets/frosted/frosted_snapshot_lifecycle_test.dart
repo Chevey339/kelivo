@@ -383,7 +383,7 @@ void main() {
     expect(controller.generation, greaterThan(generationA));
     expect(find.byType(RawImage), findsNothing);
     expect(controller.liveTransition, isTrue);
-    expect(find.byType(BackdropFilter), findsWidgets);
+    expect(_activeFilters, findsWidgets);
 
     await tester.pump();
     await tester.pump();
@@ -453,9 +453,9 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.byType(BackdropFilter), findsNWidgets(2));
+      expect(_activeFilters, findsNWidgets(2));
       final filters = tester.renderObjectList<RenderBackdropFilter>(
-        find.byType(BackdropFilter),
+        _activeFilters,
       );
       expect(filters, hasLength(2));
       expect(filters.first.backdropKey, isNotNull);
@@ -481,7 +481,7 @@ void main() {
 
       expect(controller.mode, FrostedRenderMode.uniform);
       expect(controller.snapshotUnsupported, isTrue);
-      expect(find.byType(BackdropFilter), findsNothing);
+      expect(_activeFilters, findsNothing);
       expect(_countLayers<BackdropFilterLayer>(tester), 0);
     },
   );
@@ -530,7 +530,7 @@ void main() {
     final pixelsAfterFirst = controller.pixelVersion;
     expect(controller.hasCurrentSnapshot(14), isTrue);
     expect(find.byType(RawImage), findsOneWidget);
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(_activeFilters, findsNothing);
 
     backdropKey.currentState!.paintSecondTone();
     await tester.pump();
@@ -540,7 +540,7 @@ void main() {
     expect(controller.pixelVersion, greaterThan(pixelsAfterFirst));
     expect(controller.hasCurrentSnapshot(14), isTrue);
     expect(find.byType(RawImage), findsOneWidget);
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(_activeFilters, findsNothing);
     expect(_countLayers<BackdropFilterLayer>(tester), 0);
     expect(controller.mode, FrostedRenderMode.cached);
   });
@@ -587,7 +587,7 @@ void main() {
         .controller;
     expect(controller.debugCaptureCount, 1);
     expect(controller.hasCurrentSnapshot(14), isTrue);
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(_activeFilters, findsNothing);
 
     backdropKey.currentState!.paintSecondTone();
     await tester.pump();
@@ -595,7 +595,7 @@ void main() {
 
     expect(controller.debugCaptureCount, 2);
     expect(controller.hasCurrentSnapshot(14), isTrue);
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(_activeFilters, findsNothing);
   });
 
   testWidgets('delayed wallpaper decode recaptures after first placeholder', (
@@ -647,7 +647,7 @@ void main() {
     final capturesAfterPlaceholder = controller.debugCaptureCount;
     expect(capturesAfterPlaceholder, greaterThanOrEqualTo(1));
     expect(controller.hasCurrentSnapshot(14), isTrue);
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(_activeFilters, findsNothing);
 
     completer.complete(ImageInfo(image: _solidImage(const Color(0xFF00C853))));
     await tester.pump();
@@ -664,7 +664,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(_activeFilters, findsNothing);
     expect(controller.mode, FrostedRenderMode.cached);
   });
 
@@ -725,7 +725,7 @@ void main() {
         .widget<ChatFrostedBackdropScope>(find.byType(ChatFrostedBackdropScope))
         .controller;
     expect(controller.mode, FrostedRenderMode.cached);
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(_activeFilters, findsNothing);
 
     dark = true;
     rebuild(() {});
@@ -733,7 +733,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(controller.liveTransition, isTrue);
-    expect(find.byType(BackdropFilter), findsWidgets);
+    expect(_activeFilters, findsWidgets);
     expect(find.byType(RawImage), findsNothing);
   });
 
@@ -785,7 +785,7 @@ void main() {
 
     expect(controller.debugCaptureCount, lessThanOrEqualTo(baseline + 2));
     expect(controller.liveTransition, isTrue);
-    expect(find.byType(BackdropFilter), findsWidgets);
+    expect(_activeFilters, findsWidgets);
   });
 }
 
@@ -935,3 +935,7 @@ int _countLayers<T extends Layer>(WidgetTester tester) {
   walk(tester.binding.renderViews.first.debugLayer!);
   return count;
 }
+
+Finder get _activeFilters => find.byWidgetPredicate(
+  (widget) => widget is BackdropFilter && widget.enabled,
+);

@@ -140,7 +140,11 @@ void main() {
               if (timeline) {
                 controller.markStreamingStarted(message.id);
                 if (reasoning) {
-                  await controller.handleReasoningChunk(source.value, state);
+                  await controller.handleReasoningChunk(
+                    source.value,
+                    state,
+                    id: 'profile-reasoning',
+                  );
                 } else {
                   controller.streamingContentNotifier.updateContent(
                     message.id,
@@ -250,7 +254,14 @@ void main() {
               await tester.pump(const Duration(seconds: 1));
               scroll.jumpTo(scroll.position.maxScrollExtent);
               await tester.pump(const Duration(seconds: 1));
-              if (frosted) expect(find.byType(BackdropFilter), findsWidgets);
+              if (frosted) {
+                expect(
+                  find.byWidgetPredicate(
+                    (widget) => widget is BackdropFilter && widget.enabled,
+                  ),
+                  findsWidgets,
+                );
+              }
               frames.clear();
               final updates = <int>[];
               final elapsed = Stopwatch()..start();
@@ -270,7 +281,11 @@ void main() {
                 source.value += delta;
                 if (timeline) {
                   if (reasoning) {
-                    await controller.handleReasoningChunk(delta, state);
+                    await controller.handleReasoningChunk(
+                      delta,
+                      state,
+                      id: 'profile-reasoning',
+                    );
                   } else {
                     controller.streamingContentNotifier.updateContent(
                       message.id,

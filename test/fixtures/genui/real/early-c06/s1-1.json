@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-23",
+  "testedCommit": "66148048a16bf3cce98c9a4d66ebe24065296da0",
+  "task": "s1-1",
+  "response": "这是一个可直接运行的行程距离计算界面，用速度、时长和已有路程合成总距离，所有计算都在本地完成，示例数据为合成值。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[intro, formula, aInput, bInput, cInput, result, reset], gap=\"medium\")\nintro = Callout(title=\"本地计算 · 合成示例数据\", text=\"总距离按 d = a × b + c 计算。速度单位为 km/h，时长为 h，已有路程为 km；所有输入与结果显示都在本地实时完成，不会发送任何消息。\", tone=\"info\")\nformula = Formula(tex=\"d = a \\\\times b + c\", label=\"行程距离公式\")\naInput = Slider(label=\"速度 a\", bind=$a, min=0, max=120, step=1, unit=\"km/h\")\nbInput = NumberField(label=\"时长 b\", bind=$b, min=0, max=24, step=0.5, unit=\"h\")\ncInput = NumberField(label=\"已有路程 c\", bind=$c, min=0, max=500, step=1, unit=\"km\")\nresult = Metric(label=\"总行程距离\", value=total, unit=\"km\", digits=1)\nreset = Button(label=\"重置为默认值\", action=Reset(), variant=\"tonal\")\n$a: number = 30\n$b: number = 2\n$c: number = 5\nlet total = $a * $b + $c\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "coding-agent",
+    "accepted": true,
+    "notes": "Coding-agent inspection: the explanation and labels correctly use km/h, h and km; source computes a*b+c, preserves the requested input/result/reset IDs, and accurately states local updates without sending. The optional Formula decodes to a single TeX backslash for times."
+  }
+}

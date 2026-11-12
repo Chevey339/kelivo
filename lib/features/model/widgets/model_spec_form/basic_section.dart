@@ -11,9 +11,16 @@ import '../../../../shared/widgets/segmented_tabs.dart';
 import '../../../../shared/widgets/snackbar.dart';
 import 'model_spec_form_controller.dart';
 import 'spec_field_header.dart';
+import 'model_avatar_field.dart';
 
 class BasicSection extends StatelessWidget {
-  const BasicSection({super.key, required this.controller});
+  const BasicSection({
+    super.key,
+    required this.controller,
+    this.desktop = false,
+  });
+
+  final bool desktop;
 
   final ModelSpecFormController controller;
 
@@ -27,6 +34,7 @@ class BasicSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            ModelAvatarField(controller: controller, desktop: desktop),
             SpecFieldHeader(
               label: l10n.modelDetailSheetModelIdLabel,
               source: controller.isApiModelIdOverridden

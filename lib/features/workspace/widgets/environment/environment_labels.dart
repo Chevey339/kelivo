@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
@@ -177,8 +175,18 @@ String workspaceEnvErrorMessage(AppLocalizations l10n, String? code) {
       return l10n.workspaceEnvErrorChecksumMismatch;
     case 'extract_failed':
       return l10n.workspaceEnvErrorExtractFailed;
+    case 'cleanup_failed':
+      return l10n.workspaceEnvErrorCleanupFailed;
+    case 'cleanup_incomplete':
+      return l10n.workspaceEnvCleanupIncomplete;
+    case 'reset_failed':
+      return l10n.workspaceEnvErrorResetFailed;
     case 'patch_failed':
       return l10n.workspaceEnvErrorPatchFailed;
+    case 'patch_interrupted':
+      return l10n.workspaceEnvErrorRepairInterrupted;
+    case 'patch_timeout':
+      return l10n.workspaceEnvErrorRepairTimeout;
     case 'cancelled':
       return l10n.workspaceEnvErrorCancelled;
     case 'invalid_rootfs':
@@ -350,19 +358,6 @@ double? workspaceEnvProgressFraction(EnvironmentState state) {
 
 String workspaceEnvMb(int bytes) {
   return (bytes / (1024 * 1024)).toStringAsFixed(1);
-}
-
-String workspaceEnvNativeShellPath() {
-  if (defaultTargetPlatform == TargetPlatform.windows) {
-    final shell = Platform.environment['SHELL'];
-    if (shell != null && shell.isNotEmpty) return shell;
-    final comspec = Platform.environment['COMSPEC'];
-    if (comspec != null && comspec.isNotEmpty) return comspec;
-    return 'PowerShell';
-  }
-  final shell = Platform.environment['SHELL'];
-  if (shell != null && shell.isNotEmpty) return shell;
-  return '/bin/sh';
 }
 
 List<MirrorProbe> workspaceEnvSortedProbes(List<MirrorProbe> probes) {

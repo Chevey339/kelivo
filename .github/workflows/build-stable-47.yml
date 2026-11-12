@@ -21,19 +21,19 @@ on:
         type: boolean
 
       build_mac:
-        description: '构建 macOS'
+        description: '构建 macOS（Impeller 和 NoImpeller 两种版本）'
         required: false
         default: true
         type: boolean
 
       build_windows:
-        description: '构建 Windows'
+        description: '构建 Windows（Impeller 和 NoImpeller 两种版本）'
         required: false
         default: true
         type: boolean
 
       build_linux:
-        description: '构建 Linux'
+        description: '构建 Linux（Impeller 和 NoImpeller 两种版本）'
         required: false
         default: true
         type: boolean
@@ -232,9 +232,28 @@ jobs:
   # macOS 构建
   macos:
     if: ${{ github.event.inputs.build_mac == 'true' }}
-    name: 构建 macOS
+    name: 构建 macOS (${{ matrix.renderer }})
     runs-on: macos-latest
     permissions: write-all
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - renderer: Impeller
+            suffix: ''
+          - renderer: Skia
+            suffix: '-NoImpeller'
+    # 未配置时 tool/macos_sign_and_notarize.sh 会跳过签名。说明见 docs/macos-signing.md。
+    env:
+      PACKAGE_SUFFIX: ${{ matrix.suffix }}
+      MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
     steps:
       - name: 📦 检出代码
@@ -251,6 +270,10 @@ jobs:
 
       - name: 🔧 关闭 Swift Package Manager
         run: flutter config --no-enable-swift-package-manager
+
+      - name: 🔧 关闭 Impeller（Skia 构建）
+        if: matrix.renderer == 'Skia'
+        run: plutil -replace FLTEnableImpeller -bool false macos/Runner/Info.plist
 
       - name: 📝 Inject fallback
         shell: bash
@@ -270,6 +293,14 @@ jobs:
       - name: 🏗️ 构建 macOS
         run: flutter build macos --release
 
+      - name: 🔍 验证应用已关闭 Impeller
+        if: matrix.renderer == 'Skia'
+        run: |
+          test "$(plutil -extract FLTEnableImpeller raw -expect bool build/macos/Build/Products/Release/kelivo.app/Contents/Info.plist)" = false
+
+      - name: 🔐 使用 Developer ID 签名应用
+        run: bash tool/macos_sign_and_notarize.sh sign-app "build/macos/Build/Products/Release/kelivo.app"
+
       - name: 📦 创建 DMG
         run: |
           brew install create-dmg
@@ -279,12 +310,16 @@ jobs:
             --window-size 800 400 \
             --icon-size 100 \
             --app-drop-link 600 185 \
-            "Kelivo_macos_${VERSION}.dmg" \
+            "Kelivo_macos_${VERSION}${PACKAGE_SUFFIX}.dmg" \
             "build/macos/Build/Products/Release/kelivo.app" || true
           # 如果 create-dmg 失败，使用简单方式
-          if [ ! -f "Kelivo_macos_${VERSION}.dmg" ]; then
-            hdiutil create -volname Kelivo -srcfolder build/macos/Build/Products/Release/kelivo.app -ov -format UDZO Kelivo_macos_${VERSION}.dmg
+          if [ ! -f "Kelivo_macos_${VERSION}${PACKAGE_SUFFIX}.dmg" ]; then
+            hdiutil create -volname Kelivo -srcfolder build/macos/Build/Products/Release/kelivo.app -ov -format UDZO "Kelivo_macos_${VERSION}${PACKAGE_SUFFIX}.dmg"
           fi
+
+      - name: 🧾 公证并验证 DMG
+        run: bash tool/macos_sign_and_notarize.sh notarize-dmg "Kelivo_macos_${VERSION}${PACKAGE_SUFFIX}.dmg" "build/macos/Build/Products/Release/kelivo.app"
+
       - name: 🚀 发布到 Release
         if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
         uses: softprops/action-gh-release@v2
@@ -297,15 +332,25 @@ jobs:
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: macOS-DMG
+          name: macOS-DMG${{ matrix.suffix }}
           path: Kelivo_macos_*.dmg
 
   # Windows 构建
   windows:
     if: ${{ github.event.inputs.build_windows == 'true' }}
-    name: 构建 Windows
+    name: 构建 Windows (${{ matrix.renderer }})
     runs-on: windows-latest
     permissions: write-all
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - renderer: Impeller
+            suffix: ''
+          - renderer: Skia
+            suffix: '-NoImpeller'
+    env:
+      PACKAGE_SUFFIX: ${{ matrix.suffix }}
 
     steps:
       - name: 📦 检出代码
@@ -315,6 +360,23 @@ jobs:
 
       - name: 🔧 安装最新 CMake
         uses: lukka/get-cmake@latest
+
+      - name: 🔧 关闭 Impeller（Skia 构建）
+        if: matrix.renderer == 'Skia'
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('windows/runner/main.cpp')
+          source = path.read_text(encoding='utf-8')
+          anchor = '  flutter::DartProject project(L"data");'
+          if source.count(anchor) != 1 or 'set_impeller_switch(' in source:
+              raise SystemExit('Unexpected Windows Impeller configuration; review the Skia build step.')
+          source = source.replace(
+              anchor,
+              anchor + '\n  project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);',
+          )
+          path.write_text(source, encoding='utf-8')
 
       - name: 🐦 安装 Flutter
         uses: subosito/flutter-action@v2
@@ -356,7 +418,7 @@ jobs:
       - name: 📦 打包 ZIP
         shell: pwsh
         run: |
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "Kelivo_windows_$env:VERSION.zip"
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "Kelivo_windows_$($env:VERSION)$($env:PACKAGE_SUFFIX).zip"
       - name: 🔧 安装 Inno Setup
         run: choco install innosetup -y
 
@@ -414,7 +476,7 @@ jobs:
           DefaultDirName={autopf}\{#MyAppName}
           DefaultGroupName={#MyAppName}
           OutputDir=.
-          OutputBaseFilename=Kelivo_windows_{#MyAppVersion}_setup
+          OutputBaseFilename=Kelivo_windows_{#MyAppVersion}$($env:PACKAGE_SUFFIX)_setup
           Compression=lzma2
           SolidCompression=yes
           WizardStyle=modern
@@ -423,15 +485,15 @@ jobs:
           UninstallDisplayIcon={app}\{#MyAppExeName}
           $languagesBlock
           [Tasks]
-          Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标:"
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
           [Files]
           Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
           [Icons]
           Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-          Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
+          Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
           Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
           [Run]
-          Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
+          Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
           "@
 
           # 使用 UTF-8 BOM 以确保中文字符在 Inno Setup 中正确解析
@@ -452,21 +514,31 @@ jobs:
       - name: 📤 上传构建产物 (ZIP)
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-ZIP
+          name: Windows-ZIP${{ matrix.suffix }}
           path: Kelivo_windows_*.zip
 
       - name: 📤 上传构建产物 (Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-Installer
+          name: Windows-Installer${{ matrix.suffix }}
           path: Kelivo_windows_*_setup.exe
 
   # Linux 构建
   linux:
     if: ${{ github.event.inputs.build_linux == 'true' }}
-    name: 构建 Linux
+    name: 构建 Linux (${{ matrix.renderer }})
     runs-on: ubuntu-22.04
     permissions: write-all
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - renderer: Impeller
+            suffix: ''
+          - renderer: Skia
+            suffix: '-NoImpeller'
+    env:
+      PACKAGE_SUFFIX: ${{ matrix.suffix }}
 
     steps:
       - name: 📦 检出代码
@@ -491,6 +563,23 @@ jobs:
           channel: stable
           cache: true
 
+      - name: 🔧 关闭 Impeller（Skia 构建）
+        if: matrix.renderer == 'Skia'
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('linux/runner/my_application.cc')
+          source = path.read_text(encoding='utf-8')
+          anchor = '  g_autoptr(FlDartProject) project = fl_dart_project_new();'
+          if source.count(anchor) != 1 or 'fl_dart_project_set_enable_impeller(' in source:
+              raise SystemExit('Unexpected Linux Impeller configuration; review the Skia build step.')
+          source = source.replace(
+              anchor,
+              anchor + '\n  fl_dart_project_set_enable_impeller(project, FALSE);',
+          )
+          path.write_text(source, encoding='utf-8')
+
       - name: 📝 Inject fallback
         shell: bash
         run: |
@@ -514,12 +603,12 @@ jobs:
       - name: 📦 打包 tar.gz
         run: |
           cd build/linux/x64/release/bundle
-          tar -czf ../../../../../Kelivo_linux_${VERSION}.tar.gz .
+          tar -czf "../../../../../Kelivo_linux_${VERSION}${PACKAGE_SUFFIX}.tar.gz" .
       - name: 📦 创建 AppImage
-        run: bash tool/build_appimage.sh build/linux/x64/release/bundle "$VERSION"
+        run: bash tool/build_appimage.sh build/linux/x64/release/bundle "${VERSION}${PACKAGE_SUFFIX}"
 
       - name: 🧪 验证 AppImage 启动及 GStreamer 依赖
-        run: bash tool/test_appimage.sh "Kelivo-${VERSION}-x86_64.AppImage"
+        run: bash tool/test_appimage.sh "Kelivo-${VERSION}${PACKAGE_SUFFIX}-x86_64.AppImage"
 
       - name: 📦 创建 DEB 包
         run: |
@@ -578,7 +667,7 @@ jobs:
           chmod +x deb/opt/kelivo/kelivo.sh
 
           # 构建 DEB 包
-          dpkg-deb --build deb Kelivo_linux_${VERSION}_amd64.deb
+          dpkg-deb --build deb "Kelivo_linux_${VERSION}${PACKAGE_SUFFIX}_amd64.deb"
       - name: 📦 创建 RPM 包
         run: |
           # 创建 RPM 构建目录
@@ -649,12 +738,12 @@ jobs:
 
           # 构建 RPM
           rpmbuild -bb ~/rpmbuild/SPECS/kelivo.spec
-          cp ~/rpmbuild/RPMS/x86_64/kelivo-${VERSION_NUMBER}-1.*.rpm Kelivo_linux_${VERSION}.rpm
+          cp ~/rpmbuild/RPMS/x86_64/kelivo-${VERSION_NUMBER}-1.*.rpm "Kelivo_linux_${VERSION}${PACKAGE_SUFFIX}.rpm"
       - name: 🔍 RPM 元数据（调试）
         shell: bash
         run: |
           set -euxo pipefail
-          RPM_FILE="Kelivo_linux_${VERSION}.rpm"
+          RPM_FILE="Kelivo_linux_${VERSION}${PACKAGE_SUFFIX}.rpm"
           echo "RPM file: ${RPM_FILE}"
           cp -f ~/rpmbuild/SPECS/kelivo.spec rpm-spec.spec
           rpm -qp --info "${RPM_FILE}" | tee rpm-info.txt
@@ -663,7 +752,7 @@ jobs:
       - name: 📤 上传 RPM 元数据（调试）
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-RPM-Metadata
+          name: Linux-RPM-Metadata${{ matrix.suffix }}
           path: |
             rpm-spec.spec
             rpm-info.txt
@@ -673,7 +762,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          RPM_FILE="Kelivo_linux_${VERSION}.rpm"
+          RPM_FILE="Kelivo_linux_${VERSION}${PACKAGE_SUFFIX}.rpm"
           docker run --rm -v "${PWD}:/work" -w /work fedora:43 bash -lc "dnf -y install ./${RPM_FILE}"
       - name: 🚀 发布到 Release
         if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
@@ -690,23 +779,23 @@ jobs:
       - name: 📤 上传构建产物 (tar.gz)
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-tar.gz
+          name: Linux-tar.gz${{ matrix.suffix }}
           path: Kelivo_linux_*.tar.gz
 
       - name: 📤 上传构建产物 (AppImage)
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-AppImage
+          name: Linux-AppImage${{ matrix.suffix }}
           path: Kelivo-*-x86_64.AppImage
 
       - name: 📤 上传构建产物 (DEB)
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-DEB
+          name: Linux-DEB${{ matrix.suffix }}
           path: Kelivo_linux_*_amd64.deb
 
       - name: 📤 上传构建产物 (RPM)
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-RPM
+          name: Linux-RPM${{ matrix.suffix }}
           path: Kelivo_linux_*.rpm

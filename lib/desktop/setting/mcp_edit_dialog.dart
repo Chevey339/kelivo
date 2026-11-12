@@ -1,3 +1,9 @@
+import '../../shared/widgets/ios_form_text_field.dart';
+import '../../shared/widgets/ios_tactile.dart';
+import '../../shared/widgets/ios_text_button.dart';
+import '../widgets/desktop_form_dialog.dart';
+import '../../features/mcp/widgets/mcp_presentation_fields.dart';
+import '../../core/models/mcp_presentation.dart';
 import 'dart:math' as math;
 import '../../core/services/mcp/stdio_arguments.dart';
 import '../../features/mcp/widgets/mcp_environment_picker.dart';
@@ -23,12 +29,10 @@ Future<void> showDesktopMcpEditDialog(
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => Dialog(
-      backgroundColor: context.overlaySurface,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
+    builder: (ctx) => Padding(
+      padding: const EdgeInsets.all(24),
+      child: DesktopFormDialog(
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 640),
         child: _DesktopMcpEditDialog(serverId: serverId),
       ),
     ),
@@ -52,6 +56,8 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
 
   late final McpOAuthFormController _oauth;
   bool _enabled = true;
+  McpServerIcon? _icon;
+  String? _groupId;
   final _nameCtrl = TextEditingController();
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
@@ -73,6 +79,11 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     );
     if (isEdit) {
       final server = context.read<McpProvider>().getById(widget.serverId!)!;
+      final presentation = context.read<McpProvider>().presentationFor(
+        server.id,
+      );
+      _icon = presentation.icon;
+      _groupId = presentation.groupId;
       _enabled = server.enabled;
       _nameCtrl.text = server.name;
       _transport = server.transport;
@@ -120,13 +131,21 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     super.dispose();
   }
 
+  Future<void> _savePresentation(McpProvider mcp, String id) async {
+    await mcp.setServerIcon(id, _icon);
+    final groupId = mcp.groups.any((g) => g.id == _groupId) ? _groupId : null;
+    await mcp.moveServersToGroup({id}, groupId);
+  }
+
   Future<void> _save() async {
+    var savedId = widget.serverId;
     final l10n = AppLocalizations.of(context)!;
     final mcp = context.read<McpProvider>();
     // Built-in server: only allow toggling enabled, no other changes
     if (isEdit && _transport == McpTransportType.inmemory) {
       final old = mcp.getById(widget.serverId!)!;
       await mcp.updateServerMetadata(old.copyWith(enabled: _enabled));
+      await _savePresentation(mcp, savedId!);
       if (mounted) Navigator.of(context).maybePop();
       return;
     }
@@ -193,7 +212,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           ),
         );
       } else {
-        await mcp.addServer(
+        savedId = await mcp.addServer(
           enabled: _enabled,
           name: name,
           transport: McpTransportType.stdio,
@@ -245,7 +264,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           replaceOAuthSettings: true,
         );
       } else {
-        await mcp.addServer(
+        savedId = await mcp.addServer(
           enabled: _enabled,
           name: name,
           transport: _transport,
@@ -256,6 +275,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         );
       }
     }
+    await _savePresentation(mcp, savedId!);
     if (mounted) Navigator.of(context).maybePop();
   }
 
@@ -284,7 +304,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             if (isEdit)
               Padding(
                 padding: const EdgeInsets.only(right: 4),
-                child: _SmallIconBtn(
+                child: IosIconButton(
+                  minSize: 44,
+                  size: 18,
                   icon: lucide.Lucide.RefreshCw,
                   tooltip: l10n.mcpServerEditSheetSyncToolsTooltip,
                   onTap: () async {
@@ -294,7 +316,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                   },
                 ),
               ),
-            _SmallIconBtn(
+            IosIconButton(
+              minSize: 44,
+              size: 18,
               icon: lucide.Lucide.X,
               tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
               onTap: () => Navigator.of(context).maybePop(),
@@ -307,7 +331,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
 
   Widget _basicForm() {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final isBuiltin = isEdit && _transport == McpTransportType.inmemory;
     return ListView(
@@ -331,6 +354,17 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 10),
+        McpPresentationFields(
+          desktop: true,
+          server: isEdit
+              ? context.read<McpProvider>().getById(widget.serverId!)
+              : null,
+          icon: _icon,
+          groupId: _groupId,
+          onIconChanged: (value) => setState(() => _icon = value),
+          onGroupChanged: (value) => setState(() => _groupId = value),
         ),
         const SizedBox(height: 10),
         // Name row: read-only text for builtin, editable for others
@@ -361,7 +395,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             label: l10n.mcpServerEditSheetNameLabel,
             controller: _nameCtrl,
             hint: 'My MCP',
-            bold: true,
           ),
           const SizedBox(height: 10),
           Text(
@@ -409,7 +442,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             hint: _transport == McpTransportType.sse
                 ? 'http://localhost:3000/sse'
                 : 'http://localhost:3000',
-            bold: true,
           ),
         if (!isBuiltin && _transport != McpTransportType.stdio)
           McpOAuthSettings(controller: _oauth),
@@ -422,7 +454,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             label: l10n.mcpServerEditSheetStdioCommandLabel,
             controller: _cmdCtrl,
             hint: 'npx',
-            bold: false,
           ),
           const SizedBox(height: 10),
           _labeledField(
@@ -430,14 +461,12 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             controller: _argsCtrl,
             hint: l10n.mcpArgumentsHint,
             maxLines: 4,
-            bold: false,
           ),
           const SizedBox(height: 10),
           _labeledField(
             label: l10n.mcpServerEditSheetStdioWorkingDirectoryLabel,
             controller: _cwdCtrl,
             hint: '',
-            bold: false,
           ),
           const SizedBox(height: 16),
           Text(
@@ -451,9 +480,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              icon: const Icon(lucide.Lucide.Download, size: 16),
-              label: Text(l10n.mcpImportEnvironment),
+            child: IosTextButton(
+              icon: lucide.Lucide.Download,
+              label: l10n.mcpImportEnvironment,
               onPressed: () async {
                 final variable = await pickMcpEnvironmentVariable(context);
                 if (variable == null || !mounted) return;
@@ -490,18 +519,18 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                         label: l10n.mcpServerEditSheetStdioEnvNameLabel,
                         controller: _env[i].key,
                         hint: 'ENV_NAME',
-                        bold: false,
                       ),
                       const SizedBox(height: 10),
                       _labeledField(
                         label: l10n.mcpServerEditSheetStdioEnvValueLabel,
                         controller: _env[i].value,
                         hint: 'value',
-                        bold: false,
                       ),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: _SmallIconBtn(
+                        child: IosIconButton(
+                          minSize: 44,
+                          size: 18,
                           icon: lucide.Lucide.Trash2,
                           tooltip: l10n.mcpServerEditSheetRemoveHeaderTooltip,
                           onTap: () => setState(() => _env.removeAt(i)),
@@ -513,34 +542,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
               ],
               Align(
                 alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  icon: const Icon(lucide.Lucide.Plus, size: 16),
-                  label: Text(l10n.mcpServerEditSheetStdioAddEnv),
-                  style:
-                      OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ).copyWith(
-                        splashFactory: NoSplash.splashFactory,
-                        overlayColor: const WidgetStatePropertyAll(
-                          Colors.transparent,
-                        ),
-                        backgroundColor: WidgetStateProperty.resolveWith((
-                          states,
-                        ) {
-                          if (states.contains(WidgetState.hovered)) {
-                            return cs.onSurface.withValues(
-                              alpha: isDark ? 0.06 : 0.05,
-                            );
-                          }
-                          return Colors.transparent;
-                        }),
-                      ),
+                child: IosTextButton(
+                  icon: lucide.Lucide.Plus,
+                  label: l10n.mcpServerEditSheetStdioAddEnv,
                   onPressed: () => setState(
                     () => _env.add(
                       _HeaderEntry(
@@ -576,18 +580,18 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                         label: l10n.mcpServerEditSheetHeaderNameLabel,
                         controller: _headers[i].key,
                         hint: l10n.mcpServerEditSheetHeaderNameHint,
-                        bold: false,
                       ),
                       const SizedBox(height: 10),
                       _labeledField(
                         label: l10n.mcpServerEditSheetHeaderValueLabel,
                         controller: _headers[i].value,
                         hint: l10n.mcpServerEditSheetHeaderValueHint,
-                        bold: false,
                       ),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: _SmallIconBtn(
+                        child: IosIconButton(
+                          minSize: 44,
+                          size: 18,
                           icon: lucide.Lucide.Trash2,
                           tooltip: l10n.mcpServerEditSheetRemoveHeaderTooltip,
                           onTap: () => setState(() => _headers.removeAt(i)),
@@ -599,34 +603,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
               ],
               Align(
                 alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  icon: const Icon(lucide.Lucide.Plus, size: 16),
-                  label: Text(l10n.mcpServerEditSheetAddHeader),
-                  style:
-                      OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ).copyWith(
-                        splashFactory: NoSplash.splashFactory,
-                        overlayColor: const WidgetStatePropertyAll(
-                          Colors.transparent,
-                        ),
-                        backgroundColor: WidgetStateProperty.resolveWith((
-                          states,
-                        ) {
-                          if (states.contains(WidgetState.hovered)) {
-                            return cs.onSurface.withValues(
-                              alpha: isDark ? 0.06 : 0.05,
-                            );
-                          }
-                          return Colors.transparent;
-                        }),
-                      ),
+                child: IosTextButton(
+                  icon: lucide.Lucide.Plus,
+                  label: l10n.mcpServerEditSheetAddHeader,
                   onPressed: () => setState(
                     () => _headers.add(
                       _HeaderEntry(
@@ -783,7 +762,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final tab = _tab;
 
@@ -823,40 +801,14 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              FilledButton(
-                onPressed: _save,
-                style:
-                    FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      backgroundColor: cs.primary,
-                      foregroundColor: cs.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ).copyWith(
-                      splashFactory: NoSplash.splashFactory,
-                      overlayColor: const WidgetStatePropertyAll(
-                        Colors.transparent,
-                      ),
-                      backgroundColor: WidgetStateProperty.resolveWith((
-                        states,
-                      ) {
-                        if (states.contains(WidgetState.hovered)) {
-                          final isDark =
-                              Theme.of(context).brightness == Brightness.dark;
-                          return Color.lerp(
-                            cs.primary,
-                            isDark ? cs.onSurface : cs.surface,
-                            isDark ? 0.06 : 0.08,
-                          );
-                        }
-                        return cs.primary;
-                      }),
-                    ),
-                child: Text(l10n.mcpServerEditSheetSave),
+              IosTextButton(
+                label: l10n.mcpServerEditSheetCancel,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              const SizedBox(width: 8),
+              DesktopFormPrimaryButton(
+                label: l10n.mcpServerEditSheetSave,
+                onTap: _save,
               ),
             ],
           ),
@@ -869,62 +821,18 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     required String label,
     required TextEditingController controller,
     String? hint,
-    bool bold = false,
     int maxLines = 1,
   }) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: bold ? AppFontWeights.emphasis : AppFontWeights.medium,
-            color: cs.onSurface.withValues(alpha: 0.8),
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          minLines: 1,
-          autocorrect: false,
-          enableSuggestions: false,
-          smartDashesType: SmartDashesType.disabled,
-          smartQuotesType: SmartQuotesType.disabled,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: AppFontWeights.regular,
-            color: cs.onSurface,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            fillColor: context.appColors.surfaceCard,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
-            ),
-          ),
-        ),
-      ],
+    return IosFormTextField(
+      label: label,
+      controller: controller,
+      hintText: hint,
+      inlineLabel: false,
+      outerPadding: EdgeInsets.zero,
+      maxLines: maxLines,
+      minLines: 1,
+      autocorrect: false,
+      enableSuggestions: false,
     );
   }
 }
@@ -936,48 +844,6 @@ class _HeaderEntry {
   void dispose() {
     key.dispose();
     value.dispose();
-  }
-}
-
-class _SmallIconBtn extends StatefulWidget {
-  const _SmallIconBtn({required this.icon, required this.onTap, this.tooltip});
-  final IconData icon;
-  final VoidCallback onTap;
-  final String? tooltip;
-  @override
-  State<_SmallIconBtn> createState() => _SmallIconBtnState();
-}
-
-class _SmallIconBtnState extends State<_SmallIconBtn> {
-  bool _hover = false;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover
-        ? (cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
-        : Colors.transparent;
-    final btn = Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.center,
-      child: Icon(widget.icon, size: 18, color: cs.onSurface),
-    );
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: widget.tooltip == null
-            ? btn
-            : Tooltip(message: widget.tooltip!, child: btn),
-      ),
-    );
   }
 }
 

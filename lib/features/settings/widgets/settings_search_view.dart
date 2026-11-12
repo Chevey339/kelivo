@@ -44,6 +44,7 @@ class SettingsSearchView extends StatefulWidget {
 class _SettingsSearchViewState extends State<SettingsSearchView> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _firstResultFocusNode = FocusNode();
   final _scrollController = ScrollController();
   List<SettingsSearchItem> _results = const [];
   bool _focusRequested = false;
@@ -59,7 +60,20 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
       if (event is KeyDownEvent &&
           event.logicalKey == LogicalKeyboardKey.arrowDown &&
           _controller.value.composing.isCollapsed) {
-        FocusScope.of(context).nextFocus();
+        // Arrow Down enters the results, independent of clear/cancel buttons
+        // in the normal Tab order. Mount the first lazy row before focusing it.
+        if (_scrollController.hasClients) _scrollController.jumpTo(0);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final items = _hasQuery ? _results : widget.index.suggestions;
+          if (mounted &&
+              !_closing &&
+              _focusNode.hasFocus &&
+              items.isNotEmpty &&
+              _firstResultFocusNode.parent != null) {
+            _firstResultFocusNode.requestFocus();
+          }
+        });
+        WidgetsBinding.instance.ensureVisualUpdate();
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -99,6 +113,7 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
     widget.transition.removeStatusListener(_onTransition);
     _controller.dispose();
     _focusNode.dispose();
+    _firstResultFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -331,6 +346,7 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
                 Semantics(
                   button: true,
                   child: SettingsSearchAction(
+                    focusNode: index == 1 ? _firstResultFocusNode : null,
                     onTap: () => _open(item),
                     borderRadius: radius,
                     child: IosNavRow(

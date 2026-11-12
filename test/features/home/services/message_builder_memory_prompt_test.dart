@@ -119,6 +119,7 @@ void main() {
     MemoryType type = MemoryType.identity,
     MemoryScope scope = MemoryScope.global,
     String? assistantId,
+    MemoryStatus status = MemoryStatus.active,
   }) {
     final created = DateTime.utc(2026, 8, 1).microsecondsSinceEpoch;
     return businessRepository.upsertEntity(
@@ -131,7 +132,7 @@ void main() {
           'scope': MemoryEntry.scopeToString(scope),
           'assistantId': assistantId,
           'type': MemoryEntry.typeToString(type),
-          'status': 'active',
+          'status': MemoryEntry.statusToString(status),
           'content': content,
           'source': 'manual',
           'relatedIds': <String>[],
@@ -206,6 +207,161 @@ void main() {
     enableMemory: true,
     messageTemplate: '{{ message }}',
   );
+
+  test('each assistant injects its own selected types', () async {
+    await seedAssistant(assistant.id);
+    await seedAssistant('other');
+    await settings.setMemoryInjectionMaxItems(1);
+    for (final type in [MemoryType.voice, MemoryType.workflow]) {
+      for (var i = 0; i < 2; i++) {
+        await putEntry(
+          id: '${type.name}-$i',
+          type: type,
+          content: '${type.name} $i',
+        );
+      }
+    }
+    final service = buildService();
+    final a = assistant.copyWith(memoryFullInjectionTypes: {MemoryType.voice});
+    final b = assistant.copyWith(
+      id: 'other',
+      memoryFullInjectionTypes: {MemoryType.workflow},
+    );
+    Future<String> snapshot(Assistant value) async =>
+        (await service.currentMemorySnapshot(
+          assistant: value,
+          lang: MemoryPromptLang.zh,
+          settings: settings,
+        ))!.prefix;
+    final first = await snapshot(a);
+    final second = await snapshot(b);
+    expect(first, contains('<user_memory type="voice">'));
+    expect(
+      first,
+      contains(
+        '<user_memory type="workflow" mode="summary" total="2" shown="1">',
+      ),
+    );
+    expect(second, contains('<user_memory type="workflow">'));
+    expect(
+      second,
+      contains('<user_memory type="voice" mode="summary" total="2" shown="1">'),
+    );
+    await snapshot(a.copyWith(memoryFullInjectionTypes: {}));
+    expect(await snapshot(b), second);
+  });
+
+  for (final initiallyFull in [false, true]) {
+    test(
+      'full injection toggle refreshes sends and regeneration ($initiallyFull)',
+      () async {
+        await seedAssistant(assistant.id);
+        await seedAssistant('other');
+        await settings.setMemoryInjectionMaxItems(1);
+        var currentAssistant = assistant.copyWith(
+          memoryFullInjectionTypes: initiallyFull ? {MemoryType.voice} : {},
+        );
+        await putEntry(
+          id: 'voice-1',
+          type: MemoryType.voice,
+          content: 'Global voice',
+        );
+        await putEntry(
+          id: 'voice-2',
+          type: MemoryType.voice,
+          content: 'Assistant voice',
+          scope: MemoryScope.assistant,
+          assistantId: assistant.id,
+        );
+        await putEntry(
+          id: 'voice-3',
+          type: MemoryType.voice,
+          content: 'Other assistant voice',
+          scope: MemoryScope.assistant,
+          assistantId: 'other',
+        );
+        await putEntry(
+          id: 'voice-4',
+          type: MemoryType.voice,
+          content: 'Archived voice',
+          status: MemoryStatus.archived,
+        );
+        await putEntry(id: 'identity-1', content: 'First identity');
+        await putEntry(id: 'identity-2', content: 'Second identity');
+        final conversation = await seedConversation('injection-toggle');
+        final first = await seedUserMessage(
+          id: 'first',
+          conversationId: conversation.id,
+        );
+        final service = buildService();
+
+        Future<List<Map<String, dynamic>>> assemble(
+          List<ChatMessage> messages,
+        ) async {
+          final api = service.buildApiMessages(
+            messages: messages,
+            versionSelections: const {},
+            currentConversation: conversation,
+          );
+          await service.processUserMessagesForApi(
+            api,
+            settings,
+            currentAssistant,
+            conversation: conversation,
+            sourceMessages: messages,
+          );
+          return api;
+        }
+
+        void expectSnapshot(
+          List<Map<String, dynamic>> api, {
+          required bool full,
+        }) {
+          final text = api.map((m) => m['content']).join('\n');
+          expect(MemoryPrompts.introFullZh.allMatches(text), hasLength(1));
+          expect(text, contains('Global voice'));
+          expect(
+            text,
+            full
+                ? contains('(assistant) Assistant voice')
+                : isNot(contains('Assistant voice')),
+          );
+          expect(text, contains('First identity'));
+          expect(text, isNot(contains('Second identity')));
+          expect(text, isNot(contains('Other assistant voice')));
+          expect(text, isNot(contains('Archived voice')));
+        }
+
+        expectSnapshot(await assemble([first]), full: initiallyFull);
+        final frozen = (await chatRepository.getMessagePrompt(
+          first.id,
+        ))!.payload;
+        currentAssistant = currentAssistant.copyWith(
+          memoryFullInjectionTypes: initiallyFull ? {} : {MemoryType.voice},
+        );
+
+        // Regeneration has only the frozen user message to carry the new snapshot.
+        expectSnapshot(await assemble([first]), full: !initiallyFull);
+        expect(
+          (await chatRepository.getMessagePrompt(first.id))!.payload,
+          frozen,
+        );
+
+        final second = await seedUserMessage(
+          id: 'second',
+          conversationId: conversation.id,
+          content: 'next question',
+          messageOrder: 1,
+        );
+        expectSnapshot(await assemble([first, second]), full: !initiallyFull);
+        expectSnapshot(await assemble([first, second]), full: !initiallyFull);
+        expect(
+          (await chatRepository.getMessagePrompt(first.id))!.payload,
+          frozen,
+        );
+      },
+    );
+  }
 
   test(
     'context preview includes live memory without freezing or running OCR',

@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:ui' as ui;
 
-import 'package:Kelivo/shared/widgets/incremental_markdown_document.dart';
-import 'package:Kelivo/shared/widgets/markdown_block_list.dart';
+import 'package:markstream/markstream.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,9 +22,9 @@ void main() {
       final scroll = ScrollController();
       final capture = GlobalKey();
       try {
-        final blocks = IncrementalMarkdownDocument().update(
-          List.generate(80, (i) => 'block $i').join('\n\n'),
-        );
+        final blocks = const MarkdownParser()
+            .parse(List.generate(80, (i) => 'block $i').join('\n\n'))
+            .children;
         final content = Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -34,7 +33,7 @@ void main() {
               builder: (_, value, _) => SizedBox(height: value),
             ),
             RepaintBoundary(
-              child: MarkdownBlockList(
+              child: BlockList(
                 blocks: blocks,
                 signature: 0,
                 itemBuilder: (_, i) => SizedBox(
@@ -62,14 +61,8 @@ void main() {
                       child: SingleChildScrollView(
                         controller: scroll,
                         child: nested
-                            ? MarkdownBlockList(
-                                blocks: const [
-                                  IncrementalMarkdownBlock(
-                                    start: 0,
-                                    text: '',
-                                    stable: true,
-                                  ),
-                                ],
+                            ? BlockList(
+                                blocks: const [0],
                                 signature: 0,
                                 itemBuilder: (_, _) => SizedBox(
                                   height: 6000,

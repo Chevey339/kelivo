@@ -1,7 +1,9 @@
 import "../../../support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,14 +26,19 @@ void main() {
     );
   }
 
-  StreamingState buildStreamingState(SettingsProvider settings) {
-    final message = ChatMessage(
-      id: 'assistant-message',
-      role: 'assistant',
-      content: '',
-      conversationId: 'conversation-1',
-      isStreaming: true,
-    );
+  StreamingState buildStreamingState(
+    SettingsProvider settings, {
+    ChatMessage? seed,
+  }) {
+    final message =
+        seed ??
+        ChatMessage(
+          id: 'assistant-message',
+          role: 'assistant',
+          content: '',
+          conversationId: 'conversation-1',
+          isStreaming: true,
+        );
     return StreamingState(
       GenerationContext(
         assistantMessage: message,
@@ -55,6 +62,111 @@ void main() {
         streamOutput: true,
       ),
     );
+  }
+
+  for (final withHistory in [false, true]) {
+    for (final initialSummary in ['', 'first']) {
+      testWidgets('returning to background reasoning preserves live overlays '
+          '(history=$withHistory, summary=$initialSummary)', (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        var current = 'other';
+        final controller = StreamController(
+          onStateChanged: () {},
+          getSettingsProvider: () => settings,
+          getCurrentConversationId: () => current,
+        );
+        addTearDown(controller.dispose);
+        addTearDown(settings.dispose);
+        final oldStart = DateTime(2026, 11, 2);
+        final oldEnd = oldStart.add(const Duration(seconds: 1));
+        final seed = ChatMessage(
+          id: 'assistant-message',
+          role: 'assistant',
+          conversationId: 'conversation-1',
+          isStreaming: true,
+          parts: withHistory
+              ? const [
+                  ReasoningPart(''),
+                  ReasoningPart('older'),
+                  TextPart('answer'),
+                ]
+              : const [],
+          reasoningText: withHistory ? 'older' : null,
+          reasoningStartAt: withHistory ? oldStart : null,
+          reasoningFinishedAt: withHistory ? oldEnd : null,
+          reasoningSegmentsJson: withHistory
+              ? controller.serializeReasoningSegments([
+                  for (final text in ['', 'older'])
+                    ReasoningSegmentData()
+                      ..text = text
+                      ..startAt = oldStart
+                      ..finishedAt = oldEnd,
+                ])
+              : null,
+        );
+        // Generation initializes its complete seed before any stream event,
+        // including when no UI has rendered this background message yet.
+        controller.restoreMessageUiState(seed, getToolEventsFromDb: (_) => []);
+        final state = buildStreamingState(settings, seed: seed);
+        controller.markStreamingStarted(state.messageId);
+        state.partsHandler.handle(const ReasoningStart(id: 'live'));
+        controller.handleReasoningStart('live', state);
+        state.partsHandler.handle(
+          ReasoningDelta(id: 'live', text: initialSummary),
+        );
+        await controller.handleReasoningChunk(
+          initialSummary,
+          state,
+          id: 'live',
+        );
+        final live = controller.getReasoningSegments(state.messageId)!;
+        final startedAt = live.last.startAt;
+        final checkpoint = seed.copyWith(
+          parts: state.partsHandler.parts,
+          reasoningText: controller.getReasoningData(state.messageId)!.text,
+          reasoningStartAt: startedAt,
+          reasoningSegmentsJson: controller.serializeReasoningSegments(live),
+        );
+
+        controller.clearAllState(keepMessageIds: {state.messageId});
+        current = state.conversationId;
+        controller.restoreMessageUiState(
+          checkpoint,
+          getToolEventsFromDb: (_) => [],
+        );
+        controller.refreshPresentation();
+        expect(controller.getReasoningSegments(state.messageId), same(live));
+        expect(live, hasLength(withHistory ? 3 : 1));
+        expect(live.last.finishedAt, isNull);
+        expect(
+          state.partsHandler.parts.whereType<ReasoningPart>(),
+          hasLength(live.length),
+        );
+
+        await controller.handleReasoningChunk(' later', state, id: 'live');
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(live.last.text, '$initialSummary later');
+        expect(live.last.startAt, startedAt);
+        expect(live.last.finishedAt, isNull);
+        expect(
+          controller.getReasoningData(state.messageId)!.text,
+          '${withHistory ? 'older' : ''}$initialSummary later',
+        );
+        controller.handleReasoningEnd('live', state);
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(live.last.finishedAt, isNotNull);
+        expect(
+          controller
+              .deserializeReasoningSegments(
+                controller.serializeReasoningSegments(live),
+              )
+              .last
+              .text,
+          '$initialSummary later',
+        );
+        controller.cleanupTimers(state.messageId);
+      });
+    }
   }
 
   testWidgets(
@@ -141,7 +253,7 @@ void main() {
       notifier.addListener(() => notifyCount++);
 
       for (var i = 0; i < 5; i++) {
-        await controller.handleReasoningChunk('${i + 1}', state);
+        await controller.handleReasoningChunk('${i + 1}', state, id: 'r');
       }
 
       expect(notifyCount, 0);
@@ -170,10 +282,10 @@ void main() {
     final notifier = controller.streamingContentNotifier.getNotifier(
       state.messageId,
     );
-    await controller.handleReasoningChunk('before switching', state);
+    await controller.handleReasoningChunk('before switching', state, id: 'r');
     final startAt = controller.getReasoningData(state.messageId)!.startAt;
     controller.clearAllState(keepMessageIds: {state.messageId});
-    await controller.handleReasoningChunk(' and after', state);
+    await controller.handleReasoningChunk(' and after', state, id: 'r');
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(notifier.value.reasoningText, 'before switching and after');

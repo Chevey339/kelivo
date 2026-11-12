@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/workspace/workspace_layout.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 
 import 'code_file_preview.dart';
@@ -144,7 +145,7 @@ class _MarkdownRenderedView extends StatelessWidget {
     final double baseSize = isDesktopPlatform ? 14.0 : 15.7;
     final baseStyle = TextStyle(fontSize: baseSize, height: 1.5);
 
-    final markdown = SelectionArea(
+    final markdown = AppSelectionArea(
       child: DefaultTextStyle.merge(
         style: baseStyle,
         child: MarkdownWithCodeHighlight(

@@ -118,6 +118,25 @@ void main() {
       await holding;
     });
 
+    test('a copy being exported cannot be deleted', () async {
+      final vm = build();
+      await vm.takeNow();
+      final copy = vm.copies.single;
+      final gate = Completer<void>();
+      final holding = vm.whileHoldingCopies(() => gate.future);
+      try {
+        await expectLater(vm.delete(copy), throwsA(isA<StateError>()));
+        expect(await copy.file.exists(), isTrue);
+      } finally {
+        gate.complete();
+        await holding;
+      }
+      await vm.delete(copy);
+      expect(await copy.file.exists(), isFalse);
+      expect(vm.copies, isEmpty);
+      expect(vm.working, isFalse);
+    });
+
     test('恢复前那份副本可以取消保留', () async {
       final vm = build();
       final entry = await vm.takeNow(

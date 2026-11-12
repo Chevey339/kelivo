@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../database/database_family_preserver.dart';
 import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
@@ -9,6 +10,7 @@ import '../../database/database_installation_gate.dart';
 import '../hive_migration_marker.dart';
 import '../legacy_data_retirement_service.dart';
 import '../backup/local_snapshot_schedule.dart';
+import '../backup/recovery_file_discovery.dart';
 import '../backup/restore_trace_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
@@ -16,6 +18,8 @@ import '../logging/flutter_logger.dart';
 import '../network/request_logger.dart';
 import '../sandbox/rootfs_disk_usage.dart';
 import '../workspace/workspace_session_sync.dart';
+import 'storage_image_usage.dart';
+import 'attachment_file_lock.dart';
 
 enum StorageUsageCategoryKey {
   images,
@@ -25,7 +29,6 @@ enum StorageUsageCategoryKey {
   restoreTraces,
   displacedDatabases,
   localSnapshots,
-  assistantData,
   cache,
   logs,
   other,
@@ -85,20 +88,20 @@ class StorageUsageReport {
   });
 }
 
-enum StorageFileSource { userUpload, assistant }
-
 class StorageFileEntry {
   final String path;
   final String name;
   final int bytes;
   final DateTime modifiedAt;
-  final StorageFileSource source;
+  final StorageImageKind? imageKind;
+  final bool isInUse;
   const StorageFileEntry({
     required this.path,
     required this.name,
     required this.bytes,
     required this.modifiedAt,
-    required this.source,
+    this.imageKind,
+    this.isInUse = false,
   });
 }
 
@@ -160,6 +163,8 @@ abstract final class StorageUsageService {
     Future<Directory> Function()? rootfsUsageDirectory,
   }) async {
     final root = await AppDirectories.getAppDataDirectory();
+    final contentRoot = await AppDirectories.contentDirectoryFor(root);
+    final splitStorage = !p.equals(root.path, contentRoot.path);
     var migrationCompleted = false;
     try {
       migrationCompleted = HiveMigrationMarker.isMigrationComplete(
@@ -189,11 +194,12 @@ abstract final class StorageUsageService {
         name: _MutableStats(),
     };
 
-    final assistantSubs = <String, _MutableStats>{'avatars': _MutableStats()};
     final otherSubs = <String, _MutableStats>{
       'fonts': _MutableStats(),
       'local_models': _MutableStats(),
       'app': _MutableStats(),
+      'app_documents': _MutableStats(),
+      'retained_data': _MutableStats(),
     };
 
     final cacheSubs = <String, _MutableStats>{
@@ -212,7 +218,7 @@ abstract final class StorageUsageService {
     int totalBytes = 0;
     int totalFiles = 0;
 
-    if (!await root.exists()) {
+    if (!await root.exists() && !await contentRoot.exists()) {
       return StorageUsageReport(
         totalBytes: 0,
         totalFiles: 0,
@@ -228,113 +234,145 @@ abstract final class StorageUsageService {
       );
     }
 
-    try {
-      await for (final ent in _listFiles(
-        root,
-        excludedTopDirectories: _isolateMeasuredTopDirs,
-      )) {
-        final rel = p.relative(ent.path, from: root.path);
-        final parts = p.split(rel);
-        int bytes = 0;
-        try {
-          bytes = await ent.length();
-        } catch (_) {
-          bytes = 0;
-        }
-        totalFiles += 1;
-        totalBytes += bytes;
-
-        if (parts.isEmpty) {
-          byCat[StorageUsageCategoryKey.other]!.add(bytes);
-          otherSubs['app']!.add(bytes);
-          continue;
-        }
-
-        // Root-level chat data is stored by Drift in the SQLite database file
-        // family. Legacy Hive boxes are migration inputs only and should not
-        // affect the steady-state chat records size.
-        if (parts.length == 1) {
-          final name = parts.first;
-          final chatSubId = _chatDatabaseSubcategoryId(name);
-          if (name.startsWith(_displacedDatabasePrefix)) {
-            byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
-          } else if (chatSubId != null) {
-            byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
-            chatSubs[chatSubId]!.add(bytes);
-          } else if (migrationCompleted &&
-              LegacyDataRetirementService.hiveArtifactNames.contains(name)) {
-            byCat[StorageUsageCategoryKey.legacyChatData]!.add(bytes);
-            legacyChatSubs[name]!.add(bytes);
-          } else {
-            byCat[StorageUsageCategoryKey.other]!.add(bytes);
-            otherSubs['app']!.add(bytes);
+    for (final scanRoot in [root, if (splitStorage) contentRoot]) {
+      final publicFiles =
+          splitStorage && p.equals(scanRoot.path, contentRoot.path);
+      final otherApp = otherSubs[publicFiles ? 'app_documents' : 'app']!;
+      try {
+        await for (final ent in _listFiles(
+          scanRoot,
+          excludedTopDirectories: _isolateMeasuredTopDirs,
+        )) {
+          final rel = p.relative(ent.path, from: scanRoot.path);
+          final parts = p.split(rel);
+          int bytes = 0;
+          try {
+            bytes = await ent.length();
+          } catch (_) {
+            bytes = 0;
           }
-          continue;
-        }
+          totalFiles += 1;
+          totalBytes += bytes;
 
-        final top = parts.first.toLowerCase();
-        if (restoreTraces.visible &&
-            top == '.kelivo_restore' &&
-            parts.length >= 4 &&
-            parts[1] == 'completed' &&
-            RegExp(r'^run_[a-f0-9]{32}$').hasMatch(parts[2])) {
-          byCat[StorageUsageCategoryKey.restoreTraces]!.add(bytes);
-          continue;
-        }
-        switch (top) {
-          case LocalSnapshotPaths.directoryName:
+          if (parts.isEmpty) {
+            byCat[StorageUsageCategoryKey.other]!.add(bytes);
+            otherApp.add(bytes);
+            continue;
+          }
+
+          // Root-level chat data is stored by Drift in the SQLite database file
+          // family. Legacy Hive boxes are migration inputs only and should not
+          // affect the steady-state chat records size.
+          if (parts.length == 1) {
+            final name = parts.first;
+            final chatSubId = _chatDatabaseSubcategoryId(name);
+            if (splitStorage &&
+                p.equals(scanRoot.path, contentRoot.path) &&
+                (chatSubId != null ||
+                    RecoveryFileDiscovery.isDatabaseFamilyFile(name) ||
+                    name.startsWith('database_installation_receipt_') ||
+                    LegacyDataRetirementService.hiveArtifactNames.contains(
+                      name,
+                    ))) {
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherSubs['retained_data']!.add(bytes);
+            } else if (RecoveryFileDiscovery.isSnapshotArchive(name) ||
+                (name.endsWith('.json') &&
+                    RecoveryFileDiscovery.isSnapshotArchive(
+                      name.substring(0, name.length - 5),
+                    ))) {
+              byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
+            } else if (name.startsWith(_displacedDatabasePrefix)) {
+              byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
+            } else if (chatSubId != null) {
+              byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
+              chatSubs[chatSubId]!.add(bytes);
+            } else if (migrationCompleted &&
+                LegacyDataRetirementService.hiveArtifactNames.contains(name)) {
+              byCat[StorageUsageCategoryKey.legacyChatData]!.add(bytes);
+              legacyChatSubs[name]!.add(bytes);
+            } else {
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherApp.add(bytes);
+            }
+            continue;
+          }
+
+          final top = parts.first.toLowerCase();
+          if (DatabaseFamilyPreserver.isCopyDirectory(top)) {
+            if (publicFiles) {
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherSubs['retained_data']!.add(bytes);
+            } else {
+              byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
+            }
+            continue;
+          }
+          if (RecoveryFileDiscovery.isSnapshotDirectory(top)) {
             byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
-            break;
-          case 'upload':
-          case 'images':
-            final name = parts.last;
-            if (_isImageExt(name)) {
-              byCat[StorageUsageCategoryKey.images]!.add(bytes);
-            } else {
-              byCat[StorageUsageCategoryKey.files]!.add(bytes);
-            }
-            break;
-          case 'avatars':
-            byCat[StorageUsageCategoryKey.assistantData]!.add(bytes);
-            assistantSubs['avatars']!.add(bytes);
-            break;
-          case 'fonts':
-            byCat[StorageUsageCategoryKey.other]!.add(bytes);
-            otherSubs['fonts']!.add(bytes);
-            break;
-          case 'asr_models':
-            byCat[StorageUsageCategoryKey.other]!.add(bytes);
-            otherSubs['local_models']!.add(bytes);
-            break;
-          case 'cache':
-            byCat[StorageUsageCategoryKey.cache]!.add(bytes);
-            if (parts.length >= 2 && parts[1].toLowerCase() == 'avatars') {
-              cacheSubs['avatar_cache']!.add(bytes);
-            } else {
-              cacheSubs['other_cache']!.add(bytes);
-            }
-            break;
-          case 'logs':
-            byCat[StorageUsageCategoryKey.logs]!.add(bytes);
-            final name = parts.last.toLowerCase();
-            if (name.startsWith('context_logs')) {
-              logsSubs['context_logs']!.add(bytes);
-            } else if (name.startsWith('flutter_logs')) {
-              logsSubs['flutter_logs']!.add(bytes);
-            } else if (name.startsWith('logs')) {
-              logsSubs['request_logs']!.add(bytes);
-            } else {
-              logsSubs['other_logs']!.add(bytes);
-            }
-            break;
-          default:
-            byCat[StorageUsageCategoryKey.other]!.add(bytes);
-            otherSubs['app']!.add(bytes);
-            break;
+            continue;
+          }
+          if (!publicFiles &&
+              restoreTraces.visible &&
+              top == '.kelivo_restore' &&
+              parts.length >= 4 &&
+              parts[1] == 'completed' &&
+              RegExp(r'^run_[a-f0-9]{32}$').hasMatch(parts[2])) {
+            byCat[StorageUsageCategoryKey.restoreTraces]!.add(bytes);
+            continue;
+          }
+          switch (top) {
+            case LocalSnapshotPaths.directoryName:
+              byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
+              break;
+            case 'upload':
+            case 'images':
+            case 'avatars':
+              final name = parts.last;
+              if (_isImageExt(name)) {
+                byCat[StorageUsageCategoryKey.images]!.add(bytes);
+              } else {
+                byCat[StorageUsageCategoryKey.files]!.add(bytes);
+              }
+              break;
+            case 'fonts':
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherSubs['fonts']!.add(bytes);
+              break;
+            case 'asr_models':
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherSubs['local_models']!.add(bytes);
+              break;
+            case 'cache':
+              byCat[StorageUsageCategoryKey.cache]!.add(bytes);
+              if (parts.length >= 2 && parts[1].toLowerCase() == 'avatars') {
+                cacheSubs['avatar_cache']!.add(bytes);
+              } else {
+                cacheSubs['other_cache']!.add(bytes);
+              }
+              break;
+            case 'logs':
+              byCat[StorageUsageCategoryKey.logs]!.add(bytes);
+              final name = parts.last.toLowerCase();
+              if (name.startsWith('context_logs')) {
+                logsSubs['context_logs']!.add(bytes);
+              } else if (name.startsWith('flutter_logs')) {
+                logsSubs['flutter_logs']!.add(bytes);
+              } else if (name.startsWith('logs')) {
+                logsSubs['request_logs']!.add(bytes);
+              } else {
+                logsSubs['other_logs']!.add(bytes);
+              }
+              break;
+            default:
+              byCat[StorageUsageCategoryKey.other]!.add(bytes);
+              otherApp.add(bytes);
+              break;
+          }
         }
+      } catch (_) {
+        // Keep successfully measured files if a file disappears during the scan.
       }
-    } catch (_) {
-      // Keep successfully measured files if a file disappears during the scan.
     }
 
     final [
@@ -375,13 +413,12 @@ abstract final class StorageUsageService {
         sessionsUsage.stats.bytes +
         sandboxUsage.stats.bytes;
 
-    final avatarsDir = await AppDirectories.getAvatarsDirectory();
     final fontsDir = await AppDirectories.getFontsDirectory();
-    final localModelsDir = Directory(p.join(root.path, 'asr_models'));
+    final localModelsDir = Directory(p.join(contentRoot.path, 'asr_models'));
     final cacheDir = await AppDirectories.getCacheDirectory();
     final systemCacheDir = await AppDirectories.getSystemCacheDirectory();
     final avatarCacheDir = await AppDirectories.getAvatarCacheDirectory();
-    final logsDir = Directory(p.join(root.path, 'logs'));
+    final logsDir = Directory(p.join(contentRoot.path, 'logs'));
 
     // Platform cache directory (e.g. Android /data/user/0/<package>/cache).
     try {
@@ -492,21 +529,10 @@ abstract final class StorageUsageService {
             StorageUsageSubcategory(
               id: 'local_snapshots',
               stats: byCat[StorageUsageCategoryKey.localSnapshots]!.toStats(),
-              path: LocalSnapshotPaths.directoryIn(root).path,
+              path: LocalSnapshotPaths.directoryIn(contentRoot).path,
             ),
           ],
         ),
-      StorageUsageCategory(
-        key: StorageUsageCategoryKey.assistantData,
-        stats: byCat[StorageUsageCategoryKey.assistantData]!.toStats(),
-        subcategories: [
-          StorageUsageSubcategory(
-            id: 'avatars',
-            stats: assistantSubs['avatars']!.toStats(),
-            path: avatarsDir.path,
-          ),
-        ],
-      ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.cache,
         stats: byCat[StorageUsageCategoryKey.cache]!.toStats(),
@@ -574,6 +600,19 @@ abstract final class StorageUsageService {
               stats: otherSubs['local_models']!.toStats(),
               path: localModelsDir.path,
             ),
+          if (splitStorage && otherSubs['retained_data']!.fileCount > 0)
+            StorageUsageSubcategory(
+              id: 'retained_data',
+              stats: otherSubs['retained_data']!.toStats(),
+              path: contentRoot.path,
+              isDirectory: true,
+            ),
+          if (otherSubs['app_documents']!.fileCount > 0)
+            StorageUsageSubcategory(
+              id: 'app_documents',
+              stats: otherSubs['app_documents']!.toStats(),
+              path: contentRoot.path,
+            ),
           if (otherSubs['app']!.fileCount > 0)
             StorageUsageSubcategory(
               id: 'app',
@@ -620,19 +659,19 @@ abstract final class StorageUsageService {
   }
 
   static Future<void> clearCache({required bool avatarsOnly}) async {
-    if (avatarsOnly) {
-      final dir = await AppDirectories.getAvatarCacheDirectory();
+    await AvatarCache.clearCache(() async {
+      if (avatarsOnly) {
+        final dir = await AppDirectories.getAvatarCacheDirectory();
+        await _deleteDirectoryContents(dir);
+        return;
+      }
+      final dir = await AppDirectories.getCacheDirectory();
       await _deleteDirectoryContents(dir);
-      AvatarCache.clearMemory();
-      return;
-    }
-    final dir = await AppDirectories.getCacheDirectory();
-    await _deleteDirectoryContents(dir);
-    try {
-      final sys = await AppDirectories.getSystemCacheDirectory();
-      await _deleteDirectoryContents(sys);
-    } catch (_) {}
-    AvatarCache.clearMemory();
+      try {
+        final sys = await AppDirectories.getSystemCacheDirectory();
+        await _deleteDirectoryContents(sys);
+      } catch (_) {}
+    });
   }
 
   static Future<void> clearOtherCache() async {
@@ -676,7 +715,7 @@ abstract final class StorageUsageService {
     } catch (_) {}
 
     try {
-      final root = await AppDirectories.getAppDataDirectory();
+      final root = await AppDirectories.getContentDirectory();
       final logsDir = Directory(p.join(root.path, 'logs'));
       // The startup-recovery record is the only trace of an unattended rebuild
       // — the one startup outcome that destroys state without asking. Clearing
@@ -722,7 +761,7 @@ abstract final class StorageUsageService {
   }
 
   static Future<void> clearLocalModels() async {
-    final root = await AppDirectories.getAppDataDirectory();
+    final root = await AppDirectories.getContentDirectory();
     await _deleteDirectoryContents(Directory(p.join(root.path, 'asr_models')));
   }
 
@@ -731,20 +770,16 @@ abstract final class StorageUsageService {
   }) async {
     final dir = await AppDirectories.getUploadDirectory();
     final imagesDir = await AppDirectories.getImagesDirectory();
+    final avatarsDir = await AppDirectories.getAvatarsDirectory();
+    final usage = await StorageImageUsage.load(includeMessages: images);
     final out = <StorageFileEntry>[];
-    Future<void> addFromDir(
-      Directory d, {
-      required bool includeImages,
-      required bool includeNonImages,
-      required StorageFileSource source,
-    }) async {
+    Future<void> addFromDir(Directory d) async {
       if (!await d.exists()) return;
       try {
         await for (final ent in _listFiles(d)) {
           final name = p.basename(ent.path);
           final isImg = _isImageExt(name);
-          if (isImg && !includeImages) continue;
-          if (!isImg && !includeNonImages) continue;
+          if (isImg != images) continue;
           int bytes = 0;
           DateTime modifiedAt = DateTime.fromMillisecondsSinceEpoch(0);
           try {
@@ -756,13 +791,24 @@ abstract final class StorageUsageService {
               bytes = await ent.length();
             } catch (_) {}
           }
+          String? realPath;
+          try {
+            realPath = await ent.resolveSymbolicLinks();
+          } on FileSystemException {
+            // A concurrent removal must not stop listing the remaining files.
+          }
           out.add(
             StorageFileEntry(
               path: ent.path,
               name: name,
               bytes: bytes,
               modifiedAt: modifiedAt,
-              source: source,
+              imageKind: images
+                  ? usage.kindFor(ent.path, realPath: realPath)
+                  : null,
+              isInUse:
+                  usage.isInUse(ent.path) ||
+                  (realPath != null && usage.isInUse(realPath)),
             ),
           );
         }
@@ -771,19 +817,9 @@ abstract final class StorageUsageService {
       }
     }
 
-    // Chat attachments live under upload/. Inline/generated images live under images/.
-    await addFromDir(
-      dir,
-      includeImages: images,
-      includeNonImages: !images,
-      source: StorageFileSource.userUpload,
-    );
-    await addFromDir(
-      imagesDir,
-      includeImages: images,
-      includeNonImages: !images,
-      source: StorageFileSource.assistant,
-    );
+    await addFromDir(dir);
+    await addFromDir(imagesDir);
+    await addFromDir(avatarsDir);
     out.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
     return out;
   }
@@ -791,12 +827,21 @@ abstract final class StorageUsageService {
   static Future<int> deleteUploadFiles(
     Iterable<String> paths, {
     required bool images,
+  }) => AttachmentFileLock.synchronized(
+    () => _deleteUploadFiles(paths, images: images),
+  );
+
+  static Future<int> _deleteUploadFiles(
+    Iterable<String> paths, {
+    required bool images,
   }) async {
     final dir = await AppDirectories.getUploadDirectory();
     final imagesDir = await AppDirectories.getImagesDirectory();
+    final avatarsDir = await AppDirectories.getAvatarsDirectory();
     final roots = <String>[
       p.normalize(dir.absolute.path),
       p.normalize(imagesDir.absolute.path),
+      p.normalize(avatarsDir.absolute.path),
     ];
     final realRoots = await Future.wait(
       roots.map((root) async {
@@ -807,6 +852,9 @@ abstract final class StorageUsageService {
         }
       }),
     );
+    // Re-read references after confirmation; the list shown by the UI may be
+    // stale after an assistant/user/provider changed its appearance.
+    final usage = await StorageImageUsage.load(includeMessages: false);
     final removedPaths = <String>{};
     for (final raw in paths) {
       try {
@@ -824,6 +872,10 @@ abstract final class StorageUsageService {
         }
         if (await FileSystemEntity.type(abs, followLinks: false) !=
             FileSystemEntityType.file) {
+          continue;
+        }
+        if (usage.isInUse(abs) ||
+            usage.isInUse(await File(abs).resolveSymbolicLinks())) {
           continue;
         }
         await File(abs).delete();
@@ -1103,7 +1155,6 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.restoreTraces,
   StorageUsageCategoryKey.displacedDatabases,
   StorageUsageCategoryKey.localSnapshots,
-  StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,
   StorageUsageCategoryKey.other,
@@ -1130,7 +1181,6 @@ bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
     case StorageUsageCategoryKey.images:
     case StorageUsageCategoryKey.files:
     case StorageUsageCategoryKey.chatData:
-    case StorageUsageCategoryKey.assistantData:
     case StorageUsageCategoryKey.cache:
     case StorageUsageCategoryKey.logs:
     case StorageUsageCategoryKey.other:

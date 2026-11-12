@@ -7,6 +7,10 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'support/collect_generation.dart';
+import 'package:Kelivo/core/models/auto_retry_options.dart';
+import 'package:Kelivo/core/services/api/response_incomplete_exception.dart';
+import 'package:Kelivo/core/services/api/retry_policy.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 
 ProviderConfig _testConfig(
   String baseUrl,
@@ -386,6 +390,149 @@ void main() {
   });
 
   group('OpenAI Responses API in-band SSE error', () {
+    for (final stream in [true, false]) {
+      for (final followUp in [false, true]) {
+        test('incomplete preserves final usage and partial output: '
+            'stream=$stream followUp=$followUp', () async {
+          var requests = 0;
+          var toolCalls = 0;
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          server.listen((request) async {
+            await request.drain<void>();
+            requests++;
+            final first = followUp && requests == 1;
+            final response = {
+              'status': first ? 'completed' : 'incomplete',
+              'error': null,
+              if (!first) 'incomplete_details': {'reason': 'max_output_tokens'},
+              'usage': {
+                'input_tokens': first ? 100 : 1042909,
+                'output_tokens': first ? 10 : 596,
+                'output_tokens_details': {'reasoning_tokens': first ? 0 : 590},
+              },
+              'output': [
+                if (first)
+                  {
+                    'type': 'function_call',
+                    'call_id': 'call-1',
+                    'name': 'lookup',
+                    'arguments': '{}',
+                  }
+                else ...[
+                  {
+                    'type': 'reasoning',
+                    'content': [
+                      {'type': 'reasoning_text', 'text': 'Thinking'},
+                    ],
+                  },
+                  {
+                    'type': 'message',
+                    'content': [
+                      {'type': 'output_text', 'text': 'Partial reply'},
+                    ],
+                  },
+                  // An incomplete function call must never execute.
+                  {
+                    'type': 'function_call',
+                    'call_id': 'unfinished',
+                    'name': 'lookup',
+                    'arguments': '{}',
+                  },
+                ],
+              ],
+            };
+            if (stream) {
+              request.response.headers.contentType = ContentType(
+                'text',
+                'event-stream',
+              );
+              if (!first) {
+                for (final (type, delta) in [
+                  ('response.reasoning_text.delta', 'Thinking'),
+                  ('response.output_text.delta', 'Partial reply'),
+                ]) {
+                  request.response.write(
+                    'data: ${jsonEncode({'type': type, 'delta': delta})}\n\n',
+                  );
+                }
+              } else {
+                request.response.write(
+                  'data: ${jsonEncode({'type': 'response.output_item.done', 'output_index': 0, 'item': (response['output'] as List).first})}\n\n',
+                );
+              }
+              request.response.write(
+                'data: ${jsonEncode({'type': first ? 'response.completed' : 'response.incomplete', 'response': response})}\n\n',
+              );
+            } else {
+              request.response.headers.contentType = ContentType.json;
+              request.response.write(jsonEncode(response));
+            }
+            await request.response.close();
+          });
+          final result = await _drain(
+            ChatApiService.sendMessageStream(
+              config: _testConfig(
+                'http://localhost:${server.port}/v1',
+                ProviderKind.openai,
+                useResponseApi: true,
+              ),
+              modelId: 'test-model',
+              messages: [
+                {'role': 'user', 'content': 'hi'},
+              ],
+              tools: [
+                {
+                  'type': 'function',
+                  'function': {
+                    'name': 'lookup',
+                    'parameters': {'type': 'object', 'properties': {}},
+                  },
+                },
+              ],
+              onToolCall: (name, args, {toolCallId}) async {
+                toolCalls++;
+                return 'result';
+              },
+              stream: stream,
+            ),
+          );
+          expect(
+            result.error,
+            isA<ResponseIncompleteException>()
+                .having((e) => e.reason, 'reason', 'max_output_tokens')
+                .having((e) => e.inputTokens, 'this request input', 1042909),
+          );
+          expect(
+            result.chunks.whereType<TextDelta>().map((c) => c.text).join(),
+            'Partial reply',
+          );
+          expect(
+            result.chunks.whereType<ReasoningDelta>().map((c) => c.text).join(),
+            'Thinking',
+          );
+          expect(result.chunks.whereType<Finish>(), isEmpty);
+          final handler = StreamChunkHandler();
+          for (final chunk in result.chunks) {
+            handler.handle(chunk);
+          }
+          expect(handler.usage!.promptTokens, 1042909);
+          expect(handler.usage!.completionTokens, 596);
+          expect(handler.usage!.reasoningTokens, 590);
+          expect(
+            handler.totalUsage!.promptTokens,
+            1042909 + (followUp ? 100 : 0),
+          );
+          expect(toolCalls, followUp ? 1 : 0);
+          expect(requests, followUp ? 2 : 1);
+          expect(
+            shouldRetryError(result.error!, const AutoRetryOptions.defaults()),
+            isFalse,
+          );
+        });
+      }
+    }
+
     test(
       'response.failed event ends stream with error, no fake isDone',
       () async {

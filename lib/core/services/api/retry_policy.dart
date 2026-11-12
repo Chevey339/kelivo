@@ -6,6 +6,9 @@ import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 
 import '../../models/auto_retry_options.dart';
+import '../../models/image_context.dart';
+import '../network/provider_http_exception.dart';
+import 'response_incomplete_exception.dart';
 
 /// Process-wide auto-retry config, synced from [SettingsProvider].
 ///
@@ -21,6 +24,7 @@ final RegExp _httpStatusPattern = RegExp(
 );
 
 int? httpStatusFromError(Object error) {
+  if (error is ProviderHttpException) return error.statusCode;
   final match = _httpStatusPattern.firstMatch(error.toString());
   if (match == null) return null;
   return int.tryParse(match.group(1)!);
@@ -31,7 +35,12 @@ bool shouldRetryError(
   AutoRetryOptions o, {
   bool? retryOnNetworkError,
 }) {
-  if (isUserCancelError(error)) return false;
+  if (error is ImageContextBudgetException ||
+      error is ResponseIncompleteException ||
+      isUserCancelError(error) ||
+      (error is ProviderHttpException && error.prohibitsRetry)) {
+    return false;
+  }
   final text = error.toString();
   if (_containsKeyword(text, o.stopKeywords)) return false;
   final status = httpStatusFromError(error);
@@ -95,6 +104,10 @@ Duration backoffDelay(int attemptIndex, AutoRetryOptions o, {Random? random}) {
 
 bool _isRetryableNetworkError(Object error, int? status) {
   if (isUserCancelError(error)) return false;
+  if (error is ProviderHttpException && error.bodyReadError != null) {
+    final cause = error.bodyReadError!;
+    return _isRetryableNetworkError(cause, httpStatusFromError(cause));
+  }
   if (error is SocketException || error is TimeoutException) return true;
   if (error is DioException) return _isRetryableDioError(error);
   if (error is HttpException && _isConnectionAbortMessage(error.message)) {
@@ -126,6 +139,9 @@ bool _isRetryableDioError(DioException error) {
 }
 
 bool isUserCancelError(Object error) {
+  if (error is ProviderHttpException && error.bodyReadError != null) {
+    return isUserCancelError(error.bodyReadError!);
+  }
   if (error is DioException && error.type == DioExceptionType.cancel) {
     return true;
   }

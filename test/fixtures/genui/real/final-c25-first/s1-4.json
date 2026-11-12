@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "80f455ea308cab4dc35fba96aa160489835d3dc1",
+  "task": "s1-4",
+  "response": "The interface computes **a × b + c** locally: with the initial example values, 20 × 1.8 + 32 = **68 °F**. The inputs, scale, and offset are synthetic example data for exploring the interface only; changing any control updates the result on-device.\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[aInput, bInput, cInput, result, reset])\n$a: number = 20\n$b: number = 1.8\n$c: number = 32\nlet fahrenheit = $a * $b + $c\naInput = Slider(label=\"Input temperature a\", bind=$a, min=-50, max=100, step=1, unit=\"°C\", digits=0)\nbInput = NumberField(label=\"Scale b\", bind=$b, min=0, max=10, step=0.1)\ncInput = NumberField(label=\"Offset c\", bind=$c, min=-100, max=100, step=1, unit=\"°F\")\nresult = Metric(label=\"Result: a × b + c\", value=fahrenheit, unit=\"°F\", digits=2)\nreset = Button(label=\"Reset\", action=Reset())\n```\n\n`a` is the input temperature, `b` the scale ratio, and `c` the offset; the computed result is always labeled in **°F**.",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: the requested affine temperature conversion has the correct initial 68 °F, input/scale/offset meanings and °F result unit. Requested control types and Reset are present; English wording does not change the requested calculation or local synthetic-example semantics."
+  }
+}

@@ -29,6 +29,9 @@ class _FailingSkillStore extends ExtensionEntityStore {
   }) async => throw StateError('store unavailable');
 }
 
+Skill _creator(SkillsService service) =>
+    service.skills.singleWhere((s) => s.record.id == 'skill-creator');
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -61,7 +64,7 @@ void main() {
     () async {
       final service = createService();
       await service.loaded;
-      final skill = service.skills.single;
+      final skill = _creator(service);
       expect(skill.record.id, 'skill-creator');
       expect(skill.record.source, SkillSource.bundled);
       expect(skill.record.enabled, isTrue);
@@ -105,12 +108,14 @@ void main() {
       final restarted = createService();
       await restarted.loaded;
       await restarted.rescan();
-      final skill = restarted.skills.single;
+      final skill = _creator(restarted);
       expect(await File(skill.skillMdPath).readAsString(), updated);
       expect(skill.record.source, SkillSource.bundled);
       expect(skill.record.enabled, isFalse);
       expect(skill.record.useCount, 1);
-      expect(restarted.resolveForAssistant(null), isEmpty);
+      expect(restarted.resolveForAssistant(null).map((s) => s.record.id), [
+        'visualize',
+      ]);
     },
   );
 
@@ -121,12 +126,17 @@ void main() {
       await service.loaded;
       await service.delete('skill-creator');
       await service.rescan();
-      expect(service.skills, isEmpty);
+      expect(service.skills.map((s) => s.record.id), ['visualize']);
 
       final restarted = createService();
       await restarted.loaded;
-      expect(restarted.skills, isEmpty);
-      expect(await store.listByKind(ExtensionEntityStore.kindSkill), isEmpty);
+      expect(restarted.skills.map((s) => s.record.id), ['visualize']);
+      expect(
+        (await store.listByKind(
+          ExtensionEntityStore.kindSkill,
+        )).map((s) => s.id),
+        ['visualize'],
+      );
     },
   );
 
@@ -155,7 +165,7 @@ void main() {
 
         final service = createService();
         await service.loaded;
-        final skill = service.skills.single;
+        final skill = _creator(service);
         expect(await File(skill.skillMdPath).exists(), isTrue);
         expect(skill.record.source, SkillSource.bundled);
         expect(skill.record.enabled, isFalse);
@@ -167,7 +177,7 @@ void main() {
 
         final restarted = createService();
         await restarted.loaded;
-        expect(restarted.skills.single.record.toJson(), skill.record.toJson());
+        expect(_creator(restarted).record.toJson(), skill.record.toJson());
       },
     );
   }
@@ -186,7 +196,7 @@ void main() {
       );
       final upgraded = createService();
       await upgraded.loaded;
-      expect(upgraded.skills, hasLength(2));
+      expect(upgraded.skills, hasLength(3));
       final creator = upgraded.skills.singleWhere(
         (s) => s.name == 'skill-creator',
       );
@@ -207,6 +217,7 @@ void main() {
     expect(service.skills.map((s) => s.record.id), [
       'my-skill',
       'skill-creator',
+      'visualize',
     ]);
     expect(service.skills.first.record.source, SkillSource.file);
   });
@@ -218,7 +229,7 @@ void main() {
 
     final retried = createService();
     await retried.loaded;
-    expect(retried.skills.single.record.source, SkillSource.bundled);
+    expect(_creator(retried).record.source, SkillSource.bundled);
   });
 
   test('failed repair preserves the existing directory and metadata', () async {
@@ -260,8 +271,8 @@ void main() {
 
     final retried = createService();
     await retried.loaded;
-    expect(retried.skills.single.record.enabled, isFalse);
-    expect(retried.skills.single.record.useCount, 2);
+    expect(_creator(retried).record.enabled, isFalse);
+    expect(_creator(retried).record.useCount, 2);
   });
 
   test(
@@ -275,7 +286,7 @@ void main() {
 
       final retried = createService();
       await retried.loaded;
-      expect(retried.skills.single.record.source, SkillSource.bundled);
+      expect(_creator(retried).record.source, SkillSource.bundled);
     },
   );
 }

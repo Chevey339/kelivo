@@ -129,6 +129,7 @@ Future<void> openTerminal(
       skillsHostDir: skillsDir.path,
       externalMounts: await externalMounts?.resolveMounts() ?? const [],
     );
+    await Directory(paths.tmpHostRoot).create(recursive: true);
     mounts = paths.mounts;
     cwd = paths.modelRoot;
     title = workspace.name.isNotEmpty ? workspace.name : p.basename(cwd);

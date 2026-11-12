@@ -83,6 +83,9 @@ class FakeWorkspaceRuntime extends WorkspaceRuntime {
   bool get supportsSystemTerminal => !ptySupported;
 
   @override
+  bool get supportsFileManager => !ptySupported;
+
+  @override
   Future<RuntimeStatus> status() async {
     statusCalls += 1;
     return RuntimeStatus(

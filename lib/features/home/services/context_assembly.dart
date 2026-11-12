@@ -1,5 +1,8 @@
+import 'dart:convert';
+import '../../../core/services/api/request_image_context.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
+import '../../../core/models/native_compaction.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -27,9 +30,13 @@ class ContextAssemblyPreview {
     this.skillsText = '',
     this.workspaceText = '',
     this.searchText = '',
+    this.referenceText = '',
+    this.apiMessages = const [],
     this.mcpTools = const [],
+    this.imageContext,
   });
 
+  final RequestImageContext? imageContext;
   final String systemText;
   final String injectionsText;
   final String historyText;
@@ -40,6 +47,8 @@ class ContextAssemblyPreview {
   final String skillsText;
   final String workspaceText;
   final String searchText;
+  final String referenceText;
+  final List<Map<String, dynamic>> apiMessages;
   final List<Map<String, dynamic>> mcpTools;
 
   /// Attribute the assembled, trimmed payload by origin, not by message role.
@@ -49,15 +58,66 @@ class ContextAssemblyPreview {
     required List<Map<String, dynamic>> tools,
     required Set<String> mcpToolNames,
     required List<ContextImageRef> images,
+    RequestImageContext? imageContext,
   }) {
+    tools = RequestImageContext.toolsForRequest(
+      tools,
+      imageContext: imageContext,
+    );
     final text = <ContextSource, StringBuffer>{};
+    final references = <String>{};
+    final nativeImages = <ContextImageRef>[];
     for (final message in apiMessages) {
+      if (message[nativeCompactionMessageKey] case final Map native) {
+        // The returned window also contains retained readable items. Observe
+        // those without normalizing the canonical payload or counting cipher
+        // text, provider IDs, and the compaction pass's usage as input tokens.
+        for (final item
+            in (native['output'] as List? ?? const []).whereType<Map>()) {
+          final type = item['type'];
+          dynamic content;
+          if (type == 'message' || (type == null && item['role'] != null)) {
+            content = item['content'];
+          } else if (type == 'function_call_output') {
+            content = item['output'];
+          } else if (type == 'function_call') {
+            content = jsonEncode({
+              'name': item['name'],
+              'arguments': item['arguments'],
+            });
+          } else {
+            continue;
+          }
+          text
+              .putIfAbsent(ContextSource.chatHistory, StringBuffer.new)
+              .write(extractApiMessageText(content));
+          if (content is List) {
+            for (final part in content.whereType<Map>()) {
+              if (part['type'] == 'input_image') {
+                nativeImages.add(const ContextImageRef());
+              }
+            }
+          }
+        }
+        continue;
+      }
       for (final segment in segmentsFromTaggedMessage(
-        message,
+        imageContext?.previewMessage(message) ?? message,
         estimateTokenCounts: false,
         elideDataUris: false,
       )) {
         text.putIfAbsent(segment.source, StringBuffer.new).write(segment.text);
+        if (const {
+              ContextSource.systemPrompt,
+              ContextSource.instructionInjection,
+              ContextSource.memorySnapshot,
+              ContextSource.worldBook,
+            }.contains(segment.source) &&
+            segment.text.trim().isNotEmpty) {
+          references.add(
+            '[reference ${segment.source.name}; ${jsonEncode(segment.meta ?? const {})}]\n${segment.text}',
+          );
+        }
       }
       final reasoning = message['reasoning_content'];
       if (reasoning is String) {
@@ -71,6 +131,8 @@ class ContextAssemblyPreview {
     bool isMcp(Map<String, dynamic> tool) =>
         mcpToolNames.contains((tool['function'] as Map?)?['name']);
     return ContextAssemblyPreview(
+      apiMessages: apiMessages,
+      referenceText: references.join('\n\n'),
       systemText: content([ContextSource.systemPrompt]),
       injectionsText: content([ContextSource.instructionInjection]),
       historyText: content([
@@ -88,7 +150,8 @@ class ContextAssemblyPreview {
       searchText: content([ContextSource.searchPrompt]),
       tools: tools.where((tool) => !isMcp(tool)).toList(),
       mcpTools: tools.where(isMcp).toList(),
-      images: images,
+      images: [...images, ...nativeImages],
+      imageContext: imageContext,
     );
   }
 }
@@ -102,10 +165,38 @@ typedef ContextAssemblyPreviewFn =
     });
 
 class ContextEstimateJob {
-  const ContextEstimateJob({required this.preview, required this.kind});
+  ContextEstimateJob({
+    required ContextAssemblyPreview preview,
+    required this.kind,
+  }) : systemText = preview.systemText,
+       injectionsText = preview.injectionsText,
+       historyText = preview.historyText,
+       tools = preview.tools,
+       images = preview.images,
+       memoryText = preview.memoryText,
+       worldBookText = preview.worldBookText,
+       skillsText = preview.skillsText,
+       workspaceText = preview.workspaceText,
+       searchText = preview.searchText,
+       mcpTools = preview.mcpTools;
 
-  final ContextAssemblyPreview preview;
+  // Keep only counting data. The preview's imageContext owns Future caches
+  // that cannot be sent to an isolate, even after those Futures complete.
+  final String systemText;
+  final String injectionsText;
+  final String historyText;
+  final List<Map<String, dynamic>> tools;
+  final List<ContextImageRef> images;
+  final String memoryText;
+  final String worldBookText;
+  final String skillsText;
+  final String workspaceText;
+  final String searchText;
+  final List<Map<String, dynamic>> mcpTools;
   final ProviderKind kind;
+
+  // A method tear-off captures only this job, not the refresh method's scope.
+  ContextEstimateResult call() => estimateContextBuckets(this);
 }
 
 class ContextEstimateResult {
@@ -134,12 +225,23 @@ class ContextEstimateResult {
   final int workspace;
   final int search;
   final int mcpTools;
+  int get total =>
+      system +
+      injections +
+      history +
+      tools +
+      attachments +
+      memory +
+      worldBook +
+      skills +
+      workspace +
+      search +
+      mcpTools;
 }
 
 ContextEstimateResult estimateContextBuckets(ContextEstimateJob job) {
   var attachments = 0;
-  final preview = job.preview;
-  for (final image in preview.images) {
+  for (final image in job.images) {
     attachments += estimateImageTokens(
       job.kind,
       width: image.width,
@@ -147,16 +249,16 @@ ContextEstimateResult estimateContextBuckets(ContextEstimateJob job) {
     );
   }
   return ContextEstimateResult(
-    system: estimateTokens(preview.systemText),
-    injections: estimateTokens(preview.injectionsText),
-    history: estimateTokens(preview.historyText),
-    tools: estimateToolsTokens(preview.tools),
-    memory: estimateTokens(preview.memoryText),
-    worldBook: estimateTokens(preview.worldBookText),
-    skills: estimateTokens(preview.skillsText),
-    workspace: estimateTokens(preview.workspaceText),
-    search: estimateTokens(preview.searchText),
-    mcpTools: estimateToolsTokens(preview.mcpTools),
+    system: estimateTokens(job.systemText),
+    injections: estimateTokens(job.injectionsText),
+    history: estimateTokens(job.historyText),
+    tools: estimateToolsTokens(job.tools),
+    memory: estimateTokens(job.memoryText),
+    worldBook: estimateTokens(job.worldBookText),
+    skills: estimateTokens(job.skillsText),
+    workspace: estimateTokens(job.workspaceText),
+    search: estimateTokens(job.searchText),
+    mcpTools: estimateToolsTokens(job.mcpTools),
     attachments: attachments,
   );
 }

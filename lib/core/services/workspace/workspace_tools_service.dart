@@ -11,6 +11,7 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../api/tool_call_cancellation.dart';
+import '../tool_image.dart';
 import '../../models/workspace_binding.dart';
 import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
@@ -21,12 +22,14 @@ import 'conversation_files.dart';
 import 'environment_output_redactor.dart';
 import 'file_link_resolver.dart';
 import 'host_file_tools.dart';
+import 'workspace_file_access.dart';
+import '../conversation_tool_permissions.dart';
+import '../../models/tool_permission_mode.dart';
 import 'output_buffer.dart';
 import 'tool_run_registry.dart';
 import 'workspace_paths.dart';
-import 'workspace_image.dart';
 import 'workspace_runtime.dart';
-import 'workspace_session_sync.dart';
+import 'desktop_shell.dart';
 import 'workspace_tool_context.dart';
 import 'workspace_tool_metadata.dart';
 
@@ -46,6 +49,8 @@ class WorkspaceToolsService {
     ToolRunRegistry? registry,
     WorkspaceRuntimeProvider? runtimeProvider,
     this.updateConversationExtras,
+    this.readPermissionState,
+    this.permissionChanges,
     this.touchLastUsed,
     this.onSkillRead,
     this.onShellCompleted,
@@ -72,14 +77,25 @@ class WorkspaceToolsService {
       'when unset, prefers /bin/bash if available, otherwise /bin/sh. '
       'This is not an interactive shell; do not assume ~/.bashrc is loaded.';
 
-  static String get _shellInvocation =>
-      defaultTargetPlatform == TargetPlatform.android
-      ? 'configured shell -lc'
-      : 'sh -lc';
+  static String _shellInvocation(DesktopShell? shell) {
+    if (shell != null) return shell.invocation;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => 'configured shell -lc',
+      TargetPlatform.iOS => 'sh -lc',
+      _ => 'native shell selected in Environment settings',
+    };
+  }
+
+  static String _shellInstructions(DesktopShell? shell) =>
+      'Fresh non-interactive ${_shellInvocation(shell)} per call; no cwd/env persists. '
+      '${shell?.syntaxHint ?? 'Use the syntax of the selected shell.'}';
 
   final ToolRunRegistry registry;
   final WorkspaceRuntimeProvider runtimeProvider;
   final ConversationExtrasUpdater? updateConversationExtras;
+  final Listenable? permissionChanges;
+  final ToolPermissionState? Function(String conversationId)?
+  readPermissionState;
   final Future<void> Function(String workspaceId)? touchLastUsed;
   final Future<void> Function(String skillId)? onSkillRead;
   final Future<void> Function()? onShellCompleted;
@@ -145,6 +161,8 @@ class WorkspaceToolsService {
             skillsHostDir: skillsDir.path,
           );
 
+    await Directory(paths.tmpHostRoot).create(recursive: true);
+
     return WorkspaceToolContext(
       workspace: workspace,
       binding: binding,
@@ -152,6 +170,7 @@ class WorkspaceToolsService {
       sessionDir: sessionDir,
       outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
       conversationId: conversationId,
+      assistantId: conversation.assistantId,
       runtimeStatus: status,
       runtimeRegistered: runtime != null,
     );
@@ -185,6 +204,7 @@ class WorkspaceToolsService {
       ];
     }
     return definitions(
+          shell: ctx.runtimeStatus?.shell,
           vocab: _pathVocab(ctx.paths),
           outputHint: ctx.paths.sandboxed
               ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
@@ -201,12 +221,13 @@ class WorkspaceToolsService {
   static List<Map<String, dynamic>> definitions({
     List<String> vocab = const ['/workspace', '/chat', '/skills', '/tmp'],
     String outputHint = '/chat/outputs/<id>.txt',
+    DesktopShell? shell,
   }) {
     return [
       _fn(
         'shell',
         [
-          'Fresh non-interactive $_shellInvocation per call; no cwd/env persists. Chain with &&.',
+          _shellInstructions(shell),
           if (defaultTargetPlatform == TargetPlatform.android)
             _androidShellHint,
           'Use non-interactive flags (e.g. -y). Output is capped; long output is saved',
@@ -215,7 +236,8 @@ class WorkspaceToolsService {
         {
           'command': {
             'type': 'string',
-            'description': 'Shell command to run with $_shellInvocation.',
+            'description':
+                'Shell command to run with ${_shellInvocation(shell)}.',
           },
           'cwd': {
             'type': 'string',
@@ -366,11 +388,11 @@ class WorkspaceToolsService {
 
   static String buildPromptFragment(
     WorkspaceToolContext ctx, {
-    List<AttachmentInfo> attachments = const [],
     Iterable<String> environmentVariableNames = const [],
   }) {
     if (ctx.skillsOnly) return '';
     final paths = ctx.paths;
+    final shell = ctx.runtimeStatus?.shell;
     final workspace = paths.sandboxed
         ? WorkspacePaths.guestWorkspace
         : paths.workspaceHostRoot;
@@ -384,10 +406,6 @@ class WorkspaceToolsService {
     final outputsHint = paths.sandboxed
         ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
         : '${paths.sessionHostDir}/outputs/<id>.txt';
-    final attachDir = paths.sandboxed
-        ? '${WorkspacePaths.guestChat}/attachments/'
-        : '${paths.sessionHostDir}/attachments/';
-
     final buf = StringBuffer()
       ..writeln('<workspace>')
       ..writeln('Path zones:')
@@ -419,15 +437,16 @@ class WorkspaceToolsService {
       ..writeln();
     if (ctx.workspace.isToolEnabled('shell')) {
       buf.writeln(
-        'shell is one-shot: a fresh non-interactive $_shellInvocation each call. '
-        'No cd or env persists. Chain with &&. Use non-interactive flags (-y). '
+        'shell is one-shot: ${_shellInstructions(shell)} '
+        'Use non-interactive flags (-y). '
         'Output is capped; long output is saved to $outputsHint.',
       );
       if (environmentVariableNames.isNotEmpty) {
         buf.writeln(
           'User-configured environment variables are already injected: '
           '${environmentVariableNames.join(', ')}. '
-          r'Use $NAME references; do not print or attempt to discover their values.',
+          'Use ${shell?.environmentReference ?? (defaultTargetPlatform == TargetPlatform.windows ? 'the selected shell’s environment variable syntax' : r'$NAME')} references; '
+          'do not print or attempt to discover their values.',
         );
       }
     }
@@ -449,13 +468,6 @@ class WorkspaceToolsService {
       )
       ..writeln()
       ..writeln(_engineLine(ctx));
-    if (attachments.isNotEmpty) {
-      buf.writeln();
-      buf.writeln('Attachments under $attachDir');
-      for (final item in attachments) {
-        buf.writeln('- ${item.name} (${item.size} bytes)');
-      }
-    }
     buf.write('</workspace>');
     return buf.toString();
   }
@@ -471,6 +483,29 @@ class WorkspaceToolsService {
     final environment =
         await loadEnvironment?.call() ?? EnvironmentExecutionConfig();
     final redactor = EnvironmentOutputRedactor(environment);
+    final id = conversationId ?? ctx.conversationId;
+    final access = WorkspaceFileAccess(
+      paths: ctx.paths,
+      skillsOnly: ctx.skillsOnly,
+      arguments: args,
+      permission: ToolCallPermission(
+        toolName: name,
+        toolCallId: toolCallId,
+        conversationId: id,
+        workspaceId: ctx.skillsOnly ? null : ctx.workspace.id,
+        assistantId: ctx.assistantId,
+        approvals: approvalService,
+        stateChanges: permissionChanges,
+        isEnabled: () => ctx.skillsOnly || _enabled(ctx, name),
+        readState: () => readPermissionState != null && id != null
+            ? readPermissionState!(id)
+            : ToolPermissionState(
+                mode: ctx.permissionMode,
+                workspaceId: ctx.skillsOnly ? null : ctx.workspace.id,
+                assistantId: ctx.assistantId,
+              ),
+      ),
+    );
     final result = await _handle(
       ctx,
       name,
@@ -479,8 +514,18 @@ class WorkspaceToolsService {
       approvalService: approvalService,
       conversationId: conversationId,
       environment: environment.variables,
+      access: access,
     );
-    return redactor.redact(ClientToolResult.fromHandler(result));
+    final client = ClientToolResult.fromHandler(result);
+    return redactor.redact(
+      ClientToolResult(
+        client.content,
+        metadata: {
+          ...?client.metadata,
+          if (access.permission.byFullAccess) 'toolPermission': 'fullAccess',
+        },
+      ),
+    );
   }
 
   Future<Object?> _handle(
@@ -491,6 +536,7 @@ class WorkspaceToolsService {
     ToolApprovalService? approvalService,
     String? conversationId,
     required Map<String, String> environment,
+    required WorkspaceFileAccess access,
   }) async {
     if (ctx.skillsOnly && name != 'read_file') {
       return _errorResult(
@@ -515,19 +561,21 @@ class WorkspaceToolsService {
           return await _handleShell(
             ctx,
             args,
+            access: access,
             toolCallId: toolCallId,
             approvalService: approvalService,
             conversationId: conversationId,
             environment: environment,
           );
         case 'read_file':
-          return await _handleReadFile(ctx, args);
+          return await _handleReadFile(ctx, args, access);
         case 'view_image':
-          return await _handleViewImage(ctx, args);
+          return await _handleViewImage(ctx, args, access);
         case 'write_file':
           return await _handleWriteFile(
             ctx,
             args,
+            access: access,
             toolCallId: toolCallId,
             approvalService: approvalService,
             conversationId: conversationId,
@@ -536,16 +584,17 @@ class WorkspaceToolsService {
           return await _handleEditFile(
             ctx,
             args,
+            access: access,
             toolCallId: toolCallId,
             approvalService: approvalService,
             conversationId: conversationId,
           );
         case 'list_dir':
-          return await _handleListDir(ctx, args);
+          return await _handleListDir(ctx, args, access);
         case 'glob':
-          return await _handleGlob(ctx, args);
+          return await _handleGlob(ctx, args, access);
         case 'grep':
-          return await _handleGrep(ctx, args);
+          return await _handleGrep(ctx, args, access);
         default:
           return _errorResult(
             tool: name,
@@ -553,6 +602,9 @@ class WorkspaceToolsService {
             message: 'Unknown workspace tool: $name',
           );
       }
+    } on ToolPermissionException catch (e) {
+      access.permission.byFullAccess = false;
+      return _deniedResult(tool: name, error: e.code, message: e.message);
     } catch (e) {
       return _errorResult(
         tool: name,
@@ -662,6 +714,7 @@ class WorkspaceToolsService {
     ToolApprovalService? approvalService,
     String? conversationId,
     required Map<String, String> environment,
+    required WorkspaceFileAccess access,
   }) async {
     const tool = 'shell';
     final cancellation = ToolCallCancellation.current;
@@ -687,8 +740,9 @@ class WorkspaceToolsService {
         tool: tool,
         error: 'environment_not_ready',
         message: status?.reason ?? 'Sandbox environment is not ready',
-        instruction:
-            'tell the user to install/enable the sandbox environment in Settings → Workspace',
+        instruction: status?.engine == 'process'
+            ? 'tell the user to check Environment → Default shell'
+            : 'tell the user to install/enable the sandbox environment in Settings → Workspace',
         meta: const WorkspaceToolMetadata(
           tool: tool,
           status: 'error',
@@ -698,18 +752,8 @@ class WorkspaceToolsService {
     }
 
     final sandboxed = status.sandboxed;
-    final needsApproval =
-        (ctx.workspace.shellNeedsApproval || !sandboxed) &&
-        !ctx.binding.allowAll;
-    final denied = await _maybeApprove(
-      approvalService,
-      needed: needsApproval,
-      toolCallId: toolCallId,
-      toolName: tool,
-      args: args,
-      conversationId: conversationId ?? ctx.conversationId,
-    );
-    if (denied != null) return denied;
+    final needsApproval = ctx.workspace.shellNeedsApproval || !sandboxed;
+    await access.permission.authorize(needed: needsApproval, arguments: args);
 
     final timeoutSeconds = (_intArg(args, 'timeout_seconds') ?? 900).clamp(
       1,
@@ -726,10 +770,17 @@ class WorkspaceToolsService {
       'TERM': 'dumb',
       'LANG': 'C.UTF-8',
       'HOME': sandboxed ? '/root' : (Platform.environment['HOME'] ?? ''),
+      for (final name in ['TMPDIR', 'TMP', 'TEMP'])
+        name: sandboxed ? '/tmp' : ctx.paths.tmpHostRoot,
       ...environment,
     };
 
+    await Directory(ctx.paths.tmpHostRoot).create(recursive: true);
     final runtimeRunId = const Uuid().v4();
+    final before = await FileSnapshot.snapshot([
+      Directory(ctx.paths.workspaceHostRoot),
+      ctx.sessionDir,
+    ], checkCancelled: cancellation?.throwIfCancelled);
     final run = registry.start(
       toolCallId,
       tool,
@@ -737,27 +788,23 @@ class WorkspaceToolsService {
       conversationId: conversationId ?? ctx.conversationId,
       runtimeRunId: runtimeRunId,
     );
-    final before = await FileSnapshot.snapshot([
-      Directory(ctx.paths.workspaceHostRoot),
-      ctx.sessionDir,
-    ]);
 
     CommandExited? exited;
     Object? executionError;
-    var executing = false;
+    void Function()? unregisterCancellation;
     try {
       cancellation?.throwIfCancelled();
-      executing = true;
-      unawaited(
-        cancellation?.cancelled.then((_) async {
-          if (executing) await runtime.cancel(runtimeRunId);
-        }),
-      );
+      await access.permission.authorize(needed: needsApproval, arguments: args);
+      cancellation?.throwIfCancelled();
+      unregisterCancellation = cancellation?.onCancel(() {
+        unawaited(runtime.cancel(runtimeRunId));
+      });
       await for (final event in runtime.run(
         CommandRequest(
           runId: runtimeRunId,
           isCancelled: cancellation?.isCancelled,
           command: command,
+          shell: ctx.runtimeStatus?.shell,
           cwd: cwd,
           timeout: Duration(seconds: timeoutSeconds),
           env: env,
@@ -780,7 +827,7 @@ class WorkspaceToolsService {
     } catch (e) {
       executionError = e;
     } finally {
-      executing = false;
+      unregisterCancellation?.call();
       // A failed or cancelled command may still have installed/updated files.
       // Refresh observers without turning a refresh failure into a tool error.
       try {
@@ -799,120 +846,147 @@ class WorkspaceToolsService {
         : exited.exitCode == 0
         ? ToolRunStatus.succeeded
         : ToolRunStatus.failed;
-    run.complete(status: runStatus, exitCode: exited?.exitCode);
-    final stdout = run.stdoutSoFar;
-    final stderr = run.stderrSoFar;
+    run.complete(
+      status: runStatus,
+      exitCode: exited?.exitCode,
+      retainUntilHandoff: true,
+    );
+    try {
+      final stdout = run.stdoutSoFar;
+      final stderr = run.stderrSoFar;
 
-    final after = await FileSnapshot.snapshot([
-      Directory(ctx.paths.workspaceHostRoot),
-      ctx.sessionDir,
-    ]);
-    final changedHost = FileSnapshot.changedSince(before, after);
-    final files = <WorkspaceToolFile>[];
-    for (final hostPath in changedHost.take(_changedFilesCap)) {
-      final modelPath = ctx.paths.toModelPath(hostPath);
-      try {
-        final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
-        if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
-        files.add(
-          _fileFor(
-            ctx,
-            resolved,
-            role: before.containsKey(hostPath)
-                ? WorkspaceFileRole.modified
-                : WorkspaceFileRole.created,
+      final after = await FileSnapshot.snapshot([
+        Directory(ctx.paths.workspaceHostRoot),
+        ctx.sessionDir,
+      ]);
+      final changedHost = FileSnapshot.changedSince(before, after);
+      final files = <WorkspaceToolFile>[];
+      for (final hostPath in changedHost.take(_changedFilesCap)) {
+        final modelPath = ctx.paths.toModelPath(hostPath);
+        try {
+          final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
+          if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
+          files.add(
+            _fileFor(
+              ctx,
+              resolved,
+              role: before.containsKey(hostPath)
+                  ? WorkspaceFileRole.modified
+                  : WorkspaceFileRole.created,
+            ),
+          );
+        } on PathResolutionException {
+          files.add(
+            WorkspaceToolFile(
+              path: modelPath,
+              role: WorkspaceFileRole.modified,
+            ),
+          );
+        } on FileSystemException {
+          // A file removed again before collection is not a remaining output.
+        }
+      }
+      final filesTruncated =
+          changedHost.length > _changedFilesCap ||
+          before.length >= FileSnapshot.defaultMaxEntries ||
+          after.length >= FileSnapshot.defaultMaxEntries;
+
+      if (executionError != null || exited == null) {
+        return _errorResult(
+          tool: tool,
+          error: 'shell_failed',
+          message:
+              executionError?.toString() ??
+              'Command ended without an exit event',
+          meta: WorkspaceToolMetadata(
+            tool: tool,
+            status: 'error',
+            code: 'shell_failed',
+            command: command,
+            stdoutPreview: stdout,
+            stderrPreview: stderr,
+            files: files,
+            filesTruncated: filesTruncated,
           ),
         );
-      } on PathResolutionException {
-        files.add(
-          WorkspaceToolFile(path: modelPath, role: WorkspaceFileRole.modified),
-        );
-      } on FileSystemException {
-        // A file removed again before collection is not a remaining output.
       }
-    }
-    final filesTruncated =
-        changedHost.length > _changedFilesCap ||
-        before.length >= FileSnapshot.defaultMaxEntries ||
-        after.length >= FileSnapshot.defaultMaxEntries;
 
-    if (executionError != null || exited == null) {
-      return _errorResult(
-        tool: tool,
-        error: 'shell_failed',
-        message:
-            executionError?.toString() ?? 'Command ended without an exit event',
-        meta: WorkspaceToolMetadata(
-          tool: tool,
-          status: 'error',
-          code: 'shell_failed',
-          command: command,
-          stdoutPreview: stdout,
-          stderrPreview: stderr,
-          files: files,
-          filesTruncated: filesTruncated,
-        ),
+      final offload = await ToolOutputOffloader.maybeOffload(
+        toolCallId: toolCallId,
+        stdout: stdout,
+        stderr: stderr,
+        outputsDir: ctx.outputsDir,
       );
-    }
+      final payload = _shellPayload(offload.modelText);
+      payload['exit_code'] = exited.exitCode;
+      payload['duration_ms'] = exited.duration.inMilliseconds;
+      payload['timed_out'] = exited.timedOut;
+      payload['cancelled'] = exited.cancelled;
+      payload['interrupted'] = exited.interrupted;
+      if (run.stdoutTruncated || run.stderrTruncated) {
+        payload['truncated'] = true;
+      }
+      if (files.isNotEmpty) {
+        payload['changed_files'] = [for (final file in files) file.path];
+      }
+      if (filesTruncated) payload['changed_files_truncated'] = true;
+      if (offload.offloadHostPath != null) {
+        final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
+        payload['output_file'] = outputFile;
+        payload['truncated'] = true;
+        final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
+        files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
+      }
 
-    final offload = await ToolOutputOffloader.maybeOffload(
-      toolCallId: toolCallId,
-      stdout: stdout,
-      stderr: stderr,
-      outputsDir: ctx.outputsDir,
-    );
-    final payload = _shellPayload(offload.modelText);
-    payload['exit_code'] = exited.exitCode;
-    payload['duration_ms'] = exited.duration.inMilliseconds;
-    payload['timed_out'] = exited.timedOut;
-    payload['cancelled'] = exited.cancelled;
-    payload['interrupted'] = exited.interrupted;
-    if (run.stdoutTruncated || run.stderrTruncated) {
-      payload['truncated'] = true;
+      final metaStatus = exited.timedOut
+          ? 'timeout'
+          : exited.cancelled
+          ? 'cancelled'
+          : 'ok';
+      final meta = WorkspaceToolMetadata(
+        tool: tool,
+        status: metaStatus,
+        command: command,
+        exitCode: exited.exitCode,
+        durationMs: exited.duration.inMilliseconds,
+        timedOut: exited.timedOut,
+        cancelled: exited.cancelled,
+        interrupted: exited.interrupted,
+        stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
+        stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
+        files: files,
+        filesTruncated: filesTruncated,
+        truncated: payload['truncated'] == true,
+      );
+      await _markToolsUsed(
+        ctx,
+        conversationId: conversationId,
+        status: metaStatus,
+      );
+      return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
+    } finally {
+      // Model output and metadata now own immutable strings (or the offloaded
+      // file). Only now may the registry evict this completed execution.
+      run.finishHandoff();
     }
-    if (files.isNotEmpty) {
-      payload['changed_files'] = [for (final file in files) file.path];
-    }
-    if (filesTruncated) payload['changed_files_truncated'] = true;
-    if (offload.offloadHostPath != null) {
-      final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
-      payload['output_file'] = outputFile;
-      payload['truncated'] = true;
-      final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
-      files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
-    }
+  }
 
-    final metaStatus = exited.timedOut
-        ? 'timeout'
-        : exited.cancelled
-        ? 'cancelled'
-        : 'ok';
-    final meta = WorkspaceToolMetadata(
-      tool: tool,
-      status: metaStatus,
-      command: command,
-      exitCode: exited.exitCode,
-      durationMs: exited.duration.inMilliseconds,
-      timedOut: exited.timedOut,
-      cancelled: exited.cancelled,
-      interrupted: exited.interrupted,
-      stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
-      stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
-      files: files,
-      filesTruncated: filesTruncated,
-      truncated: payload['truncated'] == true,
+  Future<String> _snapshotImage(ToolImage image) async {
+    ToolCallCancellation.current?.throwIfCancelled();
+    final imagesDir = await AppDirectories.getImagesDirectory();
+    await imagesDir.create(recursive: true);
+    final extension = image.mime == 'image/png' ? 'png' : 'jpg';
+    final snapshot = File(
+      p.join(imagesDir.path, 'view_image_${const Uuid().v4()}.$extension'),
     );
-    await _markToolsUsed(
-      ctx,
-      conversationId: conversationId,
-      status: metaStatus,
-    );
-    return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
+    await snapshot.writeAsBytes(image.bytes);
+    return SandboxPathResolver.canonicalize(snapshot.path);
   }
 
   Future<Object?> _handleViewImage(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'view_image';
     final path = args['path'];
@@ -924,21 +998,14 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      final resolved = await access.resolve(path, ctx.cwd);
       ToolCallCancellation.current?.throwIfCancelled();
       if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
         throw const PathResolutionException('Path is outside sandbox zones');
       }
-      final image = await WorkspaceImage.read(resolved.hostPath);
+      final image = await ToolImage.read(resolved.hostPath);
       ToolCallCancellation.current?.throwIfCancelled();
-      final imagesDir = await AppDirectories.getImagesDirectory();
-      await imagesDir.create(recursive: true);
-      final extension = image.mime == 'image/png' ? 'png' : 'jpg';
-      final snapshot = File(
-        p.join(imagesDir.path, 'view_image_${const Uuid().v4()}.$extension'),
-      );
-      await snapshot.writeAsBytes(image.bytes);
-      final uri = SandboxPathResolver.canonicalize(snapshot.path);
+      final uri = await _snapshotImage(image);
       await _markToolsUsed(
         ctx,
         conversationId: ctx.conversationId,
@@ -956,7 +1023,7 @@ class WorkspaceToolsService {
           kMcpResultMetadataKey: mcpResultMetadata([uri]),
         },
       );
-    } on HostFileException catch (e) {
+    } on ToolImageException catch (e) {
       return _errorResult(
         tool: tool,
         error: 'view_image_failed',
@@ -970,6 +1037,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleReadFile(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'read_file';
     final path = _stringArg(args, 'path');
@@ -981,7 +1049,7 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      final resolved = await access.resolve(path, ctx.cwd);
       if (ctx.skillsOnly && resolved.zone != WorkspaceZone.skills) {
         return _errorResult(
           tool: tool,
@@ -989,7 +1057,7 @@ class WorkspaceToolsService {
           message: 'read_file is limited to /skills in skills-only mode',
         );
       }
-      final result = await HostFileTools(ctx.paths).readFile(
+      final result = await HostFileTools(ctx.paths, access: access).readFile(
         path,
         offset: _intArg(args, 'offset'),
         limit: _intArg(args, 'limit'),
@@ -1002,7 +1070,9 @@ class WorkspaceToolsService {
         files: [_fileFor(ctx, resolved)],
       );
       if (result.imageBytes != null) {
-        final uri = resolved.hostPath;
+        final uri = await _snapshotImage(
+          await ToolImage.fromBytes(result.imageBytes!),
+        );
         await _maybeNoteSkillRead(ctx, resolved);
         await _markToolsUsed(
           ctx,
@@ -1060,6 +1130,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleWriteFile(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args, {
+    required WorkspaceFileAccess access,
     required String toolCallId,
     ToolApprovalService? approvalService,
     String? conversationId,
@@ -1085,25 +1156,15 @@ class WorkspaceToolsService {
     }
     late final ResolvedPath resolved;
     try {
-      resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      resolved = await access.resolve(path, ctx.cwd, write: true);
     } on PathResolutionException catch (e) {
       return _errorResult(tool: tool, error: 'path_error', message: e.message);
     }
 
-    final denied = await _approveWrite(
-      ctx,
-      resolved,
-      tool: tool,
-      args: args,
-      toolCallId: toolCallId,
-      approvalService: approvalService,
-      conversationId: conversationId,
-    );
-    if (denied != null) return denied;
-
     try {
       final result = await HostFileTools(
         ctx.paths,
+        access: access,
         checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
       ).writeFile(path, content, cwd: ctx.cwd);
       final link = linkFor(resolved, paths: ctx.paths);
@@ -1144,6 +1205,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleEditFile(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args, {
+    required WorkspaceFileAccess access,
     required String toolCallId,
     ToolApprovalService? approvalService,
     String? conversationId,
@@ -1166,26 +1228,16 @@ class WorkspaceToolsService {
     }
     late final ResolvedPath resolved;
     try {
-      resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      resolved = await access.resolve(path, ctx.cwd, write: true);
     } on PathResolutionException catch (e) {
       return _errorResult(tool: tool, error: 'path_error', message: e.message);
     }
-
-    final denied = await _approveWrite(
-      ctx,
-      resolved,
-      tool: tool,
-      args: args,
-      toolCallId: toolCallId,
-      approvalService: approvalService,
-      conversationId: conversationId,
-    );
-    if (denied != null) return denied;
 
     try {
       final result =
           await HostFileTools(
             ctx.paths,
+            access: access,
             checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
           ).editFile(
             path,
@@ -1237,12 +1289,14 @@ class WorkspaceToolsService {
   Future<Object?> _handleListDir(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'list_dir';
     final path = _stringArg(args, 'path', fallback: ctx.cwd);
     try {
       final result = await HostFileTools(
         ctx.paths,
+        access: access,
       ).listDir(path, depth: _intArg(args, 'depth') ?? 1, cwd: ctx.cwd);
       final lines = <String>[
         for (final entry in result.entries)
@@ -1251,7 +1305,7 @@ class WorkspaceToolsService {
       if (result.truncated) lines.add('... truncated');
       ResolvedPath? resolved;
       try {
-        resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+        resolved = await access.resolve(path, ctx.cwd);
       } catch (_) {}
       final meta = WorkspaceToolMetadata(
         tool: tool,
@@ -1281,6 +1335,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleGlob(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'glob';
     final pattern = _stringArg(args, 'pattern');
@@ -1294,6 +1349,7 @@ class WorkspaceToolsService {
     try {
       final result = await HostFileTools(
         ctx.paths,
+        access: access,
       ).glob(pattern, path: _optionalString(args, 'path'), cwd: ctx.cwd);
       final lines = List<String>.from(result.paths);
       if (result.truncated) lines.add('... truncated');
@@ -1321,6 +1377,7 @@ class WorkspaceToolsService {
   Future<Object?> _handleGrep(
     WorkspaceToolContext ctx,
     Map<String, dynamic> args,
+    WorkspaceFileAccess access,
   ) async {
     const tool = 'grep';
     final pattern = _stringArg(args, 'pattern');
@@ -1332,7 +1389,7 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final result = await HostFileTools(ctx.paths).grep(
+      final result = await HostFileTools(ctx.paths, access: access).grep(
         pattern,
         path: _optionalString(args, 'path'),
         cwd: ctx.cwd,
@@ -1365,90 +1422,6 @@ class WorkspaceToolsService {
     }
   }
 
-  Future<Object?> _approveWrite(
-    WorkspaceToolContext ctx,
-    ResolvedPath resolved, {
-    required String tool,
-    required Map<String, dynamic> args,
-    required String toolCallId,
-    ToolApprovalService? approvalService,
-    String? conversationId,
-  }) async {
-    if (ctx.paths.isReadOnlyPath(resolved.hostPath)) {
-      return _deniedResult(
-        tool: tool,
-        error: 'mount_readonly',
-        message: 'This external mount is read-only',
-        path: resolved.modelPath,
-      );
-    }
-    if (resolved.zone == WorkspaceZone.skills) {
-      return _deniedResult(
-        tool: tool,
-        error: 'skills_readonly',
-        message: 'The skills zone is read-only',
-        path: resolved.modelPath,
-      );
-    }
-    if (resolved.zone == WorkspaceZone.outside) {
-      if (ctx.paths.sandboxed) {
-        return _deniedResult(
-          tool: tool,
-          error: 'path_outside',
-          message: 'Writes outside the workspace are not allowed',
-          path: resolved.modelPath,
-        );
-      }
-      return _maybeApprove(
-        approvalService,
-        needed: true,
-        toolCallId: toolCallId,
-        toolName: tool,
-        args: args,
-        conversationId: conversationId ?? ctx.conversationId,
-        path: resolved.modelPath,
-      );
-    }
-    return null;
-  }
-
-  Future<Object?> _maybeApprove(
-    ToolApprovalService? approvalService, {
-    required bool needed,
-    required String toolCallId,
-    required String toolName,
-    required Map<String, dynamic> args,
-    String? conversationId,
-    String? path,
-  }) async {
-    ToolCallCancellation.current?.throwIfCancelled();
-    if (!needed) return null;
-    if (approvalService == null) {
-      return _deniedResult(
-        tool: toolName,
-        error: 'approval_denied',
-        message: 'User denied the tool call',
-        path: path,
-      );
-    }
-    final id = toolCallId.trim().isEmpty
-        ? '${toolName}_${DateTime.now().microsecondsSinceEpoch}'
-        : toolCallId;
-    final result = await approvalService.requestApproval(
-      toolCallId: id,
-      toolName: toolName,
-      arguments: args,
-      conversationId: conversationId,
-    );
-    if (result.approved) return null;
-    return _deniedResult(
-      tool: toolName,
-      error: 'approval_denied',
-      message: result.denyReason ?? 'User denied the tool call',
-      path: path,
-    );
-  }
-
   Future<void> _markToolsUsed(
     WorkspaceToolContext ctx, {
     String? conversationId,
@@ -1467,7 +1440,6 @@ class WorkspaceToolsService {
           workspaceId: current.workspaceId,
           cwd: current.cwd,
           toolsUsed: true,
-          allowAll: current.allowAll,
         ).applyTo(extras);
       });
       await touchLastUsed?.call(ctx.workspace.id);
@@ -1582,6 +1554,9 @@ class WorkspaceToolsService {
   static String _engineLine(WorkspaceToolContext ctx) {
     final status = ctx.runtimeStatus;
     if (!ctx.runtimeRegistered || status == null || !status.ready) {
+      if (status?.engine == 'process') {
+        return 'Native shell unavailable — ask the user to check Environment > Default shell.';
+      }
       return 'Sandbox environment not installed — `shell` will fail until the user installs it';
     }
     switch (status.engine) {

@@ -41,6 +41,9 @@ void main() {
     expect(find.text('System'), findsWidgets);
     expect(find.text('Offline Model'), findsOneWidget);
     expect(find.text('OpenAI Realtime'), findsOneWidget);
+    expect(find.text('Groq'), findsOneWidget);
+    expect(find.text('Mistral'), findsOneWidget);
+    expect(find.text('ElevenLabs'), findsOneWidget);
     expect(find.text('DashScope'), findsOneWidget);
     expect(find.text('Volcengine'), findsOneWidget);
     expect(find.text('MiMo'), findsOneWidget);
@@ -61,6 +64,269 @@ void main() {
     expect(statusRect.left, nameRect.left);
     expect(statusRect.right, nameRect.right);
   });
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'Qwen Token Plan settings can be saved, edited and restored on ${desktop ? 'desktop' : 'mobile'}',
+      (tester) async {
+        await tester.binding.setSurfaceSize(Size(desktop ? 1100 : 420, 900));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final preferences = createBusinessTestPreferences();
+        final settings = SettingsProvider(preferences);
+        final fixture = _ModelManagerFixture.create();
+        addTearDown(fixture.dispose);
+        await _pumpSection(
+          tester,
+          settings: settings,
+          modelManager: fixture.manager,
+          desktop: desktop,
+        );
+        await tester.tap(find.byTooltip('Add speech recognition service'));
+        await tester.pumpAndSettle();
+        if (desktop) {
+          await tester.tap(
+            find.descendant(
+              of: find.byType(VoiceServiceSelectRow<AsrServiceKind>),
+              matching: find.text('System'),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        await tester.ensureVisible(find.text('Qwen Audio'));
+        await tester.tap(find.text('Qwen Audio'));
+        await tester.pumpAndSettle();
+
+        Future<void> select(Finder row, String value) async {
+          await tester.ensureVisible(row);
+          await tester.tap(
+            find.descendant(of: row, matching: find.byType(Text)).last,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(value).last);
+          await tester.pumpAndSettle();
+        }
+
+        final modeRow = desktop
+            ? find.byType(VoiceServiceSelectRow<QwenAudioAsrMode>)
+            : find.byType(VoiceServiceMobileSelectRow<QwenAudioAsrMode>);
+        await select(modeRow, 'Recorded audio');
+        expect(
+          tester
+              .widget<TextField>(find.byType(TextField).at(4))
+              .controller!
+              .text,
+          'qwen-audio-3.0-asr-flash',
+        );
+        await select(
+          desktop
+              ? find.byType(VoiceServiceSelectRow<String>)
+              : find.byType(VoiceServiceMobileSelectRow<String>),
+          'ap-southeast-1',
+        );
+        final values = [
+          'Token Plan',
+          'test-key',
+          'token-plan',
+          '',
+          'qwen-audio-3.0-asr-flash',
+          'en',
+        ];
+        for (var i = 0; i < values.length; i++) {
+          final field = find.byType(TextField).at(i);
+          await tester.ensureVisible(field);
+          await tester.enterText(field, values[i]);
+        }
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(find.byType(TextField).at(3))
+              .decoration!
+              .hintText,
+          'https://token-plan.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+        );
+        await tester.tap(
+          desktop
+              ? find.widgetWithText(FilledButton, 'Add')
+              : find.byTooltip('Add'),
+        );
+        await tester.pumpAndSettle();
+        final saved = settings.asrServices.single as QwenAudioAsrOptions;
+        expect(saved.mode, QwenAudioAsrMode.transcription);
+        expect(saved.workspaceId, 'token-plan');
+        expect(saved.region, 'ap-southeast-1');
+        expect(saved.model, 'qwen-audio-3.0-asr-flash');
+        expect(saved.language, 'en');
+        expect(saved.endpoint, isEmpty);
+        expect(saved.isConfigured, isTrue);
+        expect(settings.selectedAsrServiceId, saved.id);
+
+        await tester.tap(find.byTooltip('Edit'));
+        await tester.pumpAndSettle();
+        for (var i = 0; i < values.length; i++) {
+          expect(
+            tester
+                .widget<TextField>(find.byType(TextField).at(i))
+                .controller!
+                .text,
+            values[i],
+          );
+        }
+        expect(find.text('Recorded audio'), findsOneWidget);
+        expect(find.text('ap-southeast-1'), findsOneWidget);
+        final endpoint = find.byType(TextField).at(3);
+        await tester.ensureVisible(endpoint);
+        await tester.enterText(endpoint, 'wss://proxy.test/wrong-protocol');
+        await tester.tap(
+          desktop
+              ? find.widgetWithText(FilledButton, 'Save')
+              : find.byTooltip('Save'),
+        );
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Enter a complete http://'), findsOneWidget);
+        expect(
+          (settings.asrServices.single as QwenAudioAsrOptions).endpoint,
+          isEmpty,
+        );
+        await tester.ensureVisible(endpoint);
+        await tester.enterText(
+          endpoint,
+          'https://proxy.test/custom/asr?project=one',
+        );
+        await tester.tap(
+          desktop
+              ? find.widgetWithText(FilledButton, 'Save')
+              : find.byTooltip('Save'),
+        );
+        await tester.pumpAndSettle();
+        final edited = settings.asrServices.single as QwenAudioAsrOptions;
+        expect(edited.id, saved.id);
+        expect(edited.endpointUrl, 'https://proxy.test/custom/asr?project=one');
+        final restored = SettingsProvider(preferences);
+        await tester.runAsync(() => restored.loaded);
+        expect(restored.asrServices.single.toJson(), edited.toJson());
+        expect(restored.selectedAsrServiceId, edited.id);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (kind, title) in [
+      (AsrServiceKind.groq, 'Groq'),
+      (AsrServiceKind.mistral, 'Mistral'),
+      (AsrServiceKind.elevenLabs, 'ElevenLabs'),
+    ]) {
+      testWidgets(
+        '${kind.name} can be added, edited and restored on ${desktop ? 'desktop' : 'mobile'}',
+        (tester) async {
+          await tester.binding.setSurfaceSize(Size(desktop ? 1100 : 420, 900));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final preferences = createBusinessTestPreferences();
+          final settings = SettingsProvider(preferences);
+          final fixture = _ModelManagerFixture.create();
+          addTearDown(fixture.dispose);
+          await _pumpSection(
+            tester,
+            settings: settings,
+            modelManager: fixture.manager,
+            desktop: desktop,
+          );
+          await tester.tap(find.byTooltip('Add speech recognition service'));
+          await tester.pumpAndSettle();
+          if (desktop) {
+            await tester.tap(
+              find.descendant(
+                of: find.byType(VoiceServiceSelectRow<AsrServiceKind>),
+                matching: find.text('System'),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+          await tester.ensureVisible(find.text(title));
+          await tester.tap(find.text(title));
+          await tester.pumpAndSettle();
+          final defaults = AudioTranscriptionAsrOptions(kind: kind);
+          expect(
+            tester
+                .widget<TextField>(find.byType(TextField).at(2))
+                .controller!
+                .text,
+            defaults.baseUrl,
+          );
+          expect(
+            tester
+                .widget<TextField>(find.byType(TextField).at(3))
+                .controller!
+                .text,
+            defaults.model,
+          );
+          final values = [
+            '$title custom',
+            'test-api-key',
+            'https://proxy.test/v1',
+            'custom-model',
+            'zh',
+          ];
+          for (var index = 0; index < values.length; index++) {
+            final field = find.byType(TextField).at(index);
+            await tester.ensureVisible(field);
+            await tester.enterText(field, values[index]);
+          }
+          await tester.pumpAndSettle();
+          await tester.tap(
+            desktop
+                ? find.widgetWithText(FilledButton, 'Add')
+                : find.byTooltip('Add'),
+          );
+          await tester.pumpAndSettle();
+          final saved =
+              settings.asrServices.single as AudioTranscriptionAsrOptions;
+          expect(saved.kind, kind);
+          expect(saved.isConfigured, isTrue);
+          expect(saved.name, values[0]);
+          expect(saved.apiKey, values[1]);
+          expect(saved.baseUrl, values[2]);
+          expect(saved.model, values[3]);
+          expect(saved.language, values[4]);
+          expect(settings.selectedAsrServiceId, saved.id);
+
+          await settings.setAsrServices([
+            saved.copyWith(sampleRate: 8000, segmentDurationSec: 17),
+          ]);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('Edit'));
+          await tester.pumpAndSettle();
+          for (var index = 0; index < values.length; index++) {
+            expect(
+              tester
+                  .widget<TextField>(find.byType(TextField).at(index))
+                  .controller!
+                  .text,
+              values[index],
+            );
+          }
+          final nameField = find.byType(TextField).first;
+          await tester.ensureVisible(nameField);
+          await tester.enterText(nameField, '$title edited');
+          await tester.tap(
+            desktop
+                ? find.widgetWithText(FilledButton, 'Save')
+                : find.byTooltip('Save'),
+          );
+          await tester.pumpAndSettle();
+          final edited =
+              settings.asrServices.single as AudioTranscriptionAsrOptions;
+          expect(edited.id, saved.id);
+          expect(edited.name, '$title edited');
+          expect(edited.sampleRate, 8000);
+          expect(edited.segmentDurationSec, 17);
+          final restored = SettingsProvider(preferences);
+          await tester.runAsync(() => restored.loaded);
+          expect(restored.asrServices.single.toJson(), edited.toJson());
+          expect(restored.selectedAsrServiceId, edited.id);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   testWidgets('offline model editor uses one icon-free model list', (
     tester,

@@ -47,6 +47,7 @@ class LocalSnapshotProvider extends ChangeNotifier {
       store: _store,
       buildArchive: debugBuildArchive ?? _dataSync.prepareLocalSnapshotArchive,
       isBusy: isBusy,
+      flushPendingState: chatService.flushAcceptedUiState,
     );
     _settings = _preferences.readSettings();
     _state = _preferences.readState();
@@ -249,12 +250,15 @@ class LocalSnapshotProvider extends ChangeNotifier {
   }
 
   Future<void> delete(LocalCopy copy) async {
-    await _catalog.delete(copy);
-    await refresh();
+    if (working) throw StateError('local_snapshot_running');
+    await whileHoldingCopies(() async {
+      await _catalog.delete(copy);
+      await refresh();
+    });
   }
 
   Future<void> setPinned(LocalCopy copy, bool pinned) async {
-    if (copy.kind != LocalCopyKind.snapshot) return;
+    if (copy.discovered || copy.kind != LocalCopyKind.snapshot) return;
     await _store.setPinned(copy.id, pinned);
     await refresh();
   }

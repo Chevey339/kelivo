@@ -1,3 +1,4 @@
+import '../widgets/desktop_form_dialog.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -186,22 +187,9 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
                     onTap: () => Navigator.of(context).maybePop(),
                   ),
                   const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: _save,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      backgroundColor: cs.primary,
-                      foregroundColor: cs.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      AppLocalizations.of(context)!.mcpServerEditSheetSave,
-                    ),
+                  DesktopFormPrimaryButton(
+                    onTap: _save,
+                    label: AppLocalizations.of(context)!.mcpServerEditSheetSave,
                   ),
                 ],
               ),

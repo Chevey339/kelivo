@@ -3,6 +3,8 @@ enum BackupPhase {
   snapshottingDatabase,
   packing,
   verifying,
+  encrypting,
+  decrypting,
   uploading,
   downloading,
   extracting,

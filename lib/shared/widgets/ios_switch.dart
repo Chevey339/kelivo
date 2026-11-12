@@ -136,10 +136,14 @@ class _IosSwitchState extends State<IosSwitch> {
           child: Center(
             child: AnimatedScale(
               scale: pressScale,
-              duration: const Duration(milliseconds: 100),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 100),
               curve: Curves.easeOut,
               child: AnimatedContainer(
-                duration: widget.animationDuration,
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : widget.animationDuration,
                 curve: widget.animationCurve,
                 width: widget.width,
                 height: widget.height,
@@ -149,7 +153,9 @@ class _IosSwitchState extends State<IosSwitch> {
                   children: [
                     // Thumb
                     AnimatedAlign(
-                      duration: widget.animationDuration,
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : widget.animationDuration,
                       curve: widget.animationCurve,
                       alignment: widget.value
                           ? Alignment.centerRight

@@ -1,9 +1,9 @@
 diff --git a/fs/fake.c b/fs/fake.c
 --- a/fs/fake.c
 +++ b/fs/fake.c
-@@ -783,6 +783,9 @@ static int fakefs_stat(struct mount *mount, const char *path, struct statbuf *fake_s
+@@ -829,6 +829,9 @@
+         if (stat(host_stat_path, &real_stat) < 0)
              return errno_map();
-         }
          /* Copy basic fields from real stat */
 +        /* Match realfs_fstat's device number so coreutils does not mistake
 +         * a bind-mounted source for a file replaced between stat and open. */

@@ -1,0 +1,98 @@
+diff --git a/kernel/memory.c b/kernel/memory.c
+index fd5f589..82d38f5 100644
+--- a/kernel/memory.c
++++ b/kernel/memory.c
+@@ -1251,7 +1251,6 @@ check_reservation: ;
+             pages_t want = (pages_t)(real_page_size >> PAGE_BITS);
+             if (want < 1) want = 1;
+ #if ANON_MMAP_LIMIT_PAGES > 0
+-            static _Atomic long reservation_denied_reported;
+             // Charge the cluster up front, then refund whatever wasn't
+             // committed. Charging after the fact could let two threads both
+             // pass a nearly-full cap and overshoot it.
+@@ -1261,13 +1260,9 @@ check_reservation: ;
+                 if (!anon_pages_reserve(charged))
+                     charged = 0;
+             }
+-            if (charged == 0) {
+-                long prev = atomic_fetch_add(&reservation_denied_reported, 1);
+-                if (prev % 4096 == 0)
+-                    printk("mem: anon page cap refused lazy commit for pid=%d "
+-                           "(page %#x, %ld denials so far) — guest gets SIGSEGV\n",
+-                           current != NULL ? current->pid : -1, page, prev + 1);
+-            } else {
++            // user_write() can fault here while sys_syslog() holds log_lock.
++            // Leave the entry absent on refusal without entering guest logging.
++            if (charged != 0) {
+                 // [T-ish-anon-count-negative] The reservation above is handed
+                 // to pt_map_nothing (via the thread-local precharge) and
+                 // consumed by whatever it maps; it charges the remainder
+diff --git a/kernel/mm.h b/kernel/mm.h
+index f3b55bd..689fc2a 100644
+--- a/kernel/mm.h
++++ b/kernel/mm.h
+@@ -133,6 +133,10 @@ bool ish_footprint_mode(void);
+ // the whole limit (an absurd ask deserves a clean upfront ENOMEM rather
+ // than a mid-memset death).
+ bool ish_mem_commit_ok(uint64_t bytes);
++// Synchronously refresh stale host data before rejecting an allocation. The
++// hook must not allocate guest memory or acquire guest locks. A failed refresh
++// still fails closed. NULL leaves the periodic-feed contract unchanged.
++void ish_set_memory_refresh_hook(void (*hook)(void));
+ #endif
+
+ // uses mem.lock instead of having a lock of its own
+diff --git a/kernel/mmap.c b/kernel/mmap.c
+index 9eb8b59..38e81ff 100644
+--- a/kernel/mmap.c
++++ b/kernel/mmap.c
+@@ -35,6 +35,11 @@ static _Atomic int ish_mem_state_v = ISH_MEM_OK;
+ static _Atomic uint64_t ish_mem_limit_v;
+ static _Atomic uint64_t ish_mem_avail_v;
+ static _Atomic uint64_t ish_mem_stamp_ms;
++static _Atomic(void (*)(void)) ish_mem_refresh_hook;
++
++void ish_set_memory_refresh_hook(void (*hook)(void)) {
++    atomic_store_explicit(&ish_mem_refresh_hook, hook, memory_order_release);
++}
+
+ // Feed staleness window. A sampler that stops updating for this long is
+ // treated as dead and the brake engages — the governor must fail closed.
+@@ -69,26 +74,28 @@ void ish_set_memory_status(uint64_t limit_bytes, uint64_t avail_bytes, bool pres
+     atomic_store(&ish_mem_avail_v, avail_bytes);
+     atomic_store(&ish_mem_state_v, next);
+     atomic_store(&ish_mem_stamp_ms, ish_monotonic_ms());
+-    if (next != prev)
+-        printk("mem: brake %s — footprint %lu MB / limit %lu MB (avail %lu MB)%s\n",
+-               next == ISH_MEM_BRAKE ? "ENGAGED" : "released",
+-               (unsigned long)((limit_bytes - avail_bytes) >> 20),
+-               (unsigned long)(limit_bytes >> 20),
+-               (unsigned long)(avail_bytes >> 20),
+-               pressure_critical ? " [OS pressure critical]" : "");
++    // A synchronous host refresh can originate in user_write() while
++    // sys_syslog() holds log_lock. Do not printk or take guest locks here.
++
+ }
+
+ bool ish_mem_commit_ok(uint64_t bytes) {
+     uint64_t stamp = atomic_load(&ish_mem_stamp_ms);
+     if (stamp == 0)
+         return true;   // legacy mode: the ledger check in anon_pages_reserve decides
++    if (ish_monotonic_ms() - stamp > ISH_MEM_STALE_MS) {
++        void (*refresh)(void) = atomic_load_explicit(&ish_mem_refresh_hook, memory_order_acquire);
++        if (refresh != NULL)
++            refresh();
++        stamp = atomic_load(&ish_mem_stamp_ms);
++        if (ish_monotonic_ms() - stamp > ISH_MEM_STALE_MS)
++            return false;  // unavailable sampler still fails closed
++    }
+     uint64_t limit = atomic_load(&ish_mem_limit_v);
+     // Sanity gate: one request larger than the entire allowance can never be
+     // dirtied safely — give it a clean upfront ENOMEM (malloc returns NULL)
+     // instead of admitting it and killing the process mid-memset later.
+     if (limit != 0 && bytes > limit)
+         return false;
+-    if (ish_monotonic_ms() - stamp > ISH_MEM_STALE_MS)
+-        return false;  // dead sampler fails closed
+     return atomic_load(&ish_mem_state_v) == ISH_MEM_OK;
+ }

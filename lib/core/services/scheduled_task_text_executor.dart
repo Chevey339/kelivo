@@ -79,7 +79,7 @@ class ScheduledTaskTextExecutor implements ScheduledTaskPreparation {
       throw StateError('model_missing');
     }
     final config = settings.getProviderConfig(providerKey);
-    if (!config.enabled || !config.models.contains(modelId)) {
+    if (!config.enabled || !config.isModelEnabled(modelId)) {
       throw StateError('model_missing');
     }
     return (providerKey: providerKey, modelId: modelId);

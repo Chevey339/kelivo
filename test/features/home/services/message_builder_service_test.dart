@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_container.dart';
@@ -17,6 +18,7 @@ import 'package:Kelivo/core/services/api/providers/google/gemini_thought_signatu
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 import 'package:Kelivo/features/home/services/ocr_service.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -70,7 +72,7 @@ ChatMessage _message({
 
 void main() {
   test(
-    'inlineLocalImages leaves view_image error text and snapshots to the provider',
+    'inlineLocalImages leaves all tool text and typed images to the provider',
     () async {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
@@ -88,12 +90,25 @@ void main() {
       final messages = <Map<String, dynamic>>[
         {'role': 'tool', 'name': 'view_image', 'content': error},
         {'role': 'tool', 'name': 'view_image', 'content': snapshot},
+        {
+          'role': 'tool',
+          'name': 'svguess__view_drawing',
+          'content': snapshot,
+          'metadata': {
+            kMcpResultMetadataKey: mcpResultMetadata([file.path]),
+          },
+        },
+        {'role': 'tool', 'name': 'view_drawing', 'content': error},
+        {'role': 'tool', 'name': 'shell', 'content': snapshot},
         {'role': 'user', 'content': snapshot},
       ];
       await service.inlineLocalImages(messages);
       expect(messages[0]['content'], error);
       expect(messages[1]['content'], snapshot);
-      expect(messages[2]['content'], contains('data:image/png;base64,AQID'));
+      expect(messages[2]['content'], snapshot);
+      expect(messages[3]['content'], error);
+      expect(messages[4]['content'], snapshot);
+      expect(messages[5]['content'], contains('data:image/png;base64,AQID'));
     },
   );
 
@@ -551,6 +566,62 @@ void main() {
   });
 
   group('MessageBuilderService.buildApiMessages', () {
+    test(
+      'compression background survives M and is not a persisted user prompt',
+      () {
+        final service = MessageBuilderService(
+          chatService: _FakeChatService({}),
+          contextProvider: _FakeBuildContext(),
+        );
+        final messages = service.buildApiMessages(
+          messages: [
+            _message(
+              id: 'context-summary:S',
+              role: 'user',
+              content: 'Actual edited summary',
+            ),
+            _message(id: 'old', role: 'user', content: 'old raw history'),
+            _message(id: 'answer', role: 'assistant', content: 'old answer'),
+            _message(id: 'new', role: 'user', content: 'next input'),
+          ],
+          versionSelections: {},
+          currentConversation: Conversation(
+            id: 'conversation-1',
+            title: 'summary',
+          ),
+        );
+        expect(messages.first['role'], 'user');
+        expect(
+          messages.first.containsKey(
+            MessageBuilderService.internalRevisionIdKey,
+          ),
+          isFalse,
+        );
+        service.applyContextLimit(
+          messages,
+          const Assistant(
+            id: 'a',
+            name: 'a',
+            limitContextMessages: true,
+            contextMessageSize: 1,
+          ),
+        );
+        expect(messages.map((m) => m['content']), [
+          'Actual edited summary',
+          'next input',
+        ]);
+        service.stripInternalRevisionIds(messages);
+        expect(
+          messages.every(
+            (m) =>
+                !m.containsKey('_contextSummary') &&
+                !m.containsKey(MessageBuilderService.internalRevisionIdKey),
+          ),
+          isTrue,
+        );
+      },
+    );
+
     test('有工具调用时会把 reasoning_content 回填到 assistant tool 消息', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService({
@@ -646,6 +717,44 @@ void main() {
         );
       },
     );
+
+    for (final sourceProvider in ['vertex', 'gemini-paid', null]) {
+      test('Gemini history scopes signatures from $sourceProvider', () {
+        const signature =
+            '{"text":{"k":"thoughtSignature","v":"vertex-signature"}}';
+        const legacy = '<!-- gemini_thought_signatures:$signature -->';
+        final service = MessageBuilderService(
+          chatService: _FakeChatService({}),
+          contextProvider: _FakeBuildContext(),
+          providerArtifactLookup: (message, kind) =>
+              kind == geminiThoughtSignatureArtifactKind ? signature : null,
+        );
+        final original = ChatMessage(
+          id: 'signed',
+          conversationId: 'conversation-1',
+          role: 'assistant',
+          content: 'Earlier answer.$legacy',
+          providerId: sourceProvider,
+          modelId: 'gemini-4-argon',
+        );
+        final messages = service.buildApiMessages(
+          messages: [original],
+          versionSelections: {},
+          currentConversation: null,
+          googleProviderId: 'vertex',
+        );
+        final sameProvider = sourceProvider == 'vertex';
+        expect(
+          messages.single[multimodalInternalGeminiThoughtSignatureKey],
+          sameProvider ? signature : isNull,
+        );
+        expect(
+          messages.single['content'],
+          sameProvider ? original.content : 'Earlier answer.',
+        );
+        expect(original.content, 'Earlier answer.$legacy');
+      });
+    }
 
     test('a stored Gemini signature rides on the final assistant message', () {
       final service = MessageBuilderService(
@@ -1155,6 +1264,56 @@ void main() {
         ),
         isFalse,
       );
+    });
+
+    test('native context survives the assistant message limit', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final payload = NativeCompactionPayload(
+        protocol: NativeCompactionProtocol.compact,
+        scope: 'fixture',
+        modelId: 'model',
+        output: [
+          {'type': 'compaction', 'encrypted_content': 'opaque-history'},
+        ],
+      );
+      final messages = service.buildApiMessages(
+        messages: [
+          ChatMessage(
+            id: 'context-summary:native',
+            conversationId: 'chat',
+            role: 'user',
+            content: '',
+          )..hydrateProviderArtifacts({
+            nativeCompactionArtifactKind: jsonEncode(payload.toJson()),
+          }),
+          for (var i = 0; i < 6; i++)
+            _message(
+              id: 'm$i',
+              role: i.isEven ? 'user' : 'assistant',
+              content: 'recent $i',
+            ),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(id: 'chat', title: 'test'),
+      );
+      service.applyContextLimit(
+        messages,
+        const Assistant(
+          id: 'assistant',
+          name: 'test',
+          limitContextMessages: true,
+          contextMessageSize: 2,
+        ),
+      );
+      expect(messages, hasLength(3));
+      expect(messages.first[nativeCompactionMessageKey], payload.toJson());
+      expect(messages.skip(1).map((m) => m['content']), [
+        'recent 4',
+        'recent 5',
+      ]);
     });
 
     test('WorldBook 注入后的最终裁剪会限制发送消息数', () {

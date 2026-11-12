@@ -238,6 +238,39 @@ void main() {
     },
   );
 
+  test(
+    'assistant decoder failure retains legacy data before migration cleanup',
+    () async {
+      final source = jsonEncode([
+        {
+          'id': 'original-id',
+          'name': 'Existing',
+          'useGradientBackground': 'true',
+        },
+      ]);
+      final legacy = FakeLegacyBusinessPreferences({'assistants_v1': source});
+      await expectLater(
+        BusinessMigrationEngine(
+          repository: repository,
+          legacyPreferences: legacy,
+        ).run(),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'source',
+            'assistants_v1',
+          ),
+        ),
+      );
+      expect(legacy.values['assistants_v1'], source);
+      expect(await repository.hasMigrationReceipt(), isFalse);
+      expect(
+        await repository.readEntities(BusinessEntityKind.assistant),
+        isEmpty,
+      );
+    },
+  );
+
   test('routes a complete registered business snapshot without loss', () async {
     final source = <String, Object?>{
       for (final key in BusinessKeyRegistry.preferenceKeys) key: 'value:$key',

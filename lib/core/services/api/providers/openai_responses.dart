@@ -16,6 +16,7 @@ Stream<StreamChunk> sendOpenAIResponsesStream(
   String modelId,
   List<Map<String, dynamic>> messages, {
   String? conversationId,
+  String? serviceTier,
   List<String>? userImagePaths,
   ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
@@ -37,6 +38,7 @@ Stream<StreamChunk> sendOpenAIResponsesStream(
     modelId,
     messages,
     conversationId: conversationId,
+    serviceTier: serviceTier,
     userImagePaths: userImagePaths,
     reasoning: reasoning,
     temperature: temperature,

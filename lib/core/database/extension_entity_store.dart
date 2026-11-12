@@ -31,6 +31,9 @@ class ExtensionEntityStore {
 
   final AppDatabase _db;
 
+  Future<T> transaction<T>(Future<T> Function() action) =>
+      _db.transaction(action);
+
   Future<List<ExtensionEntity>> listByKind(String kind) async {
     final rows =
         await (_db.select(_db.extensionEntityRows)

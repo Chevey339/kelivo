@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,8 @@ import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/database_installation_gate.dart';
+import 'package:Kelivo/core/database/empty_database_recovery_guard.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
@@ -21,6 +24,7 @@ import 'package:Kelivo/core/services/backup/cherry_importer.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/utils/app_directories.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+import '../../../support/recovery_snapshot_fixture.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -74,6 +78,316 @@ void main() {
   });
 
   group('CherryImporter', () {
+    test(
+      'attachment preparation failure keeps original chats and settings',
+      () async {
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: tempDir,
+        );
+        await chatService.restoreConversation(
+          Conversation(id: 'original', title: 'Original'),
+          [],
+        );
+        final settingsBefore = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        final snapshot = await writeRecoverySnapshot(
+          File('${tempDir.path}/snapshots/kelivo-snapshot-old.zip'),
+        );
+        final snapshotBytes = await snapshot.readAsBytes();
+        final uploadDirectory = Directory('${tempDir.path}/upload');
+        if (await uploadDirectory.exists()) {
+          await uploadDirectory.delete(recursive: true);
+        }
+        final blocker = await File(
+          uploadDirectory.path,
+        ).writeAsString('original path evidence');
+        final backup = await _createZip(tempDir, {
+          'data.json': utf8.encode(
+            jsonEncode(
+              _legacyBackupRoot(
+                topicId: 'new-chat',
+                messageId: 'new-message',
+                content: 'New',
+              ),
+            ),
+          ),
+        });
+        await expectLater(
+          CherryImporter.importFromCherryStudio(
+            file: backup,
+            mode: RestoreMode.overwrite,
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ),
+          throwsA(anything),
+        );
+        expect(chatService.getAllConversations().map((c) => c.id), [
+          'original',
+        ]);
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          settingsBefore,
+        );
+        expect(await snapshot.readAsBytes(), snapshotBytes);
+        expect(await blocker.readAsString(), 'original path evidence');
+        expect(
+          await File(
+            '${tempDir.path}/${EmptyDatabaseRecoveryGuard.acknowledgementName}',
+          ).exists(),
+          isFalse,
+        );
+        await EmptyDatabaseRecoveryGuard.check(
+          appDataDirectory: tempDir,
+          databaseId: receipt.databaseId,
+        );
+      },
+    );
+
+    test('failed chat commit rolls back settings and old chats', () async {
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: tempDir,
+      );
+      await chatService.restoreConversation(
+        Conversation(id: 'original', title: 'Original'),
+        [],
+      );
+      final settingsBefore = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
+      final snapshot = await writeRecoverySnapshot(
+        File('${tempDir.path}/snapshots/kelivo-snapshot-old.zip'),
+      );
+      final snapshotBytes = await snapshot.readAsBytes();
+      await database.customStatement('''
+        CREATE TRIGGER fail_cherry_message BEFORE INSERT ON message_rows
+        BEGIN SELECT RAISE(ABORT, 'injected import failure'); END
+      ''');
+      final backup = await _createZip(tempDir, {
+        'data.json': utf8.encode(
+          jsonEncode(
+            _legacyBackupRoot(
+              topicId: 'new-chat',
+              messageId: 'new-message',
+              content: 'New',
+            ),
+          ),
+        ),
+      });
+      await expectLater(
+        CherryImporter.importFromCherryStudio(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ),
+        throwsA(anything),
+      );
+      expect(chatService.getAllConversations().map((c) => c.id), ['original']);
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        settingsBefore,
+      );
+      expect(await snapshot.readAsBytes(), snapshotBytes);
+      await EmptyDatabaseRecoveryGuard.check(
+        appDataDirectory: tempDir,
+        databaseId: receipt.databaseId,
+      );
+    });
+
+    test(
+      'successful empty overwrite acknowledges only the final empty result',
+      () async {
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: tempDir,
+        );
+        await chatService.restoreConversation(
+          Conversation(id: 'original', title: 'Original'),
+          [],
+        );
+        final snapshot = await writeRecoverySnapshot(
+          File('${tempDir.path}/snapshots/kelivo-snapshot-old.zip'),
+        );
+        final snapshotBytes = await snapshot.readAsBytes();
+        final backup = await _createZip(tempDir, {
+          'data.json': utf8.encode(
+            jsonEncode({
+              'version': 5,
+              'localStorage': {'persist:cherry-studio': '{}'},
+              'indexedDB': {'topics': [], 'message_blocks': [], 'files': []},
+            }),
+          ),
+        });
+        final result = await CherryImporter.importFromCherryStudio(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+        expect(result.conversations, 0);
+        expect(result.messages, 0);
+        expect(chatService.getAllConversations(), isEmpty);
+        expect(await snapshot.readAsBytes(), snapshotBytes);
+        await EmptyDatabaseRecoveryGuard.check(
+          appDataDirectory: tempDir,
+          databaseId: receipt.databaseId,
+        );
+        // A later real write invalidates that permission: unexpected emptying
+        // must once again offer the retained recovery snapshot.
+        await chatService.restoreConversation(
+          Conversation(id: 'later', title: 'Later'),
+          [],
+        );
+        await database.customStatement('DELETE FROM conversation_rows');
+        await expectLater(
+          EmptyDatabaseRecoveryGuard.check(
+            appDataDirectory: tempDir,
+            databaseId: receipt.databaseId,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              'database_empty_with_recovery_copies',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'overwrite preserves old attachments with the same Cherry id',
+      () async {
+        final oldFile = await File(
+          '${tempDir.path}/upload/cherry_same_photo.png',
+        ).create(recursive: true);
+        await oldFile.writeAsString('old photo');
+        final snapshot = await writeRecoverySnapshot(
+          File('${tempDir.path}/snapshots/kelivo-snapshot-old.zip'),
+        );
+        final snapshotBytes = await snapshot.readAsBytes();
+        final backup = await _createZip(tempDir, {
+          'data.json': utf8.encode(
+            jsonEncode(
+              _legacyBackupWithAttachments(
+                files: [
+                  {'id': 'same', 'name': 'photo.png', 'type': 'image/png'},
+                ],
+              ),
+            ),
+          ),
+          'Data/Files/photo.png': utf8.encode('new photo'),
+        });
+        final result = await CherryImporter.importFromCherryStudio(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+        expect(result.files, 1);
+        expect(await oldFile.readAsString(), 'old photo');
+        expect(await snapshot.readAsBytes(), snapshotBytes);
+        final imported = (await chatService.loadMessages(
+          'topic-files',
+        )).single.parts.whereType<ImagePart>().single;
+        expect(imported.unavailable, isFalse);
+        expect(
+          imported.uri,
+          isNot(SandboxPathResolver.canonicalize(oldFile.path)),
+        );
+        final files = await oldFile.parent
+            .list(recursive: true)
+            .where((e) => e is File && e.path != oldFile.path)
+            .cast<File>()
+            .toList();
+        expect(files, hasLength(1));
+        expect(await files.single.readAsString(), 'new photo');
+        expect(
+          imported.uri,
+          SandboxPathResolver.canonicalize(files.single.path),
+        );
+      },
+    );
+
+    for (final filesOnly in [false, true]) {
+      test(
+        'attachment publish failure and retry preserve old data (filesOnly=$filesOnly)',
+        () async {
+          await chatService.restoreConversation(
+            Conversation(id: 'original', title: 'Original'),
+            [],
+          );
+          final settingsBefore = await BusinessRestoreService(
+            businessRepository,
+          ).exportSettings();
+          final blocker = Directory(
+            '${tempDir.path}/upload/cherry_retry_photo.png',
+          );
+          await blocker.create(recursive: true);
+          await File('${blocker.path}/evidence').writeAsString('keep');
+          final backup = await _createZip(tempDir, {
+            'data.json': utf8.encode(
+              jsonEncode(
+                _legacyBackupWithAttachments(
+                  files: [
+                    {'id': 'retry', 'name': 'photo.png', 'type': 'image/png'},
+                  ],
+                ),
+              ),
+            ),
+            'Data/Files/photo.png': utf8.encode('complete photo'),
+          });
+          final scope = filesOnly
+              ? BackupScope(
+                  excluded: BackupCategory.values
+                      .where((c) => c != BackupCategory.files)
+                      .toSet(),
+                )
+              : const BackupScope();
+          Future<CherryImportResult> performImport() =>
+              CherryImporter.importFromCherryStudio(
+                file: backup,
+                mode: filesOnly ? RestoreMode.overwrite : RestoreMode.merge,
+                scope: scope,
+                businessRepository: businessRepository,
+                chatService: chatService,
+              );
+          await expectLater(performImport(), throwsA(anything));
+          expect(chatService.getAllConversations().map((c) => c.id), [
+            'original',
+          ]);
+          expect(
+            await BusinessRestoreService(businessRepository).exportSettings(),
+            settingsBefore,
+          );
+          expect(await File('${blocker.path}/evidence').readAsString(), 'keep');
+          expect(blocker.parent.listSync().whereType<File>(), isEmpty);
+          // An abandoned temporary from a killed process must never be reused.
+          final abandoned = await File(
+            '${blocker.parent.path}/.cherry-pending-interrupted',
+          ).writeAsString('truncated');
+          await blocker.delete(recursive: true);
+          final result = await performImport();
+          expect(result.files, 1);
+          expect(await File(blocker.path).readAsString(), 'complete photo');
+          expect(await abandoned.readAsString(), 'truncated');
+          expect(
+            chatService.getAllConversations().map((c) => c.id),
+            contains('original'),
+          );
+          if (filesOnly) {
+            expect(chatService.getAllConversations(), hasLength(1));
+          } else {
+            final image = (await chatService.loadMessages(
+              'topic-files',
+            )).single.parts.whereType<ImagePart>().single;
+            expect(image.uri, SandboxPathResolver.canonicalize(blocker.path));
+            expect(image.unavailable, isFalse);
+          }
+        },
+      );
+    }
+
     for (final mode in RestoreMode.values) {
       test(
         'provider-only $mode import preserves local chats, assistants and files',
@@ -1307,7 +1621,7 @@ void main() {
 
         final upload = await AppDirectories.getUploadDirectory();
         Future<List<int>> readUpload(String id, String name) {
-          return File('${upload.path}/cherry_${id}_$name').readAsBytes();
+          return _uploadedFile(upload, 'cherry_${id}_$name').readAsBytes();
         }
 
         expect(await readUpload('file-base', 'by-base.txt'), byBaseBytes);
@@ -1508,7 +1822,7 @@ void main() {
         );
 
         final upload = await AppDirectories.getUploadDirectory();
-        final saved = File('${upload.path}/cherry_file-path_local.bin');
+        final saved = _uploadedFile(upload, 'cherry_file-path_local.bin');
         expect(await saved.exists(), isTrue);
         final file = (await chatService.loadMessages(
           'topic-files',
@@ -1549,7 +1863,7 @@ void main() {
         );
 
         final upload = await AppDirectories.getUploadDirectory();
-        final saved = File('${upload.path}/cherry_file-url_photo.png');
+        final saved = _uploadedFile(upload, 'cherry_file-url_photo.png');
         expect(await saved.exists(), isTrue);
         final image = (await chatService.loadMessages(
           'topic-files',
@@ -1714,8 +2028,9 @@ void main() {
       expect(result.files, greaterThanOrEqualTo(1));
       final upload = await AppDirectories.getUploadDirectory();
       expect(
-        await File(
-          '${upload.path}/cherry_file-disk_disk-only.txt',
+        await _uploadedFile(
+          upload,
+          'cherry_file-disk_disk-only.txt',
         ).readAsBytes(),
         diskBytes,
       );
@@ -1806,13 +2121,18 @@ void main() {
         expect(result.files, greaterThanOrEqualTo(1));
         final upload = await AppDirectories.getUploadDirectory();
         expect(
-          await File('${upload.path}/cherry_${uuidId}_win.bin').readAsBytes(),
+          await _uploadedFile(upload, 'cherry_${uuidId}_win.bin').readAsBytes(),
           bytes,
         );
       },
     );
   });
 }
+
+File _uploadedFile(Directory upload, String name) => upload
+    .listSync(recursive: true)
+    .whereType<File>()
+    .singleWhere((file) => p.basename(file.path) == name);
 
 Map<String, dynamic> _legacyBackupWithAttachments({
   required List<Map<String, dynamic>> files,

@@ -3,6 +3,27 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  private var loginLaunch: Bool?
+  private var launchCallbacks: [(Bool) -> Void] = []
+
+  override func applicationDidFinishLaunching(_ notification: Notification) {
+    let event = NSAppleEventManager.shared().currentAppleEvent
+    let launchedAtLogin = event?.eventID == kAEOpenApplication
+      && event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+    loginLaunch = launchedAtLogin
+    for callback in launchCallbacks { callback(launchedAtLogin) }
+    launchCallbacks.removeAll()
+    super.applicationDidFinishLaunching(notification)
+  }
+
+  func readLoginLaunch(_ completion: @escaping (Bool) -> Void) {
+    if let value = loginLaunch {
+      completion(value)
+    } else {
+      launchCallbacks.append(completion)
+    }
+  }
+
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     return false
   }

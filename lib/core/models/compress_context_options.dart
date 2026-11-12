@@ -1,6 +1,7 @@
 import '../utils/token_estimator.dart';
 import 'chat_message.dart';
-import '../../utils/utf16_safe_cut.dart';
+import 'context_operation.dart';
+import 'message_part.dart';
 
 enum CompressContextLimitMode { start, recent, unlimited, keepRecent }
 
@@ -9,313 +10,301 @@ class CompressContextOptions {
     required this.mode,
     this.maxChars,
     this.keepUserMessages,
+    this.historySource = ContextHistorySource.effective,
+    this.includeEditedSummaries = true,
+    this.includeAttachmentsAndTools = true,
+    this.regenerateExisting = false,
+    this.newConversation = false,
+    this.focus = '',
+    this.previewOnly = false,
+    this.native = false,
   });
 
   static const int defaultMaxChars = 6000;
-  static const int defaultKeepUserMessages = 3;
+  static const int defaultKeepUserMessages = 6;
 
-  /// Hard cap on a single compress request, in UTF-16 code units.
-  ///
-  /// Even a 1M-context model stays at or below this to avoid AOT / regex /
-  /// JSON-encode blow-ups. The effective budget is
-  /// `min(safeRequestChars, compressRequestCharBudget(...))`.
-  static const int safeRequestChars = 100000;
-
-  /// Assumed context window when model metadata is missing.
-  /// 32k is a conservative floor for current small chat models.
-  static const int defaultContextWindowTokens = 32000;
-
-  /// Fraction of the context window reserved for the compress prompt
-  /// wrapper and the model's completion.
-  static const double contextReserveFraction = 0.30;
-
-  /// Conservative chars/token (CJK-heavy). Matches
-  /// [estimateCompressionTokens] (`cjk / 1.6`).
-  static const double charsPerToken = 1.6;
-
-  /// Max binary splits when a compress `generateText` hits a context-length
-  /// error. Shared across the whole retry tree (halves + merge).
-  static const int contextRetryMaxSplits = 5;
-
-  /// Do not split a request whose resulting half would be shorter than this
-  /// (UTF-16 code units). Prevents infinite retry on a still-too-dense input.
-  static const int contextRetryMinSplitChars = 512;
+  /// Planning window when the summary model has no catalog or explicit limit.
+  static const int defaultContextWindowTokens = 1048576;
 
   final CompressContextLimitMode mode;
   final int? maxChars;
   final int? keepUserMessages;
+  final ContextHistorySource historySource;
+  final bool includeEditedSummaries;
+  final bool includeAttachmentsAndTools;
+  final bool regenerateExisting;
+  final bool newConversation;
+  final String focus;
+  final bool previewOnly;
+  final bool native;
+
+  Map<String, dynamic> toJson() => {
+    'mode': mode.name,
+    'maxChars': maxChars,
+    'keep': keepUserMessages,
+    'source': historySource.name,
+    'includeEdited': includeEditedSummaries,
+    'includeAttachmentsAndTools': includeAttachmentsAndTools,
+    'regenerateExisting': regenerateExisting,
+    'newConversation': newConversation,
+    'focus': focus,
+    'previewOnly': previewOnly,
+    'native': native,
+  };
+
+  factory CompressContextOptions.fromJson(Map<String, dynamic> json) =>
+      CompressContextOptions(
+        mode: CompressContextLimitMode.values.byName(json['mode'] as String),
+        maxChars: json['maxChars'] as int?,
+        keepUserMessages: json['keep'] as int?,
+        historySource: ContextHistorySource.values.byName(
+          json['source'] as String,
+        ),
+        includeEditedSummaries: json['includeEdited'] as bool,
+        includeAttachmentsAndTools: json['includeAttachmentsAndTools'] != false,
+        regenerateExisting: json['regenerateExisting'] == true,
+        newConversation: json['newConversation'] as bool,
+        focus: json['focus'] as String? ?? '',
+        previewOnly: json['previewOnly'] == true,
+        native: json['native'] == true,
+      );
 }
 
-/// Resolve the model that [HomeViewModel.compressContext] will call.
-///
-/// Chain: compress → summary → title → assistant chat → global default.
-/// Provider and model id are resolved independently (same as the existing
-/// `??` chain) so a half-set pair can still mix with a later fallback.
+bool isCompressionUserMessage(ChatMessage message) =>
+    message.role == 'user' &&
+    !ContextOperation.isSummary(message) &&
+    !message.id.startsWith('context-note:') &&
+    (message.content.trim().isNotEmpty ||
+        message.parts.any((part) => part is ImagePart || part is FilePart));
+
+class CompressionHistory {
+  const CompressionHistory({required this.messages, required this.operations});
+  factory CompressionHistory.fromMessages(
+    List<ChatMessage> messages,
+    List<ContextOperation> operations,
+  ) => CompressionHistory(
+    messages: messages.map(ContextMessageMetadata.fromMessage).toList(),
+    operations: operations,
+  );
+  final List<ContextMessageMetadata> messages;
+  final List<ContextOperation> operations;
+}
+
+typedef ContextSelection<T> = ({
+  List<T> effective,
+  List<T> retained,
+  List<T> covered,
+  List<T> input,
+  List<String> dependencies,
+  bool needsRegeneration,
+  bool missingOriginals,
+});
+typedef CompressionSelection = ContextSelection<ChatMessage>;
+typedef CompressionRangeSelection = ContextSelection<ContextMessageMetadata>;
+
+CompressionSelection selectCompressionHistory(
+  List<ChatMessage> messages,
+  List<ContextOperation> operations,
+  CompressContextOptions options, {
+  String? protectedMessageId,
+  Set<String>? effectiveMessageIds,
+}) {
+  final range = selectCompressionRange(
+    messages.map(ContextMessageMetadata.fromMessage).toList(),
+    operations,
+    options,
+    protectedMessageId: protectedMessageId,
+    effectiveMessageIds: effectiveMessageIds,
+  );
+  final entries = {
+    for (final m in [
+      ...range.effective,
+      ...range.retained,
+      ...range.covered,
+      ...range.input,
+    ])
+      m.id: m,
+  };
+  final hydrated = {
+    for (final m in ContextHistory.materialize(
+      messages,
+      operations,
+      entries.values.toList(),
+    ))
+      m.id: m,
+  };
+  List<ChatMessage> materialize(List<ContextMessageMetadata> entries) => [
+    for (final entry in entries) hydrated[entry.id]!,
+  ];
+  return (
+    effective: materialize(range.effective),
+    retained: materialize(range.retained),
+    covered: materialize(range.covered),
+    input: materialize(range.input),
+    dependencies: range.dependencies,
+    needsRegeneration: range.needsRegeneration,
+    missingOriginals: range.missingOriginals,
+  );
+}
+
+List<ContextMessageMetadata> _keepRecentMetadata(
+  List<ContextMessageMetadata> messages,
+  int keep,
+) {
+  if (keep <= 0) return const [];
+  final indices = [
+    for (var i = 0; i < messages.length; i++)
+      if (messages[i].isUserMessage) i,
+  ];
+  if (indices.isEmpty) return const [];
+  if (indices.length <= keep) {
+    return messages.skipWhile((m) => m.isSummary).toList();
+  }
+  return messages.sublist(indices[indices.length - keep]);
+}
+
+/// The options preview and the actual task use the same range selection.
+CompressionRangeSelection selectCompressionRange(
+  List<ContextMessageMetadata> messages,
+  List<ContextOperation> operations,
+  CompressContextOptions options, {
+  String? protectedMessageId,
+  Set<String>? effectiveMessageIds,
+}) {
+  final effective = ContextHistory.project(messages, operations)
+      .where(
+        (message) =>
+            effectiveMessageIds == null ||
+            effectiveMessageIds.contains(message.id),
+      )
+      .toList();
+  final keep = options.mode == CompressContextLimitMode.keepRecent
+      ? options.keepUserMessages ??
+            CompressContextOptions.defaultKeepUserMessages
+      : 0;
+  final retained = keep == 0
+      ? <ContextMessageMetadata>[]
+      : _keepRecentMetadata(effective, keep);
+  var prefix = effective.take(effective.length - retained.length).toList();
+  if (options.mode == CompressContextLimitMode.start ||
+      options.mode == CompressContextLimitMode.recent) {
+    // The old character setting now chooses whole messages. Coverage and
+    // serialization always receive exactly the same selection.
+    final selected = <ContextMessageMetadata>[];
+    var length = 0;
+    final candidates = options.mode == CompressContextLimitMode.recent
+        ? prefix.reversed
+        : prefix;
+    for (final message in candidates) {
+      if (length >=
+          (options.maxChars ?? CompressContextOptions.defaultMaxChars)) {
+        break;
+      }
+      selected.add(message);
+      length += message.contentLength;
+    }
+    prefix = options.mode == CompressContextLimitMode.recent
+        ? selected.reversed.toList()
+        : selected;
+  }
+  if (protectedMessageId != null) {
+    final protected = effective.indexWhere((m) => m.id == protectedMessageId);
+    if (protected < 0) throw StateError('context_changed');
+    final allowed = effective.take(protected).map((m) => m.id).toSet();
+    prefix = prefix.where((m) => allowed.contains(m.id)).toList();
+  }
+  final dependencies = prefix
+      .where((m) => m.isSummary)
+      .map((m) => m.id.substring(ContextOperation.summaryPrefix.length))
+      .toList();
+  final byId = {for (final op in operations) op.id: op};
+  final byMessage = {
+    for (final op in operations) op.summaryMessageId: op,
+    for (final op in operations) 'context-note:${op.id}': op,
+  };
+  final groups = <String>{
+    for (final message in prefix)
+      if (!message.isSummary) message.groupId,
+    for (final id in dependencies) ...?byId[id]?.sourceGroups,
+  };
+  final expanded = ContextHistory.compressionProjection(
+    messages,
+    operations,
+    source: options.historySource,
+    includeEditedSummaries: options.includeEditedSummaries,
+    includeNative: options.native,
+  );
+  final input = expanded.where((message) {
+    if (groups.contains(message.groupId)) return true;
+    final operation = byMessage[message.id];
+    return operation != null && operation.sourceGroups.every(groups.contains);
+  }).toList();
+  final prefixIds = prefix.map((m) => m.id).toSet();
+  return (
+    effective: effective,
+    retained: effective.where((m) => !prefixIds.contains(m.id)).toList(),
+    covered: messages.where((m) => groups.contains(m.groupId)).toList(),
+    dependencies: dependencies,
+    needsRegeneration:
+        !options.native &&
+        prefix.isNotEmpty &&
+        prefix.every((m) => m.isSummary) &&
+        options.historySource == ContextHistorySource.effective &&
+        !options.regenerateExisting,
+    input: input,
+    missingOriginals: !options.native && input.any((message) => message.native),
+  );
+}
+
+/// Resolve an explicit compression model as a pair, otherwise use the
+/// conversation's current chat model. Never silently change providers.
 ({String? providerKey, String? modelId}) resolveCompressContextModel({
   String? compressProvider,
   String? compressModelId,
-  String? summaryProvider,
-  String? summaryModelId,
-  String? titleProvider,
-  String? titleModelId,
   String? assistantProvider,
   String? assistantModelId,
   String? currentProvider,
   String? currentModelId,
+}) => compressProvider != null && compressModelId != null
+    ? (providerKey: compressProvider, modelId: compressModelId)
+    : assistantProvider != null && assistantModelId != null
+    ? (providerKey: assistantProvider, modelId: assistantModelId)
+    : (providerKey: currentProvider, modelId: currentModelId);
+
+String? conversationLineForCompression(
+  ChatMessage message, {
+  required String Function(int) quoteMarker,
 }) {
-  return (
-    providerKey:
-        compressProvider ??
-        summaryProvider ??
-        titleProvider ??
-        assistantProvider ??
-        currentProvider,
-    modelId:
-        compressModelId ??
-        summaryModelId ??
-        titleModelId ??
-        assistantModelId ??
-        currentModelId,
-  );
+  final content = message.quotedContent(quoteMarker);
+  if (content.trim().isEmpty) return null;
+  return '[source message:${message.id}; role=${message.role}]\n${message.role == 'assistant' ? 'Assistant' : 'User'}: $content';
 }
 
-/// Per-request UTF-16 budget for one compress `generateText` call.
-///
-/// Formula:
-///   window = contextWindowTokens ?? defaultContextWindowTokens (32k)
-///   usableTokens = window * (1 - reserveFraction)   // 30% reserved
-///   chars = floor(usableTokens * charsPerToken)     // 1.6, CJK-heavy
-///   budget = min(safeRequestChars, max(1, chars))
-///
-/// A 32k window → 22400 usable tokens → 35840 chars.
-/// A 128k+ window is larger but still capped at [safeRequestChars].
-int compressRequestCharBudget({
-  int? contextWindowTokens,
-  int safeRequestChars = CompressContextOptions.safeRequestChars,
-  int defaultContextWindowTokens =
-      CompressContextOptions.defaultContextWindowTokens,
-  double reserveFraction = CompressContextOptions.contextReserveFraction,
-  double charsPerToken = CompressContextOptions.charsPerToken,
-}) {
-  final window = (contextWindowTokens == null || contextWindowTokens <= 0)
-      ? defaultContextWindowTokens
-      : contextWindowTokens;
-  final chars = (window * (1.0 - reserveFraction) * charsPerToken).floor();
-  if (chars < 1) return 1;
-  return chars < safeRequestChars ? chars : safeRequestChars;
-}
-
-String buildCompressContextContent(
-  String joined,
-  CompressContextOptions options,
-) {
-  if (options.mode == CompressContextLimitMode.unlimited ||
-      options.mode == CompressContextLimitMode.keepRecent) {
-    return joined;
-  }
-  final maxChars = options.maxChars ?? CompressContextOptions.defaultMaxChars;
-  if (maxChars <= 0 || joined.length <= maxChars) return joined;
-  return switch (options.mode) {
-    CompressContextLimitMode.start => truncateHeadUtf16Safe(joined, maxChars),
-    CompressContextLimitMode.recent => joined.substring(
-      utf16SafeTailStart(joined, joined.length - maxChars),
-    ),
-    CompressContextLimitMode.unlimited ||
-    CompressContextLimitMode.keepRecent => joined,
-  };
-}
-
-String? conversationLineForCompression(ChatMessage message) {
-  if (message.content.trim().isEmpty) return null;
-  return '${message.role == "assistant" ? "Assistant" : "User"}: ${message.content}';
-}
-
-String buildConversationTextForCompression(List<ChatMessage> messages) {
-  final lines = <String>[];
-  for (final message in messages) {
-    final line = conversationLineForCompression(message);
-    if (line != null) lines.add(line);
-  }
-  return lines.join('\n\n');
-}
-
-/// Incremental start/recent window. Walks messages and stops at [maxChars]
-/// without first joining the full history.
-String buildBoundedConversationText(
+String buildConversationTextForCompression(
   List<ChatMessage> messages, {
-  required CompressContextLimitMode mode,
-  required int maxChars,
-}) {
-  if (maxChars <= 0) return '';
-  if (mode == CompressContextLimitMode.recent) {
-    return _buildRecentBoundedConversationText(messages, maxChars);
-  }
-  return _buildStartBoundedConversationText(messages, maxChars);
-}
+  required String Function(int) quoteMarker,
+}) => buildCompressRequestContents(
+  messages,
+  const CompressContextOptions(mode: CompressContextLimitMode.unlimited),
+  quoteMarker: quoteMarker,
+).join('\n\n');
 
-String _buildStartBoundedConversationText(
-  List<ChatMessage> messages,
-  int maxChars,
-) {
-  final buf = StringBuffer();
-  for (final message in messages) {
-    if (message.content.trim().isEmpty) continue;
-    final prefix = message.role == 'assistant' ? 'Assistant: ' : 'User: ';
-    final sep = buf.isEmpty ? '' : '\n\n';
-    final remaining = maxChars - buf.length;
-    if (remaining <= 0) break;
-    final head = '$sep$prefix';
-    if (head.length >= remaining) {
-      buf.write(truncateHeadUtf16Safe(head, remaining));
-      break;
-    }
-    final contentBudget = remaining - head.length;
-    final content = message.content.length <= contentBudget
-        ? message.content
-        : truncateHeadUtf16Safe(message.content, contentBudget);
-    buf
-      ..write(head)
-      ..write(content);
-    if (message.content.length > contentBudget) break;
-  }
-  return buf.toString();
-}
-
-String _buildRecentBoundedConversationText(
-  List<ChatMessage> messages,
-  int maxChars,
-) {
-  final parts = <String>[];
-  var used = 0;
-  for (var i = messages.length - 1; i >= 0; i--) {
-    final message = messages[i];
-    if (message.content.trim().isEmpty) continue;
-    final prefix = message.role == 'assistant' ? 'Assistant: ' : 'User: ';
-    final sepLen = parts.isEmpty ? 0 : 2;
-    final remaining = maxChars - used - sepLen;
-    if (remaining <= 0) break;
-    final lineLen = prefix.length + message.content.length;
-    if (lineLen <= remaining) {
-      parts.add('$prefix${message.content}');
-      used += lineLen + sepLen;
-      continue;
-    }
-    final tail = _utf16SafeTailOfPrefixed(prefix, message.content, remaining);
-    if (tail.isNotEmpty) parts.add(tail);
-    break;
-  }
-  return parts.reversed.join('\n\n');
-}
-
-String _utf16SafeTailOfPrefixed(String prefix, String content, int maxChars) {
-  final total = prefix.length + content.length;
-  if (total <= maxChars) return '$prefix$content';
-  if (maxChars <= 0) return '';
-  if (maxChars <= content.length) {
-    final start = utf16SafeTailStart(content, content.length - maxChars);
-    return content.substring(start);
-  }
-  final prefixKeep = maxChars - content.length;
-  final start = utf16SafeTailStart(prefix, prefix.length - prefixKeep);
-  return '${prefix.substring(start)}$content';
-}
-
-/// Pack formatted messages into chunks of at most [maxChars].
-/// Prefers message boundaries; a single over-long line is UTF-16-safe split.
-List<String> chunkMessagesForCompression(
-  List<ChatMessage> messages, {
-  required int maxChars,
-}) {
-  if (maxChars <= 0) return const <String>[];
-  final chunks = <String>[];
-  final current = StringBuffer();
-
-  void flush() {
-    if (current.isEmpty) return;
-    chunks.add(current.toString());
-    current.clear();
-  }
-
-  for (final message in messages) {
-    final line = conversationLineForCompression(message);
-    if (line == null) continue;
-    if (line.length > maxChars) {
-      flush();
-      chunks.addAll(splitUtf16SafeChunks(line, maxChars));
-      continue;
-    }
-    final extra = current.isEmpty ? line.length : line.length + 2;
-    if (current.isNotEmpty && current.length + extra > maxChars) {
-      flush();
-    }
-    if (current.isNotEmpty) current.write('\n\n');
-    current.write(line);
-  }
-  flush();
-  return chunks;
-}
-
-/// Pack already-formatted texts (chunk summaries) into budget-sized groups.
-List<String> chunkPlainTexts(List<String> texts, {required int maxChars}) {
-  if (maxChars <= 0) return const <String>[];
-  final chunks = <String>[];
-  final current = StringBuffer();
-
-  void flush() {
-    if (current.isEmpty) return;
-    chunks.add(current.toString());
-    current.clear();
-  }
-
-  for (final text in texts) {
-    if (text.isEmpty) continue;
-    if (text.length > maxChars) {
-      flush();
-      chunks.addAll(splitUtf16SafeChunks(text, maxChars));
-      continue;
-    }
-    final extra = current.isEmpty ? text.length : text.length + 2;
-    if (current.isNotEmpty && current.length + extra > maxChars) {
-      flush();
-    }
-    if (current.isNotEmpty) current.write('\n\n');
-    current.write(text);
-  }
-  flush();
-  return chunks;
-}
-
-/// Build the per-request compress payloads.
-///
-/// start/recent: incremental character window (never joins the full history),
-/// then split only if the window itself exceeds [safeRequestChars].
-/// keepRecent/unlimited: message-boundary chunks at [safeRequestChars] so
-/// older content is not dropped and no single request is unbounded.
+/// Whole selected messages for local preview and the token-budgeted engine.
 List<String> buildCompressRequestContents(
   List<ChatMessage> messages,
   CompressContextOptions options, {
-  int safeRequestChars = CompressContextOptions.safeRequestChars,
-}) {
-  if (options.mode == CompressContextLimitMode.start ||
-      options.mode == CompressContextLimitMode.recent) {
-    final maxChars = options.maxChars ?? CompressContextOptions.defaultMaxChars;
-    final bounded = buildBoundedConversationText(
-      messages,
-      mode: options.mode,
-      maxChars: maxChars,
-    );
-    if (bounded.trim().isEmpty) return const <String>[];
-    if (bounded.length <= safeRequestChars) return [bounded];
-    return splitUtf16SafeChunks(bounded, safeRequestChars);
-  }
-  return chunkMessagesForCompression(messages, maxChars: safeRequestChars);
-}
+  required String Function(int) quoteMarker,
+}) => [
+  for (final message in messages)
+    if (conversationLineForCompression(message, quoteMarker: quoteMarker)
+        case final String text)
+      text,
+];
 
 /// Select the trailing messages starting at the last [keepUserMessages]
-/// user messages (user messages = role 'user' with non-empty content), so
-/// the kept region always starts with a user message. When the requested
-/// count covers all user messages, returns the full list (nothing left to
-/// summarize).
+/// user messages, including attachment-only inputs. Leading summaries stay
+/// outside the retained region so an explicit original-history reread can
+/// regenerate them even when all raw user messages are retained.
 List<ChatMessage> selectKeepRecentMessages(
   List<ChatMessage> messages,
   int keepUserMessages,
@@ -324,30 +313,21 @@ List<ChatMessage> selectKeepRecentMessages(
   final userIndices = <int>[];
   for (var i = 0; i < messages.length; i++) {
     final m = messages[i];
-    if (m.role == 'user' && m.content.trim().isNotEmpty) {
+    if (isCompressionUserMessage(m)) {
       userIndices.add(i);
     }
   }
   if (userIndices.isEmpty) return const <ChatMessage>[];
-  if (userIndices.length <= keepUserMessages) return List.of(messages);
+  if (userIndices.length <= keepUserMessages) {
+    return messages.skipWhile(ContextOperation.isSummary).toList();
+  }
   return messages.sublist(userIndices[userIndices.length - keepUserMessages]);
 }
 
 /// Number of user messages in a collapsed list (role 'user', non-empty
 /// content) — the count that [selectKeepRecentMessages] counts against.
 int countUserMessages(List<ChatMessage> messages) {
-  return messages
-      .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
-      .length;
-}
-
-/// Default keep count for the keep-recent mode, scaling with conversation
-/// size (<5 user messages → 1, <10 → 2, ≥10 → 3) so a small conversation's
-/// default never covers all of its user messages.
-int defaultKeepUserMessageCountFor(int userMessageCount) {
-  if (userMessageCount < 5) return 1;
-  if (userMessageCount < 10) return 2;
-  return 3;
+  return messages.where(isCompressionUserMessage).length;
 }
 
 class CompressionTokenEstimate {
@@ -387,95 +367,7 @@ bool isContextLengthError(Object error) {
     'exceeds the maximum number of tokens',
   ];
   if (phrases.any(lower.contains)) return true;
-  if (lower.contains('max_tokens') &&
-      (lower.contains('exceed') ||
-          lower.contains('too long') ||
-          lower.contains('too many') ||
-          lower.contains('over'))) {
-    return true;
-  }
   return false;
-}
-
-class _ContextSplitBudget {
-  _ContextSplitBudget(this.remaining);
-
-  int remaining;
-
-  bool get canSplit => remaining > 0;
-
-  void consume() {
-    remaining--;
-  }
-}
-
-/// Summarize [text], UTF-16-safely splitting and retrying on context-length
-/// errors. [summarize] is the injected generate call (chunk or merge).
-///
-/// On overflow: split in half, summarize each half, then summarize the
-/// joined pair (same merge path as multi-chunk). Stops when [maxSplits]
-/// is exhausted or a half would be below [minSplitChars]. Other errors
-/// are rethrown immediately.
-Future<String> summarizeWithContextRetry(
-  String text, {
-  required Future<String> Function(String text) summarize,
-  int maxSplits = CompressContextOptions.contextRetryMaxSplits,
-  int minSplitChars = CompressContextOptions.contextRetryMinSplitChars,
-  void Function(Object error, StackTrace stackTrace, String text)? onSplitRetry,
-}) {
-  return _summarizeWithContextRetry(
-    text,
-    summarize: summarize,
-    budget: _ContextSplitBudget(maxSplits),
-    minSplitChars: minSplitChars,
-    onSplitRetry: onSplitRetry,
-  );
-}
-
-Future<String> _summarizeWithContextRetry(
-  String text, {
-  required Future<String> Function(String text) summarize,
-  required _ContextSplitBudget budget,
-  required int minSplitChars,
-  required void Function(Object error, StackTrace stackTrace, String text)?
-  onSplitRetry,
-}) async {
-  try {
-    return await summarize(text);
-  } catch (e, st) {
-    if (!isContextLengthError(e) || !budget.canSplit) {
-      rethrow;
-    }
-    final halves = splitUtf16SafeHalves(text);
-    if (halves == null ||
-        halves.left.length < minSplitChars ||
-        halves.right.length < minSplitChars) {
-      rethrow;
-    }
-    budget.consume();
-    onSplitRetry?.call(e, st, text);
-    final left = await _summarizeWithContextRetry(
-      halves.left,
-      summarize: summarize,
-      budget: budget,
-      minSplitChars: minSplitChars,
-      onSplitRetry: onSplitRetry,
-    );
-    final right = await _summarizeWithContextRetry(
-      halves.right,
-      summarize: summarize,
-      budget: budget,
-      minSplitChars: minSplitChars,
-      onSplitRetry: onSplitRetry,
-    );
-    return _summarizeWithContextRetry(
-      '$left\n\n$right',
-      summarize: summarize,
-      budget: budget,
-      minSplitChars: minSplitChars,
-      onSplitRetry: onSplitRetry,
-    );
-  }
 }
 
 /// Estimate the token budget of a keep-recent compression result.

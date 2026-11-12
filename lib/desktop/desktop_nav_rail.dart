@@ -9,6 +9,7 @@ import 'user_profile_dialog.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../utils/sandbox_path_resolver.dart';
 import '../theme/app_font_weights.dart';
+import 'widgets/desktop_pane_surface.dart';
 
 /// A compact left rail for desktop with avatar, primary actions, and bottom system toggles.
 class DesktopNavRail extends StatelessWidget {
@@ -45,62 +46,63 @@ class DesktopNavRail extends StatelessWidget {
     final isStorageActive = activeIndex == 2;
     final isSettingsActive = activeIndex == 3;
 
-    return Container(
+    return SizedBox(
       width: width,
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: Column(
-        children: [
-          SizedBox(height: topGap),
-          _UserAvatarButton(),
-          const SizedBox(height: 12),
-          _CircleAction(
-            tooltip: l10n.desktopNavChatTooltip,
-            icon: lucide.Lucide.MessageCircle,
-            onTap: onTapChat,
-            size: 40,
-            iconSize: 18,
-            iconColor: isChatActive ? cs.primary : null,
-          ),
-          const SizedBox(height: 8),
-          _CircleAction(
-            tooltip: l10n.desktopNavGlobalSearchTooltip,
-            icon: lucide.Lucide.Search,
-            onTap: onTapGlobalSearch,
-            size: 40,
-            iconSize: 18,
-            iconColor: isGlobalSearchActive ? cs.primary : null,
-          ),
-          const SizedBox(height: 8),
-          _CircleAction(
-            tooltip: l10n.desktopNavTranslateTooltip,
-            icon: lucide.Lucide.Languages,
-            onTap: onTapTranslate,
-            size: 40,
-            iconSize: 18,
-            iconColor: isTranslateActive ? cs.primary : null,
-          ),
-          const SizedBox(height: 8),
-          _CircleAction(
-            tooltip: l10n.desktopNavStorageTooltip,
-            icon: lucide.Lucide.Folder,
-            onTap: onTapStorage,
-            size: 40,
-            iconSize: 18,
-            iconColor: isStorageActive ? cs.primary : null,
-          ),
-          const Spacer(),
-          _ThemeCycleButton(),
-          const SizedBox(height: 8),
-          _CircleAction(
-            tooltip: l10n.desktopNavSettingsTooltip,
-            icon: lucide.Lucide.Settings,
-            onTap: onTapSettings,
-            size: 40,
-            iconSize: 18,
-            iconColor: isSettingsActive ? cs.primary : null,
-          ),
-          const SizedBox(height: 12),
-        ],
+      child: DesktopPaneSurface(
+        child: Column(
+          children: [
+            SizedBox(height: topGap),
+            _UserAvatarButton(),
+            const SizedBox(height: 12),
+            _CircleAction(
+              tooltip: l10n.desktopNavChatTooltip,
+              icon: lucide.Lucide.MessageCircle,
+              onTap: onTapChat,
+              size: 40,
+              iconSize: 18,
+              iconColor: isChatActive ? cs.primary : null,
+            ),
+            const SizedBox(height: 8),
+            _CircleAction(
+              tooltip: l10n.desktopNavGlobalSearchTooltip,
+              icon: lucide.Lucide.Search,
+              onTap: onTapGlobalSearch,
+              size: 40,
+              iconSize: 18,
+              iconColor: isGlobalSearchActive ? cs.primary : null,
+            ),
+            const SizedBox(height: 8),
+            _CircleAction(
+              tooltip: l10n.desktopNavTranslateTooltip,
+              icon: lucide.Lucide.Languages,
+              onTap: onTapTranslate,
+              size: 40,
+              iconSize: 18,
+              iconColor: isTranslateActive ? cs.primary : null,
+            ),
+            const SizedBox(height: 8),
+            _CircleAction(
+              tooltip: l10n.desktopNavStorageTooltip,
+              icon: lucide.Lucide.Folder,
+              onTap: onTapStorage,
+              size: 40,
+              iconSize: 18,
+              iconColor: isStorageActive ? cs.primary : null,
+            ),
+            const Spacer(),
+            _ThemeCycleButton(),
+            const SizedBox(height: 8),
+            _CircleAction(
+              tooltip: l10n.desktopNavSettingsTooltip,
+              icon: lucide.Lucide.Settings,
+              onTap: onTapSettings,
+              size: 40,
+              iconSize: 18,
+              iconColor: isSettingsActive ? cs.primary : null,
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }

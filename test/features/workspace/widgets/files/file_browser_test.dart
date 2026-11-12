@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:Kelivo/core/models/workspace.dart';
+import 'package:Kelivo/core/services/workspace/workspace_file_coordinator.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
@@ -12,11 +14,13 @@ import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../../support/business_test_harness.dart';
+import '../../../../support/file_browser_test_helpers.dart';
 
 Future<void> _flushIo(WidgetTester tester) async {
   await tester.runAsync(
@@ -27,7 +31,7 @@ Future<void> _flushIo(WidgetTester tester) async {
 Future<void> _reload(WidgetTester tester) async {
   await _flushIo(tester);
   final state = tester.state<FileBrowserState>(find.byType(FileBrowser));
-  await tester.runAsync(state.refreshEntries);
+  await waitForFileBrowserOperation(tester, state.refreshEntries());
   await tester.pump();
 }
 
@@ -35,6 +39,37 @@ Future<void> _pumpUi(WidgetTester tester) async {
   await _flushIo(tester);
   await tester.pump();
   await tester.pumpAndSettle();
+}
+
+Future<void> _waitForItem(
+  WidgetTester tester,
+  String name, {
+  bool present = true,
+}) async {
+  final item = find.byKey(FileBrowser.itemKey(name));
+  // Mutations finish on the real I/O loop, then reload the list asynchronously.
+  // Do not race that reload with another refresh or assume 50 ms is sufficient.
+  for (var attempt = 0; attempt < 100; attempt++) {
+    await _flushIo(tester);
+    await tester.pump(const Duration(milliseconds: 16));
+    if (item.evaluate().isNotEmpty == present) {
+      await tester.pumpAndSettle();
+      if (item.evaluate().isNotEmpty == present) return;
+    }
+  }
+  expect(item, present ? findsOneWidget : findsNothing);
+}
+
+Future<void> _waitForFileState(
+  WidgetTester tester,
+  bool Function() ready,
+) async {
+  for (var i = 0; i < 100; i++) {
+    await _flushIo(tester);
+    await tester.pump();
+    if (ready()) return;
+  }
+  fail('The filesystem operation and browser refresh did not complete');
 }
 
 Future<void> _tapFormConfirm(WidgetTester tester) async {
@@ -142,6 +177,34 @@ class _PhoneFilesAppBarState extends State<_PhoneFilesAppBar> {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final alias in [false, true]) {
+    testWidgets(
+      'file changes refresh the owning directory only, alias=$alias',
+      (tester) async {
+        if (alias && Platform.isWindows) return;
+        final temp = Directory.systemTemp.createTempSync('file-change-event-');
+        addTearDown(() => temp.deleteSync(recursive: true));
+        final root = Directory('${temp.path}/root')..createSync();
+        final shown = alias ? Directory('${temp.path}/alias') : root;
+        if (alias) Link(shown.path).createSync(root.path);
+        await tester.pumpWidget(_harness(child: _browser(shown)));
+        await _reload(tester);
+        File('${root.path}/saved.txt').writeAsStringSync('saved');
+        WorkspaceFileCoordinator.changed('${temp.path}/unrelated.txt');
+        await _flushIo(tester);
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byKey(FileBrowser.itemKey('saved.txt')), findsNothing);
+        WorkspaceFileCoordinator.changed(
+          '${root.resolveSymbolicLinksSync()}/saved.txt',
+        );
+        await _flushIo(tester);
+        await tester.pump(const Duration(milliseconds: 300));
+        await _waitForItem(tester, 'saved.txt');
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
   late Directory tempDir;
 
   setUp(() {
@@ -161,6 +224,171 @@ void main() {
       tempDir.deleteSync(recursive: true);
     }
   });
+
+  testWidgets('file changes coalesce while a directory read is in flight', (
+    tester,
+  ) async {
+    File(p.join(tempDir.path, 'initial.txt')).writeAsStringSync('initial');
+    final key = GlobalKey<FileBrowserState>();
+    final slowRead = Completer<void>(), nextRead = Completer<void>();
+    var reads = 0;
+    await pumpHarness(
+      tester,
+      child: FileBrowser(
+        key: key,
+        root: tempDir,
+        rootLabel: 'Root',
+        modelPathOf: (host) => host,
+        afterDirectoryRead: (_) async {
+          reads++;
+          if (reads == 2) await slowRead.future;
+          if (reads == 3) await nextRead.future;
+        },
+      ),
+    );
+    await _waitForItem(tester, 'initial.txt');
+    final first = key.currentState!.refreshEntries();
+    await _waitForFileState(tester, () => reads == 2);
+    final saved = File(p.join(tempDir.path, 'saved.txt'))
+      ..writeAsStringSync('saved');
+    for (var i = 0; i < 3; i++) {
+      WorkspaceFileCoordinator.changed(saved.path);
+      await _flushIo(tester);
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(reads, 2, reason: 'An in-flight scan must absorb later events');
+    var refreshed = false;
+    final latest = key.currentState!.refreshEntries().then((_) {
+      refreshed = true;
+    });
+    slowRead.complete();
+    await _waitForFileState(tester, () => reads == 3);
+    expect(refreshed, false, reason: 'Await the requested follow-up scan');
+    nextRead.complete();
+    await waitForFileBrowserOperation(tester, Future.wait([first, latest]));
+    await tester.pump();
+    expect(reads, 3, reason: 'All pending events share one follow-up scan');
+    expect(find.byKey(FileBrowser.itemKey('saved.txt')), findsOneWidget);
+  });
+
+  for (final change in ['directory', 'root', 'filter']) {
+    testWidgets('discard an old directory result after a $change change', (
+      tester,
+    ) async {
+      final root = Directory(p.join(tempDir.path, 'root'))..createSync();
+      final other = Directory(p.join(tempDir.path, 'other'))..createSync();
+      final child = Directory(p.join(root.path, 'child'))..createSync();
+      File(p.join(child.path, 'child.txt')).writeAsStringSync('child');
+      File(p.join(other.path, 'other.txt')).writeAsStringSync('other');
+      File(p.join(root.path, '.secret')).writeAsStringSync('hidden');
+      final key = GlobalKey<FileBrowserState>();
+      final oldRead = Completer<void>(), newRead = Completer<void>();
+      final reads = <String>[];
+      Future<void> afterRead(Directory dir) async {
+        reads.add(dir.path);
+        if (reads.length == 2) await oldRead.future;
+        if (reads.length == 3) await newRead.future;
+      }
+
+      FileBrowser browser(Directory directory) => FileBrowser(
+        key: key,
+        root: directory,
+        rootLabel: 'Root',
+        modelPathOf: (host) => host,
+        afterDirectoryRead: afterRead,
+      );
+      await pumpHarness(tester, child: browser(root));
+      await _waitForItem(tester, 'child');
+      File(p.join(root.path, 'old-result.txt')).writeAsStringSync('old');
+      final first = key.currentState!.refreshEntries();
+      await _waitForFileState(tester, () => reads.length == 2);
+      if (change == 'directory') {
+        await tester.tap(find.byKey(FileBrowser.itemKey('child')));
+      } else if (change == 'root') {
+        await tester.pumpWidget(_harness(child: browser(other)));
+      } else {
+        await tester.tap(find.byKey(FileBrowser.hiddenToggleKey));
+      }
+      await tester.pump();
+      final latest = key.currentState!.refreshEntries();
+      expect(reads.length, 2);
+      oldRead.complete();
+      await _waitForFileState(tester, () => reads.length == 3);
+      expect(
+        find.byKey(FileBrowser.itemKey('old-result.txt')),
+        findsNothing,
+        reason: 'The previous view must not publish into the new view',
+      );
+      newRead.complete();
+      await waitForFileBrowserOperation(tester, Future.wait([first, latest]));
+      await tester.pump();
+      final expected = switch (change) {
+        'directory' => 'child.txt',
+        'root' => 'other.txt',
+        _ => '.secret',
+      };
+      expect(find.byKey(FileBrowser.itemKey(expected)), findsOneWidget);
+    });
+  }
+
+  testWidgets(
+    'wide file rows support long press and touch rename/delete actions',
+    (tester) async {
+      const haptics = MethodChannel('haptic_feedback');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(haptics, (_) async => true);
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(haptics, null),
+      );
+      Directory(p.join(tempDir.path, 'docs')).createSync();
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1366, 1024);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(_harness(child: _browser(tempDir)));
+      await _reload(tester);
+
+      await tester.longPress(find.byKey(FileBrowser.itemKey('docs')));
+      await _pumpUi(tester);
+      expect(find.text('Rename'), findsOneWidget);
+      await _tapVisible(tester, find.text('Rename'));
+      await tester.enterText(find.byType(TextField), 'renamed');
+      await _tapFormConfirm(tester);
+      await _waitForFileState(
+        tester,
+        () =>
+            Directory(p.join(tempDir.path, 'renamed')).existsSync() &&
+            find
+                .byKey(FileBrowser.itemMoreKey('renamed'))
+                .hitTestable()
+                .evaluate()
+                .isNotEmpty,
+      );
+      expect(Directory(p.join(tempDir.path, 'renamed')).existsSync(), isTrue);
+      expect(Directory(p.join(tempDir.path, 'docs')).existsSync(), isFalse);
+
+      await tester.tap(find.byKey(FileBrowser.itemMoreKey('renamed')));
+      await _pumpUi(tester);
+      await _tapVisible(tester, find.text('Delete'));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('workspace-confirm-accept')),
+      );
+      await _waitForFileState(
+        tester,
+        () =>
+            !Directory(p.join(tempDir.path, 'renamed')).existsSync() &&
+            find.byKey(FileBrowser.itemKey('renamed')).evaluate().isEmpty,
+      );
+      expect(Directory(p.join(tempDir.path, 'renamed')).existsSync(), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+      TargetPlatform.macOS,
+    }),
+  );
 
   test('refuses an escape path', () {
     expect(FileBrowserOps.joinInsideRoot(tempDir.path, '../escape'), isNull);
@@ -295,12 +523,7 @@ void main() {
     await _tapVisible(tester, find.text('New folder'));
     await tester.enterText(find.byType(TextField), 'created');
     await _tapFormConfirm(tester);
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 50)),
-    );
-    await _pumpUi(tester);
-    await _reload(tester);
+    await _waitForItem(tester, 'created');
     expect(Directory(p.join(tempDir.path, 'created')).existsSync(), isTrue);
     expect(find.byKey(FileBrowser.itemKey('created')), findsOneWidget);
 
@@ -310,12 +533,7 @@ void main() {
     await _pumpUi(tester);
     await tester.enterText(find.byType(TextField), 'renamed');
     await _tapFormConfirm(tester);
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 50)),
-    );
-    await _pumpUi(tester);
-    await _reload(tester);
+    await _waitForItem(tester, 'renamed');
     expect(Directory(p.join(tempDir.path, 'renamed')).existsSync(), isTrue);
     expect(Directory(p.join(tempDir.path, 'created')).existsSync(), isFalse);
 
@@ -326,12 +544,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey<String>('workspace-confirm-accept')),
     );
-    await tester.pump();
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 50)),
-    );
-    await _pumpUi(tester);
-    await _reload(tester);
+    await _waitForItem(tester, 'renamed', present: false);
     expect(Directory(p.join(tempDir.path, 'renamed')).existsSync(), isFalse);
   });
 
@@ -428,15 +641,17 @@ void main() {
 
     final browser = find.byType(FileBrowser);
     expect(browser, findsOneWidget);
-    await tester.runAsync(
-      tester.state<FileBrowserState>(browser).refreshEntries,
+    await waitForFileBrowserOperation(
+      tester,
+      tester.state<FileBrowserState>(browser).refreshEntries(),
     );
     await tester.pump();
 
     await tester.tap(find.byKey(FileBrowser.itemKey('src')));
     await tester.pump();
-    await tester.runAsync(
-      tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries,
+    await waitForFileBrowserOperation(
+      tester,
+      tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries(),
     );
     await tester.pump();
 

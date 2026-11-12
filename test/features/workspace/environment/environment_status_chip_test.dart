@@ -74,6 +74,18 @@ void main() {
     expect(find.text(l10n.workspaceEnvChipInstalling(43)), findsOneWidget);
   });
 
+  testWidgets('patching uses the same phase label as environment details', (
+    tester,
+  ) async {
+    final env = await createEnv(
+      tester,
+      const EnvironmentState(phase: EnvironmentPhase.patching, progress: 0.5),
+    );
+    final l10n = await pumpChip(tester, env);
+    expect(find.text(l10n.workspaceEnvPhasePatching), findsOneWidget);
+    expect(find.text(l10n.workspaceEnvChipInstalling(50)), findsNothing);
+  });
+
   testWidgets('error and needsRestart labels', (tester) async {
     final env = await createEnv(
       tester,

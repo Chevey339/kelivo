@@ -16,6 +16,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/markdown_render_helpers.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,32 @@ void main() {
       'The quick brown fox jumps over the lazy dog. '
       'The quick brown fox jumps over the lazy dog. '
       'The quick brown fox jumps over the lazy dog.';
+
+  testWidgets(
+    'revealing a quoted range expands its source and keeps it open afterwards',
+    (tester) async {
+      Widget app(bool reveal) => MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: CollapsibleUserText(
+            reveal: reveal,
+            collapsedHeight: 20,
+            child: const Text(longText),
+          ),
+        ),
+      );
+      await tester.pumpWidget(app(false));
+      await tester.pumpAndSettle();
+      expect(find.byKey(clipKey), findsOneWidget);
+      await tester.pumpWidget(app(true));
+      await tester.pumpAndSettle();
+      expect(find.byKey(clipKey), findsNothing);
+      await tester.pumpWidget(app(false));
+      await tester.pumpAndSettle();
+      expect(find.byKey(clipKey), findsNothing);
+    },
+  );
 
   Future<void> pumpText(
     WidgetTester tester,
@@ -425,14 +452,17 @@ void main() {
 
     // The closed <details> leaves the message short enough to fit.
     expect(find.byType(CollapsibleUserText), findsOneWidget);
-    expect(find.byKey(const ValueKey('details-expanded')), findsNothing);
+    Iterable<Object> detailParagraphs() => markdownParagraphs(tester).where(
+      (paragraph) => paragraph.text.toPlainText().startsWith('Detail line '),
+    );
+    expect(detailParagraphs(), isEmpty);
     expect(find.byKey(toggleKey), findsNothing);
 
     await tester.tap(find.text('Show details'));
     await tester.pumpAndSettle();
 
     // Turning on the fade must not remount the block and snap it shut again.
-    expect(find.byKey(const ValueKey('details-expanded')), findsOneWidget);
+    expect(detailParagraphs(), hasLength(40));
     expect(find.byKey(toggleKey), findsOneWidget);
     expect(find.byType(ShaderMask), findsOneWidget);
   });

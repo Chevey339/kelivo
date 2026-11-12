@@ -793,7 +793,16 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     return _chunkIndicators[index].index;
   }
 
-  CodeLinePosition? getUpPosition(CodeLinePosition position) {
+  CodeNavigationLayout? captureNavigationLayout() => !hasSize ? null :
+    CodeNavigationLayout(_textStyle, _horizontalViewport == null
+      ? constraints.maxWidth - _padding.horizontal : double.infinity,
+      _displayParagraphs.isNotEmpty && _displayParagraphs.first.paragraph is _ParagraphImpl
+        ? ((_displayParagraphs.first.paragraph as _ParagraphImpl).span.style ?? _textStyle) : _textStyle);
+
+  double? navigationHorizontalOffset(CodeLinePosition position) =>
+    findDisplayParagraphByLineIndex(position.index)?.getOffset(position.textPosition)?.dx;
+
+  CodeLinePosition? getUpPosition(CodeLinePosition position, {double? horizontal}) {
     final CodeLineRenderParagraph? paragraph = findDisplayParagraphByLineIndex(position.index);
     if (paragraph == null) {
       return null;
@@ -803,7 +812,7 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
       return null;
     }
     if (offset.dy > 0) {
-      return paragraph.getPosition(offset - Offset(0, paragraph.preferredLineHeight));
+      return paragraph.getPosition(Offset(horizontal ?? offset.dx, offset.dy - paragraph.preferredLineHeight));
     }
     // The up position is not in this code line
     IParagraph? upParagraph = findDisplayParagraphByLineIndex(position.index - 1)?.paragraph;
@@ -816,11 +825,11 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     }
     return CodeLinePosition.from(
       index: position.index - 1,
-      position: upParagraph.getPosition(Offset(offset.dx, upParagraph.height - upParagraph.preferredLineHeight))
+      position: upParagraph.getPosition(Offset(horizontal ?? offset.dx, upParagraph.height - upParagraph.preferredLineHeight))
     );
   }
 
-  CodeLinePosition? getDownPosition(CodeLinePosition position) {
+  CodeLinePosition? getDownPosition(CodeLinePosition position, {double? horizontal}) {
     final CodeLineRenderParagraph? paragraph = findDisplayParagraphByLineIndex(position.index);
     if (paragraph == null) {
       return null;
@@ -830,7 +839,7 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
       return null;
     }
     if (offset.dy < paragraph.height - paragraph.preferredLineHeight) {
-      return paragraph.getPosition(offset + Offset(0, paragraph.preferredLineHeight));
+      return paragraph.getPosition(Offset(horizontal ?? offset.dx, offset.dy + paragraph.preferredLineHeight));
     }
     // The up position is not in this code line
     IParagraph? downParagraph = findDisplayParagraphByLineIndex(position.index + 1)?.paragraph;
@@ -843,7 +852,7 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     }
     return CodeLinePosition.from(
       index: position.index + 1,
-      position: downParagraph.getPosition(Offset(offset.dx, 0))
+      position: downParagraph.getPosition(Offset(horizontal ?? offset.dx, 0))
     );
   }
 

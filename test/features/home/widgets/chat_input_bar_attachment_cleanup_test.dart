@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/storage/windows_data_directory.dart';
 import 'package:Kelivo/desktop/windows_paste_fix.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -20,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:irondash_message_channel/irondash_message_channel.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // ignore: depend_on_referenced_packages, implementation_imports
@@ -55,6 +57,48 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => '$path/tmp';
+}
+
+class _DeletionObservedFile extends Fake implements File {
+  _DeletionObservedFile(this.delegate, this.deleted);
+
+  final File delegate;
+  final Completer<String> deleted;
+
+  @override
+  String get path => delegate.path;
+
+  @override
+  Future<File> create({bool recursive = false, bool exclusive = false}) async {
+    await delegate.create(recursive: recursive, exclusive: exclusive);
+    return this;
+  }
+
+  @override
+  Future<File> writeAsString(
+    String contents, {
+    Encoding encoding = utf8,
+    FileMode mode = FileMode.write,
+    bool flush = false,
+  }) async {
+    await delegate.writeAsString(
+      contents,
+      encoding: encoding,
+      mode: mode,
+      flush: flush,
+    );
+    return this;
+  }
+
+  @override
+  Future<bool> exists() => delegate.exists();
+
+  @override
+  Future<File> delete({bool recursive = false}) async {
+    await delegate.delete(recursive: recursive);
+    if (!deleted.isCompleted) deleted.complete(path);
+    return this;
+  }
 }
 
 const _config = ImageCompressConfig(
@@ -156,6 +200,11 @@ void main() {
   }
 
   testWidgets('Windows 历史粘贴复用文本、长文本附件和图片入口', (tester) async {
+    await tester.runAsync(() async {
+      final storage = await WindowsDataDirectory.instance;
+      await storage.initialize();
+      addTearDown(storage.close);
+    });
     final nativeClipboardContext = MockMessageChannelContext()
       ..registerMockMethodCallHandler('ClipboardReader', (_) {
         throw PlatformException(code: 'unavailable-in-widget-test');
@@ -361,30 +410,62 @@ void main() {
     );
 
     final uploadDir = Directory('${appSupportDir.path}/upload');
-    final existingPaths = await tester.runAsync(
+    final existingPaths = (await tester.runAsync(
       () => uploadDir.list().map((entry) => entry.path).toSet(),
-    );
+    ))!;
 
-    final disposeGate = Completer<void>();
+    // These notifications are awaited inside runAsync, so create them in its
+    // real async zone instead of queuing completion in the test's fake clock.
+    final disposeGate = (await tester.runAsync(() async => Completer<void>()))!;
+    final deleted = (await tester.runAsync(() async => Completer<String>()))!;
     fakePathProvider.appDataGate = disposeGate;
     final completedRequestsBeforeDispose =
         fakePathProvider.completedAppDataRequests;
     clipboardText = List.filled(5001, 'd').join();
-    await _invokePasteShortcut(tester, focusNode);
-    expect(mediaController.hasUnreadyImages, isTrue);
+    final filesystemZone = Zone.current;
+    String? discardedPath;
+    await IOOverrides.runZoned(
+      () async {
+        await _invokePasteShortcut(tester, focusNode);
+        expect(mediaController.hasUnreadyImages, isTrue);
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.runAsync(() async {
-      disposeGate.complete();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+        await tester.pumpWidget(const SizedBox.shrink());
+        discardedPath = await tester.runAsync(() async {
+          disposeGate.complete();
+          // A path lookup is followed by file creation, a flushed write and
+          // cleanup. Wait for the real deletion instead of guessing its time.
+          return deleted.future.timeout(const Duration(seconds: 10));
+        });
+      },
+      createFile: (path) {
+        final file = filesystemZone.run(() => File(path));
+        if (p.equals(p.dirname(path), uploadDir.path) &&
+            p.basename(path).startsWith('pasted_') &&
+            !existingPaths.contains(path)) {
+          return _DeletionObservedFile(file, deleted);
+        }
+        return file;
+      },
+    );
+    expect(discardedPath, isNotNull);
+    expect(existingPaths, isNot(contains(discardedPath)));
     expect(
       fakePathProvider.completedAppDataRequests,
       greaterThan(completedRequestsBeforeDispose),
     );
-    final remainingPaths = await tester.runAsync(
-      () => uploadDir.list().map((entry) => entry.path).toSet(),
-    );
+    // Pump the continuation that removes a file written after disposal; a
+    // fixed real-clock delay does not drain the widget test's fake-clock work.
+    Set<String>? remainingPaths;
+    for (var attempt = 0; attempt < 400; attempt++) {
+      await tester.pump();
+      remainingPaths = await tester.runAsync(
+        () => uploadDir.list().map((entry) => entry.path).toSet(),
+      );
+      if (setEquals(remainingPaths, existingPaths)) break;
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
     expect(remainingPaths, existingPaths);
 
     controller.dispose();
@@ -833,6 +914,63 @@ void main() {
     expect(submitted?.imagePaths.single, product.path);
     expect(await fileExists(tester, source), isTrue);
 
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('removing restored history images only changes the draft', (
+    tester,
+  ) async {
+    late List<File> sources;
+    await tester.runAsync(() async {
+      sources = [
+        await writeUserImage('history_first.png'),
+        await writeUserImage('history_second.png'),
+      ];
+    });
+    final controller = TextEditingController(text: 'history caption');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    var submissions = 0;
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (_) async {
+          submissions++;
+          return ChatInputSubmissionResult.sent;
+        },
+      ),
+    );
+    mediaController.restoreInput(
+      ChatInputData(
+        text: controller.text,
+        imagePaths: sources.map((file) => file.path).toList(),
+      ),
+    );
+    await tester.pump();
+
+    ChatInputData? changedDraft;
+    mediaController.onDraftChanged = () {
+      changedDraft = mediaController.snapshotInput(controller.text);
+    };
+    for (var remaining = 1; remaining >= 0; remaining--) {
+      await tester.tap(find.byKey(const ValueKey('chat-input-image-remove:0')));
+      await tester.pumpAndSettle();
+      expect(
+        changedDraft!.imagePaths,
+        sources.skip(2 - remaining).map((f) => f.path),
+      );
+      expect(controller.text, 'history caption');
+      expect(submissions, 0);
+      expect(tester.takeException(), isNull);
+      for (final source in sources) {
+        expect(await fileExists(tester, source), isTrue);
+      }
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     focusNode.dispose();
   });

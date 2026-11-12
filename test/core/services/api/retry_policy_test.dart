@@ -3,7 +3,9 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:Kelivo/core/models/auto_retry_options.dart';
+import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/services/api/retry_policy.dart';
+import 'package:Kelivo/core/services/network/provider_http_exception.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +14,13 @@ void main() {
   const options = AutoRetryOptions.defaults();
 
   group('httpStatusFromError', () {
+    test('uses the structured status before provider body text', () {
+      final error = ProviderHttpException(
+        http.Response('', 503),
+        'HTTP 400: upstream error',
+      );
+      expect(httpStatusFromError(error), 503);
+    });
     test('parses HTTP code from provider HttpException text', () {
       expect(
         httpStatusFromError(
@@ -27,6 +36,83 @@ void main() {
   });
 
   group('shouldRetryError', () {
+    test(
+      'error body failures retain network retry and cancellation policy',
+      () {
+        for (final value in [null, 'false', 'true']) {
+          final error = ProviderHttpException.bodyReadFailure(503, {
+            if (value != null) 'x-should-retry': value,
+          }, const HttpException('Connection closed while receiving data'));
+          expect(shouldRetryError(error, options), value != 'false');
+          expect(
+            shouldRetryError(error, options, retryOnNetworkError: false),
+            isFalse,
+          );
+          expect(
+            shouldRetryError(
+              error,
+              options.copyWith(retryOnNetworkError: false),
+            ),
+            isFalse,
+          );
+        }
+        final cancelled = ProviderHttpException.bodyReadFailure(
+          503,
+          {},
+          http.ClientException('cancelled'),
+        );
+        expect(isUserCancelError(cancelled), isTrue);
+        expect(shouldRetryError(cancelled, options), isFalse);
+      },
+    );
+
+    test(
+      'explicit false overrides retry status and text, irrespective of case',
+      () {
+        for (final name in ['x-should-retry', 'X-Should-Retry']) {
+          for (final value in ['false', ' FALSE ']) {
+            for (final status in [429, 503]) {
+              final error = ProviderHttpException(
+                http.Response('', status, headers: {name: value}),
+                'overloaded, try again',
+              );
+              expect(shouldRetryError(error, options), isFalse);
+              expect(error.headers[name], value);
+            }
+          }
+        }
+      },
+    );
+
+    test('missing or other retry verdicts retain configured policy', () {
+      for (final value in [null, 'true', 'unknown']) {
+        for (final status in [429, 503, 404]) {
+          final error = ProviderHttpException(
+            http.Response(
+              '',
+              status,
+              headers: {if (value != null) 'x-should-retry': value},
+            ),
+            'upstream error',
+          );
+          expect(shouldRetryError(error, options), status != 404);
+        }
+      }
+    });
+
+    test('local budget failures do not retry even with a matching keyword', () {
+      expect(
+        shouldRetryError(
+          const ImageContextBudgetException(
+            kind: ImageContextBudgetKind.requestBody,
+            actual: 101,
+            limit: 100,
+          ),
+          options.copyWith(retryKeywords: ['limit']),
+        ),
+        isFalse,
+      );
+    });
     test('retries 429 and 5xx status codes', () {
       expect(
         shouldRetryError(const HttpException('HTTP 429: busy'), options),

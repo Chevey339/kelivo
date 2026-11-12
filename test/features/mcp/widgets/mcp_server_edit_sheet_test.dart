@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -21,6 +22,115 @@ import '../../../support/business_test_harness.dart';
 import '../../../support/fake_workspace_runtime.dart';
 
 void main() {
+  for (final desktop in [false, true]) {
+    for (final creating in [false, true]) {
+      testWidgets(
+        'icon and group are saved with ${creating ? 'new' : 'existing'} server desktop=$desktop',
+        (tester) async {
+          final provider = await _openEditor(
+            tester,
+            [],
+            desktop: desktop,
+            creating: creating,
+            remoteConfig: _remoteOAuthConfig,
+            size: desktop ? const Size(1280, 900) : const Size(390, 844),
+          );
+          final group = await provider.createGroup('Development');
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('mcp-edit-icon')));
+          await tester.pumpAndSettle();
+          expect(find.byType(SimpleDialog), findsNothing);
+          await tester.tap(find.text('Choose Emoji'));
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byType(TextField).last, '🌿');
+          await tester.pump();
+          await tester.tap(find.text('Save').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('mcp-edit-group')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(ValueKey('mcp-group-option-$group')));
+          await tester.pumpAndSettle();
+          expect(provider.presentationFor('guest').icon, isNull);
+          expect(provider.presentationFor('guest').groupId, isNull);
+          if (creating) {
+            await tester.enterText(
+              find.byWidgetPredicate(
+                (w) => w is TextField && w.decoration?.hintText == 'My MCP',
+              ),
+              'Draft server',
+            );
+            final url = find.byWidgetPredicate(
+              (w) =>
+                  w is TextField &&
+                  w.decoration?.hintText == 'http://localhost:3000',
+            );
+            await tester.ensureVisible(url);
+            await tester.pumpAndSettle();
+            await tester.enterText(url, 'https://mcp.example.com/mcp');
+            await tester.ensureVisible(find.byType(IosSwitch).first);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byType(IosSwitch).first);
+          }
+          await tester.tap(find.text('Save').hitTestable());
+          for (var i = 0; i < 6; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 20)),
+            );
+            await tester.pump();
+          }
+          await tester.pumpAndSettle();
+          final server = creating
+              ? provider.servers.singleWhere((s) => s.name == 'Draft server')
+              : provider.getById('guest')!;
+          expect(provider.presentationFor(server.id).icon!.value, '🌿');
+          expect(provider.presentationFor(server.id).groupId, group);
+          expect(find.byKey(const ValueKey('mcp-edit-group')), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+        variant: TargetPlatformVariant.only(
+          desktop ? TargetPlatform.macOS : TargetPlatform.android,
+        ),
+      );
+    }
+    testWidgets(
+      'cancelling presentation changes leaves the saved server untouched desktop=$desktop',
+      (tester) async {
+        final provider = await _openEditor(
+          tester,
+          [],
+          desktop: desktop,
+          remoteConfig: _remoteOAuthConfig,
+          size: desktop ? const Size(1280, 900) : const Size(390, 844),
+        );
+        final group = await provider.createGroup('Draft group');
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('mcp-edit-group')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('mcp-group-option-$group')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('mcp-edit-icon')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Choose Emoji'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField).last, '🌿');
+        await tester.pump();
+        await tester.tap(find.text('Save').last);
+        await tester.pumpAndSettle();
+        final formContext = tester.element(
+          find.byKey(const ValueKey('mcp-edit-group')),
+        );
+        Navigator.of(formContext).pop();
+        await tester.pumpAndSettle();
+        expect(provider.presentationFor('guest').icon, isNull);
+        expect(provider.presentationFor('guest').groupId, isNull);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(
+        desktop ? TargetPlatform.macOS : TargetPlatform.android,
+      ),
+    );
+  }
+
   for (final desktop in [false, true]) {
     testWidgets(
       'OAuth settings preserve login on rename and clear it on client change (${desktop ? 'desktop' : 'mobile'})',
@@ -59,6 +169,7 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('Automatic'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Automatic'));
         await tester.pumpAndSettle();
         final fillExample = find.byKey(
@@ -350,6 +461,7 @@ Future<McpProvider> _openEditor(
   String? workspaceId,
   bool withWorkspaces = false,
   bool desktop = false,
+  bool creating = false,
   Brightness brightness = Brightness.light,
   Size size = const Size(600, 1600),
   Map<String, Object?>? remoteConfig,
@@ -427,8 +539,14 @@ Future<McpProvider> _openEditor(
           body: Builder(
             builder: (context) => TextButton(
               onPressed: () => desktop
-                  ? showDesktopMcpEditDialog(context, serverId: 'guest')
-                  : showMcpServerEditSheet(context, serverId: 'guest'),
+                  ? showDesktopMcpEditDialog(
+                      context,
+                      serverId: creating ? null : 'guest',
+                    )
+                  : showMcpServerEditSheet(
+                      context,
+                      serverId: creating ? null : 'guest',
+                    ),
               child: const Text('Open'),
             ),
           ),

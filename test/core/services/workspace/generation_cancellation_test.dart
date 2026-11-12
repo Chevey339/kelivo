@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -93,7 +94,8 @@ void main() {
           createdAt: now,
           updatedAt: now,
         ),
-        binding: const WorkspaceBinding(workspaceId: 'review', allowAll: true),
+        binding: const WorkspaceBinding(workspaceId: 'review'),
+        permissionMode: ToolPermissionMode.fullAccess,
         paths: paths,
         sessionDir: Directory(paths.sessionHostDir),
         outputsDir: Directory('${paths.sessionHostDir}/outputs'),

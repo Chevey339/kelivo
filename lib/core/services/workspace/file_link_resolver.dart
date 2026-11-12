@@ -288,7 +288,7 @@ class FileLinkResolver {
       case KelivoLinkKind.skillFile:
         root = (await AppDirectories.getSkillsDirectory()).path;
       case KelivoLinkKind.temporaryFile:
-        root = Directory.systemTemp.path;
+        root = p.join((await AppDirectories.sessionDir(sessionId)).path, 'tmp');
       case KelivoLinkKind.externalFile:
         final provider = externalMounts;
         if (provider == null) {

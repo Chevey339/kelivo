@@ -42,9 +42,17 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 <table>
 <tr>
 <td width="180" align="center" valign="middle">
-  <b><a href="https://siliconflow.cn">siliconflow.cn</a></b>
+  <a href="https://sta1n.ai/"><img src="docs/sponsors/sta1n.png" alt="STA1N API" width="150"></a><br />
+  <b><a href="https://sta1n.ai/">STA1N API🍪</a></b>
 </td>
-<td valign="middle">感谢 siliconflow.cn 与我们合作提供可免费使用的模型。</td>
+<td valign="middle">感谢<a href="https://sta1n.ai/">STA1N API🍪</a>对 Kelivo 的赞助与支持！专注角色扮演（RP）的 API 服务，为角色聊天提供更多选择。</td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <a href="https://api.10dianai.com"><img src="docs/sponsors/10dian.png" alt="10dian-API" width="150"></a><br />
+  <b><a href="https://api.10dianai.com">10dian-API</a></b>
+</td>
+<td valign="middle">感谢<a href="https://api.10dianai.com">10dian-API</a>对本项目的赞助！10dian-API 为广大开发者和玩家提供安全·快速·稳定的 API 服务，资费透明·价格低廉·体验至上，承诺 100% 不掺水。用一把钥匙，召唤全世界的 AI～</td>
 </tr>
 <tr>
 <td width="180" align="center" valign="middle">
@@ -58,6 +66,12 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
   <a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo"><img src="docs/sponsors/marucode.jpg" alt="MaruCode" width="150"></a>
 </td>
 <td valign="middle"><b><a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">MaruCode</a></b> 是一家偶尔做做慈善的小破站 API，自营号池，主要提供 Codex、Claude Code、GPT Image 等主流模型，支持 Websocket 协议，明码标价(Codex 0.25x, CC 1.5x)，透明汇率(1:1)，<a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">新用户注册送 2 刀</a>。<a href="https://images-2.muteki.site">生图工作台🖼️</a></td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <b><a href="https://ai.ota1245.top/">砂糖酒馆</a></b>
+</td>
+<td valign="middle">感谢<a href="https://ai.ota1245.top/">砂糖酒馆</a>对本项目的赞助！砂糖酒馆主营角色聊天，按次收费，价格透明。提供 Gemini、Claude、DeepSeek、GLM 等主流文本模型，以及 NAI 生图、TTS 和视频模型。注重隐私，无数据倒卖，无模型掺水，充值额度 1:1。<a href="https://www.16688.com.cn/shop/S929990">购买链接</a>。</td>
 </tr>
 </table>
 
@@ -108,7 +122,7 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 
 ### 🤖 智能体与工作区
 
-- **工作区**：为对话绑定工作区后，模型可以使用 `shell`、`read_file`、`write_file`、`edit_file`、`list_dir`、`glob` 和 `grep` 七个工具。命令输出实时显示，文件修改以 diff 呈现；Shell 命令可以设为需要审批，按单条命令批准或在本次会话中全部允许。
+- **工作区**：为对话绑定工作区后，模型可以使用 `shell`、`read_file`、`view_image`、`write_file`、`edit_file`、`list_dir`、`glob` 和 `grep` 八个工具。命令输出实时显示，文件修改以 diff 呈现；默认询问授权区域外的文件访问和桌面命令，也可为当前对话启用“完全访问”，免除需要授权的工具的常规审批。
 - **手机上的 Linux 沙盒**：Android 通过 PRoot 运行 Ubuntu、Debian 或 Alpine Linux，也可以导入自己的 rootfs 镜像；iOS 内置基于 iSH 的 Alpine Linux，无需额外下载。可在应用内安装 Python、Node.js、Git、SSH 等常用工具，并通过测速为 apt/apk、pip 和 npm 选择最快的镜像源。
 - **桌面端原生运行**：在 macOS、Windows 和 Linux 上，工具直接在系统 Shell 中运行，工作区可以是应用托管的文件夹，也可以链接电脑上的任意文件夹。
 - **文件与终端**：内置文件浏览器，可预览 Markdown、HTML、CSV、图片和文本。手机端提供应用内终端，桌面端可在系统终端中打开工作区。手机端还可以把最多 10 个外部文件夹以只读或读写方式挂载到沙盒中。
@@ -179,7 +193,7 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 | 平台专属设备工具 | 日历、定位、屏幕使用时间 | 日历、定位、天气、提醒事项、健康数据 | — |
 | 全局快捷键与系统托盘 | — | — | ✓ |
 
-桌面端的工作区命令以当前用户的权限运行，没有沙盒隔离。对于存放重要文件的工作区，建议保持命令审批开启。
+桌面端的工作区命令以当前用户的权限运行，没有沙盒隔离。默认“请求批准”模式会询问桌面命令和授权区域外的文件访问；可为当前对话主动选择“完全访问”，免除常规工具审批。完全访问不会获得额外系统权限或开启已禁用的工具。
 
 ## 🔧 从源码构建
 

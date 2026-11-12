@@ -136,6 +136,17 @@ abstract class CodeLineEditingController extends ValueNotifier<CodeLineEditingVa
   /// This Will convert all the code lines into a whole text.
   String get text;
 
+  /// Complete plain-text state with document-relative selection offsets.
+  TextEditingValue get documentEditingValue;
+
+  CodeNavigationLayout? captureNavigationLayout();
+
+  TextSelection resolveVerticalNavigation(TextSelection selection, bool up, bool extend);
+
+  /// Apply a native document update, retaining untouched lines. [replacedRange]
+  /// is in the previous document; omit it for full-state updates without deltas.
+  void editDocument(TextEditingValue newValue, {TextRange? replacedRange, bool revealCaret = true});
+
   /// The current text being selected.
   String get selectedText;
 
@@ -1004,6 +1015,7 @@ class CodeLineOptions {
     this.lineBreak = TextLineBreak.lf,
     this.indentSize = _defaultIndentSize,
     this.plainText = false,
+    this.inputConnectionFactory,
   });
 
   /// Line break symbols, like LF, CRLF.
@@ -1016,21 +1028,24 @@ class CodeLineOptions {
 
   /// Literal message editing without code indentation or paired deletion.
   final bool plainText;
+  final CodeInputConnectionFactory? inputConnectionFactory;
 
   CodeLineOptions copyWith({
     TextLineBreak? lineBreak,
     int? indentSize,
     bool? plainText,
+    CodeInputConnectionFactory? inputConnectionFactory,
   }) {
     return CodeLineOptions(
       lineBreak: lineBreak ?? this.lineBreak,
       indentSize: indentSize ?? this.indentSize,
       plainText: plainText ?? this.plainText,
+      inputConnectionFactory: inputConnectionFactory ?? this.inputConnectionFactory,
     );
   }
 
   @override
-  int get hashCode => Object.hash(lineBreak, indentSize, plainText);
+  int get hashCode => Object.hash(lineBreak, indentSize, plainText, inputConnectionFactory);
 
   @override
   bool operator ==(Object other) {
@@ -1040,7 +1055,8 @@ class CodeLineOptions {
     return other is CodeLineOptions
         && other.lineBreak == lineBreak
         && other.indentSize == indentSize
-        && other.plainText == plainText;
+        && other.plainText == plainText
+        && other.inputConnectionFactory == inputConnectionFactory;
   }
 
   String get indent => ' ' * indentSize;

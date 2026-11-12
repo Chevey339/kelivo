@@ -1,0 +1,15 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Popup child</title>
+<style>
+  body { font: 20px system-ui; padding: 30px; background: #eef2ea; color: #28382d; }
+  button { font: inherit; padding: 20px; border: 0; border-radius: 18px; background: #526e58; color: white; }
+</style>
+<h1>Popup child</h1>
+<p id="status"></p>
+<button onclick="window.close()">Close test popup</button>
+<script>
+  document.querySelector('#status').textContent = window.opener
+    ? 'Opener preserved' : 'Missing opener';
+  if (window.opener) window.opener.postMessage('Popup connected', location.origin);
+</script>

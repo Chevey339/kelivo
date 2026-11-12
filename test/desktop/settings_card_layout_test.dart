@@ -1,3 +1,5 @@
+import 'package:Kelivo/desktop/setting/hotkeys_pane.dart';
+import 'package:Kelivo/core/providers/hotkey_provider.dart';
 import 'dart:io';
 
 import 'package:Kelivo/core/providers/backup_provider.dart';
@@ -42,6 +44,7 @@ Future<SettingsProvider> _pumpPane(
   await tester.pumpWidget(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => HotkeyProvider()),
         ChangeNotifierProvider<SettingsProvider>(create: (_) => settings),
         ChangeNotifierProvider<BackupProvider>(
           create: (_) => BackupProvider(
@@ -101,6 +104,28 @@ void _expectInsetHeading(WidgetTester tester, String title) {
 }
 
 void main() {
+  for (final pane in [
+    const DesktopNetworkProxyPane(),
+    const DesktopBackupPane(),
+    const DesktopHotkeysPane(),
+  ]) {
+    testWidgets('360px ${pane.runtimeType} keeps settings reachable', (
+      tester,
+    ) async {
+      await _pumpPane(tester, pane, Brightness.light);
+      tester.view.physicalSize = const Size(360, 640);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final scrollable = find.byType(Scrollable).first;
+      await tester.drag(scrollable, const Offset(0, -420));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      tester.view.physicalSize = const Size(1200, 900);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final brightness in Brightness.values) {
     testWidgets(
       'proxy headings and notes are inset and left aligned ($brightness)',

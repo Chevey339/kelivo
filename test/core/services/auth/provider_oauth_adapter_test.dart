@@ -474,7 +474,11 @@ void main() {
                   ? {
                       'isUnifiedBillingUser': true,
                       'creditUsagePercent': 10,
-                      'currentPeriod': {'end': '2026-10-01'},
+                      'currentPeriod': {
+                        'type': 'WEEKLY',
+                        'start': '2026-09-24',
+                        'end': '2026-10-01',
+                      },
                     }
                   : {
                       'monthlyLimit': {'val': 100},
@@ -487,7 +491,8 @@ void main() {
         stored,
       );
       expect(requests, hasLength(2));
-      expect(result.windows.single.usedPercent, 20);
+      expect(result.windows.map((window) => window.id), ['weekly', 'monthly']);
+      expect(result.windows.map((window) => window.usedPercent), [10, 20]);
     },
   );
 
@@ -581,7 +586,7 @@ void main() {
           'monthlyLimit': {'val': 0},
           'used': {'val': 0},
         },
-      }, allowInferredWeekly: true);
+      });
       expect(expired.windows, isEmpty);
     },
   );

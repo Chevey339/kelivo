@@ -45,6 +45,7 @@ const _webSearchHistory = <Map<String, dynamic>>[
         'type': 'function',
         'function': {'name': 'search_web', 'arguments': '{"query":"kyoto"}'},
         'metadata': {
+          'server': true,
           'anthropic': {
             'assistant_blocks': [
               {'type': 'text', 'text': '我先搜索一下。'},

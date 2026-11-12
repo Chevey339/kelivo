@@ -8,6 +8,7 @@ import '../database/business_preferences.dart';
 import '../database/business_repository.dart';
 import '../models/backup.dart';
 import '../services/backup/backup_cancel_token.dart';
+import '../services/backup/backup_encryption.dart';
 import '../services/backup/backup_task_progress.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/s3_client.dart';
@@ -96,6 +97,7 @@ class S3BackupProvider extends ChangeNotifier {
   }
 
   Future<bool> backup({
+    String? password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
@@ -106,6 +108,7 @@ class S3BackupProvider extends ChangeNotifier {
     try {
       file = await _dataSync.prepareBackupFile(
         _scopeAsWebdavConfig(),
+        password: password,
         onProgress: onProgress,
         cancelToken: cancelToken,
       );
@@ -149,6 +152,7 @@ class S3BackupProvider extends ChangeNotifier {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
     ForwardCompatibilityPrompt? onForwardCompatibility,
+    BackupPasswordPrompt? onPassword,
   }) async {
     _busy = true;
     _message = null;
@@ -174,6 +178,8 @@ class S3BackupProvider extends ChangeNotifier {
         onProgress: onProgress,
         cancelToken: cancelToken,
         onForwardCompatibility: onForwardCompatibility,
+        onPassword: onPassword,
+        requireEncrypted: key.toLowerCase().endsWith('.kbackup'),
       );
       _message = 'Restored';
     } catch (e) {

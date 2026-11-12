@@ -63,6 +63,42 @@ void main() {
     expect((await repository.getGenerationRun(run.id))?.id, run.id);
   });
 
+  test(
+    'loaded revisions carry the newest authoritative run, including interrupted terminal states',
+    () async {
+      expect(
+        (await repository.getMessage('revision-a1'))!.generationState,
+        isNull,
+      );
+      var run = await createRun();
+      expect(
+        (await repository.getMessage('revision-a1'))!.generationState,
+        GenerationRunState.preparing,
+      );
+      run = await repository.transitionGenerationRun(
+        id: run.id,
+        expectedState: run.state,
+        expectedStateRevision: run.stateRevision,
+        nextState: GenerationRunState.interrupted,
+        updatedAt: createdAt.add(const Duration(microseconds: 1)),
+      );
+      expect(
+        (await repository.getMessage('revision-a1'))!.generationState,
+        GenerationRunState.interrupted,
+      );
+      final next = await repository.createGenerationRun(
+        id: 'run-2',
+        conversationId: 'conversation-1',
+        targetRevisionId: 'revision-a1',
+        createdAt: createdAt.add(const Duration(seconds: 1)),
+      );
+      expect(
+        (await repository.getMessage('revision-a1'))!.generationState,
+        next.state,
+      );
+    },
+  );
+
   test('allows only the frozen state-machine transitions', () async {
     var run = await createRun();
     for (final next in const [

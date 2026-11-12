@@ -711,4 +711,7 @@ class _Paths extends PathProviderPlatform {
   final String root;
   @override
   Future<String?> getApplicationDocumentsPath() async => root;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => '$root/support';
 }

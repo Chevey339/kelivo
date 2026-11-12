@@ -77,7 +77,11 @@ class HomeMobileScaffold extends StatelessWidget {
   final ValueChanged<String> onGlobalSearchQueryChanged;
   final VoidCallback onEnterGlobalSearch;
   final VoidCallback onExitGlobalSearch;
-  final Future<void> Function(String conversationId, String messageId)
+  final Future<void> Function(
+    String conversationId,
+    String messageId,
+    String? surfaceKey,
+  )
   onOpenGlobalSearchResult;
   final PreferredSizeWidget? appBarOverride;
   final Widget body;
@@ -103,10 +107,15 @@ class HomeMobileScaffold extends StatelessWidget {
         onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
         onEnterGlobalSearch: onEnterGlobalSearch,
         onExitGlobalSearch: onExitGlobalSearch,
-        onOpenGlobalSearchResult: (conversationId, messageId) async {
-          await onOpenGlobalSearchResult(conversationId, messageId);
-          drawerController.close();
-        },
+        onOpenGlobalSearchResult:
+            (conversationId, messageId, surfaceKey) async {
+              await onOpenGlobalSearchResult(
+                conversationId,
+                messageId,
+                surfaceKey,
+              );
+              drawerController.close();
+            },
         onSelectConversation: (id, {closeDrawer = true}) {
           onSelectConversation(id);
           if (closeDrawer) drawerController.close();

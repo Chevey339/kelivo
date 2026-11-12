@@ -24,7 +24,7 @@ class ReasoningIcons {
   static String assetForLevel(ReasoningLevel level) {
     return switch (level) {
       ReasoningLevel.off => offAsset,
-      ReasoningLevel.auto => autoAsset,
+      ReasoningLevel.auto || ReasoningLevel.on => autoAsset,
       ReasoningLevel.minimal || ReasoningLevel.low => lightAsset,
       ReasoningLevel.medium => mediumAsset,
       ReasoningLevel.high => heavyAsset,

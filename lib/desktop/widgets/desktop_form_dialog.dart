@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 import '../../icons/lucide_adapter.dart';
@@ -28,18 +29,23 @@ class DesktopFormDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: ConstrainedBox(
-        constraints: constraints,
-        child: Material(
-          color: context.overlaySurface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(cornerRadius),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(cornerRadius),
-            child: child,
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: constraints,
+          child: Material(
+            color: context.overlaySurface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(cornerRadius),
+              side: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.25),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(cornerRadius),
+              child: child,
+            ),
           ),
         ),
       ),
@@ -54,44 +60,71 @@ class DesktopFormDialogHeader extends StatelessWidget {
     required this.onClose,
     this.closeTooltip,
     this.closeSemanticLabel,
+    this.actions = const [],
   });
 
   final String title;
   final VoidCallback onClose;
   final String? closeTooltip;
   final String? closeSemanticLabel;
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      height: 52,
-      color: context.overlaySurface,
-      padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: AppFontWeights.emphasis,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackActions = constraints.maxWidth < 520 && actions.isNotEmpty;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 52,
+              color: context.overlaySurface,
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: AppFontWeights.emphasis,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (!stackActions) ...actions,
+                  IosIconButton(
+                    icon: Lucide.X,
+                    size: 20,
+                    minSize: 36,
+                    tooltip: closeTooltip,
+                    semanticLabel: closeSemanticLabel,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                    onTap: onClose,
+                  ),
+                ],
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          IosIconButton(
-            icon: Lucide.X,
-            size: 20,
-            minSize: 36,
-            tooltip: closeTooltip,
-            semanticLabel: closeSemanticLabel,
-            color: cs.onSurface.withValues(alpha: 0.9),
-            onTap: onClose,
-          ),
-        ],
-      ),
+            if (stackActions)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: actions,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -303,6 +336,7 @@ class DesktopFormPrimaryButton extends StatefulWidget {
 
 class _DesktopFormPrimaryButtonState extends State<DesktopFormPrimaryButton> {
   bool _hover = false;
+  bool _focused = false;
   bool _pressed = false;
 
   @override
@@ -310,38 +344,59 @@ class _DesktopFormPrimaryButtonState extends State<DesktopFormPrimaryButton> {
     final cs = Theme.of(context).colorScheme;
     final bg = _pressed
         ? cs.primary.withValues(alpha: 0.85)
-        : (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, size: 16, color: cs.onPrimary),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: cs.onPrimary,
-                  fontWeight: AppFontWeights.semibold,
-                ),
+        : (_hover || _focused
+              ? cs.primary.withValues(alpha: 0.92)
+              : cs.primary);
+    return FocusableActionDetector(
+      onShowFocusHighlight: (value) => setState(() => _focused = value),
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
+        ),
+      },
+      child: Semantics(
+        button: true,
+        enabled: true,
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTapDown: (_) => setState(() => _pressed = true),
+            onTapUp: (_) => setState(() => _pressed = false),
+            onTapCancel: () => setState(() => _pressed = false),
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(10),
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.icon != null) ...[
+                    Icon(widget.icon, size: 16, color: cs.onPrimary),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: cs.onPrimary,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

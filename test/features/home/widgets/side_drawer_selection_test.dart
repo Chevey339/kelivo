@@ -307,7 +307,11 @@ void main() {
         final notifyBeforeDelete = service.notifyCount;
         expect(notifyBeforeDelete, notifyBaseline);
 
-        await tester.tap(find.text(l10n.sideDrawerSelectionDelete).first);
+        // Start the asynchronous UI command outside the fake timer zone so
+        // its SQLite and durable file operations can finish after confirmation.
+        await tester.runAsync(
+          () => tester.tap(find.text(l10n.sideDrawerSelectionDelete).first),
+        );
         await tester.pumpAndSettle();
         expect(
           find.text(l10n.sideDrawerSelectionDeleteConfirmTitle),
@@ -335,7 +339,9 @@ void main() {
           await tester.pump();
         }
         await tester.pump(const Duration(milliseconds: 400));
-        await tester.pump(const Duration(seconds: 3));
+        // The command's toast uses a real timer too. Finish its exit animation
+        // before the next test resets the scheduler's clock.
+        AppSnackBarManager().dismissAll();
         await tester.pumpAndSettle();
 
         expect(service.notifyCount, notifyBeforeDelete + 1);

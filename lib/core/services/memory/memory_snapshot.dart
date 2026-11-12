@@ -11,6 +11,7 @@ Future<MemorySnapshotState> readMemorySnapshot({
   required String assistantId,
   required MemoryPromptLang lang,
   required int maxItems,
+  required Set<MemoryType> fullInjectionTypes,
 }) async {
   final data = await repository.readMemorySnapshotData(
     assistantId: assistantId,
@@ -30,6 +31,7 @@ Future<MemorySnapshotState> readMemorySnapshot({
     totalByType: totals,
     lang: lang,
     maxItems: maxItems,
+    fullInjectionTypes: fullInjectionTypes,
   );
   return (
     prefix: MemoryBlockBuilder.buildFullSnapshotPrefix(

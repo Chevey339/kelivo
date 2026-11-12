@@ -2172,6 +2172,34 @@
       "reasoning"
     ]
   },
+  "gemini-4-argon": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-4-argon-cyber-permissive": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
   "gemini-embedding-001": {
     "type": "embedding",
     "input": [

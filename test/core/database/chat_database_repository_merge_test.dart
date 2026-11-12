@@ -4,6 +4,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/quote_ref.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -215,6 +216,159 @@ void main() {
         file: File('${directory.path}/live.sqlite'),
       );
       await live.ensureReady();
+    }
+
+    test(
+      'inline quotes follow remapped source revisions and repeated imports deduplicate',
+      () async {
+        await putConversation(
+          live,
+          conversationId: 'chat',
+          title: 'Local',
+          messageId: 'original',
+          content: 'local body',
+        );
+        final quote = QuoteRef(
+          id: 'q',
+          messageId: 'original',
+          start: 0,
+          end: 6,
+          text: 'source',
+          model: 'Model',
+          createdAt: DateTime.utc(2026),
+        );
+        await source.putMigrationBatch(
+          conversations: [
+            Conversation(
+              id: 'chat',
+              title: 'Imported',
+              messageIds: ['original', 'reply'],
+            ),
+          ],
+          messages: [
+            (
+              message: ChatMessage(
+                id: 'original',
+                role: 'assistant',
+                content: 'source',
+                conversationId: 'chat',
+              ),
+              messageOrder: 0,
+            ),
+            (
+              message: ChatMessage(
+                id: 'reply',
+                role: 'user',
+                content: 'Explain \uFFFC',
+                quotes: [quote],
+                conversationId: 'chat',
+              ),
+              messageOrder: 1,
+            ),
+          ],
+          toolEventsByMessageId: const {},
+          geminiSignaturesByMessageId: const {},
+        );
+        await source.close();
+        sourceClosed = true;
+        final report = await live.mergeBackupSnapshot(sourceFile);
+        expect(report.remappedConversations, 1);
+        final imported = (await live.getAllConversations()).singleWhere(
+          (conversation) => conversation.title == 'Imported',
+        );
+        final messages = await live.getMessagesByIds(imported.messageIds);
+        expect(messages.last.quotes.single.messageId, messages.first.id);
+        expect(messages.last.quotes.single.text, quote.text);
+        expect(messages.last.content, 'Explain \uFFFC');
+        final repeated = await live.mergeBackupSnapshot(sourceFile);
+        expect(repeated.importedConversations, 0);
+        expect(repeated.deduplicatedConversations, 1);
+      },
+    );
+
+    for (final sourceId in ['a-source', 'z-source']) {
+      for (final alreadyImported in [false, true]) {
+        test(
+          'cross-conversation quote remaps source $sourceId, deduplicated=$alreadyImported',
+          () async {
+            await putConversation(
+              live,
+              conversationId: sourceId,
+              title: 'Local source',
+              messageId: 's',
+              content: 'local text',
+            );
+            await putConversation(
+              source,
+              conversationId: sourceId,
+              title: 'Backup source',
+              messageId: 's',
+              content: 'backup text',
+            );
+            if (alreadyImported) {
+              await source.close();
+              sourceClosed = true;
+              await live.mergeBackupSnapshot(sourceFile);
+              source = ChatDatabaseRepository.open(file: sourceFile);
+              await source.ensureReady();
+              sourceClosed = false;
+            }
+            final quote = QuoteRef(
+              id: 'q',
+              messageId: 's',
+              start: 0,
+              end: 6,
+              text: 'backup',
+              model: 'Model',
+              createdAt: DateTime.utc(2026),
+            );
+            await source.putMigrationBatch(
+              conversations: [
+                Conversation(
+                  id: 'middle-quote',
+                  title: 'Quote',
+                  messageIds: ['q-message'],
+                ),
+              ],
+              messages: [
+                (
+                  message: ChatMessage(
+                    id: 'q-message',
+                    role: 'user',
+                    conversationId: 'middle-quote',
+                    content: 'Explain \uFFFC',
+                    quotes: [quote],
+                  ),
+                  messageOrder: 0,
+                ),
+              ],
+              toolEventsByMessageId: const {},
+              geminiSignaturesByMessageId: const {},
+            );
+            await source.close();
+            sourceClosed = true;
+            await live.mergeBackupSnapshot(sourceFile);
+            final sourceChat = (await live.getAllConversations()).singleWhere(
+              (chat) => chat.title == 'Backup source',
+            );
+            final target = (await live.getMessagesByIds(
+              sourceChat.messageIds,
+            )).single;
+            final imported = (await live.getMessage('q-message'))!;
+            expect(target.id, isNot('s'));
+            expect(imported.quotes.single.messageId, target.id);
+            expect(
+              (await live.getMessage(
+                imported.quotes.single.messageId,
+              ))!.content,
+              'backup text',
+            );
+            final repeat = await live.mergeBackupSnapshot(sourceFile);
+            expect(repeat.importedConversations, 0);
+            expect(repeat.deduplicatedConversations, 2);
+          },
+        );
+      }
     }
 
     test('无冲突 conversation 原 ID 导入且 order/关联数据完整', () async {

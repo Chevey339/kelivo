@@ -4,43 +4,44 @@ import 'package:Kelivo/core/services/api/gemini_tool_config.dart';
 
 void main() {
   group('supportsMixedBuiltInAndFunctionTools', () {
-    test('is the residual Gemini 3 generation check', () {
+    test('covers the Gemini 3 and 4 generations', () {
       expect(supportsMixedBuiltInAndFunctionTools('gemini-3.6-flash'), isTrue);
       expect(
         supportsMixedBuiltInAndFunctionTools('models/gemini-3-pro-preview'),
         isTrue,
       );
+      expect(supportsMixedBuiltInAndFunctionTools('gemini-4-argon'), isTrue);
       expect(supportsMixedBuiltInAndFunctionTools('gemini-2.5-flash'), isFalse);
       expect(supportsMixedBuiltInAndFunctionTools('gemma-4-31B-it'), isFalse);
     });
   });
 
   group('shouldAttachGeminiFunctionCallingConfig', () {
-    test('returns false for google_search built-in tool', () {
+    test('returns false for googleSearch built-in tool', () {
       final tools = <Map<String, dynamic>>[
-        {'google_search': {}},
+        {'googleSearch': {}},
       ];
       expect(shouldAttachGeminiFunctionCallingConfig(tools), isFalse);
     });
 
-    test('returns false for url_context built-in tool', () {
+    test('returns false for urlContext built-in tool', () {
       final tools = <Map<String, dynamic>>[
-        {'url_context': {}},
+        {'urlContext': {}},
       ];
       expect(shouldAttachGeminiFunctionCallingConfig(tools), isFalse);
     });
 
-    test('returns false for code_execution built-in tool', () {
+    test('returns false for codeExecution built-in tool', () {
       final tools = <Map<String, dynamic>>[
-        {'code_execution': {}},
+        {'codeExecution': {}},
       ];
       expect(shouldAttachGeminiFunctionCallingConfig(tools), isFalse);
     });
 
-    test('returns true when function_declarations exists and non-empty', () {
+    test('returns true when functionDeclarations exists and non-empty', () {
       final tools = <Map<String, dynamic>>[
         {
-          'function_declarations': [
+          'functionDeclarations': [
             {'name': 'toolA', 'description': 'A tool'},
           ],
         },
@@ -52,16 +53,16 @@ void main() {
   group('hasBuiltInAndFunctionDeclarations', () {
     test('returns false for only built-in tools', () {
       final tools = <Map<String, dynamic>>[
-        {'google_search': {}},
-        {'url_context': {}},
+        {'googleSearch': {}},
+        {'urlContext': {}},
       ];
       expect(hasBuiltInAndFunctionDeclarations(tools), isFalse);
     });
 
-    test('returns false for only function_declarations', () {
+    test('returns false for only functionDeclarations', () {
       final tools = <Map<String, dynamic>>[
         {
-          'function_declarations': [
+          'functionDeclarations': [
             {'name': 'fn1'},
           ],
         },
@@ -69,11 +70,11 @@ void main() {
       expect(hasBuiltInAndFunctionDeclarations(tools), isFalse);
     });
 
-    test('returns true for google_search + function_declarations', () {
+    test('returns true for googleSearch + functionDeclarations', () {
       final tools = <Map<String, dynamic>>[
-        {'google_search': {}},
+        {'googleSearch': {}},
         {
-          'function_declarations': [
+          'functionDeclarations': [
             {'name': 'fn1'},
           ],
         },
@@ -81,11 +82,11 @@ void main() {
       expect(hasBuiltInAndFunctionDeclarations(tools), isTrue);
     });
 
-    test('returns true for code_execution + function_declarations', () {
+    test('returns true for codeExecution + functionDeclarations', () {
       final tools = <Map<String, dynamic>>[
-        {'code_execution': {}},
+        {'codeExecution': {}},
         {
-          'function_declarations': [
+          'functionDeclarations': [
             {'name': 'fn1'},
           ],
         },
@@ -93,11 +94,11 @@ void main() {
       expect(hasBuiltInAndFunctionDeclarations(tools), isTrue);
     });
 
-    test('returns true for url_context + function_declarations', () {
+    test('returns true for urlContext + functionDeclarations', () {
       final tools = <Map<String, dynamic>>[
-        {'url_context': {}},
+        {'urlContext': {}},
         {
-          'function_declarations': [
+          'functionDeclarations': [
             {'name': 'fn1'},
           ],
         },
@@ -105,10 +106,10 @@ void main() {
       expect(hasBuiltInAndFunctionDeclarations(tools), isTrue);
     });
 
-    test('returns false for empty function_declarations', () {
+    test('returns false for empty functionDeclarations', () {
       final tools = <Map<String, dynamic>>[
-        {'google_search': {}},
-        {'function_declarations': <dynamic>[]},
+        {'googleSearch': {}},
+        {'functionDeclarations': <dynamic>[]},
       ];
       expect(hasBuiltInAndFunctionDeclarations(tools), isFalse);
     });
@@ -120,47 +121,65 @@ void main() {
   });
 
   group('buildGeminiToolConfig', () {
-    test('returns null when no function_declarations', () {
+    test('returns null when no functionDeclarations', () {
       final tools = <Map<String, dynamic>>[
-        {'google_search': {}},
+        {'googleSearch': {}},
       ];
-      expect(buildGeminiToolConfig(tools: tools, isGemini3: true), isNull);
+      expect(
+        buildGeminiToolConfig(
+          tools: tools,
+          allowServerSideToolInvocations: true,
+        ),
+        isNull,
+      );
     });
 
     test('returns null for only built-in tools even on Gemini 2.x', () {
       final tools = <Map<String, dynamic>>[
-        {'code_execution': {}},
+        {'codeExecution': {}},
       ];
-      expect(buildGeminiToolConfig(tools: tools, isGemini3: false), isNull);
+      expect(
+        buildGeminiToolConfig(
+          tools: tools,
+          allowServerSideToolInvocations: false,
+        ),
+        isNull,
+      );
     });
 
-    test('returns AUTO mode for Gemini 2.x with function_declarations', () {
+    test('returns AUTO mode for Gemini 2.x with functionDeclarations', () {
       final tools = <Map<String, dynamic>>[
         {
-          'function_declarations': [
+          'functionDeclarations': [
             {'name': 'fn1'},
           ],
         },
       ];
-      final config = buildGeminiToolConfig(tools: tools, isGemini3: false);
+      final config = buildGeminiToolConfig(
+        tools: tools,
+        allowServerSideToolInvocations: false,
+      );
       expect(config, isNotNull);
-      expect(config!['function_calling_config']['mode'], equals('AUTO'));
+      expect(config!['functionCallingConfig']['mode'], equals('AUTO'));
       expect(config.containsKey('includeServerSideToolInvocations'), isFalse);
     });
 
     test(
-      'returns AUTO mode for Gemini 3 with only function_declarations (no built-in)',
+      'returns AUTO mode for Gemini 3 with only functionDeclarations (no built-in)',
       () {
         final tools = <Map<String, dynamic>>[
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {'name': 'fn1'},
             ],
           },
         ];
-        final config = buildGeminiToolConfig(tools: tools, isGemini3: true);
+        final config = buildGeminiToolConfig(
+          tools: tools,
+          allowServerSideToolInvocations: true,
+        );
         expect(config, isNotNull);
-        expect(config!['function_calling_config']['mode'], equals('AUTO'));
+        expect(config!['functionCallingConfig']['mode'], equals('AUTO'));
         expect(config.containsKey('includeServerSideToolInvocations'), isFalse);
       },
     );
@@ -169,16 +188,19 @@ void main() {
       'returns VALIDATED mode with includeServerSideToolInvocations for Gemini 3 combined tools',
       () {
         final tools = <Map<String, dynamic>>[
-          {'google_search': {}},
+          {'googleSearch': {}},
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {'name': 'fn1'},
             ],
           },
         ];
-        final config = buildGeminiToolConfig(tools: tools, isGemini3: true);
+        final config = buildGeminiToolConfig(
+          tools: tools,
+          allowServerSideToolInvocations: true,
+        );
         expect(config, isNotNull);
-        expect(config!['function_calling_config']['mode'], equals('VALIDATED'));
+        expect(config!['functionCallingConfig']['mode'], equals('VALIDATED'));
         expect(config['includeServerSideToolInvocations'], isTrue);
       },
     );
@@ -187,54 +209,63 @@ void main() {
       'returns AUTO mode for Gemini 2.x even with combined tools (mutual exclusion prevents this case, but test function in isolation)',
       () {
         final tools = <Map<String, dynamic>>[
-          {'google_search': {}},
+          {'googleSearch': {}},
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {'name': 'fn1'},
             ],
           },
         ];
-        final config = buildGeminiToolConfig(tools: tools, isGemini3: false);
+        final config = buildGeminiToolConfig(
+          tools: tools,
+          allowServerSideToolInvocations: false,
+        );
         expect(config, isNotNull);
-        expect(config!['function_calling_config']['mode'], equals('AUTO'));
+        expect(config!['functionCallingConfig']['mode'], equals('AUTO'));
         expect(config.containsKey('includeServerSideToolInvocations'), isFalse);
       },
     );
 
     test(
-      'returns VALIDATED mode for Gemini 3 with code_execution + function_declarations',
+      'returns VALIDATED mode for Gemini 3 with codeExecution + functionDeclarations',
       () {
         final tools = <Map<String, dynamic>>[
-          {'code_execution': {}},
+          {'codeExecution': {}},
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {'name': 'fn1'},
             ],
           },
         ];
-        final config = buildGeminiToolConfig(tools: tools, isGemini3: true);
+        final config = buildGeminiToolConfig(
+          tools: tools,
+          allowServerSideToolInvocations: true,
+        );
         expect(config, isNotNull);
-        expect(config!['function_calling_config']['mode'], equals('VALIDATED'));
+        expect(config!['functionCallingConfig']['mode'], equals('VALIDATED'));
         expect(config['includeServerSideToolInvocations'], isTrue);
       },
     );
 
     test(
-      'returns VALIDATED mode for Gemini 3 with multiple built-in + function_declarations',
+      'returns VALIDATED mode for Gemini 3 with multiple built-in + functionDeclarations',
       () {
         final tools = <Map<String, dynamic>>[
-          {'google_search': {}},
-          {'url_context': {}},
-          {'code_execution': {}},
+          {'googleSearch': {}},
+          {'urlContext': {}},
+          {'codeExecution': {}},
           {
-            'function_declarations': [
+            'functionDeclarations': [
               {'name': 'fn1'},
             ],
           },
         ];
-        final config = buildGeminiToolConfig(tools: tools, isGemini3: true);
+        final config = buildGeminiToolConfig(
+          tools: tools,
+          allowServerSideToolInvocations: true,
+        );
         expect(config, isNotNull);
-        expect(config!['function_calling_config']['mode'], equals('VALIDATED'));
+        expect(config!['functionCallingConfig']['mode'], equals('VALIDATED'));
         expect(config['includeServerSideToolInvocations'], isTrue);
       },
     );

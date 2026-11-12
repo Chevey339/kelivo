@@ -159,7 +159,7 @@ void main() {
       });
 
       await expectBump(chat, id, () async {
-        await chat.toggleTruncateAtTail(id);
+        await chat.clearConversationContext(id);
       });
 
       await expectBump(chat, id, () async {

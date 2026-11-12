@@ -1,41 +1,77 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gpt_markdown/gpt_markdown.dart';
+import 'package:markstream/markstream.dart';
+import 'package:flutter/rendering.dart';
+
+class _TokenSyntax extends InlineSyntax {
+  const _TokenSyntax();
+  @override
+  Set<int> get startCharacters => {116};
+  @override
+  InlineSyntaxMatch? match(InlineSyntaxContext context, int offset) {
+    if (!context.text.startsWith('token', offset)) return null;
+    return InlineSyntaxMatch(
+      end: offset + 5,
+      node: EmphasisNode(
+        strong: true,
+        span: context.span(offset, offset + 5),
+        children: context.textNodes(offset, offset + 5),
+      ),
+    );
+  }
+}
+
+List<RenderParagraph> paragraphs(Finder root) {
+  final result = <RenderParagraph>[];
+  void visit(RenderObject object) {
+    if (object is RenderParagraph) result.add(object);
+    object.visitChildren(visit);
+  }
+
+  for (final element in root.evaluate()) {
+    visit(element.findRenderObject()!);
+  }
+  return result;
+}
 
 void main() {
-  testWidgets('plain suffixes still run source-dependent preprocessing', (
-    tester,
-  ) async {
-    final source = ValueNotifier('Paragraph to');
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ValueListenableBuilder<String>(
-            valueListenable: source,
-            builder: (_, value, _) => GptMarkdown(
-              value,
-              streaming: true,
-              preprocessBlocks: (text) => text.replaceAll('token', '**token**'),
+  testWidgets(
+    'plain suffixes still evaluate a source-indexed inline extension',
+    (tester) async {
+      final source = ValueNotifier('Paragraph to');
+      final extensions = MarkstreamExtensions(
+        inlineSyntaxes: const [_TokenSyntax()],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ValueListenableBuilder<String>(
+              valueListenable: source,
+              builder: (_, value, _) => MarkstreamView(
+                source: value,
+                streaming: true,
+                extensions: extensions,
+              ),
             ),
           ),
         ),
-      ),
-    );
-    source.value += 'ken';
-    await tester.pump();
-    final rich = tester.widget<RichText>(find.byType(RichText).first);
-    expect(rich.text.toPlainText(), 'Paragraph token');
-    final weights = <FontWeight?>[];
-    rich.text.visitChildren((span) {
-      if (span is TextSpan && span.text == 'token') {
-        weights.add(span.style?.fontWeight);
-      }
-      return true;
-    });
-    expect(weights, contains(FontWeight.bold));
-    await tester.pumpWidget(const SizedBox.shrink());
-    source.dispose();
-  });
+      );
+      source.value += 'ken';
+      await tester.pump();
+      final rich = paragraphs(find.byType(MarkstreamView)).first;
+      expect(rich.text.toPlainText(), 'Paragraph token');
+      final weights = <FontWeight?>[];
+      rich.text.visitChildren((span) {
+        if (span is TextSpan && span.text == 'token') {
+          weights.add(span.style?.fontWeight);
+        }
+        return true;
+      });
+      expect(weights, contains(FontWeight.bold));
+      await tester.pumpWidget(const SizedBox.shrink());
+      source.dispose();
+    },
+  );
   testWidgets('cached plain appends agree with a fresh Markdown parse', (
     tester,
   ) async {
@@ -53,9 +89,19 @@ void main() {
                 children: [
                   SizedBox(
                     width: 350,
-                    child: GptMarkdown(value, key: cached, streaming: true),
+                    child: MarkstreamView(
+                      source: value,
+                      key: cached,
+                      streaming: true,
+                    ),
                   ),
-                  SizedBox(width: 350, child: GptMarkdown(value, key: fresh)),
+                  SizedBox(
+                    width: 350,
+                    child: MarkstreamView(
+                      document: const MarkdownParser().parse(value),
+                      key: fresh,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -89,9 +135,7 @@ void main() {
         }
       }
 
-      for (final text in tester.widgetList<RichText>(
-        find.descendant(of: find.byKey(key), matching: find.byType(RichText)),
-      )) {
+      for (final text in paragraphs(find.byKey(key))) {
         result.add('paragraph');
         walk(text.text, const TextStyle());
       }

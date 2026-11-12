@@ -187,7 +187,12 @@ void main() {
         watch.stop();
         SchedulerBinding.instance.removeTimingsCallback(collect);
         expect(frames, isNotEmpty);
-        expect(find.byType(BackdropFilter), findsWidgets);
+        expect(
+          find.byWidgetPredicate(
+            (widget) => widget is BackdropFilter && widget.enabled,
+          ),
+          findsWidgets,
+        );
         final expectedReasoning =
             List.filled(
               1800,

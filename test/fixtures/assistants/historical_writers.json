@@ -1,0 +1,2556 @@
+[
+  {
+    "writers": [
+      {
+        "commit": "d8753ed461adb82a417a01e6a1992a760b6ec783",
+        "refs": [
+          "v1.0.0",
+          "v1.0.1",
+          "v1.0.2",
+          "v1.0.3",
+          "v1.0.4",
+          "v1.0.5",
+          "v1.0.6",
+          "v1.0.7",
+          "v1.0.8",
+          "v1.0.9",
+          "a210c8e6a102726381fde588eaa0756f3bbb89e9"
+        ],
+        "sourceSha256": "13a4f18ee011ecdcfbdd6143377652fb70a324666ebbfc96650bc2279dc838e1"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "deletable": true,
+        "customHeaders": [],
+        "customBody": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "deletable": false,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "49d14000ce0dea341f73e91bc26279c4c6309f2c",
+        "refs": [
+          "v1.0.10",
+          "v1.0.11",
+          "95bc9407f8271920c3a0a96b7e1e36ce158b5d0b"
+        ],
+        "sourceSha256": "a7353e968deb0ec097330796714d0cfa7e4f844272b1a13922f381780e088775"
+      },
+      {
+        "commit": "038ceb98c20e8262d4d2df4d24cc219af95a137f",
+        "refs": [
+          "v1.0.12",
+          "fa78f3e0aebd773460d4a6915424e8dee53ea05d"
+        ],
+        "sourceSha256": "002dc99a0b5c027e4efb94aaca32714e29c53111674fe1992a8c93e73be06bb0"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "deletable": true,
+        "customHeaders": [],
+        "customBody": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "deletable": false,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "c48f0451cc27c6746211d11d6f4637887b136ec6",
+        "refs": [
+          "v1.0.15",
+          "v1.0.16",
+          "38e0c223030f74fc102a06a8fa7d0150ac179d04"
+        ],
+        "sourceSha256": "f61ea0b44f3e74b046300405f2bdd39c8c165995369f32133669a4f4ac6a70b8"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "deletable": true,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "deletable": false,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "c47afe857331d1dc5c5604793647820db32ed71c",
+        "refs": [
+          "v1.1.0",
+          "v1.1.1",
+          "v1.1.2",
+          "2c069c23aaeee0476fa1d85bb258daee803db29d"
+        ],
+        "sourceSha256": "b943374b65f32a7e230c8980578e229efd7c98c5b486dade5b2c46246c770360"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "deletable": true,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "presetMessages": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "deletable": false,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "8146232e3ce84cf2491d396bf2f8dcf7132c560c",
+        "refs": [
+          "v1.1.3",
+          "v1.1.4-beta.1",
+          "v1.1.4-beta.2",
+          "v1.1.4-beta.3",
+          "v1.1.5",
+          "v1.1.6",
+          "v1.1.7",
+          "02e6ef2f3483b405fb472c8bfb4cfaedfff02ffe"
+        ],
+        "sourceSha256": "f7e7c519d209ba46b70c512900a9bbc9dc2d37f0386d078e56ccf53e2a5cbb33"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "deletable": true,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "deletable": false,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "74e4e69a4dbc62312eb506fe40f2832b169e8fb1",
+        "refs": [
+          "v1.1.8",
+          "v1.1.8-beta.1",
+          "f3c56d25cafe7a50be5b577a53fa201f9e6e9830"
+        ],
+        "sourceSha256": "ce769d92a2a0d0653b1a5ab70f8734342ce8a0670381d8b23f5528ca3b5f3307"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "deletable": true,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "deletable": false,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "f982e4364245129f67f11893375ca6ff4c0a8d2e",
+        "refs": [
+          "v1.1.9",
+          "v1.1.10",
+          "v1.1.11",
+          "v1.1.12",
+          "ada221eb060f0aebdbbbac7fc274c5cd5e080988"
+        ],
+        "sourceSha256": "af3cc1b18fcb83e496627227a25c630e78daedc4f8446bcabce21f4608fabf69"
+      },
+      {
+        "commit": "b270be9bbfe4bcc388c5a87a65f77332b1162362",
+        "refs": [
+          "b270be9bbfe4bcc388c5a87a65f77332b1162362"
+        ],
+        "sourceSha256": "5c3192417757722ecc8d0fb49ccdad5b3b6f39d83e25a554469645c1e93f1a83"
+      },
+      {
+        "commit": "458cceba42c233b2f40ce42640f9498457ff6460",
+        "refs": [
+          "458cceba42c233b2f40ce42640f9498457ff6460"
+        ],
+        "sourceSha256": "48dab16b0733e2ddfef83a4b6e2ccb0c365fad5ab85e2e7849847e9344804037"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "deletable": true,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "recentChatsSummaryMessageCount": 5,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "deletable": false,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "recentChatsSummaryMessageCount": 10,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "7acbdc3d70c649076edceeaa9570ec7c6fa893ac",
+        "refs": [
+          "v1.1.13",
+          "v1.1.15",
+          "c4e315ea364f2253c189e6f8d423a61042041e80"
+        ],
+        "sourceSha256": "368ab6ef2c94588603694ad3c1e3781d318dcec3e6cf767883ff8a54a4fabf8b"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "background": null,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "recentChatsSummaryMessageCount": 5,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "background": "#123456",
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "recentChatsSummaryMessageCount": 10,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "4e9026fb9ca9555bef3f924a2398440593b2b905",
+        "refs": [
+          "v1.1.16",
+          "v1.1.17",
+          "dbcf11ef5435fd64627fb2b4e010b8ae3604a26b"
+        ],
+        "sourceSha256": "82f3ae95ed7fedaa44b3cda779107ccb8404bfb263efceea50d9252c9c904c9b"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "background": null,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "recentChatsSummaryMessageCount": 5,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "background": "#123456",
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "recentChatsSummaryMessageCount": 10,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "5f63d6e2f7c247b598f6209c485eb717ed0df424",
+        "refs": [
+          "v1.2.0",
+          "v1.2.1",
+          "v1.2.2",
+          "59101ed1275cab7ebb8bc5288753b28ed470d610"
+        ],
+        "sourceSha256": "4d990f371507235824c647ad8027e4211cf7a588fa6bdb03c42acceb66a87b5c"
+      },
+      {
+        "commit": "cb2e8890758a1b92b3cc374563a2705ce4a96dad",
+        "refs": [
+          "v1.2.3",
+          "v1.2.4",
+          "d646171fc5625d38579b0b98f2685091e416992a"
+        ],
+        "sourceSha256": "0dbeb813f509e1aef17d21118635520f271268c2d38c6559171d17f5afed918a"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "background": null,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "background": "#123456",
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "6263eb7c61fcfaccab3c26f8a5b4b438f3e509a3",
+        "refs": [
+          "v1.2.5",
+          "57c37c4c5c8b559aed2ccb412946398b16626077"
+        ],
+        "sourceSha256": "083faad627f56e7ffaecf314c952aa881d89da977c148733c23ca6d83b7d0984"
+      },
+      {
+        "commit": "1137526eaaa0eb60690e25f8f76694e85215158c",
+        "refs": [
+          "v1.2.6"
+        ],
+        "sourceSha256": "1fca0aa8ba1154f4363543a274f9a720c66fec1f7eb8abbcdbe27d3ea0dc3792"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "healthDataTypeIds": [
+          "steps",
+          "active_energy",
+          "distance",
+          "sleep",
+          "heart_rate",
+          "workouts"
+        ],
+        "background": null,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "healthDataTypeIds": [
+          "steps",
+          "sleep"
+        ],
+        "background": "#123456",
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "4d4448a07d033dc78ca01b8f83acb1c967f74dfa",
+        "refs": [
+          "v1.2.7",
+          "25876c21a6cd3cca7d4b30c3bd402e519c25303f"
+        ],
+        "sourceSha256": "b2ed3076e3805347128d541432030096db3d470eb98d7f3f0be0ae7d062fbd03"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "defaultWorkspaceId": null,
+        "skillIds": null,
+        "healthDataTypeIds": [
+          "steps",
+          "active_energy",
+          "distance",
+          "sleep",
+          "heart_rate",
+          "workouts"
+        ],
+        "background": null,
+        "useGradientBackground": false,
+        "gradientBackgroundAnimated": true,
+        "gradientBackgroundPhase": 7.0,
+        "gradientBackgroundOffsetX": 0.0,
+        "gradientBackgroundOffsetY": 0.0,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "useIso8601TimeFormat": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "defaultWorkspaceId": "workspace-a",
+        "skillIds": [
+          "skill-a"
+        ],
+        "healthDataTypeIds": [
+          "steps",
+          "sleep"
+        ],
+        "background": "#123456",
+        "useGradientBackground": true,
+        "gradientBackgroundAnimated": false,
+        "gradientBackgroundPhase": 5.5,
+        "gradientBackgroundOffsetX": 0.3,
+        "gradientBackgroundOffsetY": -0.4,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "useIso8601TimeFormat": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "81acf0164de342d1fc3cad70b7ddc7c2447d07d1",
+        "refs": [
+          "v1.3.0",
+          "39aea982f45925b86843dd9e2f7ae2c04e361cea"
+        ],
+        "sourceSha256": "c7a8710bb27a41d9156562c0e019887a9743a0d6e5dec4d3f69969701baa5d25"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "allowConversationSystemPrompt": false,
+        "allowConversationPromptInjection": false,
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "defaultWorkspaceId": null,
+        "defaultWorkspaceSetup": "automatic",
+        "skillIds": null,
+        "healthDataTypeIds": [
+          "steps",
+          "active_energy",
+          "distance",
+          "sleep",
+          "heart_rate",
+          "workouts"
+        ],
+        "background": null,
+        "useGradientBackground": false,
+        "gradientBackgroundAnimated": true,
+        "gradientBackgroundPhase": 7.0,
+        "gradientBackgroundOffsetX": 0.0,
+        "gradientBackgroundOffsetY": 0.0,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "useIso8601TimeFormat": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "allowConversationSystemPrompt": true,
+        "allowConversationPromptInjection": true,
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "defaultWorkspaceId": "workspace-a",
+        "defaultWorkspaceSetup": "completed",
+        "skillIds": [
+          "skill-a"
+        ],
+        "healthDataTypeIds": [
+          "steps",
+          "sleep"
+        ],
+        "background": "#123456",
+        "useGradientBackground": true,
+        "gradientBackgroundAnimated": false,
+        "gradientBackgroundPhase": 5.5,
+        "gradientBackgroundOffsetX": 0.3,
+        "gradientBackgroundOffsetY": -0.4,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "useIso8601TimeFormat": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "8567cdebecbddc59c078ca9be492630de9de81c5",
+        "refs": [
+          "8567cdebecbddc59c078ca9be492630de9de81c5"
+        ],
+        "sourceSha256": "45f6205249ac0b2ce411f161924159c759522ec77fd1d6cb78c3fe0e14c155b0"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "reasoning": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "allowConversationSystemPrompt": false,
+        "allowConversationPromptInjection": false,
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "defaultWorkspaceId": null,
+        "defaultWorkspaceSetup": "automatic",
+        "skillIds": null,
+        "healthDataTypeIds": [
+          "steps",
+          "active_energy",
+          "distance",
+          "sleep",
+          "heart_rate",
+          "workouts"
+        ],
+        "background": null,
+        "useGradientBackground": false,
+        "gradientBackgroundAnimated": true,
+        "gradientBackgroundPhase": 7.0,
+        "gradientBackgroundOffsetX": 0.0,
+        "gradientBackgroundOffsetY": 0.0,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "useIso8601TimeFormat": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "reasoning": {
+          "level": "high",
+          "budgetTokens": 8192
+        },
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "allowConversationSystemPrompt": true,
+        "allowConversationPromptInjection": true,
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "defaultWorkspaceId": "workspace-a",
+        "defaultWorkspaceSetup": "completed",
+        "skillIds": [
+          "skill-a"
+        ],
+        "healthDataTypeIds": [
+          "steps",
+          "sleep"
+        ],
+        "background": "#123456",
+        "useGradientBackground": true,
+        "gradientBackgroundAnimated": false,
+        "gradientBackgroundPhase": 5.5,
+        "gradientBackgroundOffsetX": 0.3,
+        "gradientBackgroundOffsetY": -0.4,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "useIso8601TimeFormat": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "2d5f9f364ff2f958634844a176567e3ff4c22b36",
+        "refs": [
+          "2d5f9f364ff2f958634844a176567e3ff4c22b36"
+        ],
+        "sourceSha256": "f86b91896cf53113f0afa9b595a8dae9b61bedf8f4362a2b1c237b49b4d91fcd"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "reasoning": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "allowConversationSystemPrompt": false,
+        "allowConversationPromptInjection": false,
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "defaultWorkspaceId": null,
+        "skillIds": null,
+        "healthDataTypeIds": [
+          "steps",
+          "active_energy",
+          "distance",
+          "sleep",
+          "heart_rate",
+          "workouts"
+        ],
+        "background": null,
+        "useGradientBackground": false,
+        "gradientBackgroundAnimated": true,
+        "gradientBackgroundPhase": 7.0,
+        "gradientBackgroundOffsetX": 0.0,
+        "gradientBackgroundOffsetY": 0.0,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "useIso8601TimeFormat": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "reasoning": {
+          "level": "high",
+          "budgetTokens": 8192
+        },
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "allowConversationSystemPrompt": true,
+        "allowConversationPromptInjection": true,
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "defaultWorkspaceId": "workspace-a",
+        "skillIds": [
+          "skill-a"
+        ],
+        "healthDataTypeIds": [
+          "steps",
+          "sleep"
+        ],
+        "background": "#123456",
+        "useGradientBackground": true,
+        "gradientBackgroundAnimated": false,
+        "gradientBackgroundPhase": 5.5,
+        "gradientBackgroundOffsetX": 0.3,
+        "gradientBackgroundOffsetY": -0.4,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "useIso8601TimeFormat": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "77ce3ef436782bc230e1b3ddf095d979853562fa",
+        "refs": [
+          "77ce3ef436782bc230e1b3ddf095d979853562fa"
+        ],
+        "sourceSha256": "ec5bd0cfcef1e1bc1ae0e4c3af1b49a3907be832a1be08e4338d1c2fc8e53753"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "allowConversationSystemPrompt": false,
+        "allowConversationPromptInjection": false,
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "defaultWorkspaceId": null,
+        "skillIds": null,
+        "healthDataTypeIds": [
+          "steps",
+          "active_energy",
+          "distance",
+          "sleep",
+          "heart_rate",
+          "workouts"
+        ],
+        "background": null,
+        "useGradientBackground": false,
+        "gradientBackgroundAnimated": true,
+        "gradientBackgroundPhase": 7.0,
+        "gradientBackgroundOffsetX": 0.0,
+        "gradientBackgroundOffsetY": 0.0,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "useIso8601TimeFormat": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "allowConversationSystemPrompt": true,
+        "allowConversationPromptInjection": true,
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "defaultWorkspaceId": "workspace-a",
+        "skillIds": [
+          "skill-a"
+        ],
+        "healthDataTypeIds": [
+          "steps",
+          "sleep"
+        ],
+        "background": "#123456",
+        "useGradientBackground": true,
+        "gradientBackgroundAnimated": false,
+        "gradientBackgroundPhase": 5.5,
+        "gradientBackgroundOffsetX": 0.3,
+        "gradientBackgroundOffsetY": -0.4,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "useIso8601TimeFormat": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "fe8cb76027d36f28e5fadc3a8276b40e76a652e9",
+        "refs": [
+          "fe8cb76027d36f28e5fadc3a8276b40e76a652e9"
+        ],
+        "sourceSha256": "788f5185438d80a4caf6ef7f25591edb5e63e21f5a803c81f6a77c7359c47005"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "defaultWorkspaceId": null,
+        "skillIds": null,
+        "healthDataTypeIds": [
+          "steps",
+          "active_energy",
+          "distance",
+          "sleep",
+          "heart_rate",
+          "workouts"
+        ],
+        "background": null,
+        "useGradientBackground": false,
+        "gradientBackgroundAnimated": true,
+        "gradientBackgroundPhase": 7.0,
+        "gradientBackgroundOffsetX": 0.0,
+        "gradientBackgroundOffsetY": 0.0,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "defaultWorkspaceId": "workspace-a",
+        "skillIds": [
+          "skill-a"
+        ],
+        "healthDataTypeIds": [
+          "steps",
+          "sleep"
+        ],
+        "background": "#123456",
+        "useGradientBackground": true,
+        "gradientBackgroundAnimated": false,
+        "gradientBackgroundPhase": 5.5,
+        "gradientBackgroundOffsetX": 0.3,
+        "gradientBackgroundOffsetY": -0.4,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "44c84e0e6aa848c808dc3e9b8dc2c81b97c0c945",
+        "refs": [
+          "44c84e0e6aa848c808dc3e9b8dc2c81b97c0c945"
+        ],
+        "sourceSha256": "2ff03f5ab38d67eb30d67f63bfb5c26f12919cc1608171246191b5fbdf0fd3b5"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "healthDataTypeIds": [
+          "steps",
+          "active_energy",
+          "distance",
+          "sleep",
+          "heart_rate",
+          "workouts"
+        ],
+        "background": null,
+        "useGradientBackground": false,
+        "gradientBackgroundAnimated": true,
+        "gradientBackgroundPhase": 7.0,
+        "gradientBackgroundOffsetX": 0.0,
+        "gradientBackgroundOffsetY": 0.0,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "autoOrganizeMemory": false,
+        "memoryOrganizeEveryNTurns": 1,
+        "memorySmartAddMode": "batched",
+        "memoryWriteScope": "alwaysGlobal",
+        "allowPastConversationRecall": false,
+        "generateConversationSummary": false,
+        "recentChatsSummaryMessageCount": 5,
+        "appendCurrentTimeToUserMessage": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "healthDataTypeIds": [
+          "steps",
+          "sleep"
+        ],
+        "background": "#123456",
+        "useGradientBackground": true,
+        "gradientBackgroundAnimated": false,
+        "gradientBackgroundPhase": 5.5,
+        "gradientBackgroundOffsetX": 0.3,
+        "gradientBackgroundOffsetY": -0.4,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "autoOrganizeMemory": true,
+        "memoryOrganizeEveryNTurns": 3,
+        "memorySmartAddMode": "perItem",
+        "memoryWriteScope": "alwaysAssistant",
+        "allowPastConversationRecall": true,
+        "generateConversationSummary": true,
+        "recentChatsSummaryMessageCount": 10,
+        "appendCurrentTimeToUserMessage": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "5d42e6927f6d8638f36a7b9c62f8df7851b34560",
+        "refs": [
+          "5d42e6927f6d8638f36a7b9c62f8df7851b34560"
+        ],
+        "sourceSha256": "42e1907db4f24ba8ca5add053837011c97a484939e20a09fe46bcb204a379562"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": false,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "searchEnabled": false,
+        "mcpServerIds": [],
+        "localToolIds": [],
+        "background": null,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "recentChatsSummaryMessageCount": 5,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "searchEnabled": true,
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "localToolIds": [
+          "terminal_exec"
+        ],
+        "background": "#123456",
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "recentChatsSummaryMessageCount": 10,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "1ea61371650599e6e5a77550f3dc417f786c3fc1",
+        "refs": [
+          "1ea61371650599e6e5a77550f3dc417f786c3fc1"
+        ],
+        "sourceSha256": "a8259f871e9d49291cecf8144e4686efc7d739ff6c1a70027e861a366010c539"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "recentChatsSummaryMessageCount": 5,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "recentChatsSummaryMessageCount": 10,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "writers": [
+      {
+        "commit": "dd2fc185c826142eaa9f2a0cc57ab0007184c2f0",
+        "refs": [
+          "dd2fc185c826142eaa9f2a0cc57ab0007184c2f0"
+        ],
+        "sourceSha256": "2ea1eac6ea42b8e40bd12fcd25f0457658ec76950ec3b7905b8e40bbd6a7852e"
+      }
+    ],
+    "assistants": [
+      {
+        "id": "old-default",
+        "name": "默认助手",
+        "avatar": null,
+        "useAssistantAvatar": false,
+        "useAssistantName": false,
+        "chatModelProvider": null,
+        "chatModelId": null,
+        "temperature": null,
+        "topP": null,
+        "contextMessageSize": 64,
+        "limitContextMessages": true,
+        "streamOutput": true,
+        "thinkingBudget": null,
+        "maxTokens": null,
+        "systemPrompt": "",
+        "messageTemplate": "{{ message }}",
+        "mcpServerIds": [],
+        "background": null,
+        "deletable": true,
+        "customHeaders": [],
+        "customBody": [],
+        "enableMemory": false,
+        "enableRecentChatsReference": false,
+        "presetMessages": [],
+        "regexRules": []
+      },
+      {
+        "id": "old-configured",
+        "name": "自定义助手 🧪",
+        "avatar": "https://example.com/avatar.png",
+        "useAssistantAvatar": true,
+        "useAssistantName": true,
+        "chatModelProvider": "provider-a",
+        "chatModelId": "model-a",
+        "temperature": 0.75,
+        "topP": 0.9,
+        "contextMessageSize": 1024,
+        "limitContextMessages": true,
+        "streamOutput": false,
+        "thinkingBudget": 8192,
+        "maxTokens": 8192,
+        "systemPrompt": "测试系统提示词",
+        "messageTemplate": "{{ message }}\n{{ model_name }}",
+        "mcpServerIds": [
+          "mcp-a"
+        ],
+        "background": "#123456",
+        "deletable": false,
+        "customHeaders": [
+          {
+            "name": "X-Test",
+            "value": "a"
+          }
+        ],
+        "customBody": [
+          {
+            "key": "test",
+            "value": "{\"a\":1}"
+          }
+        ],
+        "enableMemory": true,
+        "enableRecentChatsReference": true,
+        "presetMessages": [
+          {
+            "id": "preset-a",
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "id": "preset-b",
+            "role": "assistant",
+            "content": "你好"
+          }
+        ],
+        "regexRules": [
+          {
+            "id": "regex-a",
+            "name": "test",
+            "pattern": "a",
+            "replacement": "b",
+            "scopes": [
+              "user",
+              "assistant"
+            ],
+            "visualOnly": false,
+            "replaceOnly": true,
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -18,6 +18,50 @@ void main() {
   HttpOverrides.global = null;
 
   test(
+    'server-declared icons follow the current initialized configuration',
+    () async {
+      final server = await _MockMcpServer.start();
+      server.icons = [
+        for (var i = 0; i < 18; i++)
+          {'src': '${server.url}/icon-$i.svg', 'theme': 'light'},
+      ];
+      final harness = await BusinessTestHarness.create();
+      final provider = McpProvider(preferences: harness.preferences);
+      try {
+        await provider.loaded;
+        final id = await provider.addServer(
+          enabled: true,
+          name: 'Icons',
+          transport: McpTransportType.http,
+          url: server.url,
+        );
+        await _waitUntil(() => provider.statusFor(id) == McpStatus.connected);
+        expect(provider.declaredIconsFor(id), hasLength(16));
+        expect(
+          provider.declaredIconsFor(id).first['src'],
+          '${server.url}/icon-0.svg',
+        );
+        await provider.updateServerMetadata(
+          provider.getById(id)!.copyWith(enabled: false),
+        );
+        await provider.replaceAllFromJson(provider.exportServersAsUiJson());
+        expect(provider.declaredIconsFor(id), isEmpty);
+        await provider.updateServerMetadata(
+          provider.getById(id)!.copyWith(enabled: true),
+        );
+        await _waitUntil(() => provider.statusFor(id) == McpStatus.connected);
+        expect(provider.declaredIconsFor(id), hasLength(16));
+        await provider.removeServer(id);
+        expect(provider.declaredIconsFor(id), isEmpty);
+      } finally {
+        provider.dispose();
+        await harness.close();
+        await server.close();
+      }
+    },
+  );
+
+  test(
     '401 exposes authorization immediately while OAuth discovery continues',
     () async {
       const resourceMetadata = 'https://metadata.example.test/resource';
@@ -1544,6 +1588,7 @@ final class _FakeOAuthCallback implements OAuthCallback {
 }
 
 class _MockMcpServer {
+  List<Map<String, dynamic>> icons = [];
   final HttpServer _server;
   final bool failInitialize;
   final bool failFirstInitialize;
@@ -1738,7 +1783,11 @@ class _MockMcpServer {
       'id': message['id'],
       'result': {
         'protocolVersion': mcp.McpProtocol.defaultVersion,
-        'serverInfo': {'name': 'Mock', 'version': '1.0.0'},
+        'serverInfo': {
+          'name': 'Mock',
+          'version': '1.0.0',
+          if (icons.isNotEmpty) 'icons': icons,
+        },
         'capabilities': supportsTools
             ? {'tools': <String, dynamic>{}}
             : {'resources': <String, dynamic>{}},

@@ -3,7 +3,10 @@ import 'package:uuid/uuid.dart';
 
 import '../../utils/utf16_safe_cut.dart';
 import 'message_part.dart';
+import 'message_part_snapshot.dart';
 import 'token_usage.dart';
+import 'quote_ref.dart';
+import '../database/generation_run.dart';
 
 part 'chat_message.g.dart';
 
@@ -20,13 +23,35 @@ class ChatMessage extends HiveObject {
   /// Hive field 2 (legacy content string) is intentionally not a stored field
   /// here. [ChatMessageAdapter] still reads field 2 for migration only;
   /// [content] is derived from [TextPart]s.
-  final List<MessagePart> parts;
+  final List<MessagePart> _parts;
+  List<MessagePart>? _storageParts;
+  List<MessagePart> get parts => _storageParts ?? _parts;
+
+  /// Canonical ordered storage parts may add reasoning/tool overlays, never
+  /// rewrite the body. Prepare before commit; invoke the assignment afterwards.
+  /// Existing copied/notifier snapshots remain snapshots of their own parts.
+  void Function() prepareStorageParts(List<MessagePart> value) {
+    final frozen = List<MessagePart>.unmodifiable(value);
+    if (frozen.whereType<TextPart>().map((part) => part.text).join() !=
+        content) {
+      throw StateError('Storage parts changed the message body');
+    }
+    return () => _storageParts = frozen;
+  }
 
   // SQLite order metadata for sorting a bounded cache without loading every
   // message id. Not serialized: message_rows remains the ordering authority.
   int? _storageOrder;
   int? get storageOrder => _storageOrder;
   void hydrateStorageOrder(int? order) => _storageOrder = order;
+
+  /// Projection of the authoritative generation run, not another persisted
+  /// status field. A non-streaming revision can be cancelled or interrupted;
+  /// absence of a run does not prove successful completion.
+  GenerationRunState? _generationState;
+  GenerationRunState? get generationState => _generationState;
+  void hydrateGenerationState(GenerationRunState? state) =>
+      _generationState = state;
 
   // Hydrated request metadata belongs to this message snapshot. It is not a
   // second persisted representation: provider_artifact_rows owns storage.
@@ -50,6 +75,10 @@ class ChatMessage extends HiveObject {
       .join();
 
   String get content => _content;
+
+  final List<QuoteRef> quotes;
+  String quotedContent(String Function(int) quoteMarker) =>
+      formatQuotedMessage(content, quotes, quoteMarker: quoteMarker);
 
   @HiveField(3)
   final DateTime timestamp;
@@ -107,8 +136,12 @@ class ChatMessage extends HiveObject {
   @HiveField(19)
   final int? durationMs;
 
-  /// Request start to first streamed output, including reasoning or tool input.
-  /// Null when first-token timing was not observed (for example, non-streaming).
+  /// Request start to the first reasoning-start event or non-empty output.
+  /// Measures client-observed response activity, not a hidden reasoning token.
+  final int? firstResponseMs;
+
+  /// Request start to first non-empty streamed output, including a public
+  /// reasoning summary or tool input. Null when no output timing was observed.
   final int? firstTokenMs;
 
   @HiveField(20)
@@ -134,6 +167,7 @@ class ChatMessage extends HiveObject {
     required this.role,
     String? content,
     List<MessagePart>? parts,
+    List<QuoteRef> quotes = const [],
     DateTime? timestamp,
     this.modelId,
     this.providerId,
@@ -151,13 +185,17 @@ class ChatMessage extends HiveObject {
     this.completionTokens,
     this.cachedTokens,
     this.durationMs,
+    this.firstResponseMs,
     this.firstTokenMs,
     this.reasoningTokens,
     this.cacheWriteTokens,
     this.finishUsage,
-  }) : parts = List<MessagePart>.unmodifiable(
-         parts ?? <MessagePart>[TextPart(content ?? '')],
-       ),
+  }) : quotes = List.unmodifiable(quotes),
+       _parts = parts is MessagePartSnapshot
+           ? parts
+           : MessagePartSnapshotBuilder().update(
+               parts ?? <MessagePart>[TextPart(content ?? '')],
+             ),
        id = id ?? const Uuid().v4(),
        timestamp = timestamp ?? DateTime.now(),
        groupId = groupId ?? id,
@@ -290,6 +328,7 @@ class ChatMessage extends HiveObject {
     String? role,
     String? content,
     List<MessagePart>? parts,
+    List<QuoteRef>? quotes,
     DateTime? timestamp,
     String? modelId,
     String? providerId,
@@ -307,6 +346,7 @@ class ChatMessage extends HiveObject {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? firstResponseMs,
     int? firstTokenMs,
     int? reasoningTokens,
     int? cacheWriteTokens,
@@ -324,6 +364,7 @@ class ChatMessage extends HiveObject {
         id: id ?? this.id,
         role: role ?? this.role,
         parts: nextParts,
+        quotes: quotes ?? this.quotes,
         timestamp: timestamp ?? this.timestamp,
         modelId: modelId ?? this.modelId,
         providerId: providerId ?? this.providerId,
@@ -342,12 +383,18 @@ class ChatMessage extends HiveObject {
         completionTokens: completionTokens ?? this.completionTokens,
         cachedTokens: cachedTokens ?? this.cachedTokens,
         durationMs: durationMs ?? this.durationMs,
+        firstResponseMs: firstResponseMs ?? this.firstResponseMs,
         firstTokenMs: firstTokenMs ?? this.firstTokenMs,
         reasoningTokens: reasoningTokens ?? this.reasoningTokens,
         cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
         finishUsage: finishUsage ?? this.finishUsage,
       )
       .._storageOrder = (id == null || id == this.id) ? _storageOrder : null
+      .._generationState = (id == null || id == this.id)
+          ? isStreaming == true
+                ? GenerationRunState.streaming
+                : _generationState
+          : null
       .._providerArtifactSnapshot = (id == null || id == this.id)
           ? _providerArtifactSnapshot
           : null;
@@ -359,6 +406,7 @@ class ChatMessage extends HiveObject {
       'role': role,
       // Derived text for older readers; structured attachments live in [parts].
       'content': content,
+      'quotes': quotes.map((quote) => quote.toJson()).toList(),
       'parts': [
         for (final part in parts)
           {'kind': part.kind, 'payload': part.encodePayload()},
@@ -380,6 +428,7 @@ class ChatMessage extends HiveObject {
       'completionTokens': completionTokens,
       'cachedTokens': cachedTokens,
       'durationMs': durationMs,
+      'firstResponseMs': firstResponseMs,
       'firstTokenMs': firstTokenMs,
       'reasoningTokens': reasoningTokens,
       'cacheWriteTokens': cacheWriteTokens,
@@ -416,6 +465,7 @@ class ChatMessage extends HiveObject {
       // decodeLegacyContent to promote markers into parts.
       content: parts == null ? json['content'] as String : null,
       parts: parts,
+      quotes: QuoteRef.decodeList(json['quotes']),
       timestamp: DateTime.parse(json['timestamp'] as String),
       modelId: json['modelId'] as String?,
       providerId: json['providerId'] as String?,
@@ -438,6 +488,7 @@ class ChatMessage extends HiveObject {
       cachedTokens: json['cachedTokens'] as int?,
       durationMs: json['durationMs'] as int?,
       firstTokenMs: json['firstTokenMs'] as int?,
+      firstResponseMs: json['firstResponseMs'] as int?,
       reasoningTokens: json['reasoningTokens'] as int?,
       cacheWriteTokens: json['cacheWriteTokens'] as int?,
       finishUsage: json['finishUsage'] is Map

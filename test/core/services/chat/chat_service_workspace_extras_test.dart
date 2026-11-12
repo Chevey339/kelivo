@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -121,8 +122,11 @@ void main() {
         workspaceId: 'ws-source',
         cwd: 'lib',
         toolsUsed: true,
-        allowAll: true,
       ).applyTo({}),
+    );
+    await service.updateConversationExtras(
+      source.id,
+      ToolPermissionMode.fullAccess.applyTo,
     );
     final message = await service.addMessage(
       conversationId: source.id,
@@ -138,7 +142,10 @@ void main() {
     final binding = WorkspaceBinding.fromExtras(fork.extras);
     expect(binding.workspaceId, 'ws-source');
     expect(binding.cwd, 'lib');
-    expect(binding.allowAll, isTrue);
+    expect(
+      ToolPermissionMode.fromExtras(fork.extras),
+      ToolPermissionMode.requestApproval,
+    );
     expect(binding.toolsUsed, isFalse);
   });
 
@@ -149,6 +156,10 @@ void main() {
     await service.init();
     final draft = await service.createDraftConversation(title: 'Draft');
     expect(WorkspaceBinding.fromExtras(draft.extras).workspaceId, 'ws-keep');
+    await service.updateConversationExtras(
+      draft.id,
+      ToolPermissionMode.fullAccess.applyTo,
+    );
     await service.addMessage(
       conversationId: draft.id,
       role: 'user',
@@ -159,5 +170,9 @@ void main() {
     final binding = WorkspaceBinding.fromExtras(persisted!.extras);
     expect(binding.workspaceId, 'ws-keep');
     expect(binding.cwd, 'notes');
+    expect(
+      ToolPermissionMode.fromExtras(persisted.extras),
+      ToolPermissionMode.fullAccess,
+    );
   });
 }

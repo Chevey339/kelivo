@@ -161,34 +161,32 @@ void main() {
       expect(WorkspacePaths.isWritableZone(outside.zone), isFalse);
     });
 
-    test('rejects .. that escapes every zone', () {
-      final climb = List<String>.filled(24, '..').join('/');
+    test('normalizes native outside traversal for the authorization layer', () {
+      final climb = List.filled(
+        p.split(workspace.path).length + 2,
+        '..',
+      ).join('/');
       expect(
-        () => paths.resolve('$climb/etc/passwd', cwd: workspace.path),
-        throwsA(isA<PathResolutionException>()),
+        paths.resolve('$climb/etc', cwd: workspace.path).zone,
+        WorkspaceZone.outside,
       );
     });
 
-    test('normalizeCwd falls back when the path leaves the zones', () {
+    test('normalizeCwd keeps native external paths for authorization', () {
       expect(paths.normalizeCwd(null), p.canonicalize(workspace.path));
       expect(
         paths.normalizeCwd(p.join(session.path, 'out')),
         p.canonicalize(p.join(session.path, 'out')),
       );
       final climb = List<String>.filled(24, '..').join('/');
-      expect(paths.normalizeCwd('$climb/etc'), p.canonicalize(workspace.path));
+      expect(paths.normalizeCwd('$climb/etc'), p.canonicalize('/etc'));
     });
 
-    test('rejects .. that leaves workspace even when landing in tmp', () {
-      expect(paths.tmpHostRoot, p.canonicalize(Directory.systemTemp.path));
+    test('system temp is outside the conversation temporary zone', () {
+      expect(paths.tmpHostRoot, p.join(session.path, 'tmp'));
       expect(
-        p.isWithin(paths.tmpHostRoot, paths.workspaceHostRoot) ||
-            p.equals(paths.tmpHostRoot, paths.workspaceHostRoot),
-        isTrue,
-      );
-      expect(
-        () => paths.resolve('../x.txt', cwd: workspace.path),
-        throwsA(isA<PathResolutionException>()),
+        paths.resolve('../x.txt', cwd: workspace.path).zone,
+        WorkspaceZone.outside,
       );
     });
 
@@ -202,7 +200,7 @@ void main() {
     });
 
     test('absolute tmp-zone path without .. resolves to tmp', () {
-      final tmpFile = p.join(tmp.path, 'scratch.txt');
+      final tmpFile = p.join(paths.tmpHostRoot, 'scratch.txt');
       final resolved = paths.resolve(tmpFile, cwd: workspace.path);
       expect(resolved.zone, WorkspaceZone.tmp);
       expect(resolved.hostPath, p.canonicalize(tmpFile));

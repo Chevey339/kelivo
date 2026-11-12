@@ -1,4 +1,8 @@
 {
+  "avatarInputInvalid": "请输入有效的图标名称或 HTTP(S) 图片链接。",
+  "modelAvatarTitle": "模型图标",
+  "avatarColor": "彩色",
+  "avatarMonochrome": "单色",
   "settingsSearchHint": "搜索设置",
   "settingsSearchCancel": "取消",
   "settingsSearchClear": "清空搜索",
@@ -34,7 +38,7 @@
   "settingsPageCalculating": "统计中…",
   "storageSpacePageTitle": "存储空间",
   "storageSpaceRefreshTooltip": "刷新",
-  "storageSpaceLoadFailed": "加载失败",
+  "storageSpaceLoadFailed": "无法加载文件或检查图片使用情况，请刷新后重试。",
   "storageSpaceTotalLabel": "已用空间",
   "storageSpaceClearableLabel": "可清理：{size}",
   "storageSpaceClearableHint": "共发现可清理空间 {size}",
@@ -55,7 +59,6 @@
   "storageSpaceClearDisplacedDatabasesButton": "删除保留的旧数据库",
   "storageSpaceClearRestoreTracesConfirmMessage": "确定清理已完成恢复留下的旧数据快照吗？当前数据库、设置和文件不会受到影响。",
   "storageSpaceSubCompletedRestoreRuns": "已完成的恢复快照",
-  "storageSpaceCategoryAssistantData": "助手",
   "storageSpaceCategoryCache": "缓存",
   "storageSpaceCategoryLogs": "日志",
   "storageSpaceCategoryOther": "其他",
@@ -69,8 +72,6 @@
   "storageSpaceSubChatDatabase": "聊天数据库",
   "storageSpaceSubChatWriteAheadLog": "写入日志",
   "storageSpaceSubChatSharedMemory": "共享内存索引",
-  "storageSpaceSubAssistantAvatars": "头像",
-  "storageSpaceSubAssistantImages": "图片",
   "storageSpaceSubCacheAvatars": "头像缓存",
   "storageSpaceSubCacheOther": "其他缓存",
   "storageSpaceSubCacheSystem": "系统缓存",
@@ -100,10 +101,6 @@
   "storageSpaceClearSelection": "清空选择",
   "storageSpaceSelectedCount": "已选 {count} 项",
   "storageSpaceUploadsCount": "共 {count} 项",
-  "storageSpaceSourceLabel": "来源",
-  "storageSpaceSourceAll": "全部",
-  "storageSpaceSourceUserUpload": "用户上传",
-  "storageSpaceSourceAssistant": "助手发出",
   "storageSpaceSortLabel": "排序",
   "storageSpaceSortNewest": "最新",
   "storageSpaceSortOldest": "最旧",
@@ -181,8 +178,8 @@
   "assistantEditPageBasicTab": "基础设置",
   "assistantEditPagePromptsTab": "提示词",
   "assistantEditPageMcpTab": "MCP",
-  "assistantEditPageCustomTab": "自定义请求",
   "assistantEditPageQuickPhraseTab": "快捷短语",
+  "assistantEditPageCustomTab": "自定义请求",
   "assistantEditPageRegexTab": "正则替换",
   "assistantEditPageLocalToolsTab": "本地工具",
   "assistantEditTabLayoutTooltip": "自定义标签页",
@@ -311,7 +308,6 @@
   "providersPageExportAction": "导出",
   "assistantEditGalleryErrorMessage": "无法打开相册，试试输入图片链接",
   "assistantEditGeneralErrorMessage": "发生错误，试试输入图片链接",
-  "assistantEditSystemPromptTitle": "系统提示词",
   "providerDetailPageMultiKeyModeTitle": "多Key模式",
   "providerDetailPageManageKeysButton": "多Key管理",
   "multiKeyPageTitle": "多Key管理",
@@ -350,6 +346,7 @@
   "multiKeyPageCancel": "取消",
   "multiKeyPageSave": "保存",
   "multiKeyPageDelete": "删除",
+  "assistantEditSystemPromptTitle": "系统提示词",
   "assistantEditSystemPromptHint": "输入系统提示词…",
   "assistantEditSystemPromptImportButton": "从文件导入",
   "assistantEditSystemPromptImportSuccess": "已从文件更新系统提示词",
@@ -369,7 +366,7 @@
   "assistantEditVariableNickname": "用户昵称",
   "assistantEditVariableAssistantName": "助手名称",
   "assistantEditMessageTemplateTitle": "聊天内容模板",
-  "assistantEditVariableRole": "角色",
+  "assistantEditVariableRole": "助手",
   "assistantEditVariableMessage": "内容",
   "assistantEditPreviewTitle": "预览",
   "assistantEditPromptTimeVarWarning": "在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。",
@@ -429,17 +426,33 @@
   "assistantSettingsCopyButton": "复制",
   "assistantSettingsCopySuccess": "已复制助手",
   "assistantSettingsCopySuffix": "副本",
+  "assistantCopyTitle": "复制助手",
+  "assistantCopyDefaultHint": "选择复制范围，或直接全量复制。",
+  "assistantCopyConfiguration": "助手配置",
+  "assistantCopyConfigurationHint": "始终复制名称、头像、提示词、模型、参数及预设消息等配置。",
+  "assistantCopyMemories": "助手专属记忆",
+  "assistantCopyMemoriesHint": "包含新旧两套专属记忆，保留归档状态；全局记忆继续共享。",
+  "assistantCopyChooseMemories": "选择记忆条目",
+  "assistantCopyChooseEntries": "选择条目",
+  "assistantCopyPhrasesHint": "复制此助手专属的快捷短语；全局短语继续共享。",
+  "assistantCopyBindingsHint": "以下仅复制绑定，不另建资源或复制工作区文件。世界书、指令注入未勾选时沿用全局默认。",
+  "assistantCopyWorldBooks": "世界书绑定",
+  "assistantCopySkills": "技能选择",
+  "assistantCopyTools": "工具与搜索设置",
+  "assistantCopyWorkspace": "默认工作区绑定",
+  "assistantCopyAll": "全量复制",
+  "assistantCopyInProgress": "正在复制…",
+  "assistantCopyFailed": "复制失败，原数据未改变，请重试。",
+  "assistantCopyMemoryLoadFailed": "无法加载记忆，请重试。",
+  "assistantCopyRetry": "重试",
+  "assistantCopyNoMemories": "此助手没有可复制的专属记忆。",
+  "assistantCopySelectAll": "全选记忆",
   "assistantSettingsDeleteButton": "删除",
   "assistantSettingsEditButton": "编辑",
   "assistantSettingsAddSheetTitle": "助手名称",
   "assistantSettingsAddSheetHint": "输入助手名称",
   "assistantSettingsAddSheetCancel": "取消",
   "assistantSettingsAddSheetSave": "保存",
-  "assistantSettingsDeleteDialogTitle": "删除助手",
-  "assistantSettingsDeleteDialogContent": "确定要删除该助手吗？此操作不可撤销。",
-  "assistantSettingsDeleteDialogCancel": "取消",
-  "assistantSettingsDeleteDialogConfirm": "删除",
-  "assistantSettingsAtLeastOneAssistantRequired": "至少需要保留一个助手",
   "desktopAssistantsListTitle": "助手列表",
   "desktopSidebarTabAssistants": "助手",
   "desktopSidebarTabTopics": "话题",
@@ -456,42 +469,13 @@
   "hotkeysResetDefault": "重置为默认",
   "hotkeysClearShortcut": "清除快捷键",
   "hotkeysResetAll": "重置所有快捷键为默认",
-  "assistantTagsManageTitle": "管理标签",
-  "assistantTagsCreateButton": "创建",
-  "assistantTagsCreateDialogTitle": "创建标签",
-  "assistantTagsCreateDialogOk": "创建",
-  "assistantTagsCreateDialogCancel": "取消",
-  "assistantTagsNameHint": "标签名称",
-  "assistantTagsRenameButton": "重命名",
-  "assistantTagsRenameDialogTitle": "重命名标签",
-  "assistantTagsRenameDialogOk": "重命名",
-  "assistantTagsDeleteButton": "删除",
-  "assistantTagsDeleteConfirmTitle": "删除标签",
-  "assistantTagsDeleteConfirmContent": "确定要删除该标签吗？",
-  "assistantTagsDeleteConfirmOk": "删除",
-  "assistantTagsDeleteConfirmCancel": "取消",
-  "assistantTagsContextMenuEditAssistant": "编辑助手",
-  "assistantTagsContextMenuManageTags": "管理标签",
-  "mcpTransportOptionStdio": "STDIO",
-  "mcpTransportTagStdio": "STDIO",
-  "mcpTransportTagInmemory": "内置",
-  "mcpTransportTagSse": "SSE",
-  "mcpTransportTagHttp": "HTTP",
-  "mcpServerEditSheetStdioCommandLabel": "命令",
-  "mcpServerEditSheetStdioArgumentsLabel": "参数",
-  "mcpServerEditSheetStdioWorkingDirectoryLabel": "工作目录（可选）",
-  "mcpWorkspaceBindingLabel": "绑定工作区（可选）",
-  "mcpWorkspaceBindingHint": "服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。",
-  "mcpWorkspaceBindingMobileOnly": "工作区绑定适用于移动端 Linux 环境。在桌面端运行此服务器前，请先解除绑定。",
-  "mcpServerEditSheetStdioEnvironmentTitle": "环境变量",
-  "mcpServerEditSheetStdioEnvNameLabel": "名称",
-  "mcpServerEditSheetStdioEnvValueLabel": "值",
-  "mcpServerEditSheetStdioAddEnv": "添加环境变量",
-  "mcpServerEditSheetStdioCommandRequired": "STDIO 需要填写命令",
-  "assistantTagsContextMenuDeleteAssistant": "删除助手",
-  "assistantTagsClearTag": "清除标签",
   "assistantEditTemperatureTitle": "温度",
   "assistantEditTopPTitle": "Top-p",
+  "assistantSettingsDeleteDialogTitle": "删除助手",
+  "assistantSettingsDeleteDialogContent": "确定要删除该助手吗？此操作不可撤销。",
+  "assistantSettingsDeleteDialogCancel": "取消",
+  "assistantSettingsDeleteDialogConfirm": "删除",
+  "assistantSettingsAtLeastOneAssistantRequired": "至少需要保留一个助手",
   "assistantProviderDefaultAssistantName": "默认助手",
   "assistantProviderSampleAssistantName": "示例助手",
   "assistantProviderNewAssistantName": "新助手",
@@ -518,18 +502,13 @@
       }
     }
   },
-  "imagePreviewSheetSaveImage": "保存图片",
-  "imagePreviewSheetSaveSuccess": "已保存到相册",
-  "imagePreviewSheetSaveFailed": "保存失败: {error}",
-  "@imagePreviewSheetSaveFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "chatServiceDefaultConversationTitle": "新对话",
   "userProviderDefaultUserName": "用户",
+  "assistantConversationMcpTitle": "允许对话自定义 MCP",
+  "assistantConversationMcpHint": "开启后，对话可单独选择 MCP 服务器；未自定义时跟随助手设置。",
+  "mcpSelectionInherited": "跟随助手",
+  "mcpSelectionCustom": "本对话自定义",
+  "mcpInheritAssistant": "跟随助手设置",
   "mcpAssistantSheetTitle": "MCP服务器",
   "mcpAssistantSheetSubtitle": "为该助手启用的服务",
   "mcpAssistantSheetSelectAll": "全选",
@@ -542,7 +521,10 @@
   "backupPagePassword": "密码",
   "backupPagePath": "路径",
   "backupPageChatsLabel": "聊天记录",
-  "backupPageFilesLabel": "文件",
+  "backupPageFilesDescription": "聊天附件、头像、背景图和自定义字体。恢复头像或背景图时，还需选中对应的助手、服务商或设置。",
+  "backupPageChooseBackupFolder": "选择备份保存文件夹",
+  "backupPageChooseExternalFolder": "请选择 iCloud 云盘或“我的 iPhone > Kelivo”之外的文件夹。Kelivo 文件夹会随 App 卸载而删除，本次备份尚未保存。",
+  "backupPageFilesLabel": "文件与图片",
   "backupPageScopeTitle": "备份与导入内容",
   "backupPageScopeSelectedCount": "{selected}/{total}",
   "@backupPageScopeSelectedCount": {
@@ -584,6 +566,9 @@
   "restartAppFailedMessage": "Kelivo 无法自动重启，请完全关闭后重新打开。",
   "backupRestoreRolledBackTitle": "恢复已回滚",
   "backupRestoreRolledBackContent": "恢复未能完成。Kelivo 已验证并保留原有数据。",
+  "backupRestoreDirectoryBlockedTitle": "还原正在等待目录释放",
+  "backupRestoreDirectoryBlockedContent": "Windows 无法移动下方目录。请关闭正在使用该目录的终端、编辑器或其他程序，然后继续还原。如果仍然受阻，请检查当前账户是否有移动该目录的权限。此前的还原进度已保留。",
+  "backupRestoreContinueButton": "继续还原",
   "backupRestoreFailureTitle": "恢复需要处理",
   "backupRestoreFailureContent": "Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。",
   "backupRestoreBusinessLeaseUnavailableTitle": "Kelivo 已在运行",
@@ -610,15 +595,15 @@
   "startupRecoveryMoreOptions": "更多恢复选项",
   "startupRecoveryRepairButton": "修复并重启",
   "startupRecoveryExportButton": "导出我的数据副本",
-  "startupRecoveryResetButton": "重置数据",
+  "startupRecoveryResetButton": "从空列表重新开始",
   "startupRecoveryBusy": "处理中…",
   "startupRecoveryExportSucceeded": "已保存一份数据副本。",
   "startupRecoveryExportFailed": "无法导出数据副本。",
-  "startupRecoveryRepairFailed": "修复未能解决问题。请先导出数据副本，然后重置。",
+  "startupRecoveryRepairFailed": "修复未能完成。数据已保留，可以选择通过校验的副本恢复，或导出数据进一步排查。",
   "startupRecoveryResetFailed": "重置失败。请彻底关闭 Kelivo 后重新打开。",
-  "startupRecoveryResetDialogTitle": "重置全部数据？",
-  "startupRecoveryResetDialogContent": "这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。",
-  "startupRecoveryResetDialogConfirm": "重置并重启",
+  "startupRecoveryResetDialogTitle": "确定从空列表重新开始？",
+  "startupRecoveryResetDialogContent": "这不会找回之前的聊天。Kelivo 会保留当前数据库和已有副本，建立新的空聊天列表。想找回聊天，请取消并选择本地副本恢复。",
+  "startupRecoveryResetDialogConfirm": "保留副本并重新开始",
   "startupRecoveryResetDialogCancel": "取消",
   "startupRecoveryWhatFailed": "失败原因",
   "startupRecoveryStageLabel": "失败阶段",
@@ -640,7 +625,7 @@
   "startupRecoveryReportShared": "报告已导出。",
   "startupRecoveryReportSaveFailed": "无法导出报告。",
   "startupRecoverySectionDataTitle": "你的数据",
-  "startupRecoverySectionDataBody": "目前没有任何数据被删除。在尝试下面的操作前，先把副本保存到安全的地方。",
+  "startupRecoverySectionDataBody": "也可以先导出剩余数据，保存到安全的位置，再继续操作。",
   "startupRecoveryExportSavedTo": "数据副本已保存到 {path}",
   "startupRecoverySectionRepairTitle": "诊断与修复",
   "startupRecoverySectionRepairBody": "完整性检查只读取数据库。修复会清理上次更新中断留下的元数据并重新启动，不会删除聊天记录。",
@@ -649,9 +634,9 @@
   "startupRecoveryIntegrityDamaged": "SQLite 报告了问题 —— {detail}",
   "startupRecoveryIntegrityMissing": "数据目录中没有找到数据库文件。",
   "startupRecoveryIntegrityFailed": "完整性检查无法运行。",
-  "startupRecoveryDangerZone": "危险操作",
-  "startupRecoveryDangerBody": "重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。",
-  "startupRecoveryResetAcknowledge": "我已导出副本，或不需要这些数据。",
+  "startupRecoveryDangerZone": "其他选项",
+  "startupRecoveryDangerBody": "重新开始后，当前数据将不再显示。Kelivo 会保留旧数据库和已有副本以供恢复，建议先导出一份数据副本。",
+  "startupRecoveryResetAcknowledge": "我确认暂不恢复聊天，继续使用空聊天列表。",
   "startupDatabaseUpdateRequiredTitle": "请更新 Kelivo 以继续",
   "startupDatabaseUpdateRequiredContent": "本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。",
   "startupDatabaseUpdateRequiredDowngradeTitle": "若要改用旧版",
@@ -682,8 +667,12 @@
   "backupPageForwardCompatBody": "这份备份由更新版本的 Kelivo 创建（数据格式 {backupVersion}，当前版本支持 {currentVersion}），且未声明旧版本能否读取。\n\n你可以继续导入：当前版本不认识的内容会被跳过，备份文件本身不会被修改。但如果新版本改变了已有数据的存储方式，部分内容可能会被错误导入。\n\n更稳妥的做法是先升级 Kelivo。",
   "@backupPageForwardCompatBody": {
     "placeholders": {
-      "backupVersion": { "type": "int" },
-      "currentVersion": { "type": "int" }
+      "backupVersion": {
+        "type": "int"
+      },
+      "currentVersion": {
+        "type": "int"
+      }
     }
   },
   "backupPageForwardCompatContinue": "仍然导入",
@@ -736,8 +725,8 @@
       }
     }
   },
-  "backupPageExportToFile": "导出为文件",
-  "backupPageExportToFileSubtitle": "导出APP数据为文件",
+  "backupPageExportToFile": "立即备份",
+  "backupPageExportToFileSubtitle": "将所选内容保存为备份文件",
   "backupPageImportBackupFile": "备份文件导入",
   "backupPageImportBackupFileSubtitle": "导入本地备份文件",
   "backupPageImportFromOtherApps": "从其他APP导入",
@@ -746,6 +735,8 @@
   "backupPageNoBackups": "暂无备份",
   "backupPageRestoreTooltip": "恢复",
   "backupPageDeleteTooltip": "删除",
+  "backupPageDeleteConfirmTitle": "确认删除",
+  "backupPageDeleteConfirmContent": "确定要删除远程备份“{name}”吗？此操作不可撤销。",
   "backupPageBackupManagement": "备份管理",
   "backupPageWebDavBackup": "WebDAV 备份",
   "backupPageWebDavServerSettings": "WebDAV 服务器设置",
@@ -764,6 +755,7 @@
   "backupPageSave": "保存",
   "backupPageBackupNow": "立即备份",
   "backupPageLocalBackup": "本地备份",
+  "backupPageIosSystemBackupNote": "Kelivo 的本地数据不参与 iCloud 系统备份。换机或卸载 App 前，请将备份保存到 iCloud 云盘或 Kelivo 之外的文件夹。“我的 iPhone > Kelivo”中的文件会随 App 卸载而删除。",
   "backupPageImportFromCherryStudio": "从 Cherry Studio 导入",
   "backupPageCherryStudioUnsupportedBackupVersion": "此备份使用 Cherry Studio 格式版本 {version}，Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。",
   "backupPageImportFromChatbox": "从 Chatbox 导入",
@@ -821,7 +813,6 @@
   "homePageDelete": "删除",
   "homePageSelectMessagesToShare": "请选择要分享的消息",
   "homePageDone": "完成",
-  "homePageProcessingFiles": "正在解析文件……",
   "homePageDropToUpload": "将文件拖拽到此处上传",
   "chatHistoryPageTitle": "聊天历史",
   "chatHistoryPageSearchTooltip": "搜索",
@@ -852,27 +843,26 @@
   "bottomToolsSheetUpload": "上传文件",
   "bottomToolsSheetClearContext": "清空上下文",
   "compressContext": "压缩上下文",
-  "compressContextDesc": "总结对话并开始新聊天",
+  "compressContextDesc": "生成可查看、可撤销的摘要",
   "clearContextDesc": "标记上下文分界点",
   "contextManagement": "上下文管理",
-  "compressingContext": "正在压缩上下文...",
   "compressContextFailed": "压缩上下文失败",
   "compressContextNoMessages": "没有可压缩的消息",
   "compressContextNoConversation": "没有可压缩的会话",
   "compressContextNoModel": "未配置压缩模型",
   "compressContextEmptySummary": "压缩返回了空摘要",
   "compressContextOptionsTitle": "压缩上下文",
-  "compressContextOptionsDesc": "选择发送给压缩模型的当前聊天范围。",
-  "compressContextKeepStart": "最开始",
-  "compressContextKeepRecent": "最近",
-  "compressContextUnlimited": "无限制",
+  "compressContextOptionsDesc": "在当前聊天生成可查看、可编辑、可撤销的摘要。原始消息保留。",
+  "compressContextKeepStart": "较早历史",
+  "compressContextKeepRecent": "较近历史",
+  "compressContextUnlimited": "全部历史",
   "compressContextMaxCharsLabel": "字符数",
   "compressContextInvalidLimit": "请输入大于 0 的字符数",
   "compressContextStartButton": "开始压缩",
   "compressContextModelLabel": "压缩模型",
   "compressContextModelUnset": "选择模型",
-  "compressContextKeepRecentMessages": "保留N条",
-  "compressContextKeepCountLabel": "保留最近条数",
+  "compressContextKeepRecentMessages": "保留最近原文",
+  "compressContextKeepCountLabel": "保留用户消息数",
   "compressContextKeepAllMessages": "保留条数覆盖全部消息，无内容可压缩",
   "compressContextEstimatePreview": "总结 {summarized} 字符，原样保留 {kept} 字符 → 压缩后约 {minTokens}–{maxTokens} tokens（原文约 {totalTokens} tokens）",
   "@compressContextEstimatePreview": {
@@ -918,6 +908,8 @@
   "reasoningLevelAuto": "自动",
   "reasoningLevelAutoSubtitle": "使用模型或供应商的默认设置",
   "reasoningLevelOff": "关闭",
+  "reasoningLevelOn": "开启",
+  "reasoningLevelOnSubtitle": "启用推理",
   "reasoningLevelOffSubtitle": "关闭推理，直接回答",
   "reasoningLevelMinimal": "最低",
   "reasoningLevelMinimalSubtitle": "使用极少推理来回答问题",
@@ -980,7 +972,9 @@
   "chatMessageWidgetWebFetch": "读取网页: {target}",
   "@chatMessageWidgetWebFetch": {
     "placeholders": {
-      "target": { "type": "String" }
+      "target": {
+        "type": "String"
+      }
     }
   },
   "chatMessageWidgetBuiltinSearch": "模型内置搜索",
@@ -1040,6 +1034,16 @@
   "messageExportThinkingContentLabel": "思考内容",
   "messageExportSheetDateTimeWithSecondsPattern": "yyyy年M月d日 HH:mm:ss",
   "exportDisclaimerAiGenerated": "内容由 AI 生成，请仔细甄别",
+  "imagePreviewSheetSaveImage": "保存图片",
+  "imagePreviewSheetSaveSuccess": "已保存到相册",
+  "imagePreviewSheetSaveFailed": "保存失败: {error}",
+  "@imagePreviewSheetSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "sideDrawerMenuRename": "重命名",
   "sideDrawerMenuPin": "置顶",
   "sideDrawerMenuUnpin": "取消置顶",
@@ -1183,6 +1187,13 @@
   "contextUsageStateEstimated": "估算",
   "contextUsageStateStale": "已过时，正在更新…",
   "contextUsageStateComputing": "计算中…",
+  "contextUsageStateFailed": "计算失败",
+  "contextUsageStateFailedWithPrevious": "更新失败，上次结果已过时",
+  "contextUsageUnavailable": "用量不可用",
+  "contextUsagePartialSummary": "已估算 {tokens} + 压缩块未知",
+  "contextUsageBucketNativeCompaction": "原生压缩块",
+  "contextUsageUnknownTokens": "未知",
+  "contextUsageLastRequestInput": "上次请求输入（实测）：{tokens}",
   "contextUsageStateNone": "暂无数据",
   "contextUsageBucketSystem": "系统提示词",
   "contextUsageBucketInjections": "指令注入",
@@ -1214,7 +1225,7 @@
   "mcpPageStatusDisconnected": "未连接",
   "mcpPageStatusAuthorizationRequired": "需要授权",
   "mcpPageStatusAuthorizing": "授权中…",
-  "mcpPageStatusDisabled": "已禁用",
+  "mcpPageStatusDisabled": "已停用",
   "mcpPageOAuthRequired": "需要 OAuth 登录",
   "mcpPageOAuthSignIn": "OAuth 登录",
   "mcpPageToolsCount": "工具: {enabled}/{total}",
@@ -1286,8 +1297,12 @@
   "backgroundTaskFailed": "{task}失败：{error}",
   "@backgroundTaskFailed": {
     "placeholders": {
-      "task": {"type": "String"},
-      "error": {"type": "String"}
+      "task": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
     }
   },
   "defaultModelPageOcrModelSubtitle": "用于对图片执行文字识别的模型",
@@ -1389,6 +1404,8 @@
   "modelSpecFormDialectAnthropicBudgetSubtitle": "thinking.budget_tokens",
   "modelSpecFormDialectAnthropicAdaptiveEffort": "Anthropic adaptive effort",
   "modelSpecFormDialectAnthropicAdaptiveEffortSubtitle": "thinking + output_config.effort",
+  "modelSpecFormDialectAnthropicBetweenTools": "Anthropic adaptive / between_tools",
+  "modelSpecFormDialectAnthropicBetweenToolsSubtitle": "自适应思考；关闭时使用 between_tools",
   "modelSpecFormDialectAnthropicEffort": "Anthropic effort",
   "modelSpecFormDialectAnthropicEffortSubtitle": "thinking + output_config.effort",
   "modelSpecFormDialectGeminiThinkingBudget": "Gemini thinking budget",
@@ -1493,7 +1510,11 @@
   "providerDetailPageClaudePromptCachingTtl1h": "1 小时",
   "providerDetailPageBalanceTitle": "账户余额",
   "providerDetailPageBalanceInfo": "获取账户余额",
-  "providerDetailPageBalanceApiPathLabel": "余额 API 路径",
+  "providerDetailPageBalanceApiPathLabel": "余额 API 路径或完整网址",
+  "providerDetailPageBalanceMethodLabel": "HTTP 方法",
+  "providerDetailPageBalanceRequestHint": "这些设置仅用于余额查询。在请求头或请求体中使用 {apiKeyPlaceholder} 可引用当前 API Key。默认使用 Bearer 认证；请求头值留空可移除该请求头。",
+  "providerDetailPageBalanceBodyLabel": "请求体（可选）",
+  "providerDetailPageBalanceBodyHint": "仅随 POST 发送，留空则不发送请求体。Content-Type 默认为 application/json，可添加请求头指定其他格式。",
   "providerDetailPageBalanceResultPathLabel": "结果 JSON 路径",
   "providerDetailPageBalanceQueryButton": "查询余额",
   "providerDetailPageBalanceQuerying": "查询中...",
@@ -1643,13 +1664,17 @@
   "searchServicesPageWebFetchFollowValue": "跟随搜索 · {name}",
   "@searchServicesPageWebFetchFollowValue": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "searchServicesPageWebFetchFollowSubtitle": "当前：{name}",
   "@searchServicesPageWebFetchFollowSubtitle": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "searchServicesPageWebFetchLocal": "本地抓取",
@@ -1657,7 +1682,7 @@
   "searchServicesPageWebFetchProviderSubtitle": "使用该服务商的 API Key 和额度",
   "searchServicesPageWebFetchOff": "关闭",
   "searchServicesPageWebFetchOffSubtitle": "联网时只搜索，不读取网页",
-  "searchServicesPageWebFetchFooter": "开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。",
+  "searchServicesPageWebFetchFooter": "开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。\n\n如已使用此处的网页抓取，建议前往「设置 → MCP」关闭内置 @kelivo/fetch，避免模型混用两个抓取工具。此处配置的网页抓取仍可正常使用。",
   "searchServicesPageWebFetchSupported": "支持网页抓取",
   "searchServicesPageMaxResults": "最大结果数",
   "searchServicesPageTimeoutSeconds": "超时时间（秒）",
@@ -1670,6 +1695,11 @@
   "searchServicesPageTestConnectionTooltip": "测试连接",
   "searchServicesPageDeleteServiceTooltip": "删除服务",
   "searchServicesPageConfiguredStatus": "已配置",
+  "miniMapTitle": "迷你地图",
+  "miniMapTooltip": "迷你地图",
+  "miniMapScrollToBottomTooltip": "滚动到底部",
+  "miniMapSearchMatchCount": "{count} 处",
+  "miniMapSearchNoResults": "没有匹配的消息",
   "searchServicesPageApiKeyRequiredStatus": "需要 API Key",
   "searchServicesPageUrlRequiredStatus": "需要 URL",
   "searchServicesAddDialogTitle": "添加搜索服务",
@@ -1708,14 +1738,12 @@
   "searchServiceEditorMultiKeyTitle": "多 Key 轮询",
   "searchServiceEditorMultiKeyNone": "未配置",
   "searchApiKeysPageDescription": "列表中的 Key 按顺序轮询使用，第一个为主 Key；不查额度，以防触发服务商风控。",
-
   "searchApiKeysPagePrimaryBadge": "主",
   "searchApiKeysPageBatchHint": "可一次粘贴多个 Key：每行一个，或用逗号分隔",
   "searchApiKeysPageBatchResult": "已添加 {added} 个，跳过 {skipped} 个重复",
   "searchApiKeysPageAdd": "添加",
   "searchApiKeysPageEmpty": "尚未配置任何 Key。",
   "searchServiceEditorMultiKeyCount": "共 {count} 个 Key",
-
   "searchServiceEditorUsageTitle": "账户用量",
   "searchServiceEditorUsageNotQueried": "尚未查询用量。",
   "searchServiceEditorUsageQuery": "查询用量",
@@ -1723,26 +1751,36 @@
   "searchServiceEditorUsageRemaining": "剩余 {remaining} 额度",
   "@searchServiceEditorUsageRemaining": {
     "placeholders": {
-      "remaining": { "type": "String" }
+      "remaining": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageBalance": "余额 {balance}",
   "@searchServiceEditorUsageBalance": {
     "placeholders": {
-      "balance": { "type": "String" }
+      "balance": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageUsed": "已使用 {used} / {limit} 额度",
   "@searchServiceEditorUsageUsed": {
     "placeholders": {
-      "used": { "type": "String" },
-      "limit": { "type": "String" }
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorUsageFailed": "用量查询失败：{message}",
   "@searchServiceEditorUsageFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestTitle": "测试搜索",
@@ -1753,7 +1791,9 @@
   "searchServiceEditorTestFailed": "搜索失败：{message}",
   "@searchServiceEditorTestFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestModeSearch": "搜索",
@@ -1764,14 +1804,20 @@
   "searchServiceEditorTestFetchFailed": "抓取失败：{message}",
   "@searchServiceEditorTestFetchFailed": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorTestFetchStats": "{characters} 字符 · {seconds} 秒",
   "@searchServiceEditorTestFetchStats": {
     "placeholders": {
-      "characters": { "type": "String" },
-      "seconds": { "type": "String" }
+      "characters": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorResultOpenTooltip": "打开结果",
@@ -1780,7 +1826,9 @@
   "searchServiceEditorDeleteMessage": "确定删除 {provider} 吗？此操作无法撤销。",
   "@searchServiceEditorDeleteMessage": {
     "placeholders": {
-      "provider": { "type": "String" }
+      "provider": {
+        "type": "String"
+      }
     }
   },
   "searchServiceEditorDeleteConfirm": "删除",
@@ -1802,7 +1850,7 @@
   "aboutPageKelivoSearchUnlocked": "有扇没有名字的门开了一条缝。去设置里找找看。",
   "aboutPageKelivoSearchAlreadyUnlocked": "这扇门你已经推开过了。",
   "aboutPageAppName": "Kelivo",
-  "aboutPageAppDescription": "开源 AI 助手",
+  "aboutPageAppDescription": "开源AI 助手",
   "aboutPageNoQQGroup": "暂无QQ群",
   "aboutPageVersion": "版本",
   "aboutPageVersionDetail": "{version} / {buildNumber}",
@@ -1927,10 +1975,8 @@
   "desktopDisplaySettingsTopicPositionRight": "右侧",
   "displaySettingsPageNewChatOnLaunchSubtitle": "应用启动时自动创建新对话",
   "displaySettingsPageChatFontSizeTitle": "聊天字体大小",
-  "displaySettingsPageAutoScrollEnableTitle": "自动回到底部",
-  "displaySettingsPageAutoScrollIdleTitle": "自动回到底部延迟",
-  "displaySettingsPageAutoScrollIdleSubtitle": "用户停止滚动后等待多久再自动回到底部",
-  "displaySettingsPageAutoScrollDisabledLabel": "已关闭",
+  "displaySettingsPageAutoScrollEnableTitle": "自动跟随底部",
+  "displaySettingsPageAutoScrollDisabledLabel": "关闭",
   "displaySettingsPageChatFontSampleText": "这是一个示例的聊天文本",
   "displaySettingsPageChatBackgroundMaskTitle": "背景图片遮罩透明度",
   "displaySettingsPageChatInputBackgroundOpacityTitle": "输入框背景透明度",
@@ -2004,6 +2050,9 @@
   "asrServicesLocalSubtitle": "下载后在设备上离线运行",
   "asrServicesOpenAiTitle": "OpenAI Realtime",
   "asrServicesOpenAiSubtitle": "低延迟流式转写",
+  "asrServicesGroqSubtitle": "Whisper 分段云端转写",
+  "asrServicesMistralSubtitle": "Voxtral 分段云端转写",
+  "asrServicesElevenLabsSubtitle": "Scribe 分段云端转写",
   "asrServicesDashScopeTitle": "DashScope",
   "asrServicesDashScopeSubtitle": "Qwen 实时转写",
   "asrServicesVolcengineTitle": "火山引擎",
@@ -2024,6 +2073,16 @@
   "asrServicesNameLabel": "名称",
   "asrServicesApiKeyLabel": "API Key",
   "asrServicesEndpointLabel": "服务地址",
+  "asrServicesRecognitionModeLabel": "识别方式",
+  "asrServicesRealtimeMode": "实时识别",
+  "asrServicesRecordedMode": "录音转写",
+  "asrServicesQwenAudioSubtitle": "实时识别或录音转写",
+  "asrServicesQwenTokenPlanHint": "使用 Token Plan 时，选择录音转写，业务空间 ID 填 token-plan，并选择与密钥对应的地域。",
+  "asrServicesWorkspaceIdHint": "例如：token-plan",
+  "asrServicesEndpointOverrideLabel": "自定义端点（可选）",
+  "asrServicesWorkspaceIdInvalid": "请输入业务空间 ID，不要填写网址。",
+  "asrServicesWebSocketEndpointInvalid": "请输入完整的 ws:// 或 wss:// 端点，不含用户名、密码或 URL 片段。",
+  "asrServicesHttpEndpointInvalid": "请输入完整的 http:// 或 https:// 端点，不含用户名、密码或 URL 片段。",
   "asrServicesModelLabel": "模型",
   "asrServicesResourceIdLabel": "资源 ID",
   "asrServicesLanguageLabel": "语言",
@@ -2079,7 +2138,31 @@
   "ttsServicesFieldSpeedLabel": "语速",
   "ttsServicesFieldLanguageTypeLabel": "语言类型",
   "ttsServicesFieldLanguageLabel": "语言",
+  "ttsServicesFieldWorkspaceIdLabel": "业务空间 ID",
+  "ttsServicesFieldRegionLabel": "地域",
+  "ttsServicesFieldFormatLabel": "音频格式",
+  "ttsServicesFieldOutputFormatLabel": "输出格式",
+  "ttsServicesFieldSampleRateLabel": "采样率",
+  "ttsServicesFieldVolumeLabel": "音量",
+  "ttsServicesFieldPitchLabel": "音调",
+  "ttsServicesFieldLanguageBoostLabel": "语言增强",
+  "ttsServicesFieldBitrateLabel": "比特率",
+  "ttsServicesFieldChannelLabel": "声道数",
+  "ttsServicesFieldSubtitlesLabel": "生成字幕",
+  "ttsServicesFieldPronunciationDictionaryLabel": "发音词典（每行一项）",
+  "ttsServicesFieldInstructionLabel": "风格／音色描述",
+  "ttsServicesFieldStreamingLabel": "流式输出",
+  "ttsServicesFieldOptimizeTextPreviewLabel": "优化播报文本",
+  "ttsServicesFieldReferenceAudioLabel": "参考音频（WAV/MP3 数据 URI）",
+  "ttsServicesFieldChooseReferenceAudioButton": "选择参考音频",
+  "ttsServicesFieldTemperatureLabel": "随机度",
+  "ttsServicesFieldTopPLabel": "Top P",
+  "ttsServicesFieldLatencyLabel": "延迟模式",
+  "ttsServicesEmotionAutoLabel": "自动匹配",
   "ttsServicesValidationApiKeyRequired": "API Key 不能为空",
+  "ttsServicesValidationReferenceIdRequired": "音色／参考 ID 不能为空",
+  "ttsServicesValidationInstructionRequired": "音色描述不能为空",
+  "ttsServicesValidationSampleRate": "{format} 格式要求使用 {rates} Hz。",
   "ttsServicesViewDetailsButton": "查看详情",
   "ttsServicesDialogErrorTitle": "错误详情",
   "ttsServicesCloseButton": "关闭",
@@ -2177,6 +2260,7 @@
   "searchProviderTavilyDescription": "为大型语言模型（LLMs）优化的 AI 搜索 API，提供高质量、相关的搜索结果。",
   "searchProviderZhipuDescription": "智谱 AI 旗下中文 AI 搜索服务，针对中文内容与查询进行了优化。",
   "searchProviderOllamaDescription": "Ollama 网络搜索 API。为模型补充最新信息，减少幻觉并提升准确性。",
+  "searchProviderDeepSeekDescription": "DeepSeek 官方网页搜索与抓取 API，使用 DeepSeek API Key。",
   "searchProviderJinaDescription": "适合开发者和企业用于 AI 搜索应用。支持多语言与多模态。",
   "searchServiceNameBingLocal": "Bing（Local）",
   "searchServiceNameDuckDuckGo": "DuckDuckGo",
@@ -2189,6 +2273,7 @@
   "searchServiceNameBrave": "Brave",
   "searchServiceNameMetaso": "秘塔",
   "searchServiceNameOllama": "Ollama",
+  "searchServiceNameDeepSeek": "DeepSeek",
   "searchServiceNameJina": "Jina",
   "searchServiceNamePerplexity": "Perplexity",
   "searchProviderPerplexityDescription": "Perplexity 搜索 API。提供排序的网页结果，支持区域与域名过滤。",
@@ -2246,14 +2331,13 @@
   "temporaryChatTitle": "临时对话",
   "temporaryChatEmptyMessage": "临时对话不显示在历史记录，退出后将被完全删除",
   "temporaryChatToggleTooltip": "切换临时对话",
-  "miniMapTitle": "迷你地图",
-  "miniMapTooltip": "迷你地图",
-  "miniMapScrollToBottomTooltip": "滚动到底部",
-  "miniMapSearchMatchCount": "{count} 处",
-  "miniMapSearchNoResults": "没有匹配的消息",
   "displaySettingsPageEnableDollarLatexTitle": "启用 $...$ 渲染",
   "displaySettingsPageEnableDollarLatexSubtitle": "将 $...$ 之间的内容按行内数学公式渲染",
   "displaySettingsPageEnableMathTitle": "启用数学公式渲染",
+  "displaySettingsPageUseLegacyInlineCodeStyleTitle": "旧版行内代码样式",
+  "displaySettingsPageUseLegacyInlineCodeStyleSubtitle": "为行内代码使用较浅的底色、细边框和更宽松的行距。",
+  "displaySettingsPageUseLegacyCodeBlockStyleTitle": "旧版代码块样式",
+  "displaySettingsPageUseLegacyCodeBlockStyleSubtitle": "恢复代码块原有的配色、圆角和间距。",
   "displaySettingsPageEnableUserMarkdownTitle": "用户消息 Markdown 渲染",
   "displaySettingsPageEnableReasoningMarkdownTitle": "思维链 Markdown 渲染",
   "displaySettingsPageEnableAssistantMarkdownTitle": "助手消息 Markdown 渲染",
@@ -2315,7 +2399,7 @@
   "quickPhraseMenuTitle": "快捷短语",
   "chatInputBarQuickPhraseTooltip": "快捷短语",
   "chatInputBarOcrTooltip": "OCR 文字识别",
-  "assistantEditQuickPhraseDescription": "管理该助手的快捷短语。点击下方按钮添加或编辑短语。",
+  "assistantEditQuickPhraseDescription": "管理该助手的快捷短语。点击下方按钮添加短语。",
   "assistantEditManageQuickPhraseButton": "管理快捷短语",
   "assistantEditPageMemoryTab": "记忆",
   "assistantEditLocalToolTimeInfoTitle": "时间信息",
@@ -2328,14 +2412,14 @@
   "assistantEditLocalToolAskUserSubtitle": "允许助手提出简短问题，并在你回答后继续生成。",
   "assistantEditLocalToolCalculateTitle": "计算器",
   "assistantEditLocalToolCalculateSubtitle": "计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。",
-   "assistantEditLocalToolScreenTimeTitle": "屏幕使用时间",
-   "assistantEditLocalToolScreenTimeSubtitle": "查询本设备的应用使用时长，需要授予使用情况访问权限。",
-   "chatMessageWidgetScreenTimeTotal": "总屏幕时间",
-   "chatMessageWidgetScreenTimePermissionRequired": "未授予使用情况访问权限，请在系统设置中开启后重试。",
-   "assistantEditLocalToolCalendarQueryTitle": "查询日历",
-   "assistantEditLocalToolCalendarQuerySubtitle": "读取本设备上的日历日程，需要授予日历权限。",
-   "assistantEditLocalToolCalendarCreateTitle": "创建日程",
-   "assistantEditLocalToolCalendarCreateSubtitle": "在你确认后于本设备创建日历日程，需要授予日历权限。",
+  "assistantEditLocalToolScreenTimeTitle": "屏幕使用时间",
+  "assistantEditLocalToolScreenTimeSubtitle": "查询本设备的应用使用时长，需要授予使用情况访问权限。",
+  "chatMessageWidgetScreenTimeTotal": "总屏幕时间",
+  "chatMessageWidgetScreenTimePermissionRequired": "未授予使用情况访问权限，请在系统设置中开启后重试。",
+  "assistantEditLocalToolCalendarQueryTitle": "查询日历",
+  "assistantEditLocalToolCalendarQuerySubtitle": "读取本设备上的日历日程，需要授予日历权限。",
+  "assistantEditLocalToolCalendarCreateTitle": "创建日程",
+  "assistantEditLocalToolCalendarCreateSubtitle": "在你确认后于本设备创建日历日程，需要授予日历权限。",
   "assistantEditLocalToolLocationTitle": "当前位置",
   "assistantEditLocalToolLocationSubtitle": "读取本设备的一次性位置，需要授予定位权限。",
   "assistantEditLocalToolWeatherTitle": "天气",
@@ -2435,6 +2519,40 @@
   "assistantEditPresetEditDialogTitle": "编辑预设消息",
   "assistantEditPresetRoleUser": "用户",
   "assistantEditPresetRoleAssistant": "助手",
+  "assistantTagsManageTitle": "管理标签",
+  "assistantTagsCreateButton": "创建",
+  "assistantTagsCreateDialogTitle": "创建标签",
+  "assistantTagsCreateDialogOk": "创建",
+  "assistantTagsCreateDialogCancel": "取消",
+  "assistantTagsNameHint": "标签名称",
+  "assistantTagsRenameButton": "重命名",
+  "assistantTagsRenameDialogTitle": "重命名标签",
+  "assistantTagsRenameDialogOk": "重命名",
+  "assistantTagsDeleteButton": "删除",
+  "assistantTagsDeleteConfirmTitle": "删除标签",
+  "assistantTagsDeleteConfirmContent": "确定要删除该标签吗？",
+  "assistantTagsDeleteConfirmOk": "删除",
+  "assistantTagsDeleteConfirmCancel": "取消",
+  "assistantTagsContextMenuEditAssistant": "编辑助手",
+  "assistantTagsContextMenuManageTags": "管理标签",
+  "mcpTransportOptionStdio": "STDIO",
+  "mcpTransportTagStdio": "STDIO",
+  "mcpTransportTagInmemory": "内置",
+  "mcpTransportTagSse": "SSE",
+  "mcpTransportTagHttp": "HTTP",
+  "mcpServerEditSheetStdioCommandLabel": "命令",
+  "mcpServerEditSheetStdioArgumentsLabel": "参数",
+  "mcpServerEditSheetStdioWorkingDirectoryLabel": "工作目录（可选）",
+  "mcpWorkspaceBindingLabel": "绑定工作区（可选）",
+  "mcpWorkspaceBindingHint": "服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。",
+  "mcpWorkspaceBindingMobileOnly": "工作区绑定适用于移动端 Linux 环境。在桌面端运行此服务器前，请先解除绑定。",
+  "mcpServerEditSheetStdioEnvironmentTitle": "环境变量",
+  "mcpServerEditSheetStdioEnvNameLabel": "名称",
+  "mcpServerEditSheetStdioEnvValueLabel": "值",
+  "mcpServerEditSheetStdioAddEnv": "添加环境变量",
+  "mcpServerEditSheetStdioCommandRequired": "STDIO 需要填写命令",
+  "assistantTagsContextMenuDeleteAssistant": "删除助手",
+  "assistantTagsClearTag": "清除标签",
   "desktopTtsPleaseAddProvider": "请先在设置中添加语音服务商",
   "settingsPageNetworkProxy": "网络代理",
   "networkProxyEnableLabel": "启动代理",
@@ -2605,8 +2723,7 @@
   "assistantEditSummaryDialogHint": "输入摘要内容",
   "assistantEditDeleteSummaryTitle": "清除摘要",
   "assistantEditDeleteSummaryContent": "确定要清除此摘要吗？",
-  "backupPageDeleteConfirmTitle": "确认删除",
-  "backupPageDeleteConfirmContent": "确定要删除远程备份“{name}”吗？此操作不可撤销。",
+  "homePageProcessingFiles": "正在解析文件……",
   "settingsPageWorldBook": "世界书",
   "settingsPageMemory": "记忆",
   "memorySettingsPageTitle": "记忆",
@@ -2625,7 +2742,7 @@
   "memoryAboutScopeTitle": "全局与助手范围",
   "memoryAboutScopeBody": "全局记忆会对所有助手注入。助手范围的记忆只对该助手可见。跨助手都该知道的事实用全局；只属于某一个助手的规则或上下文用助手范围。",
   "memoryAboutInjectionTitle": "记忆如何注入",
-  "memoryAboutInjectionBody": "开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。",
+  "memoryAboutInjectionBody": "开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。 可在各助手的记忆设置中选择需要全量注入的类型。",
   "memoryAboutPipelineTitle": "后台整理",
   "memoryAboutPipelineBody": "开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手「记忆」页点「整理记忆」。因此处理模型会被较频繁调用。",
   "memoryAboutCacheTitle": "保持缓存良好",
@@ -2637,11 +2754,17 @@
   "memorySettingsThinkingSubtitle": "在模型支持时允许记忆模型使用推理",
   "memorySettingsInjectionSection": "记忆注入",
   "memorySettingsInjectionMaxItemsTitle": "每类注入条数",
-  "memorySettingsInjectionMaxItemsSubtitle": "某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
+  "memorySettingsInjectionMaxItemsSubtitle": "此限制仅适用于未在助手记忆设置中选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
+  "assistantEditMemoryFullInjectionTypesTitle": "全量注入类型",
+  "assistantEditMemoryFullInjectionTypesNone": "未选择",
+  "assistantEditMemoryFullInjectionTypesSelected": "已选 {count} 类",
+  "assistantEditMemoryFullInjectionTypesSubtitle": "仅对当前助手生效，可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。",
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memorySettingsInjectionMaxItemsCustomButton": "自定义",
@@ -2692,7 +2815,9 @@
   "memoryEntryScopeAssistantNamed": "{name}",
   "@memoryEntryScopeAssistantNamed": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "memoryEntrySourceManual": "手动",
@@ -2704,7 +2829,9 @@
   "memoryEntryUpdatedAt": "更新于 {date}",
   "@memoryEntryUpdatedAt": {
     "placeholders": {
-      "date": {"type": "String"}
+      "date": {
+        "type": "String"
+      }
     }
   },
   "memoryEntryActionEdit": "编辑",
@@ -2719,7 +2846,9 @@
   "memoryEntryBatchDeleteConfirmTitle": "删除 {count} 条记忆？",
   "@memoryEntryBatchDeleteConfirmTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryEntryBatchDeleteConfirmContent": "所选记忆将被永久删除。",
@@ -2746,7 +2875,9 @@
   "memoryOrphanBanner": "有 {count} 条孤儿助手记忆（助手已删除）",
   "@memoryOrphanBanner": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrphanCleanupButton": "清理",
@@ -2754,7 +2885,9 @@
   "memoryOrphanConfirmContent": "将永久删除 {count} 条所属助手已不存在的记忆。",
   "@memoryOrphanConfirmContent": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeButton": "整理记忆",
@@ -2764,26 +2897,34 @@
   "memoryOrganizeStatusLast": "上次整理：{when}",
   "@memoryOrganizeStatusLast": {
     "placeholders": {
-      "when": {"type": "String"}
+      "when": {
+        "type": "String"
+      }
     }
   },
   "memoryOrganizeStatusExtracted": "提取 {count} 条",
   "@memoryOrganizeStatusExtracted": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeStatusSkipped": "无需记忆",
   "memoryOrganizeStatusFailed": "失败：{reason}",
   "@memoryOrganizeStatusFailed": {
     "placeholders": {
-      "reason": {"type": "String"}
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "memoryOrganizeStatusSkippedReason": "已跳过：{reason}",
   "@memoryOrganizeStatusSkippedReason": {
     "placeholders": {
-      "reason": {"type": "String"}
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "memoryOutcomeTemporaryConversation": "临时对话不会写入记忆",
@@ -2815,19 +2956,25 @@
   "memoryOrganizeMinutesAgo": "{n} 分钟前",
   "@memoryOrganizeMinutesAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeHoursAgo": "{n} 小时前",
   "@memoryOrganizeHoursAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryOrganizeDaysAgo": "{n} 天前",
   "@memoryOrganizeDaysAgo": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "memoryModelMissingNotice": "需要先在 设置 → 记忆 中选择记忆处理模型。",
@@ -2860,7 +3007,9 @@
   "legacyMemoryAssistantHeader": "助手：{name}",
   "@legacyMemoryAssistantHeader": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "legacyMemorySearchHint": "搜索旧版记忆",
@@ -2869,7 +3018,9 @@
   "legacyMemoryMigrationSubtitle": "使用模型整理并分类 {count} 条旧版记忆，原数据不会改变。",
   "@legacyMemoryMigrationSubtitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationModel": "迁移模型",
@@ -2887,16 +3038,24 @@
   "legacyMemoryMigrationProgress": "{current} / {total}",
   "@legacyMemoryMigrationProgress": {
     "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationComplete": "迁移完成",
   "legacyMemoryMigrationResult": "已迁移 {created} 条 · 跳过已有 {skipped} 条",
   "@legacyMemoryMigrationResult": {
     "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"}
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationFailed": "迁移已停止。可以重试，已保存的记忆会自动跳过。",
@@ -2911,9 +3070,15 @@
   "legacyMemoryMigrationPartial": "已迁移 {created} · 跳过 {skipped} · 失败 {failed}",
   "@legacyMemoryMigrationPartial": {
     "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"},
-      "failed": {"type": "int"}
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
     }
   },
   "legacyMemoryMigrationContinue": "继续迁移",
@@ -2923,7 +3088,9 @@
   "legacyMemoryMigrationErrorOther": "迁移失败：{message}",
   "@legacyMemoryMigrationErrorOther": {
     "placeholders": {
-      "message": {"type": "String"}
+      "message": {
+        "type": "String"
+      }
     }
   },
   "legacyMemoryModeTitle": "使用旧版记忆",
@@ -2968,7 +3135,9 @@
   "assistantEditOrganizeFrequencyOption": "每 {n} 轮",
   "@assistantEditOrganizeFrequencyOption": {
     "placeholders": {
-      "n": {"type": "int"}
+      "n": {
+        "type": "int"
+      }
     }
   },
   "assistantEditOrganizeFrequencyCustomButton": "自定义",
@@ -3047,7 +3216,6 @@
   "worldBookInjectionRoleAssistant": "助手",
   "mcpToolNeedsApproval": "需要审批",
   "toolApprovalPending": "等待审批",
-  "toolApprovalApprove": "批准",
   "toolApprovalDeny": "拒绝",
   "toolApprovalDenyTitle": "拒绝工具调用",
   "toolApprovalDenyHint": "原因（可选）",
@@ -3066,7 +3234,8 @@
   "tokenDetailCompletionTokens": "{count} tokens",
   "tokenDetailSpeed": "{value} tok/s",
   "tokenDetailDuration": "{value}s",
-  "tokenDetailFirstToken": "{value}s（首字）",
+  "tokenDetailFirstResponse": "{value}s（首响应）",
+  "tokenDetailFirstOutput": "{value}s（首输出）",
   "tokenDetailTotalTokens": "{count} tokens",
   "tokenDetailReasoningTokens": "{count} tokens",
   "tokenDetailCacheWriteTokens": "{count} 缓存写入 tokens",
@@ -3211,7 +3380,13 @@
   "migrationChatsExportDegradedNote": "chats.json 导出因出错而被跳过。备份 ZIP 仍包含原始 Hive 文件，完整聊天记录未丢失。",
   "timelineJumpToLatest": "跳到最新",
   "largeContentShowMore": "再显示 {count} 项",
-  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "@largeContentShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "largeContentCollapse": "收起",
   "imageSettingsPageTitle": "图片处理",
   "imageSettingsPageEditSectionTitle": "编辑",
@@ -3300,13 +3475,43 @@
   "memoryTraceAfter": "改动后",
   "memoryTraceEmptyValue": "（空）",
   "memoryTraceStepsCount": "{count} 个步骤",
-  "@memoryTraceStepsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceStepsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceMutationsCount": "{count} 项改动",
-  "@memoryTraceMutationsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceMutationsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceRepeatCount": "重复 {count} 次",
-  "@memoryTraceRepeatCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceRepeatCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceWindowValue": "{size} 条消息 · #{start}–#{end}",
-  "@memoryTraceWindowValue": {"placeholders": {"size": {"type": "int"}, "start": {"type": "int"}, "end": {"type": "int"}}},
+  "@memoryTraceWindowValue": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      },
+      "start": {
+        "type": "int"
+      },
+      "end": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceShowMore": "展开全文",
   "memoryTraceShowLess": "收起",
   "messageStyleSettingsPageTitle": "消息样式",
@@ -3517,7 +3722,6 @@
   "workspaceToolUpdated": "已更新",
   "workspaceToolTruncated": "已截断",
   "workspaceToolImageTag": "图片",
-  "workspaceToolAllowAll": "本会话全部允许",
   "workspaceToolStdout": "stdout",
   "workspaceToolStderr": "stderr",
   "workspaceToolOpenFullOutput": "打开完整输出",
@@ -3600,7 +3804,13 @@
   "workspaceEnvErrorNetwork": "下载失败，请检查网络后重试。",
   "workspaceEnvErrorChecksumMismatch": "下载文件已损坏，请重试。",
   "workspaceEnvErrorExtractFailed": "无法解压沙箱镜像。",
+  "workspaceEnvErrorCleanupFailed": "无法清理旧沙箱文件，请重试。",
+  "workspaceEnvCleanupIncomplete": "沙箱已就绪，但部分旧文件未能清理，仍占用存储空间。",
+  "workspaceEnvErrorResetFailed": "未能完成沙箱重置，请重试。",
   "workspaceEnvErrorPatchFailed": "无法完成沙箱配置。",
+  "workspaceEnvErrorRepairInterrupted": "沙盒修复已中断，现有沙盒已保留。请重试以完成修复。",
+  "workspaceEnvErrorRepairTimeout": "沙盒修复超时，请检查网络连接后重试。现有沙盒已保留。",
+  "workspaceEnvRepairRestartBanner": "未能在限定时间内确认沙盒修复已停止。请完全退出并重新打开 Kelivo 后重试。现有沙盒已保留。",
   "workspaceEnvErrorCancelled": "安装已取消。",
   "workspaceEnvErrorGeneric": "安装沙箱时出错。",
   "workspaceEnvChipInstall": "安装沙箱",
@@ -3610,7 +3820,7 @@
   "workspaceEnvChipRestart": "需要重启",
   "workspaceEnvNativeExplanation": "在桌面端，Kelivo 使用系统终端，而不是 Linux 沙箱。",
   "workspaceEnvNativeShellPath": "终端：{path}",
-  "workspaceEnvNativeShellApproval": "除非此会话允许全部工具，否则 shell 工具需要批准。",
+  "workspaceEnvNativeShellApproval": "请求批准模式下，Shell 工具需要批准。",
   "workspaceEnvDownloadProgress": "{downloaded} / {total} MB ({percent}%)",
   "workspaceEnvMirrorsFailed": "无法检测镜像",
   "workspaceEnvCategoryApt": "APT",
@@ -3697,8 +3907,6 @@
   "workspaceEntryOpenSystemTerminal": "在系统终端中打开",
   "workspaceEntryReveal": "在文件管理器中显示",
   "workspaceEntrySessionSkills": "技能",
-  "workspaceEntryAllowAll": "本会话全部允许",
-  "workspaceEntryAllowAllSubtitle": "此对话中的 Shell 命令将不再需要批准。",
   "workspaceEntryEnvironment": "环境",
   "workspaceEntryManage": "管理工作区",
   "workspaceEntryCreate": "新建工作区…",
@@ -3839,8 +4047,8 @@
   "skillsImportExtracting": "正在解压…",
   "skillsImportInstalling": "正在安装…",
   "skillsImportGitHubRepoLabel": "仓库地址",
-  "skillsImportGitHubHelp": "支持仓库根目录或子目录下的 SKILL.md",
   "skillsImportGitHubUrlHint": "https://github.com/owner/repo 或 owner/repo[/path]",
+  "skillsImportGitHubHelp": "支持仓库根目录或子目录下的 SKILL.md",
   "skillsEmptyHint": "技能是带 frontmatter 的 SKILL.md，导入后助手可按需调用",
   "skillsMoreActions": "更多",
   "skillsSearchClear": "清除",
@@ -3938,7 +4146,7 @@
   "workspaceEnvRelativeHoursAgo": "{count} 小时前",
   "workspaceEnvRelativeDaysAgo": "{count} 天前",
   "workspaceEnvDownloadLine": "{downloaded} / {total} · {phase}",
-  "workspaceEnvNativeUnsandboxed": "命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。",
+  "workspaceEnvNativeUnsandboxed": "命令在本机直接运行（无沙盒），除非此对话已启用完全访问，否则需要批准。",
   "workspaceEnvRootfsTitle": "/",
   "workspaceEnvBrowserUnavailable": "沙盒文件系统不可用。",
   "workspaceEnvMirrorNameOfficial": "官方",
@@ -4229,10 +4437,10 @@
   "mcpImportPaste": "从剪贴板粘贴",
   "mcpImportPreview": "预览",
   "mcpImportConfirm": "导入",
-  "startupRecoverySnapshotTitle": "从数据库快照恢复",
+  "startupRecoverySnapshotTitle": "从本地副本找回",
   "startupRecoverySnapshotBody": "即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 Kelivo，卸载会一并删除这些快照。",
   "startupRecoverySnapshotEmpty": "未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。",
-  "startupRecoverySnapshotButton": "选择快照恢复",
+  "startupRecoverySnapshotButton": "选择副本恢复记录",
   "startupRecoverySnapshotConfirm": "将聊天和设置恢复到 {when} 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，Kelivo 将重启以完成恢复。",
   "startupRecoverySnapshotFailed": "无法准备快照恢复：{reason}",
   "startupRecoverySnapshotReady": "快照已准备好，请重启 Kelivo 完成恢复。",
@@ -4385,7 +4593,7 @@
   "oauthLastUpdated": "更新于 {time}",
   "oauthSyncModels": "同步",
   "oauthSyncing": "正在同步模型…",
-  "oauthModelsHint": "可用模型由账号同步。",
+  "oauthModelsHint": "可用模型由账号同步。选择要在模型列表中启用的模型，选择会在同步和重新登录后保留。",
   "oauthNoModels": "同步模型后即可开始对话",
   "oauthConnection": "接入",
   "oauthConnectionInfo": "接入信息",
@@ -4408,6 +4616,21 @@
   "oauthResetsAt": "重置于 {time}",
   "oauthUsedValue": "已用 {value}",
   "oauthNetworkError": "连接失败，请检查网络后重试。",
+  "oauthDnsError": "DNS 解析失败，请检查网络或代理的 DNS 设置。",
+  "oauthTlsError": "TLS 安全连接失败，请检查网络或代理的证书配置。",
+  "oauthProxyError": "代理连接失败，请检查代理地址和认证设置。",
+  "oauthConnectionError": "连接失败或中断，请检查网络或代理设置。",
+  "oauthConnectionTimeout": "连接服务器超时，请检查网络或代理设置。",
+  "oauthSendTimeout": "发送请求超时，请检查网络后重试。",
+  "oauthReceiveTimeout": "等待服务器响应超时，请重试。",
+  "oauthRequestTimeout": "请求超时，请检查网络或代理设置后重试。",
+  "oauthFailureStage": "失败阶段：{stage}",
+  "oauthStageRequestDeviceCode": "申请设备码",
+  "oauthStageWaitDeviceAuthorization": "等待设备授权",
+  "oauthStagePrepareBrowser": "准备浏览器登录",
+  "oauthStageBrowserAuthorization": "浏览器授权与回调",
+  "oauthStageExchangeToken": "交换登录令牌",
+  "oauthStageRefreshToken": "刷新登录令牌",
   "oauthInvalidResponse": "授权未完成，请重试。",
   "oauthTimeout": "授权超时，请重试。",
   "oauthDenied": "授权未获批准，请重试。",
@@ -4425,6 +4648,13 @@
   "oauthInvalidAuthorizationCode": "请输入本次登录的授权码或回调链接。",
   "oauthSubmitAuthorizationCode": "完成登录",
   "oauthExtraUsage": "额外用量",
+  "oauthMonthlyTotal": "本月总额度",
+  "oauthMonthlyCode": "本月代码额度",
+  "oauthSpendCap": "积分消费上限",
+  "oauthOnDemand": "按需额度",
+  "oauthQuotaAdvisory": "仅供参考：本周额度仍有效，暂无法确认该月额度是否限制使用。",
+  "oauthCreditsValue": "{value} 积分",
+  "oauthRemainingValue": "剩余 {value}",
   "oauthPromptCachingHelp": "复用多轮对话中的上下文，可设置缓存保留时长。",
   "scheduledTasksPreparation": "执行与通知",
   "scheduledTasksAllowPreparation": "允许提前准备",
@@ -4541,5 +4771,1384 @@
   "mcpOAuthDiscovering": "正在发现授权服务器…",
   "mcpOAuthRegistering": "正在准备授权…",
   "mcpOAuthWaitingBrowser": "等待浏览器授权…",
-  "mcpOAuthExchangingToken": "正在完成登录…"
+  "mcpOAuthExchangingToken": "正在完成登录…",
+  "markdownPlaygroundTitle": "Markdown Playground",
+  "markdownPlaygroundSource": "Markdown 源码",
+  "markdownPlaygroundPreview": "渲染预览",
+  "markdownPlaygroundAst": "AST 语法树",
+  "markdownPlaygroundPlay": "逐字输入",
+  "markdownPlaygroundPause": "暂停",
+  "markdownPlaygroundResume": "继续",
+  "markdownPlaygroundShowAll": "显示全文",
+  "markdownPlaygroundWidth": "预览宽度",
+  "markdownPlaygroundTheme": "预览主题",
+  "markdownPlaygroundPlain": "选区纯文本",
+  "markdownPlaygroundMarkdown": "选区 Markdown",
+  "markdownPlaygroundSelectionHint": "在预览中选择文本，查看复制结果。",
+  "markdownPlaygroundEmpty": "输入 Markdown 开始预览。",
+  "markdownPlaygroundProgress": "已输入 {shown} / {total}",
+  "markdownCopyMarkdownAction": "复制为 Markdown",
+  "markdownCopyCsvAction": "复制 CSV",
+  "markdownCopyImageAction": "复制图片",
+  "markdownCodeLabel": "代码",
+  "markdownDetailsLabel": "详情",
+  "markdownMoreRows": "再显示 {count} 行",
+  "markdownNoteLabel": "备注",
+  "markdownTipLabel": "提示",
+  "markdownImportantLabel": "重要",
+  "markdownWarningLabel": "警告",
+  "markdownCautionLabel": "注意",
+  "markdownDangerLabel": "危险",
+  "markdownCopyRichTextAction": "复制富文本",
+  "markdownCopySelectionFailed": "复制所选内容失败。",
+  "recoveryMissingDataTitle": "检测到已有数据",
+  "recoveryMissingDataBody": "暂时找不到当前聊天数据库，Kelivo 已暂停载入，没有新建空数据库。我们会在下方查找旧副本，现有文件会保留。",
+  "recoveryEmptyDataTitle": "当前聊天记录为空",
+  "recoveryEmptyDataBody": "当前聊天列表为空，但找到了旧副本。可以从下方选择副本找回聊天记录，现有文件会保留。",
+  "recoveryKeepCurrent": "继续使用空聊天列表",
+  "recoveryKeepCurrentConfirm": "此操作不会找回之前的聊天，当前聊天列表将保持为空，旧副本会继续保留。如果想找回聊天，请取消并选择本地副本恢复。",
+  "recoverySearchingCopies": "正在查找并校验本机数据副本…",
+  "recoveryFoundCopies": "找到 {count} 份通过校验的副本。可以选择恢复聊天与设置，原文件会保留。",
+  "@recoveryFoundCopies": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryInvalidCopy": "{name}：校验未通过，原文件已保留。",
+  "@recoveryInvalidCopy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "recoverySearchFailed": "部分数据位置无法读取。现有文件已保留，请先导出数据副本再尝试其他恢复操作。",
+  "recoveryDiscoveredCopyBody": "在原存储目录或其他位置发现的副本。原文件会保留，恢复前会进行完整校验。",
+  "recoveryStorageFailureTitle": "数据存储需要检查",
+  "recoveryStorageFailureBody": "数据更新暂时未能完成，原数据已保留。可以尝试重新打开 Kelivo，或选择下方的本地副本恢复。",
+  "recoveryProtectingTitle": "正在保护聊天数据库",
+  "recoveryProtectingData": "正在复制并校验数据库。图片、附件和快照留在 Documents，不会重复复制；原数据库也会保留。",
+  "recoveryStorageReadyTitle": "聊天数据库已转存至 App 内部",
+  "recoveryStorageReadyBody": "存放聊天、助手和设置的数据库已转存至 App 内部。快照、图片和附件仍在系统“文件”App 可访问的 Documents 中，原数据库也已保留。若之前的聊天仍然缺失，可前往“设置 → 备份与恢复 → 本地副本”查看恢复副本。",
+  "recoveryRetainedData": "保留的原数据",
+  "recoveryNoValidCopies": "找到了数据副本，但没有副本通过校验。原文件均已保留，可以导出数据进一步排查。",
+  "recoveryStorageInsufficientSpaceBody": "存储空间不足，暂时无法安全地准备数据。请到系统设置释放一些空间，再重新打开 Kelivo，或重新检查下方的副本。请保留 Kelivo，不要删除它的数据和本地副本。",
+  "migrationFreshStartTitle": "已重新开始",
+  "migrationFreshStartSubtitle": "已新建空数据库，旧数据已保留。请重启 App 后继续使用。",
+  "migrationFreshStartFailedTitle": "重新开始未完成",
+  "migrationFreshStartFailedSubtitle": "旧数据已保留。请重试重新开始，或关闭并重新打开 App。",
+  "imageExportPreparing": "正在准备图片…",
+  "imageExportDiagrams": "正在准备图表 {completed}/{total}…",
+  "@imageExportDiagrams": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportCapturing": "正在截图 {completed}/{total}…",
+  "@imageExportCapturing": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageExportProcessing": "正在合成图片并准备预览…",
+  "imageExportSaving": "正在保存图片…",
+  "backupEncryptionTitle": "加密备份",
+  "backupEncryptionOffHint": "未加密的备份可被直接读取。",
+  "backupEncryptionOnHint": "备份将加密保存，重启应用后需重新输入口令。",
+  "backupEncryptionPasswordHint": "请妥善保存口令，遗忘后无法恢复备份。口令仅在内存中保留至退出应用。",
+  "backupEncryptionPassword": "口令",
+  "backupEncryptionConfirmPassword": "确认口令",
+  "backupEncryptionMismatch": "两次输入的口令不一致。",
+  "backupEncryptionShowPassword": "显示口令",
+  "backupEncryptionHidePassword": "隐藏口令",
+  "backupEncryptionUnlockTitle": "加密备份",
+  "backupEncryptionUnlockHint": "请输入创建这份备份时使用的口令。",
+  "backupEncryptionUnlock": "解锁",
+  "backupEncryptionFailed": "口令错误或备份已损坏，请重试或取消。",
+  "backupEncryptionInvalid": "加密备份不完整或格式无效。",
+  "backupEncryptionUnsupported": "此加密备份需要更新版本的 Kelivo。",
+  "backupProgressEncrypting": "正在加密备份",
+  "backupProgressDecrypting": "正在解密备份",
+  "mcpPageStatusFailed": "连接失败",
+  "mcpPageCardToolsShort": "工具 {enabled}/{total}",
+  "mcpPageSelectServer": "选择 {name}",
+  "mcpIconTitle": "服务器图标",
+  "mcpIconInvalid": "无法使用此图片，请选择不超过 10 MB 的有效图片。",
+  "mcpSelectServers": "选择服务器",
+  "mcpMoveToGroup": "移到分组",
+  "mcpRenameGroup": "重命名分组",
+  "mcpDeleteGroupConfirm": "组内服务器将移至「其他」，不会删除服务器。",
+  "mcpGroupNameInvalid": "请输入非空且不重复的分组名称。",
+  "mcpEnableSelected": "启用",
+  "mcpDisableSelected": "停用",
+  "mcpDeleteSelectedConfirm": "删除选中的 {count} 个服务器？",
+  "browserTitle": "浏览器",
+  "browserSearchHint": "搜索或输入网址",
+  "browserStartTitle": "下一站，去哪里？",
+  "browserStartSubtitle": "自由浏览，也可以让 Agent 帮你探索。",
+  "browserNewTab": "新建标签页",
+  "browserTabs": "标签页",
+  "browserCloseTab": "关闭标签页",
+  "browserClose": "关闭浏览器",
+  "browserBack": "后退",
+  "browserForward": "前进",
+  "browserReload": "重新加载",
+  "browserStop": "停止加载",
+  "browserMore": "更多",
+  "browserBookmarks": "书签",
+  "browserHistory": "历史记录",
+  "browserSettings": "浏览器设置",
+  "browserAddBookmark": "添加书签",
+  "browserRemoveBookmark": "移除书签",
+  "browserNoBookmarks": "收藏的网站会显示在这里。",
+  "browserNoHistory": "浏览记录会显示在这里。",
+  "browserSearchLibrary": "搜索已保存的页面",
+  "browserClearHistory": "清空历史记录",
+  "browserClearHistoryConfirm": "删除全部浏览记录？书签会保留。",
+  "browserToday": "今天",
+  "browserYesterday": "昨天",
+  "browserDelete": "删除",
+  "browserCancel": "取消",
+  "browserDone": "完成",
+  "browserFind": "在页面中查找",
+  "browserFindPreviousMatch": "上一个匹配项",
+  "browserFindNextMatch": "下一个匹配项",
+  "browserFindHint": "查找文字",
+  "browserSearchEngine": "搜索引擎",
+  "browserDesktopMode": "桌面版网站",
+  "browserDesktopModeDescription": "使用桌面版用户代理重新加载页面。",
+  "browserRestoreTabs": "恢复标签页",
+  "browserRestoreTabsDescription": "启动 Kelivo 时恢复上次的标签页。",
+  "browserSaveHistory": "保存浏览记录",
+  "browserSaveHistoryDescription": "在本地记录访问过的页面。",
+  "browserClearData": "清除网站数据",
+  "browserClearDataConfirm": "清除 Cookie、网站存储和缓存，并关闭全部标签页？网站登录状态也会清除。",
+  "browserDataCleared": "已清除网站数据",
+  "browserAgentControl": "Agent 控制",
+  "browserAgentWorking": "AI 正在操作",
+  "browserTakeOver": "接管",
+  "browserAgentPaused": "AI 操作已暂停",
+  "browserAllowAgent": "允许继续",
+  "browserAgentDescription": "在聊天中发送任务后，AI 才会操作浏览器。允许继续只解除暂停，不会自动发送消息或启动任务。",
+  "browserOpenExternal": "在默认浏览器打开",
+  "browserCopyLink": "复制链接",
+  "browserLinkCopied": "已复制链接",
+  "browserUnsupported": "此平台暂不支持内置浏览器。",
+  "browserStorageUnsupported": "此工作区应用需要 Android System WebView 或 Microsoft Edge WebView2 Runtime 152 及以上版本，请更新浏览器内核后重试。",
+  "browserLoadFailed": "无法加载此页面",
+  "browserRetry": "重试",
+  "browserFavorites": "个人收藏",
+  "browserEditBookmark": "编辑书签",
+  "browserBookmarkTitle": "标题",
+  "browserBookmarkUrl": "网址",
+  "browserSave": "保存",
+  "browserDownloads": "下载",
+  "browserNoDownloads": "下载的文件会显示在这里。",
+  "browserDownloadCancel": "取消下载",
+  "browserOpenDownload": "打开文件",
+  "browserDownloadFailed": "下载失败",
+  "browserAgentEnableHint": "在聊天工具中启用浏览器工具，再在这里允许控制。",
+  "browserSessionRequired": "从一个对话中打开浏览器，即可允许 Agent 控制。",
+  "browserDownloadCancelled": "已取消",
+  "browserAgentEnabled": "允许助手使用浏览器",
+  "browserAgentEnabledDescription": "开启后，助手可以浏览并操作这个浏览器中的页面。",
+  "browserToolTitle": "浏览器控制",
+  "browserToolSubtitle": "浏览并操作浏览器中已登录的网页。请先在浏览器设置中开启 Agent 控制。",
+  "browserOpen": "打开浏览器",
+  "browserInvalidUrl": "请输入有效的 HTTP 或 HTTPS 网址。",
+  "browserClearDataUnavailable": "Windows 浏览器引擎暂不支持清除全部网站数据。",
+  "browserSurfaceStyle": "表面样式",
+  "browserSurfaceLiquid": "液态玻璃",
+  "browserSurfaceFrosted": "磨砂",
+  "browserSurfaceSolid": "纯色",
+  "browserPageOptions": "页面选项",
+  "browserAskAi": "让 AI 处理此页",
+  "browserAskAiHint": "返回聊天，补充需求后发送。",
+  "browserAskAiCurrentPage": "浏览器当前页面",
+  "browserAskAiUnavailable": "当前会话不可用，请先从聊天中打开浏览器。",
+  "browserAskAiEditing": "请先完成或取消正在编辑的消息，再添加网页任务。",
+  "browserAskAiAssistantDisabled": "请先在此助手的工具中开启“浏览器控制”。",
+  "browserAskAiBrowserDisabled": "请先在浏览器设置中允许助手使用浏览器。",
+  "browserAskAiDraft": "请使用浏览器处理这个页面：\n{page}\n\n我的需求：",
+  "browserOpenFullPage": "完整页面打开",
+  "browserClosePanel": "关闭浏览器面板",
+  "browserSearchTabs": "搜索标签页",
+  "browserTabsCount": "{count} 个标签页",
+  "@browserTabsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserOpenInSidebar": "在侧栏打开",
+  "browserUserAgent": "用户代理（UA）",
+  "browserUserAgentMobile": "移动端",
+  "browserUserAgentDesktop": "桌面端",
+  "browserUserAgentCustom": "自定义",
+  "browserUserAgentHint": "输入自定义 User-Agent",
+  "browserUserAgentInvalid": "UA 仅支持可打印 ASCII 字符（英文字母、数字和英文符号），最多 2048 个字符。",
+  "browserUserAgentDescription": "更改后将重新加载当前网页。",
+  "browserStepsShowEarlier": "更早的 {count} 步",
+  "browserOpenThisPage": "在浏览器中打开",
+  "browserGroupToggleSemantics": "展开或收起浏览步骤",
+  "browserStepGroupTitle": "浏览网页",
+  "browserStepCount": "{count} 步",
+  "browserStepCurrent": "第 {count} 步",
+  "browserActionFailedCount": "· {count} 步失败",
+  "browserActionFailed": "{action}失败",
+  "browserCardOpen": "打开",
+  "browserCardEnable": "去开启",
+  "browserCardRunning": "正在{action}…",
+  "browserCardLive": "实时",
+  "browserCardOpenFailed": "未能打开页面",
+  "browserCardBlankPage": "空白页",
+  "browserCardTabCount": "{count} 个标签页",
+  "browserActionOpen": "打开网页",
+  "browserActionNewTab": "新建标签页",
+  "browserActionRender": "渲染页面",
+  "browserActionExtract": "提取正文",
+  "browserActionSnapshot": "读取页面结构",
+  "browserActionClick": "点击",
+  "browserActionType": "输入文字",
+  "browserActionPress": "按键",
+  "browserActionScroll": "滚动页面",
+  "browserActionWait": "等待页面",
+  "browserActionBack": "后退",
+  "browserActionForward": "前进",
+  "browserActionReload": "刷新页面",
+  "browserActionEvaluate": "执行脚本",
+  "browserActionSwitchTab": "切换标签页",
+  "browserActionCloseTab": "关闭标签页",
+  "browserActionListTabs": "查看标签页",
+  "browserActionUnknown": "浏览器操作",
+  "browserMetaChars": "{count} 字",
+  "browserMetaElements": "{count} 个元素",
+  "browserErrAgentDisabled": "浏览器控制未开启",
+  "browserErrStaleRef": "元素已失效，需重新读取页面",
+  "browserErrNotVisible": "元素不可见或被遮挡",
+  "browserErrNotFound": "未找到元素",
+  "browserErrTimeout": "页面加载超时",
+  "browserErrHumanControl": "你正在接管浏览器",
+  "browserErrTabClosed": "标签页已关闭",
+  "browserErrGeneric": "操作失败",
+  "browserDirectionUp": "上",
+  "browserDirectionDown": "下",
+  "browserDirectionLeft": "左",
+  "browserDirectionRight": "右",
+  "browserMetaTabs": "{count} 个",
+  "browserTabsCurrentConversation": "当前对话",
+  "browserTabsAll": "全部标签",
+  "browserTabsUnassigned": "个人标签",
+  "browserTabsUnknownConversation": "其他对话",
+  "browserTabsEmptyConversation": "这里还没有标签页。打开网页，或从「全部标签」中选择已有页面。",
+  "browserTabsNoResults": "没有匹配的标签页",
+  "browserMoveToConversation": "移到当前对话",
+  "browserReopenInConversation": "在当前对话重新打开",
+  "browserTabBusy": "助手仍在操作此页面，请等待任务完成或停止任务后再移动。",
+  "browserLiveViewLimit": "浏览器资源正在使用中，请等待任务结束后重试，或关闭不需要的页面。",
+  "browserAskAiInOwnerConversation": "让所属对话的 AI 处理",
+  "displaySettingsPageShowBrowserPageCardsTitle": "显示网页卡片",
+  "browserObserverHint": "AI 正在操作此页面，点击“接管”后可以操作网页。",
+  "genuiSurfaceTitle": "交互界面",
+  "genuiStatusStreaming": "生成中",
+  "genuiStatusInterrupted": "已中断",
+  "genuiStatusUnsaved": "尚未保存",
+  "genuiStatusUnsavedRetry": "点击重试保存",
+  "genuiReadOnlyUntilComplete": "生成完成后可操作",
+  "genuiReadOnlySnapshot": "只读快照",
+  "genuiPendingNode": "等待 {id}",
+  "@genuiPendingNode": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiViewSource": "查看源码",
+  "genuiCopySource": "复制源码",
+  "genuiExpand": "展开",
+  "genuiExpandedStub": "正在展开视图中操作",
+  "genuiMore": "更多",
+  "genuiReset": "重置为默认值",
+  "genuiRepair": "修复界面",
+  "genuiInvalidTitle": "这段界面无法渲染",
+  "genuiNodesFailed": "{count} 个节点无法显示",
+  "@genuiNodesFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiErrorLine": "第 {line} 行",
+  "@genuiErrorLine": {
+    "placeholders": {
+      "line": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiValueUnavailable": "无值",
+  "genuiFormulaInvalid": "这条公式无法显示",
+  "genuiNodeUnavailable": "此组件无法显示",
+  "genuiErrorHeader": "界面首行格式无效",
+  "genuiErrorVersion": "不支持此界面语言版本",
+  "genuiErrorCatalog": "不支持此组件目录",
+  "genuiErrorRoot": "根组件缺失或无效",
+  "genuiErrorSyntax": "声明格式不正确",
+  "genuiErrorDuplicateSymbol": "同一名称被重复定义",
+  "genuiErrorDuplicateProperty": "同一属性被重复定义",
+  "genuiErrorReservedName": "此名称是保留名称",
+  "genuiErrorUnknownComponent": "未知组件 {detail}",
+  "@genuiErrorUnknownComponent": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorUnknownProperty": "未知属性 {detail}",
+  "@genuiErrorUnknownProperty": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorMissingProperty": "缺少必需属性 {detail}",
+  "@genuiErrorMissingProperty": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiErrorBinding": "输入绑定不是有效的可写状态",
+  "genuiErrorReference": "组件引用无效",
+  "genuiErrorMissingReference": "被引用的内容尚未定义",
+  "genuiErrorDependency": "依赖的内容无法显示",
+  "genuiErrorCycle": "不支持循环引用",
+  "genuiErrorDuplicateParent": "同一组件不能出现在两个位置",
+  "genuiErrorUnreachableNode": "此组件未包含在根组件中",
+  "genuiErrorType": "值的类型不匹配",
+  "genuiErrorValue": "值不在支持的选项或范围内",
+  "genuiErrorSourceBudget": "界面源码超过大小上限",
+  "genuiErrorDeclarationBudget": "单条声明超过大小上限",
+  "genuiErrorDeclarationCount": "声明数量超过上限",
+  "genuiErrorComponentCount": "组件数量超过上限",
+  "genuiErrorInputCount": "输入数量超过上限",
+  "genuiErrorComponentDepth": "组件嵌套过深",
+  "genuiErrorExpressionDepth": "计算嵌套过深",
+  "genuiErrorFunction": "计算函数不受支持",
+  "genuiErrorAction": "此操作不受支持",
+  "genuiErrorNestedSample": "不支持嵌套采样",
+  "genuiErrorSample": "采样区间或数量无效",
+  "genuiErrorDataBudget": "数据超过支持的大小",
+  "genuiErrorRowKey": "每行需要唯一且非空的标识",
+  "genuiErrorDomain": "该值不在函数定义域内",
+  "genuiErrorDivisionByZero": "不能除以零",
+  "genuiErrorNonFinite": "计算结果不是有限数值",
+  "genuiErrorOperationsBudget": "计算操作量超过上限",
+  "genuiMetricTrend": "变化 {value}",
+  "@genuiMetricTrend": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiFormErrorsLeft": "还有 {count} 项需要修改",
+  "@genuiFormErrorsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiFieldRequired": "必填",
+  "genuiNumberRange": "范围 {min}–{max}",
+  "@genuiNumberRange": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiNumberMinimum": "最小值 {min}",
+  "@genuiNumberMinimum": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiNumberMaximum": "最大值 {max}",
+  "@genuiNumberMaximum": {
+    "placeholders": {
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiFieldTooShort": "至少 {min} 个字符",
+  "@genuiFieldTooShort": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiFieldTooLong": "最多 {max} 个字符",
+  "@genuiFieldTooLong": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiInvalidNumber": "请输入完整的有限数值",
+  "genuiChooseOption": "请选择一项",
+  "genuiFinishComposing": "请先完成输入法组字",
+  "genuiActionDisabledDep": "已停用：依赖的 {id} 无法显示",
+  "@genuiActionDisabledDep": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiActionUnavailable": "此视图暂不支持这项操作",
+  "genuiActionDisabled": "此界面已停用该操作",
+  "genuiFormUnavailable": "此表单包含无法显示的内容",
+  "genuiDecrease": "减少 {label}",
+  "@genuiDecrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiIncrease": "增加 {label}",
+  "@genuiIncrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiCharacterCount": "{used} / {max} 个字符",
+  "@genuiCharacterCount": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiBlockLimit": "每条消息最多渲染 3 个界面，其余以源码显示",
+  "genuiChartLine": "折线图",
+  "genuiChartArea": "面积图",
+  "genuiChartBar": "柱状图",
+  "genuiChartScatter": "散点图",
+  "genuiChartPie": "饼图",
+  "genuiChartDonut": "环形图",
+  "genuiChartEmpty": "所选区间没有数据",
+  "genuiChartAllHidden": "所有系列均已隐藏，可通过图例显示。",
+  "genuiChartSummary": "{kind}，{series} 个系列，{points} 行数据，{missing} 个值缺失（未连线，未填零）。",
+  "@genuiChartSummary": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "series": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartPieSummary": "{kind}，{count} 项，合计 {total}。",
+  "@genuiChartPieSummary": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartDomainGap": "未定义",
+  "genuiChartDomainSummary": "{count} 个采样点无定义；阴影区域不连线。",
+  "@genuiChartDomainSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartShowSeries": "显示 {name}",
+  "@genuiChartShowSeries": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartHideSeries": "隐藏 {name}",
+  "@genuiChartHideSeries": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiChartKeyboardHint": "左右方向键选择数据行，上下方向键选择系列，Esc 清除选择。",
+  "genuiChartTotal": "合计",
+  "genuiChartFieldsError": "请选择一个 X 字段和一到四个不同的 Y 字段。",
+  "genuiChartRecordsError": "图表数据必须是记录数组。",
+  "genuiChartXError": "X 值须全为数值或全为文本；散点图必须使用数值。",
+  "genuiChartYError": "Y 字段须存在，且只能包含数值或空值。",
+  "genuiChartPieError": "饼图数值必须非负，且总和须为大于零的有限数。",
+  "genuiChartMissingValues": "{count} 个值缺失，未填零。",
+  "@genuiChartMissingValues": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiChartNoVisibleValues": "所选系列没有可绘制的数值。",
+  "genuiChartUnit": "单位：{unit}",
+  "@genuiChartUnit": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "genuiSomeValuesUnavailable": "部分值无法计算",
+  "genuiViewChart": "图表",
+  "genuiViewData": "数据",
+  "genuiTableFilterHint": "筛选可见文本",
+  "genuiTableRows": "{count} 行",
+  "@genuiTableRows": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTablePageInfo": "第 {from}–{to} 行，共 {total} 行",
+  "@genuiTablePageInfo": {
+    "placeholders": {
+      "from": {
+        "type": "int"
+      },
+      "to": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTablePerPage": "{n} 行/页",
+  "@genuiTablePerPage": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "genuiTableEmpty": "没有匹配的行",
+  "genuiSortAsc": "升序",
+  "genuiSortDesc": "降序",
+  "genuiSortNone": "未排序",
+  "genuiValueTrue": "是",
+  "genuiValueFalse": "否",
+  "genuiTablePreviousPage": "上一页",
+  "genuiTableNextPage": "下一页",
+  "genuiTableCellsError": "表格数据必须是记录数组，单元格只能是有限标量或空值。",
+  "genuiTableColumnsError": "请选择 1–8 个不同的字段，并提供表头；小数位数可为 0–10。",
+  "genuiTableRowKeyError": "每行都需要一个非空值的标量标识。",
+  "genuiViewStateFailed": "保存状态过大，无法更改视图。请缩短输入或重置界面后重试。",
+  "genuiAttachState": "附带当前界面状态",
+  "genuiChipExactText": "将随消息发送的准确文本（已冻结）",
+  "genuiChipStale": "来源已失效 · 请移除或重新附带",
+  "genuiChipRemove": "移除附带的界面",
+  "genuiReplaceTitle": "替换已附带的界面？",
+  "genuiReplaceBody": "一份草稿只能附带一个界面状态。",
+  "genuiReplaceCurrent": "当前",
+  "genuiReplaceNew": "替换为",
+  "genuiReplaceConfirm": "替换",
+  "genuiMergeTitle": "合并到当前草稿？",
+  "genuiMergeConfirm": "合并",
+  "genuiContextEmpty": "没有附带参数或结果字段。",
+  "genuiContextOmitted": "[部分字段或数据行已省略。]",
+  "genuiChipOmitted": "此前附带的界面来源已失效，本条消息未附带其状态。",
+  "genuiDraftChanged": "草稿已发生变化，请重新附带。",
+  "genuiRepairDraft": "请根据以下诊断和源码片段修复这段界面。",
+  "genuiCopySourceMarkdown": "复制源码 / Markdown",
+  "genuiTextFailed": "无法读取界面状态，请重试。",
+  "genuiCopyLimit": "文本超过 64 KiB 复制上限，请选择较小的片段。",
+  "genuiExportSnapshot": "导出只读快照",
+  "genuiExpandedSharedState": "与消息内共享同一状态",
+  "genuiExportTooLarge": "图片超过 1600 万像素，请减少所选消息或导出较小的界面。",
+  "genuiWebTitle": "网页预览",
+  "genuiWebOpen": "打开",
+  "genuiWebNotReady": "生成完成后才可打开",
+  "genuiWebInvalidMeta": "首行元信息无效，未加载",
+  "genuiWebSandboxNote": "沙盒预览 · 关闭后不保留",
+  "genuiWebUnsupported": "此平台暂不支持内嵌网页预览，可导出后在浏览器中打开",
+  "genuiWebExportHtml": "导出 HTML",
+  "genuiWebInfo": "预览说明",
+  "genuiWebCspNote": "CSP: default-src 'none' · 限制网络访问 · 独立页面状态",
+  "genuiWebFailed": "预览初始化或加载失败。可查看或复制源码。",
+  "genuiWebEmpty": "元信息后没有 HTML 内容",
+  "genuiWebBlockLimit": "每条消息最多渲染 3 个网页预览，其余以源码显示",
+  "genuiWebCloseFailed": "无法确认上一个预览已关闭。请重启应用后再打开。",
+  "displaySettingsShowGenUiHeader": "显示交互界面标题栏",
+  "displaySettingsShowGenUiHeaderSubtitle": "关闭后更沉浸；源码与操作仍可从界面底部的更多菜单访问。",
+  "genuiClearFilter": "清除筛选",
+  "genuiClearSelection": "清除选择",
+  "chatInputBarQueuedPausedReason": "压缩未完成，不会自动发送",
+  "contextChanged": "历史已发生变化，请重新打开此操作并确认范围。",
+  "contextOperationSuperseded": "已并入后续摘要",
+  "compressIncludeAttachments": "附件文字与工具结果",
+  "contextEditCharacters": "{count} 字",
+  "compressOverSnack": "摘要过长，应用后会超出上下文上限，未应用",
+  "contextSummaryHint": "这是后续请求实际使用的摘要，保存不会改写已有回复。附件仅使用已有文字，不会额外识图。",
+  "compressAdvanced": "高级选项",
+  "compressTaskWaiting": "等待当前回复完成",
+  "contextBudgetExceeded": "预计上下文超过当前模型上限，请缩短摘要、重新压缩或选择上下文更大的模型。",
+  "contextManualSupplement": "将手工编辑的摘要作为补充",
+  "contextDetailEdited": "已人工编辑",
+  "contextSourceLabel": "摘要来源",
+  "contextImpactSourceTitle": "修改已压缩的原文？",
+  "chatInputBarQueuedCompressionFailed": "压缩失败，不会自动发送",
+  "contextTokenInfo": "摘要输入约 {before} tokens → 摘要约 {after} tokens",
+  "worldBookTransferFailed": "保存条目失败，请重试。",
+  "contextDetailKeptCount": "最近 {count} 条用户消息及其回复、工具过程",
+  "toolPermissionRequestApproval": "请求批准",
+  "compressNothingNew": "自上次压缩后没有新的可压缩内容",
+  "browserActionScreenshot": "截取页面",
+  "displaySettingsPageIosNativeSelectionMenuSubtitle": "用于输入框和消息选区；如遇卡顿可关闭，恢复原菜单。",
+  "contextUndoneSnack": "已撤销 · {from} → {to}",
+  "toolApprovalByFullAccess": "已自动执行",
+  "displaySettingsPageAutoScrollSubtitle": "开启后，流式输出时位于底部会自动跟随。上滑后保持阅读位置，主动回到底部后才继续跟随；关闭后不随新内容自动滚动。",
+  "toolApprovalRealTarget": "实际目标",
+  "compressTaskRetry": "重试",
+  "wsDeniedPathOutside": "目标不在授权区域内，已拒绝。",
+  "contextImpactSaveConfirm": "保存并撤销 {count} 个节点",
+  "contextRestore": "恢复",
+  "compressUsageOriginal": "原 {value}",
+  "toolApprovalPendingKind": "等待审批 · {kind}",
+  "contextTaskApplying": "正在应用摘要",
+  "storageSpaceImagesHint": "删除会影响聊天图片和工具结果。正在使用的头像与背景会受到保护。",
+  "displaySettingsPageIosNativeSelectionMenuTitle": "iOS 26+ 原生选择菜单",
+  "worldBookMoveEntries": "移动到…",
+  "compressReread": "重新读取已压缩的原始消息",
+  "chatInputBarQueuedPausedHold": "待发内容保持暂停，请取消排队后编辑或发送",
+  "contextSummaryTitle": "压缩摘要",
+  "contextKeepInvalid": "请输入正整数的用户消息数量。",
+  "compressTaskAbandon": "放弃",
+  "browserAgentTimedOut": "操作超时，AI 已暂停",
+  "compressCancelledSnack": "已取消压缩，当前上下文未改变",
+  "contextImpactClearTitle": "撤销较早的清除？",
+  "compressTaskWaitingApproval": "等待工具审批完成",
+  "contextTaskFailed": "压缩失败",
+  "wsDeniedSkillsReadonly": "技能目录只读。",
+  "compressTaskMerging": "正在合并摘要",
+  "toolPermissionFullAccessDesc": "允许此对话直接访问本机文件、运行命令及使用已启用的联网工具，不再逐次询问。",
+  "compressStaleSnack": "聊天内容已变化，压缩结果未应用",
+  "worldBookCopyEntries": "复制到…",
+  "contextEditEmpty": "摘要不能为空。如需丢弃全部旧历史，请使用“清空上下文”。",
+  "toolApprovalDenyWithReason": "拒绝并说明原因…",
+  "toolApprovalRequestedPath": "请求路径",
+  "toolApprovalScopeOnce": "仅授权本次调用",
+  "storageSpaceImageTypeLabel": "类型",
+  "contextImpactUndoTitle": "撤销较早的压缩？",
+  "contextOriginalMessages": "查看原始消息",
+  "storageSpaceDeleteImagesConfirmMessage": "删除 {count} 张图片？相关聊天图片、工具截图及其会话副本将无法再查看或使用。正在使用的头像与背景会保留。",
+  "chatInputBarQueuedAfterCompress": "压缩完成后发送",
+  "toolPermissionFullAccessDescMobile": "允许此对话在沙箱和已授权文件夹内自动执行工具，不再逐次询问。",
+  "compressTaskAdjustRetry": "调整选项后重试",
+  "contextDetailLegacy": "由旧版清除位置转换",
+  "contextDetailCurrent": "当前上下文",
+  "toolPermissionUndo": "撤销",
+  "contextDetailViewOriginals": "查看被压缩的原文",
+  "contextTaskCompleted": "压缩已完成",
+  "chatInputBarQueuedPaused": "已暂停",
+  "contextCompressMarker": "上下文已压缩",
+  "contextDetailParts": "自动分 {count} 段",
+  "contextEditPending": "已保存，当前回复结束后生效",
+  "contextTaskRetry": "重试压缩",
+  "contextUndoCompressTooltip": "撤销此次压缩",
+  "contextDividerCompressed": "压缩上下文",
+  "compressSuccessSnack": "上下文已压缩 · {from} → {to}",
+  "contextEffectiveHistory": "当前摘要及后续消息",
+  "compressRereadAll": "本段全部原文",
+  "contextDone": "完成",
+  "contextMore": "更多",
+  "compressFailedSnack": "压缩失败：{reason}",
+  "branchInheritNote": "只继承此处之前有效的上下文节点",
+  "contextTaskInterrupted": "压缩已中断，输入内容已保留",
+  "storageSpaceImageTypeAll": "全部",
+  "contextRangeInfo": "替代 {count} 条消息；原样保留最近 {keep} 条用户消息及后续回复。",
+  "contextInputModeInfo": "摘要输入：{mode} · {source}",
+  "contextDetailKept": "原样保留",
+  "worldBookEntriesCopied": "已复制 {count} 个条目",
+  "toolPermissionSaveFailed": "保存失败，权限未更改。",
+  "compressDiscardedSnack": "已清空上下文，进行中的压缩已废弃",
+  "browserActionSelect": "选择选项",
+  "toolPermissionTitle": "权限",
+  "contextDetailNext": "下次请求",
+  "contextTaskCancel": "取消压缩",
+  "toolPermissionFullAccess": "完全访问",
+  "chatInputBarQueuedCompressionCancelled": "压缩已取消，不会自动发送",
+  "toolPermissionResetSnack": "已更换工作区 · 此对话权限已恢复为请求批准",
+  "contextImpactUndoOne": "撤销",
+  "contextDetailContinueNewChat": "在新聊天继续",
+  "contextTaskPaused": "发送已暂停，可取消排队恢复编辑",
+  "contextTaskReview": "请检查摘要后再应用",
+  "compressApproxTokens": "约 {value} tokens",
+  "storageSpaceImageInUseHint": "请先在对应设置中更换或移除头像、背景或图标，再删除。",
+  "compressRereadLastLayer": "展开最近一层压缩",
+  "contextRestoreOperation": "恢复操作",
+  "contextOriginalHistory": "重新读取本段全部原文",
+  "contextImpactEditTitle": "保存较早的摘要？",
+  "contextOpenNewChat": "打开新聊天",
+  "wsPathChanged": "审批期间目标已变化。",
+  "contextEditUnknownPreview": "用量暂不可用，保存前会重新检查。",
+  "contextTaskWait": "等待当前回复和工具执行结束",
+  "compressTaskElapsed": "第 {i}/{n} 段 · 已用 {seconds} 秒",
+  "wsContextChanged": "对话上下文已变化，请求失效。",
+  "contextChangeImpact": "此次修改还会撤销 {count} 个受影响的上下文操作，原始消息保留。是否继续？",
+  "contextImpactSave": "保存",
+  "contextTaskProgress": "正在压缩 {done}/{total} 段",
+  "contextSummaryNotSmaller": "摘要没有比输入更短，请检查后再应用。",
+  "storageSpaceImageTypeTool": "工具图片",
+  "contextPreviousHistory": "重新读取最近一层压缩原文",
+  "contextDetailRead": "实际读取",
+  "contextViewGenerated": "查看已生成摘要",
+  "contextImpactDeleteDescription": "删除原文时，一并撤销相关摘要及依赖后继，避免继续发送残留内容。其他消息与独立节点保持不变。",
+  "storageSpaceImageTypeAvatar": "头像与背景",
+  "contextDetailAfterUndo": "撤销后",
+  "contextOperationUndo": "撤销此次上下文操作",
+  "contextHistoryWindowNote": "原样保留的历史仍受当前聊天“最多发送 {count} 条消息”的限制。",
+  "contextOverLimitWarning": "撤销后可能超出模型上下文上限，建议重新压缩。仍可撤销，发送前会再次检查。",
+  "storageSpaceImageTypeChat": "聊天图片",
+  "worldBookSelectEntries": "多选条目",
+  "compressUsageSummary": "预计摘要",
+  "contextDetailRange": "第 {from}–{to} 条 · {count} 条用户消息",
+  "contextOperationHidden": "已被后续清除隔开",
+  "contextUndoClearTooltip": "撤销此次清除",
+  "compressKeepDescription": "保留最近 {count} 条用户消息及其回复、工具过程；更早内容由摘要替代。纯附件消息也算一条。",
+  "contextOperationUndone": "已撤销",
+  "contextEditPreview": "保存后约 {value} tokens。输入时不影响当前生效内容。",
+  "contextDetailExcluded": "不再发送",
+  "worldBookNoMoveTargets": "请先创建另一本世界书，再移动条目。",
+  "worldBookSelectedEntries": "已选择 {count} 项",
+  "contextDetailReplaced": "被替代范围",
+  "displaySettingsPageAutoScrollEnabledLabel": "开启",
+  "contextChangeTitle": "确认上下文影响",
+  "contextDetailTitle": "压缩摘要",
+  "compressModelGlobal": "全局设置 · 本次启动后固定",
+  "wsDeniedMountReadonly": "只读挂载，不能写入。",
+  "compressRereadDesc": "处理多次压缩造成的信息损失，会增加本次用量",
+  "toolApprovalSwitchToFullAccess": "切换到完全访问",
+  "compressUsageInput": "本次摘要输入",
+  "contextDetailSummaryLabel": "实际用于后续请求的摘要",
+  "contextImpactDeleteTitle": "删除已压缩的原文？",
+  "compressAdvancedOff": "重读原文 关",
+  "contextOperationActive": "当前生效",
+  "compressAdvancedOn": "重读原文 开",
+  "contextTaskMerging": "正在合并摘要",
+  "contextSampledInfo": "本次只读取选定的 {count} 字符，摘要会替代整个选定历史范围。",
+  "contextDividerRunning": "正在压缩上下文",
+  "contextClearDetails": "此前聊天历史不再参与后续请求；系统提示、记忆和工具定义仍然生效。",
+  "compressCopyResult": "复制结果",
+  "contextDetailInUse": "当前直接使用",
+  "contextImpactDescription": "相关摘要将一并撤销；原始聊天消息保留，不会自动调用模型。独立的上下文节点保持不变。",
+  "compressIncludeAttachmentsDesc": "按原始顺序包含可用附件文字与完整工具记录；不会重新分析图片。",
+  "worldBookEntriesMoved": "已移动 {count} 个条目",
+  "contextImpactSourceDescription": "确认后变更原文，并撤销概括过它的摘要及依赖后继。其他消息与独立节点保留，不会自动调用模型。",
+  "contextEditTitle": "编辑摘要",
+  "compressUsageNext": "生效后下次请求",
+  "contextSummaryEmpty": "摘要不能为空；需要排除历史时请使用清除上下文。",
+  "toolApprovalDenied": "已拒绝",
+  "contextDetailModel": "模型 · 时间",
+  "compressIncludeManual": "纳入人工补充 · {count} 份",
+  "contextBudgetInfo": "下次请求估算（含输出预留）：{used} / {limit} tokens",
+  "contextTaskDismiss": "关闭状态提示",
+  "contextUndoBudgetInfo": "撤销后预计约 {used} tokens（含输出预留）",
+  "storageSpaceImageInUse": "使用中",
+  "worldBookSelectionDone": "完成",
+  "contextDividerFailed": "压缩失败",
+  "toolPermissionUnboundHint": "未绑定工作区：不会因此开启文件或 Shell 工具。",
+  "contextChangeWaiting": "等待当前回复和工具执行结束后生效。",
+  "storageSpaceDeletedUploadsPartial": "已删除 {deleted} 个项目；保留了 {kept} 个正在使用或无法删除的项目。",
+  "contextSourceScopeHint": "仅处理最近清除边界之后的历史，可能包含平时发送窗口之外的较早消息。",
+  "@toolApprovalPendingKind": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "contextTaskPreparing": "正在准备压缩",
+  "contextImpactUsage": "约 {from} → {to} tokens",
+  "contextImpactConfirm": "撤销 {count} 个节点",
+  "contextDividerEdited": "已编辑",
+  "compressAdjust": "调整",
+  "compressRegenerate": "重新压缩",
+  "toolPermissionEnabledSnack": "已为此对话启用完全访问",
+  "contextDetailSuperseded": "已由后续摘要替代",
+  "contextTaskQueued": "已排队，等待压缩完成",
+  "contextNewConversation": "使用摘要创建新聊天",
+  "contextUnknownLimit": "上限未知",
+  "browserErrActionTimeout": "操作超时，结果未确认，请检查页面后允许继续",
+  "toolPermissionRequestApprovalDesc": "工作区外文件访问、桌面命令和其他需要授权的工具将在执行前询问。",
+  "contextLimitedInputHint": "仅读取所选字符范围；被替代历史中的其余内容不会进入摘要，原始消息仍可回看。",
+  "contextTaskCancelled": "压缩已取消",
+  "contextDetailClearTitle": "上下文已清除",
+  "contextImpactKeep": "保持不变",
+  "contextImpactUndoAlso": "一并撤销",
+  "contextClearMarker": "上下文已清除",
+  "toolPermissionScopeThisChat": "仅此对话",
+  "dataDirectoryTitle": "数据存储目录",
+  "dataDirectoryChange": "更改目录",
+  "dataDirectoryChoose": "选择一个空的本地文件夹",
+  "dataDirectoryHint": "请选择本地磁盘上的空文件夹。聊天记录、附件和应用管理的文件将在重启后搬迁。少量设备设置和系统缓存仍保留在系统目录。",
+  "dataDirectoryPendingHint": "将在下次重启时搬迁。复制和校验完成前，原数据保持不变。目标目录：",
+  "dataDirectoryRestart": "重启并搬迁数据",
+  "dataDirectoryCancelMove": "取消搬迁，继续使用原目录",
+  "dataDirectoryPreviousHint": "已保留原数据副本。新目录成功启动后，可以清理旧副本以释放磁盘空间。再次更改目录前，请先清理此副本。",
+  "dataDirectoryCleanPrevious": "清理原数据副本",
+  "dataDirectoryCleanConfirm": "确定清理以下目录中的原数据副本？当前目录中的数据会保留，搬迁后发生变化的文件不会被删除。",
+  "dataDirectoryMoving": "正在搬迁并校验数据…请保持 Kelivo 开启。",
+  "dataDirectoryStartupFailed": "无法打开数据目录",
+  "dataDirectoryRetry": "重试",
+  "dataDirectoryUnavailable": "数据目录不可用。请重新连接磁盘，或将文件夹恢复到原位置后重试。应用不会创建空数据库。",
+  "dataDirectoryIdentityMismatch": "此文件夹与已设置的数据目录不匹配。请恢复原文件夹后重试。",
+  "dataDirectoryNotEmpty": "请选择空文件夹，不会覆盖已有文件。",
+  "dataDirectoryOverlap": "请选择当前数据目录之外的独立文件夹，不能选择其上级目录、子目录或磁盘根目录。",
+  "dataDirectoryLocalOnly": "请选择本地磁盘上的文件夹，不支持网络共享目录。",
+  "dataDirectoryFinishPrevious": "请先完成或取消待执行的搬迁，并清理保留的旧副本，再选择其他目录。",
+  "dataDirectoryPendingRestore": "有备份恢复尚未完成。请取消目录搬迁并重启，完成恢复后再更改目录。",
+  "dataDirectorySourceChanged": "原数据在复制后发生了变化，已保留原文件。若正在搬迁，请取消后重新开始；若正在清理，请先检查原目录。",
+  "dataDirectoryCopyChanged": "目标目录存在意外文件或文件变化，原数据已保留。请检查目标目录后重试。",
+  "dataDirectoryGenericError": "操作未完成。请检查磁盘剩余空间、文件夹权限，以及是否有其他 Kelivo 进程运行，然后重试。已有数据已保留。",
+  "dataDirectoryCancelHint": "取消搬迁会保留目标目录中已复制的文件，你可以检查后手动清理这些副本。",
+  "providerDetailPageBaseUrlExample": "例如 {url}",
+  "@providerDetailPageBaseUrlExample": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageApiKeyExample": "例如 sk-…",
+  "providerDetailPageRequestUrlLabel": "请求地址",
+  "providerDetailPageUrlWillAppendVersion": "未包含版本号，离开输入框时将自动补全 {v}",
+  "@providerDetailPageUrlWillAppendVersion": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageUrlAppendedVersion": "已自动补全 {v}",
+  "@providerDetailPageUrlAppendedVersion": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageUrlTrimmedSlash": "已去掉末尾的 /",
+  "providerDetailPageUrlMovedPath": "已识别完整地址，{path} 已移到「API 路径」",
+  "@providerDetailPageUrlMovedPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageUrlEmptyError": "未填写，无法发起请求",
+  "providerDetailPageUrlInvalidError": "地址格式不正确，需以 http:// 或 https:// 开头",
+  "providerDetailPageRestoreDefaultTooltip": "恢复默认地址",
+  "providerDetailPageClearTooltip": "清除",
+  "providerDetailPageTestSuccessWithLatency": "测试成功 · {ms} ms",
+  "@providerDetailPageTestSuccessWithLatency": {
+    "placeholders": {
+      "ms": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageTestFailedWithCode": "测试失败 · {code}",
+  "@providerDetailPageTestFailedWithCode": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDetailPageTestHintMissingVersion": "地址可能缺少版本号，试试 {url}",
+  "@providerDetailPageTestHintMissingVersion": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "providerAutoVersionAdded": "已自动补全 {v}",
+  "@providerAutoVersionAdded": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "providerUndo": "撤销",
+  "sidePanelToggle": "显示 / 收起侧面板",
+  "sidePanelFiles": "文件",
+  "sidePanelTopics": "话题",
+  "sidePanelExpand": "展开面板",
+  "sidePanelCollapse": "退出展开",
+  "sidePanelAllTabs": "全部标签",
+  "sidePanelMoreTabs": "另有 {count} 个",
+  "sidePanelSearchTabs": "搜索标签",
+  "sidePanelOpenFile": "打开文件…",
+  "sidePanelCloseOthers": "关闭其他标签",
+  "sidePanelCloseRight": "关闭右侧标签",
+  "sidePanelReopenTab": "重新打开关闭的标签",
+  "sidePanelPinned": "已固定 · 不可关闭",
+  "sidePanelMoveTopicsLeft": "把话题移回左侧…",
+  "sidePanelPinnedHint": "话题放在右侧时始终固定在面板最左。要移除，请在 设置 › 显示 › 话题位置 中改回左侧。",
+  "sidePanelEvictedTitle": "已释放",
+  "sidePanelEvictedBody": "这个网页在后台被释放以节省内存（最多保留 {count} 个后台网页）。重新加载后继续浏览。",
+  "sidePanelEvictedTooltip": "已释放 · 重新加载后继续",
+  "sidePanelFileMissing": "文件不可用",
+  "sidePanelFileMissingBody": "{path} 已被删除或移动。",
+  "sidePanelRelocate": "重新查找",
+  "sidePanelBackgroundIn": "在「{topic}」中运行",
+  "sidePanelWidth": "{px}px",
+  "sidePanelWidthMax": "最大",
+  "sidePanelWidthMin": "最小",
+  "sidePanelRecentFiles": "最近的输出和附件",
+  "sidePanelOpenExternalUrl": "在系统浏览器中打开网址…",
+  "sidePanelWebPages": "网页",
+  "hotkeyToggleSidePanel": "显示 / 收起侧面板",
+  "hotkeySidePanelNewWeb": "新建网页标签",
+  "hotkeySidePanelFiles": "显示文件",
+  "hotkeySidePanelExpand": "展开侧面板",
+  "hotkeySidePanelReopenTab": "重新打开关闭的标签",
+  "hotkeySidePanelNextTab": "下一个面板标签",
+  "hotkeySidePanelPreviousTab": "上一个面板标签",
+  "hotkeySidePanelAddress": "聚焦网页地址栏",
+  "hotkeySidePanelFocus": "切换聊天与面板焦点",
+  "selectionQuote": "引用",
+  "selectionQuoteMarker": "[引用{index}]",
+  "selectionTranslate": "翻译",
+  "selectionAiTranslateIos": "AI翻译",
+  "selectionCopyMarkdown": "复制为 Markdown",
+  "selectionCopyRich": "复制富文本",
+  "quoteJumpToSource": "跳到原文",
+  "quoteRemove": "移除引用",
+  "quoteDuplicate": "这段已在引用中",
+  "quoteLimit": "一条消息最多引用 10 段",
+  "quoteLocated": "已定位到引用原文",
+  "quoteSourceMissing": "原文已不存在",
+  "selectionRegenerate": "重新生成",
+  "translating": "正在翻译…",
+  "retry": "重试",
+  "recoveryGuideTitle": "帮你找回聊天记录",
+  "recoveryGuideBody": "Kelivo 暂时无法载入数据，已暂停操作。我们会查找本地副本，供你选择恢复。现有文件会保留。",
+  "recoverySpaceTitle": "需要一些存储空间",
+  "recoveryChecksNeedSpace": "找到了本地副本，但空间不足，暂时无法检查。这不代表副本已损坏。释放一些空间后，可以重新检查。",
+  "recoveryChecksUnavailable": "部分本地副本暂时无法检查，文件仍然保留。可以重新检查，或导出数据副本寻求帮助。",
+  "recoveryRecheckCopies": "重新检查本地副本",
+  "recoveryCopyPreview": "副本预览",
+  "recoveryRestoreRetryBody": "这次恢复尚未完成，选中的副本已保留。可以重新检查本地副本，或重新打开 Kelivo 继续。",
+  "recoverySpaceAmount": "上次检查：可用空间 {available}，安全准备数据至少需要预留 {required}。",
+  "recoveryCopiesNeedUpdate": "部分副本来自更新版本的 Kelivo，请升级 App 后再恢复。这些副本仍然保留。",
+  "imageContextAllowRecall": "允许模型回读历史图片",
+  "imageContextAllowRecallDescription": "允许模型按需读取本对话中的图片。关闭后不影响历史图片的自动管理。",
+  "imageContextTitle": "图片上下文",
+  "imageContextAutomatic": "自动管理历史图片",
+  "imageContextDescription": "管理本轮使用的图片，原图仍保留在聊天中。",
+  "imageContextIncluded": "本轮发送",
+  "imageContextOmitted": "本轮不发送",
+  "imageContextPin": "固定图片",
+  "imageContextUnpin": "取消固定",
+  "imageContextAttachAgain": "再次添加到输入框",
+  "imageContextEmpty": "还没有图片",
+  "imageContextUnavailable": "当前上下文无法读取这张图片。",
+  "imageContextEntryDescription": "查看和管理本轮使用的图片",
+  "imageContextAutomaticDescription": "优先保留你上传的图片，分批收起较早的工具图片。",
+  "imageContextActionsHint": "固定以优先保留，或再次添加到输入框。",
+  "imageContextEmptyDescription": "发送图片或让工具读取图片后，会显示在这里。",
+  "imageContextUserImages": "你上传的图片",
+  "imageContextToolImages": "工具图片",
+  "imageContextAssistantImages": "生成的图片",
+  "imageContextImageNumber": "图片 {index}",
+  "imageContextIncludedCount": "本轮发送 {included} / {total} 张",
+  "imageContextMissing": "图片不可用",
+  "imageContextLoadFailed": "暂时无法加载图片，请重试。",
+  "imageContextUpdateFailed": "未能保存修改，请重试。",
+  "contextOperationsTitle": "上下文操作记录",
+  "contextOperationsLoadMore": "展开更多",
+  "contextOperationsDescription": "管理压缩任务、摘要和上下文分界",
+  "contextOperationsEmpty": "暂无上下文操作记录。",
+  "contextOperationsStored": "已保存历史：{count} 条消息",
+  "contextOperationsEffective": "下次请求的历史部分：{summaries} 条摘要 + {messages} 条原始消息",
+  "contextOperationsScope": "已应用当前历史消息数量限制。系统提示、记忆、工具和未发送输入会额外加入上下文。点击记录可查看摘要、原始范围或撤销操作。",
+  "contextOperationsLoadFailed": "无法加载上下文概览，请重试。",
+  "compressNewConversation": "压缩并新建会话",
+  "compressNewConversationDescription": "新会话包含摘要和保留的消息，原会话保持不变。关闭后将在当前会话原位压缩。",
+  "@contextOperationsStored": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextOperationsEffective": {
+    "placeholders": {
+      "summaries": {
+        "type": "int"
+      },
+      "messages": {
+        "type": "int"
+      }
+    }
+  },
+  "contextViewBoundary": "跳转到分界位置",
+  "contextFixedStart": "固定上下文起点",
+  "contextSetFixedStart": "从此处开始上下文",
+  "contextCancelFixedStart": "取消固定上下文起点",
+  "contextFixedStartDescription": "从这条消息开始发送历史，不再按消息数量滚动截取。",
+  "contextBeforeFixedStart": "这条消息位于固定上下文起点之前，请先移动或取消起点再重新生成。",
+  "contextRegenerateFixedStart": "这条回复是固定上下文起点，其之前的问题已被排除。请将起点移到更早的消息，或取消起点后再重新生成。",
+  "responseSpeedLabel": "响应速度",
+  "responseSpeedStandard": "标准",
+  "responseSpeedUsageHint": "加速模式会消耗更多额度或余额。",
+  "responseSpeedLoading": "正在检查可用档位…",
+  "responseSpeedUnavailable": "当前模型没有可请求的加速档位。",
+  "responseSpeedSaveFailed": "响应速度保存失败，请重试。",
+  "responseSpeedRequestFailed": "{mode} 请求失败。请检查模型及账号是否支持，或切换为标准模式重试。",
+  "responseSpeedSelectionUnavailable": "之前选择的加速档位已不可用，此会话将使用标准模式。",
+  "responseSpeedProviderDependent": "是否支持加速取决于当前供应商。",
+  "responseSpeedTapTo": "点击切换为{mode}",
+  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要启用 Responses API。",
+  "compressionTemplate": "摘要模板",
+  "compressionGeneral": "通用",
+  "compressionCode": "代码",
+  "compressionWriting": "写作",
+  "compressionResearch": "研究",
+  "compressionRoleplay": "角色扮演",
+  "compressionOriginalPrompt": "我的原提示词",
+  "compressionMore": "更多设置",
+  "compressionFocus": "本次重点保留",
+  "compressionFocusHint": "可选：关键决定、任务进展、人物状态",
+  "compressionForConversation": "用于此会话",
+  "compressionFollowGlobal": "跟随全局默认",
+  "compressionSetGlobal": "设为全局默认",
+  "compressionGlobalDescription": "影响跟随全局默认的会话；已有会话覆盖保持不变。",
+  "compressionAutoTitle": "自动压缩",
+  "compressionAutoOff": "关闭",
+  "compressionAutoNotify": "仅提醒",
+  "compressionAutoOn": "自动",
+  "compressionNearLimit": "上下文接近估算容量，可以继续发送或手动压缩。",
+  "compressionKeepTurns": "保留最近",
+  "compressionKeepHint": "一轮包含一条用户消息及其后续回复、工具内容。",
+  "compressionLength": "摘要目标长度（tokens）",
+  "compressionTrigger": "触发阈值",
+  "compressionTarget": "压缩后目标",
+  "compressionWindow": "规划窗口",
+  "compressionRequests": "最多调用",
+  "compressionReference": "参考世界书与历史记忆",
+  "compressionReferenceHint": "仅按所选历史触发世界书，并使用其中已保存的记忆快照。参考用于理解人名与规则，不代表事件已经发生或角色已经知情。",
+  "compressionToolReferences": "以引用替代已读工具结果",
+  "compressionToolReferencesHint": "仅工具可用时生效。保留最新未读结果，可只读回查原记录。",
+  "compressionSummaryScan": "摘要参与世界书关键词匹配",
+  "compressionChatModel": "跟随当前对话模型",
+  "compressionManageTemplates": "管理模板与方案",
+  "compressionLocalPreview": "预览发送内容 · 不调用模型",
+  "compressionTry": "试生成摘要 · 会产生模型用量",
+  "compressionPreviewOnly": "仅生成候选，审阅后可应用。",
+  "compressionTemplateChanged": "新模板用于后续摘要。已有摘要保持原样；可从原文重新生成以补回细节。",
+  "compressionRange": "压缩 {count} 条历史 · 保留 {turns} 轮原文",
+  "compressionCalls": "模型调用 {count} 次",
+  "compressionActualUsage": "摘要模型实际用量",
+  "compressionUsageValues": "输入 {input} · 输出 {output} tokens",
+  "compressionUsageUnknown": "有 {count} 次调用未返回用量，不能视为免费。",
+  "compressionBudgetError": "预计调用数超过上限。请调高上限或选择更大窗口的摘要模型；未应用部分摘要。",
+  "compressionIncomplete": "摘要被截断或拒绝，未应用。请调整输出上限或模型。",
+  "compressionReferenceTooLarge": "模板、参考或工作摘要占满了摘要模型预算。请减少参考或选择更大窗口模型。",
+  "compressionReferenceChanged": "引用背景已改变，请审阅候选或重新生成。",
+  "compressionTargetNotReached": "候选未使完整请求降到自动触发线以下，已保留原上下文。",
+  "compressionTemplateMissing": "所选模板不可用，请选择其他模板。",
+  "compressionTemplates": "模板",
+  "compressionRecipes": "方案",
+  "compressionNewTemplate": "新建模板",
+  "compressionEditTemplate": "编辑模板",
+  "compressionRestoreDefault": "恢复默认",
+  "compressionCopyEdit": "复制并修改",
+  "compressionTemplateName": "名称",
+  "compressionPrompt": "摘要提示词",
+  "compressionLanguage": "输出语言",
+  "compressionLanguageConversation": "跟随对话",
+  "compressionLanguageLegacy": "沿用原模板语言行为",
+  "compressionLanguageHint": "语言名称或代码，或 conversation / legacy",
+  "compressionVariables": "支持以下变量；缺少历史变量时会自动附加历史：",
+  "compressionDeleteTemplate": "选择替代模板并删除？已接受的摘要和方案快照仍保留。",
+  "compressionTemplateReferences": "被 {count} 个会话单独引用。",
+  "compressionSaveRecipe": "保存当前设置为方案",
+  "compressionBindModel": "绑定所选摘要模型",
+  "compressionRecipeHint": "方案不会开启自动压缩；导入只加入库，不立即应用。",
+  "compressionImport": "导入 JSON",
+  "compressionExport": "导出 JSON",
+  "compressionCopyJson": "复制 JSON",
+  "compressionApplyRecipe": "应用方案",
+  "compressionInvalidSettings": "请检查参数：压后目标需低于触发阈值，调用数与 token 上限需有效。",
+  "compressionOverflowAction": "压缩一次后重试失败的回复",
+  "@compressionRange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "turns": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionCalls": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionUsageValues": {
+    "placeholders": {
+      "input": {
+        "type": "String"
+      },
+      "output": {
+        "type": "String"
+      }
+    }
+  },
+  "@compressionUsageUnknown": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@compressionTemplateReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionPlannedCalls": "预计 {count} 次请求 · 本次上限 {limit} 次（含重试）",
+  "@compressionPlannedCalls": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionGlobalTemplateReference": "同时用作全局默认模板。",
+  "compressionRecipeReferences": "{count} 个方案将保留各自独立的模板快照。",
+  "compressionReplacementTemplate": "替代模板",
+  "@compressionRecipeReferences": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionGeneralDescription": "保留当前话题、决定与未解决问题。",
+  "compressionCodeDescription": "区分代码改动、实际验证与下一步工作。",
+  "compressionWritingDescription": "保存已采纳文本、结构、文风与编辑要求。",
+  "compressionResearchDescription": "保留证据、来源、数值与不确定性。",
+  "compressionRoleplayDescription": "保持场景、人物状态与各角色的知识边界。",
+  "compressionLastUsed": "最近使用：{date}",
+  "@compressionLastUsed": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "compressionManage": "管理",
+  "compressionOutputSettings": "摘要设置",
+  "compressionSourceSettings": "参考与原文",
+  "compressionSavedSettings": "预览与方案",
+  "compressionNoRecipes": "暂无保存的方案",
+  "compressionNoTemplatesFound": "没有匹配的模板",
+  "compressionBuiltIn": "内置",
+  "compressionGlobalDefault": "全局默认",
+  "compressionCustomLanguage": "其他语言",
+  "compressionCustomLanguageHint": "语言名称或代码，例如日语 / ja",
+  "compressionLibraryTitle": "模板与方案",
+  "compressionBuiltInTemplates": "内置模板",
+  "compressionMyTemplates": "我的模板",
+  "compressionSearchTemplates": "搜索模板",
+  "compressionSearchRecipes": "搜索方案",
+  "compressionRecipeCreateHint": "在「更多设置」中将当前配置保存为方案。",
+  "compressionTurnUnit": "轮",
+  "compressionCallUnit": "次",
+  "compressionRequestTimeout": "压缩请求超时",
+  "compressionMinuteUnit": "分钟",
+  "compressionRequestTimeoutDefault": "默认",
+  "compressionRequestTimeoutHint": "输入正数，单位为分钟。留空沿用现有行为（原生压缩默认 5 分钟）。分段摘要的每段生成和合并请求分别计时。",
+  "compressionRequestTimedOut": "压缩请求超时（已等待 {minutes} 分钟）",
+  "@compressionRequestTimedOut": {
+    "placeholders": {
+      "minutes": {
+        "type": "num"
+      }
+    }
+  },
+  "compressionAdvancedOptions": "压缩细节",
+  "compressionAdvancedHint": "参考内容、原文回读与调用限制",
+  "compressionAutomaticWindow": "自动",
+  "compressionAutoOffHint": "需要时可在压缩页手动开始。",
+  "compressionAutoNotifyHint": "接近阈值时提醒，由你决定何时压缩。",
+  "compressionAutoOnHint": "达到阈值后自动整理较早历史，会产生额外模型用量。",
+  "compressionBudgetHint": "百分比以当前可用的输入预算为基准。",
+  "compressionPreviewAction": "本地预览",
+  "compressionSaveRecipeAction": "保存方案",
+  "compressionManualRange": "本次压缩范围",
+  "compressionScopeKeepHint": "保留最近原文，压缩更早历史；此轮数也用于自动压缩。",
+  "compressionScopeAllHint": "当前上下文的历史全部纳入摘要，不保留最近原文；原消息仍可查看。",
+  "compressionScopeStartHint": "按字符预算选取较早的完整消息，未选中的历史保留原文。",
+  "compressionScopeRecentHint": "按字符预算选取较近的完整消息，未选中的历史保留原文。",
+  "compressionAutoKeepHint": "自动压缩始终保留最近原文，不受本次范围选择影响；轮数与手动压缩共用。",
+  "requestBudgetTitle": "图片与请求预算",
+  "requestBudgetInherited": "继承默认",
+  "requestBudgetCustom": "自定义",
+  "requestBudgetReset": "恢复默认",
+  "requestBudgetSingleImage": "单张图片（MiB）",
+  "requestBudgetTotalImages": "图片合计（MiB）",
+  "requestBudgetImageCount": "图片数量",
+  "requestBudgetBody": "请求体（MiB）",
+  "requestBudgetProviderHelp": "这些是发送前的本地检查，不代表供应商上限。留空使用提示中的默认值。图片大小按 Base64 编码后计算；请求体大小包含完整 JSON。",
+  "requestBudgetModelHelp": "为此模型覆盖本地发送限制。留空继承提示中的供应商设置。图片大小按 Base64 编码后计算；请求体大小包含完整 JSON。",
+  "requestBudgetRetentionHelp": "调大限制不会增加自动保留的历史图片，可固定需要保留的图片。较大的预算会增加设备内存占用。",
+  "requestBudgetInvalid": "请输入正数大小和正整数图片数量，或留空继承默认值。",
+  "requestBudgetBytes": "{mib} MiB（{bytes} 字节）",
+  "requestBudgetSingleError": "Kelivo 本地预检：本次请求第 {index} 张图片编码后为 {actual}，超过单张预算 {limit}。",
+  "requestBudgetTotalError": "Kelivo 本地预检：图片编码后合计 {actual}，超过图片总预算 {limit}。",
+  "requestBudgetCountError": "Kelivo 本地预检：本次请求包含 {actual} 张图片，超过数量上限 {limit} 张。",
+  "requestBudgetBodyError": "Kelivo 本地预检：完整请求体为 {actual}，超过请求体预算 {limit}。",
+  "requestBudgetPinnedError": "这张图片已固定。",
+  "requestBudgetImageHint": "打开“图片上下文”查看本轮图片及固定状态。可缩小或减少图片、取消固定旧图片，或在供应商／模型设置中调整预算。",
+  "requestBudgetBodyHint": "请缩短或压缩会话上下文（包括工具记录），或在供应商／模型设置中调整请求体预算。",
+  "imageContextEncodedSize": "编码后 {size} MiB",
+  "imageContextPinned": "已固定",
+  "imageContextSizeUnknown": "大小待发送时确认",
+  "requestBudgetAtLeast": "至少 {value}",
+  "compressionNativeTitle": "使用 OpenAI 原生压缩",
+  "compressionNativeHint": "使用当前对话模型和 Responses 协议；本会话开启自动压缩时也使用原生方式，支持情况由服务端决定。",
+  "compressionNativeScopeHint": "保留最近原文，压缩较早历史；此轮数也用于原生自动压缩，不修改文本摘要的保留轮数。",
+  "compressionNativeLabel": "原生压缩",
+  "compressionNativeDescription": "已在本地保存服务端返回的原生上下文，用于后续请求，无法作为文本查看或编辑。原始消息仍保留，可以撤销本次压缩。",
+  "compressionNativeIncomplete": "服务端未返回完整的原生压缩结果，原上下文未改变。",
+  "compressionNativeScopeChanged": "此原生上下文属于其他连接或账号。请切回原连接继续，或在保留原文的会话中撤销压缩、重新生成文字摘要。",
+  "compressionNativeTokenHint": "原生上下文的 token 用量以服务端统计为准。",
+  "compressionNativeCopyHint": "新会话仅保存完整的原生压缩结果和保留的最近对话。原文留在原会话，无法在新会话中撤销恢复。",
+  "compressionNativeInputOverride": "自定义 input 字段会覆盖原生压缩数据。请先移除供应商、模型或助手设置中的 input 参数，再继续对话。",
+  "compressionNativeAllHint": "将当前上下文的全部历史提交给原生压缩，不另外保留最近原文。原始消息仍可查看。",
+  "compressionNativeAutoHint": "达到阈值时，用当前对话模型执行原生压缩后继续发送。失败时保留原上下文，不会改用文本摘要。",
+  "languageDisplayRussian": "俄语",
+  "languageDisplayTurkish": "土耳其语",
+  "sideDrawerDeleteConfirmContent": "删除“{title}”？",
+  "backupPageCherryImportWarning": "此功能目前仍处于实验阶段，可导入助手、对话、供应商和文件。部分供应商需要在基础 URL 后添加 /v1 或 /v1beta。为确保数据安全，请在导入前备份。是否继续选择文件？",
+  "themePaletteDefault": "默认",
+  "themePaletteBlue": "海霄蓝",
+  "themePaletteGreen": "竹影绿",
+  "themePalettePurple": "暮紫韵",
+  "themePaletteYellow": "琥珀金",
+  "themePaletteSmokyRose": "暮霭玫",
+  "themePaletteTerracotta": "陶砂红",
+  "themePaletteMonochrome": "纸墨灰",
+  "themePaletteDocument": "樱桃绿",
+  "themePaletteCustom": "自定义",
+  "@sideDrawerDeleteConfirmContent": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "compressionNativeImported": "已载入原生压缩上下文",
+  "compressionNativeImportedDescription": "此会话以完整的原生压缩结果和保留的最近对话开始。压缩结果无法作为文本查看或编辑；较早的原文保留在原会话，不能在此撤销恢复。",
+  "compressionNativeOpenSource": "查看原会话",
+  "compressionNativeOriginalsUnavailable": "此会话没有已载入原生上下文对应的原文。可继续使用原生压缩，或返回原会话查看原文、重新生成文字摘要。",
+  "compressionNativeTemporaryCopyHint": "新的临时会话仅保留完整的原生压缩结果和最近对话。离开旧临时会话后，它及未保留的原文会被清除，无法在新会话中恢复。",
+  "compressionNativeSourceUnavailable": "此会话保存了完整的原生压缩结果和保留的最近对话。原会话已不可用，未复制到此处的原文无法恢复，原生结果也无法作为文本查看或编辑。",
+  "modelDetailSheetImageGenerationModel": "生图模型",
+  "modelDetailSheetImageGenerationAuto": "自动",
+  "modelDetailSheetImageGenerationComplexity": "生图复杂度",
+  "modelDetailSheetImageGenerationComplexityDefault": "默认",
+  "modelDetailSheetImageGenerationComplexityLow": "低",
+  "modelDetailSheetImageGenerationComplexityMedium": "中",
+  "modelDetailSheetImageGenerationComplexityHigh": "高",
+  "modelDetailSheetImageGenerationComplexityDescription": "独立控制生图规划程度。默认使用服务端行为，可能沿用聊天思考档位。",
+  "modelDetailSheetImageGenerationOAuthHint": "ChatGPT 登录通道可能替换所选生图模型，模型和复杂度设置能否生效取决于服务端支持。",
+  "imageGenerationComplexityErrorHint": "请将聊天思考档位切换为“自动”，生图复杂度设为“默认”，然后重试生图。ChatGPT 登录通道可能替换所选生图模型或不支持显式复杂度。",
+  "workspaceEnvNativeShellTitle": "默认 Shell",
+  "workspaceEnvNativeShellHint": "留空时自动检测，也可填写 PowerShell、cmd 或支持 -lc 的 Shell（如 bash、zsh、fish）的绝对路径。此设置仅用于本机。",
+  "workspaceEnvNativeShellInvalid": "无法启动此 Shell，请检查绝对路径及其支持的命令语法。",
+  "workspaceEnvNativeShellUnavailable": "Shell 不可用",
+  "workspaceEnvNativeShellDetect": "重新检测",
+  "workspaceEnvNativeShellSave": "保存",
+  "desktopAutostartTitle": "开机自启动",
+  "desktopAutostartDescription": "登录这台电脑后自动启动 Kelivo。",
+  "desktopAutostartHiddenTitle": "自启动后隐藏到托盘",
+  "desktopAutostartHiddenDescription": "需要开启自启动和托盘图标。手动打开 Kelivo 时仍会显示窗口。",
+  "desktopAutostartUnsupported": "开机自启动需要 macOS 13 或更高版本。",
+  "desktopAutostartError": "无法应用启动设置。请检查系统启动项或登录项中的 Kelivo 设置后重试。",
+  "compressionOutputBudget": "总输出上限（tokens）",
+  "compressionOutputBudgetHint": "包含推理和摘要正文。留空时使用摘要目标长度；开启思考时可单独提高此上限，不会增加摘要目标长度。实际额度仍受模型输出上限限制。",
+  "responseOutputLimitReached": "回复已截断：输出额度包含推理内容。请提高输出上限或降低推理强度后重试。",
+  "responseContextLimitReached": "回复已截断：本次请求输入为 {inputTokens} token，接近 {contextWindow} token 的上下文上限。请缩短上下文后重试。",
+  "responseRetryWithoutImages": "不发送图片重试（保留原图）"
 }

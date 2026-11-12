@@ -1,3 +1,7 @@
+import '../../network/provider_http_exception.dart';
+import '../request_history_context.dart';
+import '../request_image_context.dart';
+import '../../../utils/provider_url.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -31,10 +35,10 @@ import 'google/google_decoder.dart';
 import 'google_gemini.dart';
 import 'google_vertex.dart';
 
-/// Builds the Gemini tools array, handling Gemini 3 coexistence vs 2.x mutual exclusion.
+/// Builds the Gemini tools array, handling Gemini 3+ coexistence vs 2.x mutual exclusion.
 ///
-/// Gemini 3: built-in tools can coexist with function_declarations (MCP).
-/// Gemini 2.x and below: code_execution is exclusive; search/url_context exclude MCP.
+/// Gemini 3+: built-in tools can coexist with functionDeclarations (MCP).
+/// Gemini 2.x and below: codeExecution is exclusive; search/urlContext exclude MCP.
 List<Map<String, dynamic>> _buildGeminiToolsArray({
   required Set<String> builtIns,
   required bool allowCoexistence,
@@ -43,27 +47,27 @@ List<Map<String, dynamic>> _buildGeminiToolsArray({
   final toolsArr = <Map<String, dynamic>>[];
   if (allowCoexistence) {
     if (builtIns.contains(BuiltInToolNames.codeExecution)) {
-      toolsArr.add({'code_execution': {}});
+      toolsArr.add({'codeExecution': {}});
     }
     if (builtIns.contains(BuiltInToolNames.search)) {
-      toolsArr.add({'google_search': {}});
+      toolsArr.add({'googleSearch': {}});
     }
     if (builtIns.contains(BuiltInToolNames.urlContext)) {
-      toolsArr.add({'url_context': {}});
+      toolsArr.add({'urlContext': {}});
     }
     if (geminiTools != null) {
       toolsArr.addAll(geminiTools);
     }
   } else {
     if (builtIns.contains(BuiltInToolNames.codeExecution)) {
-      toolsArr.add({'code_execution': {}});
+      toolsArr.add({'codeExecution': {}});
     } else if (builtIns.contains(BuiltInToolNames.search) ||
         builtIns.contains(BuiltInToolNames.urlContext)) {
       if (builtIns.contains(BuiltInToolNames.search)) {
-        toolsArr.add({'google_search': {}});
+        toolsArr.add({'googleSearch': {}});
       }
       if (builtIns.contains(BuiltInToolNames.urlContext)) {
-        toolsArr.add({'url_context': {}});
+        toolsArr.add({'urlContext': {}});
       }
     } else if (geminiTools != null) {
       toolsArr.addAll(geminiTools);
@@ -150,31 +154,69 @@ Future<List<Map<String, dynamic>>> _googleFunctionResponsePartsFromToolMessage(
   Map<String, dynamic> message, {
   required bool canImageInput,
 }) async {
-  final name = (message['name'] ?? '').toString();
-  final result = await ToolResultContent.read(
-    name,
-    (message['content'] ?? '').toString(),
-    metadata: (message['metadata'] as Map?)?.cast<String, dynamic>(),
-    canImageInput: canImageInput,
-  );
-  final content = result.text;
-  Map<String, dynamic> response;
-  try {
-    response = (jsonDecode(content) as Map).cast<String, dynamic>();
-  } catch (_) {
-    response = {'result': content};
-  }
-  final part = <String, dynamic>{
-    'functionResponse': {'name': name, 'response': response},
-  };
   final google = _googleToolMetadata(message);
   final rawPart = google?['part'];
   final rawFunctionCall = rawPart is Map ? rawPart['functionCall'] : null;
-  final id = rawFunctionCall is Map ? rawFunctionCall['id']?.toString() : null;
-  if (id != null && id.isNotEmpty) {
-    (part['functionResponse'] as Map<String, dynamic>)['id'] = id;
+  return _googleFunctionResponseParts(
+    (message['name'] ?? '').toString(),
+    (message['content'] ?? '').toString(),
+    metadata: (message['metadata'] as Map?)?.cast<String, dynamic>(),
+    canImageInput: canImageInput,
+    id: rawFunctionCall is Map ? rawFunctionCall['id']?.toString() : null,
+    toolCallId: message['tool_call_id']?.toString(),
+  );
+}
+
+/// Gemini requires every call of a parallel batch to be answered in one user
+/// turn, so a tool message following another joins its turn.
+void _addGoogleFunctionResponseParts(
+  List<Map<String, dynamic>> contents,
+  List<Map<String, dynamic>> parts,
+) {
+  final last = contents.lastOrNull;
+  final lastParts = last?['parts'];
+  if (last?['role'] == 'user' &&
+      lastParts is List<Map<String, dynamic>> &&
+      lastParts.firstOrNull?['functionResponse'] != null) {
+    lastParts.addAll(parts);
+    return;
   }
-  return [part, ...result.googleImageParts];
+  contents.add({'role': 'user', 'parts': parts});
+}
+
+/// The `functionResponse` part answering call [id], then the result's images.
+Future<List<Map<String, dynamic>>> _googleFunctionResponseParts(
+  String name,
+  String content, {
+  Map<String, dynamic>? metadata,
+  required bool canImageInput,
+  String? id,
+  String? toolCallId,
+}) async {
+  final result = await ToolResultContent.read(
+    name,
+    content,
+    metadata: metadata,
+    toolCallId: toolCallId ?? id,
+    canImageInput: canImageInput,
+  );
+  Map<String, dynamic> response;
+  try {
+    response = (jsonDecode(result.text) as Map).cast<String, dynamic>();
+  } catch (_) {
+    response = {'result': result.text};
+  }
+  return [
+    {
+      if (toolCallId != null) toolSourceKey: toolCallId,
+      'functionResponse': {
+        'name': name,
+        'response': response,
+        if (id != null && id.isNotEmpty) 'id': id,
+      },
+    },
+    ...result.googleImageParts,
+  ];
 }
 
 List<Map<String, dynamic>> _googleApiContents(
@@ -243,9 +285,7 @@ const Set<String> _geminiBlockedFinishReasons = {
   'IMAGE_SAFETY',
 };
 
-/// Surfaces candidate-level content filtering (`finishReason: SAFETY` etc.)
-/// as a stream error so truncated output is not persisted as a normal finish.
-void _throwIfGeminiCandidateBlocked(String data) {
+void _throwIfGeminiStreamCandidateFailed(String data) {
   if (!data.contains('finishReason')) return;
   Object? decoded;
   try {
@@ -258,15 +298,24 @@ void _throwIfGeminiCandidateBlocked(String data) {
   if (candidates is! List) return;
   for (final cand in candidates) {
     if (cand is! Map) continue;
-    final reason = (cand['finishReason'] ?? '').toString().trim();
-    if (!_geminiBlockedFinishReasons.contains(reason)) continue;
-    final message = (cand['finishMessage'] ?? '').toString().trim();
-    throw HttpException(
-      message.isEmpty
-          ? 'Response blocked ($reason)'
-          : 'Response blocked ($reason): $message',
-    );
+    _throwIfGeminiCandidateFailed(cand);
   }
+}
+
+/// Surfaces candidate-level filtering and malformed function calls as errors
+/// instead of persisting an empty or truncated reply as a normal finish.
+void _throwIfGeminiCandidateFailed(Map candidate) {
+  final reason = (candidate['finishReason'] ?? '').toString().trim();
+  final String summary;
+  if (reason == 'MALFORMED_FUNCTION_CALL') {
+    summary = 'Gemini function call failed ($reason)';
+  } else if (_geminiBlockedFinishReasons.contains(reason)) {
+    summary = 'Response blocked ($reason)';
+  } else {
+    return;
+  }
+  final message = (candidate['finishMessage'] ?? '').toString().trim();
+  throw HttpException(message.isEmpty ? summary : '$summary: $message');
 }
 
 Stream<StreamChunk> sendGoogleStream(
@@ -313,6 +362,7 @@ Stream<StreamChunk> sendGoogleStream(
   }
 
   final upstreamModelId = apiModelId(config, modelId);
+  RequestHistoryContext.current?.format = HistoryWireFormat.google;
   final bool mixedBuiltInAndFunctionTools =
       supportsMixedBuiltInAndFunctionTools(upstreamModelId);
   final builtIns = builtInTools(config, modelId);
@@ -322,199 +372,194 @@ Stream<StreamChunk> sendGoogleStream(
   final bool persistGeminiThoughtSigs =
       effective.reasoning.replay != ReasoningReplayPolicy.none;
   final wantsImageOutput = effective.output.contains(Modality.image);
+  final lastUserIndex = lastUserInputIndex(messages);
   // Non-streaming path: use generateContent
   if (!stream) {
     final isVertex = config.vertexAI == true;
-    final base = config.baseUrl.endsWith('/')
-        ? config.baseUrl.substring(0, config.baseUrl.length - 1)
-        : config.baseUrl;
-    String url;
-    if (isVertex &&
-        (config.projectId?.isNotEmpty == true) &&
-        (config.location?.isNotEmpty == true)) {
-      url =
-          'https://aiplatform.googleapis.com/v1/projects/${config.projectId}/locations/${config.location}/publishers/google/models/$upstreamModelId:generateContent';
-    } else {
-      url = '$base/models/$upstreamModelId:generateContent';
-    }
+    final url = resolveRequestUrl(
+      config,
+      modelId: upstreamModelId,
+      stream: false,
+    );
 
     // Extract system messages into systemInstruction (Google Gemini API best practice)
     String systemPrompt = '';
     final contents = <Map<String, dynamic>>[];
     for (int i = 0; i < messages.length; i++) {
       final msg = messages[i];
-      final roleRaw = (msg['role'] ?? 'user').toString();
-      if (roleRaw == 'system') {
-        final s = (msg['content'] ?? '').toString();
-        if (s.isNotEmpty) {
-          systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
+      final sourceStart = contents.length;
+      try {
+        final roleRaw = (msg['role'] ?? 'user').toString();
+        if (roleRaw == 'system') {
+          final s = (msg['content'] ?? '').toString();
+          if (s.isNotEmpty) {
+            systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
+          }
+          continue;
         }
-        continue;
-      }
-      final role = roleRaw == 'assistant' ? 'model' : 'user';
-      if (roleRaw == 'tool') {
-        contents.add({
-          'role': 'user',
-          'parts': await _googleFunctionResponsePartsFromToolMessage(
-            msg,
-            canImageInput: effective.input.contains(Modality.image),
-          ),
-        });
-        continue;
-      }
-      if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
+        final role = roleRaw == 'assistant' ? 'model' : 'user';
+        if (roleRaw == 'tool') {
+          _addGoogleFunctionResponseParts(
+            contents,
+            await _googleFunctionResponsePartsFromToolMessage(
+              msg,
+              canImageInput: effective.input.contains(Modality.image),
+            ),
+          );
+          continue;
+        }
+        if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
+          final parts = <Map<String, dynamic>>[];
+          final raw = _geminiHistoryText(msg);
+          if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
+            parts.add({'text': raw});
+          }
+          for (final tc in msg['tool_calls'] as List) {
+            if (tc is! Map) continue;
+            final part = _googleFunctionCallPartFromToolCall(tc);
+            if (part != null) parts.add(part);
+          }
+          if (persistGeminiThoughtSigs) {
+            _ensureGeminiFunctionCallThoughtSig(parts);
+          }
+          if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
+          continue;
+        }
+        final isLast = i == lastUserIndex;
         final parts = <Map<String, dynamic>>[];
-        final raw = _geminiHistoryText(msg);
-        if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
-          parts.add({'text': raw});
-        }
-        for (final tc in msg['tool_calls'] as List) {
-          if (tc is! Map) continue;
-          final part = _googleFunctionCallPartFromToolCall(tc);
-          if (part != null) parts.add(part);
-        }
-        if (persistGeminiThoughtSigs) {
-          _ensureGeminiFunctionCallThoughtSig(parts);
-        }
-        if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
-        continue;
-      }
-      final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
-      final parts = <Map<String, dynamic>>[];
-      parts.addAll(
-        await NativeInputAttachments(
-          config: config,
-          spec: effective,
-          protocol: NativeInputProtocol.gemini,
-        ).build(msg, userPaths: isLast ? userImagePaths : null),
-      );
-      final meta = _geminiHistoryMeta(msg);
-      final raw = meta.cleanedText;
-      final seenSources = <String>{};
-      String normalizeSrc(String src) {
-        if (src.startsWith('http') || src.startsWith('data:')) return src;
-        try {
-          return SandboxPathResolver.fix(src);
-        } catch (_) {
-          return src;
-        }
-      }
+        parts.addAll(
+          await NativeInputAttachments(
+            config: config,
+            spec: effective,
+            protocol: NativeInputProtocol.gemini,
+          ).build(msg, userPaths: isLast ? userImagePaths : null),
+        );
+        final meta = _geminiHistoryMeta(msg);
+        final raw = meta.cleanedText;
+        final seenSources = <String>{};
+        String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
-      // Semantic media detection only - custom attachment markers are not
-      // recognized. Attachments arrive via structured media-path keys /
-      // userImagePaths, plus Markdown ![](...).
-      final hasMarkdownImages = shouldParseMarkdownImages(
-        raw,
-        skipImageParsing: skipImageParsing,
-      );
-      final internalMediaRefs = parseInternalMediaRefs(
-        msg[multimodalInternalMediaPathsKey],
-      );
-      // Consume injected media refs for user and assistant history turns.
-      final hasInternalMedia = internalMediaRefs.isNotEmpty;
-      final hasAttachedImages =
-          isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
-      if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
-        final parsed = await parseTextAndImages(
+        // Semantic media detection only - custom attachment markers are not
+        // recognized. Attachments arrive via structured media-path keys /
+        // userImagePaths, plus Markdown ![](...).
+        final hasMarkdownImages = shouldParseMarkdownImages(
           raw,
-          // Gemini API 目前无法直接拉取远程 http(s) 图片
-          allowRemoteImages: false,
-          allowLocalImages: true,
-          keepRemoteMarkdownText: true,
           skipImageParsing: skipImageParsing,
         );
-        if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
-        for (final ref in parsed.images) {
-          final normalized = normalizeSrc(ref.src);
-          if (!seenSources.add(normalized)) continue;
-          if (ref.kind == 'data') {
-            final mime = mimeFromDataUrl(ref.src);
-            final idx = ref.src.indexOf('base64,');
-            if (idx > 0) {
-              final b64 = ref.src.substring(idx + 7);
-              parts.add({
-                'inline_data': {'mime_type': mime, 'data': b64},
-              });
-            } else {
-              parts.add({'text': ref.src});
-            }
-          } else if (ref.kind == 'path') {
-            final mime = mimeFromPath(ref.src);
-            final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
-            if (b64 == null) continue;
-            parts.add({
-              'inline_data': {'mime_type': mime, 'data': b64},
-            });
-          } else {
-            parts.add({'text': '(image) ${ref.src}'});
-          }
-        }
-        final supplementalRefs = supplementalMediaRefs(
-          internalRaw: msg[multimodalInternalMediaPathsKey],
-          userPaths: userImagePaths,
-          includeUserPaths: hasAttachedImages,
+        final internalMediaRefs = parseInternalMediaRefs(
+          msg[multimodalInternalMediaPathsKey],
         );
-        if (supplementalRefs.isNotEmpty) {
-          for (final mediaRef in supplementalRefs) {
-            final p = mediaRef.uri;
-            final inputMime = mimeForInternalMediaRef(mediaRef);
-            if (role == 'user' &&
-                (isAudioMime(inputMime) ||
-                    isVideoMime(inputMime) ||
-                    isPdfMime(inputMime))) {
-              continue;
-            }
-            final normalized = normalizeSrc(p);
+        // Consume injected media refs for user and assistant history turns.
+        final hasInternalMedia = internalMediaRefs.isNotEmpty;
+        final hasAttachedImages =
+            isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+        if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
+          final parsed = await parseTextAndImages(
+            raw,
+            literalText: internalLiteralText(msg),
+            imageReferences: internalImageReferences(msg),
+            // Gemini API 目前无法直接拉取远程 http(s) 图片
+            allowRemoteImages: false,
+            allowLocalImages: true,
+            keepRemoteMarkdownText: true,
+            skipImageParsing: skipImageParsing,
+          );
+          if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
+          for (final ref in parsed.images) {
+            final normalized = normalizeSrc(ref.src);
             if (!seenSources.add(normalized)) continue;
-            if (p.startsWith('data:')) {
-              final mime = mimeForInternalMediaRef(mediaRef);
-              final idx = p.indexOf('base64,');
+            if (ref.kind == 'data') {
+              final mime = mimeFromDataUrl(ref.src);
+              final idx = ref.src.indexOf('base64,');
               if (idx > 0) {
-                final b64 = p.substring(idx + 7);
+                final b64 = ref.src.substring(idx + 7);
                 parts.add({
-                  'inline_data': {'mime_type': mime, 'data': b64},
+                  'inlineData': {'mimeType': mime, 'data': b64},
                 });
+              } else {
+                parts.add({'text': ref.src});
               }
-            } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
-              final mime = mimeForInternalMediaRef(mediaRef);
-              final b64 = await tryEncodeBase64File(p, withPrefix: false);
+            } else if (ref.kind == 'path') {
+              final mime = mimeFromPath(ref.src);
+              final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
               if (b64 == null) continue;
               parts.add({
-                'inline_data': {'mime_type': mime, 'data': b64},
+                'inlineData': {'mimeType': mime, 'data': b64},
               });
             } else {
-              parts.add({'text': '(image) $p'});
+              parts.add({'text': '(image) ${ref.src}'});
+            }
+          }
+          final supplementalRefs = supplementalMediaRefs(
+            internalRaw: msg[multimodalInternalMediaPathsKey],
+            userPaths: userImagePaths,
+            includeUserPaths: hasAttachedImages,
+          );
+          if (supplementalRefs.isNotEmpty) {
+            for (final mediaRef in supplementalRefs) {
+              final p = mediaRef.uri;
+              final inputMime = mimeForInternalMediaRef(mediaRef);
+              if (role == 'user' &&
+                  (isAudioMime(inputMime) ||
+                      isVideoMime(inputMime) ||
+                      isPdfMime(inputMime))) {
+                continue;
+              }
+              final normalized = normalizeSrc(p);
+              if (!seenSources.add(normalized)) continue;
+              if (p.startsWith('data:')) {
+                final mime = mimeForInternalMediaRef(mediaRef);
+                final idx = p.indexOf('base64,');
+                if (idx > 0) {
+                  final b64 = p.substring(idx + 7);
+                  parts.add({
+                    'inlineData': {'mimeType': mime, 'data': b64},
+                  });
+                }
+              } else if (!(p.startsWith('http://') ||
+                  p.startsWith('https://'))) {
+                final mime = mimeForInternalMediaRef(mediaRef);
+                final b64 = await tryEncodeBase64File(p, withPrefix: false);
+                if (b64 == null) continue;
+                parts.add({
+                  'inlineData': {'mimeType': mime, 'data': b64},
+                });
+              } else {
+                parts.add({'text': '(image) $p'});
+              }
+            }
+          }
+        } else {
+          if (raw.isNotEmpty) parts.add({'text': raw});
+        }
+        // YouTube URL ingestion as fileData parts (Gemini official API)
+        // Only inject on the last user message of this request.
+        if (role == 'user' && isLast && enableYoutube) {
+          final urls = extractYouTubeUrls(raw);
+          for (final u in urls) {
+            // Vertex AI requires mimeType for fileData
+            if (isVertex) {
+              parts.add({
+                'fileData': {'fileUri': u, 'mimeType': 'video/*'},
+              });
+            } else {
+              parts.add({
+                'fileData': {'fileUri': u},
+              });
             }
           }
         }
-      } else {
-        if (raw.isNotEmpty) parts.add({'text': raw});
-      }
-      // YouTube URL ingestion as file_data parts (Gemini official API)
-      // Only inject on the last user message of this request.
-      if (role == 'user' && isLast && enableYoutube) {
-        final urls = extractYouTubeUrls(raw);
-        for (final u in urls) {
-          // Vertex AI requires mime_type for file_data
-          if (isVertex) {
-            parts.add({
-              'file_data': {'file_uri': u, 'mime_type': 'video/*'},
-            });
-          } else {
-            parts.add({
-              'file_data': {'file_uri': u},
-            });
-          }
+        if (role == 'model') {
+          applyGeminiThoughtSignatures(
+            meta,
+            parts,
+            attachDummyWhenMissing: persistGeminiThoughtSigs,
+          );
         }
+        contents.add({'role': role, 'parts': parts});
+      } finally {
+        RequestHistoryContext.mark(msg, contents.skip(sourceStart));
       }
-      if (role == 'model') {
-        applyGeminiThoughtSignatures(
-          meta,
-          parts,
-          attachDummyWhenMissing: persistGeminiThoughtSigs,
-        );
-      }
-      contents.add({'role': role, 'parts': parts});
     }
 
     // Map OpenAI-style tools to Gemini functionDeclarations (MCP)
@@ -539,7 +584,7 @@ Stream<StreamChunk> sendGoogleStream(
       }
       if (decls.isNotEmpty) {
         geminiTools = [
-          {'function_declarations': decls},
+          {'functionDeclarations': decls},
         ];
       }
     }
@@ -574,7 +619,7 @@ Stream<StreamChunk> sendGoogleStream(
     );
     final geminiToolConfig = buildGeminiToolConfig(
       tools: toolsArr,
-      isGemini3: mixedBuiltInAndFunctionTools && !isVertex,
+      allowServerSideToolInvocations: mixedBuiltInAndFunctionTools && !isVertex,
     );
 
     final generationConfig = <String, dynamic>{
@@ -616,30 +661,30 @@ Stream<StreamChunk> sendGoogleStream(
     CustomRequestMerger.applyBody(baseBody, extraG);
 
     TokenUsage? totalUsage;
+    String? finishReason;
     List<Map<String, dynamic>> currentContents =
         List<Map<String, dynamic>>.from(contents);
     var pendingCalls = <EmitToolCall>[];
     var lastParts = <dynamic>[];
     var lastFunctionCallParts = <dynamic>[];
-    var lastText = '';
 
     yield* runProviderToolRounds(
       retryRound: retryRound,
       sendRound: () async* {
         totalUsage = null;
+        finishReason = null;
         pendingCalls = [];
         lastParts = [];
         lastFunctionCallParts = [];
-        lastText = '';
         final req = http.Request('POST', Uri.parse(url));
         req.headers.addAll(headers);
         final body = Map<String, dynamic>.from(baseBody);
         body['contents'] = _googleApiContents(currentContents);
-        req.body = jsonEncode(body);
+        req.body = await RequestImageContext.encodeBody(body);
         final resp = await client.send(req);
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
           final errorBody = await resp.stream.bytesToString();
-          throw HttpException('HTTP ${resp.statusCode}: $errorBody');
+          throw ProviderHttpException(resp, errorBody);
         }
         final txt = await decodeUtf8Stream(resp.stream);
         final obj = jsonDecode(txt) as Map<String, dynamic>;
@@ -653,48 +698,15 @@ Stream<StreamChunk> sendGoogleStream(
         final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
         if (candidates.isEmpty) return;
         final cand = (candidates.first as Map).cast<String, dynamic>();
+        _throwIfGeminiCandidateFailed(cand);
+        finishReason = cand['finishReason']?.toString();
         final parts = (cand['content']?['parts'] as List?) ?? const <dynamic>[];
         final functionCallParts = parts
             .where((e) => e is Map && e.containsKey('functionCall'))
             .toList();
         lastParts = parts;
         lastFunctionCallParts = functionCallParts;
-        if (functionCallParts.isNotEmpty && onToolCall != null) {
-          pendingCalls = [
-            for (var idx = 0; idx < functionCallParts.length; idx++)
-              () {
-                final fc = functionCallParts[idx] as Map;
-                final call = (fc['functionCall'] as Map)
-                    .cast<String, dynamic>();
-                String? thoughtSigKey;
-                dynamic thoughtSigVal;
-                if (fc.containsKey('thoughtSignature')) {
-                  thoughtSigKey = 'thoughtSignature';
-                  thoughtSigVal = fc['thoughtSignature'];
-                } else if (fc.containsKey('thought_signature')) {
-                  thoughtSigKey = 'thought_signature';
-                  thoughtSigVal = fc['thought_signature'];
-                }
-                return emitToolCall(
-                  id: effectiveToolCallId(call['id'], 'fn', idx),
-                  name: (call['name'] ?? '').toString(),
-                  arguments:
-                      (call['args'] as Map?)?.cast<String, dynamic>() ??
-                      const <String, dynamic>{},
-                  metadata: {
-                    'google': {
-                      'part': fc.cast<String, dynamic>(),
-                      if (thoughtSigKey != null && thoughtSigVal != null)
-                        'thoughtSigKey': thoughtSigKey,
-                      if (thoughtSigKey != null && thoughtSigVal != null)
-                        'thoughtSigVal': thoughtSigVal,
-                    },
-                  },
-                );
-              }(),
-          ];
-          return;
-        }
+        final ids = StreamChunkIds('round-${currentContents.length}');
         // Provider-hosted code execution stays on ServerTool*, not ToolCallResult.
         var codeExecIdx = 0;
         for (final p in parts) {
@@ -704,7 +716,7 @@ Stream<StreamChunk> sendGoogleStream(
             final lang = (ec['language'] ?? '').toString().toLowerCase();
             final code = (ec['code'] ?? '').toString();
             if (code.isNotEmpty) {
-              final ceId = 'code_exec_$codeExecIdx';
+              final ceId = ids.indexed('code_exec', codeExecIdx);
               codeExecIdx++;
               yield ToolCallStart(id: ceId, toolName: 'code_execution');
               yield ToolCallDelta(
@@ -718,9 +730,10 @@ Stream<StreamChunk> sendGoogleStream(
           if (cr is Map) {
             final outcome = (cr['outcome'] ?? '').toString();
             final output = (cr['output'] ?? '').toString();
-            final resultId = codeExecIdx > 0
-                ? 'code_exec_${codeExecIdx - 1}'
-                : 'code_exec_0';
+            final resultId = ids.indexed(
+              'code_exec',
+              codeExecIdx > 0 ? codeExecIdx - 1 : 0,
+            );
             yield ServerToolStart(id: resultId, toolName: 'code_execution');
             yield ServerToolEnd(
               id: resultId,
@@ -742,15 +755,36 @@ Stream<StreamChunk> sendGoogleStream(
           }
         }
         final reasoningStr = reasoningBuf.toString();
-        if (reasoningStr.isNotEmpty) {
+        if (reasoningStr.isNotEmpty || buf.isNotEmpty) {
           yield* emitDelta(
-            ids: StreamChunkIds('round-${currentContents.length}'),
+            ids: ids,
+            content: buf.toString(),
             reasoning: reasoningStr,
             usage: totalUsage,
             totalTokens: totalUsage?.totalTokens ?? 0,
           );
         }
-        lastText = buf.toString();
+        if (functionCallParts.isNotEmpty && onToolCall != null) {
+          pendingCalls = [
+            for (var idx = 0; idx < functionCallParts.length; idx++)
+              () {
+                final fc = functionCallParts[idx] as Map;
+                final call = (fc['functionCall'] as Map)
+                    .cast<String, dynamic>();
+                return emitToolCall(
+                  id: effectiveToolCallId(call['id'], 'fn', idx),
+                  name: (call['name'] ?? '').toString(),
+                  arguments:
+                      (call['args'] as Map?)?.cast<String, dynamic>() ??
+                      const <String, dynamic>{},
+                  metadata: {
+                    'google': {'part': fc.cast<String, dynamic>()},
+                  },
+                );
+              }(),
+          ];
+          return;
+        }
         if (persistGeminiThoughtSigs) {
           final signature = collectGeminiThoughtSignatureFromParts(parts);
           if (signature.isNotEmpty) {
@@ -767,45 +801,30 @@ Stream<StreamChunk> sendGoogleStream(
       emitCalls: true,
       onToolCall: onToolCall,
       append: (executed) async {
-        final results = [
-          for (final item in executed)
-            await ToolResultContent.read(
+        final responseParts = <Map<String, dynamic>>[];
+        for (var i = 0; i < executed.length; i++) {
+          final item = executed[i];
+          final call = (lastFunctionCallParts[i] as Map)['functionCall'] as Map;
+          responseParts.addAll(
+            await _googleFunctionResponseParts(
               item.call.name,
               item.content,
               metadata: item.metadata,
+              toolCallId: item.call.id,
+              id: call['id']?.toString(),
               canImageInput: effective.input.contains(Modality.image),
             ),
-        ];
+          );
+        }
         currentContents = [
           ...currentContents,
           {'role': 'model', 'parts': lastParts},
-          {
-            'role': 'user',
-            'parts': [
-              for (var i = 0; i < executed.length; i++)
-                <String, dynamic>{
-                  'functionResponse': {
-                    'name': executed[i].call.name,
-                    'response': {'result': results[i].text},
-                    if (i < lastFunctionCallParts.length &&
-                        lastFunctionCallParts[i] is Map &&
-                        ((lastFunctionCallParts[i] as Map)['functionCall']
-                                    as Map?)
-                                ?.containsKey('id') ==
-                            true)
-                      'id':
-                          ((lastFunctionCallParts[i] as Map)['functionCall']
-                              as Map)['id'],
-                  },
-                },
-              for (final result in results) ...result.googleImageParts,
-            ],
-          },
+          {'role': 'user', 'parts': responseParts},
         ];
       },
-      finish: () => emitDone(
+      finish: () => emitFinish(
         ids: StreamChunkIds('finish'),
-        content: lastText,
+        finishReason: finishReason,
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
       ),
@@ -816,20 +835,7 @@ Stream<StreamChunk> sendGoogleStream(
 
   // Implement SSE streaming via :streamGenerateContent with alt=sse
   // Build endpoint per Vertex vs Gemini
-  String baseUrl;
-  if (config.vertexAI == true &&
-      (config.location?.isNotEmpty == true) &&
-      (config.projectId?.isNotEmpty == true)) {
-    final loc = config.location!.trim();
-    final proj = config.projectId!.trim();
-    baseUrl =
-        'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamModelId:streamGenerateContent';
-  } else {
-    final base = config.baseUrl.endsWith('/')
-        ? config.baseUrl.substring(0, config.baseUrl.length - 1)
-        : config.baseUrl;
-    baseUrl = '$base/models/$upstreamModelId:streamGenerateContent';
-  }
+  final baseUrl = resolveRequestUrl(config, modelId: upstreamModelId);
 
   // Build query with alt=sse
   final uriBase = Uri.parse(baseUrl);
@@ -843,183 +849,185 @@ Stream<StreamChunk> sendGoogleStream(
   final contents = <Map<String, dynamic>>[];
   for (int i = 0; i < messages.length; i++) {
     final msg = messages[i];
-    final roleRaw = (msg['role'] ?? 'user').toString();
-    if (roleRaw == 'system') {
-      final s = (msg['content'] ?? '').toString();
-      if (s.isNotEmpty) {
-        systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
+    final sourceStart = contents.length;
+    try {
+      final roleRaw = (msg['role'] ?? 'user').toString();
+      if (roleRaw == 'system') {
+        final s = (msg['content'] ?? '').toString();
+        if (s.isNotEmpty) {
+          systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
+        }
+        continue;
       }
-      continue;
-    }
-    final role = roleRaw == 'assistant' ? 'model' : 'user';
-    if (roleRaw == 'tool') {
-      contents.add({
-        'role': 'user',
-        'parts': await _googleFunctionResponsePartsFromToolMessage(
-          msg,
-          canImageInput: effective.input.contains(Modality.image),
-        ),
-      });
-      continue;
-    }
-    if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
+      final role = roleRaw == 'assistant' ? 'model' : 'user';
+      if (roleRaw == 'tool') {
+        _addGoogleFunctionResponseParts(
+          contents,
+          await _googleFunctionResponsePartsFromToolMessage(
+            msg,
+            canImageInput: effective.input.contains(Modality.image),
+          ),
+        );
+        continue;
+      }
+      if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
+        final parts = <Map<String, dynamic>>[];
+        final raw = _geminiHistoryText(msg);
+        if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
+          parts.add({'text': raw});
+        }
+        for (final tc in msg['tool_calls'] as List) {
+          if (tc is! Map) continue;
+          final part = _googleFunctionCallPartFromToolCall(tc);
+          if (part != null) parts.add(part);
+        }
+        if (persistGeminiThoughtSigs) {
+          _ensureGeminiFunctionCallThoughtSig(parts);
+        }
+        if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
+        continue;
+      }
+      final isLast = i == lastUserIndex;
       final parts = <Map<String, dynamic>>[];
-      final raw = _geminiHistoryText(msg);
-      if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
-        parts.add({'text': raw});
-      }
-      for (final tc in msg['tool_calls'] as List) {
-        if (tc is! Map) continue;
-        final part = _googleFunctionCallPartFromToolCall(tc);
-        if (part != null) parts.add(part);
-      }
-      if (persistGeminiThoughtSigs) _ensureGeminiFunctionCallThoughtSig(parts);
-      if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
-      continue;
-    }
-    final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
-    final parts = <Map<String, dynamic>>[];
-    parts.addAll(
-      await NativeInputAttachments(
-        config: config,
-        spec: effective,
-        protocol: NativeInputProtocol.gemini,
-      ).build(msg, userPaths: isLast ? userImagePaths : null),
-    );
-    final meta = _geminiHistoryMeta(msg);
-    final raw = meta.cleanedText;
-    final seenSources = <String>{};
-    String normalizeSrc(String src) {
-      if (src.startsWith('http') || src.startsWith('data:')) return src;
-      try {
-        return SandboxPathResolver.fix(src);
-      } catch (_) {
-        return src;
-      }
-    }
+      parts.addAll(
+        await NativeInputAttachments(
+          config: config,
+          spec: effective,
+          protocol: NativeInputProtocol.gemini,
+        ).build(msg, userPaths: isLast ? userImagePaths : null),
+      );
+      final meta = _geminiHistoryMeta(msg);
+      final raw = meta.cleanedText;
+      final seenSources = <String>{};
+      String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
-    // Only parse images if there are images to process.
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userImagePaths, plus Markdown ![](...).
-    final hasMarkdownImages = shouldParseMarkdownImages(
-      raw,
-      skipImageParsing: skipImageParsing,
-    );
-    final internalMediaRefs = parseInternalMediaRefs(
-      msg[multimodalInternalMediaPathsKey],
-    );
-    // Consume injected media refs for user and assistant history turns.
-    final hasInternalMedia = internalMediaRefs.isNotEmpty;
-    final hasAttachedImages =
-        isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
-
-    if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
-      final parsed = await parseTextAndImages(
+      // Only parse images if there are images to process.
+      // Semantic media detection only - custom attachment markers are not
+      // recognized. Attachments arrive via structured media-path keys /
+      // userImagePaths, plus Markdown ![](...).
+      final hasMarkdownImages = shouldParseMarkdownImages(
         raw,
-        // Gemini API 目前无法直接拉取远程 http(s) 图片
-        allowRemoteImages: false,
-        allowLocalImages: true,
-        keepRemoteMarkdownText: true,
         skipImageParsing: skipImageParsing,
       );
-      if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
-      // Images extracted from this message's text
-      for (final ref in parsed.images) {
-        final normalized = normalizeSrc(ref.src);
-        if (!seenSources.add(normalized)) continue;
-        if (ref.kind == 'data') {
-          final mime = mimeFromDataUrl(ref.src);
-          final idx = ref.src.indexOf('base64,');
-          if (idx > 0) {
-            final b64 = ref.src.substring(idx + 7);
-            parts.add({
-              'inline_data': {'mime_type': mime, 'data': b64},
-            });
-          } else {
-            // If malformed data URL, include as plain text fallback
-            parts.add({'text': ref.src});
-          }
-        } else if (ref.kind == 'path') {
-          final mime = mimeFromPath(ref.src);
-          final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
-          if (b64 == null) continue;
-          parts.add({
-            'inline_data': {'mime_type': mime, 'data': b64},
-          });
-        } else {
-          // Remote URL: Gemini official API doesn't fetch http(s) here; keep short reference
-          parts.add({'text': '(image) ${ref.src}'});
-        }
-      }
-      final supplementalRefs = supplementalMediaRefs(
-        internalRaw: msg[multimodalInternalMediaPathsKey],
-        userPaths: userImagePaths,
-        includeUserPaths: hasAttachedImages,
+      final internalMediaRefs = parseInternalMediaRefs(
+        msg[multimodalInternalMediaPathsKey],
       );
-      if (supplementalRefs.isNotEmpty) {
-        for (final mediaRef in supplementalRefs) {
-          final p = mediaRef.uri;
-          final inputMime = mimeForInternalMediaRef(mediaRef);
-          if (role == 'user' &&
-              (isAudioMime(inputMime) ||
-                  isVideoMime(inputMime) ||
-                  isPdfMime(inputMime))) {
-            continue;
-          }
-          final normalized = normalizeSrc(p);
+      // Consume injected media refs for user and assistant history turns.
+      final hasInternalMedia = internalMediaRefs.isNotEmpty;
+      final hasAttachedImages =
+          isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+
+      if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
+        final parsed = await parseTextAndImages(
+          raw,
+          literalText: internalLiteralText(msg),
+          imageReferences: internalImageReferences(msg),
+          // Gemini API 目前无法直接拉取远程 http(s) 图片
+          allowRemoteImages: false,
+          allowLocalImages: true,
+          keepRemoteMarkdownText: true,
+          skipImageParsing: skipImageParsing,
+        );
+        if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
+        // Images extracted from this message's text
+        for (final ref in parsed.images) {
+          final normalized = normalizeSrc(ref.src);
           if (!seenSources.add(normalized)) continue;
-          if (p.startsWith('data:')) {
-            final mime = mimeForInternalMediaRef(mediaRef);
-            final idx = p.indexOf('base64,');
+          if (ref.kind == 'data') {
+            final mime = mimeFromDataUrl(ref.src);
+            final idx = ref.src.indexOf('base64,');
             if (idx > 0) {
-              final b64 = p.substring(idx + 7);
+              final b64 = ref.src.substring(idx + 7);
               parts.add({
-                'inline_data': {'mime_type': mime, 'data': b64},
+                'inlineData': {'mimeType': mime, 'data': b64},
               });
+            } else {
+              // If malformed data URL, include as plain text fallback
+              parts.add({'text': ref.src});
             }
-          } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
-            final mime = mimeForInternalMediaRef(mediaRef);
-            final b64 = await tryEncodeBase64File(p, withPrefix: false);
+          } else if (ref.kind == 'path') {
+            final mime = mimeFromPath(ref.src);
+            final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
             if (b64 == null) continue;
             parts.add({
-              'inline_data': {'mime_type': mime, 'data': b64},
+              'inlineData': {'mimeType': mime, 'data': b64},
             });
           } else {
-            // http url fallback reference text
-            parts.add({'text': '(image) $p'});
+            // Remote URL: Gemini official API doesn't fetch http(s) here; keep short reference
+            parts.add({'text': '(image) ${ref.src}'});
+          }
+        }
+        final supplementalRefs = supplementalMediaRefs(
+          internalRaw: msg[multimodalInternalMediaPathsKey],
+          userPaths: userImagePaths,
+          includeUserPaths: hasAttachedImages,
+        );
+        if (supplementalRefs.isNotEmpty) {
+          for (final mediaRef in supplementalRefs) {
+            final p = mediaRef.uri;
+            final inputMime = mimeForInternalMediaRef(mediaRef);
+            if (role == 'user' &&
+                (isAudioMime(inputMime) ||
+                    isVideoMime(inputMime) ||
+                    isPdfMime(inputMime))) {
+              continue;
+            }
+            final normalized = normalizeSrc(p);
+            if (!seenSources.add(normalized)) continue;
+            if (p.startsWith('data:')) {
+              final mime = mimeForInternalMediaRef(mediaRef);
+              final idx = p.indexOf('base64,');
+              if (idx > 0) {
+                final b64 = p.substring(idx + 7);
+                parts.add({
+                  'inlineData': {'mimeType': mime, 'data': b64},
+                });
+              }
+            } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
+              final mime = mimeForInternalMediaRef(mediaRef);
+              final b64 = await tryEncodeBase64File(p, withPrefix: false);
+              if (b64 == null) continue;
+              parts.add({
+                'inlineData': {'mimeType': mime, 'data': b64},
+              });
+            } else {
+              // http url fallback reference text
+              parts.add({'text': '(image) $p'});
+            }
+          }
+        }
+      } else {
+        // No images, use simple text content
+        if (raw.isNotEmpty) parts.add({'text': raw});
+      }
+      // YouTube URL ingestion as fileData parts (Gemini official API)
+      // Only inject on the last user message of this request.
+      if (role == 'user' && isLast && enableYoutube) {
+        final urls = extractYouTubeUrls(raw);
+        for (final u in urls) {
+          // Vertex AI requires mimeType for fileData
+          if (isVertex) {
+            parts.add({
+              'fileData': {'fileUri': u, 'mimeType': 'video/*'},
+            });
+          } else {
+            parts.add({
+              'fileData': {'fileUri': u},
+            });
           }
         }
       }
-    } else {
-      // No images, use simple text content
-      if (raw.isNotEmpty) parts.add({'text': raw});
-    }
-    // YouTube URL ingestion as file_data parts (Gemini official API)
-    // Only inject on the last user message of this request.
-    if (role == 'user' && isLast && enableYoutube) {
-      final urls = extractYouTubeUrls(raw);
-      for (final u in urls) {
-        // Vertex AI requires mime_type for file_data
-        if (isVertex) {
-          parts.add({
-            'file_data': {'file_uri': u, 'mime_type': 'video/*'},
-          });
-        } else {
-          parts.add({
-            'file_data': {'file_uri': u},
-          });
-        }
+      if (role == 'model') {
+        applyGeminiThoughtSignatures(
+          meta,
+          parts,
+          attachDummyWhenMissing: persistGeminiThoughtSigs,
+        );
       }
+      contents.add({'role': role, 'parts': parts});
+    } finally {
+      RequestHistoryContext.mark(msg, contents.skip(sourceStart));
     }
-    if (role == 'model') {
-      applyGeminiThoughtSignatures(
-        meta,
-        parts,
-        attachDummyWhenMissing: persistGeminiThoughtSigs,
-      );
-    }
-    contents.add({'role': role, 'parts': parts});
   }
 
   bool expectImage = wantsImageOutput;
@@ -1053,7 +1061,7 @@ Stream<StreamChunk> sendGoogleStream(
     }
     if (decls.isNotEmpty) {
       geminiTools = [
-        {'function_declarations': decls},
+        {'functionDeclarations': decls},
       ];
     }
   }
@@ -1064,20 +1072,20 @@ Stream<StreamChunk> sendGoogleStream(
   );
   final geminiToolConfig = buildGeminiToolConfig(
     tools: toolsArr,
-    isGemini3: mixedBuiltInAndFunctionTools && !isVertex,
+    allowServerSideToolInvocations: mixedBuiltInAndFunctionTools && !isVertex,
   );
 
   // Maintain a rolling conversation for multi-round tool calls
   List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(contents);
   TokenUsage? usage;
+  String? finishReason;
   int totalTokens = 0;
 
   // Accumulate built-in search citations across stream rounds
   final List<Map<String, dynamic>> builtinCitations = <Map<String, dynamic>>[];
   int malformedResponseRetryCount = 0;
   var streamRound = 0;
-  var pendingCalls = <EmitToolCall>[];
-  var lastRoundCalls = <Map<String, dynamic>>[];
+  var lastRoundCalls = <GoogleFunctionCall>[];
   var lastRoundModelParts = <dynamic>[];
   var retryMalformed = false;
 
@@ -1086,7 +1094,6 @@ Stream<StreamChunk> sendGoogleStream(
     sendRound: () async* {
       usage = null;
       totalTokens = 0;
-      pendingCalls = [];
       lastRoundCalls = [];
       lastRoundModelParts = [];
       retryMalformed = false;
@@ -1153,18 +1160,17 @@ Stream<StreamChunk> sendGoogleStream(
       final extra = customBody(config, modelId, assistantBody: extraBody);
       CustomRequestMerger.applyBody(body, extra);
       body['contents'] = _googleApiContents(convo);
-      request.body = jsonEncode(body);
+      request.body = await RequestImageContext.encodeBody(body);
 
       final resp = await client.send(request);
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
         final errorBody = await resp.stream.bytesToString();
-        throw HttpException('HTTP ${resp.statusCode}: $errorBody');
+        throw ProviderHttpException(resp, errorBody);
       }
 
       final sse = resp.stream.transform(utf8.decoder);
       final sourceId = 'round-${streamRound++}';
       final decoder = GoogleStreamDecoder(
-        isGemini3: mixedBuiltInAndFunctionTools,
         persistThoughtSigs: persistGeminiThoughtSigs,
         expectImage: expectImage,
         receivedImage: receivedImage,
@@ -1209,11 +1215,11 @@ Stream<StreamChunk> sendGoogleStream(
         final data = event.data;
         if (data.isEmpty) continue;
         // Gemini can deliver {"error":{code,message,status}}, a prompt-level
-        // block, or a candidate-level content-filter finish in-band on a 2xx
+        // block, or a candidate-level failure in-band on a 2xx
         // stream; raise before the malformed-chunk guard below can swallow it.
         throwIfInBandStreamError(data);
         _throwIfGeminiPromptBlocked(data);
-        _throwIfGeminiCandidateBlocked(data);
+        _throwIfGeminiStreamCandidateFailed(data);
         final decoded = decoder.accept(event);
         for (final remote in decoder.takePendingRemoteImages()) {
           try {
@@ -1247,15 +1253,7 @@ Stream<StreamChunk> sendGoogleStream(
                 name: call.name,
                 arguments: call.args,
                 metadata: {
-                  'google': {
-                    'part': call.part,
-                    if (call.thoughtSigKey != null &&
-                        call.thoughtSigVal != null)
-                      'thoughtSigKey': call.thoughtSigKey,
-                    if (call.thoughtSigKey != null &&
-                        call.thoughtSigVal != null)
-                      'thoughtSigVal': call.thoughtSigVal,
-                  },
+                  'google': {'part': call.part},
                 },
               );
               await for (final resultChunk in executeClientTools(
@@ -1281,23 +1279,11 @@ Stream<StreamChunk> sendGoogleStream(
         yield await sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
       }
 
+      finishReason = decoder.finishReason;
       receivedImage = decoder.receivedImage;
       usage = decoder.usage ?? usage;
       totalTokens = usage?.totalTokens ?? totalTokens;
-      final calls = [
-        for (final call in decoder.functionCalls)
-          <String, dynamic>{
-            'id': call.id,
-            'apiId': call.apiId,
-            'name': call.name,
-            'args': call.args,
-            'result': call.result,
-            'thoughtSigKey': call.thoughtSigKey,
-            'thoughtSigVal': call.thoughtSigVal,
-            'part': call.part,
-          },
-      ];
-      final roundModelParts = decoder.roundModelParts;
+      final calls = decoder.functionCalls;
       final retryMalformedResponse = decoder.retryMalformedResponse;
       final responseTextThoughtSigKey = decoder.textThoughtSigKey;
       final responseTextThoughtSigVal = decoder.textThoughtSigVal;
@@ -1355,101 +1341,36 @@ Stream<StreamChunk> sendGoogleStream(
 
       malformedResponseRetryCount = 0;
       lastRoundCalls = calls;
-      lastRoundModelParts = roundModelParts;
-      pendingCalls = [
-        for (final c in calls)
-          emitToolCall(
-            id: (c['id'] ?? '').toString(),
-            name: (c['name'] ?? '').toString(),
-            arguments:
-                (c['args'] as Map<String, dynamic>?) ??
-                const <String, dynamic>{},
-          ),
-      ];
+      lastRoundModelParts = decoder.roundModelParts;
     },
-    takeCalls: () => pendingCalls,
+    takeCalls: () => [
+      for (final c in lastRoundCalls)
+        emitToolCall(id: c.id, name: c.name, arguments: c.args),
+    ],
     continueWithoutCalls: () => retryMalformed,
     executeAfterRound: false,
     onToolCall: onToolCall,
     append: (executed) async {
       if (retryMalformed) return;
-      if (mixedBuiltInAndFunctionTools) {
-        convo.add({'role': 'model', 'parts': lastRoundModelParts});
-        final responseParts = <Map<String, dynamic>>[];
-        for (final c in lastRoundCalls) {
-          final name = (c['name'] ?? '').toString();
-          final toolResult = c['result'] as ClientToolResult?;
-          final result = await ToolResultContent.read(
-            name,
-            toolResult?.content ?? '',
-            metadata: toolResult?.metadata,
+      convo.add({'role': 'model', 'parts': lastRoundModelParts});
+      final responseParts = <Map<String, dynamic>>[];
+      for (final call in lastRoundCalls) {
+        responseParts.addAll(
+          await _googleFunctionResponseParts(
+            call.name,
+            call.result?.content ?? '',
+            metadata: call.result?.metadata,
             canImageInput: effective.input.contains(Modality.image),
-          );
-          final resText = result.text;
-          final apiId = c['apiId'] as String?;
-          Map<String, dynamic> responseObj;
-          try {
-            responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
-          } catch (_) {
-            responseObj = {'result': resText};
-          }
-          responseParts.add({
-            'functionResponse': {
-              'name': name,
-              'response': responseObj,
-              if (apiId != null) 'id': apiId,
-            },
-          });
-          responseParts.addAll(result.googleImageParts);
-        }
-        convo.add({'role': 'user', 'parts': responseParts});
-        return;
-      }
-      for (final c in lastRoundCalls) {
-        final name = (c['name'] ?? '').toString();
-        final args =
-            (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-        final toolResult = c['result'] as ClientToolResult?;
-        final result = await ToolResultContent.read(
-          name,
-          toolResult?.content ?? '',
-          metadata: toolResult?.metadata,
-          canImageInput: effective.input.contains(Modality.image),
+            id: call.apiId,
+            toolCallId: call.id,
+          ),
         );
-        final resText = result.text;
-        final thoughtSigKey = c['thoughtSigKey'] as String?;
-        final thoughtSigVal = c['thoughtSigVal'];
-
-        final part = <String, dynamic>{
-          'functionCall': {'name': name, 'args': args},
-        };
-        if (thoughtSigKey != null && thoughtSigVal != null) {
-          part[thoughtSigKey] = thoughtSigVal;
-        }
-
-        convo.add({
-          'role': 'model',
-          'parts': [part],
-        });
-        Map<String, dynamic> responseObj;
-        try {
-          responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
-        } catch (_) {
-          responseObj = {'result': resText};
-        }
-        convo.add({
-          'role': 'user',
-          'parts': [
-            {
-              'functionResponse': {'name': name, 'response': responseObj},
-            },
-            ...result.googleImageParts,
-          ],
-        });
       }
+      convo.add({'role': 'user', 'parts': responseParts});
     },
     finish: () => emitDone(
       ids: StreamChunkIds('finish'),
+      finishReason: finishReason,
       usage: usage,
       totalTokens: totalTokens,
     ),

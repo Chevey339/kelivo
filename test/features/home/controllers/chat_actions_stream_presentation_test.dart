@@ -185,6 +185,105 @@ void main() {
         notifier.value.parts!.whereType<ReasoningPart>().single.text,
         '01234hidden',
       );
+
+      await actions.debugHandleStreamChunk(
+        const ReasoningEnd(id: 'reasoning'),
+        state,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(
+        controller.getReasoningData(state.messageId)!.finishedAt,
+        isNotNull,
+      );
+
+      final beforeStart = notifications;
+      await actions.debugHandleStreamChunk(
+        const ReasoningStart(id: 'empty'),
+        state,
+      );
+      await actions.debugHandleStreamChunk(
+        const ReasoningStart(id: 'empty'),
+        state,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(notifications, beforeStart + 1);
+      expect(controller.getReasoningData(state.messageId)!.finishedAt, isNull);
+      final segments = controller.getReasoningSegments(state.messageId)!;
+      expect(segments, hasLength(2));
+      expect(segments.last.text, isEmpty);
+      expect(segments.last.finishedAt, isNull);
+      expect(notifier.value.parts!.whereType<ReasoningPart>(), hasLength(2));
+      final startedAt = segments.last.startAt;
+      expect(startedAt, isNotNull);
+
+      await actions.debugHandleStreamChunk(
+        const ReasoningDelta(id: 'empty', text: 'late summary'),
+        state,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(segments, hasLength(2));
+      expect(segments.last.startAt, startedAt);
+      expect(segments.last.text, 'late summary');
+      await actions.debugHandleStreamChunk(
+        const ReasoningEnd(id: 'empty'),
+        state,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(segments.last.finishedAt, isNotNull);
+
+      await actions.debugHandleStreamChunk(
+        const ReasoningStart(id: 'no-summary'),
+        state,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(segments.last.text, isEmpty);
+      final beforeEnd = notifications;
+      await actions.debugHandleStreamChunk(
+        const ReasoningEnd(id: 'no-summary'),
+        state,
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(notifications, beforeEnd + 1);
+      expect(segments.last.finishedAt, isNotNull);
+
+      await actions.debugHandleStreamChunk(
+        const ReasoningStart(id: 'before-tool'),
+        state,
+      );
+      await actions.debugHandleStreamChunk(
+        const ToolCallStart(id: 'tool', toolName: 'lookup'),
+        state,
+      );
+      expect(segments.last.finishedAt, isNotNull);
+      expect(
+        controller.getReasoningData(state.messageId)!.finishedAt,
+        isNotNull,
+      );
+      await actions.debugHandleStreamChunk(
+        const ReasoningStart(id: 'after-tool'),
+        state,
+      );
+      expect(segments.last.toolStartIndex, 1);
+      expect(segments.last.finishedAt, isNull);
+      await actions.debugHandleStreamChunk(
+        const TextDelta(id: 'answer', text: 'answer'),
+        state,
+      );
+      expect(segments.last.finishedAt, isNotNull);
+
+      final previousCount = segments.length;
+      for (var round = 0; round < 2; round++) {
+        await actions.debugHandleStreamChunk(
+          ReasoningDelta(id: 'reused', text: 'round $round'),
+          state,
+        );
+        await actions.debugHandleStreamChunk(const AssistantRoundEnd(), state);
+      }
+      expect(segments.length, previousCount + 2);
+      expect(segments.last.text, 'round 1');
+      expect(segments.last.finishedAt, isNotNull);
+      await tester.pump(const Duration(milliseconds: 50));
+      controller.cleanupTimers(state.messageId);
     },
   );
 }

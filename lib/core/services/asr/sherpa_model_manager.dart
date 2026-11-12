@@ -244,7 +244,7 @@ final class SherpaModelManager {
   Future<Directory> get modelsDirectory async {
     final injected = _injectedModelsRoot;
     if (injected != null) return injected;
-    final appData = await AppDirectories.getAppDataDirectory();
+    final appData = await AppDirectories.getContentDirectory();
     return Directory(p.join(appData.path, 'asr_models'));
   }
 

@@ -12,11 +12,13 @@ class FileSnapshot {
   static Future<Map<String, int>> snapshot(
     List<Directory> roots, {
     int maxEntries = defaultMaxEntries,
+    void Function()? checkCancelled,
   }) async {
     final out = <String, int>{};
     for (final root in roots) {
+      checkCancelled?.call();
       if (!await root.exists()) continue;
-      await _walk(root, out, maxEntries);
+      await _walk(root, out, maxEntries, checkCancelled);
       if (out.length >= maxEntries) break;
     }
     return out;
@@ -41,15 +43,16 @@ class FileSnapshot {
     Directory dir,
     Map<String, int> out,
     int maxEntries,
+    void Function()? checkCancelled,
   ) async {
-    final children = await dir.list(followLinks: false).toList();
-    for (final entity in children) {
+    await for (final entity in dir.list(followLinks: false)) {
+      checkCancelled?.call();
       if (out.length >= maxEntries) return;
       final name = p.basename(entity.path);
       if (name.startsWith('.l2s.')) continue;
       if (entity is Directory) {
         if (name.startsWith('.')) continue;
-        await _walk(entity, out, maxEntries);
+        await _walk(entity, out, maxEntries, checkCancelled);
         continue;
       }
       try {

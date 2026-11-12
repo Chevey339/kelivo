@@ -214,6 +214,7 @@ static dispatch_queue_t _readerQueue;
                 @"timedOut": @NO,
                 @"cancelled": @YES,
                 @"interrupted": @NO,
+                @"terminationConfirmed": @YES,
                 @"durationMs": @0,
             });
             return;
@@ -318,6 +319,7 @@ static dispatch_queue_t _readerQueue;
             @"timedOut": @NO,
             @"cancelled": @NO,
             @"interrupted": @NO,
+            @"terminationConfirmed": @YES,
             @"durationMs": @0,
             @"error": reason,
         });
@@ -590,6 +592,7 @@ static dispatch_queue_t _readerQueue;
             @"timedOut": @(ctx.timedOut && !ctx.cancelled && !ctx.interrupted),
             @"cancelled": @(ctx.cancelled && !ctx.interrupted),
             @"interrupted": @(ctx.interrupted),
+            @"terminationConfirmed": @(ctx.exited),
             @"durationMs": @(MAX(0, durationMs)),
         });
     }

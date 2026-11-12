@@ -60,6 +60,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _DesktopTrayShowRow(),
                   _RowDivider(),
                   _DesktopTrayMinimizeOnCloseRow(),
+                  _RowDivider(),
+                  _DesktopStartupRows(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -107,11 +109,16 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowMathRendering(),
                   _RowDivider(),
+                  _ToggleRowLegacyInlineCodeStyle(),
+                  _RowDivider(),
+                  _ToggleRowLegacyCodeBlockStyle(),
+                  _RowDivider(),
                   _ToggleRowUserMarkdown(),
                   _RowDivider(),
                   _ToggleRowReasoningMarkdown(),
                   _RowDivider(),
                   _ToggleRowAssistantMarkdown(),
+                  _ToggleRowGenUiHeader(),
                   _RowDivider(),
                   _AutoCollapseCodeBlocksSection(),
                 ],
@@ -129,6 +136,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowShowToolResultSummary(),
                   _RowDivider(),
                   _ToggleRowHideToolResultImages(),
+                  _RowDivider(),
+                  _ToggleRowShowBrowserPageCards(),
                   _RowDivider(),
                   _ToggleRowInsertSuggestionOnly(),
                   _RowDivider(),
@@ -168,9 +177,7 @@ class _DisplaySettingsBody extends StatelessWidget {
               _SettingsCard(
                 title: l10n.displaySettingsPageOtherSettingsTitle,
                 children: const [
-                  _ToggleRowAutoScrollEnabled(),
-                  _RowDivider(),
-                  _AutoScrollDelayRow(),
+                  _AutoScrollRow(),
                   _RowDivider(),
                   _BackgroundMaskRow(),
                   _RowDivider(),
@@ -436,35 +443,22 @@ class _LabeledRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              // Match other settings row labels (14, normal, slightly dimmed)
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: AppFontWeights.regular,
-                color: cs.onSurface.withValues(alpha: 0.9),
-                decoration: TextDecoration.none,
-              ),
-            ),
+      child: DesktopLabeledControl(
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: AppFontWeights.regular,
+            color: cs.onSurface.withValues(alpha: 0.9),
+            decoration: TextDecoration.none,
           ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: trailing,
-              ),
-            ),
-          ),
-        ],
+        ),
+        controlWidth: 400,
+        control: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: trailing,
+        ),
       ),
     );
     return SettingsSearchTarget.wrap(context, label, row);
@@ -952,6 +946,95 @@ class _LinuxHideTitleBarRow extends StatelessWidget {
   }
 }
 
+class _DesktopStartupRows extends StatefulWidget {
+  const _DesktopStartupRows();
+
+  @override
+  State<_DesktopStartupRows> createState() => _DesktopStartupRowsState();
+}
+
+class _DesktopStartupRowsState extends State<_DesktopStartupRows>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final settings = context.read<SettingsProvider>();
+    await settings.loaded;
+    if (mounted) await settings.refreshDesktopStartup();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refresh());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<void> _change(Future<void> Function() update) async {
+    try {
+      await update();
+    } catch (_) {
+      if (!mounted) return;
+      await context.read<SettingsProvider>().refreshDesktopStartup();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.desktopAutostartError,
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    final available =
+        settings.desktopAutostartSupported && !settings.desktopAutostartBusy;
+    final canHide =
+        available &&
+        settings.desktopAutostartEnabled &&
+        settings.desktopShowTray;
+    return Column(
+      children: [
+        _ToggleRow(
+          label: l10n.desktopAutostartTitle,
+          tip: !settings.desktopAutostartSupported
+              ? l10n.desktopAutostartUnsupported
+              : settings.desktopAutostartFailed
+              ? l10n.desktopAutostartError
+              : l10n.desktopAutostartDescription,
+          value: settings.desktopAutostartEnabled,
+          onChanged: available
+              ? (value) =>
+                    _change(() => settings.setDesktopAutostartEnabled(value))
+              : null,
+        ),
+        const _RowDivider(),
+        _ToggleRow(
+          label: l10n.desktopAutostartHiddenTitle,
+          tip: l10n.desktopAutostartHiddenDescription,
+          value: canHide && settings.desktopAutostartHidden,
+          onChanged: canHide
+              ? (value) =>
+                    _change(() => settings.setDesktopAutostartHidden(value))
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
 // --- Desktop tray settings ---
 class _DesktopTrayShowRow extends StatelessWidget {
   const _DesktopTrayShowRow();
@@ -1127,9 +1210,8 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
           final style = TextStyle(fontSize: 14);
           final labels = <String>[
             '🖥️ ${AppLocalizations.of(ctx)!.settingsPageSystemMode}',
-            '🇨🇳 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageChineseLabel}',
-            '🇨🇳 ${AppLocalizations.of(ctx)!.languageDisplayTraditionalChinese}',
-            '🇺🇸 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageEnglishLabel}',
+            for (final language in AppLanguage.values)
+              '${language.flag} ${language.nativeName}',
           ];
           double maxText = 0;
           for (final s in labels) {
@@ -1188,19 +1270,10 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
-    String labelFor(Locale l) {
-      if (l.languageCode == 'zh') {
-        if ((l.scriptCode ?? '').toLowerCase() == 'hant') {
-          return l10n.languageDisplayTraditionalChinese;
-        }
-        return l10n.displaySettingsPageLanguageChineseLabel;
-      }
-      return l10n.displaySettingsPageLanguageEnglishLabel;
-    }
 
     final current = sp.isFollowingSystemLocale
         ? l10n.settingsPageSystemMode
-        : labelFor(sp.appLocale);
+        : AppLanguage.fromLocale(sp.appLocale).nativeName;
     return _LabeledRow(
       label: l10n.displaySettingsPageLanguageTitle,
       trailing: CompositedTransformTarget(
@@ -1499,34 +1572,16 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         ),
         sp.isFollowingSystemLocale,
       ),
-      (
-        _LangItem(
-          flag: '🇨🇳',
-          label: l10n.displaySettingsPageLanguageChineseLabel,
-          tag: 'zh_CN',
+      for (final language in AppLanguage.values)
+        (
+          _LangItem(
+            flag: language.flag,
+            label: language.nativeName,
+            tag: language.tag,
+          ),
+          !sp.isFollowingSystemLocale &&
+              AppLanguage.fromLocale(sp.appLocale) == language,
         ),
-        (!sp.isFollowingSystemLocale &&
-            sp.appLocale.languageCode == 'zh' &&
-            (sp.appLocale.scriptCode ?? '').isEmpty),
-      ),
-      (
-        _LangItem(
-          flag: '🇨🇳',
-          label: l10n.languageDisplayTraditionalChinese,
-          tag: 'zh_Hant',
-        ),
-        (!sp.isFollowingSystemLocale &&
-            sp.appLocale.languageCode == 'zh' &&
-            (sp.appLocale.scriptCode ?? '').toLowerCase() == 'hant'),
-      ),
-      (
-        _LangItem(
-          flag: '🇺🇸',
-          label: l10n.displaySettingsPageLanguageEnglishLabel,
-          tag: 'en_US',
-        ),
-        (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'en'),
-      ),
     ];
     final maxH = MediaQuery.of(context).size.height * 0.5;
     return AnimatedOpacity(
@@ -1567,32 +1622,14 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                         item: ent.$1,
                         checked: ent.$2,
                         onTap: () async {
-                          switch (ent.$1.tag) {
-                            case 'system':
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setAppLocaleFollowSystem();
-                              break;
-                            case 'zh_CN':
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setAppLocale(const Locale('zh', 'CN'));
-                              break;
-                            case 'zh_Hant':
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setAppLocale(
-                                    const Locale.fromSubtags(
-                                      languageCode: 'zh',
-                                      scriptCode: 'Hant',
-                                    ),
-                                  );
-                              break;
-                            case 'en_US':
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setAppLocale(const Locale('en', 'US'));
-                              break;
+                          final settings = context.read<SettingsProvider>();
+                          if (ent.$1.tag == 'system') {
+                            await settings.setAppLocaleFollowSystem();
+                          } else {
+                            final language = AppLanguage.fromTag(ent.$1.tag);
+                            if (language != null) {
+                              await settings.setAppLocale(language.locale);
+                            }
                           }
                           if (!mounted) return;
                           widget.onClose();
@@ -1612,7 +1649,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
 class _LangItem {
   final String flag;
   final String label;
-  final String tag; // 'system' | 'zh_CN' | 'zh_Hant' | 'en_US'
+  final String tag;
   const _LangItem({required this.flag, required this.label, required this.tag});
 }
 
@@ -2522,6 +2559,38 @@ class _ToggleRowMathRendering extends StatelessWidget {
   }
 }
 
+class _ToggleRowLegacyInlineCodeStyle extends StatelessWidget {
+  const _ToggleRowLegacyInlineCodeStyle();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageUseLegacyInlineCodeStyleTitle,
+      tip: l10n.displaySettingsPageUseLegacyInlineCodeStyleSubtitle,
+      value: sp.useLegacyInlineCodeStyle,
+      onChanged: (value) =>
+          context.read<SettingsProvider>().setUseLegacyInlineCodeStyle(value),
+    );
+  }
+}
+
+class _ToggleRowLegacyCodeBlockStyle extends StatelessWidget {
+  const _ToggleRowLegacyCodeBlockStyle();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageUseLegacyCodeBlockStyleTitle,
+      tip: l10n.displaySettingsPageUseLegacyCodeBlockStyleSubtitle,
+      value: sp.useLegacyCodeBlockStyle,
+      onChanged: (value) =>
+          context.read<SettingsProvider>().setUseLegacyCodeBlockStyle(value),
+    );
+  }
+}
+
 class _ToggleRowUserMarkdown extends StatelessWidget {
   const _ToggleRowUserMarkdown();
   @override
@@ -2563,6 +2632,22 @@ class _ToggleRowAssistantMarkdown extends StatelessWidget {
       value: sp.enableAssistantMarkdown,
       onChanged: (v) =>
           context.read<SettingsProvider>().setEnableAssistantMarkdown(v),
+    );
+  }
+}
+
+class _ToggleRowGenUiHeader extends StatelessWidget {
+  const _ToggleRowGenUiHeader();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsShowGenUiHeader,
+      tip: l10n.displaySettingsShowGenUiHeaderSubtitle,
+      value: sp.showGenUiHeader,
+      onChanged: (value) =>
+          context.read<SettingsProvider>().setShowGenUiHeader(value),
     );
   }
 }
@@ -2705,6 +2790,21 @@ class _ToggleRowHideToolResultImages extends StatelessWidget {
   }
 }
 
+class _ToggleRowShowBrowserPageCards extends StatelessWidget {
+  const _ToggleRowShowBrowserPageCards();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowBrowserPageCardsTitle,
+      value: sp.showBrowserPageCards,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowBrowserPageCards(v),
+    );
+  }
+}
+
 class _ToggleRowInsertSuggestionOnly extends StatelessWidget {
   const _ToggleRowInsertSuggestionOnly();
   @override
@@ -2783,17 +2883,32 @@ class _ToggleRowEditAssistantKeepThinkingToolCards extends StatelessWidget {
   }
 }
 
-class _ToggleRowAutoScrollEnabled extends StatelessWidget {
-  const _ToggleRowAutoScrollEnabled();
+class _AutoScrollRow extends StatelessWidget {
+  const _AutoScrollRow();
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageAutoScrollEnableTitle,
-      value: sp.autoScrollEnabled,
-      onChanged: (v) =>
-          context.read<SettingsProvider>().setAutoScrollEnabled(v),
+    return Tooltip(
+      message: l10n.displaySettingsPageAutoScrollSubtitle,
+      child: _LabeledRow(
+        label: l10n.displaySettingsPageAutoScrollEnableTitle,
+        trailing: DesktopSelectDropdown<bool>(
+          value: sp.autoScrollEnabled,
+          options: [
+            DesktopSelectOption(
+              value: true,
+              label: l10n.displaySettingsPageAutoScrollEnabledLabel,
+            ),
+            DesktopSelectOption(
+              value: false,
+              label: l10n.displaySettingsPageAutoScrollDisabledLabel,
+            ),
+          ],
+          onSelected: (enabled) =>
+              context.read<SettingsProvider>().setAutoScrollEnabled(enabled),
+        ),
+      ),
     );
   }
 }
@@ -2825,7 +2940,7 @@ class _ToggleRowRequestLogging extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () async {
-                final dir = await AppDirectories.getAppDataDirectory();
+                final dir = await AppDirectories.getContentDirectory();
                 final logsDir = Directory('${dir.path}/logs');
                 if (!await logsDir.exists()) {
                   await logsDir.create(recursive: true);
@@ -2882,7 +2997,7 @@ class _ToggleRowFlutterLogging extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () async {
-                final dir = await AppDirectories.getAppDataDirectory();
+                final dir = await AppDirectories.getContentDirectory();
                 final logsDir = Directory('${dir.path}/logs');
                 if (!await logsDir.exists()) {
                   await logsDir.create(recursive: true);
@@ -3321,79 +3436,6 @@ class _CollapseLongUserMessageCharsRowState
 }
 
 // --- Others: inputs ---
-class _AutoScrollDelayRow extends StatefulWidget {
-  const _AutoScrollDelayRow();
-  @override
-  State<_AutoScrollDelayRow> createState() => _AutoScrollDelayRowState();
-}
-
-class _AutoScrollDelayRowState extends State<_AutoScrollDelayRow> {
-  late final TextEditingController _controller;
-  @override
-  void initState() {
-    super.initState();
-    final seconds = context.read<SettingsProvider>().autoScrollIdleSeconds;
-    _controller = TextEditingController(text: '${seconds.round()}');
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _commit(String text) {
-    final v = text.trim();
-    final n = int.tryParse(v);
-    if (n == null) return;
-    final clamped = n.clamp(2, 64);
-    context.read<SettingsProvider>().setAutoScrollIdleSeconds(clamped);
-    _controller.text = '$clamped';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    final enabled = sp.autoScrollEnabled;
-    return _LabeledRow(
-      label: l10n.displaySettingsPageAutoScrollIdleTitle,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IntrinsicWidth(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 36, maxWidth: 72),
-              child: IgnorePointer(
-                ignoring: !enabled,
-                child: Opacity(
-                  opacity: enabled ? 1.0 : 0.5,
-                  child: _BorderInput(
-                    controller: _controller,
-                    onSubmitted: _commit,
-                    onFocusLost: _commit,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            's',
-            style: TextStyle(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: enabled ? 0.7 : 0.35),
-              fontSize: 14,
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _AutoCollapseCodeBlockLinesRow extends StatefulWidget {
   const _AutoCollapseCodeBlockLinesRow();
   @override

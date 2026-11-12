@@ -3,22 +3,25 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:markstream/markstream.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_detail.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/utils/format_bytes.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/markdown_render_helpers.dart';
 import 'skills_test_fakes.dart';
 
 const _limit = 100 * 1024;
@@ -166,6 +169,44 @@ void main() {
   AppLocalizations localizations(WidgetTester tester) =>
       AppLocalizations.of(tester.element(find.byType(SkillDetailView)))!;
 
+  for (final desktop in [false, true]) {
+    testWidgets('skill preview owns a table selection area: desktop=$desktop', (
+      tester,
+    ) async {
+      file.replace(
+        '$_source\n\n| Name | Value |\n| --- | --- |\n| Alpha | 42 |',
+      );
+      String? copied;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      await IOOverrides.runWithIOOverrides(() async {
+        await pumpDetail(tester, desktop: desktop);
+        await tester.pumpAndSettle();
+        final region = tester.state<SelectableRegionState>(
+          find.byType(SelectableRegion),
+        );
+        region.selectAll(SelectionChangedCause.keyboard);
+        await tester.pumpAndSettle();
+        region.contextMenuButtonItems
+            .singleWhere((item) => item.type == ContextMenuButtonType.copy)
+            .onPressed!();
+        await tester.pump();
+        expect(copied, contains('Name\tValue\nAlpha\t42'));
+        expect(copied, isNot(contains('Instructions')));
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, _SkillFileOverrides([file]));
+    });
+  }
+
   for (final size in [_limit - 1, _limit, _limit + 1]) {
     testWidgets('preview limit uses file bytes: $size', (tester) async {
       file.replace(_source.padRight(size));
@@ -237,9 +278,7 @@ void main() {
     await IOOverrides.runWithIOOverrides(() async {
       await pumpDetail(tester);
       await tester.pumpAndSettle();
-      final markdownState = tester.state(
-        find.byType(MarkdownWithCodeHighlight),
-      );
+      final markdownState = tester.state(find.byType(MarkstreamView));
       await service.setEnabled(skill.record.id, false);
       await tester.pumpAndSettle();
       await pumpDetail(tester, brightness: Brightness.dark);
@@ -247,10 +286,7 @@ void main() {
       await service.rescan();
       await tester.pumpAndSettle();
       expect(file.reads, 1);
-      expect(
-        tester.state(find.byType(MarkdownWithCodeHighlight)),
-        same(markdownState),
-      );
+      expect(tester.state(find.byType(MarkstreamView)), same(markdownState));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     }, _SkillFileOverrides([file]));
@@ -274,11 +310,18 @@ void main() {
         Finder row(String label) => find.text(label, findRichText: true);
         await pumpDetail(tester, desktop: desktop);
         await tester.pumpAndSettle();
-        expect(find.text('End of the skill'), findsOneWidget);
+        expect(
+          markdownParagraph(tester, 'End of the skill').text.toPlainText(),
+          'End of the skill',
+        );
         expect(row('row-35'), findsOneWidget);
         expect(row('row-55'), findsNothing);
 
-        final showMore = find.byKey(const ValueKey('markdown-table-show-more'));
+        final showMore = find.byWidgetPredicate(
+          (widget) =>
+              widget is MarkstreamActionButton &&
+              widget.action.kind == MarkstreamActionKind.showMore,
+        );
         await tester.ensureVisible(showMore);
         await tester.pumpAndSettle();
         await tester.tap(showMore);
@@ -315,39 +358,28 @@ void main() {
         await IOOverrides.runWithIOOverrides(() async {
           await pumpDetail(tester, desktop: desktop);
           await tester.pumpAndSettle();
-          final state = tester.state(find.byType(MarkdownWithCodeHighlight));
+          final state = tester.state(find.byType(MarkstreamView));
           expect(find.byType(Math), findsOneWidget);
 
           file.replace('$original appended');
           await service.updateBody(skill.record.id, utf8.decode(file.bytes));
           await tester.pumpAndSettle();
           expect(find.byType(Math), findsOneWidget);
-          expect(
-            tester.state(find.byType(MarkdownWithCodeHighlight)),
-            same(state),
-          );
+          expect(tester.state(find.byType(MarkstreamView)), same(state));
           await tester.runAsync(() => settings.setEnableDollarLatex(false));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
           expect(find.byType(Math), findsNothing);
+          expect(tester.state(find.byType(MarkstreamView)), same(state));
           expect(
-            tester.state(find.byType(MarkdownWithCodeHighlight)),
-            same(state),
-          );
-          expect(
-            tester
-                .widgetList<RichText>(find.byType(RichText))
-                .map((text) => text.text.toPlainText()),
+            markdownParagraphs(tester).map((text) => text.text.toPlainText()),
             contains('$original appended'),
           );
           await tester.runAsync(() => settings.setEnableDollarLatex(true));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
           expect(find.byType(Math), findsOneWidget);
-          expect(
-            tester.state(find.byType(MarkdownWithCodeHighlight)),
-            same(state),
-          );
+          expect(tester.state(find.byType(MarkstreamView)), same(state));
           expect(file.reads, 2);
           await tester.pumpWidget(const SizedBox.shrink());
         }, _SkillFileOverrides([file]));

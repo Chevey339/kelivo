@@ -18,6 +18,7 @@ import 'widgets/files/file_browser.dart';
 import 'widgets/files/file_browser_ops.dart';
 import 'widgets/preview/file_preview.dart';
 import 'workspace_layout.dart';
+import '../browser/browser_navigation.dart';
 import 'workspace_navigation.dart';
 
 Future<FileSystemEntity?> _resolveLinkedEntry(
@@ -95,7 +96,28 @@ Future<void> openWorkspaceLinkedFile(
     // Directory permissions may have changed since the tool ran.
   }
   if (!context.mounted) return;
-  if (entry is File) {
+  if (entry is File &&
+      parsed?.kind == KelivoLinkKind.workspaceFile &&
+      ['.html', '.htm'].contains(p.extension(entry.path).toLowerCase()) &&
+      !Platform.isLinux) {
+    try {
+      await openBrowserPage(
+        context,
+        conversationId:
+            conversationId ??
+            context.read<ChatService?>()?.currentConversationId,
+        url: link,
+      );
+    } catch (_) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.workspaceFileNotAvailable,
+          type: NotificationType.info,
+        );
+      }
+    }
+  } else if (entry is File) {
     await showFilePreview(context, entry, title: title);
   } else if (entry is Directory) {
     await _showDirectory(

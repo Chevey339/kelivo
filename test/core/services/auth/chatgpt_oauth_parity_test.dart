@@ -210,14 +210,13 @@ void main() {
         OAuthWire(
           MockClient((request) async {
             expect(request.url.path, '/backend-api/codex/models');
-            expect(
-              request.url.queryParameters['client_version'],
-              codexClientVersion,
-            );
+            expect(request.url.queryParameters['client_version'], '0.159.0');
+            expect(request.headers['version'], '0.159.0');
+            expect(request.headers, isNot(contains('openai-beta')));
             return json({
               'models': [
                 {
-                  'slug': 'subscription-model',
+                  'slug': 'gpt-6.1-sol',
                   'supported_in_api': false,
                   'priority': 2,
                 },
@@ -231,10 +230,7 @@ void main() {
         ),
         stored,
       );
-      expect(rows.map((row) => row['id']), [
-        'id-only-model',
-        'subscription-model',
-      ]);
+      expect(rows.map((row) => row['id']), ['id-only-model', 'gpt-6.1-sol']);
     },
   );
 

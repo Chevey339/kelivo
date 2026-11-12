@@ -1237,12 +1237,30 @@ class NetworkTtsService {
       if (dataB64.isEmpty) continue;
       buf.add(base64Decode(dataB64));
     }
-    final pcm = buf.takeBytes();
-    if (pcm.isEmpty) {
+    final audioBytes = buf.takeBytes();
+    if (audioBytes.isEmpty) {
       throw Exception('Qwen TTS returned no audio data');
     }
+    if (audioBytes.lengthInBytes >= 4 &&
+        ByteData.sublistView(audioBytes).getUint32(0, Endian.little) ==
+            _riffFourCc) {
+      final wav = _parseWav(audioBytes, allowStreamingLengths: true);
+      final normalized = _encodeWav(wav.formatData, wav.audioData);
+      return NetworkTtsResult(
+        bytes: normalized,
+        mime: 'audio/wav',
+        sampleRate: ByteData.sublistView(
+          wav.formatData,
+        ).getUint32(4, Endian.little),
+      );
+    }
+    if (audioBytes.lengthInBytes.isOdd) {
+      throw const FormatException(
+        'Qwen PCM data is not aligned to 16-bit samples.',
+      );
+    }
     return NetworkTtsResult(
-      bytes: _pcmToWav(Uint8List.fromList(pcm), sampleRate: 24000),
+      bytes: _pcmToWav(audioBytes, sampleRate: 24000),
       mime: 'audio/wav',
       sampleRate: 24000,
     );
@@ -2103,21 +2121,37 @@ Uint8List combineWavAudio(List<Uint8List> wavFiles) {
   }
   if (parsed.length == 1) return Uint8List.fromList(wavFiles.single);
 
+  return _encodeWav(format, parsed.expand((wav) => wav.audioData));
+}
+
+Uint8List _encodeWav(Uint8List format, Iterable<Uint8List> audioData) {
+  final formatTag = _supportedWavFormatTag(format);
+  final view = ByteData.sublistView(format);
+  final channels = view.getUint16(2, Endian.little);
+  final sampleRate = view.getUint32(4, Endian.little);
+  final byteRate = view.getUint32(8, Endian.little);
+  final blockAlign = view.getUint16(12, Endian.little);
+  final bitsPerSample = view.getUint16(14, Endian.little);
+  if (channels == 0 ||
+      sampleRate == 0 ||
+      bitsPerSample == 0 ||
+      bitsPerSample % 8 != 0 ||
+      blockAlign != channels * (bitsPerSample ~/ 8) ||
+      byteRate != sampleRate * blockAlign ||
+      (formatTag == 3 && bitsPerSample != 32 && bitsPerSample != 64)) {
+    throw const FormatException('Invalid WAV audio format.');
+  }
+
   final combinedData = BytesBuilder(copy: false);
-  for (final wav in parsed) {
-    for (final data in wav.audioData) {
-      combinedData.add(data);
+  for (final data in audioData) {
+    if (data.lengthInBytes % blockAlign != 0) {
+      throw const FormatException('Invalid WAV block alignment.');
     }
+    combinedData.add(data);
   }
   final audioBytes = combinedData.takeBytes();
   if (audioBytes.isEmpty) {
     throw const FormatException('WAV data chunk is empty.');
-  }
-
-  final formatTag = _supportedWavFormatTag(format);
-  final blockAlign = ByteData.sublistView(format).getUint16(12, Endian.little);
-  if (blockAlign == 0 || audioBytes.lengthInBytes % blockAlign != 0) {
-    throw const FormatException('Invalid WAV block alignment.');
   }
 
   final body = BytesBuilder(copy: false)..add(utf8.encode('WAVE'));
@@ -2143,7 +2177,10 @@ const int _waveFourCc = 0x45564157;
 const int _fmtFourCc = 0x20746d66;
 const int _dataFourCc = 0x61746164;
 
-({Uint8List formatData, List<Uint8List> audioData}) _parseWav(Uint8List bytes) {
+({Uint8List formatData, List<Uint8List> audioData}) _parseWav(
+  Uint8List bytes, {
+  bool allowStreamingLengths = false,
+}) {
   if (bytes.lengthInBytes < 12) {
     throw const FormatException('WAV file is too short.');
   }
@@ -2153,8 +2190,14 @@ const int _dataFourCc = 0x61746164;
     throw const FormatException('Invalid RIFF/WAVE header.');
   }
 
-  final riffEnd = 8 + view.getUint32(4, Endian.little);
-  if (riffEnd < 12 || riffEnd > bytes.lengthInBytes) {
+  final declaredSize = view.getUint32(4, Endian.little);
+  final declaredEnd = 8 + declaredSize;
+  final streamingRiff =
+      allowStreamingLengths &&
+      declaredEnd > bytes.lengthInBytes &&
+      _isStreamingWavLength(declaredSize);
+  final riffEnd = streamingRiff ? bytes.lengthInBytes : declaredEnd;
+  if (riffEnd < 12 || riffEnd != bytes.lengthInBytes) {
     throw const FormatException('Invalid RIFF size.');
   }
 
@@ -2168,8 +2211,17 @@ const int _dataFourCc = 0x61746164;
     final id = view.getUint32(offset, Endian.little);
     final size = view.getUint32(offset + 4, Endian.little);
     final dataStart = offset + 8;
-    final dataEnd = dataStart + size;
-    final paddedEnd = dataEnd + (size.isOdd ? 1 : 0);
+    // Streaming WAV writers may use a sentinel for data, or derive its size
+    // from the placeholder RIFF end (for example 0x7fffff9b in Qwen responses).
+    // Only the audio chunk may consume the remaining response in this case.
+    final streamingData =
+        allowStreamingLengths &&
+        id == _dataFourCc &&
+        dataStart + size > riffEnd &&
+        (_isStreamingWavLength(size) ||
+            (streamingRiff && dataStart + size == declaredEnd));
+    final dataEnd = streamingData ? riffEnd : dataStart + size;
+    final paddedEnd = dataEnd + (!streamingData && size.isOdd ? 1 : 0);
     if (dataEnd > riffEnd || paddedEnd > riffEnd) {
       throw const FormatException('Truncated WAV chunk data.');
     }
@@ -2191,6 +2243,9 @@ const int _dataFourCc = 0x61746164;
   }
   return (formatData: formatData, audioData: audioData);
 }
+
+bool _isStreamingWavLength(int size) =>
+    size == 0xffffffff || size == 0x7fffffff || size == 0x7fffffbf;
 
 int _supportedWavFormatTag(Uint8List format) {
   if (format.lengthInBytes < 16) {

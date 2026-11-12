@@ -1,3 +1,4 @@
+import 'widgets/desktop_form_dialog.dart';
 import 'package:flutter/material.dart';
 import '../core/models/chat_message.dart';
 import '../features/chat/models/message_edit_result.dart';
@@ -63,66 +64,49 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        l10n.messageEditPageTitle,
+                DesktopFormDialogHeader(
+                  title: l10n.messageEditPageTitle,
+                  closeTooltip: l10n.mcpPageClose,
+                  onClose: () => Navigator.of(context).maybePop(),
+                  actions: [
+                    TextButton.icon(
+                      onPressed: () {
+                        final text = _controller.text.trim();
+                        Navigator.of(context).pop<MessageEditResult>(
+                          MessageEditResult(content: text, shouldSend: true),
+                        );
+                      },
+                      icon: Icon(
+                        Lucide.MessageCirclePlus,
+                        size: 18,
+                        color: cs.primary,
+                      ),
+                      label: Text(
+                        l10n.messageEditPageSaveAndSend,
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: AppFontWeights.emphasis,
-                        ),
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: () {
-                          final text = _controller.text.trim();
-                          Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: true),
-                          );
-                        },
-                        icon: Icon(
-                          Lucide.MessageCirclePlus,
-                          size: 18,
                           color: cs.primary,
-                        ),
-                        label: Text(
-                          l10n.messageEditPageSaveAndSend,
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: AppFontWeights.semibold,
-                          ),
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      TextButton.icon(
-                        onPressed: () {
-                          final text = _controller.text.trim();
-                          Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: false),
-                          );
-                        },
-                        icon: Icon(Lucide.Check, size: 18, color: cs.primary),
-                        label: Text(
-                          l10n.messageEditPageSave,
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: AppFontWeights.semibold,
-                          ),
+                    ),
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      onPressed: () {
+                        final text = _controller.text.trim();
+                        Navigator.of(context).pop<MessageEditResult>(
+                          MessageEditResult(content: text, shouldSend: false),
+                        );
+                      },
+                      icon: Icon(Lucide.Check, size: 18, color: cs.primary),
+                      label: Text(
+                        l10n.messageEditPageSave,
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
-                      IconButton(
-                        tooltip: l10n.mcpPageClose,
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        icon: Icon(
-                          Lucide.X,
-                          size: 18,
-                          color: cs.onSurface.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 // Body

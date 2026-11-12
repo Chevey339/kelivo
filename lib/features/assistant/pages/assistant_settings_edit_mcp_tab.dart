@@ -47,6 +47,20 @@ class _McpTab extends StatelessWidget {
       children: [
         SectionCard(
           children: [
+            _ConversationPromptOption(
+              icon: Lucide.MessagesSquare,
+              title: l10n.assistantConversationMcpTitle,
+              subtitle: l10n.assistantConversationMcpHint,
+              value: assistant.allowConversationMcp,
+              onChanged: (value) => ap.updateAssistant(
+                assistant.copyWith(allowConversationMcp: value),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SectionCard(
+          children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(

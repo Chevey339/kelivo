@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -15,6 +16,7 @@ import '../../../shared/widgets/qq_group_join_sheet.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import 'debug_page.dart';
+import '../../dev/pages/markdown_playground_page.dart';
 import 'log_viewer_page.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -482,6 +484,19 @@ class _AboutPageState extends State<AboutPage> {
           // iOS-style list card
           SectionCard(
             children: [
+              if (kDebugMode || kProfileMode) ...[
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Code,
+                  label: l10n.markdownPlaygroundTitle,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const MarkdownPlaygroundPage(),
+                    ),
+                  ),
+                ),
+                _iosDivider(context),
+              ],
               // Version (tap 7x to unlock easter egg) — logic unchanged
               _iosNavRow(
                 context,

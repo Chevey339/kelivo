@@ -149,6 +149,7 @@ void main() {
           'exitCode': 137,
           'timedOut': false,
           'interrupted': true,
+          'terminationConfirmed': true,
           'durationMs': 40,
         });
         return <String, Object?>{'started': true};
@@ -190,6 +191,7 @@ void main() {
 
     final exit = events.whereType<CommandExited>().single;
     expect(exit.interrupted, isTrue);
+    expect(exit.terminationConfirmed, isTrue);
     expect(exit.exitCode, 137);
     expect(exit.cancelled, isFalse);
     expect(exit.timedOut, isFalse);
@@ -232,6 +234,7 @@ void main() {
   test('openPty omits rootfs paths and maps session events', () async {
     expect(runtime.supportsPty, isTrue);
     expect(runtime.supportsSystemTerminal, isFalse);
+    expect(runtime.supportsFileManager, isFalse);
 
     final session = await runtime.openPty(
       mounts: const [],

@@ -22,6 +22,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'dart:ui' as ui show ImageFilter;
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
@@ -161,7 +162,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
           }
         : {for (final p in filteredItems) p.keyName};
 
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         leading: Tooltip(
           message: l10n.settingsPageBackButton,
@@ -484,26 +485,37 @@ class _ProvidersPageState extends State<ProvidersPage> {
         ],
       ),
     );
+    return SelectionBackScope(
+      selecting: _selectMode,
+      onCancel: () => setState(() {
+        _selectMode = false;
+        _selected.clear();
+      }),
+      child: page,
+    );
   }
 
   List<_Provider> _providers({required AppLocalizations l10n}) => [
     _p('OpenAI', 'OpenAI', enabled: true, models: 0),
+    _p('Gemini', 'Gemini', enabled: true, models: 0),
+    _p('STA1N API', 'STA1N API', enabled: false, models: 0),
+    _p('OpenRouter', 'OpenRouter', enabled: true, models: 0),
+    _p('KelivoIN', 'KelivoIN', enabled: true, models: 0),
+    _p('10dian-API', '10dian-API', enabled: false, models: 0),
+    _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),
     _p(
       l10n.providersPageSiliconFlowName,
       'SiliconFlow',
       enabled: true,
       models: 0,
     ),
-    _p('Gemini', 'Gemini', enabled: true, models: 0),
-    _p('OpenRouter', 'OpenRouter', enabled: true, models: 0),
-    _p('Vercel AI Gateway', 'Vercel', enabled: false, models: 0),
-    _p('Atlas Cloud', 'Atlas Cloud', enabled: true, models: 0),
-    _p('KelivoIN', 'KelivoIN', enabled: true, models: 0),
-    _p('Tensdaq', 'Tensdaq', enabled: false, models: 0),
-    _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),
     _p('AIhubmix', 'AIhubmix', enabled: false, models: 0),
     _p('随想AI中转站', '随想AI中转站', enabled: false, models: 0),
     _p('MaruCode', 'MaruCode', enabled: false, models: 0),
+    _p('砂糖酒馆', '砂糖酒馆', enabled: false, models: 0),
+    _p('Vercel AI Gateway', 'Vercel', enabled: false, models: 0),
+    _p('Atlas Cloud', 'Atlas Cloud', enabled: true, models: 0),
+    _p('Tensdaq', 'Tensdaq', enabled: false, models: 0),
     _p(l10n.providersPageAliyunName, 'Aliyun', enabled: false, models: 0),
     _p(l10n.providersPageZhipuName, 'Zhipu AI', enabled: false, models: 0),
     _p('Claude', 'Claude', enabled: false, models: 0),

@@ -11,7 +11,7 @@ import 'package:Kelivo/features/chat/widgets/frosted/chat_frosted_backdrop.dart'
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_overlay_layout.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/widgets/long_message_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -284,7 +284,12 @@ void main() {
           ),
         );
         await tester.pump(const Duration(seconds: 2));
-        expect(find.byType(BackdropFilter), findsWidgets);
+        expect(
+          find.byWidgetPredicate(
+            (widget) => widget is BackdropFilter && widget.enabled,
+          ),
+          findsWidgets,
+        );
         expect(find.byType(MarkdownWithCodeHighlight), findsOneWidget);
         final field = tester.widget<LongMessageEditor>(
           find.byType(LongMessageEditor),

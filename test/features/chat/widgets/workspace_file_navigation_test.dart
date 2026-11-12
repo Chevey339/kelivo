@@ -21,11 +21,14 @@ import 'package:Kelivo/core/services/workspace/workspace_tool_metadata.dart';
 import 'package:Kelivo/features/chat/widgets/workspace_tool_ui.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/file_preview.dart';
+import 'package:Kelivo/features/workspace/widgets/preview/code_file_preview.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/file_browser_test_helpers.dart';
+import '../../../support/markdown_render_helpers.dart';
 
 class _Chat extends ChatService {
   _Chat(this.conversation);
@@ -92,8 +95,17 @@ void main() {
       );
     }
     if (find.byType(FileBrowser).evaluate().isNotEmpty) {
+      await waitForFileBrowserOperation(
+        tester,
+        tester
+            .state<FileBrowserState>(find.byType(FileBrowser))
+            .refreshEntries(),
+      );
+      await tester.pump();
+    }
+    if (find.byType(CodeFilePreview).evaluate().isNotEmpty) {
       await tester.runAsync(
-        tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries,
+        tester.state<CodeFilePreviewState>(find.byType(CodeFilePreview)).load,
       );
       await tester.pump();
     }
@@ -161,7 +173,11 @@ void main() {
                   ),
           ),
         );
-        await tester.tap(find.text('folder').first);
+        if (markdown) {
+          await tester.tapAt(markdownGlyphCenter(tester, 'folder'));
+        } else {
+          await tester.tap(find.text('folder').first);
+        }
         await settle(tester);
         expect(find.byType(FileBrowser), findsOneWidget);
         final browser = tester.widget<FileBrowser>(find.byType(FileBrowser));

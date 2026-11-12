@@ -1,5 +1,17 @@
+import 'package:Kelivo/core/models/compression_config.dart';
+import 'package:Kelivo/features/home/controllers/home_view_model.dart';
+import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/core/models/world_book.dart';
+import 'package:Kelivo/core/services/memory/memory_prompts.dart';
+import 'package:Kelivo/core/models/memory_entry.dart';
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/memory_provider_v2.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
@@ -34,7 +46,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import '../../../support/business_test_harness.dart';
 
 class _Chat extends ChatService {
-  _Chat(this.repository);
+  _Chat(this.repository) : super(existingRepository: repository);
   final ChatDatabaseRepository repository;
   final conversations = <String, Conversation>{};
   final revisions = <String, int>{};
@@ -58,8 +70,9 @@ class _Chat extends ChatService {
   @override
   Future<void> updateConversationExtras(
     String id,
-    Map<String, dynamic> Function(Map<String, dynamic>) update,
-  ) async {
+    Map<String, dynamic> Function(Map<String, dynamic>) update, {
+    Conversation? expectedOwner,
+  }) async {
     await repository.updateConversationExtras(id, update);
     conversations[id] = (await repository.getConversation(id))!;
     revisions[id] = contextRevision(id) + 1;
@@ -73,19 +86,30 @@ class _Chat extends ChatService {
   @override
   Future<List<ChatMessage>> loadSelectedContextMessages(
     String id, {
-    required int truncateIndex,
     required int limit,
     String? throughRevisionId,
     bool includeFollowingAssistant = false,
   }) {
-    return repository.getSelectedContextMessages(
+    return repository.getEffectiveContextMessages(
       id,
-      truncateIndex: truncateIndex,
       limit: limit,
       throughRevisionId: throughRevisionId,
       includeFollowingAssistant: includeFollowingAssistant,
     );
   }
+}
+
+class _CompressionPaths extends PathProviderPlatform {
+  _CompressionPaths(this.path);
+  final String path;
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+  @override
+  Future<String?> getApplicationCachePath() async => '$path/cache';
+  @override
+  Future<String?> getTemporaryPath() async => '$path/tmp';
 }
 
 class _Routes extends Fake implements McpToolRouteSnapshot {}
@@ -98,7 +122,10 @@ class _Generation extends Fake implements GenerationController {
   @override
   Map<String, dynamic>? buildCustomBody(Assistant? assistant) => null;
   @override
-  McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) => _Routes();
+  McpToolRouteSnapshot captureMcpToolRoutes(
+    Assistant? assistant, {
+    String? conversationId,
+  }) => _Routes();
   @override
   List<Map<String, dynamic>> buildToolDefinitions(
     SettingsProvider settings,
@@ -110,6 +137,39 @@ class _Generation extends Fake implements GenerationController {
     WorkspaceToolContext? workspaceContext,
     String? conversationId,
   }) => [];
+}
+
+class _ClockGeneration extends MessageGenerationService {
+  _ClockGeneration({
+    required super.chatService,
+    required super.messageBuilderService,
+    required super.generationController,
+    required super.streamController,
+    required super.contextProvider,
+  });
+  DateTime wallClock = DateTime(2020, 1, 1, 12);
+  @override
+  Future<ContextAssemblyPreview> previewContextAssembly({
+    bool? fixedContextStart,
+    DateTime? promptTime,
+    bool forceResponses = false,
+    bool applyMessageLimit = true,
+    required String conversationId,
+    required String providerKey,
+    required String modelId,
+    required String? assistantId,
+    List<ChatMessage>? messagesOverride,
+  }) => super.previewContextAssembly(
+    fixedContextStart: fixedContextStart,
+    promptTime: promptTime ?? wallClock,
+    forceResponses: forceResponses,
+    applyMessageLimit: applyMessageLimit,
+    conversationId: conversationId,
+    providerKey: providerKey,
+    modelId: modelId,
+    assistantId: assistantId,
+    messagesOverride: messagesOverride,
+  );
 }
 
 class _Usage extends ContextUsageService {
@@ -143,11 +203,22 @@ void main() {
   late BusinessTestHarness harness;
   late ChatDatabaseRepository repository;
   late _Chat chat;
+  late Directory directory;
+  late PathProviderPlatform paths;
   late WorldBookProvider books;
   late InstructionInjectionProvider injections;
   late UserProvider user;
   late SettingsProvider settings;
   late AssistantProvider assistants;
+
+  Future<void> setFullInjectionTypes(Set<MemoryType> types) async {
+    await assistants.updateAssistant(
+      assistants
+          .getById('assistant')!
+          .copyWith(memoryFullInjectionTypes: types),
+    );
+  }
+
   late MemoryProviderV2 memories;
   late BuildContext context;
   late MessageBuilderService builder;
@@ -156,7 +227,11 @@ void main() {
     harness = await createBusinessTestHarness();
     repository = ChatDatabaseRepository(harness.database);
     await repository.ensureReady();
+    directory = await Directory.systemTemp.createTemp('context_memory_');
+    paths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _CompressionPaths(directory.path);
     chat = _Chat(repository);
+    await chat.init();
     memories = MemoryProviderV2(
       repository: MemoryRepository(harness.preferences),
       chatRepository: repository,
@@ -208,13 +283,16 @@ void main() {
     chat.conversations[conversation.id] = conversation;
   });
 
-  tearDown(() {
+  tearDown(() async {
+    await chat.close();
     memories.dispose();
     books.dispose();
     injections.dispose();
     user.dispose();
     settings.dispose();
     assistants.dispose();
+    PathProviderPlatform.instance = paths;
+    await directory.delete(recursive: true);
   });
 
   Future<void> mount(WidgetTester tester) async {
@@ -321,6 +399,372 @@ void main() {
     runEstimate: <T>(T Function() computation) async => computation(),
   );
 
+  testWidgets(
+    'manual and automatic compression share the resolved request timeout',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        final previousHttp = HttpOverrides.current;
+        HttpOverrides.global = null;
+        addTearDown(() => HttpOverrides.global = previousHttp);
+        await seedUser('history to compress');
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          await request.drain<void>();
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode(
+              request.uri.path.endsWith('/compact')
+                  ? {
+                      'output': [
+                        {
+                          'type': 'compaction',
+                          'id': 'compact',
+                          'encrypted_content': 'state',
+                        },
+                      ],
+                    }
+                  : {
+                      'choices': [
+                        {
+                          'message': {
+                            'role': 'assistant',
+                            'content': 'summary',
+                          },
+                          'finish_reason': 'stop',
+                        },
+                      ],
+                    },
+            ),
+          );
+          await request.response.close();
+        });
+        await settings.setProviderConfig(
+          'Test',
+          settings
+              .getProviderConfig('Test')
+              .copyWith(baseUrl: 'http://127.0.0.1:${server.port}/v1'),
+        );
+        await settings.setCompressionDefaults(
+          const CompressionConfig(requestTimeoutMinutes: 7),
+        );
+        final g = generation();
+        final controller = ChatController(chatService: chat);
+        final vm = HomeViewModel(
+          chatService: chat,
+          messageBuilderService: builder,
+          messageGenerationService: g,
+          generationController: g.generationController,
+          streamController: g.streamController,
+          chatController: controller,
+          contextProvider: context,
+          getTitleForLocale: (_) => 'title',
+        );
+        try {
+          for (final native in [false, true]) {
+            for (final automatic in [false, true]) {
+              Future<CompressionConfig> resolved({
+                CompressionConfig? override,
+              }) async {
+                final request = await vm.buildCompressionRequest(
+                  'one',
+                  options: CompressContextOptions(
+                    mode: CompressContextLimitMode.unlimited,
+                    native: native,
+                  ),
+                  automatic: automatic,
+                  configOverride: override,
+                );
+                expect(request.automatic, automatic);
+                if (request.config.requestTimeoutMinutes == 10) {
+                  final deadlines = <Duration>[];
+                  await runZoned(
+                    () async {
+                      if (native) {
+                        await request.compactNative!(
+                          selectCompressionHistory(
+                            chat.storedMessages,
+                            [],
+                            request.options,
+                          ),
+                          'timeout-settings',
+                        );
+                      } else {
+                        await request.generate!(
+                          'summarize',
+                          'timeout-settings',
+                          128,
+                          (_) {},
+                        );
+                      }
+                    },
+                    zoneSpecification: ZoneSpecification(
+                      createTimer: (self, parent, zone, duration, callback) {
+                        if (duration == const Duration(minutes: 5) ||
+                            duration == const Duration(minutes: 10)) {
+                          deadlines.add(duration);
+                        }
+                        return parent.createTimer(zone, duration, callback);
+                      },
+                    ),
+                  );
+                  expect(deadlines, [const Duration(minutes: 10)]);
+                }
+                return request.config;
+              }
+
+              await chat.setCompressionOverrides('one', {});
+              expect(
+                (await resolved()).requestTimeout,
+                const Duration(minutes: 7),
+              );
+              await chat.setCompressionOverrides('one', {
+                'requestTimeoutMinutes': 10,
+              });
+              expect(
+                (await resolved()).requestTimeout,
+                const Duration(minutes: 10),
+              );
+              expect(
+                (await resolved(
+                  override: const CompressionConfig(requestTimeoutMinutes: 3),
+                )).requestTimeout,
+                const Duration(minutes: 3),
+              );
+              await chat.setCompressionOverrides('one', {
+                'requestTimeoutMinutes': null,
+              });
+              expect((await resolved()).requestTimeout, isNull);
+            }
+          }
+        } finally {
+          vm.dispose();
+          controller.dispose();
+        }
+      });
+    },
+  );
+
+  testWidgets('compression preview excludes retained text and dynamic references', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.runAsync(() async {
+      final g = generation();
+      final controller = ChatController(chatService: chat);
+      final vm = HomeViewModel(
+        chatService: chat,
+        messageBuilderService: builder,
+        messageGenerationService: g,
+        generationController: g.generationController,
+        streamController: g.streamController,
+        chatController: controller,
+        contextProvider: context,
+        getTitleForLocale: (_) => 'title',
+      );
+      try {
+        for (final (id, content) in [
+          ('old', 'Earlier history'),
+          ('covered', 'Decision A; PAST_TRIGGER; result still unknown'),
+          ('covered-last', 'We are still waiting for the result'),
+          ('retained', 'Decision B; FUTURE_MARKER; FUTURE_TRIGGER'),
+        ]) {
+          final message = ChatMessage(
+            id: id,
+            conversationId: 'one',
+            role: 'user',
+            content: content,
+          );
+          await repository.putMessage(message);
+          chat.storedMessages.add(message);
+        }
+        final operation = ContextOperation(
+          id: 'prior',
+          kind: ContextOperationKind.compress,
+          anchorGroupId: 'old',
+          appliedAfterGroupId: 'old',
+          sourceGroups: const ['old'],
+          dependencies: const [],
+          createdAt: DateTime(2026),
+          summary: 'PAST_SUMMARY',
+        );
+        String memory(String marker) =>
+            '${MemoryPrompts.introFullEn}\n'
+            '<user_profile><occupation>$marker</occupation></user_profile>\n'
+            '<user_memory type="identity"/>\n<user_memory type="workflow"/>\n'
+            '<user_memory type="voice"/>\n<user_memory type="instruction"/>\n\n';
+        for (final (id, marker) in [
+          ('covered', 'SUPERSEDED_MEMORY'),
+          ('covered-last', 'PAST_MEMORY'),
+          ('retained', 'FUTURE_MEMORY'),
+        ]) {
+          await repository.putMessagePrompt(
+            revisionId: id,
+            conversationId: 'one',
+            payload: '${memory(marker)}original message',
+            carriesMemorySnapshot: true,
+          );
+        }
+        await putMemory('future', 'FUTURE_LIVE_MEMORY');
+        await assistants.updateAssistant(
+          assistants
+              .getById('assistant')!
+              .copyWith(limitContextMessages: true, contextMessageSize: 1),
+        );
+        await books.addBook(
+          const WorldBook(
+            id: 'range',
+            entries: [
+              WorldBookEntry(
+                id: 'past',
+                keywords: ['PAST_TRIGGER'],
+                content: 'PAST_REFERENCE',
+                scanDepth: 100,
+                sticky: 5,
+              ),
+              WorldBookEntry(
+                id: 'future',
+                keywords: ['FUTURE_TRIGGER'],
+                content: 'FUTURE_REFERENCE',
+                scanDepth: 100,
+                sticky: 5,
+              ),
+            ],
+          ),
+        );
+        await books.setActiveBookIds(['range'], assistantId: 'assistant');
+        const options = CompressContextOptions(
+          mode: CompressContextLimitMode.keepRecent,
+          keepUserMessages: 1,
+        );
+        final history = (
+          messages: chat.storedMessages,
+          operations: [operation],
+        );
+        final selection = selectCompressionHistory(
+          history.messages,
+          history.operations,
+          options,
+        );
+        expect(selection.retained.single.id, 'retained');
+        for (final includeReference in [false, true]) {
+          final config = CompressionConfig(
+            summaryTokens: 512,
+            maxOutputTokens: 4096,
+            includeReference: includeReference,
+          );
+          final preview = await vm.previewCompressionRequest(
+            'one',
+            options,
+            config,
+            history: Future.value(history),
+          );
+          expect(preview.prompt, contains('PAST_SUMMARY'));
+          expect(preview.prompt, contains('Decision A'));
+          expect(preview.prompt, isNot(contains('FUTURE_')));
+          expect(preview.prompt, isNot(contains('<continuation')));
+          if (includeReference) {
+            expect(preview.prompt, contains('PAST_REFERENCE'));
+            expect(preview.prompt, contains('PAST_MEMORY'));
+            final request = await vm.buildCompressionRequest(
+              'one',
+              options: options,
+              configOverride: config,
+            );
+            final reference = await request.loadReference!(selection);
+            expect(reference, contains('PAST_REFERENCE'));
+            expect(reference, contains('PAST_MEMORY'));
+            expect(reference, isNot(contains('SUPERSEDED_MEMORY')));
+            expect(reference, isNot(contains('FUTURE_')));
+            // A summary-only range must not read the latest real turn for timers.
+            final summaries = selection.input
+                .where(ContextOperation.isSummary)
+                .toList();
+            final summaryReference = await g.compressionReferenceText(
+              conversationId: 'one',
+              modelId: 'opaque',
+              assistantId: 'assistant',
+              messages: summaries,
+              promptTime: DateTime(2026),
+            );
+            expect(summaryReference, isNot(contains('FUTURE_')));
+          }
+        }
+      } finally {
+        vm.dispose();
+        controller.dispose();
+      }
+    });
+  });
+
+  testWidgets(
+    'compression references freeze clock but still detect real prompt edits',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        await seedUser('hello');
+        await assistants.updateAssistant(
+          assistants
+              .getById('assistant')!
+              .copyWith(
+                systemPrompt: 'RULES {cur_date} {cur_time} {cur_datetime}',
+              ),
+        );
+        final g = _ClockGeneration(
+          chatService: chat,
+          messageBuilderService: builder,
+          generationController: _Generation(),
+          streamController: _Stream(),
+          contextProvider: context,
+        );
+        final controller = ChatController(chatService: chat);
+        final vm = HomeViewModel(
+          chatService: chat,
+          messageBuilderService: builder,
+          messageGenerationService: g,
+          generationController: g.generationController,
+          streamController: g.streamController,
+          chatController: controller,
+          contextProvider: context,
+          getTitleForLocale: (_) => 'title',
+        );
+        try {
+          const options = CompressContextOptions(
+            mode: CompressContextLimitMode.unlimited,
+          );
+          final request = await vm.buildCompressionRequest(
+            'one',
+            options: options,
+            configOverride: const CompressionConfig(),
+          );
+          final selection = selectCompressionHistory(
+            chat.storedMessages,
+            [],
+            options,
+          );
+          final first = await request.loadReference!(selection);
+          expect(first, contains('RULES'));
+          expect(first, isNot(contains('{cur_')));
+          g.wallClock = g.wallClock.add(const Duration(days: 1, minutes: 2));
+          final later = await request.loadReference!(selection);
+          expect(later, first);
+          await assistants.updateAssistant(
+            assistants
+                .getById('assistant')!
+                .copyWith(systemPrompt: 'CHANGED {cur_datetime}'),
+          );
+          final edited = await request.loadReference!(selection);
+          expect(edited, contains('CHANGED'));
+          expect(edited, isNot(first));
+        } finally {
+          vm.dispose();
+          controller.dispose();
+        }
+      });
+    },
+  );
+
   testWidgets('profile edit invalidates the cached memory bucket', (
     tester,
   ) async {
@@ -369,6 +813,36 @@ void main() {
     });
   });
 
+  testWidgets('full injection toggles refresh the cached memory bucket', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.runAsync(() async {
+      await seedUser('hello');
+      await putMemory('one', List.filled(500, 'word').join(' '));
+      await putMemory('two', List.filled(500, 'word').join(' '));
+      await settings.setMemoryInjectionMaxItems(1);
+      final g = generation();
+      final usage = usageService(g)..setActiveConversation('one');
+      try {
+        await usage.refresh('one', force: true);
+        final limited = usage.current!.buckets.memory;
+        await setFullInjectionTypes({MemoryType.identity});
+        await usage.refresh('one');
+        expect(usage.current!.buckets.memory, greaterThan(limited + 400));
+        expect(
+          usage.current!.buckets.memory,
+          estimateTokens((await preview(g)).memoryText),
+        );
+        await setFullInjectionTypes({});
+        await usage.refresh('one');
+        expect(usage.current!.buckets.memory, limited);
+      } finally {
+        usage.dispose();
+      }
+    });
+  });
+
   testWidgets('data URI in plain text is counted in full', (tester) async {
     await mount(tester);
     await tester.runAsync(() async {
@@ -407,6 +881,53 @@ void main() {
         modelId: 'opaque',
       );
 
+  testWidgets('image context respects models that disable remote image URLs', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.runAsync(() async {
+      final config = settings.getProviderConfig('Test');
+      await settings.setProviderConfig(
+        'Test',
+        config.copyWith(
+          modelOverrides: {
+            'opaque': {
+              'input': ['text', 'image'],
+              'remoteImageUrls': false,
+            },
+          },
+        ),
+      );
+      const url = 'https://example.test/remote.png';
+      final message = ChatMessage(
+        id: 'remote-user',
+        conversationId: 'one',
+        role: 'user',
+        parts: [
+          const TextPart('Inspect ![remote]($url)'),
+          ImagePart(uri: url, mime: 'image/png'),
+        ],
+      );
+      await repository.putMessage(message);
+      chat.storedMessages.add(message);
+      final result = await prepare(generation());
+      expect(result.imageContext!.allowsRemoteUserImages, isFalse);
+      expect(result.lastUserImagePaths, contains(url));
+      final user = result.apiMessages.lastWhere((m) => m['role'] == 'user');
+      expect(internalImageReferences(user), isEmpty);
+      expect(
+        parseInternalMediaRefs(
+          user[multimodalInternalMediaPathsKey],
+        ).single.uri,
+        url,
+      );
+      expect(
+        (await result.imageContext!.preview()).where((im) => im.included),
+        isEmpty,
+      );
+    });
+  });
+
   Future<void> record(ContextUsageService usage, PreparedGeneration request) =>
       usage.recordUsage(
         conversationId: 'one',
@@ -430,6 +951,8 @@ void main() {
     'delete',
     'scope',
     'limit',
+    'fullInjection',
+    'limitedInjection',
   ]) {
     for (final force in [false, true]) {
       testWidgets(
@@ -442,6 +965,9 @@ void main() {
             await putMemory('m1', 'first fact');
             await putMemory('m2', 'second fact');
             await settings.setMemoryInjectionMaxItems(1);
+            if (change == 'limitedInjection') {
+              await setFullInjectionTypes({MemoryType.identity});
+            }
             final g = generation();
             final usage = usageService(g);
             if (!force) usage.setActiveConversation('one');
@@ -467,6 +993,10 @@ void main() {
                   await putMemory('m1', 'first fact', assistantId: 'other');
                 case 'limit':
                   await settings.setMemoryInjectionMaxItems(2);
+                case 'fullInjection':
+                  await setFullInjectionTypes({MemoryType.identity});
+                case 'limitedInjection':
+                  await setFullInjectionTypes({});
               }
               final rebuilt = await preview(g);
               await usage.refresh('one', force: force);
@@ -512,6 +1042,42 @@ void main() {
       }
     });
   });
+
+  testWidgets(
+    'another assistant full injection selection preserves exact usage',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        final otherId = await assistants.addAssistant(name: 'Other');
+        await seedUser('hello');
+        await putMemory('first', 'first fact');
+        await putMemory('second', 'second fact');
+        await settings.setMemoryInjectionMaxItems(1);
+        final g = generation();
+        final usage = usageService(g)..setActiveConversation('one');
+        try {
+          final request = await prepare(g);
+          await record(usage, request);
+          await usage.refresh('one', force: true);
+          final before = await preview(g);
+          await assistants.updateAssistant(
+            assistants
+                .getById(otherId)!
+                .copyWith(
+                  enableMemory: true,
+                  memoryFullInjectionTypes: {MemoryType.identity},
+                ),
+          );
+          await usage.refresh('one');
+          expect(usage.snapshot('one')!.state, ContextUsageState.exact);
+          expect(usage.snapshot('one')!.usedTokens, 10);
+          expect((await preview(g)).memoryText, before.memoryText);
+        } finally {
+          usage.dispose();
+        }
+      });
+    },
+  );
 
   testWidgets('memory edits during estimation discard the old estimate', (
     tester,

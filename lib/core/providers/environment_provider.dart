@@ -6,6 +6,8 @@ import '../database/business_preferences.dart';
 import '../models/environment_state.dart';
 import '../models/environment_variable.dart';
 import '../services/sandbox/rootfs_source.dart';
+import '../services/sandbox/sandbox_proxy_environment.dart';
+import 'settings_provider.dart';
 
 class EnvironmentProvider extends ChangeNotifier {
   static const String stateKey = 'environment_state_v1';
@@ -14,13 +16,15 @@ class EnvironmentProvider extends ChangeNotifier {
   static const String variablesKey = 'environment_variables_v1';
   static const String privacyModeKey = 'environment_privacy_mode_v1';
   static const String rootfsSelectionKey = 'environment_rootfs_selection_v1';
+  static const String nativeShellPathKey = 'environment_native_shell_path_v1';
   static const String prootOptionsKey = 'environment_proot_options_v1';
 
-  EnvironmentProvider({required this.preferences}) {
+  EnvironmentProvider({required this.preferences, this.proxySettings}) {
     loaded = _load();
   }
 
   final BusinessPreferences preferences;
+  final SettingsProvider? proxySettings;
   List<EnvironmentVariable> _variables = [];
   bool _privacyMode = true;
   Future<void> _variablesWrite = Future<void>.value();
@@ -28,12 +32,20 @@ class EnvironmentProvider extends ChangeNotifier {
   List<EnvironmentVariable> get variables => List.unmodifiable(_variables);
   bool get privacyMode => _privacyMode;
 
-  Future<EnvironmentExecutionConfig> loadExecutionConfig() async {
+  Future<EnvironmentExecutionConfig> loadExecutionConfig({
+    Map<String, String> overrides = const {},
+  }) async {
     await loaded;
+    final settings = proxySettings;
+    await settings?.loaded;
+    final variables = {
+      for (final variable in _variables) variable.name: variable.value,
+      ...overrides,
+    };
     return EnvironmentExecutionConfig(
-      variables: {
-        for (final variable in _variables) variable.name: variable.value,
-      },
+      variables: settings == null
+          ? variables
+          : sandboxProxyEnvironment(settings, variables),
       privacyMode: _privacyMode,
     );
   }
@@ -150,6 +162,20 @@ class EnvironmentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String _nativeShellPath = '';
+  String get nativeShellPath => _nativeShellPath;
+
+  Future<void> setNativeShellPath(String value) async {
+    await loaded;
+    final path = value.trim();
+    if (path.contains('\u0000') || path.contains('\n') || path.contains('\r')) {
+      throw const FormatException('Invalid shell path');
+    }
+    await preferences.setString(nativeShellPathKey, path);
+    _nativeShellPath = path;
+    notifyListeners();
+  }
+
   Future<void> setProotOptions({
     required String shell,
     required String arguments,
@@ -214,6 +240,7 @@ class EnvironmentProvider extends ChangeNotifier {
     if (!preferences.isLoaded) {
       await preferences.load();
     }
+    _nativeShellPath = preferences.getString(nativeShellPathKey) ?? '';
     _privacyMode = preferences.getBool(privacyModeKey) ?? true;
     final rawVariables = preferences.getString(variablesKey);
     if (rawVariables != null && rawVariables.isNotEmpty) {

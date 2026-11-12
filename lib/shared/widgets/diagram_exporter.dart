@@ -1,47 +1,44 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'mermaid_bridge.dart';
 import 'mermaid_image_cache.dart';
-import 'markdown_line_lexer.dart';
+import 'package:markstream/markstream_core.dart';
 import '../../utils/svg_preview_html.dart';
 
 typedef DiagramCode = ({String code, bool isSvg});
 
+Future<void>? _diagramRenderTail;
+
+/// Preview and export share one native renderer slot. Each WebView includes
+/// the complete Mermaid runtime, so parallel diagrams can exhaust mobile RAM.
+Future<T> renderDiagramSerially<T>(Future<T> Function() render) async {
+  final previous = _diagramRenderTail;
+  final released = Completer<void>();
+  _diagramRenderTail = released.future;
+  try {
+    if (previous != null) await previous;
+    return await render();
+  } finally {
+    if (identical(_diagramRenderTail, released.future)) {
+      _diagramRenderTail = null;
+    }
+    released.complete();
+  }
+}
+
 List<DiagramCode> extractDiagramCodes(String markdown) {
   final diagrams = <DiagramCode>[];
-  final lexer = MarkdownLineLexer();
-  final body = StringBuffer();
-  var language = '';
-
-  void addDiagram() {
-    final code = body.toString().trim();
-    if (code.isEmpty) return;
+  final infoWords = RegExp(r'\s+');
+  for (final node in MarkdownStructure(markdown).codeBlocks) {
+    final code = node.code.trim();
+    if (code.isEmpty) continue;
+    final language = node.info.trim().split(infoWords).first.toLowerCase();
     final isSvg = isSvgCodeBlock(language, code);
     if (language == 'mermaid' || isSvg) {
       diagrams.add((code: code, isSvg: isSvg));
     }
   }
-
-  for (final line in const LineSplitter().convert(markdown)) {
-    final wasFenced = lexer.fenced;
-    lexer.consumeFence(line);
-    if (!wasFenced && lexer.fenced) {
-      final opening = line.trimLeft();
-      var end = 0;
-      while (end < opening.length && opening[end] == opening[0]) {
-        end++;
-      }
-      language = opening.substring(end).trim().toLowerCase();
-      body.clear();
-    } else if (wasFenced && !lexer.fenced) {
-      addDiagram();
-    } else if (wasFenced) {
-      body.writeln(line);
-    }
-  }
-  if (lexer.fenced) addDiagram();
   return diagrams;
 }
 
@@ -96,9 +93,10 @@ Map<String, String> buildThemeVarsFromColorScheme(ColorScheme cs) {
 
 Future<void> preRenderDiagramCodesForExport(
   BuildContext context,
-  List<DiagramCode> codes,
-) async {
-  if (codes.isEmpty) return;
+  List<DiagramCode> codes, {
+  void Function(int completed, int total)? onProgress,
+}) async {
+  if (!context.mounted || codes.isEmpty) return;
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final themeVars = buildThemeVarsFromColorScheme(cs);
@@ -109,68 +107,86 @@ Future<void> preRenderDiagramCodesForExport(
     themeVars,
     isSvg: diagram.isSvg,
   );
-  final distinct = codes
-      .toSet()
-      .where((c) => MermaidImageCache.get(cacheKey(c)) == null)
-      .toList();
-  if (distinct.isEmpty) return;
+  // Exports that need no renderer must not wait for unrelated previews.
+  if (codes.every((c) => MermaidImageCache.get(cacheKey(c)) != null)) return;
 
-  final overlay = Overlay.maybeOf(context);
-  if (overlay == null) return;
-
-  // Sequentially render codes with a single offscreen overlay to avoid heavy composites
-  for (final diagram in distinct) {
+  await renderDiagramSerially(() async {
     if (!context.mounted) return;
-    final key = GlobalKey();
-    final factory = debugDiagramExportViewFactory;
-    final handle = factory != null
-        ? factory(diagram)
-        : createMermaidView(
-            diagram.code,
-            isDark,
-            themeVars: themeVars,
-            viewKey: key,
-            isSvg: diagram.isSvg,
-          );
-    if (handle == null) continue;
-    final ready = Completer<void>();
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (ctx) {
-        // Wait a few frames to allow WebView to load and mermaid to render
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!ready.isCompleted) ready.complete();
-        });
-        return Positioned(
-          left: -10000,
-          top: -10000,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints.tightFor(width: 720, height: 600),
-            child: Material(color: Colors.transparent, child: handle.widget),
-          ),
-        );
-      },
-    );
-    overlay.insert(entry);
-    try {
-      // Wait initial frame and a small delay for mermaid.run
-      await ready.future;
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      final toBytes = handle.exportPngBytes;
-      if (toBytes != null) {
-        Uint8List? bytes;
-        // Retry a few times as Mermaid may not be ready immediately
-        for (int i = 0; i < 8; i++) {
-          bytes = await toBytes();
-          if (bytes != null && bytes.isNotEmpty) break;
-          await Future<void>.delayed(const Duration(milliseconds: 200));
-        }
-        if (bytes != null && bytes.isNotEmpty) {
-          MermaidImageCache.put(cacheKey(diagram), bytes);
-        }
+    final distinct = codes
+        .toSet()
+        .where((c) => MermaidImageCache.get(cacheKey(c)) == null)
+        .toList();
+    if (distinct.isEmpty) return;
+
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+
+    var completed = 0;
+    onProgress?.call(completed, distinct.length);
+    // Sequentially render codes with a single offscreen overlay to avoid heavy composites
+    for (final diagram in distinct) {
+      if (!context.mounted) return;
+      final key = GlobalKey();
+      final factory = debugDiagramExportViewFactory;
+      final handle = factory != null
+          ? factory(diagram)
+          : createMermaidView(
+              diagram.code,
+              isDark,
+              themeVars: themeVars,
+              viewKey: key,
+              isSvg: diagram.isSvg,
+            );
+      if (handle == null) {
+        onProgress?.call(++completed, distinct.length);
+        continue;
       }
-    } finally {
-      entry.remove();
+      final ready = Completer<void>();
+      late OverlayEntry entry;
+      entry = OverlayEntry(
+        builder: (ctx) {
+          // Wait a few frames to allow WebView to load and mermaid to render
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!ready.isCompleted) ready.complete();
+          });
+          return Positioned(
+            left: -10000,
+            top: -10000,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints.tightFor(
+                width: 720,
+                height: 600,
+              ),
+              child: Material(color: Colors.transparent, child: handle.widget),
+            ),
+          );
+        },
+      );
+      overlay.insert(entry);
+      try {
+        // Wait initial frame and a small delay for mermaid.run
+        await ready.future;
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        final toBytes = handle.exportPngBytes;
+        if (toBytes != null) {
+          Uint8List? bytes;
+          // Retry a few times as Mermaid may not be ready immediately
+          for (int i = 0; i < 8; i++) {
+            bytes = await toBytes();
+            if (bytes != null && bytes.isNotEmpty) break;
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+          }
+          if (bytes != null && bytes.isNotEmpty) {
+            MermaidImageCache.put(cacheKey(diagram), bytes);
+          }
+        }
+      } finally {
+        entry.remove();
+        entry.dispose();
+        // Unmount the platform view before the next renderer is constructed.
+        await WidgetsBinding.instance.endOfFrame;
+        onProgress?.call(++completed, distinct.length);
+      }
     }
-  }
+  });
 }

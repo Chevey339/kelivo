@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
+import 'restore_diagnostic_exception.dart';
+import '../../../utils/windows_file_path.dart';
+
 abstract interface class RestoreDurability {
   Future<void> restrictFile(File file);
 
@@ -46,7 +49,24 @@ final class RestorePlatformDurability implements RestoreDurability {
   Future<void> renameAndSync({
     required FileSystemEntity source,
     required String targetPath,
-  }) => _implementation.renameAndSync(source: source, targetPath: targetPath);
+  }) async {
+    try {
+      await _implementation.renameAndSync(
+        source: source,
+        targetPath: targetPath,
+      );
+    } on FileSystemException catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        RestoreFileSystemException(error, {
+          'operation': 'rename',
+          'source path': source.path,
+          'target path': targetPath,
+          if (error is RestoreFileSystemException) ...error.details,
+        }),
+        stackTrace,
+      );
+    }
+  }
 }
 
 typedef _OpenNative = Int32 Function(Pointer<Utf8>, Int32);
@@ -406,7 +426,9 @@ final class _WindowsRestoreDurability implements RestoreDurability {
         expectedType) {
       throw FileSystemException('restore_durability_path_type', entity.path);
     }
-    final nativePath = entity.absolute.path.toNativeUtf16();
+    final nativePath = extendedWindowsFilePath(
+      entity.absolute.path,
+    ).toNativeUtf16();
     late final int handle;
     var openError = 0;
     try {
@@ -425,17 +447,21 @@ final class _WindowsRestoreDurability implements RestoreDurability {
       malloc.free(nativePath);
     }
     if (handle == _invalidHandleValue) {
-      throw FileSystemException(
-        'restore_durability_open:$openError',
-        entity.path,
+      throw RestoreFileSystemException(
+        FileSystemException('restore_durability_open:$openError', entity.path),
+        {'operation': 'CreateFileW', 'Windows error code': '$openError'},
       );
     }
     Object? operationError;
     try {
       if (_flushFileBuffers(handle) == 0) {
-        throw FileSystemException(
-          'restore_durability_flush:${_getLastError()}',
-          entity.path,
+        final errorCode = _getLastError();
+        throw RestoreFileSystemException(
+          FileSystemException(
+            'restore_durability_flush:$errorCode',
+            entity.path,
+          ),
+          {'operation': 'FlushFileBuffers', 'Windows error code': '$errorCode'},
         );
       }
     } catch (error) {
@@ -443,9 +469,13 @@ final class _WindowsRestoreDurability implements RestoreDurability {
       rethrow;
     } finally {
       if (_closeHandle(handle) == 0 && operationError == null) {
-        throw FileSystemException(
-          'restore_durability_close:${_getLastError()}',
-          entity.path,
+        final errorCode = _getLastError();
+        throw RestoreFileSystemException(
+          FileSystemException(
+            'restore_durability_close:$errorCode',
+            entity.path,
+          ),
+          {'operation': 'CloseHandle', 'Windows error code': '$errorCode'},
         );
       }
     }
@@ -470,16 +500,26 @@ final class _WindowsRestoreDurability implements RestoreDurability {
         FileSystemEntityType.notFound) {
       throw FileSystemException('restore_durability_target_exists', target);
     }
-    final nativeSource = sourcePath.toNativeUtf16();
-    final nativeTarget = target.toNativeUtf16();
+    final nativeSource = extendedWindowsFilePath(sourcePath).toNativeUtf16();
+    final nativeTarget = extendedWindowsFilePath(target).toNativeUtf16();
     try {
       // MOVEFILE_WRITE_THROUGH is the only durability primitive used here.
       // Same-volume rename and directory metadata remain Windows acceptance
       // boundaries until exercised on every supported filesystem.
       if (_moveFileEx(nativeSource, nativeTarget, _moveFileWriteThrough) == 0) {
-        throw FileSystemException(
-          'restore_durability_rename:${_getLastError()}:$target',
-          sourcePath,
+        final errorCode = _getLastError();
+        throw RestoreFileSystemException(
+          FileSystemException(
+            'restore_durability_rename:$errorCode:$target',
+            sourcePath,
+          ),
+          {
+            'operation': 'MoveFileExW',
+            'Windows error code': '$errorCode',
+            'source type': sourceType == FileSystemEntityType.directory
+                ? 'directory'
+                : 'file',
+          },
         );
       }
     } finally {

@@ -42,9 +42,17 @@ Conversations, settings and files are stored locally. Kelivo has no account syst
 <table>
 <tr>
 <td width="180" align="center" valign="middle">
-  <b><a href="https://siliconflow.cn">siliconflow.cn</a></b>
+  <a href="https://sta1n.ai/"><img src="docs/sponsors/sta1n.png" alt="STA1N API" width="150"></a><br />
+  <b><a href="https://sta1n.ai/">STA1N API🍪</a></b>
 </td>
-<td valign="middle">Thanks to siliconflow.cn for providing free models in cooperation with us.</td>
+<td valign="middle">Thanks to <a href="https://sta1n.ai/">STA1N API🍪</a> for sponsoring Kelivo! An API service focused on roleplay (RP) and character chat.</td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <a href="https://api.10dianai.com"><img src="docs/sponsors/10dian.png" alt="10dian-API" width="150"></a><br />
+  <b><a href="https://api.10dianai.com">10dian-API</a></b>
+</td>
+<td valign="middle">Thanks to <a href="https://api.10dianai.com">10dian-API</a> for sponsoring Kelivo! 10dian-API provides secure, fast and stable API services for developers and AI enthusiasts, with transparent, affordable pricing and a focus on user experience. It promises 100% genuine models with no substitution. One key to unlock a world of AI!</td>
 </tr>
 <tr>
 <td width="180" align="center" valign="middle">
@@ -58,6 +66,12 @@ Conversations, settings and files are stored locally. Kelivo has no account syst
   <a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo"><img src="docs/sponsors/marucode.jpg" alt="MaruCode" width="150"></a>
 </td>
 <td valign="middle"><b><a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">MaruCode</a></b> 是一家偶尔做做慈善的小破站 API，自营号池，主要提供 Codex、Claude Code、GPT Image 等主流模型，支持 Websocket 协议，明码标价(Codex 0.25x, CC 1.5x)，透明汇率(1:1)，<a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">新用户注册送 2 刀</a>。<a href="https://images-2.muteki.site">生图工作台🖼️</a></td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <b><a href="https://ai.ota1245.top/">砂糖酒馆</a></b>
+</td>
+<td valign="middle">Thanks to <a href="https://ai.ota1245.top/">砂糖酒馆</a> for sponsoring Kelivo! Focused on character chat with transparent, per-request pricing. Offers mainstream text models including Gemini, Claude, DeepSeek and GLM, plus NAI image generation, TTS and video models. Prioritizes privacy, with no data reselling or model substitution, and a 1:1 recharge credit ratio. <a href="https://www.16688.com.cn/shop/S929990">Purchase credits</a>.</td>
 </tr>
 </table>
 
@@ -108,7 +122,7 @@ The [User Guide](https://kelivo.psycheas.top/guide) (Chinese) covers providers, 
 
 ### 🤖 Agent and Workspaces
 
-- **Workspaces**: bind a conversation to a workspace to give the model seven tools: `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `glob` and `grep`. Command output streams live, file edits appear as diffs, and shell commands can require approval, which you grant per command or for the whole session.
+- **Workspaces**: bind a conversation to a workspace to give the model eight tools: `shell`, `read_file`, `view_image`, `write_file`, `edit_file`, `list_dir`, `glob` and `grep`. Command output streams live, file edits appear as diffs, and file access outside authorized folders and desktop commands ask for approval. A conversation can explicitly enable Full access to skip ordinary tool approvals, including MCP and supported local actions.
 - **A Linux sandbox on your phone**: Android runs Ubuntu, Debian or Alpine Linux through PRoot, or a rootfs image you import. iOS includes Alpine Linux based on iSH, so nothing needs to be downloaded. Install Python, Node.js, Git, SSH and other common tools from the app, and choose the fastest apt/apk, pip and npm mirrors after a speed test.
 - **Native on desktop**: on macOS, Windows and Linux, tools run in your system shell, in an app-managed folder or a folder you link from your computer.
 - **Files and terminal**: browse workspace files with previews for Markdown, HTML, CSV, images and text. Mobile has an in-app terminal; on desktop, open the workspace in your system terminal. On mobile, you can also mount up to 10 external folders into the sandbox, read-only or read-write.

@@ -33,6 +33,7 @@ void main() {
       LocalToolNames.calendarCreate,
       LocalToolNames.currentLocation,
       LocalToolNames.phoneControl,
+      LocalToolNames.browser,
       LocalToolNames.weather,
       LocalToolNames.healthSummary,
       LocalToolNames.remindersQuery,

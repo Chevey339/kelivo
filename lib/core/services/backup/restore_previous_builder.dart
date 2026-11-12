@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../../utils/app_directories.dart';
 import 'restore_durability.dart';
 import 'restore_previous_plan.dart';
 import 'restore_receipt.dart';
@@ -52,7 +53,10 @@ final class RestorePreviousBuilder {
     final database = await inspectDatabase(appDataDirectory);
     final assets =
         preparedReceipt.selectedComponents.contains(RestoreComponent.assets)
-        ? await inspectAssets(appDataDirectory, rootNames: assetRoots)
+        ? await inspectAssets(
+            await AppDirectories.contentDirectoryFor(appDataDirectory),
+            rootNames: assetRoots,
+          )
         : null;
     final totalBytes =
         (database.descriptor?.bytes ?? 0) +
@@ -92,7 +96,7 @@ final class RestorePreviousBuilder {
     }
     if (expected.assets != null) {
       final actual = await inspectAssets(
-        appDataDirectory,
+        await AppDirectories.contentDirectoryFor(appDataDirectory),
         rootNames: expected.assets!.rootStates.keys,
       );
       if (!_sameAssets(actual, expected.assets!)) {

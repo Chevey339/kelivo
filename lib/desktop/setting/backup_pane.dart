@@ -1,3 +1,4 @@
+import '../widgets/desktop_labeled_control.dart';
 import 'dart:io';
 
 import 'package:Kelivo/shared/widgets/ios_time_picker.dart';
@@ -28,6 +29,8 @@ import '../../features/backup/widgets/backup_progress_dialog.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../features/backup/widgets/backup_scope_tile.dart';
+import '../../features/backup/widgets/backup_encryption_tile.dart';
+import '../../features/backup/widgets/storage_migration_notice_button.dart';
 import '../../features/backup/pages/local_snapshots_page.dart';
 import '../../core/database/startup_failure_report.dart' show formatBytes;
 import '../widgets/desktop_select_dropdown.dart';
@@ -248,6 +251,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final webdavVm = context.watch<BackupProvider>();
@@ -281,6 +285,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             ),
                           ),
                         ),
+                      ),
+                      StorageMigrationNoticeButton(
+                        dataDirectory: context
+                            .read<LocalSnapshotProvider>()
+                            .appDataDirectory,
                       ),
                       if (showHeaderBusy) const SizedBox(width: 8),
                       if (showHeaderBusy)
@@ -333,6 +342,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               if (!mounted) return;
                               await _applyS3Partial(scope: scope);
                             },
+                    ),
+                    BackupEncryptionTile(
+                      enabled: settings.backupEncryptionEnabled,
+                      onChanged: busy
+                          ? null
+                          : settings.setBackupEncryptionPassword,
                     ),
                   ],
                 ),
@@ -512,6 +527,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onPassword: backupPasswordPrompt(
+                                            context,
+                                          ),
                                           onForwardCompatibility:
                                               forwardCompatibilityPrompt(
                                                 context,
@@ -546,6 +564,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title: l10n.backupPageBackupNow,
                                       task: (handle) async {
                                         final ok = await backupProvider.backup(
+                                          password:
+                                              await backupPasswordForExport(
+                                                context,
+                                              ),
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
                                         );
@@ -803,6 +825,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onPassword: backupPasswordPrompt(
+                                            context,
+                                          ),
                                           onForwardCompatibility:
                                               forwardCompatibilityPrompt(
                                                 context,
@@ -838,6 +863,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       task: (handle) async {
                                         final ok = await s3BackupProvider
                                             .backup(
+                                              password:
+                                                  await backupPasswordForExport(
+                                                    context,
+                                                  ),
                                               onProgress: handle.report,
                                               cancelToken: handle.cancelToken,
                                             );
@@ -899,6 +928,25 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ),
             ],
           ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: Text(
+              l10n.backupPageExportToFileSubtitle,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ),
+          if (Platform.isIOS)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Text(
+                l10n.backupPageIosSystemBackupNote,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+            ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -923,6 +971,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           ),
                       task: (handle) async {
                         file = await backupProvider.exportToFile(
+                          password: await backupPasswordForExport(context),
                           onProgress: handle.report,
                           cancelToken: handle.cancelToken,
                         );
@@ -934,7 +983,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       dialogTitle: l10n.backupPageExportToFile,
                       fileName: exported.uri.pathSegments.last,
                       type: FileType.custom,
-                      allowedExtensions: ['zip'],
+                      allowedExtensions: [
+                        exported.path.endsWith('.kbackup') ? 'kbackup' : 'zip',
+                      ],
                     );
                     if (savePath != null) {
                       try {
@@ -996,6 +1047,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       mode: mode,
                       onProgress: handle.report,
                       cancelToken: handle.cancelToken,
+                      onPassword: backupPasswordPrompt(context),
+                      onForwardCompatibility: forwardCompatibilityPrompt(
+                        context,
+                      ),
                       allowUnverifiedForwardCompatible:
                           decision == ForwardCompatDecision.proceedUnverified,
                     );
@@ -1756,20 +1811,16 @@ class _ItemRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: vpad),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: cs.onSurface.withValues(alpha: 0.88),
-              ),
-            ),
+      child: DesktopLabeledControl(
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: cs.onSurface.withValues(alpha: 0.88),
           ),
-          const SizedBox(width: 12),
-          Align(alignment: Alignment.centerRight, child: trailing),
-        ],
+        ),
+        control: trailing,
+        controlWidth: 420,
       ),
     );
   }

@@ -428,9 +428,25 @@ void main() {
         await tester.tap(
           find.byKey(const ValueKey('environment-dependency-install')),
         );
-        await tester.runAsync(
-          () async => Future<void>.delayed(const Duration(milliseconds: 30)),
+        // Installation crosses real database futures and the widget's fake
+        // async queue. Advance both until it finishes, rather than settling a
+        // continuously animated busy indicator after a fixed real-time delay.
+        final installationWait = Stopwatch()..start();
+        while (service.busy &&
+            installationWait.elapsed < const Duration(seconds: 5)) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 10));
+        }
+        expect(
+          service.busy,
+          isFalse,
+          reason:
+              'Installation did not finish: ${runtime.requests.length} '
+              'commands, status=${service.status(EnvironmentDependency.python)}',
         );
+        expect(service.failure, isNull);
         await tester.pumpAndSettle();
         expect(
           service.status(EnvironmentDependency.python),

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/models/composer_draft.dart';
+import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -79,10 +81,26 @@ class _Media extends ChatInputBarController {
   @override
   List<Object> get draftMediaIdentity => [...images, ...files];
   @override
-  void clearDraft() {
-    images.clear();
-    files.clear();
+  ComposerDraftInput snapshotDraft(String text) => super
+      .snapshotDraft(text)
+      .copyWith(
+        images: [for (final path in images) DraftImage(path: path)],
+        documents: List.of(files),
+      );
+
+  @override
+  void restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
+    super.restoreDraft(input, resetHistory: resetHistory);
+    images
+      ..clear()
+      ..addAll(input.images.map((image) => image.path));
+    files
+      ..clear()
+      ..addAll(input.documents);
   }
+
+  @override
+  void clearDraft() => restoreDraft(const ComposerDraftInput());
 
   @override
   void addFiles(List<DocumentAttachment> docs) {
@@ -125,10 +143,14 @@ void main() {
           fileName: 'report.pdf',
           mime: 'application/pdf',
         );
+        final attachment = UiContextAttachment.history(
+          UiContextText(title: 'Parameters', body: 'Rate: 3'),
+        );
         await _pumpUntilDone(
           tester,
           state.controller.openIncomingShareDraft(
-            const ChatInputData(
+            ChatInputData(
+              uiContext: attachment,
               text: '分享内容',
               imagePaths: ['/upload/图片.png'],
               documents: [document],
@@ -144,6 +166,10 @@ void main() {
         expect(state.text.text, '分享内容');
         expect(state.media.images, ['/upload/图片.png']);
         expect(state.media.files, [document]);
+        expect(
+          state.media.snapshotDraft(state.text.text).uiContext,
+          same(attachment),
+        );
         expect(state.media.deletesOwnedSources, isTrue);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());

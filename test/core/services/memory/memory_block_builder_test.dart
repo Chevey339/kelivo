@@ -251,6 +251,67 @@ void main() {
       expect(summary.contains('entry 0'), isFalse);
     });
 
+    for (final fullTypes in [
+      {MemoryType.voice},
+      {MemoryType.voice, MemoryType.instruction},
+      MemoryType.values.toSet(),
+    ]) {
+      test('full injection bypasses limits only for $fullTypes', () {
+        final entries = [
+          for (final type in MemoryType.values)
+            for (var i = 0; i < 101; i++)
+              _entry(
+                id: '${type.name}_$i',
+                type: type,
+                content: '${type.name} entry $i',
+                createdAt: DateTime(2026, 1, 1).add(Duration(days: i)),
+                updatedAt: DateTime(2026, 1, 1).add(Duration(days: i)),
+              ),
+        ];
+        final totals = {for (final type in MemoryType.values) type: 101};
+        final block = MemoryBlockBuilder.buildMemoryBlock(
+          visible: entries,
+          totalByType: totals,
+          lang: MemoryPromptLang.en,
+          maxItems: 2,
+          fullInjectionTypes: fullTypes,
+        );
+        for (final type in MemoryType.values) {
+          if (fullTypes.contains(type)) {
+            expect(block, contains('<user_memory type="${type.name}">'));
+            expect(block, contains('${type.name} entry 0\n'));
+          } else {
+            expect(
+              block,
+              contains(
+                '<user_memory type="${type.name}" mode="summary" total="101" shown="2">',
+              ),
+            );
+            expect(block, isNot(contains('${type.name} entry 0\n')));
+          }
+          expect(block, contains('${type.name} entry 100\n'));
+        }
+        expect(
+          '\n- ['.allMatches(block),
+          hasLength(fullTypes.length * 101 + (4 - fullTypes.length) * 2),
+        );
+        expect(
+          MemoryPrompts.moreHintEn.allMatches(block),
+          hasLength(4 - fullTypes.length),
+        );
+        expect(
+          MemoryBlockBuilder.buildMemoryBlock(
+            visible: entries.reversed.toList(),
+            totalByType: totals,
+            lang: MemoryPromptLang.en,
+            maxItems: 2,
+            fullInjectionTypes: fullTypes,
+          ),
+          block,
+        );
+      });
+    }
+
     test('maxItems=1 folds extra items to a single shown entry', () {
       MemoryEntry make(int i) => _entry(
         id: 'mem_${i.toString().padLeft(8, '0')}',

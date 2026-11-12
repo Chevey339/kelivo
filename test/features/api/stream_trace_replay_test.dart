@@ -130,7 +130,27 @@ void main() {
     );
     _assertCommon(replayed);
     expect(decoder.reasoningEcho, isNotEmpty);
-    expect(decoder.reasoningDetails, isNotEmpty);
+    final rawDetails = <Map<String, dynamic>>[
+      for (final event in replayed.events)
+        if (event.data.isNotEmpty && event.data != '[DONE]')
+          for (final choice in jsonDecode(event.data)['choices'] as List? ?? [])
+            for (final detail
+                in choice['delta']?['reasoning_details'] as List? ?? [])
+              Map<String, dynamic>.from(detail as Map),
+    ];
+    expect(rawDetails, hasLength(29));
+    expect(decoder.reasoningDetails, hasLength(1));
+    final block = decoder.reasoningDetails!.single;
+    final completeText = rawDetails
+        .map((detail) => detail['text'] ?? '')
+        .join();
+    expect(block['text'], completeText);
+    expect(block['text'], decoder.reasoningEcho);
+    expect(block['signature'], rawDetails.last['signature']);
+    expect(block['signature'], isNotEmpty);
+    expect(block['type'], 'reasoning.text');
+    expect(block['format'], 'anthropic-claude-v1');
+    expect(block['index'], 0);
     expect(
       replayed.chunks.whereType<ToolCallStart>().map((c) => c.toolName),
       everyElement('search_web'),
@@ -230,8 +250,8 @@ _Replay _replay(
     reason: 'Missing $path/expected.json; rerun with $_updateEnv=true',
   );
   expect(
-    jsonDecode(expectedFile.readAsStringSync()),
     snapshot,
+    jsonDecode(expectedFile.readAsStringSync()),
     reason: '$path snapshot mismatch',
   );
   return _Replay(

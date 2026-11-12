@@ -1,4 +1,5 @@
 #include "flutter_window.h"
+#include "desktop_startup.h"
 
 #include <optional>
 #include <chrono>
@@ -14,6 +15,7 @@
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
 #include <flutter_windows.h>
+#include <flutter_inappwebview_windows/flutter_inappwebview_windows_plugin_c_api.h>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -81,10 +83,13 @@ std::optional<RECT> DecodeWindowRect(const flutter::EncodableValue* value) {
 
 }  // namespace
 
-FlutterWindow::FlutterWindow(const flutter::DartProject& project)
-    : project_(project) {}
+FlutterWindow::FlutterWindow(const flutter::DartProject& project, bool autostart)
+    : autostart_(autostart), project_(project) {}
 
-FlutterWindow::~FlutterWindow() {}
+FlutterWindow::~FlutterWindow() {
+  // WM_QUIT can end the loop without a WM_DESTROY (windowManager.destroy()).
+  OnDestroy();
+}
 
 bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
@@ -101,6 +106,8 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  webview_registrar_ = flutter_controller_->engine()->GetRegistrarForPlugin(
+      "FlutterInappwebviewWindowsPluginCApi");
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   auto window_channel =
@@ -137,6 +144,39 @@ bool FlutterWindow::OnCreate() {
             result->Success();
           } else {
             result->Error("restore_bounds_failed", "SetWindowPos failed");
+          }
+        } else {
+          result->NotImplemented();
+        }
+      });
+
+  auto startup_channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "app.desktop_startup",
+      &flutter::StandardMethodCodec::GetInstance());
+  startup_channel->SetMethodCallHandler(
+      [](const flutter::MethodCall<flutter::EncodableValue>& call,
+         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == "getState") {
+          bool enabled = false;
+          const auto status = desktop_startup::IsEnabled(&enabled);
+          if (status != ERROR_SUCCESS) {
+            result->Error("startup_read_failed", std::to_string(status));
+          } else {
+            result->Success(flutter::EncodableMap{
+                {flutter::EncodableValue("supported"), flutter::EncodableValue(true)},
+                {flutter::EncodableValue("enabled"), flutter::EncodableValue(enabled)}});
+          }
+        } else if (call.method_name() == "setEnabled") {
+          const auto enabled = call.arguments() ? std::get_if<bool>(call.arguments()) : nullptr;
+          if (!enabled) {
+            result->Error("invalid_arguments", "Expected a boolean");
+            return;
+          }
+          const auto status = desktop_startup::SetEnabled(*enabled);
+          if (status != ERROR_SUCCESS) {
+            result->Error("startup_write_failed", std::to_string(status));
+          } else {
+            result->Success();
           }
         } else {
           result->NotImplemented();
@@ -399,7 +439,7 @@ bool FlutterWindow::OnCreate() {
       });
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
+    if (!autostart_) this->Show();
   });
 
   // Ensure a frame is pending so the window shows.
@@ -410,7 +450,17 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
-    flutter_controller_ = nullptr;
+    engine_shutdown_.Run(
+        [this] {
+          // Draining the WebView dispatcher can run queued Flutter channel
+          // calls. Do it before ANY plugin registrar/handler is destroyed.
+          FlutterInappwebviewWindowsPluginCApiPrepareForShutdown(
+              webview_registrar_);
+        },
+        [this] {
+          webview_registrar_ = nullptr;
+          flutter_controller_ = nullptr;
+        });
   }
   Win32Window::OnDestroy();
 }
@@ -419,6 +469,12 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // Queue draining may re-enter this window. A second close/destroy must not
+  // tear down the engine while other plugins are still servicing callbacks.
+  if (engine_shutdown_.started() &&
+      (message == WM_CLOSE || message == WM_DESTROY)) {
+    return 0;
+  }
   if (message == WM_GETDPISCALEDSIZE && restoring_bounds_) {
     auto* size = reinterpret_cast<SIZE*>(lparam);
     size->cx = restoring_bounds_->right - restoring_bounds_->left;

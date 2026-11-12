@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/settings_provider.dart';
+import '../../../utils/app_directories.dart';
 import '../network/dio_http_client.dart';
 import 'catalog_entry.dart';
 import 'model_catalog_trim.dart';
@@ -729,7 +730,9 @@ Future<String> _defaultLoadBundledJson() {
 }
 
 Future<Directory> _defaultCacheDirectory() async {
-  final support = await getApplicationSupportDirectory();
+  final support = Platform.isWindows
+      ? await AppDirectories.getAppDataDirectory()
+      : await getApplicationSupportDirectory();
   return Directory('${support.path}/model_catalog');
 }
 

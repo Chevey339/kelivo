@@ -1,0 +1,17 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Popup parent</title>
+<style>
+  body { font: 20px system-ui; padding: 30px; background: #eef2ea; color: #28382d; }
+  button { font: inherit; padding: 20px; border: 0; border-radius: 18px; background: #526e58; color: white; }
+</style>
+<h1>Browser window test</h1>
+<p id="status">Waiting for popup</p>
+<button onclick="window.open('child.html', 'child')">Open test popup</button>
+<script>
+  addEventListener('message', event => {
+    if (event.origin === location.origin) {
+      document.querySelector('#status').textContent = event.data;
+    }
+  });
+</script>

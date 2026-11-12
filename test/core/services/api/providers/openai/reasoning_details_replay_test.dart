@@ -37,15 +37,91 @@ void main() {
       expect(details[1]['signature'], 'sig-b');
     });
 
-    test('collapses fragments that repeat the same signature', () {
+    test('keeps completed blocks even when their signatures are identical', () {
       final details = normalizeReasoningDetailsForReplay([
         {'type': 'reasoning.text', 'text': 'part A', 'signature': 'sig-x'},
         {'type': 'reasoning.text', 'text': ' part B', 'signature': 'sig-x'},
       ]);
 
-      expect(details, hasLength(1));
-      expect(details!.first['text'], 'part A part B');
-      expect(details.first['signature'], 'sig-x');
+      expect(details, hasLength(2));
+      expect(details![0]['text'], 'part A');
+      expect(details[1]['text'], ' part B');
+      expect(details.map((entry) => entry['signature']), ['sig-x', 'sig-x']);
+    });
+
+    test(
+      'merges unsigned text without trimming, deduplicating or adding breaks',
+      () {
+        final fragments = [
+          for (final text in ['Let', ' me', ' me', '\n', 'check.'])
+            {
+              'type': 'reasoning.text',
+              'text': text,
+              'format': 'unknown',
+              'index': 0,
+            },
+        ];
+        final details = normalizeReasoningDetailsForReplay(fragments);
+
+        expect(details, [
+          {
+            'type': 'reasoning.text',
+            'text': 'Let me me\ncheck.',
+            'format': 'unknown',
+            'index': 0,
+          },
+        ]);
+        expect(fragments.map((entry) => entry['text']), [
+          'Let',
+          ' me',
+          ' me',
+          '\n',
+          'check.',
+        ]);
+        expect(normalizeReasoningDetailsForReplay(details), details);
+      },
+    );
+
+    for (final field in ['id', 'index', 'format']) {
+      test('preserves text block boundaries with different $field', () {
+        final details = normalizeReasoningDetailsForReplay([
+          {
+            'type': 'reasoning.text',
+            'text': 'first',
+            field: field == 'index' ? 0 : 'a',
+          },
+          {
+            'type': 'reasoning.text',
+            'text': 'second',
+            field: field == 'index' ? 1 : 'b',
+          },
+        ]);
+        expect(details, hasLength(2));
+        expect(details!.map((entry) => entry['text']), ['first', 'second']);
+      });
+    }
+
+    test('encrypted and unknown blocks remain opaque merge boundaries', () {
+      const encrypted = {
+        'type': 'reasoning.encrypted',
+        'data': 'AAAA',
+        'id': 'r',
+      };
+      const unknown = {
+        'type': 'reasoning.future',
+        'payload': {'value': 1},
+      };
+      const raw = [
+        {'type': 'reasoning.text', 'text': 'before'},
+        encrypted,
+        encrypted,
+        {'type': 'reasoning.text', 'text': 'after'},
+        unknown,
+        {'type': 'reasoning.text', 'text': 'last'},
+      ];
+      final details = normalizeReasoningDetailsForReplay(raw);
+      expect(details, raw);
+      expect(normalizeReasoningDetailsForReplay(details), raw);
     });
 
     test('does not merge blocks with different indexes', () {
@@ -175,5 +251,18 @@ void main() {
         isNull,
       );
     });
+
+    test(
+      'retains orphan signatures in captured data but not request blocks',
+      () {
+        const raw = [
+          {'type': 'reasoning.text', 'signature': 'orphan'},
+        ];
+        final captured = mergeReasoningDetails(raw);
+        expect(captured, raw);
+        expect(reasoningDetailsNeedSignedReplay(captured), isTrue);
+        expect(normalizeReasoningDetailsForReplay(captured), isNull);
+      },
+    );
   });
 }

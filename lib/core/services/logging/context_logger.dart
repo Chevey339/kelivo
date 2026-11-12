@@ -58,7 +58,7 @@ class ContextLogger {
     _sink = null;
     _sinkDate = today;
 
-    final dir = await AppDirectories.getAppDataDirectory();
+    final dir = await AppDirectories.getContentDirectory();
     final logsDir = Directory('${dir.path}/logs');
     if (!await logsDir.exists()) {
       await logsDir.create(recursive: true);

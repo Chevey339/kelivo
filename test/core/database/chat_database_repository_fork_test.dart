@@ -92,6 +92,12 @@ void main() {
             lastSummarizedMessageCount: 5,
             chatSuggestions: const ['next'],
             injectedMemoryHash: 'source-memory',
+            extras: const {
+              'workspace.id': 'workspace',
+              'custom': 42,
+              'tools.permission_mode': 'fullAccess',
+              'workspace.allowAll': true,
+            },
           ),
         ],
         messages: [
@@ -118,16 +124,23 @@ void main() {
       final fork = await repository.forkConversationWithVersions(
         sourceId: 'source',
         targetRevisionId: 'a1v1',
-        title: 'Fork title',
         assistantId: 'assistant',
       );
 
       expect(fork, isNotNull);
       expect(fork!.id, isNot('source'));
-      expect(fork.title, 'Fork title');
+      expect(fork.extras, {'workspace.id': 'workspace', 'custom': 42});
+      expect((await repository.getConversation(fork.id))!.extras, fork.extras);
+      expect(
+        (await repository.getConversation(
+          'source',
+        ))!.extras['tools.permission_mode'],
+        'fullAccess',
+      );
+      expect(fork.title, 'Topic (1)');
       expect(fork.assistantId, 'assistant');
       expect(fork.isPinned, isFalse);
-      expect(fork.mcpServerIds, isEmpty);
+      expect(fork.mcpServerIds, const ['mcp-server']);
       expect(fork.truncateIndex, -1);
       expect(fork.summary, isNull);
       expect(fork.chatSuggestions, isEmpty);
@@ -274,7 +287,6 @@ void main() {
         final fork = await repository.forkConversationWithVersions(
           sourceId: 'source',
           targetRevisionId: 'a1v0',
-          title: 'Rolled fork',
           assistantId: 'assistant',
         );
 
@@ -305,7 +317,6 @@ void main() {
         await repository.forkConversationWithVersions(
           sourceId: 'missing',
           targetRevisionId: 'rev',
-          title: 'Fork',
         ),
         isNull,
       );
@@ -344,7 +355,6 @@ void main() {
         await repository.forkConversationWithVersions(
           sourceId: 'source',
           targetRevisionId: 'missing-rev',
-          title: 'Fork',
         ),
         isNull,
       );
@@ -403,7 +413,6 @@ void main() {
           await repository.forkConversationWithVersions(
             sourceId: 'source',
             targetRevisionId: 'other-msg',
-            title: 'Fork',
           ),
           isNull,
         );

@@ -1,3 +1,6 @@
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/message_part.dart';
@@ -91,6 +94,96 @@ void main() {
     final service = ChatService(assetContentHash: assetContentHash);
     services.add(service);
     return service;
+  }
+
+  for (final temporary in [false, true]) {
+    test('image recall scope and pins: temporary=$temporary', () async {
+      final chat = createService();
+      await chat.init();
+      final conversation = await chat.createDraftConversation(
+        temporary: temporary,
+      );
+      await chat.setImageContextSettings(
+        conversation.id,
+        const ImageContextSettings(allowRecall: false),
+      );
+      final message = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        parts: [
+          const TextPart('keep original ordinal'),
+          ImagePart(uri: 'data:image/png;base64,YWJj'),
+        ],
+      );
+      final before = await chat.imageContextHistory(conversation.id);
+      final image = RequestImageContext.collect(before).single;
+      expect(image.key, ContextImageIdentity(message.id, 'part:1').key);
+      final settings = await chat.imageContextSettings(conversation.id);
+      expect(settings.allowRecall, isFalse);
+      final revision = chat.contextRevision(conversation.id);
+      await chat.setImageContextSettings(
+        conversation.id,
+        settings.pin(image.key, true),
+      );
+      expect(chat.contextRevision(conversation.id), revision + 1);
+      expect((await chat.imageContextSettings(conversation.id)).pinned, {
+        image.key,
+      });
+      expect(
+        (await chat.imageContextSettings(conversation.id)).allowRecall,
+        isFalse,
+      );
+      expect(
+        (await chat.chatRepositoryOrNull!.readImageContextSettings(
+          conversation.id,
+        )).pinned,
+        temporary ? isEmpty : {image.key},
+      );
+      expect(
+        (await chat.chatRepositoryOrNull!.readImageContextSettings(
+          conversation.id,
+        )).allowRecall,
+        temporary,
+      );
+      await chat.clearConversationContext(conversation.id);
+      expect(
+        (await chat.imageContextSettings(conversation.id)).allowRecall,
+        isFalse,
+      );
+      expect(await chat.imageContextHistory(conversation.id), isEmpty);
+      expect(
+        await chat.imageContextHistory(
+          conversation.id,
+          throughMessageId: message.id,
+        ),
+        isEmpty,
+      );
+      final next = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'after clear',
+      );
+      expect(
+        (await chat.imageContextHistory(conversation.id)).map((m) => m.id),
+        [next.id],
+      );
+      final request = RequestImageContext(
+        settings: await chat.imageContextSettings(conversation.id),
+        images: RequestImageContext.collect(
+          await chat.imageContextHistory(conversation.id),
+        ),
+      );
+      expect(request.readImage(image.handle).metadata, isNull);
+      await chat.deleteConversation(conversation.id);
+      expect(
+        (await chat.imageContextSettings(conversation.id)).pinned,
+        isEmpty,
+      );
+      expect(
+        (await chat.imageContextSettings(conversation.id)).allowRecall,
+        isTrue,
+      );
+    });
   }
 
   for (final temporary in [false, true]) {
@@ -277,7 +370,6 @@ void main() {
             }
             message = (await service.loadSelectedContextMessages(
               conversation.id,
-              truncateIndex: -1,
               limit: 10,
             )).single;
             expect(message.id, edited.id);
@@ -481,7 +573,6 @@ void main() {
           }
           final selected = (await service.loadSelectedContextMessages(
             conversation.id,
-            truncateIndex: -1,
             limit: 10,
           )).single;
           expect(selected.id, edited.id);
@@ -888,7 +979,6 @@ void main() {
       final fork = await restarted.forkConversationAtRevision(
         sourceConversationId: conversation.id,
         sourceRevisionId: assistant.id,
-        title: 'Fork',
       );
       expect(
         restarted.getProviderArtifact(
@@ -2094,6 +2184,99 @@ void main() {
 
   group('ChatService fork conversations', () {
     for (final preserveVersions in [false, true]) {
+      for (final editedRole in ['user', 'assistant']) {
+        test('fork keeps earlier $editedRole revisions in logical order '
+            '(preserveVersions: $preserveVersions)', () async {
+          final service = createService();
+          final source = await service.createConversation(title: 'Source');
+          final messages = <ChatMessage>[];
+          for (final (role, content) in const [
+            ('user', 'q1'),
+            ('assistant', 'a1'),
+            ('user', 'q2'),
+            ('assistant', 'a2'),
+            ('user', 'q3'),
+            ('assistant', 'a3'),
+          ]) {
+            messages.add(
+              await service.addMessage(
+                conversationId: source.id,
+                role: role,
+                content: content,
+              ),
+            );
+          }
+          final original = messages.firstWhere((m) => m.role == editedRole);
+          final edited = (await service.appendMessageVersion(
+            messageId: original.id,
+            content: '${original.content} edited',
+          ))!;
+          await service.appendMessageVersion(
+            messageId: original.id,
+            content: '${original.content} another edit',
+          );
+          await service.setSelectedVersion(
+            source.id,
+            original.groupId ?? original.id,
+            edited.version,
+          );
+          final expected = [
+            for (final message in messages.take(4))
+              message.id == original.id ? edited.content : message.content,
+          ];
+          final sourceExpected = [...expected, 'q3', 'a3'];
+
+          Future<void> expectHistory(
+            ChatService reader,
+            String id,
+            List<String> contents,
+          ) async {
+            expect(
+              (await reader.loadActiveTimelineMessages(
+                id,
+              )).map((m) => m.content),
+              contents,
+            );
+            expect(
+              (await reader.loadSelectedContextMessages(
+                id,
+                limit: 100,
+              )).map((m) => m.content),
+              contents,
+            );
+          }
+
+          await expectHistory(service, source.id, sourceExpected);
+          final fork = await service.forkConversationAtRevision(
+            sourceConversationId: source.id,
+            sourceRevisionId: messages[3].id,
+            preserveVersions: preserveVersions,
+          );
+          await expectHistory(service, fork.id, expected);
+          final followUp = await service.addMessage(
+            conversationId: fork.id,
+            role: 'user',
+            content: 'branch follow-up',
+          );
+          final continued = [...expected, followUp.content];
+          await expectHistory(service, fork.id, continued);
+          final nested = await service.forkConversationAtRevision(
+            sourceConversationId: fork.id,
+            sourceRevisionId: followUp.id,
+            preserveVersions: preserveVersions,
+          );
+          await expectHistory(service, nested.id, continued);
+
+          await service.close();
+          services.remove(service);
+          final reopened = createService();
+          await reopened.init();
+          await expectHistory(reopened, source.id, sourceExpected);
+          await expectHistory(reopened, fork.id, continued);
+          await expectHistory(reopened, nested.id, continued);
+        });
+      }
+
       for (final selectedVersion in [0, 1]) {
         test(
           'latest reply suggestions survive fork and restart '
@@ -2127,7 +2310,6 @@ void main() {
             final fork = await service.forkConversationAtRevision(
               sourceConversationId: source.id,
               sourceRevisionId: selected.id,
-              title: 'Fork',
               preserveVersions: preserveVersions,
             );
 
@@ -2196,7 +2378,6 @@ void main() {
             final fork = await service.forkConversationAtRevision(
               sourceConversationId: source.id,
               sourceRevisionId: target.id,
-              title: 'Fork',
               preserveVersions: preserveVersions,
             );
             expect(fork.chatSuggestions, isEmpty, reason: target.content);
@@ -2204,7 +2385,6 @@ void main() {
           final latestFork = await service.forkConversationAtRevision(
             sourceConversationId: source.id,
             sourceRevisionId: selected.id,
-            title: 'Fork',
             preserveVersions: preserveVersions,
           );
           expect(latestFork.chatSuggestions, suggestions);
@@ -2217,7 +2397,6 @@ void main() {
           final earlierFork = await service.forkConversationAtRevision(
             sourceConversationId: source.id,
             sourceRevisionId: selected.id,
-            title: 'Fork',
             preserveVersions: preserveVersions,
           );
           expect(earlierFork.chatSuggestions, isEmpty);
@@ -2239,7 +2418,6 @@ void main() {
         final fork = await service.forkConversationAtRevision(
           sourceConversationId: source.id,
           sourceRevisionId: reply.id,
-          title: 'Fork',
           preserveVersions: preserveVersions,
         );
         expect(fork.chatSuggestions, isEmpty);
@@ -2247,7 +2425,7 @@ void main() {
     }
 
     for (final mode in ['plain', 'fromMessages', 'withVersions']) {
-      test('fork preserves total and finish usage ($mode)', () async {
+      test('fork preserves usage and response timing ($mode)', () async {
         final service = createService();
         final source = await service.createConversation(title: 'Source');
         const finish = TokenUsage(
@@ -2266,6 +2444,8 @@ void main() {
           cacheWriteTokens: 30,
           reasoningTokens: 5,
           finishUsage: finish,
+          firstResponseMs: 500,
+          firstTokenMs: 1250,
         );
         await service.addMessageDirectly(source.id, message);
 
@@ -2278,7 +2458,6 @@ void main() {
             : await service.forkConversationAtRevision(
                 sourceConversationId: source.id,
                 sourceRevisionId: message.id,
-                title: 'Fork',
                 preserveVersions: mode == 'withVersions',
               );
 
@@ -2287,6 +2466,8 @@ void main() {
           expect(copied.conversationId, fork.id);
           expect(copied.finishUsage?.toJson(), finish.toJson());
           expect(copied.tokenUsage.toJson(), message.tokenUsage.toJson());
+          expect(copied.firstResponseMs, 500);
+          expect(copied.firstTokenMs, 1250);
         }
 
         expectUsage((await service.loadMessages(fork.id)).single);
@@ -2297,6 +2478,61 @@ void main() {
         expectUsage((await reopened.loadMessages(fork.id)).single);
       });
     }
+
+    test(
+      'message-selection forks reserve titles alongside ordinary forks',
+      () async {
+        final service = createService();
+        await service.init();
+        final source = await service.createConversation(title: '项目讨论');
+        final message = await service.addMessage(
+          conversationId: source.id,
+          role: 'user',
+          content: 'project notes',
+        );
+        final forks = await Future.wait([
+          service.forkConversationAtRevision(
+            sourceConversationId: source.id,
+            sourceRevisionId: message.id,
+          ),
+          service.forkConversationFromMessages(
+            title: source.title,
+            assistantId: source.assistantId,
+            sourceMessages: [message],
+            activate: false,
+          ),
+          service.forkConversationFromMessages(
+            title: source.title,
+            assistantId: source.assistantId,
+            sourceMessages: [message],
+            activate: false,
+          ),
+        ]);
+        expect(forks.map((fork) => fork.title).toSet(), {
+          '项目讨论 (1)',
+          '项目讨论 (2)',
+          '项目讨论 (3)',
+        });
+        final duplicate = (await service.duplicateConversation(
+          forks.first.id,
+        ))!;
+        expect(duplicate.title, '项目讨论 (4)');
+        for (final fork in [...forks, duplicate]) {
+          expect(service.getConversation(fork.id)!.title, fork.title);
+          expect(
+            (await service.loadMessages(fork.id)).single.content,
+            message.content,
+          );
+        }
+        await service.close();
+        services.remove(service);
+        final reopened = createService();
+        await reopened.init();
+        for (final fork in [...forks, duplicate]) {
+          expect(reopened.getConversation(fork.id)!.title, fork.title);
+        }
+      },
+    );
 
     test(
       'fork copies selected path as plain single-version messages',
@@ -2319,10 +2555,9 @@ void main() {
         final fork = await service.forkConversationAtRevision(
           sourceConversationId: source.id,
           sourceRevisionId: edited!.id,
-          title: 'Fork',
         );
 
-        expect(fork.title, source.title);
+        expect(fork.title, '${source.title} (1)');
         final forkMessages = service.getMessages(fork.id);
         expect(forkMessages, hasLength(1));
         expect(forkMessages.single.conversationId, fork.id);
@@ -2372,11 +2607,10 @@ void main() {
         final fork = await service.forkConversationAtRevision(
           sourceConversationId: source.id,
           sourceRevisionId: original.id,
-          title: 'Fork',
           preserveVersions: true,
         );
 
-        expect(fork.title, source.title);
+        expect(fork.title, '${source.title} (1)');
         expect(service.getMessages(fork.id), isEmpty);
 
         final timeline = await service.loadActiveTimelineMessages(fork.id);
@@ -2434,7 +2668,6 @@ void main() {
         final fork = await service.forkConversationAtRevision(
           sourceConversationId: source.id,
           sourceRevisionId: assistant.id,
-          title: 'Fork',
         );
 
         final forkMessages = service.getMessages(fork.id);
@@ -2505,6 +2738,44 @@ void main() {
     );
   });
 
+  for (final temporary in [false, true]) {
+    test(
+      'no-run terminal metadata is published on the caller message (temporary=$temporary)',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = temporary
+            ? await service.createDraftConversation(
+                title: 'Native fixture',
+                temporary: true,
+              )
+            : await service.createConversation(title: 'Native fixture');
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'source',
+          isStreaming: true,
+        );
+        for (final terminal in [
+          GenerationRunState.completed,
+          GenerationRunState.failed,
+          GenerationRunState.cancelled,
+        ]) {
+          final completed = original.copyWith(isStreaming: false);
+          await service.finalizeGenerationRunSilent(
+            message: completed,
+            toolEvents: const [],
+            generationRunId: null,
+            expectedState: null,
+            expectedStateRevision: null,
+            terminalState: terminal,
+          );
+          expect(completed.generationState, terminal);
+        }
+      },
+    );
+  }
+
   test('final generation commit publishes one statistics revision', () async {
     final service = createService();
     await service.init();
@@ -2549,6 +2820,7 @@ void main() {
       terminalState: GenerationRunState.completed,
     );
 
+    expect(completedMessage.generationState, GenerationRunState.completed);
     expect(service.statisticsRevision, revisionBefore + 1);
     expect(notifications, 1);
     final aggregate = await service.loadStatsAggregate(

@@ -1,3 +1,4 @@
+import '../../network/provider_http_exception.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -129,7 +130,7 @@ Future<String?> _encodeLayoutParsingFile(String source) async {
 
 Map<String, dynamic> _decodeLayoutParsingResponse(http.Response response) {
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw HttpException('HTTP ${response.statusCode}: ${response.body}');
+    throw ProviderHttpException(response, response.body);
   }
   final decoded = jsonDecode(response.body);
   if (decoded is! Map) {

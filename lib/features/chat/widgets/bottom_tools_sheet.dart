@@ -28,6 +28,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
 import 'tools_sheet_row.dart';
+import '../../browser/browser_navigation.dart';
 
 /// Row that opens the session skills picker, and pushes the skills library on
 /// a long press.
@@ -143,6 +144,23 @@ class BottomToolsSheet extends StatelessWidget {
                       l10n: l10n,
                       roundedAction: roundedAction,
                     ),
+                    ToolsSheetRow(
+                      key: const ValueKey('bottom-tools-browser'),
+                      icon: Lucide.AppWindow,
+                      label: l10n.browserTitle,
+                      onTap: () {
+                        final navigatorContext = Navigator.of(context).context;
+                        onClose?.call();
+                        unawaited(
+                          openBrowserPage(
+                            navigatorContext,
+                            conversationId: conversationId,
+                            assistantId: assistantId,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     _LearningAndClearSection(
                       clearLabel: clearLabel,
                       onClear: onClear,

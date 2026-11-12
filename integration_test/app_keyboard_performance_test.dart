@@ -18,7 +18,7 @@ void main() {
   testWidgets(
     'profiles the real home composer and Android IME',
     (tester) async {
-      await app.main();
+      await app.main(const []);
       await tester.pump(const Duration(seconds: 8));
       expect(find.byType(ChatInputBar), findsOneWidget);
       final editorFinder = find.descendant(

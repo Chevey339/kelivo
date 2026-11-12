@@ -9,6 +9,7 @@ import 'dio_http_client.dart';
 http.Client providerHttpClient(
   ProviderConfig config, {
   CancelToken? cancelToken,
+  bool logRequests = true,
 }) {
   final host = (config.proxyHost ?? '').trim();
   final port = (config.proxyPort ?? '').trim();
@@ -25,7 +26,8 @@ http.Client providerHttpClient(
         password: pass.isEmpty ? null : pass,
       ),
       cancelToken: cancelToken,
+      logRequests: logRequests,
     );
   }
-  return DioHttpClient(cancelToken: cancelToken);
+  return DioHttpClient(cancelToken: cancelToken, logRequests: logRequests);
 }

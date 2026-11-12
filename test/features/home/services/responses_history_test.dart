@@ -64,6 +64,215 @@ const _tools = [
 
 void main() {
   for (final stream in [true, false]) {
+    for (final media in ['plain', 'image', 'text-only image']) {
+      test(
+        'legacy Responses history keeps text before tool batches, stream=$stream, media=$media',
+        () async {
+          final requests = <Map<String, dynamic>>[];
+          final output = [_text('live', 'Checking again.'), _call('live')];
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          server.listen((request) async {
+            expect(request.uri.path, '/v1/responses');
+            requests.add(jsonDecode(await utf8.decoder.bind(request).join()));
+            final items = requests.length == 1
+                ? output
+                : [_text('done', 'Done.')];
+            if (stream) {
+              request.response.headers.contentType = ContentType(
+                'text',
+                'event-stream',
+              );
+              void emit(Map<String, dynamic> event) =>
+                  request.response.write('data: ${jsonEncode(event)}\n\n');
+              for (var i = 0; i < items.length; i++) {
+                final item = items[i];
+                emit({
+                  'type': 'response.output_item.added',
+                  'output_index': i,
+                  'item': {
+                    ...item,
+                    if (item['type'] == 'message') 'content': <Object>[],
+                  },
+                });
+                if (item['type'] == 'message') {
+                  emit({
+                    'type': 'response.output_text.delta',
+                    'output_index': i,
+                    'delta': responsesMessageText(item),
+                  });
+                }
+                emit({
+                  'type': 'response.output_item.done',
+                  'output_index': i,
+                  'item': item,
+                });
+              }
+              emit({
+                'type': 'response.completed',
+                'response': {'output': items},
+              });
+            } else {
+              request.response.headers.contentType = ContentType.json;
+              request.response.write(jsonEncode({'output': items}));
+            }
+            await request.response.close();
+          });
+
+          final config = ProviderConfig(
+            id: 'DeepSeek',
+            enabled: true,
+            name: 'Legacy Responses fixture',
+            apiKey: 'test',
+            baseUrl: 'http://${server.address.address}:${server.port}/v1',
+            providerType: ProviderKind.openai,
+            useResponseApi: true,
+            modelOverrides: {
+              'deepseek-flash': {
+                'input': ['text', if (media == 'image') 'image'],
+              },
+            },
+          );
+          final events = [
+            for (final id in ['a', 'b', 'c', 'unfinished'])
+              {
+                'id': id,
+                'name': 'lookup',
+                'arguments': {'id': id},
+                'content': id == 'unfinished'
+                    ? null
+                    : id == 'a'
+                    ? ''
+                    : 'result-$id',
+              },
+          ];
+          final imageUrl = media == 'image'
+              ? 'data:image/png;base64,'
+                    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ1sAAAAASUVORK5CYII='
+              : 'https://example.com/history.png';
+          final before =
+              'Before tool.${media == 'plain' ? '' : ' ![preview]($imageUrl)'}';
+          // Older messages have ordered parts but no response boundaries or
+          // native responses_turn artifact. Exercise their actual DB reload.
+          final parts = [
+            TextPart(before),
+            ToolCallPart(jsonEncode(events[0])),
+            ToolCallPart(jsonEncode(events[1])),
+            const TextPart('Between tools.'),
+            ToolCallPart(jsonEncode(events[2])),
+            const TextPart('After tools.'),
+            ToolCallPart(jsonEncode(events[3])),
+          ];
+          final root = await Directory.systemTemp.createTemp(
+            'legacy_responses_history_',
+          );
+          final file = File('${root.path}/chat.sqlite');
+          var repository = ChatDatabaseRepository.open(file: file);
+          addTearDown(() async {
+            await repository.close();
+            await root.delete(recursive: true);
+          });
+          await repository.ensureReady();
+          await repository.putConversation(Conversation(id: 'c', title: 'Old'));
+          await repository.putMessage(
+            ChatMessage(
+              id: 'old',
+              role: 'assistant',
+              conversationId: 'c',
+              parts: parts,
+            ),
+          );
+          await repository.close();
+          repository = ChatDatabaseRepository.open(file: file);
+          await repository.ensureReady();
+          final restored = (await repository.getMessage('old'))!;
+          expect(
+            await repository.getProviderArtifactsForMessages([
+              'old',
+            ], responsesTurnArtifactKind),
+            isEmpty,
+          );
+          final builder = MessageBuilderService(
+            chatService: _Chat(events),
+            contextProvider: _Context(),
+          );
+          final history = builder.buildApiMessages(
+            messages: [
+              ChatMessage(role: 'user', content: 'Check.', conversationId: 'c'),
+              restored,
+              ChatMessage(role: 'user', content: 'Next?', conversationId: 'c'),
+            ],
+            versionSelections: {},
+            currentConversation: null,
+            includeToolMessages: true,
+            preserveToolTurns: true,
+            responsesScope: responsesReplayScope(config, 'deepseek-flash'),
+          );
+          final executed = <String>[];
+          await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: 'deepseek-flash',
+            messages: history,
+            tools: _tools,
+            stream: stream,
+            onToolCall: (name, arguments, {toolCallId}) async {
+              executed.add(arguments['id'] as String);
+              return 'result-live';
+            },
+          ).toList();
+
+          expect(executed, ['live']);
+          expect(requests, hasLength(2));
+          final input = (requests.first['input'] as List).cast<Map>();
+          expect(input.map((item) => item['call_id'] ?? item['role']), [
+            'user',
+            'assistant',
+            'a',
+            'b',
+            'a',
+            'b',
+            'assistant',
+            'c',
+            'c',
+            'assistant',
+            'user',
+          ]);
+          expect(responsesMessageText(input[1]), startsWith('Before tool.'));
+          expect(responsesMessageText(input[6]), 'Between tools.');
+          expect(responsesMessageText(input[9]), 'After tools.');
+          for (final (index, id) in [(2, 'a'), (3, 'b'), (7, 'c')]) {
+            expect(input[index]['type'], 'function_call');
+            expect(jsonDecode(input[index]['arguments'] as String), {'id': id});
+          }
+          for (final (index, result) in [
+            (4, ''),
+            (5, 'result-b'),
+            (8, 'result-c'),
+          ]) {
+            expect(input[index]['type'], 'function_call_output');
+            expect(input[index]['output'], result);
+          }
+          expect(jsonEncode(input).contains('unfinished'), isFalse);
+          if (media == 'image') {
+            expect(
+              (input.last['content'] as List).whereType<Map>(),
+              contains(equals({'type': 'input_image', 'image_url': imageUrl})),
+            );
+          }
+          expect(requests.last['input'], [
+            ...input,
+            ...output,
+            {
+              'type': 'function_call_output',
+              'call_id': 'live',
+              'output': 'result-live',
+            },
+          ]);
+          expect(restored.parts, parts);
+          expect((await repository.getMessage('old'))!.parts, parts);
+        },
+      );
+    }
     for (final encrypted in [true, false]) {
       test(
         'Responses history survives database reload, stream=$stream, encrypted=$encrypted',

@@ -1,3 +1,5 @@
+import '../../../side_panel/desktop_side_panel_controller.dart';
+import '../../../../utils/platform_utils.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -86,6 +88,11 @@ Future<void> showFilePreview(
   FilePreviewKind? kind,
   bool autoLoad = true,
 }) async {
+  final panel = DesktopSidePanelController.instance;
+  if (PlatformUtils.isDesktopTarget && panel.isAvailable) {
+    panel.openPreview(file.path);
+    return;
+  }
   if (!file.existsSync()) {
     final l10n = AppLocalizations.of(context)!;
     showAppSnackBar(
@@ -113,7 +120,11 @@ Future<void> showFilePreview(
     return;
   }
 
-  final body = _previewBody(kind: resolvedKind, file: file, autoLoad: autoLoad);
+  final body = buildFilePreviewBody(
+    kind: resolvedKind,
+    file: file,
+    autoLoad: autoLoad,
+  );
   if (desktop) {
     final height = MediaQuery.sizeOf(context).height * 0.8;
     await showAppDialog<void>(
@@ -145,7 +156,7 @@ Future<void> showFilePreview(
   );
 }
 
-Widget _previewBody({
+Widget buildFilePreviewBody({
   required FilePreviewKind kind,
   required File file,
   bool autoLoad = true,
@@ -273,8 +284,7 @@ class FilePreviewFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final desktop = dialog || useDesktopWorkspaceLayout(context);
-    final actions = _headerActions(context, desktop: desktop);
+    final actions = _headerActions(context);
     if (dialog) {
       return Column(
         children: [
@@ -307,7 +317,7 @@ class FilePreviewFrame extends StatelessWidget {
     );
   }
 
-  List<Widget> _headerActions(BuildContext context, {required bool desktop}) {
+  List<Widget> _headerActions(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     // 20 is the IosIconButton default every other page's app-bar actions use;
@@ -356,7 +366,7 @@ class FilePreviewFrame extends StatelessWidget {
         onTap: () => unawaited(openPreviewFileExternally(context, file)),
       ),
     ];
-    if (desktop) {
+    if (canRevealPreviewFileInFileManager) {
       items.add(
         action(
           label: revealInFileManagerLabel(l10n),

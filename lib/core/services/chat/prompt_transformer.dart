@@ -9,8 +9,9 @@ class PromptTransformer {
     required String? modelId,
     required String? modelName,
     required String userNickname,
+    DateTime? now,
   }) {
-    final now = DateTime.now();
+    now ??= DateTime.now();
     final locale = Localizations.localeOf(context).toLanguageTag();
     final tz = now.timeZoneName;
     final date =

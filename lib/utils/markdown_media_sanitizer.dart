@@ -85,7 +85,10 @@ class MarkdownMediaSanitizer {
 
   // Replace Markdown image links pointing to local file paths with inline base64 data URLs.
   // Example: "![image](/data/user/0/.../images/xxx.png)" -> "![image](data:image/png;base64,...)"
-  static Future<String> inlineLocalImagesToBase64(String markdown) async {
+  static Future<String> inlineLocalImagesToBase64(
+    String markdown, {
+    String? literalText,
+  }) async {
     // Quick check: contains a Markdown image and looks like a local path
     if (!(markdown.contains('![') && markdown.contains(']('))) return markdown;
 
@@ -93,10 +96,24 @@ class MarkdownMediaSanitizer {
     final matches = re.allMatches(markdown).toList();
     if (matches.isEmpty) return markdown;
 
+    final literalRanges = literalText == null || literalText.isEmpty
+        ? <Match>[]
+        : literalText.allMatches(markdown).toList();
     final sb = StringBuffer();
     int last = 0;
+    var literalIndex = 0;
     for (final m in matches) {
       sb.write(markdown.substring(last, m.start));
+      while (literalIndex < literalRanges.length &&
+          literalRanges[literalIndex].end <= m.start) {
+        literalIndex++;
+      }
+      if (literalIndex < literalRanges.length &&
+          literalRanges[literalIndex].start < m.end) {
+        sb.write(markdown.substring(m.start, m.end));
+        last = m.end;
+        continue;
+      }
       final url = (m.group(1) ?? '').trim();
       // Only convert local file paths; skip http(s) and existing data URLs
       final isRemote = url.startsWith('http://') || url.startsWith('https://');

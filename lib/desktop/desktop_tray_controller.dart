@@ -14,17 +14,35 @@ class DesktopTrayController with TrayListener, WindowListener {
   DesktopTrayController._();
   static final DesktopTrayController instance = DesktopTrayController._();
 
+  Future<void> _syncTail = Future<void>.value();
   bool _initialized = false;
   bool _isDesktop = false;
   bool _trayVisible = false;
   bool _showTraySetting = false;
   bool _minimizeToTrayOnClose = false;
   String _localeKey = '';
+  bool get isReady => _trayVisible;
   bool _contextMenuOpen = false;
 
   /// Sync tray state from settings & current localization.
   /// Safe to call multiple times; initialization is performed lazily.
   Future<void> syncFromSettings(
+    AppLocalizations l10n, {
+    required bool showTray,
+    required bool minimizeToTrayOnClose,
+  }) {
+    final sync = _syncTail.then(
+      (_) => _syncFromSettings(
+        l10n,
+        showTray: showTray,
+        minimizeToTrayOnClose: minimizeToTrayOnClose,
+      ),
+    );
+    _syncTail = sync.catchError((Object _) {});
+    return sync;
+  }
+
+  Future<void> _syncFromSettings(
     AppLocalizations l10n, {
     required bool showTray,
     required bool minimizeToTrayOnClose,
@@ -54,12 +72,6 @@ class DesktopTrayController with TrayListener, WindowListener {
     _showTraySetting = showTray;
     _minimizeToTrayOnClose = showTray && minimizeToTrayOnClose;
 
-    // Whether to intercept window close.
-    final shouldPreventClose = _showTraySetting && _minimizeToTrayOnClose;
-    try {
-      await windowManager.setPreventClose(shouldPreventClose);
-    } catch (_) {}
-
     // Handle tray icon visibility + localized menu.
     final newLocaleKey = l10n.localeName;
     final localeChanged = newLocaleKey != _localeKey;
@@ -67,8 +79,12 @@ class DesktopTrayController with TrayListener, WindowListener {
 
     if (_showTraySetting) {
       if (!_trayVisible || localeChanged) {
-        await _ensureTrayIconAndMenu(l10n);
-        _trayVisible = true;
+        try {
+          await _ensureTrayIconAndMenu(l10n);
+          _trayVisible = true;
+        } catch (_) {
+          _trayVisible = false;
+        }
       }
     } else {
       if (_trayVisible) {
@@ -78,6 +94,11 @@ class DesktopTrayController with TrayListener, WindowListener {
         _trayVisible = false;
       }
     }
+    try {
+      await windowManager.setPreventClose(
+        _trayVisible && _showTraySetting && _minimizeToTrayOnClose,
+      );
+    } catch (_) {}
   }
 
   Future<void> _ensureTrayIconAndMenu(AppLocalizations l10n) async {
@@ -88,15 +109,13 @@ class DesktopTrayController with TrayListener, WindowListener {
     // - macOS: template PNG so the system can adapt to light/dark menu bar
     // - Linux/others: regular PNG asset
     final platform = defaultTargetPlatform;
-    try {
-      if (platform == TargetPlatform.windows) {
-        await trayManager.setIcon('assets/app_icon.ico');
-      } else if (platform == TargetPlatform.macOS) {
-        await trayManager.setIcon('assets/icon_mac.png', isTemplate: true);
-      } else {
-        await trayManager.setIcon('assets/icons/kelivo.png');
-      }
-    } catch (_) {}
+    if (platform == TargetPlatform.windows) {
+      await trayManager.setIcon('assets/app_icon.ico');
+    } else if (platform == TargetPlatform.macOS) {
+      await trayManager.setIcon('assets/icon_mac.png', isTemplate: true);
+    } else {
+      await trayManager.setIcon('assets/icons/kelivo.png');
+    }
 
     // Some Linux environments do not support tooltip; keep the call
     // consistent with Gopeed and skip it there.
@@ -105,22 +124,20 @@ class DesktopTrayController with TrayListener, WindowListener {
         await trayManager.setToolTip('Kelivo');
       } catch (_) {}
     }
-    try {
-      final menu = Menu(
-        items: [
-          MenuItem(
-            label: l10n.desktopTrayMenuShowWindow,
-            onClick: (_) async => _showWindow(),
-          ),
-          MenuItem.separator(),
-          MenuItem(
-            label: l10n.desktopTrayMenuExit,
-            onClick: (_) async => _exitApp(),
-          ),
-        ],
-      );
-      await trayManager.setContextMenu(menu);
-    } catch (_) {}
+    final menu = Menu(
+      items: [
+        MenuItem(
+          label: l10n.desktopTrayMenuShowWindow,
+          onClick: (_) async => _showWindow(),
+        ),
+        MenuItem.separator(),
+        MenuItem(
+          label: l10n.desktopTrayMenuExit,
+          onClick: (_) async => _exitApp(),
+        ),
+      ],
+    );
+    await trayManager.setContextMenu(menu);
   }
 
   Future<void> _showWindow() async {
@@ -134,18 +151,9 @@ class DesktopTrayController with TrayListener, WindowListener {
   Future<void> _exitApp() async {
     if (!_isDesktop) return;
     try {
-      // Drain pending writes before exiting. On macOS/Linux destroy()
-      // routes through the engine's exit-request channel (which flushes
-      // again — flush handlers are idempotent), but on Windows the
-      // destroy() fallback posts WM_QUIT directly and bypasses WM_CLOSE,
-      // so without this the fallback exit would skip the flush entirely.
-      // The timeout keeps a stuck write queue from hanging tray exit.
-      try {
-        await AppExitFlush.flushAll().timeout(
-          const Duration(seconds: 2),
-          onTimeout: () {},
-        );
-      } catch (_) {}
+      // Windows destroy() can bypass the engine exit request. Other platforms
+      // may request exit again; both paths await the same bounded shutdown.
+      await AppExitFlush.shutdown();
       // On Windows we may have `preventClose` enabled to support
       // "close to tray". Temporarily disable it and send a normal
       // close so the window can exit immediately without being
@@ -212,7 +220,8 @@ class DesktopTrayController with TrayListener, WindowListener {
   void onWindowClose() async {
     if (!_isDesktop) return;
     // Only intercept close when user enabled minimize-to-tray.
-    final shouldIntercept = _showTraySetting && _minimizeToTrayOnClose;
+    final shouldIntercept =
+        _trayVisible && _showTraySetting && _minimizeToTrayOnClose;
     if (!shouldIntercept) return;
     try {
       final isPreventClose = await windowManager.isPreventClose();

@@ -23,6 +23,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../widgets/scheduled_task_tile.dart';
 import '../../settings/pages/mobile_background_settings_page.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 String _repeatLabel(ScheduledTask task, AppLocalizations l) {
   if (task.onceDate != null) return scheduledRepeatLabel(task.repeat, l);
@@ -607,7 +608,7 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: cs.onSurface,
               ),
             ),

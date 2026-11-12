@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "39f1c336545c2aecca0093dcbcaa54ca446e557d",
+  "task": "s6-4",
+  "response": "初始值 **a=4、b=1、useOffset=true** 时，在 x=5 处得到的 **y=21 u**。下方图表共用 x=0 到 5 的 6 个采样点；调整参数后，结果会同步更新。**合成数学示例数据（非真实测量）**；Ask 只生成可编辑草稿，不会自动发送。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form,result,chart,table,ask,reset])\n$a: number = 4\n$b: number = 1\n$useOffset: boolean = true\nlet yAt5 = $a * 5 + ($useOffset ? $b : 0)\nlet points = @sample(x => $a * x + ($useOffset ? $b : 0), 0, 5, 6)\nform = Form(children=[aInput,bInput,toggle], title=\"合成数学示例参数\")\naInput = Slider(label=\"参数 a\", bind=$a, min=0, max=10, step=1)\nbInput = NumberField(label=\"参数 b（偏移）\", bind=$b, visible=$useOffset, required=true, step=1)\ntoggle = Switch(label=\"启用偏移 b\", bind=$useOffset)\nresult = Metric(label=\"x = 5 时的 y\", value=yAt5, unit=\"u\", digits=2)\nchart = Chart(kind=\"line\", data=points, x=\"x\", y=[\"y\"], title=\"合成数学示例：y = a·x + 偏移\", xLabel=\"x\", yLabel=\"y\", unit=\"u\")\ntable = DataTable(data=points, rowKey=\"x\", columns=[{\"key\":\"x\",\"label\":\"x\"},{\"key\":\"y\",\"label\":\"y (u)\"}])\nask = Button(label=\"准备参数解释草稿\", form=form, action=Ask(text=\"请解释这些参数以及 y = a·x + (useOffset ? b : 0) 的合成数学示例。\", context={\"a\":$a,\"b\":$b,\"useOffset\":$useOffset,\"yAt5\":yAt5}))\nreset = Button(label=\"重置\", action=Reset())\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: The initial yAt5=21 u, six samples and shared chart/table data are correct. Required controls, conditional b, exact Ask context, Reset and synthetic labeling are present without a send claim."
+  }
+}

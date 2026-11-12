@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import '../models/mcp_presentation.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
 import 'business_settings_router.dart';
@@ -121,7 +122,18 @@ final class BusinessSettingsMerger {
         if (key == _pinnedModelsKey) throw FormatException(key);
         continue;
       }
-      if (key == _pinnedModelsKey) {
+      if (key == 'mcp_presentation_v1') {
+        preferences[key] = _mergeMcpPresentation(
+          preferences[key] as String?,
+          imported as String,
+          existingServerIds: existing.entities[BusinessEntityKind.mcpServer]!
+              .map((row) => row.id)
+              .toSet(),
+          mergedServerIds: entities[BusinessEntityKind.mcpServer]!
+              .map((row) => row.id)
+              .toSet(),
+        );
+      } else if (key == _pinnedModelsKey) {
         preferences[key] = _mergeStringLists(
           existing.preferences.containsKey(key)
               ? preferences[key]
@@ -147,6 +159,47 @@ final class BusinessSettingsMerger {
     }
 
     return BusinessSnapshot(entities: entities, preferences: preferences);
+  }
+
+  static String _mergeMcpPresentation(
+    String? localJson,
+    String importedJson, {
+    required Set<String> existingServerIds,
+    required Set<String> mergedServerIds,
+  }) {
+    McpPresentation decode(String raw) => McpPresentation.fromJson(
+      (jsonDecode(raw) as Map).cast<String, dynamic>(),
+    );
+    final local = localJson == null ? McpPresentation() : decode(localJson);
+    final imported = decode(importedJson);
+    final localGroupIds = local.groups.map((group) => group.id).toSet();
+    return jsonEncode(
+      McpPresentation(
+        groups: [
+          ...local.groups,
+          ...imported.groups.where(
+            (group) => !localGroupIds.contains(group.id),
+          ),
+        ],
+        servers: {
+          for (final entry in imported.servers.entries)
+            if (mergedServerIds.contains(entry.key)) entry.key: entry.value,
+          // A removed server's historical metadata must not override a newly
+          // imported server reusing that ID. Explicit local resets still win.
+          for (final entry in local.servers.entries)
+            if (existingServerIds.contains(entry.key) &&
+                mergedServerIds.contains(entry.key))
+              entry.key: entry.value,
+        },
+        collapsed: {
+          ...local.collapsed,
+          for (final id in imported.collapsed)
+            if (!localGroupIds.contains(id) &&
+                (id != '__ungrouped__' || localJson == null))
+              id,
+        },
+      ).toJson(),
+    );
   }
 
   static List<BusinessEntityValue> _mergeAssistants(

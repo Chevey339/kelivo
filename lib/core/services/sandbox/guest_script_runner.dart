@@ -6,6 +6,8 @@ Future<int> runGuestScript(
   String script, {
   String? runId,
   Duration timeout = const Duration(seconds: 60),
+  Map<String, String> environment = const {},
+  bool Function()? isCancelled,
 }) async {
   CommandExited? exit;
   await for (final event in runtime.run(
@@ -14,6 +16,8 @@ Future<int> runGuestScript(
       command: script,
       cwd: '/',
       timeout: timeout,
+      env: environment,
+      isCancelled: isCancelled,
     ),
   )) {
     if (event is CommandExited) {

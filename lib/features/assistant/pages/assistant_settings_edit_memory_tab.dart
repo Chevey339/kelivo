@@ -221,6 +221,8 @@ class _MemoryTabState extends State<_MemoryTab> {
                     ? Column(
                         children: [
                           _iosDivider(context),
+                          _MemoryFullInjectionTypesSection(assistant: a),
+                          _iosDivider(context),
                           _iosSwitchRow(
                             context,
                             icon: Lucide.Sparkles,
@@ -1016,6 +1018,52 @@ Widget _memoryDesktopSelectRow<T>({
       ],
     ),
   );
+}
+
+class _MemoryFullInjectionTypesSection extends StatelessWidget {
+  const _MemoryFullInjectionTypesSection({required this.assistant});
+
+  final Assistant assistant;
+
+  Future<void> _openPicker(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final provider = context.read<AssistantProvider>();
+    final selected = await showMemoryMultiOptionPicker<MemoryType>(
+      context,
+      title: l10n.assistantEditMemoryFullInjectionTypesTitle,
+      description: l10n.assistantEditMemoryFullInjectionTypesSubtitle,
+      selected: assistant.memoryFullInjectionTypes,
+      options: [
+        for (final type in MemoryType.values)
+          MemoryPickerOption(value: type, label: memoryTypeLabel(l10n, type)),
+      ],
+    );
+    if (selected == null || !context.mounted) return;
+    final current = provider.getById(assistant.id);
+    if (current == null) return;
+    await provider.updateAssistant(
+      current.copyWith(memoryFullInjectionTypes: selected),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = assistant.memoryFullInjectionTypes;
+    final detail = selected.isEmpty
+        ? l10n.assistantEditMemoryFullInjectionTypesNone
+        : selected.length == 1
+        ? memoryTypeLabel(l10n, selected.single)
+        : l10n.assistantEditMemoryFullInjectionTypesSelected(selected.length);
+    return _iosNavRow(
+      context,
+      icon: Lucide.ListChecks,
+      label: l10n.assistantEditMemoryFullInjectionTypesTitle,
+      tip: l10n.assistantEditMemoryFullInjectionTypesSubtitle,
+      detailText: detail,
+      onTap: () => _openPicker(context),
+    );
+  }
 }
 
 class _MemoryOrganizeFrequencySection extends StatelessWidget {

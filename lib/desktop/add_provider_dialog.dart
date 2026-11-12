@@ -1,3 +1,5 @@
+import '../features/provider/utils/provider_url_editor.dart';
+import '../features/provider/widgets/provider_base_url_field.dart';
 import '../features/provider/widgets/oauth_login_panel.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -54,6 +56,58 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     if (mounted) setState(() {});
   }
 
+  String? _createdProviderKey;
+  ProviderKind? _createdProviderKind;
+  late final Map<ProviderKind, ProviderUrlEditor> _urlEditors = {
+    ProviderKind.openai: ProviderUrlEditor(_openaiBase),
+    ProviderKind.google: ProviderUrlEditor(_googleBase),
+    ProviderKind.claude: ProviderUrlEditor(_claudeBase),
+  };
+  final _urlFields = {
+    for (final kind in ProviderKind.values)
+      kind: GlobalKey<ProviderBaseUrlFieldState>(),
+  };
+
+  Widget _baseUrlField(ProviderKind kind) {
+    final settings = context.read<SettingsProvider>();
+    final defaults = ProviderConfig.defaultsFor(switch (kind) {
+      ProviderKind.openai => 'OpenAI',
+      ProviderKind.google => 'Gemini',
+      ProviderKind.claude => 'Claude',
+    });
+    return ProviderBaseUrlField(
+      key: _urlFields[kind],
+      editor: _urlEditors[kind]!,
+      desktop: true,
+      enabled: !(kind == ProviderKind.google && _googleVertex),
+      defaultBaseUrl: defaults.baseUrl,
+      config: defaults.copyWith(
+        providerType: kind,
+        chatPath: _openaiPath.text,
+        useResponseApi: _openaiUseResponse,
+        vertexAI: _googleVertex,
+        location: _googleLocation.text,
+        projectId: _googleProject.text,
+      ),
+      onDetachedUndo: (bare, replaced) {
+        if (mounted) {
+          if (_urlEditors[kind]!.controller.text != replaced) return;
+          _urlEditors[kind]!.undoAutoVersion(kind);
+          setState(() {});
+        } else if (_createdProviderKey != null &&
+            _createdProviderKind == kind) {
+          undoSavedProviderUrl(settings, _createdProviderKey!, bare, replaced);
+        }
+      },
+      onCommit: (result) {
+        if (kind == ProviderKind.openai && result.movedPath != null) {
+          _openaiPath.text = result.movedPath!;
+        }
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
   // OpenAI
   bool _openaiEnabled = true;
   final TextEditingController _openaiName = TextEditingController(
@@ -98,6 +152,9 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
   void dispose() {
     _tab.removeListener(_onTabChanged);
     _tab.dispose();
+    for (final editor in _urlEditors.values) {
+      editor.dispose();
+    }
     _openaiName.dispose();
     _openaiKey.dispose();
     _openaiBase.dispose();
@@ -119,6 +176,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     return InputDecoration(
       isDense: true,
       hintText: hint,
+      hintStyle: TextStyle(color: cs.onSurface.withValues(alpha: 0.32)),
       filled: true,
       fillColor: context.appColors.surfaceFill,
       border: OutlineInputBorder(
@@ -225,14 +283,22 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     }
 
     final idx = _tab.index;
+    if (idx > 2) return;
+    final kind = [
+      ProviderKind.openai,
+      ProviderKind.google,
+      ProviderKind.claude,
+    ][idx];
+    if (!(kind == ProviderKind.google && _googleVertex) &&
+        _urlFields[kind]!.currentState?.commit() == false) {
+      return;
+    }
     String createdKey = '';
     if (idx == 0) {
       final rawName = _openaiName.text.trim();
       final display = rawName.isEmpty ? 'OpenAI' : rawName;
       final keyName = uniqueKey('OpenAI', display);
-      final base = _openaiBase.text.trim().isNotEmpty
-          ? _openaiBase.text.trim()
-          : 'https://api.openai.com/v1';
+      final base = _openaiBase.text;
       final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
@@ -240,6 +306,8 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
         name: display,
         apiKey: _openaiKey.text.trim(),
         baseUrl: base,
+        autoVersionDisabled:
+            _urlEditors[ProviderKind.openai]!.autoVersionDisabled,
         providerType: ProviderKind.openai,
         chatPath: _openaiUseResponse
             ? null
@@ -258,15 +326,15 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
+      _createdProviderKey = keyName;
+      _createdProviderKind = kind;
     } else if (idx == 1) {
       final rawName = _googleName.text.trim();
       final display = rawName.isEmpty ? 'Google' : rawName;
       final keyName = uniqueKey('Google', display);
       final base = _googleVertex
           ? 'https://aiplatform.googleapis.com'
-          : (_googleBase.text.trim().isNotEmpty
-                ? _googleBase.text.trim()
-                : 'https://generativelanguage.googleapis.com/v1beta');
+          : _googleBase.text;
       final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
@@ -274,6 +342,8 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
         name: display,
         apiKey: _googleVertex ? '' : _googleKey.text.trim(),
         baseUrl: base,
+        autoVersionDisabled:
+            _urlEditors[ProviderKind.google]!.autoVersionDisabled,
         providerType: ProviderKind.google,
         vertexAI: _googleVertex,
         location: _googleVertex
@@ -294,13 +364,13 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
+      _createdProviderKey = keyName;
+      _createdProviderKind = kind;
     } else {
       final rawName = _claudeName.text.trim();
       final display = rawName.isEmpty ? 'Claude' : rawName;
       final keyName = uniqueKey('Claude', display);
-      final base = _claudeBase.text.trim().isNotEmpty
-          ? _claudeBase.text.trim()
-          : 'https://api.anthropic.com/v1';
+      final base = _claudeBase.text;
       final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
@@ -308,6 +378,8 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
         name: display,
         apiKey: _claudeKey.text.trim(),
         baseUrl: base,
+        autoVersionDisabled:
+            _urlEditors[ProviderKind.claude]!.autoVersionDisabled,
         providerType: ProviderKind.claude,
         models: const [],
         modelOverrides: const {},
@@ -320,6 +392,8 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
+      _createdProviderKey = keyName;
+      _createdProviderKind = kind;
     }
 
     final order = List<String>.of(settings.providersOrder);
@@ -472,20 +546,19 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
           decoration: _deskInputDecoration(context),
         ),
         const SizedBox(height: 10),
-        _label(context, 'Base URL'),
-        TextField(
-          controller: _openaiBase,
-          decoration: _deskInputDecoration(
-            context,
-            hint: 'https://api.openai.com/v1',
-          ),
-        ),
+        _baseUrlField(ProviderKind.openai),
         const SizedBox(height: 10),
-        _label(context, l10n.addProviderSheetApiPathLabel),
-        TextField(
-          controller: _openaiPath,
-          decoration: _deskInputDecoration(context, hint: '/chat/completions'),
-        ),
+        if (!_openaiUseResponse) ...[
+          _label(context, l10n.addProviderSheetApiPathLabel),
+          TextField(
+            controller: _openaiPath,
+            onChanged: (_) => setState(() {}),
+            decoration: _deskInputDecoration(
+              context,
+              hint: '/chat/completions',
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -514,15 +587,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
           decoration: _deskInputDecoration(context),
         ),
         const SizedBox(height: 10),
-        _label(context, 'Base URL'),
-        TextField(
-          controller: _googleBase,
-          enabled: !_googleVertex,
-          decoration: _deskInputDecoration(
-            context,
-            hint: 'https://generativelanguage.googleapis.com/v1beta',
-          ),
-        ),
+        _baseUrlField(ProviderKind.google),
         const SizedBox(height: 10),
         _label(context, 'API Key'),
         TextField(
@@ -591,14 +656,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
           decoration: _deskInputDecoration(context),
         ),
         const SizedBox(height: 10),
-        _label(context, 'Base URL'),
-        TextField(
-          controller: _claudeBase,
-          decoration: _deskInputDecoration(
-            context,
-            hint: 'https://api.anthropic.com/v1',
-          ),
-        ),
+        _baseUrlField(ProviderKind.claude),
       ],
     );
   }

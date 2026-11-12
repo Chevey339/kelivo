@@ -1,5 +1,5 @@
 import '../widgets/settings_search_target.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'mobile_background_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +15,7 @@ import 'message_style_settings_page.dart';
 import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/app_language.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/tip_icon.dart';
 import '../../../core/services/haptics.dart';
@@ -42,9 +43,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     String paletteName() {
       final settings = context.read<SettingsProvider>();
       final palette = ThemePalettes.byId(settings.themePaletteId);
-      return Localizations.localeOf(context).languageCode == 'zh'
-          ? palette.displayNameZh
-          : palette.displayNameEn;
+      return palette.displayName(l10n);
     }
 
     return Scaffold(
@@ -83,13 +82,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                 detailBuilder: (ctx) {
                   final settings = ctx.watch<SettingsProvider>();
                   String labelFor(Locale l) {
-                    if (l.languageCode == 'zh') {
-                      if ((l.scriptCode ?? '').toLowerCase() == 'hant') {
-                        return l10n.languageDisplayTraditionalChinese;
-                      }
-                      return l10n.displaySettingsPageLanguageChineseLabel;
-                    }
-                    return l10n.displaySettingsPageLanguageEnglishLabel;
+                    return AppLanguage.fromLocale(l).nativeName;
                   }
 
                   return Text(
@@ -275,28 +268,22 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               _iosNavRow(
                 context,
                 icon: Lucide.ArrowDown,
-                label: l10n.displaySettingsPageAutoScrollIdleTitle,
+                label: l10n.displaySettingsPageAutoScrollEnableTitle,
                 detailBuilder: (ctx) {
-                  final sp = ctx.watch<SettingsProvider>();
-                  if (!sp.autoScrollEnabled) {
-                    return Text(
-                      l10n.displaySettingsPageAutoScrollDisabledLabel,
-                      style: TextStyle(
-                        color: cs.onSurface.withValues(alpha: 0.5),
-                        fontSize: 13,
-                      ),
-                    );
-                  }
-                  final seconds = sp.autoScrollIdleSeconds;
+                  final enabled = ctx
+                      .watch<SettingsProvider>()
+                      .autoScrollEnabled;
                   return Text(
-                    '${seconds.round()}s',
+                    enabled
+                        ? l10n.displaySettingsPageAutoScrollEnabledLabel
+                        : l10n.displaySettingsPageAutoScrollDisabledLabel,
                     style: TextStyle(
                       color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   );
                 },
-                onTap: () => _showAutoScrollIdleSheet(context),
+                onTap: () => _showAutoScrollSheet(context),
               ),
               _iosDivider(context),
               _iosNavRow(
@@ -429,33 +416,25 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _sheetOption(
-                  ctx,
-                  label: l10n.settingsPageSystemMode,
-                  onTap: () => Navigator.of(ctx).pop('system'),
-                ),
-                _sheetDividerNoIcon(ctx),
-                _sheetOption(
-                  ctx,
-                  label: l10n.displaySettingsPageLanguageChineseLabel,
-                  onTap: () => Navigator.of(ctx).pop('zh_CN'),
-                ),
-                _sheetDividerNoIcon(ctx),
-                _sheetOption(
-                  ctx,
-                  label: l10n.languageDisplayTraditionalChinese,
-                  onTap: () => Navigator.of(ctx).pop('zh_Hant'),
-                ),
-                _sheetDividerNoIcon(ctx),
-                _sheetOption(
-                  ctx,
-                  label: l10n.displaySettingsPageLanguageEnglishLabel,
-                  onTap: () => Navigator.of(ctx).pop('en_US'),
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _sheetOption(
+                    ctx,
+                    label: l10n.settingsPageSystemMode,
+                    onTap: () => Navigator.of(ctx).pop('system'),
+                  ),
+                  for (final language in AppLanguage.values) ...[
+                    _sheetDividerNoIcon(ctx),
+                    _sheetOption(
+                      ctx,
+                      label: language.nativeName,
+                      onTap: () => Navigator.of(ctx).pop(language.tag),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         );
@@ -465,21 +444,11 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     if (!context.mounted) return;
 
     final settings = context.read<SettingsProvider>();
-    switch (selected) {
-      case 'system':
-        await settings.setAppLocaleFollowSystem();
-        break;
-      case 'zh_CN':
-        await settings.setAppLocale(const Locale('zh', 'CN'));
-        break;
-      case 'zh_Hant':
-        await settings.setAppLocale(
-          const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
-        );
-        break;
-      case 'en_US':
-      default:
-        await settings.setAppLocale(const Locale('en', 'US'));
+    if (selected == 'system') {
+      await settings.setAppLocaleFollowSystem();
+    } else {
+      final language = AppLanguage.fromTag(selected);
+      if (language != null) await settings.setAppLocale(language.locale);
     }
   }
 
@@ -619,158 +588,51 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     );
   }
 
-  Future<void> _showAutoScrollIdleSheet(BuildContext context) async {
+  Future<void> _showAutoScrollSheet(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    await showModalBottomSheet(
+    final choice = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      isScrollControlled: false,
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-            child: Builder(
-              builder: (context) {
-                final theme = Theme.of(context);
-                final cs = theme.colorScheme;
-                final isDark = theme.brightness == Brightness.dark;
-                final sp = context.watch<SettingsProvider>();
-                final seconds = sp.autoScrollIdleSeconds;
-                final enabled = sp.autoScrollEnabled;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          l10n.displaySettingsPageAutoScrollEnableTitle,
-                          style: TextStyle(fontSize: 15, color: cs.onSurface),
-                        ),
-                        const Spacer(),
-                        IosSwitch(
-                          value: enabled,
-                          onChanged: (v) => context
-                              .read<SettingsProvider>()
-                              .setAutoScrollEnabled(v),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Text(
-                          '2s',
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: SfSliderTheme(
-                            data: SfSliderThemeData(
-                              activeTrackHeight: 8,
-                              inactiveTrackHeight: 8,
-                              overlayRadius: 14,
-                              activeTrackColor: cs.primary,
-                              inactiveTrackColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.25 : 0.20,
-                              ),
-                              tooltipBackgroundColor: cs.primary,
-                              tooltipTextStyle: TextStyle(
-                                color: cs.onPrimary,
-                                fontWeight: AppFontWeights.semibold,
-                              ),
-                              activeTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.45 : 0.35,
-                              ),
-                              inactiveTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.30 : 0.25,
-                              ),
-                              activeMinorTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.34 : 0.28,
-                              ),
-                              inactiveMinorTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.24 : 0.20,
-                              ),
-                            ),
-                            child: SfSlider(
-                              value: seconds.toDouble(),
-                              min: 2.0,
-                              max: 64.0,
-                              stepSize: 2.0,
-                              showTicks: true,
-                              showLabels: true,
-                              interval: 10.0,
-                              minorTicksPerInterval: 1,
-                              enableTooltip: true,
-                              shouldAlwaysShowTooltip: false,
-                              tooltipShape: const SfPaddleTooltipShape(),
-                              labelFormatterCallback: (value, text) =>
-                                  value.toInt().toString(),
-                              thumbIcon: Container(
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: cs.primary,
-                                  shape: BoxShape.circle,
-                                  boxShadow: isDark
-                                      ? []
-                                      : [
-                                          BoxShadow(
-                                            color: cs.shadow.withValues(
-                                              alpha: 0.08,
-                                            ),
-                                            blurRadius: 8,
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ],
-                                ),
-                              ),
-                              onChanged: enabled
-                                  ? (v) => context
-                                        .read<SettingsProvider>()
-                                        .setAutoScrollIdleSeconds(
-                                          (v as double).round(),
-                                        )
-                                  : null,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          enabled
-                              ? '${seconds.round()}s'
-                              : l10n.displaySettingsPageAutoScrollDisabledLabel,
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(
-                              alpha: enabled ? 1.0 : 0.5,
-                            ),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      l10n.displaySettingsPageAutoScrollIdleSubtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 16, bottom: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  l10n.displaySettingsPageAutoScrollSubtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(
+                      ctx,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _sheetOption(
+                ctx,
+                label: l10n.displaySettingsPageAutoScrollEnabledLabel,
+                onTap: () => Navigator.of(ctx).pop(true),
+              ),
+              _sheetDividerNoIcon(ctx),
+              _sheetOption(
+                ctx,
+                label: l10n.displaySettingsPageAutoScrollDisabledLabel,
+                onTap: () => Navigator.of(ctx).pop(false),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
+    if (choice == null || !context.mounted) return;
+    await context.read<SettingsProvider>().setAutoScrollEnabled(choice);
   }
 
   Future<void> _showChatBackgroundMaskSheet(BuildContext context) async {
@@ -1651,6 +1513,28 @@ class RenderingSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.Code,
+                label: l10n.displaySettingsPageUseLegacyInlineCodeStyleTitle,
+                tip: l10n.displaySettingsPageUseLegacyInlineCodeStyleSubtitle,
+                value: sp.useLegacyInlineCodeStyle,
+                onChanged: (value) => context
+                    .read<SettingsProvider>()
+                    .setUseLegacyInlineCodeStyle(value),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Code,
+                label: l10n.displaySettingsPageUseLegacyCodeBlockStyleTitle,
+                tip: l10n.displaySettingsPageUseLegacyCodeBlockStyleSubtitle,
+                value: sp.useLegacyCodeBlockStyle,
+                onChanged: (value) => context
+                    .read<SettingsProvider>()
+                    .setUseLegacyCodeBlockStyle(value),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.TextSelect,
                 label: l10n.displaySettingsPageEnableUserMarkdownTitle,
                 value: sp.enableUserMarkdown,
@@ -1676,6 +1560,16 @@ class RenderingSettingsPage extends StatelessWidget {
                 onChanged: (v) => context
                     .read<SettingsProvider>()
                     .setEnableAssistantMarkdown(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.AppWindow,
+                label: l10n.displaySettingsShowGenUiHeader,
+                tip: l10n.displaySettingsShowGenUiHeaderSubtitle,
+                value: sp.showGenUiHeader,
+                onChanged: (value) =>
+                    context.read<SettingsProvider>().setShowGenUiHeader(value),
               ),
               _iosDivider(context),
               _iosSwitchRow(
@@ -1884,6 +1778,20 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
         children: [
           SectionCard(
             children: [
+              if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.TextSelect,
+                  label: l10n.displaySettingsPageIosNativeSelectionMenuTitle,
+                  subtitle:
+                      l10n.displaySettingsPageIosNativeSelectionMenuSubtitle,
+                  value: sp.iosNativeSelectionMenuEnabled,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setIosNativeSelectionMenuEnabled(v),
+                ),
+                _iosDivider(context),
+              ],
               _iosSwitchRow(
                 context,
                 icon: Lucide.Brain,
@@ -1920,6 +1828,15 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 value: sp.hideToolResultImages,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setHideToolResultImages(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.AppWindow,
+                label: l10n.displaySettingsPageShowBrowserPageCardsTitle,
+                value: sp.showBrowserPageCards,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowBrowserPageCards(v),
               ),
               _iosDivider(context),
               _iosSwitchRow(

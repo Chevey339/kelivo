@@ -1,5 +1,4 @@
-/// Normalizes OpenRouter-style `reasoning_details` before they are replayed to
-/// an Anthropic-backed upstream.
+/// Reassembles OpenRouter-style `reasoning_details` into complete blocks.
 ///
 /// Streamed details arrive as one entry per delta: a long run of
 /// `reasoning.text` fragments, with the signature usually arriving last in an
@@ -9,11 +8,9 @@
 /// Claude (Bedrock in particular) rejects with
 /// "reasoningContent.reasoningText.text ... must not be null".
 ///
-/// Merging the fragments back into whole blocks reproduces the non-streamed
-/// shape: one entry per reasoning block, text joined, signature attached.
-/// Other vendors (OpenRouter's own routes included) want the block sequence
-/// replayed verbatim, so this only runs on Claude upstreams or on details the
-/// provider tagged with an Anthropic format.
+/// Text and summary deltas belong to their logical block, not to separate
+/// history entries. Preserve their text exactly, without adding separators.
+/// Signatures close text blocks; encrypted and unknown blocks stay opaque.
 library;
 
 /// True when [raw] carries at least one Anthropic-formatted entry.
@@ -30,8 +27,8 @@ bool reasoningDetailsLookAnthropic(dynamic raw) {
 }
 
 /// True when details are Anthropic-tagged or carry a thinking signature.
-/// Those payloads must be rebuilt into whole signed blocks; the parallel
-/// `reasoning_content` text echo is rejected by the same upstreams.
+/// These upstreams reject a plain text echo even when no replayable signed
+/// block remains (for example, an orphaned signature-only entry).
 bool reasoningDetailsNeedSignedReplay(dynamic raw) {
   if (reasoningDetailsLookAnthropic(raw)) return true;
   if (raw is! List) return false;
@@ -43,8 +40,10 @@ bool reasoningDetailsNeedSignedReplay(dynamic raw) {
   return false;
 }
 
-/// Returns the merged details list, or null when nothing replayable remains.
-List<Map<String, dynamic>>? normalizeReasoningDetailsForReplay(dynamic raw) {
+/// Joins stream fragments while retaining metadata, including orphan signatures.
+/// Persistence must keep those signatures so request shaping can still detect
+/// signed upstreams when the configured model name is an alias.
+List<Map<String, dynamic>>? mergeReasoningDetails(dynamic raw) {
   if (raw is! List || raw.isEmpty) return null;
 
   final merged = <_Block>[];
@@ -72,13 +71,25 @@ List<Map<String, dynamic>>? normalizeReasoningDetailsForReplay(dynamic raw) {
       out.add(block.entry);
       continue;
     }
-    // A block whose text never materialized (signature-only leftovers) has
-    // nothing valid to rebuild from; sending it null-texts the whole request.
-    if (block.text.isEmpty) continue;
-    block.entry[textKey] = block.text;
+    final text = block.text;
+    if (text.isNotEmpty) block.entry[textKey] = text;
     out.add(block.entry);
   }
 
+  return out.isEmpty ? null : out;
+}
+
+/// Returns complete replayable blocks. A signature-only leftover has no text
+/// to rebuild; sending it would fail the upstream thinking-block validation.
+List<Map<String, dynamic>>? normalizeReasoningDetailsForReplay(dynamic raw) {
+  final blocks = mergeReasoningDetails(raw);
+  if (blocks == null) return null;
+  final out = blocks.where((entry) {
+    final textKey = _textKeyFor(entry);
+    if (textKey == null) return true;
+    final text = entry[textKey];
+    return text is String && text.isNotEmpty;
+  }).toList();
   return out.isEmpty ? null : out;
 }
 
@@ -87,7 +98,7 @@ class _Block {
     : type = (entry['type'] ?? 'reasoning.text').toString(),
       textKey = _textKeyFor(entry) {
     final value = textKey == null ? null : entry[textKey];
-    text = value is String ? value : '';
+    if (value is String) _text.write(value);
   }
 
   final Map<String, dynamic> entry;
@@ -95,7 +106,8 @@ class _Block {
 
   /// Which field carries this entry's prose, or null for opaque payloads.
   final String? textKey;
-  late String text;
+  final StringBuffer _text = StringBuffer();
+  String get text => _text.toString();
 
   String? get signature => _asNonEmptyString(entry['signature']);
 
@@ -108,16 +120,15 @@ class _Block {
 
     final current = signature;
     if (current == null) return true;
-    // A signature closes its block: an identical one is just the same
-    // signature repeated on every fragment, a different one starts a new
-    // block, and unsigned prose after it belongs to the next block.
+    // New prose after a signature belongs to another block, even if the
+    // signature is repeated. Only redundant signature-only metadata can fold
+    // into a closed block; changing its text would invalidate the signature.
     final incoming = next.signature;
-    if (incoming != null) return incoming == current;
-    return next.text.isEmpty;
+    return next._text.isEmpty && (incoming == null || incoming == current);
   }
 
   void absorb(_Block next) {
-    text += next.text;
+    _text.write(next._text);
     final incoming = next.signature;
     if (incoming != null) entry['signature'] = incoming;
     for (final field in next.entry.entries) {

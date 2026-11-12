@@ -21,6 +21,7 @@ import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
+import '../../../core/services/backup/backup_task_progress.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../backup_task_runner.dart';
 import 'local_snapshots_page.dart';
@@ -35,6 +36,8 @@ import '../forward_compat_consent_dialog.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
 import '../widgets/backup_scope_tile.dart';
+import '../widgets/backup_encryption_tile.dart';
+import '../widgets/storage_migration_notice_button.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import '../../../core/database/startup_failure_report.dart' show formatBytes;
@@ -73,11 +76,7 @@ class _BackupPageState extends State<BackupPage> {
   Future<bool?> _confirmCherryImport(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final locale = Localizations.localeOf(context);
-    final isZh = locale.languageCode.startsWith('zh');
-    final String body = isZh
-        ? '此功能目前仍处于实验阶段。\n目前仅能导入助手，对话内容，供应商和文件，\n一些供应商需要在baseurl后面添加/v1 or /v1beta。 \n为确保数据安全，建议在导入前先执行备份。\n是否已知晓并继续选择文件？'
-        : 'This feature is experimental.\nTo keep your data safe, it is recommended to back up before importing.\nProceed to choose a file?';
+    final body = l10n.backupPageCherryImportWarning;
 
     return showModalBottomSheet<bool>(
       context: context,
@@ -297,7 +296,14 @@ class _BackupPageState extends State<BackupPage> {
                 ),
               ),
               title: Text(l10n.backupPageTitle),
-              actions: const [SizedBox(width: 12)],
+              actions: [
+                StorageMigrationNoticeButton(
+                  dataDirectory: context
+                      .read<LocalSnapshotProvider>()
+                      .appDataDirectory,
+                ),
+                const SizedBox(width: 12),
+              ],
             ),
             body: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -305,19 +311,30 @@ class _BackupPageState extends State<BackupPage> {
                 // Section 1: 备份管理
                 header(l10n.backupPageBackupManagement, first: true),
                 SectionCard(
-                  child: BackupScopeTile(
-                    scope: cfg.scope,
-                    onChanged: vm.busy || s3Vm.busy
-                        ? null
-                        : (scope) async {
-                            final newCfg = vm.config.copyWith(scope: scope);
-                            final newS3Cfg = s3Vm.config.copyWith(scope: scope);
-                            vm.updateConfig(newCfg);
-                            s3Vm.updateConfig(newS3Cfg);
-                            await settings.setWebDavConfig(newCfg);
-                            await settings.setS3Config(newS3Cfg);
-                          },
-                  ),
+                  children: [
+                    BackupScopeTile(
+                      scope: cfg.scope,
+                      onChanged: vm.busy || s3Vm.busy
+                          ? null
+                          : (scope) async {
+                              final newCfg = vm.config.copyWith(scope: scope);
+                              final newS3Cfg = s3Vm.config.copyWith(
+                                scope: scope,
+                              );
+                              vm.updateConfig(newCfg);
+                              s3Vm.updateConfig(newS3Cfg);
+                              await settings.setWebDavConfig(newCfg);
+                              await settings.setS3Config(newS3Cfg);
+                            },
+                    ),
+                    _iosDivider(context),
+                    BackupEncryptionTile(
+                      enabled: settings.backupEncryptionEnabled,
+                      onChanged: vm.busy || s3Vm.busy
+                          ? null
+                          : settings.setBackupEncryptionPassword,
+                    ),
+                  ],
                 ),
 
                 ..._buildMobileLocalBackupSection(context, l10n, vm, header),
@@ -628,6 +645,10 @@ class _BackupPageState extends State<BackupPage> {
                                                   onProgress: handle.report,
                                                   cancelToken:
                                                       handle.cancelToken,
+                                                  onPassword:
+                                                      backupPasswordPrompt(
+                                                        context,
+                                                      ),
                                                   onForwardCompatibility:
                                                       forwardCompatibilityPrompt(
                                                         context,
@@ -702,6 +723,9 @@ class _BackupPageState extends State<BackupPage> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onPassword: backupPasswordPrompt(
+                                            context,
+                                          ),
                                           onForwardCompatibility:
                                               forwardCompatibilityPrompt(
                                                 context,
@@ -756,6 +780,9 @@ class _BackupPageState extends State<BackupPage> {
                                 title: l10n.backupPageBackupNow,
                                 task: (handle) async {
                                   final ok = await vm.backup(
+                                    password: await backupPasswordForExport(
+                                      context,
+                                    ),
                                     onProgress: handle.report,
                                     cancelToken: handle.cancelToken,
                                   );
@@ -1066,6 +1093,10 @@ class _BackupPageState extends State<BackupPage> {
                                                   onProgress: handle.report,
                                                   cancelToken:
                                                       handle.cancelToken,
+                                                  onPassword:
+                                                      backupPasswordPrompt(
+                                                        context,
+                                                      ),
                                                   onForwardCompatibility:
                                                       forwardCompatibilityPrompt(
                                                         context,
@@ -1139,6 +1170,9 @@ class _BackupPageState extends State<BackupPage> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onPassword: backupPasswordPrompt(
+                                            context,
+                                          ),
                                           onForwardCompatibility:
                                               forwardCompatibilityPrompt(
                                                 context,
@@ -1193,6 +1227,9 @@ class _BackupPageState extends State<BackupPage> {
                                 title: l10n.backupPageBackupNow,
                                 task: (handle) async {
                                   final ok = await s3Vm.backup(
+                                    password: await backupPasswordForExport(
+                                      context,
+                                    ),
                                     onProgress: handle.report,
                                     cancelToken: handle.cancelToken,
                                   );
@@ -1239,6 +1276,7 @@ class _BackupPageState extends State<BackupPage> {
             context,
             icon: Lucide.Export,
             label: l10n.backupPageExportToFile,
+            subtitle: l10n.backupPageExportToFileSubtitle,
             onTap: () => _doExport(context, vm),
           ),
           _iosDivider(context),
@@ -1264,6 +1302,20 @@ class _BackupPageState extends State<BackupPage> {
           ),
         ],
       ),
+      if (Platform.isIOS)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Text(
+            l10n.backupPageIosSystemBackupNote,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+        ),
     ];
   }
 
@@ -1381,6 +1433,7 @@ class _BackupPageState extends State<BackupPage> {
       ),
       task: (handle) async {
         file = await vm.exportToFile(
+          password: await backupPasswordForExport(context),
           onProgress: handle.report,
           cancelToken: handle.cancelToken,
         );
@@ -1394,10 +1447,32 @@ class _BackupPageState extends State<BackupPage> {
       final isMobile = Platform.isAndroid || Platform.isIOS;
       if (isMobile) {
         try {
-          final saved = await NativeFileSave.saveFileFromPath(
+          Future<bool> save() => NativeFileSave.saveFileFromPath(
             sourcePath: exported.path,
             fileName: exported.uri.pathSegments.last,
+            requireOutsideAppContainer: Platform.isIOS,
+            dialogTitle: l10n.backupPageChooseBackupFolder,
           );
+          var saved = false;
+          if (Platform.isIOS) {
+            await runBackupTask(
+              context,
+              title: l10n.backupPageExportToFile,
+              task: (handle) async {
+                handle.report(
+                  const BackupProgress(
+                    phase: BackupPhase.finalizing,
+                    processed: 0,
+                    cancellable: false,
+                  ),
+                );
+                saved = await save();
+                if (!saved) throw const BackupCancelledException();
+              },
+            );
+          } else {
+            saved = await save();
+          }
           if (saved && context.mounted) {
             await context
                 .read<BackupReminderProvider>()
@@ -1407,7 +1482,7 @@ class _BackupPageState extends State<BackupPage> {
           if (!context.mounted) return;
           showAppSnackBar(
             context,
-            message: e.toString(),
+            message: backupRestoreErrorMessage(l10n, e),
             type: NotificationType.error,
           );
         }
@@ -1416,7 +1491,9 @@ class _BackupPageState extends State<BackupPage> {
           dialogTitle: l10n.backupPageExportToFile,
           fileName: exported.uri.pathSegments.last,
           type: FileType.custom,
-          allowedExtensions: ['zip'],
+          allowedExtensions: [
+            exported.path.endsWith('.kbackup') ? 'kbackup' : 'zip',
+          ],
         );
         if (savePath != null) {
           try {
@@ -1447,8 +1524,9 @@ class _BackupPageState extends State<BackupPage> {
   Future<void> _doImportLocal(BuildContext context, BackupProvider vm) async {
     final l10n = AppLocalizations.of(context)!;
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
+      // Mobile MIME registries do not recognize .kbackup. Content inspection
+      // below validates both ordinary ZIPs and encrypted backups.
+      type: FileType.any,
     );
     final path = result?.files.single.path;
     if (path == null) return;
@@ -1475,6 +1553,8 @@ class _BackupPageState extends State<BackupPage> {
           mode: mode,
           onProgress: handle.report,
           cancelToken: handle.cancelToken,
+          onPassword: backupPasswordPrompt(context),
+          onForwardCompatibility: forwardCompatibilityPrompt(context),
           allowUnverifiedForwardCompatible:
               decision == ForwardCompatDecision.proceedUnverified,
         ),
@@ -2036,6 +2116,7 @@ Widget _iosNavRow(
   required String label,
   VoidCallback? onTap,
   String? detailText,
+  String? subtitle,
 }) {
   final cs = Theme.of(context).colorScheme;
   final interactive = onTap != null;
@@ -2055,11 +2136,27 @@ Widget _iosNavRow(
                 SizedBox(width: 36, child: Icon(icon, size: 20, color: c)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(fontSize: 15, color: c),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(fontSize: 15, color: c),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 if (detailText != null)

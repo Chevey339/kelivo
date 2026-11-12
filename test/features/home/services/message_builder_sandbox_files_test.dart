@@ -146,7 +146,7 @@ void main() {
   );
 
   test(
-    'native PDF bypasses extraction and workspace routing even from API refs',
+    'native PDF keeps its workspace path and native document ref without extraction',
     () async {
       final s = await setUpService();
       final uri = '${tempDir.path}/report.pdf';
@@ -169,7 +169,7 @@ void main() {
           name: 'report.pdf',
           sourceUri: uri,
           size: 8,
-          modelPath: '/chat/attachments/report.pdf',
+          modelPath: '/chat/attachments/report (2).pdf',
         ),
       };
       expect(
@@ -191,7 +191,12 @@ void main() {
         nativePdfInput: true,
         workspaceAttachments: workspace,
       );
-      expect(apiMessages.single['content'], 'Read this PDF');
+      expect(apiMessages.single['content'], contains('Read this PDF'));
+      expect(
+        apiMessages.single['content'],
+        contains('/chat/attachments/report (2).pdf'),
+      );
+      expect(apiMessages.single['content'], contains('8 bytes'));
       expect(
         parseInternalDocumentRefs(
           apiMessages.single[multimodalInternalDocumentPathsKey],
@@ -273,6 +278,115 @@ void main() {
     );
     expect(refs.map((r) => r.name), contains('sales.csv'));
   });
+
+  for (final useSourceMessages in [false, true]) {
+    test(
+      'workspace paths follow only this message and deduplicate image/file refs '
+      '(source messages: $useSourceMessages)',
+      () async {
+        final s = await setUpService();
+        final imagePath = '${tempDir.path}/image.png';
+        final missingPath = '${tempDir.path}/unavailable.png';
+        final message = ChatMessage(
+          id: 'mixed',
+          role: 'user',
+          conversationId: 'c1',
+          parts: [
+            const TextPart('Compare these'),
+            ImagePart(uri: imagePath, mime: 'image/png'),
+            FilePart(uri: imagePath, name: 'image.png', mime: 'image/png'),
+            FilePart(uri: notes.path, name: 'notes.txt', mime: 'text/plain'),
+            ImagePart(uri: missingPath, mime: 'image/png', unavailable: true),
+          ],
+        );
+        final apiMessages = s.service.buildApiMessages(
+          messages: [message],
+          versionSelections: const {},
+          currentConversation: Conversation(title: 'test'),
+        );
+        await s.service.processUserMessagesForApi(
+          apiMessages,
+          s.settings,
+          const Assistant(id: 'a1', name: 'test'),
+          sourceMessages: useSourceMessages ? [message] : null,
+          workspaceAttachments: {
+            for (final path in [imagePath, notes.path, missingPath, csv.path])
+              path: AttachmentInfo(
+                name: path.split('/').last,
+                sourceUri: path,
+                size: 3,
+                modelPath: '/chat/attachments/${path.split('/').last}',
+              ),
+          },
+        );
+        final content = apiMessages.single['content'] as String;
+        expect('/chat/attachments/image.png'.allMatches(content), hasLength(1));
+        expect('/chat/attachments/notes.txt'.allMatches(content), hasLength(1));
+        expect(content, isNot(contains('unavailable.png')));
+        expect(content, isNot(contains('sales.csv')));
+        expect(content, isNot(contains('read me')));
+        expect(content, contains('Compare these'));
+        expect(
+          parseInternalMediaRefs(
+            apiMessages.single[multimodalInternalMediaPathsKey],
+          ).map((ref) => ref.uri),
+          [imagePath],
+        );
+      },
+    );
+  }
+
+  test(
+    'OCR keeps the workspace image path without resending image bytes',
+    () async {
+      final s = await setUpService();
+      await s.settings.setOcrModel('ocr-provider', 'ocr-model');
+      await s.settings.setOcrEnabled(true);
+      final imagePath = '${tempDir.path}/image.png';
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(),
+        contextProvider: _FakeBuildContext(),
+        ocrHandler: (paths, {revisionId, session, requestId}) async {
+          expect(paths, [imagePath]);
+          return 'Recognized image text';
+        },
+      );
+      final message = ChatMessage(
+        id: 'ocr',
+        role: 'user',
+        conversationId: 'c1',
+        parts: [ImagePart(uri: imagePath, mime: 'image/png')],
+      );
+      final apiMessages = service.buildApiMessages(
+        messages: [message],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      await service.processUserMessagesForApi(
+        apiMessages,
+        s.settings,
+        null,
+        sourceMessages: [message],
+        workspaceAttachments: {
+          imagePath: AttachmentInfo(
+            name: 'image.png',
+            sourceUri: imagePath,
+            size: 3,
+            modelPath: '/chat/attachments/image.png',
+          ),
+        },
+      );
+      expect(apiMessages.single['content'], contains('Recognized image text'));
+      expect(
+        apiMessages.single['content'],
+        contains('/chat/attachments/image.png'),
+      );
+      expect(
+        apiMessages.single.containsKey(multimodalInternalMediaPathsKey),
+        isFalse,
+      );
+    },
+  );
 
   test('a lone data file is no pending extraction work', () async {
     final s = await setUpService();
@@ -403,6 +517,65 @@ void main() {
       expect(await replay(sandboxDataFiles: true), contains('region,amount'));
     });
 
+    for (final frozenBeforeBinding in [false, true]) {
+      test('image paths survive replay without entering the frozen prompt '
+          '(already frozen: $frozenBeforeBinding)', () async {
+        final image = File('${tempDir.path}/image.png')
+          ..writeAsBytesSync([1, 2, 3]);
+        stored = await chatService.addMessage(
+          conversationId: convo.id,
+          role: 'user',
+          content: '',
+          parts: [ImagePart(uri: image.path, mime: 'image/png')],
+        );
+        final local = {
+          image.path: AttachmentInfo(
+            name: 'image.png',
+            sourceUri: image.path,
+            size: 3,
+            modelPath: '/chat/attachments/image.png',
+          ),
+        };
+        if (frozenBeforeBinding) {
+          expect(await replay(sandboxDataFiles: false), isEmpty);
+        }
+        final first = await replay(
+          sandboxDataFiles: false,
+          workspaceAttachments: local,
+        );
+        expect(first, contains('/chat/attachments/image.png'));
+        expect(first, contains('3 bytes'));
+        expect((await repo.getMessagePrompt(stored.id))!.payload, isEmpty);
+
+        // A new builder must reconstruct the same request from persisted
+        // prompts, without relying on in-memory attachment state.
+        service = MessageBuilderService(
+          chatService: chatService,
+          contextProvider: _FakeBuildContext(),
+          chatRepository: repo,
+        );
+        expect(
+          await replay(sandboxDataFiles: false, workspaceAttachments: local),
+          first,
+        );
+        expect(await replay(sandboxDataFiles: false), isEmpty);
+        final relocated = await replay(
+          sandboxDataFiles: false,
+          workspaceAttachments: {
+            image.path: AttachmentInfo(
+              name: 'image.png',
+              sourceUri: image.path,
+              size: 3,
+              modelPath: '/new-session/attachments/image.png',
+            ),
+          },
+        );
+        expect(relocated, contains('/new-session/attachments/image.png'));
+        expect(relocated, isNot(contains('/chat/attachments/image.png')));
+        expect((await repo.getMessagePrompt(stored.id))!.payload, isEmpty);
+      });
+    }
+
     test(
       'PDF switches between native bytes and extraction without stale frozen text',
       () async {
@@ -467,9 +640,14 @@ void main() {
           sandboxDataFiles: false,
           workspaceAttachments: local,
         );
-        // Previously frozen ordinary prompts remain immutable; the workspace
-        // system prompt supplies file paths when binding existing history.
+        // Previously frozen ordinary prompts remain immutable; workspace
+        // paths are appended to the owning message only for this request.
         expect(rebound, contains('region,amount'));
+        expect(rebound, contains('/chat/attachments/sales.csv'));
+        expect(
+          (await repo.getMessagePrompt(stored.id))!.payload,
+          isNot(contains('/chat/attachments/sales.csv')),
+        );
         expect(
           await replay(sandboxDataFiles: false),
           contains('region,amount'),

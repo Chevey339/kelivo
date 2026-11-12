@@ -57,6 +57,41 @@ void main() {
     }
   });
 
+  test('syntax font weights normalize before inheriting nested styles', () {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    const source = '<span>Value</span>';
+    for (final platform in [
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+      TargetPlatform.macOS,
+    ]) {
+      debugDefaultTargetPlatformOverride = platform;
+      final baseWeight = platform == TargetPlatform.android
+          ? FontWeight.w500
+          : FontWeight.w600;
+      final spans = highlightSpans(source, 'xml', const {
+        'tag': TextStyle(fontWeight: FontWeight.w700),
+        'name': TextStyle(fontStyle: FontStyle.italic),
+      }, TextStyle(fontWeight: baseWeight)).cast<TextSpan>();
+      expect(spans.map((span) => span.toPlainText()).join(), source);
+      final names = spans.where((span) => span.text == 'span');
+      expect(names, hasLength(2));
+      for (final name in names) {
+        expect(name.style!.fontStyle, FontStyle.italic);
+        expect(
+          name.style!.fontWeight,
+          platform == TargetPlatform.android
+              ? FontWeight.w500
+              : FontWeight.w700,
+        );
+      }
+      expect(
+        spans.singleWhere((span) => span.text == 'Value').style!.fontWeight,
+        baseWeight,
+      );
+    }
+  });
+
   testWidgets('code preview renders the line count', (tester) async {
     final file = File(p.join(tempDir.path, 'lines.txt'))
       ..writeAsStringSync('one\ntwo\nthree\n');
@@ -67,6 +102,41 @@ void main() {
     expect(find.byKey(CodeFilePreview.lineCountKey), findsOneWidget);
     expect(find.textContaining('4'), findsWidgets);
   });
+
+  testWidgets('system bold updates cached code without reloading its source', (
+    tester,
+  ) async {
+    final bold = ValueNotifier(false);
+    addTearDown(bold.dispose);
+    final file = File(p.join(tempDir.path, 'bold.md'))
+      ..writeAsStringSync('**probe**');
+    await tester.pumpWidget(
+      _app(
+        ValueListenableBuilder<bool>(
+          valueListenable: bold,
+          builder: (context, value, _) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(boldText: value),
+            child: CodeFilePreview(file: file, autoLoad: false),
+          ),
+        ),
+      ),
+    );
+    await _loadPreview(tester);
+    for (final enabled in [false, true, false]) {
+      bold.value = enabled;
+      await tester.pump();
+      final span = tester.widget<SelectableText>(_code).textSpan!;
+      final runs = span.children!.whereType<TextSpan>().where(
+        (child) => child.text?.contains('probe') ?? false,
+      );
+      expect(runs, hasLength(1));
+      expect(
+        runs.single.style!.fontWeight,
+        enabled ? FontWeight.bold : FontWeight.w500,
+      );
+      expect(span.toPlainText(), '**probe**');
+    }
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('code preview lazily displays files above the old size limit', (
     tester,

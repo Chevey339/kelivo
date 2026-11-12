@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'desktop_shell.dart';
+
 /// Classification of a resolved path relative to the workspace zones.
 enum WorkspaceZone { workspace, chat, skills, tmp, external, outside }
 
@@ -48,10 +50,15 @@ class CommandRequest {
     this.mounts = const <Mount>[],
     this.isCancelled,
     this.keepStdinOpen = false,
+    this.shell,
   });
 
   final String runId;
   final String command;
+
+  /// Native shell used when generating this command. Preserve its syntax
+  /// while awaiting approval even if the user changes the default shell.
+  final DesktopShell? shell;
 
   /// Keep a raw stdin pipe open for a persistent protocol process.
   final bool keepStdinOpen;
@@ -91,6 +98,7 @@ class CommandExited extends CommandEvent {
     required this.cancelled,
     required this.interrupted,
     required this.duration,
+    this.terminationConfirmed = false,
   });
 
   final int exitCode;
@@ -98,6 +106,10 @@ class CommandExited extends CommandEvent {
   final bool cancelled;
   final bool interrupted;
   final Duration duration;
+
+  /// Explicit runtime confirmation that the process exited or never started.
+  /// An output stream can also close after an unsuccessful attempt to kill it.
+  final bool terminationConfirmed;
 }
 
 class RuntimeStatus {
@@ -106,6 +118,7 @@ class RuntimeStatus {
     this.reason,
     required this.engine,
     required this.sandboxed,
+    this.shell,
   });
 
   final bool ready;
@@ -114,6 +127,7 @@ class RuntimeStatus {
   /// One of `proot`, `ish`, `process`, `fake`.
   final String engine;
   final bool sandboxed;
+  final DesktopShell? shell;
 }
 
 abstract class PtySession {
@@ -133,6 +147,7 @@ abstract class WorkspaceRuntime {
 
   bool get supportsPty => false;
   bool get supportsSystemTerminal => false;
+  bool get supportsFileManager => false;
 
   Future<PtySession> openPty({
     required List<Mount> mounts,
@@ -166,25 +181,33 @@ class WorkspaceRuntimeProvider extends ChangeNotifier {
   Future<void>? initialization;
   WorkspaceRuntime? runtime;
   RuntimeStatus? lastStatus;
+  int _refreshGeneration = 0;
 
   void register(WorkspaceRuntime runtime) {
     this.runtime = runtime;
+    _refreshGeneration++;
+    lastStatus = null;
     notifyListeners();
   }
 
   Future<RuntimeStatus> refresh() async {
+    final generation = ++_refreshGeneration;
     final current = runtime;
+    final RuntimeStatus status;
     if (current == null) {
-      lastStatus = const RuntimeStatus(
+      status = const RuntimeStatus(
         ready: false,
         reason: 'no runtime registered',
         engine: 'none',
         sandboxed: false,
       );
     } else {
-      lastStatus = await current.status();
+      status = await current.status();
     }
-    notifyListeners();
-    return lastStatus!;
+    if (generation == _refreshGeneration) {
+      lastStatus = status;
+      notifyListeners();
+    }
+    return status;
   }
 }

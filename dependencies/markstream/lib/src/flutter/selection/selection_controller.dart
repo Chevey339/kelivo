@@ -1,0 +1,471 @@
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+
+import '../../core/ast/nodes.dart';
+import '../../core/ast/source_span.dart';
+import '../../core/serialize/to_markdown.dart';
+import '../../core/text_index/text_index.dart';
+import 'selected_document.dart' as selection_slice;
+import 'stable_selection_container.dart';
+import 'text_range_rect.dart';
+import '../render/source_highlights.dart';
+
+class MarkstreamCopyLimitException implements Exception {
+  const MarkstreamCopyLimitException(this.bytes);
+  final int bytes;
+}
+
+/// A consumer may share one controller among multiple Markdown views inside
+/// the same SelectionArea. It owns no gesture handling or SelectionArea.
+class MarkstreamSelectionController extends ChangeNotifier {
+  final _documents = <DocumentSelectionBinding>{};
+  bool _scheduled = false, _disposed = false;
+  void attach(DocumentSelectionBinding binding) {
+    _documents.add(binding);
+    changed();
+  }
+
+  void detach(DocumentSelectionBinding binding) {
+    _documents.remove(binding);
+    changed();
+  }
+
+  void changed() {
+    if (_scheduled || _disposed) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      if (!_disposed) notifyListeners();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  List<DocumentSelectionBinding> get _orderedDocuments =>
+      _documents.toList()..sort((a, b) {
+        final first = a.globalPosition, second = b.globalPosition;
+        final vertical = first.dy.compareTo(second.dy);
+        return vertical != 0 ? vertical : first.dx.compareTo(second.dx);
+      });
+  bool get hasSelection => _documents.any(
+    (binding) =>
+        binding.fragments.any((fragment) => fragment.hasSelection) ||
+        binding.projections.any((projection) => projection.hasSelection),
+  );
+  int? get selectionByteLimit {
+    int? limit;
+    for (final binding in _documents) {
+      for (final projection in binding.projections) {
+        final value = projection.byteLimit();
+        if (projection.hasSelection && value != null) {
+          limit = limit == null ? value : math.min(limit, value);
+        }
+      }
+    }
+    return limit;
+  }
+
+  void verifyCopyBudget(Iterable<String> representations, {int? byteLimit}) {
+    final selectedLimit = selectionByteLimit;
+    final limit = byteLimit == null
+        ? selectedLimit
+        : selectedLimit == null
+        ? byteLimit
+        : math.min(byteLimit, selectedLimit);
+    if (limit == null) return;
+    for (final text in representations) {
+      if (text.length > limit || utf8.encode(text).length > limit) {
+        throw MarkstreamCopyLimitException(limit);
+      }
+    }
+  }
+
+  String get selectedPlainText => _orderedDocuments
+      .map((binding) => binding.plainText)
+      .whereType<String>()
+      .join('\n\n');
+  List<MarkstreamSelection> get selections => [
+    for (final binding in _orderedDocuments)
+      if (binding.selection case final selection?) selection,
+  ];
+  List<DocumentNode> get selectedDocuments =>
+      selections.map((selection) => selection.content).toList();
+
+  /// Locate source text without changing the user's native selection.
+  bool prepareSourceRange(SourceSpan range) {
+    for (final binding in _orderedDocuments) {
+      for (final preparer in binding.preparers.toList()) {
+        if (preparer.widget.span.contains(range.start) &&
+            !preparer.widget.prepare(range))
+          return false;
+      }
+      for (final fragment in binding._ordered) {
+        final ranges = SourceHighlights([
+          range,
+        ], const Color(0x00000000)).textRanges(fragment.widget.segments);
+        if (ranges.isEmpty) continue;
+        final textRange = TextRange(
+          start: ranges.first.start,
+          end: ranges.first.end,
+        );
+        if (!(fragment.widget.prepareRange?.call(textRange) ?? true))
+          return false;
+        final root = fragment.context.findRenderObject();
+        if (root == null) return false;
+        final rect = fragment.widget.rangeRect == null
+            ? textRangeRect(root, textRange)
+            : fragment.widget.rangeRect!(textRange);
+        return rect != null &&
+            revealRectInScrollables(
+              rect,
+              context: fragment.context,
+              boundary: binding.context,
+            );
+      }
+    }
+    return false;
+  }
+
+  /// Global geometry after [prepareSourceRange] has completed layout.
+  Rect? rectForSourceRange(SourceSpan range) {
+    for (final binding in _orderedDocuments) {
+      for (final fragment in binding._ordered) {
+        final ranges = SourceHighlights([
+          range,
+        ], const Color(0x00000000)).textRanges(fragment.widget.segments);
+        if (ranges.isEmpty) continue;
+        final root = fragment.context.findRenderObject();
+        if (root == null) continue;
+        final textRange = TextRange(
+          start: ranges.first.start,
+          end: ranges.first.end,
+        );
+        final rect = fragment.widget.rangeRect == null
+            ? textRangeRect(root, textRange)
+            : fragment.widget.rangeRect!(textRange);
+        if (rect != null) return rect;
+      }
+    }
+    return null;
+  }
+
+  String get selectedMarkdown =>
+      selections.map((selection) => selection.markdown).join('\n\n');
+  Future<void> copySelectionAsMarkdown() async {
+    final value = selectedMarkdown;
+    verifyCopyBudget([value]);
+    if (value.isNotEmpty) await Clipboard.setData(ClipboardData(text: value));
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _documents.clear();
+    super.dispose();
+  }
+}
+
+/// One selected document, retaining the provenance of its local source offsets.
+class MarkstreamSelection {
+  MarkstreamSelection({
+    required this.document,
+    required this.content,
+    required List<TextSegment> segments,
+  }) : segments = List.unmodifiable(segments);
+  final DocumentNode document;
+  final DocumentNode content;
+  final List<TextSegment> segments;
+  List<SourceSpan> get sourceRanges => [
+    for (final segment in segments)
+      if (!segment.sourceSpan.isEmpty) segment.sourceSpan,
+  ];
+  String get markdown => toMarkdown(content);
+}
+
+/// Supplies an app-owned controller to descendant views without changing a
+/// compatibility wrapper's public constructor.
+class MarkstreamSelectionScope extends InheritedWidget {
+  const MarkstreamSelectionScope({
+    super.key,
+    required this.controller,
+    required super.child,
+  });
+  final MarkstreamSelectionController controller;
+  static MarkstreamSelectionController? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<MarkstreamSelectionScope>()
+      ?.controller;
+  @override
+  bool updateShouldNotify(MarkstreamSelectionScope oldWidget) =>
+      oldWidget.controller != controller;
+}
+
+class SelectionGroupRegistration {
+  SelectionGroupRegistration(this.node, this.delegate, this.root);
+  final MarkdownNode? Function() node;
+  final StableSelectionDelegate delegate;
+  final bool Function() root;
+  bool get complete {
+    final range = delegate.getSelection();
+    return range != null &&
+        delegate.contentLength > 0 &&
+        math.min(range.startOffset, range.endOffset) == 0 &&
+        math.max(range.startOffset, range.endOffset) == delegate.contentLength;
+  }
+}
+
+/// An extension owns native glyph ranges and supplies a clipboard-only node.
+class SelectionProjectionRegistration {
+  SelectionProjectionRegistration(
+    this.node,
+    this.delegate,
+    this.registered,
+    this.byteLimit,
+  );
+  final bool Function() registered;
+  final int? Function() byteLimit;
+  final MarkdownNode Function() node;
+  final StableSelectionDelegate delegate;
+  bool get hasSelection {
+    if (!registered()) return false;
+    final range = delegate.getSelection();
+    return range != null && range.startOffset != range.endOffset;
+  }
+
+  String? get text =>
+      hasSelection ? delegate.getSelectedContent()?.plainText : null;
+}
+
+class DocumentSelectionBinding {
+  DocumentSelectionBinding(this.document, this.controller, this.context);
+  final BuildContext context;
+  RenderBox? renderBox() => context.findRenderObject() as RenderBox?;
+  Offset get globalPosition {
+    final box = renderBox();
+    return box != null && box.hasSize
+        ? box.localToGlobal(Offset.zero)
+        : Offset.zero;
+  }
+
+  DocumentNode document;
+  MarkstreamSelectionController controller;
+  final fragments = <_MarkstreamSelectionFragmentState>{};
+  final groups = <SelectionGroupRegistration>{};
+  final projections = <SelectionProjectionRegistration>{};
+  final preparers = <_SourceRangePreparerState>{};
+  void changed() => controller.changed();
+  List<_MarkstreamSelectionFragmentState> get _ordered => fragments.toList()
+    ..sort(
+      (a, b) => a.widget.node.span.start.compareTo(b.widget.node.span.start),
+    );
+  TextIndex get textIndex => TextIndex.fromSegments(
+    _ordered.expand((fragment) => fragment.widget.segments),
+  );
+  List<TextSegment> get selectedSegments => [
+    for (final fragment in _ordered) ...fragment.selectedSegments,
+  ];
+  String? get plainText => groups
+      .where((group) => group.root())
+      .firstOrNull
+      ?.delegate
+      .getSelectedContent()
+      ?.plainText;
+  MarkstreamSelection? get selection {
+    final replacements = <MarkdownNode, MarkdownNode>{};
+    final segments = [...selectedSegments];
+    for (final projection in projections) {
+      final text = projection.text;
+      if (text == null || text.isEmpty) continue;
+      final node = projection.node();
+      final lines = text.split('\n');
+      replacements[node] = ParagraphNode(
+        span: node.span,
+        children: [
+          for (var i = 0; i < lines.length; i++) ...[
+            if (i > 0) LineBreakNode(span: node.span, hard: true),
+            TextNode(span: node.span, text: lines[i]),
+          ],
+        ],
+      );
+      // Provenance identifies the source block, never a fabricated mapping
+      // between generated field characters and characters in source code.
+      segments.add(TextSegment(text: text, sourceSpan: node.span, node: node));
+    }
+    segments.sort((a, b) => a.sourceSpan.start.compareTo(b.sourceSpan.start));
+    if (segments.isEmpty) return null;
+    return MarkstreamSelection(
+      document: document,
+      segments: segments,
+      content: selection_slice.selectedDocument(
+        document,
+        segments,
+        replacements: replacements,
+        visible: {
+          for (final fragment in fragments) fragment.widget.node,
+          for (final fragment in fragments)
+            for (final segment in fragment.widget.segments)
+              if (segment.node != null) segment.node!,
+          for (final group in groups)
+            if (group.node() != null) group.node()!,
+        },
+        complete: {
+          for (final group in groups)
+            if (group.node() != null && group.complete) group.node()!,
+        },
+      ),
+    );
+  }
+}
+
+class DocumentSelectionScope extends InheritedWidget {
+  const DocumentSelectionScope({
+    super.key,
+    required this.binding,
+    required super.child,
+  });
+  final DocumentSelectionBinding? binding;
+  static DocumentSelectionBinding? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<DocumentSelectionScope>()
+      ?.binding;
+  @override
+  bool updateShouldNotify(DocumentSelectionScope oldWidget) =>
+      oldWidget.binding != binding;
+}
+
+/// A paginated source container can expose its target before glyph lookup.
+class SourceRangePreparer extends StatefulWidget {
+  const SourceRangePreparer({
+    super.key,
+    required this.span,
+    required this.prepare,
+    required this.child,
+  });
+  final SourceSpan span;
+  final bool Function(SourceSpan) prepare;
+  final Widget child;
+  @override
+  State<SourceRangePreparer> createState() => _SourceRangePreparerState();
+}
+
+class _SourceRangePreparerState extends State<SourceRangePreparer> {
+  DocumentSelectionBinding? _binding;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final binding = DocumentSelectionScope.maybeOf(context);
+    if (binding == _binding) return;
+    _binding?.preparers.remove(this);
+    _binding = binding;
+    binding?.preparers.add(this);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+  @override
+  void dispose() {
+    _binding?.preparers.remove(this);
+    super.dispose();
+  }
+}
+
+/// Explicit projection for extension widgets. Each fragment must describe
+/// exactly the selectable UTF-16 text underneath it, excluding nested fragments.
+class MarkstreamSelectionFragment extends StatefulWidget {
+  const MarkstreamSelectionFragment({
+    super.key,
+    required this.node,
+    required this.segments,
+    required this.child,
+    this.rangeRect,
+    this.prepareRange,
+  });
+  final MarkdownNode node;
+  final List<TextSegment> segments;
+  final Widget child;
+  final Rect? Function(TextRange)? rangeRect;
+  final bool Function(TextRange)? prepareRange;
+  @override
+  State<MarkstreamSelectionFragment> createState() =>
+      _MarkstreamSelectionFragmentState();
+}
+
+class _MarkstreamSelectionFragmentState
+    extends State<MarkstreamSelectionFragment> {
+  final _delegate = StableSelectionDelegate();
+  bool _registered = false;
+  DocumentSelectionBinding? _binding;
+  late TextIndex _index;
+  @override
+  void initState() {
+    super.initState();
+    _index = TextIndex.fromSegments(widget.segments);
+    _delegate.addListener(_changed);
+  }
+
+  void _changed() => _binding?.changed();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final binding = DocumentSelectionScope.maybeOf(context);
+    if (_binding != binding) {
+      _binding?.fragments.remove(this);
+      _changed();
+      _binding = binding;
+      binding?.fragments.add(this);
+      _changed();
+    }
+  }
+
+  @override
+  void didUpdateWidget(MarkstreamSelectionFragment oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.segments != widget.segments)
+      _index = TextIndex.fromSegments(widget.segments);
+    _changed();
+  }
+
+  TextRange? get _selectedRange {
+    if (!_registered) return null;
+    final range = _delegate.getSelection();
+    if (range == null) return null;
+    // Native edge indices can briefly refer to the previous tail during a
+    // streaming merge. The settled frame supplies the current exact range.
+    final start = math
+        .min(range.startOffset, range.endOffset)
+        .clamp(0, _index.length);
+    final end = math
+        .max(range.startOffset, range.endOffset)
+        .clamp(start, _index.length);
+    return TextRange(start: start, end: end);
+  }
+
+  bool get hasSelection => _selectedRange?.isCollapsed == false;
+
+  List<TextSegment> get selectedSegments {
+    final range = _selectedRange;
+    return range == null
+        ? const []
+        : _index.segmentsForRange(range.start, range.end);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _registered =
+        _binding != null && SelectionContainer.maybeOf(context) != null;
+    // This delegate already owns the exact range and emits selection changes.
+    // A second SelectionListener container would rebuild all selected line
+    // geometry and walk the same ranges again on every handle movement.
+    return _registered
+        ? SelectionContainer(delegate: _delegate, child: widget.child)
+        : widget.child;
+  }
+
+  @override
+  void dispose() {
+    _binding?.fragments.remove(this);
+    _changed();
+    _delegate.dispose();
+    super.dispose();
+  }
+}

@@ -1,0 +1,461 @@
+{
+  "date": "2026-10-20",
+  "baselineRevision": "cf2af98e64c0d7713491228bf56db790693573fb",
+  "flutter": "3.47.6",
+  "dart": "3.13.5",
+  "host": "Apple M4 Pro, macOS 26.5.2",
+  "mode": "debug Flutter test VM, 720x900, DPR 1",
+  "benchmarkSha256": "7aced7efb509bb1943fd45d08e9b9bfe5c340d958456494bb671092532f11f75",
+  "normal": {
+    "before": [
+      {
+        "run": 1,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 363,
+        "firstPumpP95Us": 773,
+        "contentPumpMedianUs": 2051,
+        "contentPumpP95Us": 3345,
+        "coldFirstFrameUs": 504021
+      },
+      {
+        "run": 2,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 393,
+        "firstPumpP95Us": 798,
+        "contentPumpMedianUs": 2173,
+        "contentPumpP95Us": 3428,
+        "coldFirstFrameUs": 609928
+      },
+      {
+        "run": 3,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 391,
+        "firstPumpP95Us": 652,
+        "contentPumpMedianUs": 2130,
+        "contentPumpP95Us": 3611,
+        "coldFirstFrameUs": 522245
+      },
+      {
+        "run": 4,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 357,
+        "firstPumpP95Us": 639,
+        "contentPumpMedianUs": 1893,
+        "contentPumpP95Us": 3376,
+        "coldFirstFrameUs": 517125
+      },
+      {
+        "run": 5,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 315,
+        "firstPumpP95Us": 460,
+        "contentPumpMedianUs": 1732,
+        "contentPumpP95Us": 2634,
+        "coldFirstFrameUs": 499866
+      }
+    ],
+    "after": [
+      {
+        "run": 1,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 364,
+        "firstPumpP95Us": 663,
+        "contentPumpMedianUs": 2111,
+        "contentPumpP95Us": 3668,
+        "coldFirstFrameUs": 515004
+      },
+      {
+        "run": 2,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 370,
+        "firstPumpP95Us": 835,
+        "contentPumpMedianUs": 2010,
+        "contentPumpP95Us": 3270,
+        "coldFirstFrameUs": 500863
+      },
+      {
+        "run": 3,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 407,
+        "firstPumpP95Us": 762,
+        "contentPumpMedianUs": 2123,
+        "contentPumpP95Us": 3731,
+        "coldFirstFrameUs": 503069
+      },
+      {
+        "run": 4,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 315,
+        "firstPumpP95Us": 638,
+        "contentPumpMedianUs": 1835,
+        "contentPumpP95Us": 3307,
+        "coldFirstFrameUs": 526707
+      },
+      {
+        "run": 5,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 56,
+        "firstPumpMedianUs": 371,
+        "firstPumpP95Us": 782,
+        "contentPumpMedianUs": 2084,
+        "contentPumpP95Us": 3486,
+        "coldFirstFrameUs": 503460
+      }
+    ]
+  },
+  "phases": {
+    "before": [
+      {
+        "run": 1,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 257,
+        "firstPumpP95Us": 480,
+        "contentPumpMedianUs": 1278,
+        "contentPumpP95Us": 2382,
+        "coldFirstFrameUs": 494714,
+        "coldPhaseUs": {
+          "build": 334695.0,
+          "layout": 330897.0,
+          "paint": 4361.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 250.0,
+          "layout": 441.0,
+          "paint": 122.0
+        },
+        "contentPhaseP95Us": {
+          "build": 497.0,
+          "layout": 891.0,
+          "paint": 228.0
+        }
+      },
+      {
+        "run": 2,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 245,
+        "firstPumpP95Us": 524,
+        "contentPumpMedianUs": 1184,
+        "contentPumpP95Us": 2611,
+        "coldFirstFrameUs": 501201,
+        "coldPhaseUs": {
+          "build": 335735.0,
+          "layout": 343005.0,
+          "paint": 4494.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 235.0,
+          "layout": 397.0,
+          "paint": 114.0
+        },
+        "contentPhaseP95Us": {
+          "build": 521.0,
+          "layout": 957.0,
+          "paint": 213.0
+        }
+      },
+      {
+        "run": 3,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 255,
+        "firstPumpP95Us": 449,
+        "contentPumpMedianUs": 1265,
+        "contentPumpP95Us": 2180,
+        "coldFirstFrameUs": 503653,
+        "coldPhaseUs": {
+          "build": 331447.0,
+          "layout": 339650.0,
+          "paint": 4853.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 254.0,
+          "layout": 437.0,
+          "paint": 118.0
+        },
+        "contentPhaseP95Us": {
+          "build": 461.0,
+          "layout": 826.0,
+          "paint": 209.0
+        }
+      },
+      {
+        "run": 4,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 244,
+        "firstPumpP95Us": 483,
+        "contentPumpMedianUs": 1175,
+        "contentPumpP95Us": 2744,
+        "coldFirstFrameUs": 500810,
+        "coldPhaseUs": {
+          "build": 336754.0,
+          "layout": 341466.0,
+          "paint": 5195.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 237.0,
+          "layout": 405.0,
+          "paint": 120.0
+        },
+        "contentPhaseP95Us": {
+          "build": 661.0,
+          "layout": 1044.0,
+          "paint": 227.0
+        }
+      },
+      {
+        "run": 5,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 255,
+        "firstPumpP95Us": 467,
+        "contentPumpMedianUs": 1239,
+        "contentPumpP95Us": 2294,
+        "coldFirstFrameUs": 508806,
+        "coldPhaseUs": {
+          "build": 331882.0,
+          "layout": 344312.0,
+          "paint": 5003.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 245.0,
+          "layout": 444.0,
+          "paint": 115.0
+        },
+        "contentPhaseP95Us": {
+          "build": 517.0,
+          "layout": 868.0,
+          "paint": 205.0
+        }
+      }
+    ],
+    "after": [
+      {
+        "run": 1,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 323,
+        "firstPumpP95Us": 590,
+        "contentPumpMedianUs": 1594,
+        "contentPumpP95Us": 2947,
+        "coldFirstFrameUs": 545760,
+        "coldPhaseUs": {
+          "build": 358995.0,
+          "layout": 375883.0,
+          "paint": 4127.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 318.0,
+          "layout": 569.0,
+          "paint": 160.0
+        },
+        "contentPhaseP95Us": {
+          "build": 642.0,
+          "layout": 1056.0,
+          "paint": 280.0
+        }
+      },
+      {
+        "run": 2,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 238,
+        "firstPumpP95Us": 543,
+        "contentPumpMedianUs": 1137,
+        "contentPumpP95Us": 2787,
+        "coldFirstFrameUs": 503454,
+        "coldPhaseUs": {
+          "build": 334032.0,
+          "layout": 342132.0,
+          "paint": 3462.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 224.0,
+          "layout": 397.0,
+          "paint": 119.0
+        },
+        "contentPhaseP95Us": {
+          "build": 560.0,
+          "layout": 1048.0,
+          "paint": 251.0
+        }
+      },
+      {
+        "run": 3,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 240,
+        "firstPumpP95Us": 603,
+        "contentPumpMedianUs": 1173,
+        "contentPumpP95Us": 2817,
+        "coldFirstFrameUs": 497951,
+        "coldPhaseUs": {
+          "build": 326425.0,
+          "layout": 334263.0,
+          "paint": 3869.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 225.0,
+          "layout": 397.0,
+          "paint": 116.0
+        },
+        "contentPhaseP95Us": {
+          "build": 631.0,
+          "layout": 1056.0,
+          "paint": 235.0
+        }
+      },
+      {
+        "run": 4,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 240,
+        "firstPumpP95Us": 525,
+        "contentPumpMedianUs": 1179,
+        "contentPumpP95Us": 2820,
+        "coldFirstFrameUs": 509194,
+        "coldPhaseUs": {
+          "build": 334461.0,
+          "layout": 348139.0,
+          "paint": 3864.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 222.0,
+          "layout": 402.0,
+          "paint": 119.0
+        },
+        "contentPhaseP95Us": {
+          "build": 564.0,
+          "layout": 1049.0,
+          "paint": 257.0
+        }
+      },
+      {
+        "run": 5,
+        "renderer": "markstream",
+        "appAdapters": true,
+        "selectionController": true,
+        "appendChars": 30000,
+        "coldChars": 100000,
+        "samples": 280,
+        "cycles": 5,
+        "firstPumpMedianUs": 246,
+        "firstPumpP95Us": 513,
+        "contentPumpMedianUs": 1203,
+        "contentPumpP95Us": 2618,
+        "coldFirstFrameUs": 502324,
+        "coldPhaseUs": {
+          "build": 329364.0,
+          "layout": 340089.0,
+          "paint": 4732.0
+        },
+        "contentPhaseMedianUs": {
+          "build": 235.0,
+          "layout": 409.0,
+          "paint": 123.0
+        },
+        "contentPhaseP95Us": {
+          "build": 505.0,
+          "layout": 903.0,
+          "paint": 230.0
+        }
+      }
+    ]
+  }
+}

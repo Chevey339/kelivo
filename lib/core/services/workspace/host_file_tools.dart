@@ -8,6 +8,9 @@ import 'package:path/path.dart' as p;
 import 'edit_matchers.dart';
 import 'unified_diff.dart';
 import 'workspace_paths.dart';
+import 'workspace_file_access.dart';
+import 'workspace_file_coordinator.dart';
+import '../tool_image.dart';
 import '../../models/external_mount.dart';
 
 class HostFileException implements Exception {
@@ -111,7 +114,9 @@ class GrepResult {
 }
 
 class HostFileTools {
-  HostFileTools(this.paths, {this.checkCancelled});
+  HostFileTools(this.paths, {required this.access, this.checkCancelled});
+
+  final WorkspaceFileAccess access;
 
   final WorkspacePaths paths;
   final void Function()? checkCancelled;
@@ -150,7 +155,7 @@ class HostFileTools {
     final mime = _imageMime(resolved.hostPath);
     if (mime != null) {
       return ReadFileResult(
-        imageBytes: await file.readAsBytes(),
+        imageBytes: await ToolImage.readBytes(resolved.hostPath),
         imageMime: mime,
       );
     }
@@ -174,6 +179,7 @@ class HostFileTools {
     var encodedBytes = 0;
     var included = 0;
     await for (final line in _readBoundedLines(file, start)) {
+      checkCancelled?.call();
       if (pageLimit != null && included >= pageLimit) {
         return ReadFileResult(text: buffer.toString(), nextOffset: line.number);
       }
@@ -249,20 +255,27 @@ class HostFileTools {
     String content, {
     String? cwd,
   }) async {
-    final resolved = await _resolve(path, cwd);
-    if (paths.isReadOnlyPath(resolved.hostPath)) {
-      throw const HostFileException('External mount is read-only');
-    }
-    final file = File(resolved.hostPath);
-    final created = !await file.exists();
-    checkCancelled?.call();
-    await file.parent.create(recursive: true);
-    checkCancelled?.call();
-    await file.writeAsString(content);
-    return WriteFileResult(
-      bytes: utf8.encode(content).length,
-      created: created,
-    );
+    final resolved = await _resolve(path, cwd, write: true);
+    return WorkspaceFileCoordinator.run(resolved.hostPath, () async {
+      final current = await _resolve(path, cwd, write: true);
+      if (current.hostPath != resolved.hostPath) {
+        throw const HostFileException('File target changed');
+      }
+      if (paths.isReadOnlyPath(resolved.hostPath)) {
+        throw const HostFileException('External mount is read-only');
+      }
+      final file = File(resolved.hostPath);
+      final created = !await file.exists();
+      checkCancelled?.call();
+      await file.parent.create(recursive: true);
+      checkCancelled?.call();
+      await file.writeAsString(content);
+      WorkspaceFileCoordinator.changed(resolved.hostPath);
+      return WriteFileResult(
+        bytes: utf8.encode(content).length,
+        created: created,
+      );
+    });
   }
 
   Future<EditFileResult> editFile(
@@ -272,38 +285,45 @@ class HostFileTools {
     bool replaceAll = false,
     String? cwd,
   }) async {
-    final resolved = await _resolve(path, cwd);
-    if (paths.isReadOnlyPath(resolved.hostPath)) {
-      throw const HostFileException('External mount is read-only');
-    }
-    final file = File(resolved.hostPath);
-    if (!await file.exists()) {
-      throw HostFileException('file not found: ${resolved.modelPath}');
-    }
-    final original = await file.readAsString();
-    final outcome = applyEdit(
-      original: original,
-      oldText: oldText,
-      newText: newText,
-      replaceAll: replaceAll,
-    );
-    if (outcome is EditFailed) {
-      throw HostFileException(outcome.message);
-    }
-    final applied = outcome as EditApplied;
-    checkCancelled?.call();
-    await file.writeAsString(applied.updated);
-    return EditFileResult(
-      changed: original != applied.updated,
-      diff: UnifiedDiff.compute(
-        original,
-        applied.updated,
-        path: resolved.modelPath,
-      ),
-      replacements: applied.replacements,
-      strategy: applied.strategy.id,
-      updated: applied.updated,
-    );
+    final resolved = await _resolve(path, cwd, write: true);
+    return WorkspaceFileCoordinator.run(resolved.hostPath, () async {
+      final current = await _resolve(path, cwd, write: true);
+      if (current.hostPath != resolved.hostPath) {
+        throw const HostFileException('File target changed');
+      }
+      if (paths.isReadOnlyPath(resolved.hostPath)) {
+        throw const HostFileException('External mount is read-only');
+      }
+      final file = File(resolved.hostPath);
+      if (!await file.exists()) {
+        throw HostFileException('file not found: ${resolved.modelPath}');
+      }
+      final original = await file.readAsString();
+      final outcome = applyEdit(
+        original: original,
+        oldText: oldText,
+        newText: newText,
+        replaceAll: replaceAll,
+      );
+      if (outcome is EditFailed) {
+        throw HostFileException(outcome.message);
+      }
+      final applied = outcome as EditApplied;
+      checkCancelled?.call();
+      await file.writeAsString(applied.updated);
+      WorkspaceFileCoordinator.changed(resolved.hostPath);
+      return EditFileResult(
+        changed: original != applied.updated,
+        diff: UnifiedDiff.compute(
+          original,
+          applied.updated,
+          path: resolved.modelPath,
+        ),
+        replacements: applied.replacements,
+        strategy: applied.strategy.id,
+        updated: applied.updated,
+      );
+    });
   }
 
   Future<ListDirResult> listDir(
@@ -311,12 +331,14 @@ class HostFileTools {
     int depth = 1,
     String? cwd,
   }) async {
+    access.permission.check();
     await paths.refreshExternalMounts();
     if (paths.sandboxed && p.posix.normalize(path) == ExternalMount.root) {
       final entries = <ListDirEntry>[];
       var truncated = false;
       for (final mount in paths.externalMounts) {
-        final dir = Directory(mount.host);
+        final resolved = await access.resolve(mount.guest, cwd);
+        final dir = Directory(resolved.hostPath);
         final stat = await dir.stat();
         entries.add(
           ListDirEntry(
@@ -401,6 +423,12 @@ class HostFileTools {
     var truncated = false;
 
     Future<bool> scanFile(File file) async {
+      checkCancelled?.call();
+      if (await FileSystemEntity.type(file.path, followLinks: false) ==
+          FileSystemEntityType.link) {
+        return false;
+      }
+      await access.checkDescendant(resolved.hostPath, file.path);
       final stat = await file.stat();
       if (stat.size > maxFileBytes) return false;
       final bytes = await file.readAsBytes();
@@ -441,9 +469,14 @@ class HostFileTools {
     return GrepResult(matches: matches, truncated: truncated);
   }
 
-  Future<ResolvedPath> _resolve(String path, String? cwd) async {
+  Future<ResolvedPath> _resolve(
+    String path,
+    String? cwd, {
+    bool write = false,
+  }) async {
     await paths.refreshExternalMounts();
-    return paths.resolveReal(path, cwd: paths.normalizeCwd(cwd));
+    checkCancelled?.call();
+    return access.resolve(path, cwd, write: write);
   }
 
   Future<bool> _walkDir(
@@ -451,6 +484,8 @@ class HostFileTools {
     int remainingDepth,
     List<ListDirEntry> out,
   ) async {
+    checkCancelled?.call();
+    await access.checkDescendant(dir.path, dir.path);
     final entities = await dir.list(followLinks: false).toList();
     entities.sort((a, b) {
       final aDir = a is Directory;
@@ -464,6 +499,9 @@ class HostFileTools {
     var truncated = false;
     for (final entity in entities) {
       if (out.length >= listCap) return true;
+      checkCancelled?.call();
+      if (entity is Link) continue;
+      await access.checkDescendant(dir.path, entity.path);
       final name = p.basename(entity.path);
       if (_isL2s(name)) continue;
       final stat = await entity.stat();
@@ -493,8 +531,17 @@ class HostFileTools {
     final stack = <Directory>[root];
     while (stack.isNotEmpty) {
       final dir = stack.removeLast();
+      checkCancelled?.call();
+      if (await FileSystemEntity.type(dir.path, followLinks: false) ==
+          FileSystemEntityType.link) {
+        continue;
+      }
+      await access.checkDescendant(root.path, dir.path);
       final children = await dir.list(followLinks: false).toList();
       for (final entity in children) {
+        checkCancelled?.call();
+        if (entity is Link) continue;
+        await access.checkDescendant(root.path, entity.path);
         final name = p.basename(entity.path);
         if (entity is Directory) {
           if (skipDotDirs && name.startsWith('.')) continue;

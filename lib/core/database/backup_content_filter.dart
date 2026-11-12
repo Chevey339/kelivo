@@ -11,6 +11,7 @@ final class BackupContentFilter {
     }
     if (key == 'assistants_v1' ||
         key == 'current_assistant_id_v1' ||
+        key == 'orphaned_conversations_assistant_id_v1' ||
         key.startsWith('assistant_tag')) {
       return BackupCategory.assistants;
     }

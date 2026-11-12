@@ -305,6 +305,7 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
             "timedOut": Self.boxedFlag(info["timedOut"]),
             "cancelled": Self.boxedFlag(info["cancelled"]),
             "interrupted": Self.boxedFlag(info["interrupted"]),
+            "terminationConfirmed": Self.boxedFlag(info["terminationConfirmed"]),
             "durationMs": info["durationMs"] ?? 0,
           ])
         }

@@ -1,3 +1,4 @@
+import '../widgets/desktop_adaptive_panes.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ class DesktopToolSchemasPane extends StatefulWidget {
 
 class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
   String? _selectedName;
+  bool _showDetail = false;
   int _formEpoch = 0;
   SettingsProvider? _settings;
 
@@ -105,46 +107,40 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 280,
-                  child: ListView(
-                    padding: const EdgeInsets.only(right: 8),
-                    children: [
-                      for (final group in BuiltInToolGroup.values)
-                        ..._groupTiles(
-                          context,
-                          group: group,
-                          entries: catalog
-                              .where((e) => e.group == group)
-                              .toList(),
-                          selectedName: selectedName,
-                          overrides: settings.toolSchemaOverrides,
-                        ),
-                    ],
-                  ),
+            child: DesktopAdaptivePanes(
+              sidebarWidth: 296,
+              showDetail: _showDetail,
+              onBack: () => setState(() => _showDetail = false),
+              backLabel: l10n.toolSchemaSettingsPageTitle,
+              sidebar: SizedBox(
+                width: 280,
+                child: ListView(
+                  padding: const EdgeInsets.only(right: 8),
+                  children: [
+                    for (final group in BuiltInToolGroup.values)
+                      ..._groupTiles(
+                        context,
+                        group: group,
+                        entries: catalog
+                            .where((e) => e.group == group)
+                            .toList(),
+                        selectedName: selectedName,
+                        overrides: settings.toolSchemaOverrides,
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 8, 16),
-                    child: ToolSchemaEditorForm(
-                      key: ValueKey('${selected.name}:$_formEpoch'),
-                      defaultDefinition: selected.defaultDefinition,
-                      initialOverride:
-                          settings.toolSchemaOverrides[selected.name],
-                      onChanged: (value) {
-                        settings.setToolSchemaOverrideLive(
-                          selected.name,
-                          value,
-                        );
-                      },
-                    ),
-                  ),
+              ),
+              detail: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(4, 0, 8, 16),
+                child: ToolSchemaEditorForm(
+                  key: ValueKey('${selected.name}:$_formEpoch'),
+                  defaultDefinition: selected.defaultDefinition,
+                  initialOverride: settings.toolSchemaOverrides[selected.name],
+                  onChanged: (value) {
+                    settings.setToolSchemaOverrideLive(selected.name, value);
+                  },
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -203,7 +199,10 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
             compact: true,
             onTap: () {
               unawaited(_settings?.flushPendingToolSchemaOverridePersist());
-              setState(() => _selectedName = entry.name);
+              setState(() {
+                _selectedName = entry.name;
+                _showDetail = true;
+              });
             },
           ),
         ),

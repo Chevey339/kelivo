@@ -1,3 +1,4 @@
+import 'package:markstream/markstream.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/plantuml_block.dart';
 import 'package:flutter/material.dart';
@@ -23,12 +24,22 @@ Widget _plantUmlHarness({double? width}) {
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: width == null
-          ? const PlantUMLBlock(code: _plantUmlCode)
+          ? PlantUMLBlock(
+              code: _plantUmlCode,
+              theme: MarkstreamTheme.fromColorScheme(
+                ColorScheme.fromSeed(seedColor: Colors.blue),
+              ),
+            )
           : Align(
               alignment: Alignment.topLeft,
               child: SizedBox(
                 width: width,
-                child: const PlantUMLBlock(code: _plantUmlCode),
+                child: PlantUMLBlock(
+                  code: _plantUmlCode,
+                  theme: MarkstreamTheme.fromColorScheme(
+                    ColorScheme.fromSeed(seedColor: Colors.blue),
+                  ),
+                ),
               ),
             ),
     ),

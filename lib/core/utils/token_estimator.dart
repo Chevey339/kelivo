@@ -67,6 +67,9 @@ final List<_LanguageConfig> _languageConfigs = [
   _LanguageConfig(RegExp(r'[\u03AC-\u03CE]', caseSensitive: false), 3),
   _LanguageConfig(
     RegExp(
+      // Supported by the VM; the analyzer's regexp parser rejects this Unicode
+      // property. Covered by token_estimator_test's emoji/reference samples.
+      // ignore: valid_regexps
       r'^\p{Extended_Pictographic}[\p{Extended_Pictographic}\p{Emoji_Component}]*$',
       unicode: true,
     ),

@@ -138,6 +138,39 @@ void main() {
       );
     });
 
+    for (final kind in ['groq', 'mistral', 'elevenlabs', 'qwen_audio']) {
+      test(
+        'portable ASR export preserves $kind configuration and selection',
+        () {
+          final service = {
+            'id': '$kind-id',
+            'kind': kind,
+            'apiKey': 'test-key',
+            'baseUrl': 'https://proxy.test/v1',
+            'model': 'custom-model',
+            'language': 'zh',
+            if (kind == 'qwen_audio') ...{
+              'mode': 'transcription',
+              'workspaceId': 'token-plan',
+              'region': 'ap-southeast-1',
+              'endpoint': 'https://proxy.test/custom/asr',
+              'segmentDurationSec': 30,
+            },
+          };
+          final settings = <String, dynamic>{
+            'asr_services_v1': jsonEncode([service]),
+            'asr_selected_service_id_v1': service['id'],
+          };
+
+          BackupSettingsValidator.retainCloudAsrForExport(settings);
+          BackupSettingsValidator.validate(settings);
+
+          expect(jsonDecode(settings['asr_services_v1'] as String), [service]);
+          expect(settings['asr_selected_service_id_v1'], service['id']);
+        },
+      );
+    }
+
     test('portable ASR export contains cloud providers only', () {
       final settings = <String, dynamic>{
         'asr_services_v1': jsonEncode([

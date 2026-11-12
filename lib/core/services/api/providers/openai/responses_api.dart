@@ -1,7 +1,11 @@
+import '../../../network/provider_http_exception.dart';
+import '../../../../models/image_context.dart';
+import '../../request_image_context.dart';
 import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
+import '../../native_compaction_context.dart';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -12,6 +16,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../../utils/app_directories.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../response_speed.dart';
 import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../reasoning/reasoning_dialects.dart';
@@ -214,6 +219,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required Map<String, String>? extraHeaders,
   required Map<String, dynamic>? extraBody,
   required String? promptCacheKey,
+  String? serviceTier,
   required double? temperature,
   required double? topP,
   required int? maxTokens,
@@ -226,6 +232,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   StreamRoundRunner? retryRound,
 }) async* {
   var usage = initialUsage;
+  String? finishReason;
   var chars = approxCompletionChars;
   var round = streamRound;
   var currentInput = <Map<String, dynamic>>[...initialInput];
@@ -252,6 +259,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
               item.call.name,
               item.content,
               metadata: item.metadata,
+              toolCallId: item.call.id,
               canImageInput: spec.input.contains(Modality.image),
             )).responsesOutput,
           },
@@ -274,12 +282,15 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       };
       applyOpenAIResolvedRequest(
         body2,
+        config: config,
         spec: spec,
         reasoning: reasoning,
         transport: ReasoningTransport.responses,
       );
       final extraCfg = customBody(config, modelId, assistantBody: extraBody);
+      validateNativeCompactionOverrides(body2, extraCfg);
       CustomRequestMerger.applyBody(body2, extraCfg);
+      applyServiceTier(body2, config, serviceTier);
       if (promptCacheKey != null) {
         body2.putIfAbsent('prompt_cache_key', () => promptCacheKey);
       }
@@ -305,14 +316,16 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           assistantHeaders: extraHeaders,
         ),
       );
-      req2.body = jsonEncode(body2);
+      req2.body = await RequestImageContext.encodeBody(body2);
       final http.StreamedResponse resp2;
       try {
         resp2 = await client.send(req2);
         if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
           final errorBody = await resp2.stream.bytesToString();
-          throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+          throw ProviderHttpException(resp2, errorBody);
         }
+      } on ImageContextBudgetException {
+        rethrow;
       } on ProviderOAuthException {
         rethrow;
       } on HttpException {
@@ -323,8 +336,9 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       final respCalls2 = <int, Map<String, String>>{};
       if (!stream) {
         final raw = await decodeUtf8Stream(resp2.stream);
-        throwIfInBandStreamError(raw);
+        final incomplete = throwIfInBandStreamError(raw, deferIncomplete: true);
         final obj = jsonDecode(raw) as Map;
+        finishReason = responsesFinishReason(obj);
         for (final chunk
             in ResponsesStreamDecoder(
               sourceId: 'round-$round',
@@ -380,6 +394,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           reasoning: responsesReasoningText(output),
           usage: usage,
         );
+        if (incomplete != null) throw incomplete;
       } else {
         final s2 = rethrowFollowUpStreamErrors(
           resp2.stream.transform(utf8.decoder),
@@ -388,7 +403,12 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           initialUsage: usage,
           sourceId: 'round-${round++}',
         );
-        yield* decodeSseEvents(parseSseEventStrings(s2), followUpDecoder);
+        yield* decodeSseEvents(
+          parseSseEventStrings(s2),
+          followUpDecoder,
+          deferIncomplete: true,
+        );
+        finishReason = followUpDecoder.finishReason;
         usage = followUpDecoder.usage ?? usage;
         chars += followUpDecoder.approxCompletionChars;
         outputItemsForAppend = followUpDecoder.outputItems;
@@ -422,6 +442,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       final approxTotal = approxPromptTokens + (chars / 4).round();
       return emitDone(
         ids: StreamChunkIds('finish'),
+        finishReason: finishReason,
         usage: usage,
         totalTokens: usage?.totalTokens ?? approxTotal,
       );

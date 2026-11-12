@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:Kelivo/utils/platform_utils.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/workspace.dart';
@@ -13,6 +14,8 @@ import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/utils/ensure_conversation.dart';
 import 'package:Kelivo/features/chat/utils/sheet_navigation.dart';
+import 'package:Kelivo/features/chat/widgets/tool_permission_widgets.dart';
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
 import 'package:Kelivo/features/workspace/terminal/open_terminal.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_labels.dart';
@@ -27,7 +30,6 @@ import 'package:Kelivo/features/workspace/workspace_navigation.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
-import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
@@ -35,6 +37,7 @@ import 'package:provider/provider.dart';
 
 import 'desktop_workspace_button.dart';
 import 'workspace_default_notice.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class WorkspaceSection extends StatefulWidget {
   const WorkspaceSection({
@@ -60,9 +63,7 @@ class WorkspaceSection extends StatefulWidget {
   static const Key cwdErrorKey = ValueKey<String>(
     'workspace-section-cwd-error',
   );
-  static const Key allowAllKey = ValueKey<String>(
-    'workspace-section-allow-all',
-  );
+  static const Key permissionKey = ToolPermissionRow.rowKey;
   static const Key nameKey = ValueKey<String>('workspace-section-name');
   static const Key filesKey = ValueKey<String>('workspace-section-files');
   static const Key terminalKey = ValueKey<String>('workspace-section-terminal');
@@ -109,10 +110,17 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
   Future<void> _writeBinding(WorkspaceBinding binding) async {
     final id = await _ensureConversationId();
     if (id == null || !mounted) return;
-    await context.read<ChatService>().updateConversationExtras(
-      id,
-      binding.applyTo,
-    );
+    final chat = context.read<ChatService>();
+    final wasFull =
+        ToolPermissionMode.fromExtras(chat.getConversation(id)?.extras ?? {}) ==
+        ToolPermissionMode.fullAccess;
+    await chat.updateConversationExtras(id, binding.applyTo);
+    if (mounted &&
+        wasFull &&
+        ToolPermissionMode.fromExtras(chat.getConversation(id)?.extras ?? {}) !=
+            ToolPermissionMode.fullAccess) {
+      showToolPermissionReset(context, id);
+    }
   }
 
   void _afterClose(void Function(BuildContext ctx) action) {
@@ -123,6 +131,10 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     final provider = context.read<WorkspaceProvider>();
     final id = await _ensureConversationId();
     if (id == null || !mounted) return;
+    final chat = context.read<ChatService>();
+    final wasFull =
+        ToolPermissionMode.fromExtras(chat.getConversation(id)?.extras ?? {}) ==
+        ToolPermissionMode.fullAccess;
     final notice = await bindConversationWorkspace(
       context.read<ChatService>(),
       assistants: context.read<AssistantProvider>(),
@@ -130,6 +142,11 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
       workspace: workspace,
     );
     if (!mounted) return;
+    if (wasFull &&
+        ToolPermissionMode.fromExtras(chat.getConversation(id)?.extras ?? {}) !=
+            ToolPermissionMode.fullAccess) {
+      showToolPermissionReset(context, id);
+    }
     unawaited(provider.touchLastUsed(workspace.id));
     showWorkspaceDefaultNotice(
       context,
@@ -220,19 +237,6 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
         workspaceId: workspace.id,
         cwd: picked,
         toolsUsed: binding.toolsUsed,
-        allowAll: binding.allowAll,
-      ),
-    );
-  }
-
-  Future<void> _setAllowAll(WorkspaceBinding binding, bool value) async {
-    if (!binding.isBound) return;
-    await _writeBinding(
-      WorkspaceBinding(
-        workspaceId: binding.workspaceId,
-        cwd: binding.cwd,
-        toolsUsed: binding.toolsUsed,
-        allowAll: value,
       ),
     );
   }
@@ -342,16 +346,29 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     final workspace = binding.isBound
         ? workspaces.byId(binding.workspaceId!)
         : null;
-    final runtime = context.watch<WorkspaceRuntimeProvider>().runtime;
+    final runtimeProvider = context.watch<WorkspaceRuntimeProvider>();
+    final runtime = runtimeProvider.runtime;
     final env = context.watch<EnvironmentProvider>();
     final envManager = _resolvedEnvManager();
     final desktop = useDesktopWorkspaceLayout(context);
-    final showEnvironment = envManager != null && !desktop;
-    final envStatus = workspaceEnvPhaseLabel(l10n, env.state.phase);
+    final native = PlatformUtils.isDesktopTarget;
+    final showEnvironment = native || envManager != null;
+    final envStatus = native
+        ? (runtimeProvider.lastStatus?.shell?.name ??
+              l10n.workspaceEnvEngineLocalShell)
+        : workspaceEnvPhaseLabel(l10n, env.state.phase);
     final chevron = ToolsSheetRow.chevron(context);
 
     if (desktop) {
-      return _desktopPanel(l10n, workspace, binding, runtime);
+      return _desktopPanel(
+        l10n,
+        workspace,
+        binding,
+        runtime,
+        environmentRow: showEnvironment
+            ? _environmentRow(l10n, envStatus)
+            : null,
+      );
     }
 
     final rows = <Widget>[];
@@ -378,23 +395,12 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
         ),
       );
       if (showEnvironment) {
-        rows.add(
-          ToolsSheetRow(
-            key: WorkspaceSection.environmentKey,
-            icon: Lucide.HardDrive,
-            label: l10n.workspaceEntryEnvironment,
-            detail: envStatus,
-            onTap: () {
-              Haptics.light();
-              _afterClose(WorkspaceNavigation.openEnvironmentPage);
-            },
-            trailing: chevron,
-          ),
-        );
+        rows.add(_environmentRow(l10n, envStatus));
       }
-      rows.add(_allowAllRow(l10n, binding));
+      rows.add(_permissionRow());
     }
 
+    if (!binding.isBound || workspace == null) rows.add(_permissionRow());
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -406,12 +412,27 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     );
   }
 
+  Widget _environmentRow(AppLocalizations l10n, String status) {
+    return ToolsSheetRow(
+      key: WorkspaceSection.environmentKey,
+      icon: Lucide.HardDrive,
+      label: l10n.workspaceEntryEnvironment,
+      detail: status,
+      onTap: () {
+        Haptics.light();
+        _afterClose(WorkspaceNavigation.openEnvironmentPage);
+      },
+      trailing: ToolsSheetRow.chevron(context),
+    );
+  }
+
   Widget _desktopPanel(
     AppLocalizations l10n,
     Workspace? workspace,
     WorkspaceBinding binding,
-    WorkspaceRuntime? runtime,
-  ) {
+    WorkspaceRuntime? runtime, {
+    required Widget? environmentRow,
+  }) {
     final cs = Theme.of(context).colorScheme;
     if (workspace == null) {
       return Column(
@@ -432,6 +453,12 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
               onPressed: () => unawaited(_pickWorkspace()),
             ),
           ),
+          const SizedBox(height: 8),
+          if (PlatformUtils.isDesktopTarget && environmentRow != null) ...[
+            environmentRow,
+            const SizedBox(height: 8),
+          ],
+          _permissionRow(),
         ],
       );
     }
@@ -448,9 +475,9 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
                 key: WorkspaceSection.nameKey,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -489,7 +516,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
                       )
                     : _openTerminal,
               ),
-            if (runtime != null)
+            if (runtime != null && runtime.supportsFileManager)
               DesktopWorkspaceButton(
                 key: WorkspaceSection.revealKey,
                 label: l10n.workspaceEntryReveal,
@@ -515,7 +542,11 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
           onTap: () => _editCwd(workspace, binding),
         ),
         const SizedBox(height: 12),
-        _allowAllRow(l10n, binding),
+        if (environmentRow != null) ...[
+          environmentRow,
+          const SizedBox(height: 8),
+        ],
+        _permissionRow(),
       ],
     );
   }
@@ -602,7 +633,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
                     _openSystemThenClose(runtime, workspace, binding),
                   ),
                 ),
-              if (runtime != null && useDesktopWorkspaceLayout(context))
+              if (runtime != null && runtime.supportsFileManager)
                 action(
                   key: WorkspaceSection.revealKey,
                   icon: Lucide.ExternalLink,
@@ -717,17 +748,8 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     }
   }
 
-  Widget _allowAllRow(AppLocalizations l10n, WorkspaceBinding binding) {
-    return ToolsSheetRow(
-      icon: Lucide.Shield,
-      label: l10n.workspaceEntryAllowAll,
-      subtitle: l10n.workspaceEntryAllowAllSubtitle,
-      trailing: IosSwitch(
-        key: WorkspaceSection.allowAllKey,
-        value: binding.allowAll,
-        semanticLabel: l10n.workspaceEntryAllowAll,
-        onChanged: (value) => unawaited(_setAllowAll(binding, value)),
-      ),
-    );
-  }
+  Widget _permissionRow() => ToolPermissionRow(
+    conversationId: _conversationId,
+    ensureConversationId: _ensureConversationId,
+  );
 }

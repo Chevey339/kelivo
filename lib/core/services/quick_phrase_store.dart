@@ -7,6 +7,10 @@ class QuickPhraseStore extends JsonBlobStore<QuickPhrase> {
   static const String _phrasesKey = 'quick_phrases_v1';
 
   @override
+  Future<R> runExclusive<R>(Future<R> Function() operation) =>
+      preferences.runExclusiveMutation(operation);
+
+  @override
   String get storageKey => _phrasesKey;
 
   @override

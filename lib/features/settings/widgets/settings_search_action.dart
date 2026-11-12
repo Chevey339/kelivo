@@ -6,10 +6,12 @@ class SettingsSearchAction extends StatefulWidget {
     super.key,
     required this.onTap,
     required this.child,
+    this.focusNode,
     this.borderRadius = const BorderRadius.all(Radius.circular(18)),
   });
   final VoidCallback onTap;
   final Widget child;
+  final FocusNode? focusNode;
   final BorderRadius borderRadius;
 
   @override
@@ -21,6 +23,7 @@ class _SettingsSearchActionState extends State<SettingsSearchAction> {
 
   @override
   Widget build(BuildContext context) => FocusableActionDetector(
+    focusNode: widget.focusNode,
     actions: {
       ActivateIntent: CallbackAction<ActivateIntent>(
         onInvoke: (_) {

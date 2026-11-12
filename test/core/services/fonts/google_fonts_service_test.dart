@@ -150,7 +150,7 @@ void main() {
     'download keeps full font and license until explicitly disposed',
     () async {
       final bytes = await File(
-        'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+        'test/fixtures/fonts/JetBrainsMono-Regular.ttf',
       ).readAsBytes();
       final paths = <String>[];
       final service = GoogleFontsService(

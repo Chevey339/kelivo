@@ -12,6 +12,7 @@ import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/services/backup/local_snapshot_schedule.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
+import 'package:Kelivo/core/services/storage/storage_image_usage.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -306,6 +307,38 @@ void main() {
     expect(other.stats.bytes, 0);
   });
 
+  test(
+    'renamed and root-level snapshots stay out of Other and cleanup',
+    () async {
+      final name = LocalSnapshotPaths.fileNameFor(DateTime.utc(2026, 10, 19));
+      for (final location in ['', 'snapshots 2', 'snapshots (3)']) {
+        await _writeSizedFile(tempDir, p.join(location, name), 512);
+        await _writeSizedFile(tempDir, p.join(location, '$name.json'), 64);
+      }
+      final report = await StorageUsageService.computeReport();
+      expect(
+        report.categories
+            .singleWhere(
+              (category) =>
+                  category.key == StorageUsageCategoryKey.localSnapshots,
+            )
+            .stats
+            .bytes,
+        3 * 576,
+      );
+      expect(
+        report.categories
+            .singleWhere(
+              (category) => category.key == StorageUsageCategoryKey.other,
+            )
+            .stats
+            .bytes,
+        0,
+      );
+      expect(report.clearable.bytes, 0);
+    },
+  );
+
   test('restore traces stay hidden while a restore run is active', () async {
     const runId = '0123456789abcdef0123456789abcdef';
     final workspace = Directory(
@@ -498,7 +531,7 @@ void main() {
   });
 
   test(
-    'image entries distinguish user uploads from assistant images',
+    'unreferenced images do not acquire an inferred assistant sender',
     () async {
       final uploadDir = Directory(p.join(tempDir.path, 'upload'));
       final imagesDir = Directory(p.join(tempDir.path, 'images'));
@@ -508,10 +541,10 @@ void main() {
       await _writeSizedFile(imagesDir, 'assistant.png', 20);
 
       final entries = await StorageUsageService.listUploadEntries(images: true);
-      final sources = {for (final entry in entries) entry.name: entry.source};
+      final kinds = {for (final entry in entries) entry.name: entry.imageKind};
 
-      expect(sources['uploaded.png'], StorageFileSource.userUpload);
-      expect(sources['assistant.png'], StorageFileSource.assistant);
+      expect(kinds['uploaded.png'], StorageImageKind.chat);
+      expect(kinds['assistant.png'], isNull);
     },
   );
 }

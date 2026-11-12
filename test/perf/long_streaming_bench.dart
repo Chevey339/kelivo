@@ -1,3 +1,4 @@
+import '../support/markdown_backdrop_host.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
@@ -11,7 +12,7 @@ import 'dart:isolate';
 import 'package:vm_service/vm_service_io.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -60,30 +61,36 @@ void main() {
             child: MaterialApp(
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
-              home: Scaffold(
-                body: SingleChildScrollView(
-                  controller: scroll,
-                  child: ValueListenableBuilder<String>(
-                    valueListenable: source,
-                    builder: (_, text, _) =>
-                        const bool.fromEnvironment('PERF_REASONING')
-                        ? ChatMessageWidget(
-                            message: ChatMessage(
-                              id: 'perf',
-                              role: 'assistant',
-                              content: '',
-                              conversationId: 'perf',
-                              isStreaming: true,
+              home: markdownBenchmarkBackdrop(
+                Scaffold(
+                  backgroundColor:
+                      const bool.fromEnvironment('MARKSTREAM_BENCH_WALLPAPER')
+                      ? Colors.transparent
+                      : null,
+                  body: SingleChildScrollView(
+                    controller: scroll,
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: source,
+                      builder: (_, text, _) =>
+                          const bool.fromEnvironment('PERF_REASONING')
+                          ? ChatMessageWidget(
+                              message: ChatMessage(
+                                id: 'perf',
+                                role: 'assistant',
+                                content: '',
+                                conversationId: 'perf',
+                                isStreaming: true,
+                              ),
+                              reasoningText: text,
+                              reasoningLoading: true,
+                              reasoningStartAt: DateTime(2026),
+                              showModelIcon: false,
+                            )
+                          : MarkdownWithCodeHighlight(
+                              text: text,
+                              streaming: true,
                             ),
-                            reasoningText: text,
-                            reasoningLoading: true,
-                            reasoningStartAt: DateTime(2026),
-                            showModelIcon: false,
-                          )
-                        : MarkdownWithCodeHighlight(
-                            text: text,
-                            streaming: true,
-                          ),
+                    ),
                   ),
                 ),
               ),

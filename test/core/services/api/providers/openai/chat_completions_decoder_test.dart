@@ -886,7 +886,46 @@ void main() {
     );
 
     expect(decoder.reasoningEcho, 'a');
-    expect(decoder.reasoningDetails, hasLength(2));
+    expect(decoder.reasoningDetails, [
+      {'type': 'reasoning.summary', 'text': 'ab'},
+    ]);
+  });
+
+  test('OpenRouter fragments form blocks without dropping repeated deltas', () {
+    final decoder = ChatCompletionsStreamDecoder(
+      allowReasoningSnapshots: false,
+    );
+    void accept(List<Map<String, dynamic>> details) {
+      decoder.accept(_event(_choice(delta: {'reasoning_details': details})));
+    }
+
+    const first = {'type': 'reasoning.text', 'text': 'go', 'index': 0};
+    accept([first]);
+    final previous = decoder.reasoningDetails;
+    accept([
+      first,
+      {'type': 'reasoning.text', 'text': '\nnext', 'index': 0},
+    ]);
+    expect(decoder.reasoningDetails, [
+      {'type': 'reasoning.text', 'text': 'gogo\nnext', 'index': 0},
+    ]);
+    expect(previous, [first]);
+
+    accept([
+      {'type': 'reasoning.text', 'signature': 'sig', 'index': 0},
+      {'type': 'reasoning.encrypted', 'data': 'opaque', 'index': 1},
+      {'type': 'reasoning.text', 'text': 'separate', 'index': 2},
+    ]);
+    expect(decoder.reasoningDetails, [
+      {
+        'type': 'reasoning.text',
+        'text': 'gogo\nnext',
+        'index': 0,
+        'signature': 'sig',
+      },
+      {'type': 'reasoning.encrypted', 'data': 'opaque', 'index': 1},
+      {'type': 'reasoning.text', 'text': 'separate', 'index': 2},
+    ]);
   });
 
   test('scopes text ids per sourceId', () {

@@ -1,0 +1,3783 @@
+{
+  "date": "2026-10-22",
+  "reviewedCommits": [
+    "ec0a355e",
+    "28f4e4b4"
+  ],
+  "baseline": "a8364707",
+  "pairedBatch": {
+    "baseline": "a8364707",
+    "sameRevisionControl": false,
+    "candidateHead": "28f4e4b42f22e7cce02a847c1210debee8fcad8e",
+    "sdk": "Flutter 3.47.6 \u2022 channel stable \u2022 https://github.com/flutter/flutter.git\nFramework \u2022 revision 5fc346839b (3 weeks ago) \u2022 2026-09-30 15:02:49 -0700\nEngine \u2022 hash b8c8d3d8d5d0095127057f8a29ca8cc53da2167c (revision 692136cb65) (22 days ago) \u2022 2026-09-30 00:56:59.000Z\nTools \u2022 Dart 3.13.5 \u2022 DevTools 2.60.0\n",
+    "hardware": "Apple M4 Pro",
+    "harnessSha256": {
+      "test/perf/markstream_render_bench.dart": "61237e20ec046089e74c4db881b699ba18e368c7b95627a9f0f005373b4c768f",
+      "test/perf/timeline_scroll_bench.dart": "909b13ca26f63f1b829e277dca3ff33112b14fe70a63519989850d93eb8ca23d",
+      "test/perf/long_streaming_bench.dart": "5180dab109543d2b7579f354ddc488f93b74802a71cbd4fb7d56ee0306251430",
+      "test/support/markdown_backdrop_host.dart": "7bb6e98af48f5722ee5a7480b46e3a40bab46d6c99d9214555760195c406b481"
+    },
+    "runs": [
+      {
+        "round": 1,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 6.454281,
+        "log": "1-plain-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":1,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":215,\"firstPumpP95Us\":483,\"contentPumpMedianUs\":1040,\"contentPumpP95Us\":2479,\"coldFirstFrameUs\":491933,\"coldPhaseUs\":{\"build\":334649.0,\"layout\":328447.0,\"paint\":3314.0},\"contentPhaseMedianUs\":{\"build\":202.0,\"layout\":353.0,\"paint\":102.0},\"contentPhaseP95Us\":{\"build\":529.0,\"layout\":875.0,\"paint\":210.0}}"
+        ]
+      },
+      {
+        "round": 1,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.941078167,
+        "log": "1-plain-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":1,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":205,\"firstPumpP95Us\":469,\"contentPumpMedianUs\":1008,\"contentPumpP95Us\":2434,\"coldFirstFrameUs\":465095,\"coldPhaseUs\":{\"build\":315216.0,\"layout\":316321.0,\"paint\":3273.0},\"contentPhaseMedianUs\":{\"build\":189.0,\"layout\":334.0,\"paint\":100.0},\"contentPhaseP95Us\":{\"build\":516.0,\"layout\":944.0,\"paint\":228.0}}"
+        ]
+      },
+      {
+        "round": 1,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.775532083,
+        "log": "1-wallpaper-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":1,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":390,\"firstPumpP95Us\":850,\"contentPumpMedianUs\":1070,\"contentPumpP95Us\":2255,\"coldFirstFrameUs\":476905,\"coldPhaseUs\":{\"build\":323244.0,\"layout\":426219.0,\"paint\":1980.0},\"contentPhaseMedianUs\":{\"build\":215.0,\"layout\":442.0,\"paint\":94.0},\"contentPhaseP95Us\":{\"build\":481.0,\"layout\":987.0,\"paint\":187.0}}"
+        ]
+      },
+      {
+        "round": 1,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.987577584,
+        "log": "1-wallpaper-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":1,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":435,\"firstPumpP95Us\":967,\"contentPumpMedianUs\":1101,\"contentPumpP95Us\":2429,\"coldFirstFrameUs\":477186,\"coldPhaseUs\":{\"build\":324718.0,\"layout\":425904.0,\"paint\":1886.0},\"contentPhaseMedianUs\":{\"build\":232.0,\"layout\":487.0,\"paint\":100.0},\"contentPhaseP95Us\":{\"build\":517.0,\"layout\":1106.0,\"paint\":191.0}}"
+        ]
+      },
+      {
+        "round": 2,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.890378999999999,
+        "log": "2-wallpaper-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":2,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":415,\"firstPumpP95Us\":883,\"contentPumpMedianUs\":1100,\"contentPumpP95Us\":2353,\"coldFirstFrameUs\":494006,\"coldPhaseUs\":{\"build\":335256.0,\"layout\":441122.0,\"paint\":2282.0},\"contentPhaseMedianUs\":{\"build\":226.0,\"layout\":475.0,\"paint\":100.0},\"contentPhaseP95Us\":{\"build\":504.0,\"layout\":994.0,\"paint\":173.0}}"
+        ]
+      },
+      {
+        "round": 2,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.809264000000002,
+        "log": "2-wallpaper-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":2,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":428,\"firstPumpP95Us\":855,\"contentPumpMedianUs\":1128,\"contentPumpP95Us\":2239,\"coldFirstFrameUs\":484171,\"coldPhaseUs\":{\"build\":319255.0,\"layout\":429942.0,\"paint\":2483.0},\"contentPhaseMedianUs\":{\"build\":232.0,\"layout\":489.0,\"paint\":100.0},\"contentPhaseP95Us\":{\"build\":457.0,\"layout\":945.0,\"paint\":174.0}}"
+        ]
+      },
+      {
+        "round": 2,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.706561833999999,
+        "log": "2-plain-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":2,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":222,\"firstPumpP95Us\":422,\"contentPumpMedianUs\":1064,\"contentPumpP95Us\":2282,\"coldFirstFrameUs\":476585,\"coldPhaseUs\":{\"build\":324732.0,\"layout\":327403.0,\"paint\":3243.0},\"contentPhaseMedianUs\":{\"build\":211.0,\"layout\":367.0,\"paint\":104.0},\"contentPhaseP95Us\":{\"build\":435.0,\"layout\":787.0,\"paint\":196.0}}"
+        ]
+      },
+      {
+        "round": 2,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.666810540999997,
+        "log": "2-plain-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":2,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":233,\"firstPumpP95Us\":431,\"contentPumpMedianUs\":1152,\"contentPumpP95Us\":2407,\"coldFirstFrameUs\":468522,\"coldPhaseUs\":{\"build\":316258.0,\"layout\":315410.0,\"paint\":3359.0},\"contentPhaseMedianUs\":{\"build\":228.0,\"layout\":393.0,\"paint\":109.0},\"contentPhaseP95Us\":{\"build\":499.0,\"layout\":800.0,\"paint\":199.0}}"
+        ]
+      },
+      {
+        "round": 3,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.775694292000004,
+        "log": "3-plain-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":3,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":248,\"firstPumpP95Us\":513,\"contentPumpMedianUs\":1319,\"contentPumpP95Us\":2629,\"coldFirstFrameUs\":490543,\"coldPhaseUs\":{\"build\":333819.0,\"layout\":334151.0,\"paint\":3260.0},\"contentPhaseMedianUs\":{\"build\":257.0,\"layout\":449.0,\"paint\":121.0},\"contentPhaseP95Us\":{\"build\":528.0,\"layout\":1070.0,\"paint\":230.0}}"
+        ]
+      },
+      {
+        "round": 3,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.679892041999999,
+        "log": "3-plain-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":3,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":223,\"firstPumpP95Us\":438,\"contentPumpMedianUs\":1139,\"contentPumpP95Us\":2509,\"coldFirstFrameUs\":484964,\"coldPhaseUs\":{\"build\":323037.0,\"layout\":325690.0,\"paint\":3594.0},\"contentPhaseMedianUs\":{\"build\":217.0,\"layout\":372.0,\"paint\":104.0},\"contentPhaseP95Us\":{\"build\":498.0,\"layout\":908.0,\"paint\":191.0}}"
+        ]
+      },
+      {
+        "round": 3,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.844376832999998,
+        "log": "3-wallpaper-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":3,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":408,\"firstPumpP95Us\":831,\"contentPumpMedianUs\":1082,\"contentPumpP95Us\":2354,\"coldFirstFrameUs\":477115,\"coldPhaseUs\":{\"build\":320715.0,\"layout\":424612.0,\"paint\":2144.0},\"contentPhaseMedianUs\":{\"build\":216.0,\"layout\":461.0,\"paint\":99.0},\"contentPhaseP95Us\":{\"build\":519.0,\"layout\":1111.0,\"paint\":188.0}}"
+        ]
+      },
+      {
+        "round": 3,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.967619292000002,
+        "log": "3-wallpaper-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":3,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":411,\"firstPumpP95Us\":861,\"contentPumpMedianUs\":1051,\"contentPumpP95Us\":2507,\"coldFirstFrameUs\":472765,\"coldPhaseUs\":{\"build\":319822.0,\"layout\":421798.0,\"paint\":2257.0},\"contentPhaseMedianUs\":{\"build\":216.0,\"layout\":442.0,\"paint\":97.0},\"contentPhaseP95Us\":{\"build\":557.0,\"layout\":1131.0,\"paint\":204.0}}"
+        ]
+      },
+      {
+        "round": 4,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.871961834000004,
+        "log": "4-wallpaper-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":4,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":391,\"firstPumpP95Us\":783,\"contentPumpMedianUs\":1026,\"contentPumpP95Us\":2307,\"coldFirstFrameUs\":477261,\"coldPhaseUs\":{\"build\":317030.0,\"layout\":422458.0,\"paint\":2087.0},\"contentPhaseMedianUs\":{\"build\":205.0,\"layout\":422.0,\"paint\":97.0},\"contentPhaseP95Us\":{\"build\":510.0,\"layout\":982.0,\"paint\":172.0}}"
+        ]
+      },
+      {
+        "round": 4,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.930232000000004,
+        "log": "4-wallpaper-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":4,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":453,\"firstPumpP95Us\":827,\"contentPumpMedianUs\":1242,\"contentPumpP95Us\":2388,\"coldFirstFrameUs\":479955,\"coldPhaseUs\":{\"build\":313776.0,\"layout\":426892.0,\"paint\":2054.0},\"contentPhaseMedianUs\":{\"build\":252.0,\"layout\":553.0,\"paint\":111.0},\"contentPhaseP95Us\":{\"build\":582.0,\"layout\":1103.0,\"paint\":197.0}}"
+        ]
+      },
+      {
+        "round": 4,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.805696499999996,
+        "log": "4-plain-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":4,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":243,\"firstPumpP95Us\":454,\"contentPumpMedianUs\":1186,\"contentPumpP95Us\":2222,\"coldFirstFrameUs\":515921,\"coldPhaseUs\":{\"build\":349770.0,\"layout\":356269.0,\"paint\":5759.0},\"contentPhaseMedianUs\":{\"build\":236.0,\"layout\":418.0,\"paint\":115.0},\"contentPhaseP95Us\":{\"build\":437.0,\"layout\":747.0,\"paint\":222.0}}"
+        ]
+      },
+      {
+        "round": 4,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.896274708000007,
+        "log": "4-plain-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":4,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":236,\"firstPumpP95Us\":430,\"contentPumpMedianUs\":1178,\"contentPumpP95Us\":2271,\"coldFirstFrameUs\":528935,\"coldPhaseUs\":{\"build\":360535.0,\"layout\":364642.0,\"paint\":3526.0},\"contentPhaseMedianUs\":{\"build\":229.0,\"layout\":393.0,\"paint\":112.0},\"contentPhaseP95Us\":{\"build\":460.0,\"layout\":804.0,\"paint\":227.0}}"
+        ]
+      },
+      {
+        "round": 5,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 5.264041875000004,
+        "log": "5-plain-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":5,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":228,\"firstPumpP95Us\":411,\"contentPumpMedianUs\":1114,\"contentPumpP95Us\":2552,\"coldFirstFrameUs\":489535,\"coldPhaseUs\":{\"build\":331878.0,\"layout\":329665.0,\"paint\":4086.0},\"contentPhaseMedianUs\":{\"build\":209.0,\"layout\":362.0,\"paint\":106.0},\"contentPhaseP95Us\":{\"build\":508.0,\"layout\":847.0,\"paint\":189.0}}"
+        ]
+      },
+      {
+        "round": 5,
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.853577833000003,
+        "log": "5-plain-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":5,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":243,\"firstPumpP95Us\":506,\"contentPumpMedianUs\":1189,\"contentPumpP95Us\":2636,\"coldFirstFrameUs\":489731,\"coldPhaseUs\":{\"build\":331650.0,\"layout\":329871.0,\"paint\":3677.0},\"contentPhaseMedianUs\":{\"build\":239.0,\"layout\":403.0,\"paint\":117.0},\"contentPhaseP95Us\":{\"build\":505.0,\"layout\":907.0,\"paint\":241.0}}"
+        ]
+      },
+      {
+        "round": 5,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.909313875000009,
+        "log": "5-wallpaper-markstream_render-baseline.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":5,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":410,\"firstPumpP95Us\":870,\"contentPumpMedianUs\":1103,\"contentPumpP95Us\":2458,\"coldFirstFrameUs\":511535,\"coldPhaseUs\":{\"build\":344881.0,\"layout\":456356.0,\"paint\":2495.0},\"contentPhaseMedianUs\":{\"build\":232.0,\"layout\":474.0,\"paint\":100.0},\"contentPhaseP95Us\":{\"build\":528.0,\"layout\":1152.0,\"paint\":191.0}}"
+        ]
+      },
+      {
+        "round": 5,
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5"
+        ],
+        "exitCode": 0,
+        "seconds": 4.993846125000005,
+        "log": "5-wallpaper-markstream_render-current.log",
+        "results": [
+          "MARKSTREAM_RENDER {\"run\":5,\"renderer\":\"markstream\",\"appAdapters\":true,\"selectionController\":true,\"appendChars\":30000,\"coldChars\":100000,\"samples\":280,\"cycles\":5,\"firstPumpMedianUs\":466,\"firstPumpP95Us\":923,\"contentPumpMedianUs\":1251,\"contentPumpP95Us\":2551,\"coldFirstFrameUs\":507306,\"coldPhaseUs\":{\"build\":348144.0,\"layout\":455591.0,\"paint\":2256.0},\"contentPhaseMedianUs\":{\"build\":264.0,\"layout\":560.0,\"paint\":112.0},\"contentPhaseP95Us\":{\"build\":550.0,\"layout\":1107.0,\"paint\":193.0}}"
+        ]
+      }
+    ],
+    "productionSha256": {
+      "dependencies/markstream/lib/src/flutter/render/blocks/table_block.dart": "633825df7095b2fce22c21d436229c985658fd542f5e47b9fb3d52a1b35c3527",
+      "dependencies/markstream/lib/src/flutter/render/inline_builder.dart": "275ae6f64b2994bd3e0f20543f067a57aab448a5c4e08c8c12345bcf6e18edb1",
+      "dependencies/markstream/lib/src/flutter/theme/markstream_theme.dart": "cf9796ce9f420eec8a008bffedaf78544fbfa3df1dc90809a8dd4946c1e27306",
+      "lib/features/chat/utils/export_image_processor.dart": "82d10f2da44cdb26a719801a9e4dbafd4196237e6432ee5be7bdd1bdbb9b9e0e",
+      "lib/features/chat/widgets/chat_surface.dart": "ab9a99bbe1e575ef9f17c274cfdefd8844fff32c87c1b3af845b026cf550420b",
+      "lib/features/chat/widgets/export_image_capture.dart": "41b7c3a7b3301a8a79ac1ded844015fbc78eed0a9d927a2f3b4c4e5368dec1db",
+      "lib/features/chat/widgets/frosted/chat_frosted_backdrop.dart": "36e0432b6a39095292aff44285bcb17dcad4ef7ad4d36395a9a0a7ec17e7434b",
+      "lib/features/chat/widgets/image_preview_sheet.dart": "b52a3a83643a47cc6f2e24fd814d7369dcd014e648bf9390006d11f529d6feb6",
+      "lib/features/chat/widgets/message_export_sheet.dart": "ce7533ba0659f0a97e247f6f481fedb14b2edfb9573a908d1a387018886a4a43",
+      "lib/l10n/app_en.arb": "dace2c0111d6323e0059cfa6bc99741a73f6607c0e422e497591a8167af95953",
+      "lib/l10n/app_localizations.dart": "50b113d24df3236c569099c88eb66313c0c2273eb850a0e32270776df061a507",
+      "lib/l10n/app_localizations_en.dart": "7849030749a2fe376d9e73323958ac1ec2cdbee26ce86b2223665bd5485af180",
+      "lib/l10n/app_localizations_zh.dart": "a2453eb55c50ddac821f2184f2b702391d2f3c8cf1b59a953f00129ed78b0a1d",
+      "lib/l10n/app_zh.arb": "3bac7a610ff635dbbc6749cf828263ce068cd43ad2fb041290da88bfadfdb947",
+      "lib/l10n/app_zh_Hans.arb": "ab9dfa546d4ccdeb7bc44e14eb484f7a646892c27864b22b4c0539b579ef7a7f",
+      "lib/l10n/app_zh_Hant.arb": "a86cd9c69c9bf375ec5fa34b5467ed0ae8fae31739d0ec0abc6b375fab6ddb74",
+      "lib/shared/markdown/diagram_chrome.dart": "0706f31f1c4fd17d88a48d05750909f01a568749c40dd5720f43b5af742a87e3",
+      "lib/shared/markdown/diagram_code_blocks.dart": "dcc074061114f37597cf1e99acbb81a40133c8b49f5cee26f2960d7fa10814e1",
+      "lib/shared/markdown/highlight_adapter.dart": "8d34f2d9103637404759f3e021a34d523f4eee7ca2e8d3d70df20f50e40064af",
+      "lib/shared/markdown/kelivo_markdown_extensions.dart": "b0c28fb68b3e608e1deaa413930c3b702e2146e9ed8c64f32c908ae05945aa9d",
+      "lib/shared/markdown/markdown_surface_scope.dart": "8ac5712da0ac19a45094a630de7cdbec0d708d3dab4ed720d3b71832d3025454",
+      "lib/shared/markdown/markdown_theme_mapper.dart": "29191ccd4c7ebeb04f9322062f1d8eeffc4c57ee389385ca02d482accb3c9143",
+      "lib/shared/markdown/markdown_with_code_highlight.dart": "0f36eb1bf987a7c93c558d2279a4c87b1e749ac764ba43192661fc3f451a5324",
+      "lib/shared/widgets/diagram_exporter.dart": "faa70584a7207c300dc27c7ac998bd69e6898db3c61e7bc093a0390a9efec792",
+      "lib/shared/widgets/plantuml_block.dart": "cfb93785266b408f9b411b8e2eb4f856f6bcee4ae0ab1e8ebc6fa5d187602974"
+    }
+  },
+  "pairedSummary": {
+    "rows": [
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "firstPumpMedianUs",
+        "baseline": 233,
+        "current": 223,
+        "deltaPct": -4.29184549356223,
+        "rounds": {
+          "baseline": [
+            215,
+            233,
+            248,
+            236,
+            228
+          ],
+          "current": [
+            205,
+            222,
+            223,
+            243,
+            243
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "firstPumpP95Us",
+        "baseline": 431,
+        "current": 454,
+        "deltaPct": 5.336426914153125,
+        "rounds": {
+          "baseline": [
+            483,
+            431,
+            513,
+            430,
+            411
+          ],
+          "current": [
+            469,
+            422,
+            438,
+            454,
+            506
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPumpMedianUs",
+        "baseline": 1152,
+        "current": 1139,
+        "deltaPct": -1.128472222222221,
+        "rounds": {
+          "baseline": [
+            1040,
+            1152,
+            1319,
+            1178,
+            1114
+          ],
+          "current": [
+            1008,
+            1064,
+            1139,
+            1186,
+            1189
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPumpP95Us",
+        "baseline": 2479,
+        "current": 2434,
+        "deltaPct": -1.8152480839047969,
+        "rounds": {
+          "baseline": [
+            2479,
+            2407,
+            2629,
+            2271,
+            2552
+          ],
+          "current": [
+            2434,
+            2282,
+            2509,
+            2222,
+            2636
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "coldFirstFrameUs",
+        "baseline": 490543,
+        "current": 484964,
+        "deltaPct": -1.1373111021867555,
+        "rounds": {
+          "baseline": [
+            491933,
+            468522,
+            490543,
+            528935,
+            489535
+          ],
+          "current": [
+            465095,
+            476585,
+            484964,
+            515921,
+            489731
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "coldPhaseUs.build",
+        "baseline": 333819.0,
+        "current": 324732.0,
+        "deltaPct": -2.722133850979125,
+        "rounds": {
+          "baseline": [
+            334649.0,
+            316258.0,
+            333819.0,
+            360535.0,
+            331878.0
+          ],
+          "current": [
+            315216.0,
+            324732.0,
+            323037.0,
+            349770.0,
+            331650.0
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "coldPhaseUs.layout",
+        "baseline": 329665.0,
+        "current": 327403.0,
+        "deltaPct": -0.6861510927759995,
+        "rounds": {
+          "baseline": [
+            328447.0,
+            315410.0,
+            334151.0,
+            364642.0,
+            329665.0
+          ],
+          "current": [
+            316321.0,
+            327403.0,
+            325690.0,
+            356269.0,
+            329871.0
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "coldPhaseUs.paint",
+        "baseline": 3359.0,
+        "current": 3594.0,
+        "deltaPct": 6.996129800535877,
+        "rounds": {
+          "baseline": [
+            3314.0,
+            3359.0,
+            3260.0,
+            3526.0,
+            4086.0
+          ],
+          "current": [
+            3273.0,
+            3243.0,
+            3594.0,
+            5759.0,
+            3677.0
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseMedianUs.build",
+        "baseline": 228.0,
+        "current": 217.0,
+        "deltaPct": -4.824561403508776,
+        "rounds": {
+          "baseline": [
+            202.0,
+            228.0,
+            257.0,
+            229.0,
+            209.0
+          ],
+          "current": [
+            189.0,
+            211.0,
+            217.0,
+            236.0,
+            239.0
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseMedianUs.layout",
+        "baseline": 393.0,
+        "current": 372.0,
+        "deltaPct": -5.343511450381677,
+        "rounds": {
+          "baseline": [
+            353.0,
+            393.0,
+            449.0,
+            393.0,
+            362.0
+          ],
+          "current": [
+            334.0,
+            367.0,
+            372.0,
+            418.0,
+            403.0
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseMedianUs.paint",
+        "baseline": 109.0,
+        "current": 104.0,
+        "deltaPct": -4.587155963302747,
+        "rounds": {
+          "baseline": [
+            102.0,
+            109.0,
+            121.0,
+            112.0,
+            106.0
+          ],
+          "current": [
+            100.0,
+            104.0,
+            104.0,
+            115.0,
+            117.0
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseP95Us.build",
+        "baseline": 508.0,
+        "current": 498.0,
+        "deltaPct": -1.9685039370078705,
+        "rounds": {
+          "baseline": [
+            529.0,
+            499.0,
+            528.0,
+            460.0,
+            508.0
+          ],
+          "current": [
+            516.0,
+            435.0,
+            498.0,
+            437.0,
+            505.0
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseP95Us.layout",
+        "baseline": 847.0,
+        "current": 907.0,
+        "deltaPct": 7.08382526564344,
+        "rounds": {
+          "baseline": [
+            875.0,
+            800.0,
+            1070.0,
+            804.0,
+            847.0
+          ],
+          "current": [
+            944.0,
+            787.0,
+            908.0,
+            747.0,
+            907.0
+          ]
+        }
+      },
+      {
+        "backdrop": "plain",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseP95Us.paint",
+        "baseline": 210.0,
+        "current": 222.0,
+        "deltaPct": 5.714285714285716,
+        "rounds": {
+          "baseline": [
+            210.0,
+            199.0,
+            230.0,
+            227.0,
+            189.0
+          ],
+          "current": [
+            228.0,
+            196.0,
+            191.0,
+            222.0,
+            241.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "firstPumpMedianUs",
+        "baseline": 410,
+        "current": 415,
+        "deltaPct": 1.2195121951219523,
+        "rounds": {
+          "baseline": [
+            390,
+            428,
+            408,
+            453,
+            410
+          ],
+          "current": [
+            435,
+            415,
+            411,
+            391,
+            466
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "firstPumpP95Us",
+        "baseline": 850,
+        "current": 883,
+        "deltaPct": 3.88235294117647,
+        "rounds": {
+          "baseline": [
+            850,
+            855,
+            831,
+            827,
+            870
+          ],
+          "current": [
+            967,
+            883,
+            861,
+            783,
+            923
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPumpMedianUs",
+        "baseline": 1103,
+        "current": 1100,
+        "deltaPct": -0.27198549410698547,
+        "rounds": {
+          "baseline": [
+            1070,
+            1128,
+            1082,
+            1242,
+            1103
+          ],
+          "current": [
+            1101,
+            1100,
+            1051,
+            1026,
+            1251
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPumpP95Us",
+        "baseline": 2354,
+        "current": 2429,
+        "deltaPct": 3.1860662701784115,
+        "rounds": {
+          "baseline": [
+            2255,
+            2239,
+            2354,
+            2388,
+            2458
+          ],
+          "current": [
+            2429,
+            2353,
+            2507,
+            2307,
+            2551
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "coldFirstFrameUs",
+        "baseline": 479955,
+        "current": 477261,
+        "deltaPct": -0.5613026221208184,
+        "rounds": {
+          "baseline": [
+            476905,
+            484171,
+            477115,
+            479955,
+            511535
+          ],
+          "current": [
+            477186,
+            494006,
+            472765,
+            477261,
+            507306
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "coldPhaseUs.build",
+        "baseline": 320715.0,
+        "current": 324718.0,
+        "deltaPct": 1.248148667820348,
+        "rounds": {
+          "baseline": [
+            323244.0,
+            319255.0,
+            320715.0,
+            313776.0,
+            344881.0
+          ],
+          "current": [
+            324718.0,
+            335256.0,
+            319822.0,
+            317030.0,
+            348144.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "coldPhaseUs.layout",
+        "baseline": 426892.0,
+        "current": 425904.0,
+        "deltaPct": -0.23144027060708616,
+        "rounds": {
+          "baseline": [
+            426219.0,
+            429942.0,
+            424612.0,
+            426892.0,
+            456356.0
+          ],
+          "current": [
+            425904.0,
+            441122.0,
+            421798.0,
+            422458.0,
+            455591.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "coldPhaseUs.paint",
+        "baseline": 2144.0,
+        "current": 2256.0,
+        "deltaPct": 5.223880597014929,
+        "rounds": {
+          "baseline": [
+            1980.0,
+            2483.0,
+            2144.0,
+            2054.0,
+            2495.0
+          ],
+          "current": [
+            1886.0,
+            2282.0,
+            2257.0,
+            2087.0,
+            2256.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseMedianUs.build",
+        "baseline": 232.0,
+        "current": 226.0,
+        "deltaPct": -2.5862068965517238,
+        "rounds": {
+          "baseline": [
+            215.0,
+            232.0,
+            216.0,
+            252.0,
+            232.0
+          ],
+          "current": [
+            232.0,
+            226.0,
+            216.0,
+            205.0,
+            264.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseMedianUs.layout",
+        "baseline": 474.0,
+        "current": 475.0,
+        "deltaPct": 0.21097046413502962,
+        "rounds": {
+          "baseline": [
+            442.0,
+            489.0,
+            461.0,
+            553.0,
+            474.0
+          ],
+          "current": [
+            487.0,
+            475.0,
+            442.0,
+            422.0,
+            560.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseMedianUs.paint",
+        "baseline": 100.0,
+        "current": 100.0,
+        "deltaPct": 0.0,
+        "rounds": {
+          "baseline": [
+            94.0,
+            100.0,
+            99.0,
+            111.0,
+            100.0
+          ],
+          "current": [
+            100.0,
+            100.0,
+            97.0,
+            97.0,
+            112.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseP95Us.build",
+        "baseline": 519.0,
+        "current": 517.0,
+        "deltaPct": -0.3853564547206201,
+        "rounds": {
+          "baseline": [
+            481.0,
+            457.0,
+            519.0,
+            582.0,
+            528.0
+          ],
+          "current": [
+            517.0,
+            504.0,
+            557.0,
+            510.0,
+            550.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseP95Us.layout",
+        "baseline": 1103.0,
+        "current": 1106.0,
+        "deltaPct": 0.27198549410698547,
+        "rounds": {
+          "baseline": [
+            987.0,
+            945.0,
+            1111.0,
+            1103.0,
+            1152.0
+          ],
+          "current": [
+            1106.0,
+            994.0,
+            1131.0,
+            982.0,
+            1107.0
+          ]
+        }
+      },
+      {
+        "backdrop": "wallpaper",
+        "bench": "markstream_render",
+        "scenario": "fixed",
+        "metric": "contentPhaseP95Us.paint",
+        "baseline": 188.0,
+        "current": 191.0,
+        "deltaPct": 1.5957446808510634,
+        "rounds": {
+          "baseline": [
+            187.0,
+            174.0,
+            188.0,
+            197.0,
+            191.0
+          ],
+          "current": [
+            191.0,
+            173.0,
+            204.0,
+            172.0,
+            193.0
+          ]
+        }
+      }
+    ],
+    "geometry": []
+  },
+  "threeRevisionBatch": {
+    "revisions": {
+      "baseline": "a8364707",
+      "reviewed": "28f4e4b4",
+      "current": "working tree after independent review"
+    },
+    "sdk": "Flutter 3.47.6 \u2022 channel stable \u2022 https://github.com/flutter/flutter.git\nFramework \u2022 revision 5fc346839b (3 weeks ago) \u2022 2026-09-30 15:02:49 -0700\nEngine \u2022 hash b8c8d3d8d5d0095127057f8a29ca8cc53da2167c (revision 692136cb65) (22 days ago) \u2022 2026-09-30 00:56:59.000Z\nTools \u2022 Dart 3.13.5 \u2022 DevTools 2.60.0\n",
+    "hardware": "Apple M4 Pro",
+    "harnessSha256": {
+      "test/perf/markstream_render_bench.dart": "61237e20ec046089e74c4db881b699ba18e368c7b95627a9f0f005373b4c768f",
+      "test/perf/timeline_scroll_bench.dart": "909b13ca26f63f1b829e277dca3ff33112b14fe70a63519989850d93eb8ca23d",
+      "test/perf/long_streaming_bench.dart": "5180dab109543d2b7579f354ddc488f93b74802a71cbd4fb7d56ee0306251430",
+      "test/support/markdown_backdrop_host.dart": "7bb6e98af48f5722ee5a7480b46e3a40bab46d6c99d9214555760195c406b481"
+    },
+    "productionSha256": {
+      "dependencies/markstream/lib/src/flutter/render/blocks/table_block.dart": "633825df7095b2fce22c21d436229c985658fd542f5e47b9fb3d52a1b35c3527",
+      "dependencies/markstream/lib/src/flutter/render/inline_builder.dart": "275ae6f64b2994bd3e0f20543f067a57aab448a5c4e08c8c12345bcf6e18edb1",
+      "dependencies/markstream/lib/src/flutter/theme/markstream_theme.dart": "cf9796ce9f420eec8a008bffedaf78544fbfa3df1dc90809a8dd4946c1e27306",
+      "lib/features/chat/utils/export_image_processor.dart": "82d10f2da44cdb26a719801a9e4dbafd4196237e6432ee5be7bdd1bdbb9b9e0e",
+      "lib/features/chat/widgets/chat_surface.dart": "ab9a99bbe1e575ef9f17c274cfdefd8844fff32c87c1b3af845b026cf550420b",
+      "lib/features/chat/widgets/export_image_capture.dart": "41b7c3a7b3301a8a79ac1ded844015fbc78eed0a9d927a2f3b4c4e5368dec1db",
+      "lib/features/chat/widgets/frosted/chat_frosted_backdrop.dart": "36e0432b6a39095292aff44285bcb17dcad4ef7ad4d36395a9a0a7ec17e7434b",
+      "lib/features/chat/widgets/image_preview_sheet.dart": "b52a3a83643a47cc6f2e24fd814d7369dcd014e648bf9390006d11f529d6feb6",
+      "lib/features/chat/widgets/message_export_sheet.dart": "ce7533ba0659f0a97e247f6f481fedb14b2edfb9573a908d1a387018886a4a43",
+      "lib/l10n/app_en.arb": "dace2c0111d6323e0059cfa6bc99741a73f6607c0e422e497591a8167af95953",
+      "lib/l10n/app_localizations.dart": "50b113d24df3236c569099c88eb66313c0c2273eb850a0e32270776df061a507",
+      "lib/l10n/app_localizations_en.dart": "7849030749a2fe376d9e73323958ac1ec2cdbee26ce86b2223665bd5485af180",
+      "lib/l10n/app_localizations_zh.dart": "a2453eb55c50ddac821f2184f2b702391d2f3c8cf1b59a953f00129ed78b0a1d",
+      "lib/l10n/app_zh.arb": "3bac7a610ff635dbbc6749cf828263ce068cd43ad2fb041290da88bfadfdb947",
+      "lib/l10n/app_zh_Hans.arb": "ab9dfa546d4ccdeb7bc44e14eb484f7a646892c27864b22b4c0539b579ef7a7f",
+      "lib/l10n/app_zh_Hant.arb": "a86cd9c69c9bf375ec5fa34b5467ed0ae8fae31739d0ec0abc6b375fab6ddb74",
+      "lib/shared/markdown/diagram_chrome.dart": "0706f31f1c4fd17d88a48d05750909f01a568749c40dd5720f43b5af742a87e3",
+      "lib/shared/markdown/diagram_code_blocks.dart": "dcc074061114f37597cf1e99acbb81a40133c8b49f5cee26f2960d7fa10814e1",
+      "lib/shared/markdown/highlight_adapter.dart": "8d34f2d9103637404759f3e021a34d523f4eee7ca2e8d3d70df20f50e40064af",
+      "lib/shared/markdown/kelivo_markdown_extensions.dart": "b0c28fb68b3e608e1deaa413930c3b702e2146e9ed8c64f32c908ae05945aa9d",
+      "lib/shared/markdown/markdown_surface_scope.dart": "8ac5712da0ac19a45094a630de7cdbec0d708d3dab4ed720d3b71832d3025454",
+      "lib/shared/markdown/markdown_theme_mapper.dart": "29191ccd4c7ebeb04f9322062f1d8eeffc4c57ee389385ca02d482accb3c9143",
+      "lib/shared/markdown/markdown_with_code_highlight.dart": "0f36eb1bf987a7c93c558d2279a4c87b1e749ac764ba43192661fc3f451a5324",
+      "lib/shared/widgets/diagram_exporter.dart": "faa70584a7207c300dc27c7ac998bd69e6898db3c61e7bc093a0390a9efec792",
+      "lib/shared/widgets/plantuml_block.dart": "cfb93785266b408f9b411b8e2eb4f856f6bcee4ae0ab1e8ebc6fa5d187602974"
+    },
+    "runs": [
+      {
+        "round": 1,
+        "backdrop": "plain",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 5.1151631250000005,
+        "result": {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 226,
+          "firstPumpP95Us": 425,
+          "contentPumpMedianUs": 1128,
+          "contentPumpP95Us": 2267,
+          "coldFirstFrameUs": 509950,
+          "coldPhaseUs": {
+            "build": 323624.0,
+            "layout": 345764.0,
+            "paint": 3853.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 214.0,
+            "layout": 376.0,
+            "paint": 113.0
+          },
+          "contentPhaseP95Us": {
+            "build": 466.0,
+            "layout": 777.0,
+            "paint": 225.0
+          }
+        }
+      },
+      {
+        "round": 1,
+        "backdrop": "plain",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 28.088755374999998,
+        "result": {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 223,
+          "firstPumpP95Us": 469,
+          "contentPumpMedianUs": 1126,
+          "contentPumpP95Us": 2181,
+          "coldFirstFrameUs": 487703,
+          "coldPhaseUs": {
+            "build": 320752.0,
+            "layout": 327676.0,
+            "paint": 4521.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 223.0,
+            "layout": 387.0,
+            "paint": 103.0
+          },
+          "contentPhaseP95Us": {
+            "build": 451.0,
+            "layout": 730.0,
+            "paint": 198.0
+          }
+        }
+      },
+      {
+        "round": 1,
+        "backdrop": "plain",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.905084250000002,
+        "result": {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 225,
+          "firstPumpP95Us": 457,
+          "contentPumpMedianUs": 1130,
+          "contentPumpP95Us": 2252,
+          "coldFirstFrameUs": 472413,
+          "coldPhaseUs": {
+            "build": 320771.0,
+            "layout": 324936.0,
+            "paint": 3391.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 214.0,
+            "layout": 376.0,
+            "paint": 105.0
+          },
+          "contentPhaseP95Us": {
+            "build": 512.0,
+            "layout": 852.0,
+            "paint": 202.0
+          }
+        }
+      },
+      {
+        "round": 1,
+        "backdrop": "wallpaper",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.875919665999994,
+        "result": {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 442,
+          "firstPumpP95Us": 924,
+          "contentPumpMedianUs": 1158,
+          "contentPumpP95Us": 2486,
+          "coldFirstFrameUs": 474368,
+          "coldPhaseUs": {
+            "build": 315403.0,
+            "layout": 424876.0,
+            "paint": 1915.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 239.0,
+            "layout": 492.0,
+            "paint": 103.0
+          },
+          "contentPhaseP95Us": {
+            "build": 515.0,
+            "layout": 1063.0,
+            "paint": 207.0
+          }
+        }
+      },
+      {
+        "round": 1,
+        "backdrop": "wallpaper",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 11.454461875,
+        "result": {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 431,
+          "firstPumpP95Us": 727,
+          "contentPumpMedianUs": 1161,
+          "contentPumpP95Us": 2206,
+          "coldFirstFrameUs": 484021,
+          "coldPhaseUs": {
+            "build": 324014.0,
+            "layout": 429775.0,
+            "paint": 2121.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 241.0,
+            "layout": 515.0,
+            "paint": 105.0
+          },
+          "contentPhaseP95Us": {
+            "build": 464.0,
+            "layout": 914.0,
+            "paint": 206.0
+          }
+        }
+      },
+      {
+        "round": 1,
+        "backdrop": "wallpaper",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 5.409465249999997,
+        "result": {
+          "run": 1,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 403,
+          "firstPumpP95Us": 872,
+          "contentPumpMedianUs": 1062,
+          "contentPumpP95Us": 2524,
+          "coldFirstFrameUs": 475391,
+          "coldPhaseUs": {
+            "build": 321015.0,
+            "layout": 423357.0,
+            "paint": 2031.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 212.0,
+            "layout": 446.0,
+            "paint": 97.0
+          },
+          "contentPhaseP95Us": {
+            "build": 516.0,
+            "layout": 1059.0,
+            "paint": 185.0
+          }
+        }
+      },
+      {
+        "round": 2,
+        "backdrop": "wallpaper",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 5.023289708,
+        "result": {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 427,
+          "firstPumpP95Us": 998,
+          "contentPumpMedianUs": 1127,
+          "contentPumpP95Us": 2844,
+          "coldFirstFrameUs": 481171,
+          "coldPhaseUs": {
+            "build": 330435.0,
+            "layout": 429576.0,
+            "paint": 1959.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 221.0,
+            "layout": 483.0,
+            "paint": 102.0
+          },
+          "contentPhaseP95Us": {
+            "build": 581.0,
+            "layout": 1241.0,
+            "paint": 215.0
+          }
+        }
+      },
+      {
+        "round": 2,
+        "backdrop": "wallpaper",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.9334782090000004,
+        "result": {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 424,
+          "firstPumpP95Us": 925,
+          "contentPumpMedianUs": 1167,
+          "contentPumpP95Us": 2498,
+          "coldFirstFrameUs": 471170,
+          "coldPhaseUs": {
+            "build": 314318.0,
+            "layout": 418766.0,
+            "paint": 2219.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 237.0,
+            "layout": 486.0,
+            "paint": 101.0
+          },
+          "contentPhaseP95Us": {
+            "build": 541.0,
+            "layout": 1177.0,
+            "paint": 230.0
+          }
+        }
+      },
+      {
+        "round": 2,
+        "backdrop": "wallpaper",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 5.0113400420000005,
+        "result": {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 452,
+          "firstPumpP95Us": 911,
+          "contentPumpMedianUs": 1225,
+          "contentPumpP95Us": 2405,
+          "coldFirstFrameUs": 476654,
+          "coldPhaseUs": {
+            "build": 320101.0,
+            "layout": 423622.0,
+            "paint": 2085.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 260.0,
+            "layout": 552.0,
+            "paint": 112.0
+          },
+          "contentPhaseP95Us": {
+            "build": 551.0,
+            "layout": 1092.0,
+            "paint": 195.0
+          }
+        }
+      },
+      {
+        "round": 2,
+        "backdrop": "plain",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.781263374999995,
+        "result": {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 241,
+          "firstPumpP95Us": 482,
+          "contentPumpMedianUs": 1194,
+          "contentPumpP95Us": 2574,
+          "coldFirstFrameUs": 498762,
+          "coldPhaseUs": {
+            "build": 337124.0,
+            "layout": 343920.0,
+            "paint": 3318.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 228.0,
+            "layout": 407.0,
+            "paint": 121.0
+          },
+          "contentPhaseP95Us": {
+            "build": 501.0,
+            "layout": 874.0,
+            "paint": 256.0
+          }
+        }
+      },
+      {
+        "round": 2,
+        "backdrop": "plain",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.716026540999991,
+        "result": {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 234,
+          "firstPumpP95Us": 450,
+          "contentPumpMedianUs": 1127,
+          "contentPumpP95Us": 2230,
+          "coldFirstFrameUs": 509161,
+          "coldPhaseUs": {
+            "build": 336174.0,
+            "layout": 350421.0,
+            "paint": 3421.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 218.0,
+            "layout": 378.0,
+            "paint": 110.0
+          },
+          "contentPhaseP95Us": {
+            "build": 450.0,
+            "layout": 728.0,
+            "paint": 205.0
+          }
+        }
+      },
+      {
+        "round": 2,
+        "backdrop": "plain",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.733216084000006,
+        "result": {
+          "run": 2,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 219,
+          "firstPumpP95Us": 435,
+          "contentPumpMedianUs": 1121,
+          "contentPumpP95Us": 2484,
+          "coldFirstFrameUs": 482171,
+          "coldPhaseUs": {
+            "build": 313498.0,
+            "layout": 325620.0,
+            "paint": 4151.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 216.0,
+            "layout": 376.0,
+            "paint": 105.0
+          },
+          "contentPhaseP95Us": {
+            "build": 476.0,
+            "layout": 766.0,
+            "paint": 207.0
+          }
+        }
+      },
+      {
+        "round": 3,
+        "backdrop": "plain",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.657046458000011,
+        "result": {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 223,
+          "firstPumpP95Us": 463,
+          "contentPumpMedianUs": 1066,
+          "contentPumpP95Us": 2499,
+          "coldFirstFrameUs": 477781,
+          "coldPhaseUs": {
+            "build": 325997.0,
+            "layout": 320258.0,
+            "paint": 3295.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 204.0,
+            "layout": 349.0,
+            "paint": 102.0
+          },
+          "contentPhaseP95Us": {
+            "build": 496.0,
+            "layout": 843.0,
+            "paint": 226.0
+          }
+        }
+      },
+      {
+        "round": 3,
+        "backdrop": "plain",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.829361792,
+        "result": {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 233,
+          "firstPumpP95Us": 437,
+          "contentPumpMedianUs": 1175,
+          "contentPumpP95Us": 2131,
+          "coldFirstFrameUs": 489632,
+          "coldPhaseUs": {
+            "build": 337622.0,
+            "layout": 335272.0,
+            "paint": 3472.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 231.0,
+            "layout": 395.0,
+            "paint": 114.0
+          },
+          "contentPhaseP95Us": {
+            "build": 458.0,
+            "layout": 782.0,
+            "paint": 215.0
+          }
+        }
+      },
+      {
+        "round": 3,
+        "backdrop": "plain",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.849114374999999,
+        "result": {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 252,
+          "firstPumpP95Us": 480,
+          "contentPumpMedianUs": 1269,
+          "contentPumpP95Us": 2606,
+          "coldFirstFrameUs": 507094,
+          "coldPhaseUs": {
+            "build": 335906.0,
+            "layout": 349090.0,
+            "paint": 4008.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 240.0,
+            "layout": 427.0,
+            "paint": 125.0
+          },
+          "contentPhaseP95Us": {
+            "build": 544.0,
+            "layout": 897.0,
+            "paint": 283.0
+          }
+        }
+      },
+      {
+        "round": 3,
+        "backdrop": "wallpaper",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.889707292000011,
+        "result": {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 426,
+          "firstPumpP95Us": 844,
+          "contentPumpMedianUs": 1092,
+          "contentPumpP95Us": 2404,
+          "coldFirstFrameUs": 498824,
+          "coldPhaseUs": {
+            "build": 331763.0,
+            "layout": 443576.0,
+            "paint": 2405.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 221.0,
+            "layout": 473.0,
+            "paint": 99.0
+          },
+          "contentPhaseP95Us": {
+            "build": 502.0,
+            "layout": 1063.0,
+            "paint": 183.0
+          }
+        }
+      },
+      {
+        "round": 3,
+        "backdrop": "wallpaper",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.8420619999999985,
+        "result": {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 414,
+          "firstPumpP95Us": 948,
+          "contentPumpMedianUs": 1095,
+          "contentPumpP95Us": 2517,
+          "coldFirstFrameUs": 481620,
+          "coldPhaseUs": {
+            "build": 317221.0,
+            "layout": 427182.0,
+            "paint": 2657.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 224.0,
+            "layout": 464.0,
+            "paint": 98.0
+          },
+          "contentPhaseP95Us": {
+            "build": 545.0,
+            "layout": 1159.0,
+            "paint": 205.0
+          }
+        }
+      },
+      {
+        "round": 3,
+        "backdrop": "wallpaper",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.853355249999993,
+        "result": {
+          "run": 3,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 411,
+          "firstPumpP95Us": 892,
+          "contentPumpMedianUs": 1088,
+          "contentPumpP95Us": 2648,
+          "coldFirstFrameUs": 471931,
+          "coldPhaseUs": {
+            "build": 314230.0,
+            "layout": 420435.0,
+            "paint": 2097.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 223.0,
+            "layout": 483.0,
+            "paint": 97.0
+          },
+          "contentPhaseP95Us": {
+            "build": 564.0,
+            "layout": 1212.0,
+            "paint": 211.0
+          }
+        }
+      },
+      {
+        "round": 4,
+        "backdrop": "wallpaper",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.969747541999993,
+        "result": {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 466,
+          "firstPumpP95Us": 875,
+          "contentPumpMedianUs": 1272,
+          "contentPumpP95Us": 2504,
+          "coldFirstFrameUs": 471795,
+          "coldPhaseUs": {
+            "build": 312572.0,
+            "layout": 418511.0,
+            "paint": 2253.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 261.0,
+            "layout": 552.0,
+            "paint": 113.0
+          },
+          "contentPhaseP95Us": {
+            "build": 526.0,
+            "layout": 1104.0,
+            "paint": 222.0
+          }
+        }
+      },
+      {
+        "round": 4,
+        "backdrop": "wallpaper",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.978868457999994,
+        "result": {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 402,
+          "firstPumpP95Us": 952,
+          "contentPumpMedianUs": 1036,
+          "contentPumpP95Us": 2491,
+          "coldFirstFrameUs": 500338,
+          "coldPhaseUs": {
+            "build": 327059.0,
+            "layout": 442085.0,
+            "paint": 2040.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 207.0,
+            "layout": 437.0,
+            "paint": 97.0
+          },
+          "contentPhaseP95Us": {
+            "build": 571.0,
+            "layout": 1158.0,
+            "paint": 191.0
+          }
+        }
+      },
+      {
+        "round": 4,
+        "backdrop": "wallpaper",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.955944667000011,
+        "result": {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 414,
+          "firstPumpP95Us": 918,
+          "contentPumpMedianUs": 1106,
+          "contentPumpP95Us": 2348,
+          "coldFirstFrameUs": 476837,
+          "coldPhaseUs": {
+            "build": 318055.0,
+            "layout": 420560.0,
+            "paint": 2374.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 232.0,
+            "layout": 484.0,
+            "paint": 100.0
+          },
+          "contentPhaseP95Us": {
+            "build": 494.0,
+            "layout": 1055.0,
+            "paint": 185.0
+          }
+        }
+      },
+      {
+        "round": 4,
+        "backdrop": "plain",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.731636584,
+        "result": {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 228,
+          "firstPumpP95Us": 422,
+          "contentPumpMedianUs": 1141,
+          "contentPumpP95Us": 2244,
+          "coldFirstFrameUs": 484483,
+          "coldPhaseUs": {
+            "build": 329676.0,
+            "layout": 324428.0,
+            "paint": 3299.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 225.0,
+            "layout": 386.0,
+            "paint": 105.0
+          },
+          "contentPhaseP95Us": {
+            "build": 461.0,
+            "layout": 792.0,
+            "paint": 187.0
+          }
+        }
+      },
+      {
+        "round": 4,
+        "backdrop": "plain",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.939881750000012,
+        "result": {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 242,
+          "firstPumpP95Us": 480,
+          "contentPumpMedianUs": 1205,
+          "contentPumpP95Us": 2397,
+          "coldFirstFrameUs": 489834,
+          "coldPhaseUs": {
+            "build": 323740.0,
+            "layout": 336041.0,
+            "paint": 3513.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 243.0,
+            "layout": 424.0,
+            "paint": 115.0
+          },
+          "contentPhaseP95Us": {
+            "build": 479.0,
+            "layout": 898.0,
+            "paint": 235.0
+          }
+        }
+      },
+      {
+        "round": 4,
+        "backdrop": "plain",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.838852833000004,
+        "result": {
+          "run": 4,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 237,
+          "firstPumpP95Us": 419,
+          "contentPumpMedianUs": 1184,
+          "contentPumpP95Us": 2453,
+          "coldFirstFrameUs": 508564,
+          "coldPhaseUs": {
+            "build": 332729.0,
+            "layout": 349750.0,
+            "paint": 3974.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 226.0,
+            "layout": 417.0,
+            "paint": 117.0
+          },
+          "contentPhaseP95Us": {
+            "build": 469.0,
+            "layout": 794.0,
+            "paint": 231.0
+          }
+        }
+      },
+      {
+        "round": 5,
+        "backdrop": "plain",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.8020056249999925,
+        "result": {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 211,
+          "firstPumpP95Us": 373,
+          "contentPumpMedianUs": 1007,
+          "contentPumpP95Us": 1968,
+          "coldFirstFrameUs": 485889,
+          "coldPhaseUs": {
+            "build": 309721.0,
+            "layout": 327256.0,
+            "paint": 4298.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 193.0,
+            "layout": 336.0,
+            "paint": 96.0
+          },
+          "contentPhaseP95Us": {
+            "build": 405.0,
+            "layout": 679.0,
+            "paint": 153.0
+          }
+        }
+      },
+      {
+        "round": 5,
+        "backdrop": "plain",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.646091333000015,
+        "result": {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 218,
+          "firstPumpP95Us": 418,
+          "contentPumpMedianUs": 987,
+          "contentPumpP95Us": 2108,
+          "coldFirstFrameUs": 463451,
+          "coldPhaseUs": {
+            "build": 312164.0,
+            "layout": 314902.0,
+            "paint": 3733.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 193.0,
+            "layout": 330.0,
+            "paint": 96.0
+          },
+          "contentPhaseP95Us": {
+            "build": 428.0,
+            "layout": 702.0,
+            "paint": 190.0
+          }
+        }
+      },
+      {
+        "round": 5,
+        "backdrop": "plain",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded"
+        ],
+        "exitCode": 0,
+        "seconds": 4.644397208000015,
+        "result": {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 213,
+          "firstPumpP95Us": 344,
+          "contentPumpMedianUs": 1017,
+          "contentPumpP95Us": 2076,
+          "coldFirstFrameUs": 483209,
+          "coldPhaseUs": {
+            "build": 324459.0,
+            "layout": 333622.0,
+            "paint": 3568.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 194.0,
+            "layout": 332.0,
+            "paint": 97.0
+          },
+          "contentPhaseP95Us": {
+            "build": 424.0,
+            "layout": 690.0,
+            "paint": 159.0
+          }
+        }
+      },
+      {
+        "round": 5,
+        "backdrop": "wallpaper",
+        "revision": "baseline",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.708293291999979,
+        "result": {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 401,
+          "firstPumpP95Us": 704,
+          "contentPumpMedianUs": 1044,
+          "contentPumpP95Us": 1910,
+          "coldFirstFrameUs": 460106,
+          "coldPhaseUs": {
+            "build": 303742.0,
+            "layout": 409881.0,
+            "paint": 1991.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 217.0,
+            "layout": 448.0,
+            "paint": 96.0
+          },
+          "contentPhaseP95Us": {
+            "build": 392.0,
+            "layout": 794.0,
+            "paint": 148.0
+          }
+        }
+      },
+      {
+        "round": 5,
+        "backdrop": "wallpaper",
+        "revision": "current",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.663515791000009,
+        "result": {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 389,
+          "firstPumpP95Us": 700,
+          "contentPumpMedianUs": 1017,
+          "contentPumpP95Us": 1961,
+          "coldFirstFrameUs": 451852,
+          "coldPhaseUs": {
+            "build": 299675.0,
+            "layout": 402654.0,
+            "paint": 2084.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 205.0,
+            "layout": 437.0,
+            "paint": 97.0
+          },
+          "contentPhaseP95Us": {
+            "build": 441.0,
+            "layout": 871.0,
+            "paint": 171.0
+          }
+        }
+      },
+      {
+        "round": 5,
+        "backdrop": "wallpaper",
+        "revision": "reviewed",
+        "command": [
+          "flutter",
+          "test",
+          "--no-pub",
+          "test/perf/markstream_render_bench.dart",
+          "--dart-define=MARKSTREAM_PROFILE_PHASES=true",
+          "--dart-define=MARKSTREAM_BENCH_CYCLES=5",
+          "--reporter",
+          "expanded",
+          "--dart-define=MARKSTREAM_BENCH_WALLPAPER=true"
+        ],
+        "exitCode": 0,
+        "seconds": 4.6600904999999955,
+        "result": {
+          "run": 5,
+          "renderer": "markstream",
+          "appAdapters": true,
+          "selectionController": true,
+          "appendChars": 30000,
+          "coldChars": 100000,
+          "samples": 280,
+          "cycles": 5,
+          "firstPumpMedianUs": 394,
+          "firstPumpP95Us": 803,
+          "contentPumpMedianUs": 1022,
+          "contentPumpP95Us": 2176,
+          "coldFirstFrameUs": 462570,
+          "coldPhaseUs": {
+            "build": 310822.0,
+            "layout": 412080.0,
+            "paint": 2070.0
+          },
+          "contentPhaseMedianUs": {
+            "build": 201.0,
+            "layout": 415.0,
+            "paint": 96.0
+          },
+          "contentPhaseP95Us": {
+            "build": 458.0,
+            "layout": 879.0,
+            "paint": 162.0
+          }
+        }
+      }
+    ]
+  },
+  "threeRevisionSummary": [
+    {
+      "backdrop": "plain",
+      "metric": "firstPumpMedianUs",
+      "rounds": {
+        "baseline": [
+          226,
+          234,
+          233,
+          237,
+          211
+        ],
+        "reviewed": [
+          223,
+          219,
+          223,
+          242,
+          213
+        ],
+        "current": [
+          225,
+          241,
+          252,
+          228,
+          218
+        ]
+      },
+      "baseline": 233,
+      "reviewed": 223,
+      "current": 228,
+      "vsBaselinePct": -2.145922746781115,
+      "vsReviewedPct": 2.2421524663677195
+    },
+    {
+      "backdrop": "plain",
+      "metric": "firstPumpP95Us",
+      "rounds": {
+        "baseline": [
+          425,
+          450,
+          437,
+          419,
+          373
+        ],
+        "reviewed": [
+          469,
+          435,
+          463,
+          480,
+          344
+        ],
+        "current": [
+          457,
+          482,
+          480,
+          422,
+          418
+        ]
+      },
+      "baseline": 425,
+      "reviewed": 463,
+      "current": 457,
+      "vsBaselinePct": 7.529411764705873,
+      "vsReviewedPct": -1.295896328293733
+    },
+    {
+      "backdrop": "plain",
+      "metric": "contentPumpMedianUs",
+      "rounds": {
+        "baseline": [
+          1128,
+          1127,
+          1175,
+          1184,
+          1007
+        ],
+        "reviewed": [
+          1126,
+          1121,
+          1066,
+          1205,
+          1017
+        ],
+        "current": [
+          1130,
+          1194,
+          1269,
+          1141,
+          987
+        ]
+      },
+      "baseline": 1128,
+      "reviewed": 1121,
+      "current": 1141,
+      "vsBaselinePct": 1.152482269503552,
+      "vsReviewedPct": 1.7841213202497874
+    },
+    {
+      "backdrop": "plain",
+      "metric": "contentPumpP95Us",
+      "rounds": {
+        "baseline": [
+          2267,
+          2230,
+          2131,
+          2453,
+          1968
+        ],
+        "reviewed": [
+          2181,
+          2484,
+          2499,
+          2397,
+          2076
+        ],
+        "current": [
+          2252,
+          2574,
+          2606,
+          2244,
+          2108
+        ]
+      },
+      "baseline": 2230,
+      "reviewed": 2397,
+      "current": 2252,
+      "vsBaselinePct": 0.9865470852017832,
+      "vsReviewedPct": -6.049228201919066
+    },
+    {
+      "backdrop": "plain",
+      "metric": "coldFirstFrameUs",
+      "rounds": {
+        "baseline": [
+          509950,
+          509161,
+          489632,
+          508564,
+          485889
+        ],
+        "reviewed": [
+          487703,
+          482171,
+          477781,
+          489834,
+          483209
+        ],
+        "current": [
+          472413,
+          498762,
+          507094,
+          484483,
+          463451
+        ]
+      },
+      "baseline": 508564,
+      "reviewed": 483209,
+      "current": 484483,
+      "vsBaselinePct": -4.735097254229559,
+      "vsReviewedPct": 0.26365402962278406
+    },
+    {
+      "backdrop": "plain",
+      "metric": "coldPhaseUs.build",
+      "rounds": {
+        "baseline": [
+          323624.0,
+          336174.0,
+          337622.0,
+          332729.0,
+          309721.0
+        ],
+        "reviewed": [
+          320752.0,
+          313498.0,
+          325997.0,
+          323740.0,
+          324459.0
+        ],
+        "current": [
+          320771.0,
+          337124.0,
+          335906.0,
+          329676.0,
+          312164.0
+        ]
+      },
+      "baseline": 332729.0,
+      "reviewed": 323740.0,
+      "current": 329676.0,
+      "vsBaselinePct": -0.917563542702915,
+      "vsReviewedPct": 1.8335701488848999
+    },
+    {
+      "backdrop": "plain",
+      "metric": "coldPhaseUs.layout",
+      "rounds": {
+        "baseline": [
+          345764.0,
+          350421.0,
+          335272.0,
+          349750.0,
+          327256.0
+        ],
+        "reviewed": [
+          327676.0,
+          325620.0,
+          320258.0,
+          336041.0,
+          333622.0
+        ],
+        "current": [
+          324936.0,
+          343920.0,
+          349090.0,
+          324428.0,
+          314902.0
+        ]
+      },
+      "baseline": 345764.0,
+      "reviewed": 327676.0,
+      "current": 324936.0,
+      "vsBaselinePct": -6.023761872259692,
+      "vsReviewedPct": -0.8361918480450203
+    },
+    {
+      "backdrop": "plain",
+      "metric": "coldPhaseUs.paint",
+      "rounds": {
+        "baseline": [
+          3853.0,
+          3421.0,
+          3472.0,
+          3974.0,
+          4298.0
+        ],
+        "reviewed": [
+          4521.0,
+          4151.0,
+          3295.0,
+          3513.0,
+          3568.0
+        ],
+        "current": [
+          3391.0,
+          3318.0,
+          4008.0,
+          3299.0,
+          3733.0
+        ]
+      },
+      "baseline": 3853.0,
+      "reviewed": 3568.0,
+      "current": 3391.0,
+      "vsBaselinePct": -11.990656631196472,
+      "vsReviewedPct": -4.9607623318385645
+    },
+    {
+      "backdrop": "plain",
+      "metric": "contentPhaseMedianUs.build",
+      "rounds": {
+        "baseline": [
+          214.0,
+          218.0,
+          231.0,
+          226.0,
+          193.0
+        ],
+        "reviewed": [
+          223.0,
+          216.0,
+          204.0,
+          243.0,
+          194.0
+        ],
+        "current": [
+          214.0,
+          228.0,
+          240.0,
+          225.0,
+          193.0
+        ]
+      },
+      "baseline": 218.0,
+      "reviewed": 216.0,
+      "current": 225.0,
+      "vsBaselinePct": 3.2110091743119185,
+      "vsReviewedPct": 4.166666666666674
+    },
+    {
+      "backdrop": "plain",
+      "metric": "contentPhaseMedianUs.layout",
+      "rounds": {
+        "baseline": [
+          376.0,
+          378.0,
+          395.0,
+          417.0,
+          336.0
+        ],
+        "reviewed": [
+          387.0,
+          376.0,
+          349.0,
+          424.0,
+          332.0
+        ],
+        "current": [
+          376.0,
+          407.0,
+          427.0,
+          386.0,
+          330.0
+        ]
+      },
+      "baseline": 378.0,
+      "reviewed": 376.0,
+      "current": 386.0,
+      "vsBaselinePct": 2.1164021164021163,
+      "vsReviewedPct": 2.659574468085113
+    },
+    {
+      "backdrop": "plain",
+      "metric": "contentPhaseMedianUs.paint",
+      "rounds": {
+        "baseline": [
+          113.0,
+          110.0,
+          114.0,
+          117.0,
+          96.0
+        ],
+        "reviewed": [
+          103.0,
+          105.0,
+          102.0,
+          115.0,
+          97.0
+        ],
+        "current": [
+          105.0,
+          121.0,
+          125.0,
+          105.0,
+          96.0
+        ]
+      },
+      "baseline": 113.0,
+      "reviewed": 103.0,
+      "current": 105.0,
+      "vsBaselinePct": -7.079646017699115,
+      "vsReviewedPct": 1.9417475728155331
+    },
+    {
+      "backdrop": "plain",
+      "metric": "contentPhaseP95Us.build",
+      "rounds": {
+        "baseline": [
+          466.0,
+          450.0,
+          458.0,
+          469.0,
+          405.0
+        ],
+        "reviewed": [
+          451.0,
+          476.0,
+          496.0,
+          479.0,
+          424.0
+        ],
+        "current": [
+          512.0,
+          501.0,
+          544.0,
+          461.0,
+          428.0
+        ]
+      },
+      "baseline": 458.0,
+      "reviewed": 476.0,
+      "current": 501.0,
+      "vsBaselinePct": 9.388646288209612,
+      "vsReviewedPct": 5.252100840336138
+    },
+    {
+      "backdrop": "plain",
+      "metric": "contentPhaseP95Us.layout",
+      "rounds": {
+        "baseline": [
+          777.0,
+          728.0,
+          782.0,
+          794.0,
+          679.0
+        ],
+        "reviewed": [
+          730.0,
+          766.0,
+          843.0,
+          898.0,
+          690.0
+        ],
+        "current": [
+          852.0,
+          874.0,
+          897.0,
+          792.0,
+          702.0
+        ]
+      },
+      "baseline": 777.0,
+      "reviewed": 766.0,
+      "current": 852.0,
+      "vsBaselinePct": 9.652509652509655,
+      "vsReviewedPct": 11.22715404699739
+    },
+    {
+      "backdrop": "plain",
+      "metric": "contentPhaseP95Us.paint",
+      "rounds": {
+        "baseline": [
+          225.0,
+          205.0,
+          215.0,
+          231.0,
+          153.0
+        ],
+        "reviewed": [
+          198.0,
+          207.0,
+          226.0,
+          235.0,
+          159.0
+        ],
+        "current": [
+          202.0,
+          256.0,
+          283.0,
+          187.0,
+          190.0
+        ]
+      },
+      "baseline": 215.0,
+      "reviewed": 207.0,
+      "current": 202.0,
+      "vsBaselinePct": -6.04651162790698,
+      "vsReviewedPct": -2.4154589371980673
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "firstPumpMedianUs",
+      "rounds": {
+        "baseline": [
+          442,
+          424,
+          414,
+          414,
+          401
+        ],
+        "reviewed": [
+          431,
+          452,
+          426,
+          402,
+          394
+        ],
+        "current": [
+          403,
+          427,
+          411,
+          466,
+          389
+        ]
+      },
+      "baseline": 414,
+      "reviewed": 426,
+      "current": 411,
+      "vsBaselinePct": -0.7246376811594235,
+      "vsReviewedPct": -3.5211267605633756
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "firstPumpP95Us",
+      "rounds": {
+        "baseline": [
+          924,
+          925,
+          948,
+          918,
+          704
+        ],
+        "reviewed": [
+          727,
+          911,
+          844,
+          952,
+          803
+        ],
+        "current": [
+          872,
+          998,
+          892,
+          875,
+          700
+        ]
+      },
+      "baseline": 924,
+      "reviewed": 844,
+      "current": 875,
+      "vsBaselinePct": -5.303030303030298,
+      "vsReviewedPct": 3.672985781990512
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "contentPumpMedianUs",
+      "rounds": {
+        "baseline": [
+          1158,
+          1167,
+          1095,
+          1106,
+          1044
+        ],
+        "reviewed": [
+          1161,
+          1225,
+          1092,
+          1036,
+          1022
+        ],
+        "current": [
+          1062,
+          1127,
+          1088,
+          1272,
+          1017
+        ]
+      },
+      "baseline": 1106,
+      "reviewed": 1092,
+      "current": 1088,
+      "vsBaselinePct": -1.6274864376130238,
+      "vsReviewedPct": -0.366300366300365
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "contentPumpP95Us",
+      "rounds": {
+        "baseline": [
+          2486,
+          2498,
+          2517,
+          2348,
+          1910
+        ],
+        "reviewed": [
+          2206,
+          2405,
+          2404,
+          2491,
+          2176
+        ],
+        "current": [
+          2524,
+          2844,
+          2648,
+          2504,
+          1961
+        ]
+      },
+      "baseline": 2486,
+      "reviewed": 2404,
+      "current": 2524,
+      "vsBaselinePct": 1.528559935639584,
+      "vsReviewedPct": 4.991680532445919
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "coldFirstFrameUs",
+      "rounds": {
+        "baseline": [
+          474368,
+          471170,
+          481620,
+          476837,
+          460106
+        ],
+        "reviewed": [
+          484021,
+          476654,
+          498824,
+          500338,
+          462570
+        ],
+        "current": [
+          475391,
+          481171,
+          471931,
+          471795,
+          451852
+        ]
+      },
+      "baseline": 474368,
+      "reviewed": 484021,
+      "current": 471931,
+      "vsBaselinePct": -0.5137361710739308,
+      "vsReviewedPct": -2.49782550757095
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "coldPhaseUs.build",
+      "rounds": {
+        "baseline": [
+          315403.0,
+          314318.0,
+          317221.0,
+          318055.0,
+          303742.0
+        ],
+        "reviewed": [
+          324014.0,
+          320101.0,
+          331763.0,
+          327059.0,
+          310822.0
+        ],
+        "current": [
+          321015.0,
+          330435.0,
+          314230.0,
+          312572.0,
+          299675.0
+        ]
+      },
+      "baseline": 315403.0,
+      "reviewed": 324014.0,
+      "current": 314230.0,
+      "vsBaselinePct": -0.3719051499193049,
+      "vsReviewedPct": -3.019622608899619
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "coldPhaseUs.layout",
+      "rounds": {
+        "baseline": [
+          424876.0,
+          418766.0,
+          427182.0,
+          420560.0,
+          409881.0
+        ],
+        "reviewed": [
+          429775.0,
+          423622.0,
+          443576.0,
+          442085.0,
+          412080.0
+        ],
+        "current": [
+          423357.0,
+          429576.0,
+          420435.0,
+          418511.0,
+          402654.0
+        ]
+      },
+      "baseline": 420560.0,
+      "reviewed": 429775.0,
+      "current": 420435.0,
+      "vsBaselinePct": -0.029722275061827563,
+      "vsReviewedPct": -2.1732301785818198
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "coldPhaseUs.paint",
+      "rounds": {
+        "baseline": [
+          1915.0,
+          2219.0,
+          2657.0,
+          2374.0,
+          1991.0
+        ],
+        "reviewed": [
+          2121.0,
+          2085.0,
+          2405.0,
+          2040.0,
+          2070.0
+        ],
+        "current": [
+          2031.0,
+          1959.0,
+          2097.0,
+          2253.0,
+          2084.0
+        ]
+      },
+      "baseline": 2219.0,
+      "reviewed": 2085.0,
+      "current": 2084.0,
+      "vsBaselinePct": -6.083821541234791,
+      "vsReviewedPct": -0.04796163069544779
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "contentPhaseMedianUs.build",
+      "rounds": {
+        "baseline": [
+          239.0,
+          237.0,
+          224.0,
+          232.0,
+          217.0
+        ],
+        "reviewed": [
+          241.0,
+          260.0,
+          221.0,
+          207.0,
+          201.0
+        ],
+        "current": [
+          212.0,
+          221.0,
+          223.0,
+          261.0,
+          205.0
+        ]
+      },
+      "baseline": 232.0,
+      "reviewed": 221.0,
+      "current": 221.0,
+      "vsBaselinePct": -4.741379310344829,
+      "vsReviewedPct": 0.0
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "contentPhaseMedianUs.layout",
+      "rounds": {
+        "baseline": [
+          492.0,
+          486.0,
+          464.0,
+          484.0,
+          448.0
+        ],
+        "reviewed": [
+          515.0,
+          552.0,
+          473.0,
+          437.0,
+          415.0
+        ],
+        "current": [
+          446.0,
+          483.0,
+          483.0,
+          552.0,
+          437.0
+        ]
+      },
+      "baseline": 484.0,
+      "reviewed": 473.0,
+      "current": 483.0,
+      "vsBaselinePct": -0.20661157024793875,
+      "vsReviewedPct": 2.114164904862581
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "contentPhaseMedianUs.paint",
+      "rounds": {
+        "baseline": [
+          103.0,
+          101.0,
+          98.0,
+          100.0,
+          96.0
+        ],
+        "reviewed": [
+          105.0,
+          112.0,
+          99.0,
+          97.0,
+          96.0
+        ],
+        "current": [
+          97.0,
+          102.0,
+          97.0,
+          113.0,
+          97.0
+        ]
+      },
+      "baseline": 100.0,
+      "reviewed": 99.0,
+      "current": 97.0,
+      "vsBaselinePct": -3.0000000000000027,
+      "vsReviewedPct": -2.020202020202022
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "contentPhaseP95Us.build",
+      "rounds": {
+        "baseline": [
+          515.0,
+          541.0,
+          545.0,
+          494.0,
+          392.0
+        ],
+        "reviewed": [
+          464.0,
+          551.0,
+          502.0,
+          571.0,
+          458.0
+        ],
+        "current": [
+          516.0,
+          581.0,
+          564.0,
+          526.0,
+          441.0
+        ]
+      },
+      "baseline": 515.0,
+      "reviewed": 502.0,
+      "current": 526.0,
+      "vsBaselinePct": 2.1359223300970953,
+      "vsReviewedPct": 4.7808764940239
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "contentPhaseP95Us.layout",
+      "rounds": {
+        "baseline": [
+          1063.0,
+          1177.0,
+          1159.0,
+          1055.0,
+          794.0
+        ],
+        "reviewed": [
+          914.0,
+          1092.0,
+          1063.0,
+          1158.0,
+          879.0
+        ],
+        "current": [
+          1059.0,
+          1241.0,
+          1212.0,
+          1104.0,
+          871.0
+        ]
+      },
+      "baseline": 1063.0,
+      "reviewed": 1063.0,
+      "current": 1104.0,
+      "vsBaselinePct": 3.8570084666039506,
+      "vsReviewedPct": 3.8570084666039506
+    },
+    {
+      "backdrop": "wallpaper",
+      "metric": "contentPhaseP95Us.paint",
+      "rounds": {
+        "baseline": [
+          207.0,
+          230.0,
+          205.0,
+          185.0,
+          148.0
+        ],
+        "reviewed": [
+          206.0,
+          195.0,
+          183.0,
+          191.0,
+          162.0
+        ],
+        "current": [
+          185.0,
+          215.0,
+          211.0,
+          222.0,
+          171.0
+        ]
+      },
+      "baseline": 205.0,
+      "reviewed": 191.0,
+      "current": 211.0,
+      "vsBaselinePct": 2.9268292682926855,
+      "vsReviewedPct": 10.471204188481686
+    }
+  ],
+  "finalProductionSha256": {
+    "dependencies/markstream/lib/src/flutter/render/blocks/table_block.dart": "633825df7095b2fce22c21d436229c985658fd542f5e47b9fb3d52a1b35c3527",
+    "dependencies/markstream/lib/src/flutter/render/inline_builder.dart": "275ae6f64b2994bd3e0f20543f067a57aab448a5c4e08c8c12345bcf6e18edb1",
+    "dependencies/markstream/lib/src/flutter/theme/markstream_theme.dart": "cf9796ce9f420eec8a008bffedaf78544fbfa3df1dc90809a8dd4946c1e27306",
+    "lib/features/chat/utils/export_image_processor.dart": "82d10f2da44cdb26a719801a9e4dbafd4196237e6432ee5be7bdd1bdbb9b9e0e",
+    "lib/features/chat/widgets/chat_surface.dart": "ab9a99bbe1e575ef9f17c274cfdefd8844fff32c87c1b3af845b026cf550420b",
+    "lib/features/chat/widgets/export_image_capture.dart": "41b7c3a7b3301a8a79ac1ded844015fbc78eed0a9d927a2f3b4c4e5368dec1db",
+    "lib/features/chat/widgets/frosted/chat_frosted_backdrop.dart": "36e0432b6a39095292aff44285bcb17dcad4ef7ad4d36395a9a0a7ec17e7434b",
+    "lib/features/chat/widgets/image_preview_sheet.dart": "b52a3a83643a47cc6f2e24fd814d7369dcd014e648bf9390006d11f529d6feb6",
+    "lib/features/chat/widgets/message_export_sheet.dart": "ce7533ba0659f0a97e247f6f481fedb14b2edfb9573a908d1a387018886a4a43",
+    "lib/l10n/app_en.arb": "dace2c0111d6323e0059cfa6bc99741a73f6607c0e422e497591a8167af95953",
+    "lib/l10n/app_localizations.dart": "50b113d24df3236c569099c88eb66313c0c2273eb850a0e32270776df061a507",
+    "lib/l10n/app_localizations_en.dart": "7849030749a2fe376d9e73323958ac1ec2cdbee26ce86b2223665bd5485af180",
+    "lib/l10n/app_localizations_zh.dart": "a2453eb55c50ddac821f2184f2b702391d2f3c8cf1b59a953f00129ed78b0a1d",
+    "lib/l10n/app_zh.arb": "3bac7a610ff635dbbc6749cf828263ce068cd43ad2fb041290da88bfadfdb947",
+    "lib/l10n/app_zh_Hans.arb": "ab9dfa546d4ccdeb7bc44e14eb484f7a646892c27864b22b4c0539b579ef7a7f",
+    "lib/l10n/app_zh_Hant.arb": "a86cd9c69c9bf375ec5fa34b5467ed0ae8fae31739d0ec0abc6b375fab6ddb74",
+    "lib/shared/markdown/diagram_chrome.dart": "0706f31f1c4fd17d88a48d05750909f01a568749c40dd5720f43b5af742a87e3",
+    "lib/shared/markdown/diagram_code_blocks.dart": "dcc074061114f37597cf1e99acbb81a40133c8b49f5cee26f2960d7fa10814e1",
+    "lib/shared/markdown/highlight_adapter.dart": "8d34f2d9103637404759f3e021a34d523f4eee7ca2e8d3d70df20f50e40064af",
+    "lib/shared/markdown/kelivo_markdown_extensions.dart": "b0c28fb68b3e608e1deaa413930c3b702e2146e9ed8c64f32c908ae05945aa9d",
+    "lib/shared/markdown/markdown_surface_scope.dart": "8ac5712da0ac19a45094a630de7cdbec0d708d3dab4ed720d3b71832d3025454",
+    "lib/shared/markdown/markdown_theme_mapper.dart": "29191ccd4c7ebeb04f9322062f1d8eeffc4c57ee389385ca02d482accb3c9143",
+    "lib/shared/markdown/markdown_with_code_highlight.dart": "0f36eb1bf987a7c93c558d2279a4c87b1e749ac764ba43192661fc3f451a5324",
+    "lib/shared/widgets/diagram_exporter.dart": "faa70584a7207c300dc27c7ac998bd69e6898db3c61e7bc093a0390a9efec792",
+    "lib/shared/widgets/plantuml_block.dart": "953096596dc1a2845df7756d5edc0a5fc724a2c1b4702c5442b284c5d4dac7b6"
+  },
+  "changedAfterMeasurements": [
+    "lib/shared/widgets/plantuml_block.dart"
+  ],
+  "measurementBoundary": "Both batches precede the final PlantUML custom-image-tab fix. That renderer path is absent from the fixed fixtures. All other recorded production source hashes match; no new PlantUML render-cost measurement is claimed.",
+  "validationCommands": [
+    {
+      "name": "analyze",
+      "command": [
+        "dart",
+        "analyze",
+        "--fatal-infos",
+        "lib",
+        "test",
+        "integration_test",
+        "test_goldens"
+      ],
+      "exitCode": 0,
+      "finalOutput": [
+        "Analyzing lib, test, integration_test, test_goldens...",
+        "No issues found!"
+      ]
+    },
+    {
+      "name": "widgets",
+      "command": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "test/shared/markdown/markdown_surface_contrast_test.dart",
+        "test/shared/markdown/markdown_comment_contrast_test.dart",
+        "test/shared/markdown/markdown_backdrop_test.dart",
+        "test/shared/markdown/markdown_wallpaper_streaming_test.dart",
+        "test/shared/markdown/markstream_adapters_test.dart",
+        "test/shared/widgets/markdown_with_highlight_test.dart",
+        "test/shared/widgets/markdown_streaming_height_stability_test.dart",
+        "test/shared/widgets/markdown_static_blocks_test.dart",
+        "test/features/chat/widgets/chat_message_widget_static_markdown_test.dart",
+        "test/features/chat/widgets/frosted/frosted_surface_layer_test.dart",
+        "test/goldens/frosted_surface_golden_test.dart",
+        "test/goldens/markdown_backdrop_golden_test.dart",
+        "--reporter",
+        "expanded"
+      ],
+      "exitCode": 0,
+      "finalOutput": [
+        "00:10 +238: /Users/psyche/.codex/worktrees/ios-long-image-export/kelivo/test/goldens/markdown_backdrop_golden_test.dart: wallpaper dark diagram",
+        "00:10 +239: /Users/psyche/.codex/worktrees/ios-long-image-export/kelivo/test/goldens/markdown_backdrop_golden_test.dart: (tearDownAll)",
+        "00:10 +239: All tests passed!"
+      ]
+    },
+    {
+      "name": "package-analyze",
+      "command": [
+        "dart",
+        "analyze",
+        "--fatal-infos"
+      ],
+      "exitCode": 0,
+      "finalOutput": [
+        "Analyzing markstream...",
+        "No issues found!"
+      ]
+    },
+    {
+      "name": "package-focused",
+      "command": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "test/flutter/theme_test.dart",
+        "test/flutter/backdrop_theme_test.dart",
+        "test/flutter/rich_blocks_test.dart",
+        "test/flutter/view_test.dart",
+        "--reporter",
+        "expanded"
+      ],
+      "exitCode": 1,
+      "finalOutput": [
+        "",
+        "Failing tests:",
+        "  /Users/psyche/.codex/worktrees/ios-long-image-export/kelivo/dependencies/markstream/test/flutter/view_test.dart: loading /Users/psyche/.codex/worktrees/ios-long-image-export/kelivo/dependencies/markstream/test/flutter/view_test.dart"
+      ]
+    },
+    {
+      "name": "package-targets-corrected",
+      "command": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "test/flutter/theme_test.dart",
+        "test/flutter/backdrop_theme_test.dart",
+        "test/flutter/rich_blocks_test.dart",
+        "test/flutter/markstream_view_test.dart",
+        "--reporter",
+        "expanded"
+      ],
+      "exitCode": 0,
+      "finalOutput": [
+        "00:01 +40: /Users/psyche/.codex/worktrees/ios-long-image-export/kelivo/dependencies/markstream/test/flutter/rich_blocks_test.dart: display math scrolls wide visuals and copies delimited LaTeX",
+        "00:01 +41: /Users/psyche/.codex/worktrees/ios-long-image-export/kelivo/dependencies/markstream/test/flutter/rich_blocks_test.dart: full HTML documents dispatch through the html code extension",
+        "00:01 +42: All tests passed!"
+      ]
+    },
+    {
+      "name": "captures",
+      "command": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "test_goldens/markdown_golden_test.dart",
+        "--dart-define=MARKSTREAM_GOLDEN_SET=backdrop-review",
+        "--reporter",
+        "expanded"
+      ],
+      "exitCode": 0,
+      "finalOutput": [
+        "00:12 +384: synthetic_48_image_data_390_light_1.3",
+        "00:12 +385: (tearDownAll)",
+        "00:12 +385: All tests passed!"
+      ]
+    },
+    {
+      "name": "capture-diff",
+      "command": [
+        "dart",
+        "run",
+        "test_goldens/tool/diff_report.dart",
+        "test_goldens/out/backdrop-current",
+        "test_goldens/out/backdrop-review",
+        "test_goldens/out/backdrop-review-report"
+      ],
+      "exitCode": 0,
+      "finalOutput": [
+        "Running build hooks...Running build hooks...384 captures compared: test_goldens/out/backdrop-review-report/index.html"
+      ]
+    },
+    {
+      "name": "reviewed-deps",
+      "command": [
+        "flutter",
+        "pub",
+        "get",
+        "--offline"
+      ],
+      "exitCode": 0,
+      "finalOutput": [
+        "Got dependencies!",
+        "54 packages have newer versions incompatible with dependency constraints.",
+        "Try `flutter pub outdated` for more information."
+      ]
+    },
+    {
+      "name": "triple-perf",
+      "command": [
+        "python3",
+        "-u",
+        ".scratch/run_backdrop_review_triple.py"
+      ],
+      "exitCode": 0,
+      "finalOutput": [
+        "Running 5-wallpaper-current",
+        "Running 5-wallpaper-reviewed",
+        "Completed 30 processes; all five rounds retained."
+      ]
+    }
+  ],
+  "finalAnalysis": "Analyzing lib, test, integration_test, test_goldens...\nNo issues found!\n",
+  "plantUmlAndSurfaceTests": [
+    "00:02 +17: /Users/psyche/.codex/worktrees/ios-long-image-export/kelivo/test/shared/markdown/markdown_surface_contrast_test.dart: extension code paths choose the resolved highlighter, dark=true",
+    "00:02 +18: /Users/psyche/.codex/worktrees/ios-long-image-export/kelivo/test/shared/markdown/markdown_surface_contrast_test.dart: custom background changes notify even when surface kind stays equal",
+    "00:02 +19: All tests passed!"
+  ],
+  "goldens": {
+    "counts": {
+      "equal": 384
+    },
+    "dimensionChanges": 0
+  },
+  "fullSuites": "Not rerun at the user's explicit request. The earlier 8265/296 full-suite totals describe the pre-review commits only.",
+  "reproductionSources": {
+    ".scratch/run_backdrop_review_bench.py": "from pathlib import Path\nimport subprocess,os,json,time,hashlib,sys\nroot=Path(__file__).resolve().parent.parent\nbase=root/'.scratch/backdrop-base'\nname=sys.argv[1] if len(sys.argv)>1 else 'review'\noutput=root/'.scratch'/('backdrop-perf-'+name)\noutput.mkdir(exist_ok=True)\npaths=['test/perf/markstream_render_bench.dart','test/perf/timeline_scroll_bench.dart','test/perf/long_streaming_bench.dart','test/support/markdown_backdrop_host.dart']\nfor path in paths:\n assert (root/path).read_bytes()==(base/path).read_bytes(),path\nassert (root/'pubspec.lock').read_bytes()==(base/'pubspec.lock').read_bytes(),'dependency lock mismatch'\nmetadata={'baseline':'a8364707','sameRevisionControl':name=='control','candidateHead':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'sdk':subprocess.check_output(['flutter','--version'],cwd=root,text=True),'hardware':subprocess.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True).strip(),'harnessSha256':{p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in paths},'runs':[]}\nsource_paths=subprocess.check_output(['git','diff','--name-only','a8364707','--','lib','dependencies/markstream/lib'],cwd=root,text=True).splitlines()\nmetadata['productionSha256']={p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in source_paths if (root/p).is_file()}\n(output/'results.json').write_text(json.dumps(metadata,indent=2))\nfor round in range(1,6):\n for backdrop in (['plain','wallpaper'] if round%2 else ['wallpaper','plain']):\n  for bench in ['markstream_render']:\n   for revision in (['baseline','current'] if round%2 else ['current','baseline']):\n    cwd=base if revision=='baseline' or name=='control' else root\n    args=['flutter','test','--no-pub',f'test/perf/{bench}_bench.dart','--reporter','expanded']\n    if backdrop=='wallpaper':args+=['--dart-define=MARKSTREAM_BENCH_WALLPAPER=true']\n    if bench=='markstream_render':args+=['--dart-define=MARKSTREAM_PROFILE_PHASES=true','--dart-define=MARKSTREAM_BENCH_CYCLES=5']\n    label=f'{round}-{backdrop}-{bench}-{revision}'\n    print('Running '+label,flush=True)\n    log=output/(label+'.log')\n    start=time.monotonic()\n    with log.open('w') as stream:\n     result=subprocess.run(args,cwd=cwd,env={**os.environ,'MARKSTREAM_RUN':str(round)},stdout=stream,stderr=subprocess.STDOUT)\n    text=log.read_text(errors='replace')\n    lines=[line for line in text.splitlines() if line.startswith(('MARKSTREAM_RENDER ','RESULT ','LONG_STREAM '))]\n    entry={'round':round,'backdrop':backdrop,'bench':bench,'revision':revision,'command':args,'exitCode':result.returncode,'seconds':time.monotonic()-start,'log':log.name,'results':lines}\n    metadata['runs'].append(entry)\n    (output/'results.json').write_text(json.dumps(metadata,indent=2))\n    if result.returncode or not lines:\n     print(text[-5000:],flush=True)\n     raise SystemExit(result.returncode or 1)\n    print(f'Completed {label}: {len(lines)} result rows, {entry[\"seconds\"]:.1f}s',flush=True)\n",
+    ".scratch/run_backdrop_review_triple.py": "from pathlib import Path\nfrom statistics import median\nimport hashlib,json,os,subprocess,time\n\nroot = Path(__file__).resolve().parent.parent\ndirectories = {'baseline': root/'.scratch/backdrop-base',\n               'reviewed': root/'.scratch/backdrop-reviewed-28f4e4b4',\n               'current': root}\nout = root/'.scratch/backdrop-perf-review-triple'\nout.mkdir(exist_ok=False)\nharness = ['test/perf/markstream_render_bench.dart', 'test/perf/timeline_scroll_bench.dart',\n           'test/perf/long_streaming_bench.dart', 'test/support/markdown_backdrop_host.dart']\nfor path in harness + ['pubspec.lock']:\n    assert all((folder/path).read_bytes() == (root/path).read_bytes() for folder in directories.values()), path\nsource_paths = subprocess.check_output(['git','diff','--name-only','a8364707','--','lib','dependencies/markstream/lib'],cwd=root,text=True).splitlines()\ndata = {'revisions': {'baseline': 'a8364707', 'reviewed': '28f4e4b4', 'current': 'working tree after independent review'},\n        'sdk': subprocess.check_output(['flutter','--version'],text=True),\n        'hardware': subprocess.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True).strip(),\n        'harnessSha256': {p: hashlib.sha256((root/p).read_bytes()).hexdigest() for p in harness},\n        'productionSha256': {p: hashlib.sha256((root/p).read_bytes()).hexdigest() for p in source_paths},\n        'runs': []}\norders = [['baseline','reviewed','current'], ['current','baseline','reviewed'],\n          ['reviewed','baseline','current'], ['current','reviewed','baseline'],\n          ['baseline','current','reviewed']]\nfor index, order in enumerate(orders):\n    for backdrop in (['plain','wallpaper'] if index % 2 == 0 else ['wallpaper','plain']):\n        for revision in order:\n            args = ['flutter','test','--no-pub','test/perf/markstream_render_bench.dart',\n                    '--dart-define=MARKSTREAM_PROFILE_PHASES=true','--dart-define=MARKSTREAM_BENCH_CYCLES=5','--reporter','expanded']\n            if backdrop == 'wallpaper': args += ['--dart-define=MARKSTREAM_BENCH_WALLPAPER=true']\n            label = f'{index+1}-{backdrop}-{revision}'\n            print('Running '+label,flush=True)\n            start = time.monotonic()\n            with (out/(label+'.log')).open('w') as log:\n                result = subprocess.run(args,cwd=directories[revision],env={**os.environ,'MARKSTREAM_RUN':str(index+1)},stdout=log,stderr=subprocess.STDOUT)\n            lines = [line for line in (out/(label+'.log')).read_text().splitlines() if line.startswith('MARKSTREAM_RENDER ')]\n            assert result.returncode == 0 and len(lines) == 1, label\n            data['runs'].append({'round': index+1,'backdrop': backdrop,'revision': revision,'command': args,'exitCode':result.returncode,\n                                 'seconds':time.monotonic()-start,'result':json.loads(lines[0].split(' ',1)[1])})\n            (out/'results.json').write_text(json.dumps(data,indent=2))\nrows = []\nfor backdrop in ['plain','wallpaper']:\n    values = {revision: {} for revision in directories}\n    for run in data['runs']:\n        if run['backdrop'] != backdrop: continue\n        sample = run['result']\n        metrics = {k:v for k,v in sample.items() if k.endswith('Us') and isinstance(v,(int,float))}\n        for phase in ['coldPhaseUs','contentPhaseMedianUs','contentPhaseP95Us']:\n            metrics.update({phase+'.'+k:v for k,v in sample[phase].items()})\n        for k,v in metrics.items(): values[run['revision']].setdefault(k,[]).append(v)\n    for metric in values['baseline']:\n        raw = {revision: values[revision][metric] for revision in directories}\n        assert all(len(v)==5 for v in raw.values())\n        middle = {revision:median(v) for revision,v in raw.items()}\n        rows.append({'backdrop':backdrop,'metric':metric,'rounds':raw,**middle,\n                     'vsBaselinePct':100*(middle['current']/middle['baseline']-1),\n                     'vsReviewedPct':100*(middle['current']/middle['reviewed']-1)})\n(out/'summary.json').write_text(json.dumps(rows,indent=2))\nprint('Completed 30 processes; all five rounds retained.',flush=True)\n",
+    ".scratch/summarize_backdrop_bench.py": "from pathlib import Path\nfrom collections import defaultdict\nfrom statistics import median\nimport json,re,sys\nsource=Path(sys.argv[1]);data=json.loads(source.read_text())\ngroups=defaultdict(lambda:defaultdict(list))\ncounts=defaultdict(lambda:defaultdict(list))\nfor run in data['runs']:\n for line in run['results']:\n  if line.startswith('MARKSTREAM_RENDER '):\n   record=json.loads(line.split(' ',1)[1]);scenario='fixed'\n   metrics={k:v for k,v in record.items() if k.endswith('Us') and isinstance(v,(int,float))}\n   for name in ['coldPhaseUs','contentPhaseMedianUs','contentPhaseP95Us']:\n    for k,v in (record.get(name) or {}).items():metrics[f'{name}.{k}']=v\n  else:\n   record=dict(re.findall(r'(\\w+)=([^\\s]+)',line))\n   if line.startswith('RESULT '):\n    scenario='tools='+record['tools'];metrics={k:float(v) for k,v in record.items() if k.endswith('Ms')}\n    for key in ['elements','renders','estExtent','measuredExtent','extentCorrections']:\n     counts[(run['backdrop'],run['bench'],scenario,key)][run['revision']].append(float(record[key]))\n   else:\n    scenario=f'{record[\"paragraphs\"]}-{record[\"shape\"]}';metrics={k:float(v) for k,v in record.items() if k.endswith('Us')}\n    stages=json.loads(re.search(r'stages=(\\[[^\\]]+\\])',line).group(1))\n    metrics.update(zip(['schedulingUs','contentUs','scrollUs'],stages))\n  for name,value in metrics.items():groups[(run['backdrop'],run['bench'],scenario,name)][run['revision']].append(value)\nrows=[]\nfor key,versions in groups.items():\n if len(versions['baseline'])!=5 or len(versions['current'])!=5:continue\n before=median(versions['baseline']);after=median(versions['current'])\n rows.append(dict(zip(['backdrop','bench','scenario','metric'],key),baseline=before,current=after,deltaPct=100*(after/before-1) if before else 0,rounds=versions))\nresult={'rows':rows,'geometry':[dict(zip(['backdrop','bench','scenario','metric'],key),values=value) for key,value in counts.items()]}\nsource.with_name('summary.json').write_text(json.dumps(result,indent=2))\nfor group in ['plain','wallpaper']:\n print('\\n'+group)\n for row in rows:\n  if row['backdrop']==group:\n   print(f'{row[\"bench\"]} {row[\"scenario\"]} {row[\"metric\"]}: {row[\"baseline\"]:.2f} -> {row[\"current\"]:.2f} ({row[\"deltaPct\"]:+.2f}%)')\n"
+  }
+}

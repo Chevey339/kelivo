@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:webview_flutter/webview_flutter.dart';
@@ -49,6 +50,8 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
   String? _lastThemeVarsSig;
   String? _tempFilePath;
   Completer<String?>? _exportCompleter;
+  Completer<bool> _renderReady = Completer<bool>();
+  int _loadGeneration = 0;
   Timer? _heightDebounce;
 
   @override
@@ -83,14 +86,20 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
         _handleWebMessage(text);
       });
       await _loadHtml();
-    } catch (_) {}
+    } catch (_) {
+      if (!_renderReady.isCompleted) _renderReady.complete(false);
+    }
   }
 
   void _handleWebMessage(String message) {
     try {
       final map = json.decode(message) as Map<String, dynamic>;
       final type = map['type'] as String?;
-      if (type == 'height') {
+      if (type == 'ready') {
+        if (map['generation'] == _loadGeneration && !_renderReady.isCompleted) {
+          _renderReady.complete(map['success'] == true);
+        }
+      } else if (type == 'height') {
         final v = (map['value'] as num?)?.toDouble();
         if (v != null && mounted) {
           _heightDebounce?.cancel();
@@ -142,6 +151,11 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
   }
 
   Future<void> _loadHtml() async {
+    final generation = ++_loadGeneration;
+    if (generation > 1) {
+      if (!_renderReady.isCompleted) _renderReady.complete(false);
+      _renderReady = Completer<bool>();
+    }
     try {
       final mermaidJs = widget.isSvg
           ? ''
@@ -151,8 +165,10 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
         widget.dark,
         mermaidJs,
         widget.themeVars,
+        generation,
       );
       final dir = await getTemporaryDirectory();
+      if (!mounted || generation != _loadGeneration) return;
       final file = File(
         '${dir.path}/mermaid_${DateTime.now().millisecondsSinceEpoch}.html',
       );
@@ -160,7 +176,11 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
       _tempFilePath = file.path;
       await _controller.loadUrl(Uri.file(file.path).toString());
       _lastThemeVarsSig = _themeVarsSignature(widget.themeVars);
-    } catch (_) {}
+    } catch (_) {
+      if (generation == _loadGeneration && !_renderReady.isCompleted) {
+        _renderReady.complete(false);
+      }
+    }
   }
 
   void _postHeight() {
@@ -177,12 +197,21 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
   }
 
   Future<Uint8List?> exportPngBytes() async {
+    Completer<String?>? pending;
     try {
-      _exportCompleter = Completer<String?>();
-      _controller.executeScript('exportSvgToPng();');
-      final b64 = await _exportCompleter!.future.timeout(
-        const Duration(seconds: 8),
+      final ready = _renderReady;
+      final rendered = await ready.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          if (!ready.isCompleted) ready.complete(false);
+          return false;
+        },
       );
+      if (!rendered || !mounted || !identical(ready, _renderReady)) return null;
+      pending = Completer<String?>();
+      _exportCompleter = pending;
+      await _controller.executeScript('exportSvgToPng();');
+      final b64 = await pending.future.timeout(const Duration(seconds: 8));
       if (b64 == '__UNSUPPORTED__') {
         throw UnsupportedError('Mermaid PNG export is unsupported');
       }
@@ -193,12 +222,15 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
     } catch (_) {
       return null;
     } finally {
-      _exportCompleter = null;
+      if (identical(_exportCompleter, pending)) _exportCompleter = null;
     }
   }
 
   @override
   void dispose() {
+    if (!_renderReady.isCompleted) _renderReady.complete(false);
+    final pending = _exportCompleter;
+    if (pending != null && !pending.isCompleted) pending.complete(null);
     try {
       _heightDebounce?.cancel();
     } catch (_) {}
@@ -223,8 +255,9 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
     bool dark,
     String mermaidJs,
     Map<String, String>? themeVars,
+    int generation,
   ) {
-    if (widget.isSvg) return buildSvgPreviewHtml(code);
+    if (widget.isSvg) return buildSvgPreviewHtml(code, generation: generation);
     final bg = dark ? '#212121' : '#f8f8f8';
     final fg = dark ? '#eaeaea' : '#222222';
     final escaped = code
@@ -295,7 +328,13 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
             h = Math.ceil(rect.height);
           }
           const padding = 24;
-          const scale = (window.devicePixelRatio || 1) * 2;
+          // Keep each RGBA canvas below 16 MiB, including on high-DPI phones.
+          const scale = Math.min(
+            (window.devicePixelRatio || 1) * 2,
+            4096 / (w + padding * 2),
+            4096 / (h + padding * 2),
+            Math.sqrt(4194304 / ((w + padding * 2) * (h + padding * 2)))
+          );
           const canvas = document.createElement('canvas');
           canvas.width = Math.max(1, Math.floor((w + padding * 2) * scale));
           canvas.height = Math.max(1, Math.floor((h + padding * 2) * scale));
@@ -353,8 +392,21 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
           } catch (_) {}
         });
       }
-      mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose', fontFamily: 'inherit', themeVariables: $themeVarsJson });
-      mermaid.run({ querySelector: '.mermaid' }).then(postHeight).catch(postHeight);
+      function reportReady(success) {
+        window.chrome.webview.postMessage(JSON.stringify({type:'ready', generation:$generation, success}));
+      }
+      try {
+        mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose', fontFamily: 'inherit', themeVariables: $themeVarsJson });
+        mermaid.run({ querySelector: '.mermaid' }).then(function(){
+          postHeight();
+          reportReady(true);
+        }).catch(function(){
+          postHeight();
+          reportReady(false);
+        });
+      } catch (_) {
+        reportReady(false);
+      }
       window.addEventListener('resize', postHeight);
       document.addEventListener('DOMContentLoaded', postHeight);
       setTimeout(postHeight, 200);
@@ -375,7 +427,7 @@ MermaidViewHandle? createMermaidView(
   bool isSvg = false,
 }) {
   // Windows: use webview_windows with messaging for height + export.
-  if (Platform.isWindows) {
+  if (defaultTargetPlatform == TargetPlatform.windows) {
     final usedKey = viewKey ?? GlobalKey<_MermaidInlineWindowsViewState>();
     final widget = _MermaidInlineWindowsView(
       key: usedKey,
@@ -488,6 +540,8 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
   late final WebViewController _controller;
   double _height = 160;
   Completer<String?>? _exportCompleter;
+  Completer<bool> _renderReady = Completer<bool>();
+  int _loadGeneration = 0;
   String? _lastThemeVarsSig;
   Timer? _heightDebounce;
 
@@ -501,6 +555,17 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
     } catch (_) {}
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel(
+        'ReadyChannel',
+        onMessageReceived: (JavaScriptMessage msg) {
+          if (_renderReady.isCompleted) return;
+          if (msg.message == '$_loadGeneration:ready') {
+            _renderReady.complete(true);
+          } else if (msg.message == '$_loadGeneration:error') {
+            _renderReady.complete(false);
+          }
+        },
+      )
       ..addJavaScriptChannel(
         'HeightChannel',
         onMessageReceived: (JavaScriptMessage msg) {
@@ -563,14 +628,19 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
 
   Future<void> _loadHtml() async {
     // Load mermaid script from assets and inline it to avoid external requests.
+    final generation = ++_loadGeneration;
+    if (!_renderReady.isCompleted) _renderReady.complete(false);
+    _renderReady = Completer<bool>();
     final mermaidJs = widget.isSvg
         ? ''
         : await rootBundle.loadString('assets/mermaid.min.js');
+    if (!mounted || generation != _loadGeneration) return;
     final html = _buildHtml(
       widget.code,
       widget.dark,
       mermaidJs,
       widget.themeVars,
+      generation,
     );
     await _controller.loadHtmlString(html);
     // Store latest theme signature for change detection
@@ -582,8 +652,9 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
     bool dark,
     String mermaidJs,
     Map<String, String>? themeVars,
+    int generation,
   ) {
-    if (widget.isSvg) return buildSvgPreviewHtml(code);
+    if (widget.isSvg) return buildSvgPreviewHtml(code, generation: generation);
     final bg = dark ? '#212121' : '#f8f8f8';
     final fg = dark ? '#eaeaea' : '#222222';
     final escaped = code
@@ -653,7 +724,13 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
             h = Math.ceil(rect.height);
           }
           const padding = 24;
-          const scale = (window.devicePixelRatio || 1) * 2;
+          // Keep each RGBA canvas below 16 MiB, including on high-DPI phones.
+          const scale = Math.min(
+            (window.devicePixelRatio || 1) * 2,
+            4096 / (w + padding * 2),
+            4096 / (h + padding * 2),
+            Math.sqrt(4194304 / ((w + padding * 2) * (h + padding * 2)))
+          );
           const canvas = document.createElement('canvas');
           canvas.width = Math.max(1, Math.floor((w + padding * 2) * scale));
           canvas.height = Math.max(1, Math.floor((h + padding * 2) * scale));
@@ -696,8 +773,18 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
           return true;
         }
       }
-      mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose', fontFamily: 'inherit', themeVariables: $themeVarsJson });
-      mermaid.run({ querySelector: '.mermaid' }).then(postHeight).catch(postHeight);
+      try {
+        mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose', fontFamily: 'inherit', themeVariables: $themeVarsJson });
+        mermaid.run({ querySelector: '.mermaid' }).then(function(){
+          postHeight();
+          ReadyChannel.postMessage('$generation:ready');
+        }).catch(function(){
+          postHeight();
+          ReadyChannel.postMessage('$generation:error');
+        });
+      } catch (_) {
+        ReadyChannel.postMessage('$generation:error');
+      }
       window.addEventListener('resize', postHeight);
       document.addEventListener('DOMContentLoaded', postHeight);
       setTimeout(postHeight, 200);
@@ -722,13 +809,8 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
 
   Future<bool> exportPng() async {
     try {
-      _exportCompleter = Completer<String?>();
-      await _controller.runJavaScript('exportSvgToPng();');
-      final b64 = await _exportCompleter!.future.timeout(
-        const Duration(seconds: 8),
-      );
-      if (b64 == null || b64.isEmpty) return false;
-      final bytes = base64Decode(b64);
+      final bytes = await exportPngBytes();
+      if (bytes == null || bytes.isEmpty) return false;
       // Desktop: Save As dialog (use existing file_picker, same as image viewer)
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
         final suggested =
@@ -760,8 +842,6 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
       return false;
     } catch (_) {
       return false;
-    } finally {
-      _exportCompleter = null;
     }
   }
 
@@ -771,28 +851,40 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
       _heightDebounce?.cancel();
     } catch (_) {}
     _heightDebounce = null;
+    if (!_renderReady.isCompleted) _renderReady.complete(false);
+    final pending = _exportCompleter;
+    if (pending != null && !pending.isCompleted) pending.complete(null);
     super.dispose();
   }
 
   Future<Uint8List?> exportPngBytes() async {
+    Completer<String?>? pending;
     try {
-      _exportCompleter = Completer<String?>();
-      await _controller.runJavaScript('exportSvgToPng();');
-      final b64 = await _exportCompleter!.future.timeout(
-        const Duration(seconds: 8),
+      final ready = _renderReady;
+      final rendered = await ready.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          if (!ready.isCompleted) ready.complete(false);
+          return false;
+        },
       );
+      if (!rendered || !identical(ready, _renderReady)) return null;
+      if (!mounted) return null;
+      pending = Completer<String?>();
+      _exportCompleter = pending;
+      await _controller.runJavaScript('exportSvgToPng();');
+      final b64 = await pending.future.timeout(const Duration(seconds: 8));
       if (b64 == '__UNSUPPORTED__') {
         throw UnsupportedError('Mermaid PNG export is unsupported');
       }
       if (b64 == null || b64.isEmpty) return null;
-      final bytes = base64Decode(b64);
-      return bytes;
+      return base64Decode(b64);
     } on UnsupportedError {
       rethrow;
     } catch (_) {
       return null;
     } finally {
-      _exportCompleter = null;
+      if (identical(_exportCompleter, pending)) _exportCompleter = null;
     }
   }
 }

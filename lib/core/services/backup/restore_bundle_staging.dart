@@ -22,6 +22,8 @@ import 'backup_isolate_runner.dart';
 import 'backup_settings_validator.dart';
 import 'backup_task_progress.dart';
 import 'restore_durability.dart';
+import 'restore_diagnostic_exception.dart';
+import '../../../utils/app_directories.dart';
 import 'restore_workspace_lock.dart';
 
 typedef ValidatedRestoreEntry = ({int bytes, String sha256});
@@ -122,6 +124,7 @@ final class RestoreBundleStaging {
     required bool includeFiles,
     BackupScope scope = const BackupScope(),
     bool useExistingLocalAttachments = false,
+    Directory? filesDirectory,
     bool? sourceIncludesChats,
     bool? sourceIncludesFiles,
     required String sourceManifestSha256,
@@ -275,7 +278,11 @@ final class RestoreBundleStaging {
         recomputeAttachmentsUnavailable:
             !includeFiles || !scope.includes(BackupCategory.files),
         localSnapshotAppDataPath: useExistingLocalAttachments
-            ? appDataDirectory.path
+            ? (filesDirectory ??
+                      await AppDirectories.contentDirectoryFor(
+                        appDataDirectory,
+                      ))
+                  .path
             : null,
         onProgress: onProgress,
         cancelToken: cancelToken,
@@ -1260,25 +1267,63 @@ final class RestoreBundleStaging {
           .replaceAll('\\', '/');
       if (type == FileSystemEntityType.directory) {
         if (!expectedDirectories.contains(relativePath)) {
-          throw const FormatException('restore_staging_candidate_directory');
+          throw RestoreFormatException('restore_staging_candidate_directory', {
+            'candidate directory': candidate.path,
+            'unexpected directory': relativePath,
+            'entry path': entity.path,
+          });
         }
         actualDirectories.add(relativePath);
         continue;
       }
       if (type != FileSystemEntityType.file) {
-        throw const FormatException('restore_staging_candidate_type');
+        throw RestoreFormatException('restore_staging_candidate_type', {
+          'candidate directory': candidate.path,
+          'relative path': relativePath,
+          'entry path': entity.path,
+          'entry type': '$type',
+        });
       }
       actualFiles.add(relativePath);
     }
     if (actualFiles.length != expectedFiles.length ||
         !actualFiles.containsAll(expectedFiles)) {
-      throw const FormatException('restore_staging_candidate_entries');
+      throw RestoreFormatException('restore_staging_candidate_entries', {
+        'candidate directory': candidate.path,
+        ..._topologyDifferenceDetails('files', actualFiles, expectedFiles),
+      });
     }
     if (actualDirectories.length != expectedDirectories.length ||
         !actualDirectories.containsAll(expectedDirectories) ||
         (includeChats != expectedDirectories.contains('database'))) {
-      throw const FormatException('restore_staging_candidate_directories');
+      throw RestoreFormatException('restore_staging_candidate_directories', {
+        'candidate directory': candidate.path,
+        'include chats': '$includeChats',
+        ..._topologyDifferenceDetails(
+          'directories',
+          actualDirectories,
+          expectedDirectories,
+        ),
+      });
     }
+  }
+
+  static Map<String, String> _topologyDifferenceDetails(
+    String kind,
+    Set<String> actual,
+    Set<String> expected,
+  ) {
+    final missing = expected.difference(actual);
+    final unexpected = actual.difference(expected);
+    return {
+      'expected $kind': '${expected.length}',
+      'actual $kind': '${actual.length}',
+      'missing $kind count': '${missing.length}',
+      'unexpected $kind count': '${unexpected.length}',
+      // Limit listed paths even when the whole payload is missing or unexpected.
+      'missing $kind (first 10)': jsonEncode(missing.take(10).toList()),
+      'unexpected $kind (first 10)': jsonEncode(unexpected.take(10).toList()),
+    };
   }
 
   static Future<void> _validateCandidateEntries(

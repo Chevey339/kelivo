@@ -40,11 +40,15 @@ void main() {
     expect(find.text('business ready'), findsOneWidget);
   });
 
-  testWidgets('does not interrupt a committed startup', (tester) async {
-    await tester.pumpWidget(_testApp(RestoreReceiptState.committed));
-    await tester.pumpAndSettle();
+  for (final outcome in [null, RestoreReceiptState.committed]) {
+    testWidgets('does not interrupt a normal startup ($outcome)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_testApp(outcome));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Restore was rolled back'), findsNothing);
-    expect(find.text('business ready'), findsOneWidget);
-  });
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('business ready'), findsOneWidget);
+    });
+  }
 }

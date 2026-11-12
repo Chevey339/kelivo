@@ -9,8 +9,8 @@ import 'chat_frosted_backdrop.dart';
 ///
 /// Tier 0 (uniform / no scope / `blurSigma <= 0`): a [DecoratedBox] tint.
 /// Tier 1 (cached snapshot): a pinned, pre-blurred crop plus the same tint.
-/// Live [BackdropFilter] is only a fallback if snapshot capture fails,
-/// or when [debugFrostedForceLiveBackdropFilter] is set.
+/// Live [BackdropFilter] handles theme/animated-backdrop transitions and
+/// snapshot failures. Uniform/cached modes keep the filter disabled.
 ///
 /// A missing snapshot never flips to live glass — it shows the tint only.
 class FrostedSurface extends StatelessWidget {
@@ -30,57 +30,53 @@ class FrostedSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = ChatFrostedBackdropScope.maybeOf(context);
-    final sigma = style.blurSigma;
-    final Widget painted;
-    if (debugFrostedForceLiveBackdropFilter && sigma > 0) {
-      painted = _liveBackdrop(child);
-    } else if (scope == null || sigma <= 0) {
-      painted = _tint(child);
-    } else {
-      painted = ListenableBuilder(
-        listenable: scope.controller,
-        builder: (context, _) {
-          final mode = scope.controller.mode;
-          if (mode == FrostedRenderMode.uniform) {
-            return _tint(child);
-          }
-          if (mode == FrostedRenderMode.liveBackdropFilter) {
-            return Stack(
-              fit: StackFit.passthrough,
-              children: [
-                _FrostedSnapshotLease(
-                  controller: scope.controller,
-                  sigma: sigma,
-                ),
-                _liveBackdrop(child),
-              ],
-            );
-          }
-          // passthrough: a loose Stack would shrink-wrap the tint while the
-          // Positioned.fill crop still spans the incoming (often tight-width)
-          // constraints, so the glass would overflow the bubble border.
-          return Stack(
-            fit: StackFit.passthrough,
-            children: [
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: _FrostedBackdropCrop(
-                    controller: scope.controller,
-                    sigma: sigma,
-                  ),
-                ),
-              ),
-              _tint(child),
-            ],
-          );
-        },
-      );
-    }
     return ClipRRect(
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
-      child: painted,
+      child: ListenableBuilder(
+        listenable: scope?.controller ?? const AlwaysStoppedAnimation(0),
+        child: _tint(child),
+        builder: (context, content) {
+          final sigma = style.blurSigma;
+          final live =
+              sigma > 0 &&
+              (debugFrostedForceLiveBackdropFilter ||
+                  scope?.controller.mode ==
+                      FrostedRenderMode.liveBackdropFilter);
+          return BackdropFilter.grouped(
+            enabled: live,
+            filter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+            child: Stack(
+              // Keep the filter, tint and content at the same element paths.
+              // Disabled filters create no BackdropFilterLayer; live filters
+              // retain the original compositing order around the foreground.
+              fit: StackFit.passthrough,
+              children: [
+                Positioned.fill(
+                  child: IgnorePointer(child: _backdrop(scope?.controller)),
+                ),
+                content!,
+              ],
+            ),
+          );
+        },
+      ),
     );
+  }
+
+  Widget _backdrop(ChatFrostedBackdropController? controller) {
+    final sigma = style.blurSigma;
+    if (sigma <= 0) return const SizedBox.shrink();
+    if (debugFrostedForceLiveBackdropFilter ||
+        controller?.mode == FrostedRenderMode.liveBackdropFilter) {
+      return controller != null && !debugFrostedForceLiveBackdropFilter
+          ? _FrostedSnapshotLease(controller: controller, sigma: sigma)
+          : const SizedBox.shrink();
+    }
+    if (controller?.mode == FrostedRenderMode.cached) {
+      return _FrostedBackdropCrop(controller: controller!, sigma: sigma);
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _tint(Widget child) {
@@ -91,23 +87,6 @@ class FrostedSurface extends StatelessWidget {
         border: Border.all(color: style.border, width: style.borderWidth),
       ),
       child: child,
-    );
-  }
-
-  Widget _liveBackdrop(Widget child) {
-    return BackdropFilter.grouped(
-      filter: ui.ImageFilter.blur(
-        sigmaX: style.blurSigma,
-        sigmaY: style.blurSigma,
-      ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: style.background,
-          borderRadius: borderRadius,
-          border: Border.all(color: style.border, width: style.borderWidth),
-        ),
-        child: child,
-      ),
     );
   }
 }

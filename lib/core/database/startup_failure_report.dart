@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/isolate.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../services/backup/restore_diagnostic_exception.dart';
+import '../services/backup/restore_cutover_executor.dart';
 import 'app_database.dart';
 import 'database_installation_gate.dart';
+import '../services/storage/storage_space.dart';
 
 /// Which startup gate failed closed.
 ///
@@ -127,6 +131,7 @@ final class StartupFailureEnvironment {
     Directory? appDataDirectory,
     String? appVersion,
     String? buildNumber,
+    bool inspectDatabase = true,
   }) async {
     final files = <StartupFailureFileFact>[];
     int? installedSchemaVersion;
@@ -141,7 +146,7 @@ final class StartupFailureEnvironment {
           (a, b) => p.basename(a.path).compareTo(p.basename(b.path)),
         );
         for (final entity in entities.take(_maximumListedEntries)) {
-          files.add(await _describe(entity));
+          files.add(await _describe(entity, inspectDatabase: inspectDatabase));
         }
         if (entities.length > _maximumListedEntries) {
           files.add(
@@ -165,7 +170,7 @@ final class StartupFailureEnvironment {
         p.join(appDataDirectory.path, AppDatabase.databaseFileName),
       );
       try {
-        if (databaseFile.existsSync()) {
+        if (inspectDatabase && databaseFile.existsSync()) {
           installedSchemaVersion = _readUserVersion(databaseFile);
         }
       } catch (error) {
@@ -190,8 +195,9 @@ final class StartupFailureEnvironment {
   }
 
   static Future<StartupFailureFileFact> _describe(
-    FileSystemEntity entity,
-  ) async {
+    FileSystemEntity entity, {
+    required bool inspectDatabase,
+  }) async {
     final name = p.basename(entity.path);
     if (entity is Directory) {
       final note = <String>[];
@@ -223,12 +229,17 @@ final class StartupFailureEnvironment {
       kind: 'file',
       sizeBytes: size,
       modified: modified,
-      note: await _noteFor(entity, name),
+      note: await _noteFor(entity, name, inspectDatabase: inspectDatabase),
     );
   }
 
-  static Future<String?> _noteFor(File file, String name) async {
+  static Future<String?> _noteFor(
+    File file,
+    String name, {
+    required bool inspectDatabase,
+  }) async {
     if (name == AppDatabase.databaseFileName) {
+      if (!inspectDatabase) return null;
       try {
         return 'user_version=${_readUserVersion(file)}';
       } catch (error) {
@@ -253,14 +264,20 @@ final class StartupFailureEnvironment {
   }
 
   static int _readUserVersion(File file) {
-    final database = sqlite.sqlite3.open(
-      file.absolute.path,
-      mode: sqlite.OpenMode.readOnly,
-    );
+    // Diagnostics must not open SQLite: even read-only connections can change
+    // SHM, invalidating a pending preservation transaction. This is the main
+    // file's header version; uncheckpointed WAL may contain a newer version.
+    final input = file.openSync();
     try {
-      return database.userVersion;
+      final header = input.readSync(100);
+      if (header.length != 100 ||
+          ascii.decode(header.sublist(0, 16), allowInvalid: true) !=
+              'SQLite format 3\x00') {
+        throw const FormatException('database_header_invalid');
+      }
+      return ByteData.sublistView(header).getUint32(60);
     } finally {
-      database.close();
+      input.closeSync();
     }
   }
 }
@@ -275,6 +292,7 @@ final class StartupFailureReport {
     this.step,
     this.stackTrace,
     this.environment,
+    this.restoreDetails = const {},
   });
 
   /// Builds a report from a caught error. Cheap and synchronous, so it can run
@@ -285,6 +303,7 @@ final class StartupFailureReport {
     String? step,
     StackTrace? stackTrace,
     DateTime? capturedAt,
+    Map<String, String> restoreDetails = const {},
   }) {
     return StartupFailureReport(
       stage: stage,
@@ -293,6 +312,7 @@ final class StartupFailureReport {
       capturedAt: capturedAt ?? DateTime.now(),
       step: step,
       stackTrace: stackTrace,
+      restoreDetails: Map.unmodifiable(restoreDetails),
     );
   }
 
@@ -311,6 +331,38 @@ final class StartupFailureReport {
   final String? step;
   final StackTrace? stackTrace;
   final StartupFailureEnvironment? environment;
+  final Map<String, String> restoreDetails;
+
+  ({int required, int available})? get storageSpace {
+    for (final cause in causes) {
+      final required = int.tryParse(cause.details['required bytes'] ?? '');
+      final available = int.tryParse(cause.details['available bytes'] ?? '');
+      if (required != null && available != null) {
+        return (required: required, available: available);
+      }
+    }
+    return null;
+  }
+
+  /// A blocked old-directory move can resume the same prepared transaction.
+  /// Do not offer this shortcut for installation/rollback or unrelated I/O.
+  String? get blockedRestoreDirectory {
+    if (stage != StartupFailureStage.restoreGate ||
+        restoreDetails['restore stage'] != 'preservingCurrentData' ||
+        restoreDetails['last observed receipt state'] != 'prepared') {
+      return null;
+    }
+    for (final cause in causes) {
+      final details = cause.details;
+      if (details['operation'] == 'MoveFileExW' &&
+          details['source type'] == 'directory' &&
+          const {'5', '32', '33'}.contains(details['Windows error code'])) {
+        final path = details['source path'];
+        if (path != null && path.isNotEmpty) return path;
+      }
+    }
+    return null;
+  }
 
   StartupFailureReport withEnvironment(StartupFailureEnvironment value) =>
       StartupFailureReport(
@@ -321,6 +373,7 @@ final class StartupFailureReport {
         step: step,
         stackTrace: stackTrace,
         environment: value,
+        restoreDetails: restoreDetails,
       );
 
   /// The one line worth showing without expanding anything: the root cause.
@@ -337,23 +390,34 @@ final class StartupFailureReport {
     StackTrace? stackTrace,
   ]) {
     final causes = <StartupFailureCause>[];
-    Object? current = error;
-    StackTrace? currentStack = stackTrace;
     final seen = <Object>{};
-    while (current != null) {
-      if (!seen.add(current)) break;
+    void visit(Object current, StackTrace? currentStack) {
+      if (!seen.add(current)) return;
       causes.add(_describeCause(current, currentStack));
       if (current is DriftRemoteException) {
-        currentStack = current.remoteStackTrace;
-        current = current.remoteCause;
-        continue;
+        visit(current.remoteCause, current.remoteStackTrace);
+      } else if (current is RestoreCutoverRollbackException) {
+        visit(current.cutoverError, current.cutoverStackTrace);
+        visit(current.rollbackError, current.rollbackStackTrace);
       }
-      break;
     }
+
+    visit(error, stackTrace);
     return List.unmodifiable(causes);
   }
 
   static StartupFailureCause _describeCause(Object error, StackTrace? stack) {
+    if (error is InsufficientStorageSpace) {
+      return StartupFailureCause(
+        type: 'InsufficientStorageSpace',
+        message: 'storage_insufficient_space',
+        details: {
+          'required bytes': '${error.requiredBytes}',
+          'available bytes': '${error.availableBytes}',
+        },
+        stackTrace: stack,
+      );
+    }
     if (error is DriftRemoteException) {
       return StartupFailureCause(
         type: 'DriftRemoteException',
@@ -389,6 +453,7 @@ final class StartupFailureReport {
           if (error.path case final path? when path.isNotEmpty) 'path': path,
           if (error.osError case final osError?)
             'os error': '${osError.message} (${osError.errorCode})',
+          if (error is RestoreFileSystemException) ...error.details,
         },
         stackTrace: stack,
       );
@@ -404,6 +469,7 @@ final class StartupFailureReport {
       return StartupFailureCause(
         type: 'FormatException',
         message: error.message,
+        details: error is RestoreFormatException ? error.details : const {},
         stackTrace: stack,
       );
     }
@@ -420,10 +486,17 @@ final class StartupFailureReport {
     final buffer = StringBuffer()
       ..writeln('Kelivo startup failure report')
       ..writeln('captured: ${capturedAt.toIso8601String()}')
+      ..writeln('captured UTC: ${capturedAt.toUtc().toIso8601String()}')
       ..writeln('stage: ${stage.code}')
       ..writeln('step: ${step ?? 'unknown'}')
       ..writeln('diagnostic code: $diagnosticCode')
       ..writeln();
+
+    if (restoreDetails.isNotEmpty) {
+      buffer.writeln('== restore context ==');
+      restoreDetails.forEach((key, value) => buffer.writeln('$key: $value'));
+      buffer.writeln();
+    }
 
     buffer.writeln('== error ==');
     for (var index = 0; index < causes.length; index++) {
@@ -485,6 +558,9 @@ final class StartupFailureReport {
 /// anything else that differs per device. Anything that fails that test
 /// degrades to the type name, and the full text lives in the report instead.
 String restoreFailureDiagnosticCode(Object error) {
+  if (InsufficientStorageSpace.causedBy(error)) {
+    return 'storage_insufficient_space';
+  }
   if (error is DriftRemoteException) {
     // Drift's worker isolate is a transport, not a diagnosis; report what
     // actually failed and keep the marker that it happened off-isolate.

@@ -18,6 +18,7 @@ import 'package:Kelivo/features/world_book/pages/world_book_page.dart';
 import 'package:Kelivo/features/world_book/widgets/world_book_entry_widgets.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
+import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
@@ -83,10 +84,11 @@ void main() {
     double textScale = 1,
   }) async {
     final harness = await tester.runAsync(() => createBusinessTestHarness());
-    final provider = WorldBookProvider(preferences: harness!.preferences);
-    harnesses[provider] = harness;
+    late WorldBookProvider provider;
     late SettingsProvider settings;
     await tester.runAsync(() async {
+      provider = WorldBookProvider(preferences: harness!.preferences);
+      harnesses[provider] = harness;
       settings = SettingsProvider(harness.preferences);
       await settings.loaded;
       await provider.initialize();
@@ -191,8 +193,262 @@ void main() {
     });
   }
 
+  Future<void> reloadBooks(
+    WidgetTester tester,
+    WorldBookProvider provider,
+  ) async {
+    var completed = false;
+    final reload = provider.loadAll().then((_) {
+      completed = true;
+    });
+    // UI callbacks use FakeAsync; the serialized writes also need real SQLite
+    // work to finish. Keep both schedulers moving until the queued reload ends.
+    for (var i = 0; i < 100 && !completed; i++) {
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    expect(completed, isTrue, reason: 'World book operations did not finish');
+    await reload;
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> completeTransfer(
+    WidgetTester tester,
+    String targetId,
+    String successMessage,
+  ) async {
+    await tester.tap(find.byKey(ValueKey('world-book-destination-$targetId')));
+    await tester.pump();
+    for (
+      var i = 0;
+      i < 100 && find.text(successMessage).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(find.text(successMessage), findsOneWidget);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+  }
+
   for (final desktop in [false, true]) {
     final platform = desktop ? 'desktop' : 'mobile';
+    testWidgets(
+      '$platform keeps selection after a failed save and can exit selection',
+      (tester) async {
+        final provider = await mount(tester, desktop: desktop);
+        final l10n = AppLocalizations.of(
+          tester.element(find.text('Story world')),
+        )!;
+        await tester.tap(find.byTooltip(l10n.worldBookSelectEntries));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Alpha'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('world-book-selection-copy')),
+        );
+        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => harnesses[provider]!.preferences.runWithRestoreWriteFence(
+            () async {},
+          ),
+        );
+        await completeTransfer(tester, 'book', l10n.worldBookTransferFailed);
+        expect(provider.books.single.entries.map((e) => e.id), [
+          'alpha',
+          'beta',
+          'gamma',
+        ]);
+        expect(find.text(l10n.worldBookSelectedEntries(1)), findsOneWidget);
+        await tester.tap(
+          find.byKey(const ValueKey('world-book-selection-done')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(IosCheckbox), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+    for (final copy in [false, true]) {
+      testWidgets(
+        '$platform selects multiple entries and ${copy ? 'copies' : 'moves'} them',
+        (tester) async {
+          final provider = await mount(
+            tester,
+            desktop: desktop,
+            size: Size(desktop ? 600 : 320, 900),
+            textScale: 1.4,
+            locale: copy ? const Locale('zh') : const Locale('en'),
+          );
+          await tester.runAsync(
+            () => provider.addBook(
+              const WorldBook(id: 'target', name: 'Destination'),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final l10n = AppLocalizations.of(
+            tester.element(find.text('Story world')),
+          )!;
+          final original = provider.getById('book')!.entries;
+          await tester.tap(find.byTooltip(l10n.worldBookSelectEntries).first);
+          await tester.pumpAndSettle();
+          expect(find.text(l10n.worldBookSelectedEntries(0)), findsOneWidget);
+          final copyButton = find.byKey(
+            const ValueKey('world-book-selection-copy'),
+          );
+          expect(
+            tester.getCenter(copyButton).dy,
+            closeTo(
+              tester.getCenter(find.text(l10n.worldBookSelectedEntries(0))).dy,
+              1,
+            ),
+          );
+          await tester.tap(copyButton);
+          await tester.pumpAndSettle();
+          expect(find.byType(Dialog), findsNothing);
+          expect(find.byType(BottomSheet), findsNothing);
+          await tester.tap(find.byTooltip(l10n.sideDrawerSelectionSelectAll));
+          await tester.pumpAndSettle();
+          expect(find.text(l10n.worldBookSelectedEntries(3)), findsOneWidget);
+          await tester.tap(find.byTooltip(l10n.sideDrawerSelectionDeselectAll));
+          await tester.pumpAndSettle();
+          expect(find.text(l10n.worldBookSelectedEntries(0)), findsOneWidget);
+          // Include a disabled entry, and mix row and checkbox interaction.
+          await tester.tap(find.text('Alpha'));
+          await tester.tap(
+            find.byWidgetPredicate(
+              (w) => w is IosCheckbox && w.semanticLabel == 'Gamma',
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.text(l10n.worldBookSelectedEntries(2)), findsOneWidget);
+          await screenshot(tester, '$platform-entry-selection');
+          final action = find.byKey(
+            ValueKey('world-book-selection-${copy ? 'copy' : 'move'}'),
+          );
+          await tester.ensureVisible(action);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          expect(find.byType(Dialog), desktop ? findsOneWidget : findsNothing);
+          expect(
+            find.byType(BottomSheet),
+            desktop ? findsNothing : findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('world-book-destination-book')),
+            copy ? findsOneWidget : findsNothing,
+          );
+          // Cancelling must retain the selection and leave both books intact.
+          await tester.tap(find.byTooltip(l10n.worldBookCancel));
+          await tester.pumpAndSettle();
+          expect(find.text(l10n.worldBookSelectedEntries(2)), findsOneWidget);
+          expect(provider.getById('target')!.entries, isEmpty);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          await screenshot(tester, '$platform-entry-destination');
+          await completeTransfer(
+            tester,
+            'target',
+            copy
+                ? l10n.worldBookEntriesCopied(2)
+                : l10n.worldBookEntriesMoved(2),
+          );
+          await reloadBooks(tester, provider);
+          expect(
+            provider.getById('book')!.entries.map((e) => e.id),
+            copy ? ['alpha', 'beta', 'gamma'] : ['beta'],
+          );
+          final transferred = provider.getById('target')!.entries;
+          expect(transferred.map((e) => e.name), ['Alpha', 'Gamma']);
+          for (var i = 0; i < transferred.length; i++) {
+            final before = original[i == 0 ? 0 : 2];
+            expect(
+              transferred[i].toJson()..remove('id'),
+              before.toJson()..remove('id'),
+            );
+            expect(transferred[i].id, copy ? isNot(before.id) : before.id);
+          }
+          expect(find.byType(IosCheckbox), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      '$platform single-entry copy can duplicate within the same book',
+      (tester) async {
+        final provider = await mount(tester, desktop: desktop);
+        final original = provider.books.single.entries.first;
+        final l10n = AppLocalizations.of(
+          tester.element(find.text('Story world')),
+        )!;
+        if (desktop) {
+          await tester.tap(find.byTooltip(l10n.worldBookCopyEntries).first);
+        } else {
+          await tester.longPress(find.text('Alpha'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(l10n.worldBookCopyEntries));
+        }
+        await tester.pumpAndSettle();
+        await completeTransfer(tester, 'book', l10n.worldBookEntriesCopied(1));
+        await reloadBooks(tester, provider);
+        expect(provider.books.single.entries, hasLength(4));
+        final duplicate = provider.books.single.entries.last;
+        expect(duplicate.id, isNot(original.id));
+        expect(
+          duplicate.toJson()..remove('id'),
+          original.toJson()..remove('id'),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      '$platform single-entry move handles no destinations and moves after one is added',
+      (tester) async {
+        final provider = await mount(tester, desktop: desktop);
+        final l10n = AppLocalizations.of(
+          tester.element(find.text('Story world')),
+        )!;
+        Future<void> openMove() async {
+          if (desktop) {
+            await tester.tap(find.byTooltip(l10n.worldBookMoveEntries).first);
+          } else {
+            await tester.longPress(find.text('Alpha'));
+            await tester.pumpAndSettle();
+            await tester.tap(find.text(l10n.worldBookMoveEntries));
+          }
+          await tester.pumpAndSettle();
+        }
+
+        await openMove();
+        expect(find.text(l10n.worldBookNoMoveTargets), findsOneWidget);
+        await tester.tap(find.byTooltip(l10n.worldBookCancel));
+        await tester.pumpAndSettle();
+        expect(provider.books.single.entries, hasLength(3));
+        await tester.runAsync(
+          () => provider.addBook(
+            const WorldBook(id: 'target', name: 'Destination'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await openMove();
+        await completeTransfer(tester, 'target', l10n.worldBookEntriesMoved(1));
+        await reloadBooks(tester, provider);
+        expect(provider.getById('book')!.entries.map((e) => e.id), [
+          'beta',
+          'gamma',
+        ]);
+        expect(provider.getById('target')!.entries.single.id, 'alpha');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     for (final unsupported in [false, true]) {
       testWidgets(
         '$platform imports SillyTavern JSON and reports unsupported rules: $unsupported',
@@ -243,7 +499,7 @@ void main() {
             find.text(l10n.worldBookImportUnsupportedEntries(1)),
             unsupported ? findsOneWidget : findsNothing,
           );
-          await tester.runAsync(provider.loadAll);
+          await reloadBooks(tester, provider);
           expect(provider.books.last.toJson(), book.toJson());
           if (unsupported) {
             await tester.pump(const Duration(seconds: 11));
@@ -294,13 +550,14 @@ void main() {
           );
           await tester.runAsync(
             () => provider.updateBook(
-              provider.books.single.copyWith(
+              provider.books.single.id,
+              (current) => current.copyWith(
                 name: 'A world with a long name 很长的世界书名称',
                 entries: [
-                  provider.books.single.entries.first.copyWith(
+                  current.entries.first.copyWith(
                     name: 'A very long entry title 很长的条目名称',
                   ),
-                  ...provider.books.single.entries.skip(1),
+                  ...current.entries.skip(1),
                 ],
               ),
             ),
@@ -325,6 +582,14 @@ void main() {
             );
           }
           final l10n = AppLocalizations.of(tester.element(find.text('2/3')))!;
+          expect(find.text(l10n.worldBookSelectEntries), findsNothing);
+          expect(
+            tester.getCenter(find.byTooltip(l10n.worldBookSelectEntries)).dy,
+            closeTo(
+              tester.getCenter(find.byTooltip(l10n.worldBookAddEntry)).dy,
+              1,
+            ),
+          );
           expect(
             tester.getCenter(find.text('2/3')).dy,
             closeTo(
@@ -362,10 +627,8 @@ void main() {
         }
         await tester.pump(const Duration(milliseconds: 300));
         await gesture.up();
-        await tester.runAsync(() async {
-          await Future<void>.delayed(const Duration(milliseconds: 30));
-        });
         await tester.pumpAndSettle();
+        await reloadBooks(tester, provider);
         expect(provider.books.single.entries.map((e) => e.id), [
           'beta',
           'alpha',
@@ -373,11 +636,7 @@ void main() {
         ]);
         await tester.tap(find.byType(IosSwitch).first);
         await tester.pump();
-        await tester.runAsync(() async {
-          await Future<void>.delayed(const Duration(milliseconds: 30));
-        });
-        await tester.runAsync(() => provider.loadAll());
-        await tester.pumpAndSettle();
+        await reloadBooks(tester, provider);
         expect(find.text('1/3'), findsOneWidget);
         expect(provider.books.single.entries.first.enabled, isFalse);
         expect(provider.books.single.entries.map((e) => e.id), [
@@ -423,8 +682,7 @@ void main() {
           await screenshot(tester, '$platform-${brightness.name}-editor');
           await tester.tap(find.text('Save').last);
           await tester.pumpAndSettle();
-          await tester.runAsync(() => provider.loadAll());
-          await tester.pumpAndSettle();
+          await reloadBooks(tester, provider);
           final entry = provider.books.single.entries.first;
           expect((entry.sticky, entry.cooldown, entry.delay), (5, 4, 3));
           expect(entry.position, WorldBookInjectionPosition.beforeSystemPrompt);
@@ -457,10 +715,8 @@ void main() {
         expect(find.text('Drag to reorder'), findsNothing);
         if (attempt == 0) await screenshot(tester, 'desktop-drag');
         await mouse.up();
-        await tester.runAsync(() async {
-          await Future<void>.delayed(const Duration(milliseconds: 30));
-        });
         await tester.pumpAndSettle();
+        await reloadBooks(tester, provider);
         expect(tester.takeException(), isNull);
       }
       expect(provider.books.single.entries.map((e) => e.id), [
@@ -496,7 +752,7 @@ void main() {
       }
       await mouse.removePointer();
       await tester.pumpAndSettle();
-      await tester.runAsync(() => provider.loadAll());
+      await reloadBooks(tester, provider);
       expect(provider.books.single.entries.map((e) => e.id).toSet(), {
         'alpha',
         'beta',
@@ -573,13 +829,9 @@ void main() {
           await tester.pump(const Duration(milliseconds: 20));
         }
         await screenshot(tester, 'desktop-book-drag-$collapsed');
-        await tester.runAsync(() async {
-          await mouse.up();
-          await tester.pumpAndSettle();
-          await harnesses[provider]!.preferences.flushPendingWrites();
-          await provider.loadAll();
-        });
+        await mouse.up();
         await tester.pumpAndSettle();
+        await reloadBooks(tester, provider);
         expect(provider.books.map((book) => book.id), ['other', 'book']);
         expect(provider.isBookCollapsed('book'), collapsed);
         expect(provider.getById('book')!.entries.map((entry) => entry.id), [
@@ -616,13 +868,9 @@ void main() {
         await mouse.moveTo(first + Offset(0, dy));
         await tester.pump(const Duration(milliseconds: 20));
       }
-      await tester.runAsync(() async {
-        await mouse.up();
-        await tester.pumpAndSettle();
-        await harnesses[provider]!.preferences.flushPendingWrites();
-        await provider.loadAll();
-      });
+      await mouse.up();
       await tester.pumpAndSettle();
+      await reloadBooks(tester, provider);
       expect(provider.books.map((book) => book.id), ['book', 'other']);
       expect(provider.books.first.entries.map((entry) => entry.id), [
         'beta',

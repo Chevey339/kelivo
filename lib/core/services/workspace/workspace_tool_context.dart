@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../../models/workspace.dart';
+import '../../models/tool_permission_mode.dart';
 import '../../models/workspace_binding.dart';
 import 'workspace_paths.dart';
 import 'workspace_runtime.dart';
@@ -15,6 +16,8 @@ class WorkspaceToolContext {
     required this.sessionDir,
     required this.outputsDir,
     this.conversationId,
+    this.assistantId,
+    this.permissionMode = ToolPermissionMode.requestApproval,
     this.runtimeStatus,
     this.runtimeRegistered = false,
     this.skillsOnly = false,
@@ -24,6 +27,7 @@ class WorkspaceToolContext {
   factory WorkspaceToolContext.skillsOnly({
     required String skillsHostDir,
     String? conversationId,
+    String? assistantId,
   }) {
     final placeholder = p.join(
       Directory.systemTemp.path,
@@ -47,6 +51,7 @@ class WorkspaceToolContext {
       sessionDir: Directory(placeholder),
       outputsDir: Directory(p.join(placeholder, 'outputs')),
       conversationId: conversationId,
+      assistantId: assistantId,
       skillsOnly: true,
     );
   }
@@ -57,6 +62,8 @@ class WorkspaceToolContext {
   final Directory sessionDir;
   final Directory outputsDir;
   final String? conversationId;
+  final String? assistantId;
+  final ToolPermissionMode permissionMode;
   final RuntimeStatus? runtimeStatus;
   final bool runtimeRegistered;
   final bool skillsOnly;

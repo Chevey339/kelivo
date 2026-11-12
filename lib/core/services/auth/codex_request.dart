@@ -9,7 +9,14 @@ void applyCodexRequest(
   Map<String, String> headers,
   String accessToken,
 ) {
-  headers.remove('x-api-key');
+  for (final name in [
+    'x-api-key',
+    'session_id',
+    'conversation_id',
+    'thread_id',
+  ]) {
+    headers.remove(name);
+  }
   final auth = oauthTokenClaims(accessToken)['https://api.openai.com/auth'];
   if (auth is Map) {
     for (final name in [
@@ -18,6 +25,9 @@ void applyCodexRequest(
     ]) {
       final region = auth[name];
       if (region is! String || region.trim().isEmpty) continue;
+      // The first present claim wins, including an unconstrained workspace.
+      // Declaring this sentinel as a region makes Codex return HTTP 404.
+      if (region.trim().toLowerCase() == 'no_constraint') break;
       headers.putIfAbsent(
         'x-openai-internal-codex-residency',
         () => region.trim(),
@@ -30,7 +40,7 @@ void applyCodexRequest(
     headers['x-codex-routing-hint'] =
         'model=$model${tier is String && tier.isNotEmpty ? ';tier=$tier' : ''}';
   }
-  if (headers['session_id'] case final session?) {
+  if (headers['session-id'] case final session?) {
     body.putIfAbsent('prompt_cache_key', () => session);
   }
 
@@ -62,9 +72,17 @@ void applyCodexRequest(
     body['input'] = _repairToolPairs([
       for (final item in input)
         if (item is! Map || item['type'] != 'item_reference')
-          item is Map && item['type'] != 'computer_call'
-              ? (Map<String, dynamic>.from(item)..remove('id'))
-              : item,
+          if (item is Map)
+            (Map<String, dynamic>.from(item)
+              ..remove('internal_chat_message_metadata_passthrough')
+              ..removeWhere(
+                (key, _) =>
+                    key == 'id' &&
+                    item['type'] != 'computer_call' &&
+                    item['type'] != 'compaction',
+              ))
+          else
+            item,
     ]);
   }
 

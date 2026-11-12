@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import "../../../support/business_test_harness.dart";
 import 'dart:convert';
 
@@ -103,6 +104,7 @@ class _RecordingTtsProvider extends TtsProvider {
     String text, {
     bool flush = true,
     bool waitForCompletion = true,
+    bool plainText = false,
   }) async {
     spokenTexts.add(text);
   }
@@ -110,6 +112,236 @@ class _RecordingTtsProvider extends TtsProvider {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'identical details in separate text blocks retain independent folding',
+    (tester) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      await settings.setCollapseThinkingSteps(false);
+      await settings.setAssistantBubbleSplitParagraphs(false);
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      addTearDown(settings.dispose);
+      const details =
+          '<details>\n<summary>Details</summary>\n\nShared details body\n\n</details>';
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: SingleChildScrollView(
+            controller: controller,
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                id: 'recycled-details',
+                role: 'assistant',
+                conversationId: 'chat',
+                parts: [
+                  for (var i = 0; i < 80; i++) ...[
+                    TextPart(i < 2 ? details : 'Explanation $i'),
+                    ToolCallPart(
+                      jsonEncode({
+                        'id': 'tool-$i',
+                        'name': 'mcp_read_file',
+                        'content': 'done',
+                      }),
+                    ),
+                  ],
+                ],
+              ),
+              showModelIcon: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final surfaces = find.byKey(const ValueKey('markstream-details-surface'));
+      expect(surfaces, findsNWidgets(2));
+      await tester.tap(surfaces.first);
+      await tester.pumpAndSettle();
+      expect(
+        renderedParagraphsWith('Shared details body', exact: true),
+        hasLength(1),
+      );
+      controller.jumpTo(controller.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(surfaces, findsNothing);
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(surfaces, findsNWidgets(2));
+      expect(
+        renderedParagraphsWith('Shared details body', exact: true),
+        hasLength(1),
+      );
+      expect(
+        find.descendant(
+          of: surfaces.first,
+          matching: find.byKey(const ValueKey('markstream-details-body')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: surfaces.last,
+          matching: find.byKey(const ValueKey('markstream-details-body')),
+        ),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'local reasoning expansion survives eviction without crossing blocks',
+    (tester) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      await settings.setCollapseThinkingSteps(false);
+      await settings.setEnableReasoningMarkdown(false);
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      addTearDown(settings.dispose);
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: SingleChildScrollView(
+            controller: controller,
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                id: 'recycled-reasoning',
+                role: 'assistant',
+                conversationId: 'chat',
+                parts: [
+                  for (var i = 0; i < 80; i++) ...[
+                    ReasoningPart('Reasoning body $i'),
+                    TextPart('Explanation $i'),
+                  ],
+                ],
+              ),
+              showModelIcon: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final first = find.byWidgetPredicate(
+        (widget) =>
+            widget is StatefulWidget &&
+            widget.key == const ValueKey('reasoning-0'),
+        description: 'the first cached reasoning step',
+      );
+      expect(
+        first,
+        findsOneWidget,
+        reason: 'The first reasoning row must be mounted before expansion.',
+      );
+      expect(find.text('Reasoning body 0'), findsNothing);
+      await tester.tap(first);
+      await tester.pumpAndSettle();
+      expect(find.text('Reasoning body 0'), findsOneWidget);
+      expect(find.text('Reasoning body 1'), findsNothing);
+
+      controller.jumpTo(controller.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        first,
+        findsNothing,
+        reason: 'Jumping to the tail must evict the first reasoning row.',
+      );
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(
+        first,
+        findsOneWidget,
+        reason: 'Returning to the top must remount the first reasoning row.',
+      );
+      expect(
+        find.text('Reasoning body 0'),
+        findsOneWidget,
+        reason: 'The remounted row must restore its explicit expansion.',
+      );
+      expect(
+        find.text('Reasoning body 1'),
+        findsNothing,
+        reason: 'The next thinking block must keep its own collapsed state.',
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'pending free-text answer survives transcript subtree recycling',
+    (tester) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      final service = AskUserInteractionService();
+      var storage = PageStorageBucket();
+      const arguments = <String, dynamic>{
+        'questions': [
+          {'id': 'draft', 'question': 'Describe the change', 'type': 'single'},
+        ],
+      };
+      final answer = service.requestAnswer(
+        toolCallId: 'ask-recycle',
+        arguments: arguments,
+      );
+      var show = true;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          askUserService: service,
+          locale: const Locale('en'),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              if (!show) return const SizedBox.shrink();
+              return ChatMessageWidget(
+                timelineStorage: storage,
+                message: ChatMessage(
+                  id: 'draft-message',
+                  role: 'assistant',
+                  conversationId: 'draft-chat',
+                ),
+                showModelIcon: false,
+                toolParts: const [
+                  ToolUIPart(
+                    id: 'ask-recycle',
+                    toolName: AskUserToolNames.askUser,
+                    arguments: arguments,
+                    loading: true,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'Keep this unsent answer');
+      rebuild(() => show = false);
+      await tester.pump();
+      // The whole message window can be evicted while its tool keeps waiting.
+      storage = PageStorageBucket();
+      rebuild(() => show = true);
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Keep this unsent answer',
+      );
+      expect(service.isPending('ask-recycle'), isTrue);
+      service.cancelAll();
+      await answer;
+      await tester.pumpWidget(const SizedBox.shrink());
+      service.dispose();
+      settings.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   group('ChatMessageWidget card background style', () {
     testWidgets('search citations render source capsule with favicon stack', (
@@ -1036,7 +1268,10 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.textContaining('<think>literal answer'), findsOneWidget);
+      expect(
+        renderedParagraphsWith('literal answer', exact: false),
+        hasLength(1),
+      );
       expect(find.text('Deep Thinking'), findsNothing);
     });
 
@@ -1067,10 +1302,10 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Deep Thinking'), findsOneWidget);
-        expect(find.textContaining('结构化思考'), findsOneWidget);
+        expect(renderedParagraphsWith('结构化思考', exact: false), hasLength(1));
         expect(
-          find.textContaining('正文 <think>literal</think> 继续显示'),
-          findsOneWidget,
+          renderedParagraphsWith('正文 literal 继续显示', exact: false),
+          hasLength(1),
         );
       },
     );
@@ -1100,8 +1335,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Deep Thinking'), findsNothing);
-      expect(find.textContaining('legacy reasoning'), findsNothing);
-      expect(find.textContaining('Final answer'), findsOneWidget);
+      expect(renderedParagraphsWith('legacy reasoning', exact: false), isEmpty);
+      expect(
+        renderedParagraphsWith('Final answer', exact: false),
+        hasLength(1),
+      );
     });
 
     testWidgets('hiding tool cards keeps thinking and ask-user cards', (
@@ -1171,10 +1409,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Deep Thinking'), findsOneWidget);
-      expect(find.textContaining('需要本地信息'), findsOneWidget);
+      expect(renderedParagraphsWith('需要本地信息', exact: false), hasLength(1));
       expect(find.text('Time Info'), findsNothing);
       expect(find.text('Choose scope?'), findsOneWidget);
-      expect(find.textContaining('Answer after tools'), findsOneWidget);
+      expect(
+        renderedParagraphsWith('Answer after tools', exact: false),
+        hasLength(1),
+      );
     });
 
     testWidgets(
@@ -1231,7 +1472,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Time Info'), findsNothing);
-        expect(find.bySemanticsLabel('Approve'), findsNothing);
+        expect(find.bySemanticsLabel('Allow'), findsNothing);
         expect(approval.isPending('call-a'), isTrue);
 
         await tester.pumpWidget(
@@ -1249,9 +1490,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Time Info'), findsOneWidget);
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
 
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         final result = await approvalFuture;
         expect(result.approved, isTrue);
@@ -1347,9 +1588,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.textContaining('lookup'), findsOneWidget);
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
 
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         final result = await approvalFuture;
         expect(result.approved, isTrue);
@@ -1435,9 +1676,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.textContaining('lookup'), findsOneWidget);
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
 
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         final result = await approvalFuture;
         expect(result.approved, isTrue);
@@ -1502,8 +1743,8 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         expect((await futureA).approved, isTrue);
         expect(
@@ -1525,8 +1766,8 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         expect((await futureB).approved, isTrue);
       },
@@ -1574,7 +1815,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Time Info'), findsOneWidget);
-      expect(find.bySemanticsLabel('Approve'), findsNothing);
+      expect(find.bySemanticsLabel('Allow'), findsNothing);
       expect(approval.isPending('call-a'), isTrue);
     });
 
@@ -1627,11 +1868,11 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Time Info'), findsNWidgets(2));
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
         expect(find.textContaining('seattle-pending'), findsOneWidget);
         expect(find.textContaining('query: tokyo-sibling'), findsNothing);
 
-        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.tap(find.bySemanticsLabel('Allow'));
         await tester.pump();
         final result = await approvalFuture;
         expect(result.approved, isTrue);
@@ -1691,7 +1932,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Time Info'), findsOneWidget);
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
         expect(find.textContaining('seattle-pending'), findsOneWidget);
         expect(find.textContaining('tokyo-sibling'), findsNothing);
       },
@@ -1744,7 +1985,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.bySemanticsLabel('Allow'), findsOneWidget);
         expect(find.textContaining('unscoped-args'), findsOneWidget);
         expect(find.textContaining('query: other-args'), findsNothing);
       },
@@ -1779,13 +2020,22 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Deep Thinking'), findsOneWidget);
-      expect(find.textContaining('inline reasoning'), findsOneWidget);
-      expect(find.textContaining('<thinking>'), findsNothing);
-      expect(find.textContaining('Final answer'), findsOneWidget);
+      expect(
+        renderedParagraphsWith('inline reasoning', exact: false),
+        hasLength(1),
+      );
+      expect(renderedParagraphsWith('<thinking>', exact: false), isEmpty);
+      expect(
+        renderedParagraphsWith('Final answer', exact: false),
+        hasLength(1),
+      );
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('inline reasoning'), findsNothing);
-      expect(find.textContaining('Final answer'), findsOneWidget);
+      expect(renderedParagraphsWith('inline reasoning', exact: false), isEmpty);
+      expect(
+        renderedParagraphsWith('Final answer', exact: false),
+        hasLength(1),
+      );
       expect(tester.takeException(), isNull);
     });
 
@@ -1813,10 +2063,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Deep Thinking'), findsOneWidget);
-      expect(find.textContaining('Final answer'), findsOneWidget);
       expect(
-        find.textContaining('<think>legacy reasoning</think>'),
-        findsNothing,
+        renderedParagraphsWith('Final answer', exact: false),
+        hasLength(1),
+      );
+      expect(
+        renderedParagraphsWith('<think>legacy reasoning</think>', exact: false),
+        isEmpty,
       );
     });
 

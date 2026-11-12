@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:Kelivo/core/services/haptics.dart';
+import 'package:Kelivo/core/services/workspace/workspace_file_coordinator.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
@@ -115,7 +116,9 @@ class FileBrowser extends StatefulWidget {
     this.emptyTitle,
     this.emptyHint,
     this.onOpenTerminal,
+    this.onOpenFile,
     this.scrollController,
+    this.afterDirectoryRead,
   });
 
   final Directory root;
@@ -132,11 +135,16 @@ class FileBrowser extends StatefulWidget {
   final String? emptyTitle;
   final String? emptyHint;
   final VoidCallback? onOpenTerminal;
+  final Future<void> Function(File file)? onOpenFile;
 
   /// The host's scroll controller, when it needs to read the list's offset —
   /// a bottom sheet decides from it whether a downward drag scrolls the list or
   /// pulls the sheet down.
   final ScrollController? scrollController;
+
+  /// Allows tests to pause a directory read before its results are published.
+  @visibleForTesting
+  final Future<void> Function(Directory directory)? afterDirectoryRead;
 
   static const Key emptyKey = ValueKey<String>('file-browser-empty');
   static const Key errorKey = ValueKey<String>('file-browser-error');
@@ -180,6 +188,12 @@ class FileBrowser extends StatefulWidget {
 }
 
 class FileBrowserState extends State<FileBrowser> {
+  StreamSubscription<String>? _fileChanges;
+  Timer? _fileRefreshTimer;
+  bool _reloading = false;
+  Completer<void>? _pendingReload;
+  Object? _requestedView;
+  int _reloadEpoch = 0;
   final ScrollController _desktopScroll = ScrollController();
   final List<String> _segments = <String>[];
   final GlobalKey _sortAnchorKey = GlobalKey();
@@ -197,6 +211,17 @@ class FileBrowserState extends State<FileBrowser> {
 
   String get currentRelPath => _segments.join('/');
 
+  Object get _reloadView => (
+    _rootPath,
+    currentRelPath,
+    _showHidden,
+    _sort,
+    _ascending,
+    _foldersFirst,
+    widget.pickDirectoryMode,
+    widget.excludePath,
+  );
+
   Directory get _currentDir {
     final rel = _segments.isEmpty ? '.' : _segments.join('/');
     final resolved = FileBrowserOps.joinInsideRoot(_rootPath, rel);
@@ -213,10 +238,31 @@ class FileBrowserState extends State<FileBrowser> {
     super.initState();
     _applyInitialPath();
     unawaited(refreshEntries());
+    _fileChanges = WorkspaceFileCoordinator.changes.listen((path) async {
+      final directory = _currentDir;
+      if (!p.isWithin(directory.path, path)) {
+        try {
+          final resolved = await directory.resolveSymbolicLinks();
+          if (!mounted ||
+              directory.path != _currentDir.path ||
+              !p.isWithin(resolved, path)) {
+            return;
+          }
+        } on FileSystemException {
+          return;
+        }
+      }
+      _fileRefreshTimer ??= Timer(const Duration(milliseconds: 250), () {
+        _fileRefreshTimer = null;
+        if (mounted) unawaited(refreshEntries());
+      });
+    });
   }
 
   @override
   void dispose() {
+    _fileRefreshTimer?.cancel();
+    _fileChanges?.cancel();
     _desktopScroll.dispose();
     super.dispose();
   }
@@ -227,6 +273,10 @@ class FileBrowserState extends State<FileBrowser> {
     if (oldWidget.root.path != widget.root.path) {
       _segments.clear();
       _applyInitialPath();
+    }
+    if (oldWidget.root.path != widget.root.path ||
+        oldWidget.pickDirectoryMode != widget.pickDirectoryMode ||
+        oldWidget.excludePath != widget.excludePath) {
       unawaited(refreshEntries());
     }
   }
@@ -262,19 +312,57 @@ class FileBrowserState extends State<FileBrowser> {
     await runner(mutation);
   }
 
-  Future<void> _reload() async {
+  Future<void> _reload() {
+    if (!mounted) return Future<void>.value();
+    final view = _reloadView;
+    if (view != _requestedView) {
+      _requestedView = view;
+      _reloadEpoch++;
+    }
+    final pending = _pendingReload ??= Completer<void>();
+    if (!_reloading) unawaited(_drainReloads());
+    return pending.future;
+  }
+
+  Future<void> _drainReloads() async {
+    _reloading = true;
+    try {
+      while (_pendingReload != null) {
+        final pending = _pendingReload!;
+        _pendingReload = null;
+        try {
+          await _readEntries();
+        } finally {
+          pending.complete();
+        }
+      }
+    } finally {
+      _reloading = false;
+    }
+  }
+
+  Future<void> _readEntries() async {
+    if (!mounted) return;
+    final epoch = _reloadEpoch;
+    final view = _reloadView;
+    final root = _rootPath;
+    final segments = List<String>.of(_segments);
+    bool isCurrent() => mounted && epoch == _reloadEpoch && view == _reloadView;
     try {
       var dir = _currentDir;
-      while (_segments.isNotEmpty && !await dir.exists()) {
-        _segments.removeLast();
-        dir = _currentDir;
+      while (segments.isNotEmpty && !await dir.exists()) {
+        if (!isCurrent()) return;
+        segments.removeLast();
+        dir = Directory(p.joinAll([root, ...segments]));
       }
-      if (!await Directory(_rootPath).exists()) {
+      if (!isCurrent()) return;
+      if (!await Directory(root).exists()) {
         throw StateError('root missing');
       }
+      if (!isCurrent()) return;
       final entries = await FileBrowserOps.listDir(
         dir,
-        rootPath: _rootPath,
+        rootPath: root,
         showHidden: _showHidden,
         sort: _sort,
         ascending: _ascending,
@@ -282,14 +370,18 @@ class FileBrowserState extends State<FileBrowser> {
         directoriesOnly: widget.pickDirectoryMode,
         excludePath: widget.excludePath,
       );
-      if (!mounted) return;
+      await widget.afterDirectoryRead?.call(dir);
+      if (!isCurrent()) return;
       setState(() {
+        _segments
+          ..clear()
+          ..addAll(segments);
         _entries = entries;
         _error = null;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!isCurrent()) return;
       setState(() {
         _error = e;
         _entries = const <FileBrowserEntry>[];
@@ -332,7 +424,11 @@ class FileBrowserState extends State<FileBrowser> {
     }
     if (widget.pickDirectoryMode) return;
     if (!mounted) return;
-    await showFilePreview(context, File(entry.hostPath), title: entry.name);
+    if (widget.onOpenFile case final open?) {
+      await open(File(entry.hostPath));
+    } else {
+      await showFilePreview(context, File(entry.hostPath), title: entry.name);
+    }
   }
 
   void _showSnack(String message, NotificationType type) {
@@ -639,7 +735,11 @@ class FileBrowserState extends State<FileBrowser> {
   }
 
   Offset _anchorFromKey(GlobalKey key) {
-    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    return _anchorFromContext(key.currentContext);
+  }
+
+  Offset _anchorFromContext(BuildContext? anchorContext) {
+    final box = anchorContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return Offset.zero;
     return box.localToGlobal(box.size.center(Offset.zero));
   }
@@ -1324,6 +1424,8 @@ class FileBrowserState extends State<FileBrowser> {
                             FileBrowserSortField.size,
                           ),
                         ),
+                        if (!widget.pickDirectoryMode)
+                          const SizedBox(width: 44),
                       ],
                     ),
                   ),
@@ -1343,91 +1445,119 @@ class FileBrowserState extends State<FileBrowser> {
                     itemCount: _entries.length,
                     itemBuilder: (context, index) {
                       final entry = _entries[index];
-                      return Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          splashFactory: NoSplash.splashFactory,
-                          hoverColor: cs.onSurface.withValues(alpha: 0.035),
-                          highlightColor: cs.onSurface.withValues(alpha: 0.065),
-                          focusColor: cs.primary.withValues(alpha: 0.08),
-                          key: FileBrowser.itemKey(entry.name),
-                          borderRadius: BorderRadius.circular(6),
-                          onTap: () => unawaited(_openEntry(entry)),
-                          onSecondaryTapDown: widget.pickDirectoryMode
-                              ? null
-                              : (details) => unawaited(
-                                  _showItemActions(
-                                    entry,
-                                    details.globalPosition,
-                                  ),
-                                ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
+                      return Builder(
+                        builder: (rowContext) => Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            splashFactory: NoSplash.splashFactory,
+                            hoverColor: cs.onSurface.withValues(alpha: 0.035),
+                            highlightColor: cs.onSurface.withValues(
+                              alpha: 0.065,
                             ),
-                            child: Row(
-                              children: [
-                                SizedBox.square(
-                                  dimension: 24,
-                                  child: WorkspaceFileThumbnail.supports(entry)
-                                      ? WorkspaceFileThumbnail(
-                                          entry: entry,
-                                          size: 24,
-                                          iconSize: 18,
-                                          iconColor: cs.onSurfaceVariant,
-                                        )
-                                      : Icon(
-                                          entry.isDirectory
-                                              ? Lucide.Folder
-                                              : workspaceFileTypeIcon(
-                                                  entry.name,
-                                                ),
-                                          size: 18,
-                                          color: entry.isDirectory
-                                              ? cs.primary
-                                              : cs.onSurfaceVariant,
+                            focusColor: cs.primary.withValues(alpha: 0.08),
+                            key: FileBrowser.itemKey(entry.name),
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: () => unawaited(_openEntry(entry)),
+                            onLongPress: widget.pickDirectoryMode
+                                ? null
+                                : () => unawaited(
+                                    _showItemActions(
+                                      entry,
+                                      _anchorFromContext(rowContext),
+                                    ),
+                                  ),
+                            onSecondaryTapDown: widget.pickDirectoryMode
+                                ? null
+                                : (details) => unawaited(
+                                    _showItemActions(
+                                      entry,
+                                      details.globalPosition,
+                                    ),
+                                  ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  SizedBox.square(
+                                    dimension: 24,
+                                    child:
+                                        WorkspaceFileThumbnail.supports(entry)
+                                        ? WorkspaceFileThumbnail(
+                                            entry: entry,
+                                            size: 24,
+                                            iconSize: 18,
+                                            iconColor: cs.onSurfaceVariant,
+                                          )
+                                        : Icon(
+                                            entry.isDirectory
+                                                ? Lucide.Folder
+                                                : workspaceFileTypeIcon(
+                                                    entry.name,
+                                                  ),
+                                            size: 18,
+                                            color: entry.isDirectory
+                                                ? cs.primary
+                                                : cs.onSurfaceVariant,
+                                          ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      entry.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+                                  if (columns) ...[
+                                    const SizedBox(width: 12),
+                                    SizedBox(
+                                      width: 132,
+                                      child: Text(
+                                        _relativeMtime(
+                                          entry.modified,
+                                          l10n,
+                                          MaterialLocalizations.of(context),
                                         ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    entry.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                ),
-                                if (columns) ...[
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 132,
-                                    child: Text(
-                                      _relativeMtime(
-                                        entry.modified,
-                                        l10n,
-                                        MaterialLocalizations.of(context),
-                                      ),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurfaceVariant,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: cs.onSurfaceVariant,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(
-                                    width: 80,
-                                    child: Text(
-                                      entry.isDirectory
-                                          ? '—'
-                                          : formatBytes(entry.size),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurfaceVariant,
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        entry.isDirectory
+                                            ? '—'
+                                            : formatBytes(entry.size),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: cs.onSurfaceVariant,
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                  ],
+                                  if (!widget.pickDirectoryMode)
+                                    IosIconButton(
+                                      key: FileBrowser.itemMoreKey(entry.name),
+                                      icon: Lucide.Ellipsis,
+                                      semanticLabel: l10n.workspaceFilesActions,
+                                      size: 18,
+                                      minSize: 44,
+                                      color: cs.onSurfaceVariant,
+                                      onTap: () => unawaited(
+                                        _showItemActions(
+                                          entry,
+                                          _anchorFromContext(rowContext),
+                                        ),
+                                      ),
+                                    ),
                                 ],
-                              ],
+                              ),
                             ),
                           ),
                         ),

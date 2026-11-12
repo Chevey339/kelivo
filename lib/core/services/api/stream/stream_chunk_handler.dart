@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../../models/message_part.dart';
+import '../../../models/message_part_snapshot.dart';
 import '../../../models/token_usage.dart';
 import '../generation/text_generation_result.dart';
 import 'stream_chunk.dart';
@@ -17,7 +18,8 @@ class StreamChunkHandler {
     this.onRetry,
   }) {
     for (final part in seed) {
-      if (_isBlankPart(part)) continue;
+      // Empty reasoning retains its position in persisted timing overlays.
+      if (_isBlankPart(part) && part is! ReasoningPart) continue;
       _seedPart(part);
     }
   }
@@ -28,11 +30,27 @@ class StreamChunkHandler {
   final List<MessagePart> _parts = <MessagePart>[];
   final Map<int, StreamTextBuffer> _textBuffers = {};
   List<MessagePart>? _snapshot;
+  final _partSnapshots = MessagePartSnapshotBuilder(arrivalOrdered: true);
+  final _changedParts = <int>{};
+
+  void _addPart(MessagePart part) {
+    _changedParts.add(_parts.length);
+    _parts.add(part);
+  }
+
+  void _setPart(int index, MessagePart part) {
+    _changedParts.add(index);
+    _parts[index] = part;
+  }
+
   final Map<String, int> _textIndex = <String, int>{};
   final Map<String, int> _reasoningIndex = <String, int>{};
   final Map<String, int> _imageIndex = <String, int>{};
   final Map<String, int> _toolIndex = <String, int>{};
   final Map<String, _ToolBuffer> _tools = <String, _ToolBuffer>{};
+  final Set<String> _dirtyTools = <String>{};
+  int get pendingToolBufferCount =>
+      _tools.values.where((tool) => !tool.released).length;
   final Map<String, StringBuffer> _serverInput = <String, StringBuffer>{};
   final Map<String, String> _imageMime = <String, String>{};
   final Map<String, StringBuffer> _imageBuffers = <String, StringBuffer>{};
@@ -56,7 +74,26 @@ class StreamChunkHandler {
     for (final index in _textBuffers.keys) {
       _flushText(index);
     }
-    return _snapshot = List<MessagePart>.unmodifiable(_parts);
+    _flushTools();
+    _snapshot = _partSnapshots.update(_parts, changed: _changedParts);
+    _changedParts.clear();
+    return _snapshot!;
+  }
+
+  /// Read one call without materializing or decoding the rest of the turn.
+  Map<String, dynamic>? toolPayload(String id) {
+    _flushTool(id);
+    final index = _toolIndex[id];
+    if (index == null) return null;
+    final part = _parts[index];
+    if (part is! ToolCallPart) return null;
+    return jsonDecode(part.payloadJson) as Map<String, dynamic>;
+  }
+
+  void _flushTools() {
+    for (final id in _dirtyTools.toList(growable: false)) {
+      _flushTool(id);
+    }
   }
 
   void _flushText(int index) {
@@ -65,9 +102,9 @@ class StreamChunkHandler {
     final current = _parts[index];
     final text = buffer.value;
     if (current is TextPart && current.text != text) {
-      _parts[index] = TextPart(text);
+      _setPart(index, TextPart(text));
     } else if (current is ReasoningPart && current.text != text) {
-      _parts[index] = ReasoningPart(text);
+      _setPart(index, ReasoningPart(text));
     }
   }
 
@@ -111,7 +148,7 @@ class StreamChunkHandler {
         case ImagePart(:final uri) when uri.isEmpty:
           continue;
         default:
-          _parts.add(part);
+          _addPart(part);
       }
     }
     if (result.usage != null) {
@@ -126,7 +163,7 @@ class StreamChunkHandler {
   }
 
   void _seedPart(MessagePart part) {
-    _parts.add(part);
+    _addPart(part);
     if (part is! ToolCallPart) return;
     try {
       final decoded = jsonDecode(part.payloadJson);
@@ -148,6 +185,7 @@ class StreamChunkHandler {
       if (metadata is Map) {
         buffer.metadata = Map<String, dynamic>.from(metadata);
       }
+      if (buffer.content != null) buffer.release();
     } catch (_) {}
   }
 
@@ -188,8 +226,10 @@ class StreamChunkHandler {
         );
       case ToolCallEnd(:final id):
         _upsertTool(id);
+        _flushTool(id);
       case ToolCallResult(:final id, :final output, :final metadata):
         _upsertTool(id, content: output ?? '', metadata: metadata);
+        _flushTool(id);
       case ServerToolStart(
         :final id,
         :final toolName,
@@ -261,7 +301,7 @@ class StreamChunkHandler {
         }
         _textIndex.clear();
         _reasoningIndex.clear();
-        _parts.add(AssistantRoundEndPart(reasoningDetails: reasoningDetails));
+        _addPart(AssistantRoundEndPart(reasoningDetails: reasoningDetails));
         this.reasoningDetails = null;
       case ProviderArtifact():
         // Provider state, not message content; the chat stores it separately.
@@ -270,7 +310,7 @@ class StreamChunkHandler {
         if (uri.isEmpty) return;
         // An image belongs in an image part so the viewer, the export sheet,
         // and the next request treat it as a picture rather than a download.
-        _parts.add(
+        _addPart(
           (mime ?? '').startsWith('image/')
               ? ImagePart(uri: uri, mime: mime)
               : FilePart(uri: uri, name: name, mime: mime),
@@ -287,6 +327,7 @@ class StreamChunkHandler {
         if (items.isEmpty) return;
         final targetId = _lastSearchToolId() ?? (id.isNotEmpty ? id : null);
         if (targetId == null) return;
+        _restoreTool(targetId);
         final existing = _tools[targetId];
         _upsertTool(
           targetId,
@@ -319,8 +360,9 @@ class StreamChunkHandler {
         // their replay metadata stops at whatever had arrived by then. The
         // metadata holds a live reference to the provider's block list, so
         // re-encoding now captures the finished turn.
-        for (final id in _tools.keys.toList()) {
-          _upsertTool(id);
+        _flushTools();
+        for (final id in _tools.keys) {
+          _refreshToolMetadata(id);
         }
         _textIndex.clear();
         _reasoningIndex.clear();
@@ -336,7 +378,7 @@ class StreamChunkHandler {
   int _ensureText(String id) {
     final existing = _textIndex[id];
     if (existing != null && _parts[existing] is TextPart) return existing;
-    _parts.add(const TextPart(''));
+    _addPart(const TextPart(''));
     return _textIndex[id] = _parts.length - 1;
   }
 
@@ -345,7 +387,7 @@ class StreamChunkHandler {
     if (existing != null && _parts[existing] is ReasoningPart) {
       return existing;
     }
-    _parts.add(const ReasoningPart(''));
+    _addPart(const ReasoningPart(''));
     return _reasoningIndex[id] = _parts.length - 1;
   }
 
@@ -359,10 +401,10 @@ class StreamChunkHandler {
     final index = _imageIndex[id];
     final part = ImagePart(uri: uri, mime: mimeType, id: id);
     if (index != null && _parts[index] is ImagePart) {
-      _parts[index] = part;
+      _setPart(index, part);
       return index;
     }
-    _parts.add(part);
+    _addPart(part);
     return _imageIndex[id] = _parts.length - 1;
   }
 
@@ -377,9 +419,13 @@ class StreamChunkHandler {
     Map<String, dynamic>? metadata,
   }) {
     final buffer = _tools.putIfAbsent(id, _ToolBuffer.new);
+    _restoreTool(id);
     if (name != null && name.isNotEmpty) buffer.name = name;
     if (nameDelta.isNotEmpty) buffer.name += nameDelta;
-    if (inputDelta.isNotEmpty) buffer.input.write(inputDelta);
+    if (inputDelta.isNotEmpty) {
+      buffer.input.add(inputDelta);
+      buffer.inputDirty = true;
+    }
     // A decoder that never saw the call reports no arguments; empty ones are
     // no news either, and would erase the input already streamed for it.
     if (argumentsObject != null &&
@@ -391,26 +437,91 @@ class StreamChunkHandler {
     if (metadata != null && metadata.isNotEmpty) {
       buffer.metadata = <String, dynamic>{...?buffer.metadata, ...metadata};
     }
-
-    final payload = jsonEncode(<String, dynamic>{
-      'id': id,
-      'name': buffer.name,
-      'arguments': buffer.arguments ?? _tryDecode(buffer.input.toString()),
-      'content': buffer.content,
-      'server': buffer.server,
-      if (buffer.metadata != null && buffer.metadata!.isNotEmpty)
-        'metadata': buffer.metadata,
-    });
-
-    final index = _toolIndex[id];
-    final part = ToolCallPart(payload);
-    if (index != null && _parts[index] is ToolCallPart) {
-      _parts[index] = part;
-    } else {
-      _parts.add(part);
-      _toolIndex[id] = _parts.length - 1;
+    _dirtyTools.add(id);
+    // Reserve arrival order now; encoding is deferred until a snapshot or an
+    // explicit protocol boundary. No reader can observe the placeholder.
+    if (!_toolIndex.containsKey(id)) {
+      _toolIndex[id] = _parts.length;
+      _addPart(const ToolCallPart('{}'));
     }
   }
+
+  void _flushTool(String id) {
+    if (!_dirtyTools.remove(id)) return;
+    final buffer = _tools[id]!;
+    if (buffer.inputDirty) {
+      buffer.decodedInput = _tryDecode(buffer.input.value);
+      buffer.inputDirty = false;
+    }
+
+    final body = jsonEncode(<String, dynamic>{
+      'id': id,
+      'name': buffer.name,
+      'arguments': buffer.arguments ?? buffer.decodedInput,
+      'content': buffer.content,
+      'server': buffer.server,
+    });
+    buffer.metadataOffset = body.length - 1;
+    final encodedMetadata = buffer.metadata?.isNotEmpty == true
+        ? jsonEncode(buffer.metadata)
+        : null;
+    final payload = encodedMetadata == null
+        ? body
+        : '${body.substring(0, buffer.metadataOffset)}$_metadataPrefix$encodedMetadata}';
+
+    final index = _toolIndex[id]!;
+    final previous = _parts[index] as ToolCallPart;
+    if (previous.payloadJson != payload) {
+      _setPart(index, ToolCallPart(payload));
+    }
+    if (buffer.content != null) buffer.release();
+  }
+
+  void _restoreTool(String id) {
+    final buffer = _tools[id];
+    if (buffer == null || !buffer.released) return;
+    final part = _parts[_toolIndex[id]!] as ToolCallPart;
+    final decoded = jsonDecode(part.payloadJson) as Map<String, dynamic>;
+    buffer.arguments = decoded['arguments'];
+    buffer.content = decoded['content'];
+    buffer.released = false;
+  }
+
+  void _refreshToolMetadata(String id) {
+    final buffer = _tools[id]!;
+    if (buffer.metadata == null) return;
+    final metadata = buffer.metadata!.isEmpty
+        ? null
+        : jsonEncode(buffer.metadata);
+    if (buffer.metadataOffset == null) {
+      // Seeded parts can have arbitrary JSON key order; normalize once.
+      _upsertTool(id);
+      _flushTool(id);
+      return;
+    }
+    final index = _toolIndex[id]!;
+    final part = _parts[index] as ToolCallPart;
+    final offset = buffer.metadataOffset!;
+    if (metadata == null) {
+      if (part.payloadJson.length == offset + 1) return;
+    } else if (part.payloadJson.length ==
+            offset + _metadataPrefix.length + metadata.length + 1 &&
+        part.payloadJson.startsWith(
+          metadata,
+          offset + _metadataPrefix.length,
+        )) {
+      return;
+    }
+    final body = part.payloadJson.substring(0, offset);
+    _setPart(
+      index,
+      ToolCallPart(
+        metadata == null ? '$body}' : '$body$_metadataPrefix$metadata}',
+      ),
+    );
+  }
+
+  static const _metadataPrefix = ',"metadata":';
 
   static bool _isBlankPart(MessagePart part) {
     return switch (part) {
@@ -422,6 +533,7 @@ class StreamChunkHandler {
   }
 
   String? _lastSearchToolId() {
+    _flushTools();
     for (final part in _parts.reversed) {
       if (part is! ToolCallPart) continue;
       try {
@@ -484,11 +596,24 @@ class StreamChunkHandler {
 
 class _ToolBuffer {
   String name = '';
-  final StringBuffer input = StringBuffer();
+  final StreamTextBuffer input = StreamTextBuffer();
+  bool inputDirty = false;
+  Object decodedInput = const <String, dynamic>{};
   Object? arguments;
   Object? content;
   bool server = false;
   Map<String, dynamic>? metadata;
+  bool released = false;
+  int? metadataOffset;
+
+  void release() {
+    input.value = '';
+    inputDirty = false;
+    decodedInput = const <String, dynamic>{};
+    arguments = null;
+    content = null;
+    released = true;
+  }
 }
 
 Object _tryDecode(String raw) {

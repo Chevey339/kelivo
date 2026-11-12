@@ -588,7 +588,8 @@ class _CodeEditorState extends State<CodeEditor> {
         onKeyEvent: (node, event) {
           final KeyEventResult appResult = widget.onKeyEvent?.call(node, event) ?? KeyEventResult.ignored;
           if (appResult != KeyEventResult.ignored) return appResult;
-          if (readOnly || (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
+          if (readOnly || _editingController.isComposing ||
+            (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
             return KeyEventResult.ignored;
           }
           if (event.logicalKey == LogicalKeyboardKey.backspace) {

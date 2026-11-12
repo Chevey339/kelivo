@@ -14,6 +14,35 @@ void main() {
   tearDown(() => harness.dispose());
   const args = ExecArgs(runId: 'cancel-me', command: 'true', cwd: '/');
 
+  for (final confirmed in [true, false, 1, 0, null]) {
+    test('forwards native termination confirmation $confirmed', () async {
+      harness.handler = (call) {
+        if (call.method == 'exec') {
+          harness.emit({
+            'type': 'exit',
+            'runId': args.runId,
+            'exitCode': -1,
+            'terminationConfirmed': confirmed,
+          });
+        }
+        return null;
+      };
+      final events = await runChannelCommand(
+        channel: harness.channel,
+        request: CommandRequest(
+          runId: args.runId,
+          command: args.command,
+          cwd: args.cwd,
+        ),
+        args: args,
+      ).toList();
+      expect(
+        events.whereType<CommandExited>().single.terminationConfirmed,
+        confirmed == true || confirmed == 1,
+      );
+    });
+  }
+
   test(
     'cancel during background setup prevents exec and releases background task',
     () async {

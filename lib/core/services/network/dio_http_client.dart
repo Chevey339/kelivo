@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:socks5_proxy/socks_client.dart' as socks;
 
 import '../logging/log_redactor.dart';
+import 'provider_http_exception.dart';
 import 'request_logger.dart';
 
 Future<InternetAddress?> _resolveProxyAddress(String host) async {
@@ -74,6 +75,14 @@ class NetworkProxyConfig {
 
 /// Bodies past this are file uploads; the log records their size only.
 const int _loggedBodyLimit = 4 * 1024 * 1024;
+
+/// Retains the transport type so callers can classify failures without parsing
+/// or displaying a string that may contain request credentials.
+class TransportClientException extends http.ClientException {
+  TransportClientException(this.cause, Uri uri) : super(cause.toString(), uri);
+
+  final Object cause;
+}
 
 class DioHttpClient extends http.BaseClient {
   DioHttpClient({
@@ -257,6 +266,19 @@ class DioHttpClient extends http.BaseClient {
 
       final logChunks =
           (logRequests && RequestLogger.enabled) && RequestLogger.saveOutput;
+      // Keep partial UTF-8 characters between transport chunks without
+      // buffering or transforming the bytes delivered to the caller.
+      ByteConversionSink? logDecoder = logChunks
+          ? const Utf8Decoder(
+              allowMalformed: true,
+            ).startChunkedConversion(_ResponseLogSink(reqId))
+          : null;
+      void closeLogDecoder() {
+        final decoder = logDecoder;
+        logDecoder = null;
+        decoder?.close();
+      }
+
       final controller = StreamController<List<int>>(sync: true);
       final responseState = _ResponseStreamState(body.stream, controller);
       controller.onListen = () {
@@ -280,28 +302,36 @@ class DioHttpClient extends http.BaseClient {
         }
         responseState.subscription = source.listen(
           (chunk) {
+            // A synchronous consumer can cancel and close the decoder from
+            // controller.add, so log this chunk before forwarding it.
+            logDecoder?.add(chunk);
             controller.add(chunk);
-            if (logChunks) {
-              final s = RequestLogger.safeDecodeUtf8(chunk);
-              if (s.isNotEmpty) {
-                RequestLogger.logLine(
-                  '[RES $reqId] chunk=${RequestLogger.escape(LogRedactor.redactBody(RequestLogger.elidePayloads(s)))}',
-                );
-              }
-            }
           },
           onError: (Object error, StackTrace stack) {
             responseState.finished = true;
+            closeLogDecoder();
             if (logRequests && RequestLogger.enabled) {
               RequestLogger.logLine(
                 '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(error.toString()))}',
               );
             }
-            controller.addError(error, stack);
+            final failure =
+                (statusCode < 200 || statusCode >= 300) &&
+                    !_cancelToken.isCancelled &&
+                    !(error is DioException &&
+                        error.type == DioExceptionType.cancel)
+                ? ProviderHttpException.bodyReadFailure(
+                    statusCode,
+                    headers,
+                    error,
+                  )
+                : error;
+            controller.addError(failure, stack);
             unawaited(controller.close());
           },
           onDone: () {
             responseState.finished = true;
+            closeLogDecoder();
             if (logRequests && RequestLogger.enabled) {
               RequestLogger.logLine('[RES $reqId] done');
             }
@@ -314,6 +344,7 @@ class DioHttpClient extends http.BaseClient {
       controller.onResume = () => responseState.subscription?.resume();
       controller.onCancel = () async {
         responseState.finished = true;
+        closeLogDecoder();
         final subscription = responseState.subscription;
         responseState.subscription = null;
         await subscription?.cancel();
@@ -351,6 +382,10 @@ class DioHttpClient extends http.BaseClient {
         isRedirect: resp.isRedirect,
         reasonPhrase: resp.statusMessage,
       );
+    } on ProviderHttpException {
+      // Logging may read an error body before send returns. Keep its response
+      // metadata instead of wrapping it as an unclassified transport failure.
+      rethrow;
     } on DioException catch (e) {
       if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine(
@@ -367,16 +402,33 @@ class DioHttpClient extends http.BaseClient {
           );
         }
       }
-      throw http.ClientException(e.toString(), uri);
+      throw TransportClientException(e, uri);
     } catch (e) {
       if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine(
           '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(e.toString()))}',
         );
       }
-      throw http.ClientException(e.toString(), uri);
+      throw TransportClientException(e, uri);
     }
   }
+}
+
+class _ResponseLogSink implements Sink<String> {
+  _ResponseLogSink(this.requestId);
+
+  final int requestId;
+
+  @override
+  void add(String text) {
+    if (text.isEmpty) return;
+    RequestLogger.logLine(
+      '[RES $requestId] chunk=${RequestLogger.escape(LogRedactor.redactBody(RequestLogger.elidePayloads(text)))}',
+    );
+  }
+
+  @override
+  void close() {}
 }
 
 Future<ResponseBody> _awaitResponseOrCancel(

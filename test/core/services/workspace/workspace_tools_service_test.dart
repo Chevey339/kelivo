@@ -1,3 +1,10 @@
+import 'package:image/image.dart' as img;
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+import '../../../support/claude_test_api.dart' show FakePathProviderPlatform;
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -12,6 +19,7 @@ import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
+import 'package:Kelivo/core/services/workspace/desktop_shell.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -30,6 +38,10 @@ class _RecordingApproval extends ToolApprovalService {
     required String toolName,
     required Map<String, dynamic> arguments,
     String? conversationId,
+    String? workspaceId,
+    String? assistantId,
+    String? requestedPath,
+    String? realTarget,
   }) async {
     calls++;
     lastName = toolName;
@@ -60,6 +72,7 @@ void main() {
   final canRunReal = Platform.isMacOS || Platform.isLinux;
 
   late Directory tmp;
+  late PathProviderPlatform originalPaths;
   late Directory workspaceDir;
   late Directory sessionDir;
   late Directory skillsDir;
@@ -69,6 +82,9 @@ void main() {
 
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('kelivo_ws_tools_');
+    originalPaths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = FakePathProviderPlatform(tmp.path);
+    SandboxPathResolver.debugSetDirs(docsDir: tmp.path);
     workspaceDir = Directory(p.join(tmp.path, 'ws'))..createSync();
     sessionDir = Directory(p.join(tmp.path, 'session'))..createSync();
     Directory(p.join(sessionDir.path, 'attachments')).createSync();
@@ -80,6 +96,8 @@ void main() {
   });
 
   tearDown(() async {
+    PathProviderPlatform.instance = originalPaths;
+    SandboxPathResolver.debugSetDirs();
     if (await tmp.exists()) await tmp.delete(recursive: true);
   });
 
@@ -96,7 +114,7 @@ void main() {
 
   WorkspaceToolContext ctx({
     bool sandboxed = false,
-    bool allowAll = true,
+    bool fullAccess = true,
     bool toolsUsed = false,
     bool shellNeedsApproval = false,
     RuntimeStatus? status,
@@ -122,11 +140,10 @@ void main() {
       workspace: workspace(
         shellNeedsApproval: shellNeedsApproval,
       ).copyWith(disabledTools: disabledTools),
-      binding: WorkspaceBinding(
-        workspaceId: 'ws1',
-        toolsUsed: toolsUsed,
-        allowAll: allowAll,
-      ),
+      permissionMode: fullAccess
+          ? ToolPermissionMode.fullAccess
+          : ToolPermissionMode.requestApproval,
+      binding: WorkspaceBinding(workspaceId: 'ws1', toolsUsed: toolsUsed),
       paths: paths,
       sessionDir: sessionDir,
       outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
@@ -143,6 +160,7 @@ void main() {
     bool registerRuntime = true,
     Future<void> Function()? onShellCompleted,
     Future<EnvironmentExecutionConfig> Function()? loadEnvironment,
+    ToolPermissionState? Function(String)? readPermissionState,
   }) {
     final provider = WorkspaceRuntimeProvider();
     if (registerRuntime && runtime != null) {
@@ -153,6 +171,7 @@ void main() {
       runtimeProvider: provider,
       onShellCompleted: onShellCompleted,
       loadEnvironment: loadEnvironment,
+      readPermissionState: readPermissionState,
       updateConversationExtras: (id, update) async {
         extrasById[id] = update(extrasById[id] ?? <String, dynamic>{});
       },
@@ -280,6 +299,79 @@ void main() {
     },
   );
 
+  for (final shell in [
+    const DesktopShell(
+      r'C:\Program Files\PowerShell\7\pwsh.exe',
+      DesktopShellKind.powerShell,
+      version: '7.6.9',
+    ),
+    const DesktopShell(
+      r'C:\Windows\powershell.exe',
+      DesktopShellKind.powerShell,
+      version: '5.1.19041.1',
+    ),
+    const DesktopShell(r'C:\Windows\cmd.exe', DesktopShellKind.cmd),
+    const DesktopShell('/bin/zsh', DesktopShellKind.posix),
+  ]) {
+    test('tool schema and prompt use resolved ${shell.name}', () {
+      final context = ctx(
+        status: RuntimeStatus(
+          ready: true,
+          engine: 'process',
+          sandboxed: false,
+          shell: shell,
+        ),
+      );
+      final definition = service()
+          .buildToolDefinitions(context)
+          .firstWhere((tool) => (tool['function'] as Map)['name'] == 'shell');
+      final schema = jsonEncode(definition);
+      final prompt = WorkspaceToolsService.buildPromptFragment(
+        context,
+        environmentVariableNames: ['API_KEY'],
+      );
+      expect(schema, contains(shell.name));
+      expect(prompt, contains(shell.invocation));
+      expect(prompt, contains('Use ${shell.environmentReference} references'));
+      expect(prompt, contains(shell.syntaxHint));
+      expect(schema, isNot(contains('sh -lc')));
+      if (shell.version?.startsWith('5.') == true) {
+        expect(prompt, isNot(contains('Chain with &&.')));
+      }
+    });
+  }
+
+  test('tool execution carries the shell used in the model prompt', () async {
+    const shell = DesktopShell('/bin/zsh', DesktopShellKind.posix);
+    final runtime = FakeWorkspaceRuntime();
+    final context = ctx(
+      fullAccess: true,
+      status: const RuntimeStatus(
+        ready: true,
+        engine: 'process',
+        sandboxed: false,
+        shell: shell,
+      ),
+    );
+    await service(runtime: runtime).handle(context, 'shell', {
+      'command': 'print ok',
+    }, toolCallId: 'shell-snapshot');
+    expect(runtime.requests.single.shell, same(shell));
+  });
+
+  test('unavailable native shell points to shell settings', () {
+    final context = ctx(
+      status: const RuntimeStatus(
+        ready: false,
+        engine: 'process',
+        sandboxed: false,
+      ),
+    );
+    final prompt = WorkspaceToolsService.buildPromptFragment(context);
+    expect(prompt, contains('Environment > Default shell'));
+    expect(prompt, isNot(contains('Sandbox environment not installed')));
+  });
+
   test('workspace prompt lists names without including values', () {
     final prompt = WorkspaceToolsService.buildPromptFragment(
       ctx(),
@@ -329,7 +421,7 @@ void main() {
       'command': 'install',
     }, toolCallId: 'disabled');
     await tools.handle(
-      ctx(allowAll: false, shellNeedsApproval: true),
+      ctx(fullAccess: false, shellNeedsApproval: true),
       'shell',
       {'command': 'install'},
       toolCallId: 'denied',
@@ -695,7 +787,7 @@ void main() {
           approvalService: approval,
         );
         expect(approval.calls, 0);
-        expect(metaOf(result).status, 'error');
+        expect(metaOf(result).status, 'denied');
         expect(file.readAsStringSync(), 'original');
       },
     );
@@ -727,8 +819,9 @@ void main() {
     });
 
     test('read_file image returns a structured image result', () async {
-      final png = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A]);
-      File(p.join(workspaceDir.path, 'pic.png')).writeAsBytesSync(png);
+      File(
+        p.join(workspaceDir.path, 'pic.png'),
+      ).writeAsBytesSync(img.encodePng(img.Image(width: 2, height: 2)));
       final result = client(
         await service().handle(ctx(), 'read_file', {
           'path': p.join(workspaceDir.path, 'pic.png'),
@@ -821,7 +914,7 @@ void main() {
       Directory(p.dirname(skillFile)).createSync(recursive: true);
       File(skillFile).writeAsStringSync('old');
       final result = await service().handle(
-        ctx(sandboxed: true, allowAll: true),
+        ctx(sandboxed: true, fullAccess: true),
         'write_file',
         {'path': '/skills/s1/SKILL.md', 'content': 'new'},
         toolCallId: 'skill-write',
@@ -833,12 +926,112 @@ void main() {
   });
 
   group('approval', () {
+    test(
+      'shell reads grants and revocations during the same generation',
+      () async {
+        var binding = const ToolPermissionState(workspaceId: 'ws1');
+        final approval = _RecordingApproval();
+        final tools = service(
+          runtime: FakeWorkspaceRuntime(),
+          readPermissionState: (id) {
+            expect(id, 'conv-1');
+            return binding;
+          },
+        );
+        final context = ctx(fullAccess: false);
+        Future<void> run(String id) async {
+          final result = await tools.handle(
+            context,
+            'shell',
+            {'command': 'printf ok'},
+            toolCallId: id,
+            approvalService: approval,
+          );
+          expect(jsonOf(result)['exit_code'], 0);
+        }
+
+        await run('before-grant');
+        expect(approval.calls, 1);
+        binding = const ToolPermissionState(
+          workspaceId: 'ws1',
+          mode: ToolPermissionMode.fullAccess,
+        );
+        await run('after-grant');
+        await run('next-command');
+        expect(approval.calls, 1);
+        binding = const ToolPermissionState(workspaceId: 'ws1');
+        await run('after-revoke');
+        expect(approval.calls, 2);
+      },
+    );
+
+    test(
+      'shell never reuses a stale grant after revocation or rebinding',
+      () async {
+        for (final binding in <ToolPermissionState?>[
+          null,
+          const ToolPermissionState(),
+          const ToolPermissionState(workspaceId: 'ws1'),
+          const ToolPermissionState(
+            workspaceId: 'other',
+            mode: ToolPermissionMode.fullAccess,
+          ),
+        ]) {
+          final approval = _RecordingApproval();
+          final tools = service(
+            runtime: FakeWorkspaceRuntime(),
+            readPermissionState: (_) => binding,
+          );
+          await tools.handle(
+            ctx(fullAccess: true),
+            'shell',
+            {'command': 'printf ok'},
+            toolCallId: 'stale-grant',
+            approvalService: approval,
+          );
+          expect(approval.calls, binding?.workspaceId == 'ws1' ? 1 : 0);
+        }
+      },
+    );
+
+    test('pending shell carries its workspace for session approval', () async {
+      final approval = ToolApprovalService();
+      addTearDown(approval.dispose);
+      final pending = Completer<void>();
+      approval.addListener(() {
+        if (approval.hasPending && !pending.isCompleted) pending.complete();
+      });
+      var state = const ToolPermissionState(workspaceId: 'ws1');
+      final result =
+          service(
+            runtime: FakeWorkspaceRuntime(),
+            readPermissionState: (_) => state,
+          ).handle(
+            ctx(fullAccess: false),
+            'shell',
+            {'command': 'printf ok'},
+            toolCallId: 'pending-shell',
+            approvalService: approval,
+          );
+      await pending.future;
+      expect(approval.pendingRequests.single.workspaceId, 'ws1');
+      state = const ToolPermissionState(
+        workspaceId: 'ws1',
+        mode: ToolPermissionMode.fullAccess,
+      );
+      approval.approveConversationTools(
+        conversationId: 'conv-1',
+        workspaceId: 'ws1',
+      );
+      expect(jsonOf(await result)['exit_code'], 0);
+    });
+
     test('shell asks when shellNeedsApproval', () async {
       final approval = _RecordingApproval();
       final runtime = _SandboxedRuntime();
       final tools = service(runtime: runtime);
       await tools.handle(
-        ctx(sandboxed: true, allowAll: false, shellNeedsApproval: true),
+        ctx(sandboxed: true, fullAccess: false, shellNeedsApproval: true),
         'shell',
         {'command': 'printf ok'},
         toolCallId: 'appr-1',
@@ -848,12 +1041,12 @@ void main() {
       expect(approval.lastName, 'shell');
     });
 
-    test('shell skips approval when allowAll', () async {
+    test('shell skips approval when fullAccess', () async {
       final approval = _RecordingApproval();
       final runtime = _SandboxedRuntime();
       final tools = service(runtime: runtime);
       await tools.handle(
-        ctx(sandboxed: true, allowAll: true, shellNeedsApproval: true),
+        ctx(sandboxed: true, fullAccess: true, shellNeedsApproval: true),
         'shell',
         {'command': 'printf ok'},
         toolCallId: 'appr-2',
@@ -870,7 +1063,7 @@ void main() {
           runtime: FakeWorkspaceRuntime(useRealProcess: canRunReal),
         );
         await tools.handle(
-          ctx(sandboxed: false, allowAll: false, shellNeedsApproval: false),
+          ctx(sandboxed: false, fullAccess: false, shellNeedsApproval: false),
           'shell',
           {'command': 'printf ok'},
           toolCallId: 'appr-3',
@@ -880,31 +1073,28 @@ void main() {
       },
     );
 
-    test(
-      'native outside write forces approval regardless of allowAll',
-      () async {
-        final approval = _RecordingApproval()..allow = false;
-        final outside = p.join(
-          Directory.current.path,
-          'kelivo_ws_outside_test.txt',
-        );
-        addTearDown(() {
-          final file = File(outside);
-          if (file.existsSync()) file.deleteSync();
-        });
-        final result = await service().handle(
-          ctx(allowAll: true),
-          'write_file',
-          {'path': outside, 'content': 'nope'},
-          toolCallId: 'appr-out',
-          approvalService: approval,
-        );
-        expect(approval.calls, 1);
-        expect(jsonOf(result)['error'], 'approval_denied');
-        expect(jsonOf(result)['message'], 'nope');
-        expect(File(outside).existsSync(), isFalse);
-      },
-    );
+    test('native outside write requests approval in default mode', () async {
+      final approval = _RecordingApproval()..allow = false;
+      final outside = p.join(
+        Directory.current.path,
+        'kelivo_ws_outside_test.txt',
+      );
+      addTearDown(() {
+        final file = File(outside);
+        if (file.existsSync()) file.deleteSync();
+      });
+      final result = await service().handle(
+        ctx(fullAccess: false),
+        'write_file',
+        {'path': outside, 'content': 'nope'},
+        toolCallId: 'appr-out',
+        approvalService: approval,
+      );
+      expect(approval.calls, 1);
+      expect(jsonOf(result)['error'], 'approval_denied');
+      expect(jsonOf(result)['message'], 'nope');
+      expect(File(outside).existsSync(), isFalse);
+    });
   });
 
   test(
@@ -1237,10 +1427,9 @@ void main() {
       extrasById['conv-1'] = WorkspaceBinding(
         workspaceId: 'ws1',
         toolsUsed: false,
-        allowAll: true,
       ).applyTo(<String, dynamic>{});
       await service().handle(
-        ctx(toolsUsed: false, allowAll: true),
+        ctx(toolsUsed: false, fullAccess: true),
         'read_file',
         {'path': p.join(workspaceDir.path, 'a.txt')},
         toolCallId: 'lock-1',
@@ -1253,7 +1442,7 @@ void main() {
 
     test('does not mark tools used on denial', () async {
       await service().handle(
-        ctx(sandboxed: true, allowAll: true, toolsUsed: false),
+        ctx(sandboxed: true, fullAccess: true, toolsUsed: false),
         'write_file',
         {'path': '/skills/x.txt', 'content': 'no'},
         toolCallId: 'lock-deny',

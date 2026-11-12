@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:drift/drift.dart' show ApplyInterceptor;
@@ -8,6 +9,7 @@ import 'package:Kelivo/core/database/composer_draft_store.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 
 import '../../support/commit_gate.dart';
@@ -44,6 +46,90 @@ void main() {
     await db.close();
     await root.delete(recursive: true);
   });
+
+  UiContextAttachment chip(String value) => UiContextAttachment.attached(
+    source: UiContextSource(
+      conversationId: 'a',
+      revisionId: 'source',
+      surfaceKey: '0:0',
+      sourceHash: 'a' * 64,
+    ),
+    text: UiContextText(title: 'Parameters', body: 'value: $value'),
+  );
+
+  test(
+    'chip-only draft, pending receipt and retry survive a database reopen',
+    () async {
+      await store.load('a');
+      final frozen = chip('7');
+      final input = ComposerDraftInput(uiContext: frozen);
+      store.setInput('a', input);
+      await store.flush();
+      await reopen();
+      expect((await store.load('a')).active.uiContext, frozen);
+      final submission = await store.beginSubmission(
+        'a',
+        store.peek('a')!.active,
+      );
+      final prepared = await store.prepareSubmissionInput(
+        input.toInput(submission: submission),
+      );
+      expect(prepared.uiContext, frozen);
+      expect(prepared.isEmpty, isFalse);
+      await store.flush();
+      await reopen();
+      final recovered = await store.load('a');
+      expect(recovered.pending!.uiContext, frozen);
+      expect(recovered.submissionId, submission.id);
+      store.restorePending('a');
+      expect(recovered.active.uiContext, frozen);
+    },
+  );
+
+  test(
+    'merging distinct chips requires an explicit choice and keeps both texts',
+    () {
+      final first = ComposerDraftInput(text: 'current', uiContext: chip('1'));
+      final second = ComposerDraftInput(text: 'incoming', uiContext: chip('2'));
+      expect(() => ComposerDraftStore.merge(first, second), throwsStateError);
+      final keep = ComposerDraftStore.merge(
+        first,
+        second,
+        selectedUiContext: first.uiContext,
+      );
+      expect(keep.text, 'current\n\nincoming');
+      expect(keep.uiContext, first.uiContext);
+      final replace = ComposerDraftStore.merge(
+        first,
+        second,
+        selectedUiContext: second.uiContext,
+      );
+      expect(replace.uiContext, second.uiContext);
+      expect(
+        ComposerDraftStore.merge(const ComposerDraftInput(), first).uiContext,
+        first.uiContext,
+      );
+      expect(ComposerDraftStore.merge(first, first).uiContext, first.uiContext);
+    },
+  );
+
+  test(
+    'explicit transfer preserves frozen text and original source across owners',
+    () async {
+      await store.load('a');
+      await store.load('b');
+      final frozen = chip('31');
+      store.setInput('a', ComposerDraftInput(uiContext: frozen));
+      store.setInput('b', const ComposerDraftInput(text: 'Destination'));
+      await store.transfer('a', 'b', append: true);
+      await reopen();
+      expect((await store.load('a')).active.isEmpty, isTrue);
+      final moved = (await store.load('b')).active;
+      expect(moved.text, 'Destination');
+      expect(moved.uiContext, frozen);
+      expect(moved.uiContext!.source!.conversationId, 'a');
+    },
+  );
 
   test('A and B retain exact independent text after database reopen', () async {
     await store.load('a');
@@ -82,6 +168,74 @@ void main() {
     expect(store.newEntry('assistant')?.chatModelId, 'model');
     expect((await store.load('new-id')).active.text, 'unsent');
   });
+
+  test('moving a new entry clears its permission after reopening', () async {
+    store.registerNewEntry(
+      Conversation(
+        id: 'new-permission',
+        title: 'New',
+        assistantId: 'before',
+        extras: const {
+          'workspace.id': 'workspace',
+          'workspace.allowAll': true,
+          'tools.permission_mode': 'fullAccess',
+        },
+      ),
+    );
+    store.setInput('new-permission', const ComposerDraftInput(text: 'unsent'));
+    await store.flush();
+    expect(await store.moveAssistant('new-permission', 'after'), isTrue);
+    expect(store.newEntry('before'), isNull);
+    expect(
+      ToolPermissionMode.fromExtras(store.newEntry('after')!.extras),
+      ToolPermissionMode.requestApproval,
+    );
+    await reopen();
+    final moved = store.newEntry('after')!;
+    expect(moved.extras['workspace.id'], 'workspace');
+    expect(moved.extras.containsKey('workspace.allowAll'), isFalse);
+    expect(
+      ToolPermissionMode.fromExtras(moved.extras),
+      ToolPermissionMode.requestApproval,
+    );
+    expect((await store.load(moved.id)).active.text, 'unsent');
+  });
+
+  test(
+    'a failed permission save does not publish or persist the grant',
+    () async {
+      store.registerNewEntry(
+        Conversation(id: 'permission', title: 'New', assistantId: 'assistant'),
+      );
+      await store.flush();
+      commits.onNextCommit = () async => throw StateError('disk full');
+      await expectLater(
+        store.updateNewEntryExtras(
+          'permission',
+          ToolPermissionMode.fullAccess.applyTo,
+        ),
+        throwsStateError,
+      );
+      expect(
+        ToolPermissionMode.fromExtras(store.newEntry('assistant')!.extras),
+        ToolPermissionMode.requestApproval,
+      );
+      await reopen();
+      expect(
+        ToolPermissionMode.fromExtras(store.newEntry('assistant')!.extras),
+        ToolPermissionMode.requestApproval,
+      );
+      await store.updateNewEntryExtras(
+        'permission',
+        ToolPermissionMode.fullAccess.applyTo,
+      );
+      await reopen();
+      expect(
+        ToolPermissionMode.fromExtras(store.newEntry('assistant')!.extras),
+        ToolPermissionMode.fullAccess,
+      );
+    },
+  );
 
   test(
     'attachments are recoverable after the selected original disappears',

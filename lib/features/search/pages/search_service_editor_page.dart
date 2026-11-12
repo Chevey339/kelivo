@@ -1424,6 +1424,8 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('apiKey', service.apiKey);
     } else if (service is OllamaOptions) {
       _putController('apiKey', service.apiKey);
+    } else if (service is DeepSeekOptions) {
+      _putController('apiKey', service.apiKey);
     } else if (service is JinaOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is PerplexityOptions) {
@@ -1563,6 +1565,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         );
       case 'ollama':
         return OllamaOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+        );
+      case 'deepseek':
+        return DeepSeekOptions(
           id: _serviceId,
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
@@ -2727,6 +2735,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is MetasoOptions) return 'metaso';
   if (service is JinaOptions) return 'jina';
   if (service is OllamaOptions) return 'ollama';
+  if (service is DeepSeekOptions) return 'deepseek';
   if (service is PerplexityOptions) return 'perplexity';
   if (service is BochaOptions) return 'bocha';
   if (service is DoubaoOptions) return 'doubao';
@@ -2776,6 +2785,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return JinaOptions(id: id, apiKey: '');
     case 'ollama':
       return OllamaOptions(id: id, apiKey: '');
+    case 'deepseek':
+      return DeepSeekOptions(id: id, apiKey: '');
     case 'perplexity':
       return PerplexityOptions(id: id, apiKey: '');
     case 'bocha':
@@ -2838,6 +2849,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameJina;
     case 'ollama':
       return l10n.searchServiceNameOllama;
+    case 'deepseek':
+      return l10n.searchServiceNameDeepSeek;
     case 'perplexity':
       return l10n.searchServiceNamePerplexity;
     case 'bocha':
@@ -2886,6 +2899,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'metaso', brand: 'metaso'),
   (type: 'jina', brand: 'jina'),
   (type: 'ollama', brand: 'ollama'),
+  (type: 'deepseek', brand: 'deepseek'),
   (type: 'perplexity', brand: 'perplexity'),
   (type: 'bocha', brand: 'bocha'),
   (type: 'doubao', brand: 'doubao'),

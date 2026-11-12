@@ -1,3 +1,5 @@
+import '../../test/support/workspace_test_access.dart';
+import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -13,7 +15,6 @@ import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/sandbox/ios_ish_runtime.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
-import 'package:Kelivo/core/services/workspace/host_file_tools.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -60,6 +61,7 @@ void main() {
     workspaceHost = Directory(p.join(tmp.path, 'workspace'))..createSync();
     sessionHost = Directory(p.join(tmp.path, 'session'))..createSync();
     skillsHost = Directory(p.join(tmp.path, 'skills'))..createSync();
+    Directory(p.join(sessionHost.path, 'tmp')).createSync();
     mounts = WorkspacePaths.sandboxed(
       workspaceHostRoot: workspaceHost.path,
       sessionHostDir: sessionHost.path,
@@ -179,6 +181,7 @@ void main() {
       final secondChat = await Directory(
         p.join(secondRoot.path, 'chat'),
       ).create();
+      await Directory(p.join(secondChat.path, 'tmp')).create();
       final secondPaths = WorkspacePaths.sandboxed(
         workspaceHostRoot: secondWorkspace.path,
         sessionHostDir: secondChat.path,
@@ -265,7 +268,7 @@ void main() {
         }
         expect(await aFile.readAsString(), 'workspace-a');
         expect(await bFile.readAsString(), 'workspace-b');
-        final files = HostFileTools(secondPaths);
+        final files = authorizedHostFileTools(secondPaths);
         final guestTmp = '/tmp/${p.basename(secondRoot.path)}/shared.txt';
         await files.writeFile(guestTmp, 'from-file-tool');
         final tmpResult = await runCmd(
@@ -588,10 +591,8 @@ printf 'COPY_OK\n'
             createdAt: DateTime.utc(2026, 1, 1),
             updatedAt: DateTime.utc(2026, 1, 1),
           ),
-          binding: const WorkspaceBinding(
-            workspaceId: 'ios-ish-ws',
-            allowAll: true,
-          ),
+          permissionMode: ToolPermissionMode.fullAccess,
+          binding: const WorkspaceBinding(workspaceId: 'ios-ish-ws'),
           paths: paths,
           sessionDir: sessionHost,
           outputsDir: Directory(p.join(sessionHost.path, 'outputs'))

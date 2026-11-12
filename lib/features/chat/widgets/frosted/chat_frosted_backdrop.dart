@@ -454,10 +454,17 @@ class ChatFrostedBackdropScope extends InheritedWidget {
   const ChatFrostedBackdropScope({
     super.key,
     required this.controller,
+    required this.backgroundActive,
+    required this.size,
     required super.child,
   });
 
   final ChatFrostedBackdropController controller;
+  // Stable scene data, independent of live/cached mode or gradient phase.
+  final bool backgroundActive;
+
+  /// Actual artwork bounds, independent of chat-panel and keyboard insets.
+  final Size size;
 
   static ChatFrostedBackdropScope? maybeOf(BuildContext context) {
     return context
@@ -470,7 +477,9 @@ class ChatFrostedBackdropScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(ChatFrostedBackdropScope oldWidget) =>
-      oldWidget.controller != controller;
+      oldWidget.controller != controller ||
+      oldWidget.backgroundActive != backgroundActive ||
+      oldWidget.size != size;
 }
 
 /// Pins chat artwork and publishes static pre-blurred snapshots for
@@ -820,9 +829,13 @@ class _ChatFrostedBackdropState extends State<ChatFrostedBackdrop> {
           ),
           BackdropGroup(
             backdropKey: _backdropKey,
-            child: ChatFrostedBackdropScope(
-              controller: _controller,
-              child: widget.child,
+            child: LayoutBuilder(
+              builder: (context, constraints) => ChatFrostedBackdropScope(
+                controller: _controller,
+                backgroundActive: spec.active,
+                size: constraints.biggest,
+                child: widget.child,
+              ),
             ),
           ),
         ],

@@ -60,6 +60,7 @@ ContextUsageSnapshot usageSnap({
     draft: 9,
   ),
   String modelId = 'window-model',
+  bool hasUsage = true,
 }) {
   return ContextUsageSnapshot(
     state: state,
@@ -71,7 +72,7 @@ ContextUsageSnapshot usageSnap({
     providerKey: 'TestProvider',
     modelId: modelId,
     assistantId: null,
-    computedAt: DateTime.utc(2026, 1, 1),
+    computedAt: hasUsage ? DateTime.utc(2026, 1, 1) : null,
   );
 }
 
@@ -109,6 +110,7 @@ void main() {
   Future<void> pumpOpenButton(
     WidgetTester tester, {
     required _RecordingUsage usage,
+    Future<void> Function()? onOperations,
   }) {
     final settings = SettingsProvider(createBusinessTestPreferences());
     addTearDown(settings.dispose);
@@ -140,6 +142,7 @@ void main() {
                           anchorKey: anchorKey,
                           conversationId: 'c1',
                           draftText: 'hello',
+                          onOperations: onOperations,
                         );
                       },
                       child: const Text('open'),
@@ -215,6 +218,73 @@ void main() {
       isNull,
     ); // Refresh must use the live composer state.
   });
+
+  testWidgets('operations entry closes the popover before opening management', (
+    tester,
+  ) async {
+    final usage = await _createUsage();
+    usage.seeded = usageSnap();
+    var opened = false;
+    await pumpOpenButton(
+      tester,
+      usage: usage,
+      onOperations: () async {
+        opened = true;
+      },
+    );
+    await tester.tap(find.byKey(const ValueKey('open-context-usage-popover')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Context operations'));
+    await tester.tap(find.text('Context operations'));
+    await tester.pumpAndSettle();
+    expect(opened, isTrue);
+    expect(find.byKey(contextUsagePopoverKey), findsNothing);
+  });
+
+  for (final hasPrevious in [false, true]) {
+    testWidgets('failed usage exposes retry, previous result=$hasPrevious', (
+      tester,
+    ) async {
+      final usage = await _createUsage();
+      usage.seeded = usageSnap(
+        state: ContextUsageState.failed,
+        hasUsage: hasPrevious,
+        used: hasPrevious ? 110 : 0,
+      );
+      await pumpOpenButton(tester, usage: usage);
+      await tester.tap(
+        find.byKey(const ValueKey('open-context-usage-popover')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          hasPrevious
+              ? 'Update failed · previous result is stale'
+              : 'Calculation failed',
+        ),
+        findsOneWidget,
+      );
+      if (!hasPrevious) {
+        expect(find.text('Usage unavailable'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('context-usage-bucket-freeSpace')),
+          findsNothing,
+        );
+      }
+      await tester.tap(find.byTooltip('Retry'));
+      await tester.pump();
+      expect(usage.refreshCalls, 2);
+      expect(usage.lastForce, isTrue);
+      expect(usage.lastDraft, isNull);
+
+      usage.seeded = usageSnap();
+      usage.notifyListeners();
+      await tester.pump();
+      expect(find.byTooltip('Retry'), findsNothing);
+      expect(find.byTooltip('Refresh'), findsOneWidget);
+    });
+  }
 
   testWidgets('shows set context window when the window is null', (
     tester,

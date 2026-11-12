@@ -8,10 +8,12 @@ import 'workspace_tool_metadata.dart';
 /// Like OpenMinis, values shorter than five characters are excluded to avoid
 /// replacing ubiquitous flags/numbers. Multiline values also match per line,
 /// since read_file adds line numbers to saved command output.
+/// Proxy credentials additionally match their user-info and Basic auth forms.
 class EnvironmentOutputRedactor {
   EnvironmentOutputRedactor(EnvironmentExecutionConfig config) {
     if (!config.privacyMode) return;
     final values = <String>{
+      ..._proxyCredentialValues(config.variables),
       for (final value in config.variables.values) ...[
         if (value.length >= 5) value,
         ...const LineSplitter()
@@ -25,6 +27,44 @@ class EnvironmentOutputRedactor {
   }
 
   RegExp? _pattern;
+
+  static Iterable<String> _proxyCredentialValues(
+    Map<String, String> variables,
+  ) sync* {
+    for (final entry in variables.entries) {
+      if (!const {
+        'http_proxy',
+        'https_proxy',
+        'all_proxy',
+      }.contains(entry.key.toLowerCase())) {
+        continue;
+      }
+      final userInfo = Uri.tryParse(entry.value)?.userInfo ?? '';
+      if (userInfo.isEmpty) continue;
+      final separator = userInfo.indexOf(':');
+      final encodedUser = separator < 0
+          ? userInfo
+          : userInfo.substring(0, separator);
+      final encodedPassword = separator < 0
+          ? ''
+          : userInfo.substring(separator + 1);
+      try {
+        final user = Uri.decodeComponent(encodedUser);
+        final password = Uri.decodeComponent(encodedPassword);
+        if (user.isEmpty && password.isEmpty) continue;
+        final credentials = '$user:$password';
+        // Even short credentials must not survive in a reversible auth token.
+        yield base64Encode(utf8.encode(credentials));
+        yield credentials;
+        if (separator >= 0) yield userInfo;
+        for (final value in [user, password, encodedUser, encodedPassword]) {
+          if (value.length >= 5) yield value;
+        }
+      } on FormatException {
+        // Malformed manually supplied URIs must not break local tool output.
+      }
+    }
+  }
 
   ClientToolResult redact(ClientToolResult result) {
     final pattern = _pattern;

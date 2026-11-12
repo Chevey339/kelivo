@@ -7,6 +7,8 @@ import 'package:http/testing.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/providers/claude_official.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_provider.dart';
+import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
+import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/home/services/tool_handler_service.dart';
 
 import '../../../support/tool_schema_reference_cases.dart';
@@ -155,16 +157,23 @@ Map<String, dynamic> _response(String transport, bool first) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  final browserTool = LocalToolsService.definitionFor(LocalToolNames.browser);
   final schemas = {
     'submit': _schema,
     'constraints': _constraintsSchema,
+    for (final tool in [
+      ...WorkspaceToolsService.definitions(),
+      LocalToolsService.definitionFor(LocalToolNames.phoneControl),
+    ])
+      (tool['function'] as Map)['name'] as String:
+          (tool['function'] as Map)['parameters'] as Map<String, dynamic>,
     for (final (index, example) in toolSchemaReferenceCases().indexed)
       'reference_$index': example.schema,
   };
 
   for (final transport in ['chat', 'responses', 'claude']) {
     test(
-      '$transport preserves composed MCP schemas across tool rounds',
+      '$transport preserves MCP and built-in schemas across tool rounds',
       () async {
         final requests = <Map<String, dynamic>>[];
         final client = MockClient((request) async {
@@ -200,6 +209,7 @@ void main() {
             {'role': 'user', 'content': 'Submit value 123'},
           ],
           tools: [
+            browserTool,
             for (final entry in schemas.entries)
               {
                 'type': 'function',
@@ -226,13 +236,20 @@ void main() {
         expect(requests, hasLength(2));
         for (final request in requests) {
           final tools = request['tools'] as List;
-          expect(tools, hasLength(schemas.length));
+          expect(tools, hasLength(schemas.length + 1));
           for (final tool in tools) {
             final function = transport == 'chat' ? tool['function'] : tool;
             final parameters = transport == 'claude'
                 ? function['input_schema']
                 : function['parameters'];
-            expect(parameters, schemas[function['name']]);
+            if (function['name'] == LocalToolNames.browser) {
+              expect(parameters, browserTool['function']['parameters']);
+              if (transport != 'claude') {
+                expect(function['strict'], isFalse);
+              }
+            } else {
+              expect(parameters, schemas[function['name']]);
+            }
           }
         }
       },

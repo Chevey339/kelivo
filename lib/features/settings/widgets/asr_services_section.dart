@@ -517,6 +517,9 @@ class _ProviderBadge extends StatelessWidget {
 String? _kindBrandAsset(AsrServiceKind kind) {
   final hint = switch (kind) {
     AsrServiceKind.openAiRealtime => 'OpenAI',
+    AsrServiceKind.groq => 'Groq',
+    AsrServiceKind.mistral => 'Mistral',
+    AsrServiceKind.elevenLabs => 'ElevenLabs',
     AsrServiceKind.dashScope => 'Qwen',
     AsrServiceKind.qwenAudio => 'Qwen',
     AsrServiceKind.volcengine => 'Doubao',
@@ -627,6 +630,10 @@ class _AsrEditorState extends State<_AsrEditor> {
   late final TextEditingController _modelController;
   late final TextEditingController _resourceIdController;
   late final TextEditingController _languageController;
+  late final TextEditingController _workspaceController;
+  late QwenAudioAsrMode _qwenMode;
+  late String _qwenRegion;
+  bool _qwenConfigError = false;
   String _localModelId = '';
   bool _apiKeyError = false;
   bool _checkingSystem = false;
@@ -647,6 +654,15 @@ class _AsrEditorState extends State<_AsrEditor> {
     _modelController = TextEditingController(text: _modelOf(initial));
     _resourceIdController = TextEditingController(text: _resourceIdOf(initial));
     _languageController = TextEditingController(text: _languageOf(initial));
+    _workspaceController = TextEditingController(
+      text: initial is QwenAudioAsrOptions ? initial.workspaceId : '',
+    );
+    _qwenMode = initial is QwenAudioAsrOptions
+        ? initial.mode
+        : QwenAudioAsrMode.realtime;
+    _qwenRegion = initial is QwenAudioAsrOptions
+        ? initial.region
+        : 'cn-beijing';
     if (initial case final SherpaOnnxAsrOptions local) {
       _localModelId = local.modelId;
     }
@@ -667,6 +683,7 @@ class _AsrEditorState extends State<_AsrEditor> {
     _modelController.dispose();
     _resourceIdController.dispose();
     _languageController.dispose();
+    _workspaceController.dispose();
     super.dispose();
   }
 
@@ -707,6 +724,10 @@ class _AsrEditorState extends State<_AsrEditor> {
       _endpointController.text = _defaultEndpoint(kind);
       _modelController.text = _defaultModel(kind);
       _resourceIdController.text = _defaultResourceId(kind);
+      _workspaceController.clear();
+      _qwenMode = QwenAudioAsrMode.realtime;
+      _qwenRegion = 'cn-beijing';
+      _qwenConfigError = false;
       _languageController.text =
           kind == AsrServiceKind.mimo || kind == AsrServiceKind.step
           ? 'auto'
@@ -795,6 +816,50 @@ class _AsrEditorState extends State<_AsrEditor> {
     return _apiKeyController.text.trim().isNotEmpty;
   }
 
+  QwenAudioAsrOptions _qwenAudioOptions() {
+    final initial = widget.initial;
+    return QwenAudioAsrOptions(
+      id: initial?.id,
+      name: _nameController.text.trim().isEmpty
+          ? 'Qwen Audio'
+          : _nameController.text.trim(),
+      apiKey: _apiKeyController.text.trim(),
+      workspaceId: _workspaceController.text.trim(),
+      region: _qwenRegion,
+      mode: _qwenMode,
+      endpoint: _endpointController.text.trim(),
+      model: _valueOrDefault(_modelController.text, _qwenMode.defaultModel),
+      language: _languageController.text.trim(),
+      sampleRate: initial is QwenAudioAsrOptions ? initial.sampleRate : 16000,
+      format: initial is QwenAudioAsrOptions ? initial.format : 'pcm',
+      segmentDurationSec: initial is QwenAudioAsrOptions
+          ? initial.segmentDurationSec
+          : 30,
+    );
+  }
+
+  Widget _selectionField<T>({
+    required String label,
+    required T value,
+    required List<T> options,
+    required String Function(T) labelFor,
+    required ValueChanged<T> onSelected,
+  }) => widget.desktop
+      ? VoiceServiceSelectRow<T>(
+          label: label,
+          value: value,
+          options: options,
+          labelFor: labelFor,
+          onSelected: onSelected,
+        )
+      : VoiceServiceMobileSelectRow<T>(
+          label: label,
+          value: value,
+          options: options,
+          labelFor: labelFor,
+          onSelected: onSelected,
+        );
+
   Future<void> _submit() async {
     if (_kind != AsrServiceKind.sherpaOnnx &&
         _kind != AsrServiceKind.system &&
@@ -857,6 +922,29 @@ class _AsrEditorState extends State<_AsrEditor> {
           ),
         );
         return;
+      case AsrServiceKind.groq:
+      case AsrServiceKind.mistral:
+      case AsrServiceKind.elevenLabs:
+        final initial = widget.initial is AudioTranscriptionAsrOptions
+            ? widget.initial as AudioTranscriptionAsrOptions
+            : null;
+        widget.onSubmit(
+          AudioTranscriptionAsrOptions(
+            id: id,
+            kind: _kind,
+            name: name,
+            apiKey: _apiKeyController.text.trim(),
+            baseUrl: _valueOrDefault(
+              _endpointController.text,
+              _defaultEndpoint(_kind),
+            ),
+            model: _valueOrDefault(_modelController.text, _defaultModel(_kind)),
+            language: language,
+            sampleRate: initial?.sampleRate ?? 16000,
+            segmentDurationSec: initial?.segmentDurationSec ?? 30,
+          ),
+        );
+        return;
       case AsrServiceKind.dashScope:
         final initial = widget.initial is DashScopeAsrOptions
             ? widget.initial as DashScopeAsrOptions
@@ -879,21 +967,12 @@ class _AsrEditorState extends State<_AsrEditor> {
         );
         return;
       case AsrServiceKind.qwenAudio:
-        final initial = widget.initial is QwenAudioAsrOptions
-            ? widget.initial as QwenAudioAsrOptions
-            : null;
-        widget.onSubmit(
-          QwenAudioAsrOptions(
-            id: id,
-            name: name,
-            apiKey: _apiKeyController.text.trim(),
-            workspaceId: _endpointController.text.trim(),
-            region: initial?.region ?? 'cn-beijing',
-            model: _valueOrDefault(_modelController.text, _defaultModel(_kind)),
-            sampleRate: initial?.sampleRate ?? 16000,
-            format: initial?.format ?? 'pcm',
-          ),
-        );
+        final options = _qwenAudioOptions();
+        if (!options.isConfigured) {
+          setState(() => _qwenConfigError = true);
+          return;
+        }
+        widget.onSubmit(options);
         return;
       case AsrServiceKind.volcengine:
         widget.onSubmit(
@@ -1014,12 +1093,75 @@ class _AsrEditorState extends State<_AsrEditor> {
           }
         },
       ),
-      _EditorField(
-        label: l10n.asrServicesEndpointLabel,
-        controller: _endpointController,
-        hint: _defaultEndpoint(_kind),
-        desktop: widget.desktop,
-      ),
+      if (_kind == AsrServiceKind.qwenAudio) ...[
+        _selectionField<QwenAudioAsrMode>(
+          label: l10n.asrServicesRecognitionModeLabel,
+          value: _qwenMode,
+          options: QwenAudioAsrMode.values,
+          labelFor: (mode) => mode == QwenAudioAsrMode.realtime
+              ? l10n.asrServicesRealtimeMode
+              : l10n.asrServicesRecordedMode,
+          onSelected: (mode) => setState(() {
+            if (_modelController.text.trim().isEmpty ||
+                _modelController.text == _qwenMode.defaultModel) {
+              _modelController.text = mode.defaultModel;
+            }
+            _qwenMode = mode;
+          }),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            widget.desktop ? 4 : 12,
+            8,
+            widget.desktop ? 4 : 12,
+            widget.desktop ? 12 : 16,
+          ),
+          child: Text(
+            l10n.asrServicesQwenTokenPlanHint,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.5,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        _EditorField(
+          label: l10n.ttsServicesFieldWorkspaceIdLabel,
+          controller: _workspaceController,
+          hint: l10n.asrServicesWorkspaceIdHint,
+          desktop: widget.desktop,
+          onChanged: (_) => setState(() {}),
+          errorText:
+              _qwenConfigError && !_qwenAudioOptions().hasValidWorkspaceId
+              ? l10n.asrServicesWorkspaceIdInvalid
+              : null,
+        ),
+        _selectionField<String>(
+          label: l10n.ttsServicesFieldRegionLabel,
+          value: _qwenRegion,
+          options: const ['cn-beijing', 'ap-southeast-1'],
+          labelFor: (region) => region,
+          onSelected: (region) => setState(() => _qwenRegion = region),
+        ),
+        _EditorField(
+          label: l10n.asrServicesEndpointOverrideLabel,
+          controller: _endpointController,
+          hint: _qwenAudioOptions().defaultEndpoint,
+          desktop: widget.desktop,
+          onChanged: (_) => setState(() {}),
+          errorText: _qwenConfigError && !_qwenAudioOptions().hasValidEndpoint
+              ? (_qwenMode == QwenAudioAsrMode.realtime
+                    ? l10n.asrServicesWebSocketEndpointInvalid
+                    : l10n.asrServicesHttpEndpointInvalid)
+              : null,
+        ),
+      ] else
+        _EditorField(
+          label: l10n.asrServicesEndpointLabel,
+          controller: _endpointController,
+          hint: _defaultEndpoint(_kind),
+          desktop: widget.desktop,
+        ),
       if (_kind == AsrServiceKind.volcengine)
         _EditorField(
           label: l10n.asrServicesResourceIdLabel,
@@ -1031,15 +1173,19 @@ class _AsrEditorState extends State<_AsrEditor> {
         _EditorField(
           label: l10n.asrServicesModelLabel,
           controller: _modelController,
-          hint: _defaultModel(_kind),
+          hint: _kind == AsrServiceKind.qwenAudio
+              ? _qwenMode.defaultModel
+              : _defaultModel(_kind),
           desktop: widget.desktop,
         ),
-      _EditorField(
-        label: l10n.asrServicesLanguageLabel,
-        controller: _languageController,
-        hint: l10n.asrServicesAutomaticLabel,
-        desktop: widget.desktop,
-      ),
+      if (_kind != AsrServiceKind.qwenAudio ||
+          _qwenMode == QwenAudioAsrMode.transcription)
+        _EditorField(
+          label: l10n.asrServicesLanguageLabel,
+          controller: _languageController,
+          hint: l10n.asrServicesAutomaticLabel,
+          desktop: widget.desktop,
+        ),
     ]);
     return widgets;
   }
@@ -1153,6 +1299,9 @@ class _AsrEditorState extends State<_AsrEditor> {
                       AsrServiceKind.system,
                       AsrServiceKind.sherpaOnnx,
                       AsrServiceKind.openAiRealtime,
+                      AsrServiceKind.groq,
+                      AsrServiceKind.mistral,
+                      AsrServiceKind.elevenLabs,
                       AsrServiceKind.dashScope,
                       AsrServiceKind.qwenAudio,
                       AsrServiceKind.volcengine,
@@ -1271,6 +1420,9 @@ class _ProviderChoiceGrid extends StatelessWidget {
           children: [
             for (final kind in const [
               AsrServiceKind.openAiRealtime,
+              AsrServiceKind.groq,
+              AsrServiceKind.mistral,
+              AsrServiceKind.elevenLabs,
               AsrServiceKind.dashScope,
               AsrServiceKind.qwenAudio,
               AsrServiceKind.volcengine,
@@ -1858,7 +2010,14 @@ class _EditorFieldState extends State<_EditorField> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final hintStyle = TextStyle(
+      color: cs.onSurface.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.42 : 0.46,
+      ),
+      fontWeight: AppFontWeights.regular,
+    );
     if (widget.desktop) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -1881,6 +2040,7 @@ class _EditorFieldState extends State<_EditorField> {
               onChanged: widget.onChanged,
               decoration: InputDecoration(
                 hintText: widget.hint,
+                hintStyle: hintStyle,
                 errorText: widget.errorText,
                 isDense: true,
                 border: OutlineInputBorder(
@@ -1921,6 +2081,7 @@ class _EditorFieldState extends State<_EditorField> {
             ),
             decoration: InputDecoration(
               hintText: widget.hint,
+              hintStyle: hintStyle,
               errorText: widget.errorText,
               isDense: true,
               filled: true,
@@ -2021,6 +2182,10 @@ IconData _kindIcon(AsrServiceKind kind) {
       return Lucide.AudioWaveform;
     case AsrServiceKind.mimo:
       return Lucide.Globe;
+    case AsrServiceKind.groq:
+    case AsrServiceKind.mistral:
+    case AsrServiceKind.elevenLabs:
+      return Lucide.AudioWaveform;
     case AsrServiceKind.step:
       return Lucide.AudioWaveform;
   }
@@ -2062,6 +2227,9 @@ bool _isDefaultServiceName(AsrServiceKind kind, String name) {
       'OpenAI Realtime ASR',
       'OpenAI Realtime',
     }.contains(name),
+    AsrServiceKind.groq => name == 'Groq',
+    AsrServiceKind.mistral => name == 'Mistral',
+    AsrServiceKind.elevenLabs => name == 'ElevenLabs',
     AsrServiceKind.dashScope => const {
       'DashScope ASR',
       'DashScope Realtime',
@@ -2108,6 +2276,12 @@ String _kindTitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesLocalTitle;
     case AsrServiceKind.openAiRealtime:
       return l10n.asrServicesOpenAiTitle;
+    case AsrServiceKind.groq:
+      return 'Groq';
+    case AsrServiceKind.mistral:
+      return 'Mistral';
+    case AsrServiceKind.elevenLabs:
+      return 'ElevenLabs';
     case AsrServiceKind.dashScope:
       return l10n.asrServicesDashScopeTitle;
     case AsrServiceKind.qwenAudio:
@@ -2129,10 +2303,16 @@ String _kindSubtitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesLocalSubtitle;
     case AsrServiceKind.openAiRealtime:
       return l10n.asrServicesOpenAiSubtitle;
+    case AsrServiceKind.groq:
+      return l10n.asrServicesGroqSubtitle;
+    case AsrServiceKind.mistral:
+      return l10n.asrServicesMistralSubtitle;
+    case AsrServiceKind.elevenLabs:
+      return l10n.asrServicesElevenLabsSubtitle;
     case AsrServiceKind.dashScope:
       return l10n.asrServicesDashScopeSubtitle;
     case AsrServiceKind.qwenAudio:
-      return 'Qwen Audio 3.0 ASR (/api-ws/v1/inference)';
+      return l10n.asrServicesQwenAudioSubtitle;
     case AsrServiceKind.volcengine:
       return l10n.asrServicesVolcengineSubtitle;
     case AsrServiceKind.mimo:
@@ -2145,6 +2325,7 @@ String _kindSubtitle(AppLocalizations l10n, AsrServiceKind kind) {
 String _apiKeyOf(AsrServiceOptions? options) {
   return switch (options) {
     OpenAiRealtimeAsrOptions value => value.apiKey,
+    AudioTranscriptionAsrOptions value => value.apiKey,
     DashScopeAsrOptions value => value.apiKey,
     QwenAudioAsrOptions value => value.apiKey,
     VolcengineAsrOptions value => value.apiKey,
@@ -2157,8 +2338,9 @@ String _apiKeyOf(AsrServiceOptions? options) {
 String _endpointOf(AsrServiceOptions? options) {
   return switch (options) {
     OpenAiRealtimeAsrOptions value => value.websocketUrl,
+    AudioTranscriptionAsrOptions value => value.baseUrl,
     DashScopeAsrOptions value => value.websocketUrl,
-    QwenAudioAsrOptions value => value.workspaceId,
+    QwenAudioAsrOptions value => value.endpoint,
     VolcengineAsrOptions value => value.websocketUrl,
     MimoAsrOptions value => value.baseUrl,
     StepAsrOptions value => value.baseUrl,
@@ -2169,6 +2351,7 @@ String _endpointOf(AsrServiceOptions? options) {
 String _modelOf(AsrServiceOptions? options) {
   return switch (options) {
     OpenAiRealtimeAsrOptions value => value.model,
+    AudioTranscriptionAsrOptions value => value.model,
     DashScopeAsrOptions value => value.model,
     QwenAudioAsrOptions value => value.model,
     MimoAsrOptions value => value.model,
@@ -2186,9 +2369,11 @@ String _resourceIdOf(AsrServiceOptions? options) {
 
 String _languageOf(AsrServiceOptions? options) {
   return switch (options) {
+    QwenAudioAsrOptions value => value.language,
     SherpaOnnxAsrOptions value => value.language,
     SystemAsrOptions value => value.localeId,
     OpenAiRealtimeAsrOptions value => value.language,
+    AudioTranscriptionAsrOptions value => value.language,
     DashScopeAsrOptions value => value.language,
     VolcengineAsrOptions value => value.language,
     MimoAsrOptions value => value.language,
@@ -2201,6 +2386,10 @@ String _defaultEndpoint(AsrServiceKind kind) {
   switch (kind) {
     case AsrServiceKind.openAiRealtime:
       return 'wss://api.openai.com/v1/realtime?intent=transcription';
+    case AsrServiceKind.groq:
+    case AsrServiceKind.mistral:
+    case AsrServiceKind.elevenLabs:
+      return AudioTranscriptionAsrOptions(kind: kind).baseUrl;
     case AsrServiceKind.dashScope:
       return 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime';
     case AsrServiceKind.qwenAudio:
@@ -2221,6 +2410,10 @@ String _defaultModel(AsrServiceKind kind) {
   switch (kind) {
     case AsrServiceKind.openAiRealtime:
       return 'gpt-live-transcribe';
+    case AsrServiceKind.groq:
+    case AsrServiceKind.mistral:
+    case AsrServiceKind.elevenLabs:
+      return AudioTranscriptionAsrOptions(kind: kind).model;
     case AsrServiceKind.dashScope:
       return 'qwen3-asr-flash-realtime';
     case AsrServiceKind.qwenAudio:

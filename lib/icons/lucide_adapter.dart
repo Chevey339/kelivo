@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart' as lucide;
 
 // Adapter to use `Lucide.*` style as requested.
 class Lucide {
+  static const IconData AppWindow = lucide.LucideIcons.appWindow;
   static const IconData ListTree = lucide.LucideIcons.listTree;
   static const IconData ListChecks = lucide.LucideIcons.listChecks;
   static const IconData Menu = lucide.LucideIcons.menu;
@@ -108,8 +109,10 @@ class Lucide {
   static const IconData RectangleHorizontal =
       lucide.LucideIcons.rectangleHorizontal;
   static const IconData CircleStop = lucide.LucideIcons.circleStop;
+  static const IconData CircleAlert = lucide.LucideIcons.circleAlert;
   static const IconData CircleX = lucide.LucideIcons.circleX;
   static const IconData Link2 = lucide.LucideIcons.link2;
+  static const IconData ShieldAlert = lucide.LucideIcons.shieldAlert;
   static const IconData Shield = lucide.LucideIcons.shield;
   static const IconData TriangleAlert = lucide.LucideIcons.triangleAlert;
   static const IconData Compass = lucide.LucideIcons.compass;

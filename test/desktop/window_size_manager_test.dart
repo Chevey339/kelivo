@@ -15,6 +15,16 @@ void main() {
   });
   tearDown(() => debugDefaultTargetPlatformOverride = null);
 
+  test(
+    '360px compact window survives saving and startup restoration',
+    () async {
+      await manager.setSize(const Size(360, 640));
+      expect(await manager.getInitialSize(), const Size(360, 640));
+      await manager.setSize(const Size(200, 400));
+      expect(await manager.getInitialSize(), const Size(360, 640));
+    },
+  );
+
   test('Windows discards legacy logical positions with unknown DPI', () async {
     SharedPreferences.setMockInitialValues({
       'window_pos_x_v1': 1600.0,

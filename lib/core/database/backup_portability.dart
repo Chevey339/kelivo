@@ -11,12 +11,14 @@ final class BackupPortability {
   BackupPortability._();
 
   static const devicePreferenceKeys = {
+    'backup_encryption_enabled_v1',
     'desktop_scheduled_tasks_v1',
     'scheduled_task_results_v1',
     'environment_state_v1',
     'environment_disk_usage_v1',
     'environment_rootfs_selection_v1',
     'environment_proot_options_v1',
+    'environment_native_shell_path_v1',
   };
 
   static bool _isLinked(BusinessEntityValue row) =>
@@ -112,12 +114,13 @@ final class BackupPortability {
             )
           THEN json_remove(extras_json, '\$."workspace.id"',
             '\$."workspace.cwd"', '\$."workspace.tools_used"',
-            '\$."workspace.allowAll"')
-          ELSE json_remove(extras_json, '\$."workspace.allowAll"')
+            '\$."workspace.allowAll"', '\$."tools.permission_mode"')
+          ELSE json_remove(extras_json, '\$."workspace.allowAll"', '\$."tools.permission_mode"')
         END
         WHERE json_valid(extras_json)
           AND (json_type(extras_json, '\$."workspace.id"') IS NOT NULL
-            OR json_type(extras_json, '\$."workspace.allowAll"') IS NOT NULL);
+            OR json_type(extras_json, '\$."workspace.allowAll"') IS NOT NULL
+            OR json_type(extras_json, '\$."tools.permission_mode"') IS NOT NULL);
       ''');
     });
   }

@@ -5,6 +5,8 @@ import android.app.AppOpsManager
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Looper
 import android.os.PowerManager
 import android.view.View
@@ -24,6 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowPowerManager
 import org.robolectric.shadows.ShadowSettings
 import org.robolectric.util.ReflectionHelpers
@@ -223,6 +226,41 @@ class BackgroundRuntimeTest {
         assertEquals(View.GONE, root.findViewWithTag<View>("progress").visibility)
         root.performLongClick()
         assertEquals(false, runtime.status()["overlayVisible"])
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun overlayProgressFollowsThemeColorWithoutRecreatingTheWindow() {
+        fun assertRingColor(ring: View, color: Int) {
+            ring.layout(0, 0, 64, 64)
+            val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+            ring.draw(Canvas(bitmap))
+            val pixels = IntArray(64 * 64)
+            bitmap.getPixels(pixels, 0, 64, 0, 0, 64, 64)
+            assertTrue("The progress ring must draw with the current theme color", pixels.contains(color))
+            bitmap.recycle()
+        }
+        val (runtime, m) = setup()
+        ShadowSettings.setCanDrawOverlays(true)
+        runtime.setForeground(false)
+        val lightPrimary = 0xFF6750A4L
+        val darkPrimary = 0xFFD0BCFFL
+        val settings = mapOf("overlayEnabled" to true, "overlayProgressColor" to lightPrimary)
+        sync(m, 1, listOf("a"), settings)
+        val overlay = ReflectionHelpers.callInstanceMethod<BackgroundOverlay>(runtime, "getOverlay")
+        val root = ReflectionHelpers.getField<LinearLayout>(overlay, "view")
+        val ring = root.findViewWithTag<View>("progress")
+        assertRingColor(ring, lightPrimary.toInt())
+
+        sync(m, 2, listOf("a"), settings + ("overlayProgressColor" to darkPrimary))
+        assertSame(root, ReflectionHelpers.getField<LinearLayout>(overlay, "view"))
+        assertSame(ring, root.findViewWithTag<View>("progress"))
+        assertRingColor(ring, darkPrimary.toInt())
+
+        runtime.setForeground(true)
+        runtime.setForeground(false)
+        val recreated = ReflectionHelpers.getField<LinearLayout>(overlay, "view")
+        assertRingColor(recreated.findViewWithTag<View>("progress"), darkPrimary.toInt())
     }
 
     @Test fun circularOverlayContainsOnlyArtworkAndProgressAndCanStillBeDismissed() {

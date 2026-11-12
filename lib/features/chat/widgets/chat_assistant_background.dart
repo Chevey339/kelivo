@@ -7,6 +7,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import 'chat_gradient_background.dart';
+import 'frosted/chat_frosted_backdrop.dart';
 
 /// Shared assistant wallpaper + surface-mask gradient for chat surfaces.
 ///
@@ -25,6 +26,7 @@ class ChatAssistantBackground extends StatelessWidget {
   /// Desktop chat uses a lighter mask so the wallpaper stays more visible.
   final bool desktop;
 
+  /// Overlay copies use the full backdrop's size and composited origin.
   final bool pinnedToBackdrop;
 
   /// Desktop layout paints [ColorScheme.surface] under the wallpaper.
@@ -35,12 +37,34 @@ class ChatAssistantBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final assistant = context.watch<AssistantProvider>().currentAssistant;
     if (assistant?.useGradientBackground ?? false) {
       return ChatGradientBackground(pinned: pinnedToBackdrop);
     }
-    final bg = assistant?.background;
+    final wallpaper = _buildWallpaper(context, assistant?.background);
+    if (!pinnedToBackdrop) return wallpaper;
+
+    final scope = ChatFrostedBackdropScope.maybeOf(context)!;
+    return IgnorePointer(
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: scope.size.width,
+          maxWidth: scope.size.width,
+          minHeight: scope.size.height,
+          maxHeight: scope.size.height,
+          child: CompositedTransformFollower(
+            link: scope.controller.link,
+            showWhenUnlinked: false,
+            child: RepaintBoundary(child: wallpaper),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWallpaper(BuildContext context, String? bg) {
+    final cs = Theme.of(context).colorScheme;
     final maskStrength = context
         .watch<SettingsProvider>()
         .chatBackgroundMaskStrength;

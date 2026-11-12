@@ -1,3 +1,4 @@
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
@@ -18,6 +19,7 @@ class ActionSheetItem {
     required this.label,
     required this.onTap,
     this.destructive = false,
+    this.checked = false,
     this.key,
   });
 
@@ -25,6 +27,7 @@ class ActionSheetItem {
   final String label;
   final VoidCallback onTap;
   final bool destructive;
+  final bool checked;
   final Key? key;
 }
 
@@ -74,6 +77,7 @@ Future<void> showAdaptiveActionMenu(
             icon: item.icon,
             label: item.label,
             danger: item.destructive,
+            checked: item.checked,
             onTap: item.onTap,
           ),
       ],
@@ -181,6 +185,7 @@ class _ActionTile extends StatelessWidget {
                   ),
                 ),
               ),
+              if (item.checked) Icon(Lucide.Check, size: 18, color: cs.primary),
             ],
           ),
         ),

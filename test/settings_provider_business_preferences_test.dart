@@ -206,10 +206,13 @@ void main() {
       ];
       const migratedOrder = <String>[
         ...legacyOrder,
-        'Vercel',
-        'Atlas Cloud',
+        'STA1N API',
+        '10dian-API',
         '随想AI中转站',
         'MaruCode',
+        '砂糖酒馆',
+        'Vercel',
+        'Atlas Cloud',
       ];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({

@@ -5,6 +5,7 @@ import '../../../shared/widgets/ios_settings_rows.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/section_card.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class ScheduledTaskTile extends StatelessWidget {
   const ScheduledTaskTile({
@@ -48,7 +49,7 @@ class ScheduledTaskTile extends StatelessWidget {
                           name,
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                             color: cs.onSurface,
                           ),
                           maxLines: 2,
@@ -64,7 +65,7 @@ class ScheduledTaskTile extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 32,
                                 height: 1.15,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: AppFontWeights.medium,
                                 color: cs.onSurface,
                               ),
                             ),
@@ -123,7 +124,7 @@ class ScheduledTaskTile extends StatelessWidget {
             label: detail,
             icon: running ? LucideIcons.loader : LucideIcons.clock,
             onTap: onTap,
-            labelWeight: FontWeight.w400,
+            labelWeight: AppFontWeights.regular,
           ),
         ],
       ),

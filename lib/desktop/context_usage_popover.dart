@@ -1,3 +1,4 @@
+import '../features/chat/widgets/image_context_panel.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -19,6 +20,8 @@ Future<void> showContextUsagePopover(
   required GlobalKey anchorKey,
   required String conversationId,
   required String draftText,
+  ValueChanged<String>? onAttachImage,
+  Future<void> Function()? onOperations,
 }) async {
   final keyContext = anchorKey.currentContext;
   if (keyContext == null) return;
@@ -38,19 +41,44 @@ Future<void> showContextUsagePopover(
   unawaited(usage.refresh(conversationId, draftText: draftText));
 
   var requestSetWindow = false;
+  var requestImages = false;
+  var requestOperations = false;
   await showDesktopGlassPopover(
     context,
     anchorRect: anchorRect,
     width: (size.width - 16).clamp(260.0, 720.0),
     builder: (ctx, handle) => _ContextUsagePopoverContent(
       conversationId: conversationId,
+      onOperations: onOperations == null
+          ? null
+          : () async {
+              requestOperations = true;
+              await handle.close();
+            },
+      onImages: () async {
+        requestImages = true;
+        await handle.close();
+      },
       onRequestSetWindow: () async {
         requestSetWindow = true;
         await handle.close();
       },
     ),
   );
-  if (!context.mounted || !requestSetWindow) return;
+  if (!context.mounted) return;
+  if (requestOperations) {
+    await onOperations!();
+    return;
+  }
+  if (requestImages) {
+    await showImageContextPanel(
+      context,
+      conversationId,
+      onAttach: onAttachImage,
+    );
+    return;
+  }
+  if (!requestSetWindow) return;
 
   final snap = usage.snapshot(conversationId) ?? usage.current;
   if (snap == null || snap.providerKey.isEmpty || snap.modelId.isEmpty) {
@@ -70,9 +98,13 @@ class _ContextUsagePopoverContent extends StatelessWidget {
   const _ContextUsagePopoverContent({
     required this.conversationId,
     required this.onRequestSetWindow,
+    required this.onImages,
+    this.onOperations,
   });
 
   final String conversationId;
+  final Future<void> Function() onImages;
+  final Future<void> Function()? onOperations;
   final Future<void> Function() onRequestSetWindow;
 
   @override
@@ -80,6 +112,9 @@ class _ContextUsagePopoverContent extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final usage = context.watch<ContextUsageService>();
     final snapshot = usage.snapshot(conversationId) ?? usage.current;
+    final refreshLabel = snapshot?.state == ContextUsageState.failed
+        ? l10n.retry
+        : l10n.contextUsageRefresh;
     final showSetWindow =
         snapshot != null &&
         snapshot.contextWindow == null &&
@@ -98,12 +133,36 @@ class _ContextUsagePopoverContent extends StatelessWidget {
             ContextUsageBreakdown(
               snapshot: snapshot,
               headerTrailing: IosIconButton(
-                tooltip: l10n.contextUsageRefresh,
-                semanticLabel: l10n.contextUsageRefresh,
+                tooltip: refreshLabel,
+                semanticLabel: refreshLabel,
                 icon: Lucide.RefreshCw,
                 size: 16,
                 onTap: () => usage.refresh(conversationId, force: true),
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Divider(
+                height: 1,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.08),
+              ),
+            ),
+            if (onOperations != null) ...[
+              _ActionRow(
+                icon: Lucide.History,
+                label: l10n.contextOperationsTitle,
+                description: l10n.contextOperationsDescription,
+                onTap: () => unawaited(onOperations!()),
+              ),
+              const SizedBox(height: 8),
+            ],
+            _ActionRow(
+              icon: Lucide.Image,
+              label: l10n.imageContextTitle,
+              description: l10n.imageContextEntryDescription,
+              onTap: () => unawaited(onImages()),
             ),
             if (showSetWindow) ...[
               const SizedBox(height: 8),
@@ -121,64 +180,73 @@ class _ContextUsagePopoverContent extends StatelessWidget {
   }
 }
 
-class _ActionRow extends StatefulWidget {
+class _ActionRow extends StatelessWidget {
   const _ActionRow({
     super.key,
     required this.icon,
     required this.label,
     required this.onTap,
+    this.description,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-
-  @override
-  State<_ActionRow> createState() => _ActionRowState();
-}
-
-class _ActionRowState extends State<_ActionRow> {
-  bool _hovered = false;
+  final String? description;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: _hovered
-                ? cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(widget.icon, size: 16, color: cs.onSurface),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: AppFontWeights.regular,
-                    color: cs.onSurface,
+    return IosCardPress(
+      onTap: onTap,
+      focusable: true,
+      haptics: false,
+      baseColor: cs.onSurface.withValues(alpha: 0.035),
+      borderRadius: BorderRadius.circular(10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: description == null ? 22 : 38),
+        child: Row(
+          children: [
+            Icon(icon, size: 17, color: cs.onSurface.withValues(alpha: 0.7)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.medium,
+                      color: cs.onSurface,
+                    ),
                   ),
-                ),
+                  if (description != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      description!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurface.withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 10),
+            Icon(
+              Lucide.ChevronRight,
+              size: 14,
+              color: cs.onSurface.withValues(alpha: 0.4),
+            ),
+          ],
         ),
       ),
     );

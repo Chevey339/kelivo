@@ -1,30 +1,33 @@
-/// Gemini 3 (AI Studio + Vertex) allows built-in tools to coexist with
-/// `function_declarations`. Earlier generations mutually exclude them.
+final _geminiGeneration = RegExp(r'gemini-(\d+)', caseSensitive: false);
+
+/// Gemini 3+ (AI Studio + Vertex) allows built-in tools to coexist with
+/// `functionDeclarations`. Earlier generations mutually exclude them.
 bool supportsMixedBuiltInAndFunctionTools(String upstreamModelId) {
-  return upstreamModelId.toLowerCase().contains('gemini-3');
+  final generation = _geminiGeneration.firstMatch(upstreamModelId)?.group(1);
+  return generation != null && int.parse(generation) >= 3;
 }
 
 bool shouldAttachGeminiFunctionCallingConfig(List<Map<String, dynamic>> tools) {
   for (final tool in tools) {
-    if (!tool.containsKey('function_declarations')) continue;
-    final decls = tool['function_declarations'];
+    if (!tool.containsKey('functionDeclarations')) continue;
+    final decls = tool['functionDeclarations'];
     if (decls is List && decls.isNotEmpty) return true;
   }
   return false;
 }
 
-/// Whether [tools] contains both built-in tools and non-empty function_declarations.
+/// Whether [tools] contains both built-in tools and non-empty functionDeclarations.
 bool hasBuiltInAndFunctionDeclarations(List<Map<String, dynamic>> tools) {
   bool hasBuiltIn = false;
   bool hasFuncDecls = false;
   for (final tool in tools) {
-    if (tool.containsKey('google_search') ||
-        tool.containsKey('code_execution') ||
-        tool.containsKey('url_context')) {
+    if (tool.containsKey('googleSearch') ||
+        tool.containsKey('codeExecution') ||
+        tool.containsKey('urlContext')) {
       hasBuiltIn = true;
     }
-    if (tool.containsKey('function_declarations')) {
-      final decls = tool['function_declarations'];
+    if (tool.containsKey('functionDeclarations')) {
+      final decls = tool['functionDeclarations'];
       if (decls is List && decls.isNotEmpty) hasFuncDecls = true;
     }
   }
@@ -33,28 +36,29 @@ bool hasBuiltInAndFunctionDeclarations(List<Map<String, dynamic>> tools) {
 
 /// Builds the `toolConfig` map for Gemini API requests.
 ///
-/// Gemini 3 with combined built-in + custom tools:
+/// Gemini 3+ on the Gemini API with combined built-in + custom tools:
 ///   - VALIDATED mode (AUTO not supported with server-side tool invocations)
 ///   - includeServerSideToolInvocations: true
 ///
-/// All other cases with function_declarations:
+/// All other cases with functionDeclarations:
 ///   - AUTO mode (existing behavior)
 ///
 /// Returns null if no toolConfig is needed.
 Map<String, dynamic>? buildGeminiToolConfig({
   required List<Map<String, dynamic>> tools,
-  required bool isGemini3,
+  required bool allowServerSideToolInvocations,
 }) {
   final hasFuncDecls = shouldAttachGeminiFunctionCallingConfig(tools);
   if (!hasFuncDecls) return null;
 
-  if (isGemini3 && hasBuiltInAndFunctionDeclarations(tools)) {
+  if (allowServerSideToolInvocations &&
+      hasBuiltInAndFunctionDeclarations(tools)) {
     return {
-      'function_calling_config': {'mode': 'VALIDATED'},
+      'functionCallingConfig': {'mode': 'VALIDATED'},
       'includeServerSideToolInvocations': true,
     };
   }
   return {
-    'function_calling_config': {'mode': 'AUTO'},
+    'functionCallingConfig': {'mode': 'AUTO'},
   };
 }

@@ -39,8 +39,9 @@ class _VersionService extends ChatService {
   Future<void> setSelectedVersion(
     String conversationId,
     String groupId,
-    int version,
-  ) async {
+    int version, {
+    String? expectedContextState,
+  }) async {
     writes.add((groupId, version));
     await writeGate?.future;
     selected[groupId] = version;

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
@@ -11,8 +12,10 @@ import '../../models/provider_oauth.dart';
 import '../../providers/model_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../model_spec/model_spec_resolver.dart';
+import '../api/request_image_context.dart';
 import '../network/dio_http_client.dart';
 import 'codex_request.dart';
+import 'codex_turn_state.dart';
 import 'claude_oauth_request.dart';
 import 'oauth_cancellation.dart';
 import 'provider_oauth_adapter.dart';
@@ -29,6 +32,7 @@ class ProviderOAuthService extends ChangeNotifier {
   final http.Client Function(ProviderConfig) _clientFactory;
   SettingsProvider? _settings;
   final _refreshes = <String, Future<ProviderConfig>>{};
+  final _modelSyncs = <(SettingsProvider, String), Future<void>>{};
   final _usage = <String, ProviderUsageSnapshot>{};
   final _usageRequests = <String, Future<ProviderUsageSnapshot>>{};
   OAuthCancellation? _login;
@@ -174,7 +178,10 @@ class ProviderOAuthService extends ChangeNotifier {
         throw const ProviderOAuthException(ProviderOAuthFailure.cancelled);
       }
       final saved = (providerId == null ? config : _current(providerId)!)
-          .copyWith(oauthCredentials: credentials);
+          .copyWith(
+            oauthCredentials: credentials,
+            oauthModelsClientVersion: null,
+          );
       await settings.setProviderConfig(saved.id, saved);
       if (providerId == null) {
         await settings.setProvidersOrder([
@@ -200,7 +207,7 @@ class ProviderOAuthService extends ChangeNotifier {
     _usage.remove(_sessionKey(config));
     await _settings!.setProviderConfig(
       id,
-      config.copyWith(oauthCredentials: null),
+      config.copyWith(oauthCredentials: null, oauthModelsClientVersion: null),
     );
     notifyListeners();
   }
@@ -208,6 +215,7 @@ class ProviderOAuthService extends ChangeNotifier {
   Future<ProviderConfig> resolve(
     ProviderConfig config, {
     bool force = false,
+    bool usageProbe = false,
   }) async {
     if (!config.isOAuth) return config;
     final current = _requireCurrentSession(config);
@@ -227,17 +235,31 @@ class ProviderOAuthService extends ChangeNotifier {
         )) {
       return _forRequest(current);
     }
+    final settings = _settings;
     final key = _sessionKey(current);
     final pending = _refreshes[key];
-    if (pending != null) return pending;
-    final request = _refresh(current);
-    _refreshes[key] = request;
-    notifyListeners();
+    final request = pending ?? _refresh(current);
+    if (pending == null) {
+      _refreshes[key] = request;
+      notifyListeners();
+    }
     try {
       return await request;
+    } on ProviderOAuthException catch (error) {
+      // Refreshes are shared with usage probes. Each caller decides whether
+      // its failure can invalidate the account; token rotation is still saved
+      // once by _refresh regardless of who started it.
+      if (!usageProbe &&
+          identical(settings, _settings) &&
+          error.kind == ProviderOAuthFailure.loginRequired) {
+        await markLoginRequired(current);
+      }
+      rethrow;
     } finally {
-      _refreshes.remove(key);
-      notifyListeners();
+      if (pending == null) {
+        _refreshes.remove(key);
+        notifyListeners();
+      }
     }
   }
 
@@ -279,15 +301,14 @@ class ProviderOAuthService extends ChangeNotifier {
         );
       }
       _requireCurrentSession(original);
-      if (error.kind == ProviderOAuthFailure.loginRequired) {
-        await markLoginRequired(original);
-      }
       throw ProviderOAuthException(
         error.kind,
         providerId: original.id,
         statusCode: error.statusCode,
         code: error.code,
         message: error.message,
+        stage: error.stage,
+        transportFailure: error.transportFailure,
       );
     } finally {
       client.close();
@@ -316,27 +337,44 @@ class ProviderOAuthService extends ChangeNotifier {
 
   Future<T> _authenticated<T>(
     ProviderConfig original,
-    Future<T> Function(OAuthWire, ProviderConfig) operation,
-  ) async {
-    var config = await resolve(original);
-    final client = _clientFactory(config);
+    Future<T> Function(OAuthWire, ProviderConfig) operation, {
+    bool usageProbe = false,
+  }) async {
     try {
+      var config = await resolve(original, usageProbe: usageProbe);
+      final client = _clientFactory(config);
       try {
-        return await operation(OAuthWire(client), config);
-      } on ProviderOAuthException catch (error) {
-        if (error.kind != ProviderOAuthFailure.loginRequired) rethrow;
-        config = await resolve(config, force: true);
         try {
           return await operation(OAuthWire(client), config);
         } on ProviderOAuthException catch (error) {
-          if (error.kind == ProviderOAuthFailure.loginRequired) {
-            await markLoginRequired(config);
+          if (error.kind != ProviderOAuthFailure.loginRequired) rethrow;
+          config = await resolve(config, force: true, usageProbe: usageProbe);
+          try {
+            return await operation(OAuthWire(client), config);
+          } on ProviderOAuthException catch (error) {
+            if (!usageProbe &&
+                error.kind == ProviderOAuthFailure.loginRequired) {
+              await markLoginRequired(config);
+            }
+            rethrow;
           }
-          rethrow;
         }
+      } finally {
+        client.close();
       }
-    } finally {
-      client.close();
+    } on ProviderOAuthException catch (error) {
+      if (!usageProbe || error.kind != ProviderOAuthFailure.loginRequired) {
+        rethrow;
+      }
+      throw ProviderOAuthException(
+        ProviderOAuthFailure.usageUnavailable,
+        providerId: original.id,
+        statusCode: error.statusCode,
+        code: error.code,
+        message: error.message,
+        stage: error.stage,
+        transportFailure: error.transportFailure,
+      );
     }
   }
 
@@ -354,31 +392,85 @@ class ProviderOAuthService extends ChangeNotifier {
                     !RegExp(
                       r'grok-(?:imagine|stt|voice|tts)',
                     ).hasMatch(row['id'] as String)))
-              _OAuthModelSpec(
-                row: row,
-                base: _oauthDiscoveredSpec(
-                  ModelSpecResolver.instance
-                      .resolve(
-                        config,
-                        row['id'] as String,
-                        displayName:
-                            oauthString(row['display_name']) ??
-                            oauthString(row['name']) ??
-                            row['id'] as String,
-                      )
-                      .spec,
-                  row,
-                ),
-              ),
+              _modelFromRow(config, row),
         ];
       });
 
+  _OAuthModelSpec _modelFromRow(
+    ProviderConfig config,
+    Map<String, dynamic> row,
+  ) => _OAuthModelSpec(
+    row: row,
+    base: _oauthDiscoveredSpec(
+      ModelSpecResolver.instance.spec(
+        config,
+        row['id'] as String,
+        displayName:
+            oauthString(row['display_name']) ??
+            oauthString(row['name']) ??
+            row['id'] as String,
+      ),
+      row,
+    ),
+  );
+
+  /// Like OMP's versioned Codex cache, refresh each account after a client
+  /// version change. Keep its saved models usable if discovery is unavailable.
+  Future<void> syncOutdatedModels(SettingsProvider settings) async {
+    await settings.loaded;
+    if (!identical(settings, _settings)) return;
+    // Startup discovery can run before the first rebuild applies the proxy.
+    settings.applyGlobalProxyOverridesIfNeeded();
+    for (final id in settings.providerConfigs.keys.toList()) {
+      if (!identical(settings, _settings)) return;
+      final config = _current(id);
+      if (config == null ||
+          !config.enabled ||
+          config.oauthProvider != OAuthProvider.chatgpt ||
+          config.oauthCredentials == null ||
+          config.oauthCredentials!.requiresLogin ||
+          (config.oauthModelsClientVersion == codexClientVersion &&
+              config.models.every((model) {
+                final override = config.modelOverrides[model];
+                return override is Map &&
+                    override['oauthServiceTierSessionId'] ==
+                        config.oauthCredentials!.sessionId;
+              }))) {
+        continue;
+      }
+      try {
+        await syncModels(id);
+      } catch (_) {
+        // Leave the version unchanged so the next launch or manual sync retries.
+      }
+    }
+  }
+
   Future<void> syncModels(String id) async {
+    final settings = _settings;
     final before = _current(id);
-    if (before == null) return;
+    if (settings == null || before == null) return;
+    final key = (settings, _sessionKey(before));
+    final pending = _modelSyncs[key];
+    if (pending != null) return pending;
+    final request = _syncModels(settings, before);
+    _modelSyncs[key] = request;
+    try {
+      await request;
+    } finally {
+      _modelSyncs.remove(key);
+    }
+  }
+
+  Future<void> _syncModels(
+    SettingsProvider settings,
+    ProviderConfig before,
+  ) async {
     final list = await models(before);
-    final current = _current(id);
-    if (current == null ||
+    final current = _current(before.id);
+    if (!identical(settings, _settings) ||
+        current == null ||
+        current.oauthProvider != before.oauthProvider ||
         current.oauthCredentials?.sessionId !=
             before.oauthCredentials?.sessionId) {
       return;
@@ -391,21 +483,34 @@ class ProviderOAuthService extends ChangeNotifier {
           : const <String, dynamic>{};
       overrides[model.id] = mergeOAuthModelOverride(
         existing: overrides[model.id],
-        model: model,
+        // Model edits can land while discovery is in flight.
+        model: model is _OAuthModelSpec ? _modelFromRow(current, row) : model,
         reasoning: oauthDiscoveredReasoning(provider, row),
         contextWindow: _oauthContextWindow(row),
         extra: {
+          if (provider == OAuthProvider.chatgpt) ...{
+            'oauthServiceTiers': [
+              if (row['service_tiers'] is List)
+                for (final tier
+                    in (row['service_tiers'] as List).whereType<Map>())
+                  if (tier['id'] is String) tier['id'] as String,
+            ],
+            'oauthServiceTierSessionId': current.oauthCredentials!.sessionId,
+          },
           if (provider == OAuthProvider.kimi)
             'oauthProtocol': kimiOAuthProtocol(row),
         },
       );
     }
-    await _settings!.setProviderConfig(
-      id,
+    await settings.setProviderConfig(
+      current.id,
       current.copyWith(
         models: list.map((e) => e.id).toList(),
         modelOverrides: overrides,
         oauthModelsSyncedAt: DateTime.now(),
+        oauthModelsClientVersion: provider == OAuthProvider.chatgpt
+            ? codexClientVersion
+            : null,
       ),
     );
   }
@@ -418,6 +523,7 @@ class ProviderOAuthService extends ChangeNotifier {
       (wire, config) => ProviderOAuthAdapter.forProvider(
         config.oauthProvider!,
       ).usage(wire, config.oauthCredentials!),
+      usageProbe: true,
     );
     _usageRequests[key] = request;
     try {
@@ -438,8 +544,20 @@ class ProviderOAuthService extends ChangeNotifier {
     }
   }
 
-  http.Client authenticatedClient(http.Client client, ProviderConfig config) =>
-      config.isOAuth ? _ProviderOAuthHttpClient(client, config, this) : client;
+  http.Client authenticatedClient(
+    http.Client client,
+    ProviderConfig config, {
+    CodexTurnState? codexTurnState,
+    CancelToken? cancelToken,
+  }) => config.isOAuth
+      ? _ProviderOAuthHttpClient(
+          client,
+          config,
+          this,
+          codexTurnState,
+          cancelToken,
+        )
+      : client;
 }
 
 const _deletedOAuthThinkingKeys = {
@@ -449,8 +567,6 @@ const _deletedOAuthThinkingKeys = {
   'oauthThinkingDefaultEffort',
 };
 
-const _kimiDefaultLevels = ['low', 'medium', 'high'];
-
 String kimiOAuthProtocol(Map<String, dynamic> row) {
   return row['protocol'] == null && row.containsKey('protocol')
       ? 'openai'
@@ -459,11 +575,15 @@ String kimiOAuthProtocol(Map<String, dynamic> row) {
 
 /// True/false when the catalog row states reasoning support; null if omitted.
 bool? oauthRowReasoningSupport(Map<String, dynamic> row) {
+  switch (row['supports_thinking_type']) {
+    case 'only':
+    case 'both':
+      return true;
+    case 'no':
+      return false;
+  }
   if (row.containsKey('supports_reasoning')) {
     return row['supports_reasoning'] == true;
-  }
-  if (row.containsKey('supports_thinking_type')) {
-    return const {'only', 'both'}.contains(row['supports_thinking_type']);
   }
   final efforts = oauthMap(row['think_efforts']);
   if (efforts.containsKey('support')) {
@@ -487,23 +607,21 @@ ReasoningSpecOverride? oauthDiscoveredReasoning(
   final required = row['supports_thinking_type'] == 'only';
   switch (provider) {
     case OAuthProvider.kimi:
-      if (kimiOAuthProtocol(row) == 'anthropic') {
-        final adaptive = oauthMap(row['think_efforts'])['support'] == true;
-        return ReasoningSpecOverride.fromJson({
-          'dialect': adaptive
-              ? ReasoningDialect.anthropicAdaptiveEffort.name
-              : ReasoningDialect.anthropicBudget.name,
-          'levels': _kimiDefaultLevels,
-          'canDisable': !required,
-        });
-      }
-      final levels = _oauthLevelNames(row);
+      final levels = oauthMap(row['think_efforts'])['support'] == true
+          ? _oauthLevelNames(row)
+          : <String>[];
+      final defaultLevel = _oauthDefaultLevel(row);
       return ReasoningSpecOverride.fromJson({
-        'dialect': ReasoningDialect.kimiThinking.name,
-        'levels': levels.isEmpty ? _kimiDefaultLevels : levels,
+        'dialect': kimiOAuthProtocol(row) == 'anthropic'
+            ? (levels.isNotEmpty
+                  ? ReasoningDialect.anthropicAdaptiveEffort.name
+                  : ReasoningDialect.anthropicBudget.name)
+            : ReasoningDialect.kimiThinking.name,
+        'levels': levels,
         'canDisable': !required,
-        if (_oauthDefaultLevel(row) case final defaultLevel?)
-          'defaultLevel': defaultLevel,
+        'defaultLevel': levels.contains(defaultLevel) ? defaultLevel : 'auto',
+        // A fresh roster must retire controls saved by an older discovery.
+        'budgets': <String, int>{},
       });
     case OAuthProvider.chatgpt:
     case OAuthProvider.grok:
@@ -665,15 +783,25 @@ class _OAuthModelSpec extends ModelSpec {
 /// Attaches current credentials and enforces each subscription wire contract
 /// after custom request overrides, for initial requests and tool follow-ups.
 class _ProviderOAuthHttpClient extends http.BaseClient {
-  _ProviderOAuthHttpClient(this.inner, this.config, this.service)
-    : _sessionId = config.oauthCredentials?.sessionId;
+  _ProviderOAuthHttpClient(
+    this.inner,
+    this.config,
+    this.service,
+    CodexTurnState? codexTurnState,
+    this._cancelToken,
+  ) : _sessionId = config.oauthCredentials?.sessionId,
+      _codexTurnState = codexTurnState ?? CodexTurnState();
   final http.Client inner;
   ProviderConfig config;
   final ProviderOAuthService service;
+  final CancelToken? _cancelToken;
   final String? _sessionId;
+  final CodexTurnState _codexTurnState;
   final String _claudeConversationId = const Uuid().v4();
 
   void _checkSession() {
+    final cancellation = _cancelToken?.cancelError;
+    if (cancellation != null) throw cancellation;
     if (config.oauthCredentials?.sessionId != _sessionId) {
       throw ProviderOAuthException(
         ProviderOAuthFailure.cancelled,
@@ -683,11 +811,24 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     service._requireCurrentSession(config);
   }
 
+  Future<void> _resolve({bool force = false}) async {
+    _checkSession();
+    final pending = service.resolve(config, force: force);
+    final cancellation = _cancelToken;
+    // Refresh is shared with other requests. Stop only this caller's wait;
+    // token rotation must still finish and be persisted for the other callers.
+    config = await (cancellation == null
+        ? pending
+        : Future.any<ProviderConfig>([
+            pending,
+            cancellation.whenCancel.then((error) => throw error),
+          ]));
+    _checkSession();
+  }
+
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    _checkSession();
-    config = await service.resolve(config);
-    _checkSession();
+    await _resolve();
     final base = Uri.parse(config.oauthProvider!.baseUrl);
     if (request.url.origin != base.origin ||
         !request.url.path.startsWith('${base.path}/') ||
@@ -727,6 +868,9 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
         result.headers.remove(name);
       }
       result.headers.addAll(authHeaders);
+      if (config.oauthProvider == OAuthProvider.chatgpt) {
+        _codexTurnState.apply(result.headers, config);
+      }
       if (isClaude) {
         result.headers.remove('x-api-key');
         setClaudeOAuthHeader(
@@ -799,6 +943,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
                 _claudeConversationId,
               )
             : jsonEncode(payload);
+        RequestImageContext.current?.validateBodyBytes(result.bodyBytes.length);
       }
       return result;
     }
@@ -807,7 +952,13 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     var retriedClaudeVersion = false;
     while (true) {
       final requestVersion = claudeCodeVersion;
+      final requestConfig = config;
       final response = await inner.send(build());
+      if (requestConfig.oauthProvider == OAuthProvider.chatgpt &&
+          response.statusCode >= 200 &&
+          response.statusCode < 300) {
+        _codexTurnState.capture(response.headers, requestConfig);
+      }
       if (response.statusCode == 401) {
         await response.stream.drain<void>();
         _checkSession();
@@ -819,7 +970,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
             statusCode: 401,
           );
         }
-        config = await service.resolve(config, force: true);
+        await _resolve(force: true);
         refreshed = true;
         continue;
       }

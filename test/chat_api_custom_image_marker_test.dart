@@ -1479,7 +1479,7 @@ void main() {
   });
 
   group('Gemini structured media paths (ticket 10)', () {
-    test('encodes multimodalInternalMediaPathsKey as inline_data', () async {
+    test('encodes multimodalInternalMediaPathsKey as inlineData', () async {
       final file = await _tempPng('kelivo_gemini_media_');
       addTearDown(() async {
         final dir = file.parent;
@@ -1518,10 +1518,10 @@ void main() {
       final contents = (body['contents'] as List).cast<Map>();
       final parts = (contents.single['parts'] as List).cast<Map>();
       expect(parts.first['text'], 'before after');
-      expect(parts.any((part) => part['inline_data'] is Map), isTrue);
-      final image = parts.firstWhere((part) => part['inline_data'] is Map);
-      expect(image['inline_data']['mime_type'], 'image/png');
-      expect(image['inline_data']['data'], 'AQIDBA==');
+      expect(parts.any((part) => part['inlineData'] is Map), isTrue);
+      final image = parts.firstWhere((part) => part['inlineData'] is Map);
+      expect(image['inlineData']['mimeType'], 'image/png');
+      expect(image['inlineData']['data'], 'AQIDBA==');
       expect(jsonEncode(body), isNot(contains('[image:')));
     });
 
@@ -1556,7 +1556,7 @@ void main() {
       final contents = (body['contents'] as List).cast<Map>();
       final parts = (contents.single['parts'] as List).cast<Map>();
       expect(parts.single['text'], 'inline [image:data:image/png;base64,QUJD]');
-      expect(parts.any((part) => part['inline_data'] is Map), isFalse);
+      expect(parts.any((part) => part['inlineData'] is Map), isFalse);
     });
 
     test('skips missing local media paths without crashing', () async {
@@ -1593,7 +1593,7 @@ void main() {
       final contents = (body['contents'] as List).cast<Map>();
       final parts = (contents.single['parts'] as List).cast<Map>();
       expect(parts.single['text'], 'still send me');
-      expect(parts.any((part) => part['inline_data'] is Map), isFalse);
+      expect(parts.any((part) => part['inlineData'] is Map), isFalse);
     });
   });
 

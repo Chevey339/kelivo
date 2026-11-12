@@ -1,5 +1,4 @@
-import 'dart:ui' as ui;
-
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +12,7 @@ import '../utils/brand_assets.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
+import 'desktop_overlay_backdrop.dart';
 
 /// Show a desktop-only floating popover for search provider selection.
 /// It appears above the chat input bar with blurred background, top rounded corners,
@@ -124,7 +124,10 @@ class _SearchPopoverOverlayState extends State<_SearchPopoverOverlay>
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
     // Slightly narrower than input width
-    final width = (widget.anchorWidth - 16).clamp(260.0, 720.0);
+    final width = math.min(
+      (widget.anchorWidth - 16).clamp(260.0, 720.0),
+      math.max(0.0, screen.width - 16),
+    );
     final left =
         (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
           8.0,
@@ -194,8 +197,8 @@ class _GlassPanel extends StatelessWidget {
     final radius = borderRadius ?? BorderRadius.circular(14);
     return ClipRRect(
       borderRadius: radius,
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+      child: DesktopOverlayBackdrop(
+        sigma: 20,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: AppOverlayColors.desktopPopoverSurface(cs),

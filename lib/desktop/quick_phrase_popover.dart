@@ -1,5 +1,5 @@
+import 'dart:math' as math;
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -7,6 +7,7 @@ import '../core/models/quick_phrase.dart';
 import '../icons/lucide_adapter.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
+import 'desktop_overlay_backdrop.dart';
 
 Future<QuickPhrase?> showDesktopQuickPhrasePopover(
   BuildContext context, {
@@ -117,7 +118,10 @@ class _QuickPhrasePopoverState extends State<_QuickPhrasePopover>
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
-    final width = (widget.anchorWidth - 16).clamp(320.0, 720.0);
+    final width = math.min(
+      (widget.anchorWidth - 16).clamp(320.0, 720.0),
+      math.max(0.0, screen.width - 16),
+    );
     final left =
         (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
           8.0,
@@ -187,8 +191,8 @@ class _GlassPanel extends StatelessWidget {
     final radius = borderRadius ?? BorderRadius.circular(14);
     return ClipRRect(
       borderRadius: radius,
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+      child: DesktopOverlayBackdrop(
+        sigma: 20,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: AppOverlayColors.desktopPopoverSurface(cs),

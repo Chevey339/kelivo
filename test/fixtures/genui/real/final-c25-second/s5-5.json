@@ -1,0 +1,21 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "date": "2026-10-24",
+  "testedCommit": "53eb751c8ac2fcdb1326323d4ad67533af7bb504",
+  "task": "s5-5",
+  "response": "关闭“启用明细”后，明细字段会隐藏，但内容仍会保留，并且不参与必填校验；按钮只会生成一份可编辑草稿，需要你确认后才会发送。\n\n```kelivo-ui\nui 1 catalog \"kelivo.native/1\"\nroot = Column(children=[form, ask])\n$on: boolean = false\n$name: string = \"\"\n$detail: string = \"保留内容\"\nform = Form(children=[toggle, nameField, detailField], title=\"机构报销条件\")\ntoggle = Switch(bind=$on, label=\"启用明细\")\nnameField = TextField(bind=$name, label=\"名称\", required=true, placeholder=\"请输入名称\")\ndetailField = TextField(bind=$detail, label=\"明细\", required=true, visible=$on, placeholder=\"请输入明细\")\nask = Button(label=\"准备检查草稿\", form=form, action=Ask(text=\"请检查这份机构报销条件表单草稿；它尚未发送。\", context={\"name\":$name,\"enabled\":$on,\"detail\":$detail}))\n```",
+  "finishReason": "stop",
+  "score": {
+    "deterministicPassed": true,
+    "failures": []
+  },
+  "manualChecks": [
+    "The explanation and labels express the requested calculation or data meaning, including units and synthetic-data qualification.",
+    "The UI uses the requested native controls and interactions coherently; no misleading send claim, hidden side effect, or unsupported substitute."
+  ],
+  "semanticReview": {
+    "reviewer": "Codex implementation agent; independently checked by agent:/root/review_c01",
+    "accepted": true,
+    "notes": "Agent review: conditional-form variant 5 uses the requested states, required name and conditionally visible required detail, retains hidden values, and associates Ask with the Form and exact name/enabled/detail context. Text describes an editable review draft rather than automatic sending. Defaults are blank/explicit placeholders, consistent with the first round's provenance interpretation."
+  }
+}

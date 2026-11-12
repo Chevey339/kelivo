@@ -10,6 +10,7 @@ import '../../../desktop/widgets/desktop_select_dropdown.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/selection_back_scope.dart';
 import '../../../utils/platform_utils.dart';
 import '../widgets/memory_ui.dart';
 
@@ -407,7 +408,7 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
         ? (widget.padding ?? const EdgeInsets.fromLTRB(4, 0, 4, 20))
         : (widget.padding ?? const EdgeInsets.only(bottom: 24));
 
-    return Column(
+    final content = Column(
       children: [
         Padding(
           padding: widget.padding == null
@@ -509,6 +510,14 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
                 ),
         ),
       ],
+    );
+    return SelectionBackScope(
+      selecting: _selecting,
+      onCancel: () => setState(() {
+        _selecting = false;
+        _selected.clear();
+      }),
+      child: content,
     );
   }
 }

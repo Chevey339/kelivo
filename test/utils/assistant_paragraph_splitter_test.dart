@@ -2,6 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/features/chat/utils/assistant_paragraph_splitter.dart';
 
 void main() {
+  test(
+    'nested containers use the same protected source ranges as rendering',
+    () {
+      const text = 'intro\n\n- ```dart\n  first\n\n  second\n  ```\n\nend';
+      expect(splitAssistantParagraphs(text), [
+        'intro',
+        '- ```dart\n  first\n\n  second\n  ```',
+        'end',
+      ]);
+    },
+  );
+  test('display math starting after prose keeps its blank body lines', () {
+    for (final body in ['Before \$\$x\n\ny\$\$', 'Before \\[x\n\ny\\]']) {
+      expect(splitAssistantParagraphs('intro\n\n$body\n\nend'), [
+        'intro',
+        body,
+        'end',
+      ]);
+    }
+  });
+
   test('splits on blank lines', () {
     expect(splitAssistantParagraphs('one\n\ntwo\n\nthree'), [
       'one',

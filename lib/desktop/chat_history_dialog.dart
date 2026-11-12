@@ -49,7 +49,10 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
 
-    final chatService = context.watch<ChatService>();
+    context.select<ChatService, (bool, int)>(
+      (chat) => (chat.initialized, chat.conversationListRevision),
+    );
+    final chatService = context.read<ChatService>();
     final List<Conversation> all = chatService
         .getAllConversations()
         .where(

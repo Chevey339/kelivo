@@ -6,8 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
+import 'package:Kelivo/core/database/composer_draft_store.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/composer_draft.dart';
+import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -36,6 +39,10 @@ class _ControlledChatService extends ChatService {
   final List<String?> setCurrentCalls = <String?>[];
   String? _trackedCurrentConversationId;
   int checkpointWrites = 0;
+  ComposerDraftStore? controlledDrafts;
+
+  @override
+  ComposerDraftStore? get composerDrafts => controlledDrafts;
 
   List<ChatMessage> messagesOf(String id) =>
       _messagesByConversation[id] ?? const <ChatMessage>[];
@@ -63,6 +70,7 @@ class _ControlledChatService extends ChatService {
     _PageRequest request,
     List<ChatMessage> messages, {
     required int startIndex,
+    int? totalSlotCount,
   }) {
     final timestamp = DateTime(2026, 7, 11);
     request.completer.complete(
@@ -89,7 +97,7 @@ class _ControlledChatService extends ChatService {
         ],
         hasMoreBefore: startIndex > 0,
         hasMoreAfter: false,
-        totalSlotCount: startIndex + messages.length,
+        totalSlotCount: totalSlotCount ?? startIndex + messages.length,
       ),
     );
   }
@@ -172,6 +180,48 @@ class _ControlledChatService extends ChatService {
   ) async => const <String, int>{};
 }
 
+class _DelayedComposerDrafts extends ChangeNotifier
+    implements ComposerDraftStore {
+  final firstLoad = Completer<ComposerDraft>();
+  final entries = {
+    'conv-a': ComposerDraft(
+      conversationId: 'conv-a',
+      compose: const ComposerDraftInput(text: 'Existing A draft'),
+    ),
+    'conv-b': ComposerDraft(
+      conversationId: 'conv-b',
+      compose: const ComposerDraftInput(text: 'Existing B draft'),
+    ),
+  };
+
+  @override
+  bool get suspended => false;
+  @override
+  int get resetRevision => 0;
+  @override
+  int get externalRevision => 0;
+  @override
+  String? get externalOwner => null;
+  @override
+  Future<void> flush() async {}
+  @override
+  Future<ComposerDraft> load(String id, {String? assistantId}) =>
+      id == 'conv-a' && !firstLoad.isCompleted
+      ? firstLoad.future
+      : Future.value(entries[id]!);
+  @override
+  ComposerDraft? peek(String id) => entries[id];
+  @override
+  int inputEpoch(String id, {required String? editMessageId}) => 0;
+  @override
+  void setInput(String id, ComposerDraftInput input) {
+    entries[id]!.compose = input;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 ChatMessage _message(String conversationId, int index) {
   return ChatMessage(
     id: '$conversationId-message-$index',
@@ -187,8 +237,11 @@ void main() {
   /// Runs [body] with the platform overridden to Android so the mobile
   /// (animated) switching pipeline is exercised. The override must be reset
   /// before the test body ends, so it cannot live in setUp/tearDown.
-  Future<void> runAsMobile(Future<void> Function() body) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+  Future<void> runAsMobile(
+    Future<void> Function() body, {
+    TargetPlatform platform = TargetPlatform.android,
+  }) async {
+    debugDefaultTargetPlatformOverride = platform;
     try {
       await body();
     } finally {
@@ -279,6 +332,294 @@ void main() {
     );
     await pumpUntilDone(tester, [future]);
   }
+
+  for (final action in ['same conversation', 'return to bottom']) {
+    testWidgets('$action preserves a pending initial window', (tester) async {
+      await runAsMobile(() async {
+        final service = _ControlledChatService({
+          'conv-a': [_message('conv-a', 0)],
+        });
+        final controller = await pumpHarness(tester, service);
+        final initial = controller.chatController.setCurrentConversationAndLoad(
+          service.getConversation('conv-a')!,
+        );
+        expect(controller.currentConversation?.id, 'conv-a');
+        expect(controller.messages, isEmpty);
+        expect(controller.isLoadingWindow, isTrue);
+        if (action == 'same conversation') {
+          await controller.switchConversationAnimated('conv-a');
+        } else {
+          await controller.forceScrollToBottom();
+        }
+        service.completePage(
+          service.pageRequests.single,
+          service.messagesOf('conv-a'),
+          startIndex: 0,
+        );
+        await initial;
+        expect(controller.messages.map((message) => message.id), [
+          'conv-a-message-0',
+        ]);
+      }, platform: TargetPlatform.iOS);
+    });
+  }
+
+  for (final returnToBottom in [false, true]) {
+    testWidgets(
+      'deleting the active chat reveals a pending jump (bottom=$returnToBottom)',
+      (tester) async {
+        await runAsMobile(() async {
+          final conversations = {
+            'conv-a': [_message('conv-a', 0)],
+          };
+          final service = _ControlledChatService(conversations);
+          final controller = await pumpHarness(tester, service);
+          final open = controller.switchConversationAnimated('conv-a');
+          service.completePage(
+            service.pageRequests.single,
+            service.messagesOf('conv-a'),
+            startIndex: 0,
+            totalSlotCount: 3,
+          );
+          await pumpUntilDone(tester, [open]);
+          final jump = returnToBottom
+              ? controller.forceScrollToBottom()
+              : controller.scrollToMessageId(
+                  'conv-a-message-10',
+                  useRikkaTransition: true,
+                );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 200));
+          expect(controller.messageJumpOpacity.value, 0.0);
+          final pendingPage = service.pageRequests.last;
+          // History-page deletion notifies after removing the service cache row.
+          conversations.remove('conv-a');
+          service.notifyListeners();
+          expect(controller.currentConversation, isNull);
+          pendingPage.completer.complete(null);
+          await pumpUntilDone(tester, [jump]);
+          await controller.debugViewModel.createNewConversation();
+          expect(controller.currentConversation, isNotNull);
+          expect(controller.messageJumpOpacity.value, 1.0);
+        }, platform: TargetPlatform.iOS);
+      },
+    );
+  }
+
+  testWidgets('switching conversations reveals a pending message jump', (
+    tester,
+  ) async {
+    await runAsMobile(() async {
+      final service = _ControlledChatService({
+        'conv-a': [_message('conv-a', 0)],
+        'conv-b': [_message('conv-b', 0)],
+      });
+      final controller = await pumpHarness(tester, service);
+      await switchAndSettle(tester, controller, service, 'conv-a');
+
+      final jump = controller.scrollToMessageId(
+        'conv-a-older-message',
+        useRikkaTransition: true,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(service.pageRequests, hasLength(2));
+      final pendingPage = service.pageRequests.last;
+      try {
+        await switchAndSettle(tester, controller, service, 'conv-b');
+        expect(controller.currentConversation?.id, 'conv-b');
+        expect(controller.messages.single.conversationId, 'conv-b');
+        expect(controller.messageJumpOpacity.value, 1.0);
+      } finally {
+        pendingPage.completer.complete(null);
+        await pumpUntilDone(tester, [jump]);
+      }
+    }, platform: TargetPlatform.iOS);
+  });
+
+  testWidgets('superseded conversation fade completes its switch future', (
+    tester,
+  ) async {
+    await runAsMobile(() async {
+      final service = _ControlledChatService({
+        'conv-a': [_message('conv-a', 0)],
+        'conv-b': [_message('conv-b', 0)],
+        'conv-c': [_message('conv-c', 0)],
+      });
+      final controller = await pumpHarness(tester, service);
+      await switchAndSettle(tester, controller, service, 'conv-a');
+      var firstFinished = false;
+      final first = controller.switchConversationAnimated('conv-b').then((_) {
+        firstFinished = true;
+      });
+      service.completePage(
+        service.pageRequests.last,
+        service.messagesOf('conv-b'),
+        startIndex: 0,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      await switchAndSettle(tester, controller, service, 'conv-c');
+
+      expect(controller.currentConversation?.id, 'conv-c');
+      expect(controller.convoFade.value, 1.0);
+      expect(firstFinished, isTrue);
+      await first;
+    }, platform: TargetPlatform.iOS);
+  });
+
+  testWidgets('old message jump cannot replace a reopened conversation', (
+    tester,
+  ) async {
+    await runAsMobile(() async {
+      final service = _ControlledChatService({
+        'conv-a': [_message('conv-a', 0)],
+        'conv-b': [_message('conv-b', 0)],
+      });
+      final controller = await pumpHarness(tester, service);
+      await switchAndSettle(tester, controller, service, 'conv-a');
+      final older = _message('conv-a', 10);
+      final jump = controller.scrollToMessageId(
+        older.id,
+        useRikkaTransition: true,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final pendingPage = service.pageRequests.last;
+      await switchAndSettle(tester, controller, service, 'conv-b');
+      await switchAndSettle(tester, controller, service, 'conv-a');
+      service.completePage(pendingPage, [older], startIndex: 10);
+      await pumpUntilDone(tester, [jump]);
+
+      expect(controller.messages.single.id, 'conv-a-message-0');
+      expect(controller.messageJumpOpacity.value, 1.0);
+    }, platform: TargetPlatform.iOS);
+  });
+
+  testWidgets('older page completion cannot reveal a newer message jump', (
+    tester,
+  ) async {
+    await runAsMobile(() async {
+      final service = _ControlledChatService({
+        'conv-a': [_message('conv-a', 0)],
+      });
+      final controller = await pumpHarness(tester, service);
+      await switchAndSettle(tester, controller, service, 'conv-a');
+      final first = controller.scrollToMessageId(
+        'conv-a-message-10',
+        useRikkaTransition: true,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final firstPage = service.pageRequests.last;
+      final second = controller.scrollToMessageId(
+        'conv-a-message-20',
+        useRikkaTransition: true,
+      );
+      await tester.pump();
+      final secondPage = service.pageRequests.last;
+      expect(service.pageRequests, hasLength(3));
+      service.completePage(firstPage, [_message('conv-a', 10)], startIndex: 10);
+      await pumpUntilDone(tester, [first]);
+      try {
+        expect(controller.messages.single.id, 'conv-a-message-0');
+        expect(controller.messageJumpOpacity.value, 0.0);
+      } finally {
+        service.completePage(secondPage, [
+          _message('conv-a', 20),
+        ], startIndex: 20);
+        await pumpUntilDone(tester, [second]);
+      }
+      expect(controller.messages.single.id, 'conv-a-message-20');
+      expect(controller.messageJumpOpacity.value, 1.0);
+    }, platform: TargetPlatform.iOS);
+  });
+
+  testWidgets('same conversation tap cancels an unfinished jump fade', (
+    tester,
+  ) async {
+    await runAsMobile(() async {
+      final service = _ControlledChatService({
+        'conv-a': [_message('conv-a', 0)],
+      });
+      final controller = await pumpHarness(tester, service);
+      await switchAndSettle(tester, controller, service, 'conv-a');
+      var jumpFinished = false;
+      final jump = controller
+          .scrollToMessageId('conv-a-message-10', useRikkaTransition: true)
+          .then((_) => jumpFinished = true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      await controller.switchConversationAnimated('conv-a');
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(jumpFinished, isTrue);
+      expect(service.pageRequests, hasLength(1));
+      expect(controller.messageJumpOpacity.value, 1.0);
+      await jump;
+    }, platform: TargetPlatform.iOS);
+  });
+
+  testWidgets('same conversation tap discards a pending jump page', (
+    tester,
+  ) async {
+    await runAsMobile(() async {
+      final service = _ControlledChatService({
+        'conv-a': [_message('conv-a', 0)],
+      });
+      final controller = await pumpHarness(tester, service);
+      await switchAndSettle(tester, controller, service, 'conv-a');
+      final jump = controller.scrollToMessageId(
+        'conv-a-message-10',
+        useRikkaTransition: true,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final pendingPage = service.pageRequests.last;
+      await controller.switchConversationAnimated('conv-a');
+      expect(controller.messageJumpOpacity.value, 1.0);
+      service.completePage(pendingPage, [
+        _message('conv-a', 10),
+      ], startIndex: 10);
+      await pumpUntilDone(tester, [jump]);
+      expect(controller.messages.single.id, 'conv-a-message-0');
+    }, platform: TargetPlatform.iOS);
+  });
+
+  testWidgets('switching conversations cancels a pending return to bottom', (
+    tester,
+  ) async {
+    await runAsMobile(() async {
+      final service = _ControlledChatService({
+        'conv-a': [_message('conv-a', 0)],
+        'conv-b': [_message('conv-b', 0)],
+      });
+      final controller = await pumpHarness(tester, service);
+      final open = controller.switchConversationAnimated('conv-a');
+      service.completePage(
+        service.pageRequests.last,
+        service.messagesOf('conv-a'),
+        startIndex: 0,
+        totalSlotCount: 3,
+      );
+      await pumpUntilDone(tester, [open]);
+      final jump = controller.forceScrollToBottom();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final pendingPage = service.pageRequests.last;
+      expect(service.pageRequests, hasLength(2));
+      try {
+        await switchAndSettle(tester, controller, service, 'conv-b');
+        expect(controller.messageJumpOpacity.value, 1.0);
+      } finally {
+        service.completePage(pendingPage, [
+          _message('conv-a', 2),
+        ], startIndex: 2);
+        await pumpUntilDone(tester, [jump]);
+      }
+      expect(controller.messages.single.id, 'conv-b-message-0');
+    }, platform: TargetPlatform.iOS);
+  });
 
   for (final platform in [TargetPlatform.windows, TargetPlatform.android]) {
     for (final temporary in [false, true]) {
@@ -395,6 +736,133 @@ void main() {
   }
 
   group('HomePageController conversation switch pipeline', () {
+    testWidgets('browser task leaves an existing message edit untouched', (
+      tester,
+    ) async {
+      await runAsDesktop(() async {
+        final message = _message('conv-a', 0);
+        final service = _ControlledChatService({
+          'conv-a': [message],
+        });
+        final controller = await pumpHarness(tester, service);
+        await switchAndSettle(tester, controller, service, 'conv-a');
+        await controller.startUserMessageEdit(message);
+        await tester.pump();
+        final before = controller.inputController.text;
+        expect(controller.isUserMessageEditActive, isTrue);
+        expect(
+          await controller.appendBrowserTaskDraft(
+            'Browser page context',
+            expectedConversationId: 'conv-a',
+          ),
+          isFalse,
+        );
+        expect(controller.inputController.text, before);
+        expect(controller.userMessageEditState?.messageId, message.id);
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pumpWidget(const SizedBox());
+      });
+    });
+    testWidgets(
+      'browser task stays with its owner when a chat switch wins the draft await',
+      (tester) async {
+        await runAsDesktop(() async {
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final drafts = _DelayedComposerDrafts();
+          service.controlledDrafts = drafts;
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          expect(controller.mediaController.restoringDraft, isTrue);
+          final appending = controller.appendBrowserTaskDraft(
+            'Page task for A',
+            expectedConversationId: 'conv-a',
+          );
+          await switchAndSettle(tester, controller, service, 'conv-b');
+          drafts.firstLoad.complete(drafts.entries['conv-a']);
+          expect(await appending, isFalse);
+          expect(controller.currentConversation?.id, 'conv-b');
+          expect(controller.inputController.text, 'Existing B draft');
+          expect(drafts.entries['conv-b']!.compose.text, 'Existing B draft');
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          expect(
+            controller.inputController.text,
+            'Existing A draft\n\nPage task for A',
+          );
+          expect(
+            drafts.entries['conv-a']!.compose.text,
+            'Existing A draft\n\nPage task for A',
+          );
+          expect(NotificationService.takePendingComposerText('conv-a'), isNull);
+          expect(NotificationService.takePendingComposerText('conv-b'), isNull);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+          drafts.dispose();
+        });
+      },
+    );
+    testWidgets(
+      'browser entry appends a draft without sending or replacing existing text',
+      (tester) async {
+        await runAsDesktop(() async {
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          controller.inputController.text = 'Existing request';
+          controller.mediaController.restoreDraft(
+            const ComposerDraftInput(
+              text: 'Existing request',
+              documents: [
+                DocumentAttachment(
+                  path: '/draft/notes.txt',
+                  fileName: 'notes.txt',
+                  mime: 'text/plain',
+                ),
+              ],
+            ),
+          );
+          controller.debugSetChatInitialized();
+          final before = service.messagesOf('conv-a').length;
+          NotificationService.openConversation(
+            'conv-a',
+            composerText: 'Browser page context',
+          );
+          for (
+            var i = 0;
+            i < 20 &&
+                !controller.inputController.text.contains(
+                  'Browser page context',
+                );
+            i++
+          ) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(
+            controller.inputController.text,
+            'Existing request\n\nBrowser page context',
+          );
+          expect(service.messagesOf('conv-a'), hasLength(before));
+          expect(
+            controller.mediaController
+                .snapshotDraft(controller.inputController.text)
+                .documents
+                .single
+                .path,
+            '/draft/notes.txt',
+          );
+          expect(
+            controller.inputController.selection.extentOffset,
+            controller.inputController.text.length,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        });
+      },
+    );
     testWidgets(
       'desktop task history opens the saved conversation through the bus',
       (tester) async {
@@ -673,14 +1141,9 @@ void main() {
     void enterSelection(HomePageController controller) {
       final messages = controller.messages.toList();
       expect(messages, isNotEmpty);
-      controller.startMessageSelection(
-        messageIndex: 0,
-        messageList: messages,
-        mode: ChatSelectionMode.delete,
-      );
+      controller.startMessageSelection(messageIndex: 0, messageList: messages);
       expect(controller.selecting, isTrue);
       expect(controller.selectedItems, isNotEmpty);
-      expect(controller.selectionMode, ChatSelectionMode.delete);
     }
 
     testWidgets('successful switch clears selection UI and old ids', (
@@ -701,7 +1164,6 @@ void main() {
         expect(controller.currentConversation?.id, 'conv-b');
         expect(controller.selecting, isFalse);
         expect(controller.selectedItems, isEmpty);
-        expect(controller.selectionMode, ChatSelectionMode.share);
         expect(
           previousSelected.intersection(controller.selectedItems),
           isEmpty,
@@ -730,7 +1192,6 @@ void main() {
         expect(controller.currentConversation?.id, 'conv-a');
         expect(controller.selecting, isTrue);
         expect(controller.selectedItems, selectedBefore);
-        expect(controller.selectionMode, ChatSelectionMode.delete);
       });
     });
 
@@ -750,7 +1211,6 @@ void main() {
         expect(controller.currentConversation?.id, 'conv-a');
         expect(controller.selecting, isTrue);
         expect(controller.selectedItems, selectedBefore);
-        expect(controller.selectionMode, ChatSelectionMode.delete);
       });
     });
 
@@ -769,7 +1229,6 @@ void main() {
         expect(controller.currentConversation?.id, isNot('conv-a'));
         expect(controller.selecting, isFalse);
         expect(controller.selectedItems, isEmpty);
-        expect(controller.selectionMode, ChatSelectionMode.share);
       });
     });
   });
@@ -778,14 +1237,9 @@ void main() {
     void enterSelection(HomePageController controller) {
       final messages = controller.messages.toList();
       expect(messages, isNotEmpty);
-      controller.startMessageSelection(
-        messageIndex: 0,
-        messageList: messages,
-        mode: ChatSelectionMode.delete,
-      );
+      controller.startMessageSelection(messageIndex: 0, messageList: messages);
       expect(controller.selecting, isTrue);
       expect(controller.selectedItems, isNotEmpty);
-      expect(controller.selectionMode, ChatSelectionMode.delete);
     }
 
     testWidgets('successful switch clears selection', (tester) async {
@@ -805,7 +1259,6 @@ void main() {
         expect(service.currentConversationId, 'conv-b');
         expect(controller.selecting, isFalse);
         expect(controller.selectedItems, isEmpty);
-        expect(controller.selectionMode, ChatSelectionMode.share);
         expect(
           previousSelected.intersection(controller.selectedItems),
           isEmpty,
@@ -851,7 +1304,6 @@ void main() {
           expect(controller.messages.map((m) => m.id), messagesBefore);
           expect(controller.selecting, isTrue);
           expect(controller.selectedItems, selectedBefore);
-          expect(controller.selectionMode, ChatSelectionMode.delete);
         });
       },
     );

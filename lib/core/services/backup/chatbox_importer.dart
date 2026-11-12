@@ -80,7 +80,7 @@ class ChatboxImporter {
       if (treatAsZip) {
         staging = await Directory.systemTemp.createTemp('kelivo_chatbox_res_');
         DataSync.registerLiveTempPath(staging.path);
-        final appData = await AppDirectories.getAppDataDirectory();
+        final appData = await AppDirectories.getContentDirectory();
         resourceDestDir = p.join(appData.path, 'upload', 'chatbox');
       }
 

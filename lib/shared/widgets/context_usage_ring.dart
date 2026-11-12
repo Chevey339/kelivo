@@ -6,6 +6,7 @@ import '../../features/home/services/context_usage_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/utils/token_format.dart';
 import '../../theme/app_semantic_colors.dart';
+import 'context_usage_details.dart';
 import 'ios_tactile.dart';
 
 const double kContextUsageRingSize = 16;
@@ -37,9 +38,11 @@ Color contextUsageColor(
   return switch (snapshot.state) {
     ContextUsageState.stale => base.withValues(alpha: 0.55),
     ContextUsageState.computing => base.withValues(alpha: 0.5),
+    ContextUsageState.failed => cs.error,
     ContextUsageState.exact ||
     ContextUsageState.estimated ||
-    ContextUsageState.none => base,
+    ContextUsageState.none ||
+    ContextUsageState.opaque => base,
   };
 }
 
@@ -162,6 +165,16 @@ class ContextUsageRing extends StatelessWidget {
     AppLocalizations l10n,
     ContextUsageSnapshot? snapshot,
   ) {
+    if (snapshot?.state == ContextUsageState.failed) {
+      return '${contextUsageStateLabel(l10n, snapshot)}\n'
+          '${contextUsageSummaryText(l10n, snapshot)}';
+    }
+    if (snapshot != null && !snapshot.hasUsage) {
+      return contextUsageStateLabel(l10n, snapshot);
+    }
+    if (snapshot?.hasUnknownNativeTokens == true) {
+      return contextUsageSummaryText(l10n, snapshot);
+    }
     final window = snapshot?.contextWindow;
     if (snapshot == null || window == null || window <= 0) {
       return l10n.contextUsageNoWindow;

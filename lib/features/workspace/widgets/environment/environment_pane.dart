@@ -1,5 +1,6 @@
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
+import 'package:Kelivo/core/services/logging/flutter_logger.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/features/workspace/pages/external_mounts_page.dart';
 import 'package:Kelivo/features/workspace/pages/environment_download_page.dart';
@@ -7,6 +8,9 @@ import 'package:Kelivo/features/workspace/pages/proot_options_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
 import 'package:Kelivo/features/workspace/pages/environment_variables_page.dart';
 import 'environment_dependencies_section.dart';
+import 'native_shell_dialog.dart';
+import 'package:Kelivo/core/services/workspace/desktop_process_runtime.dart';
+import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -255,8 +259,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
       await manager.install();
       await _refreshRuntime();
       if (!mounted) return;
-      if (manager is EnvironmentInstaller &&
-          manager.env.state.phase == EnvironmentPhase.ready &&
+      if (manager.env.state.phase == EnvironmentPhase.ready &&
           manager.env.state.errorMessage != null) {
         showAppSnackBar(
           context,
@@ -264,7 +267,11 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
             AppLocalizations.of(context)!,
             manager.env.state.errorMessage,
           ),
-          type: NotificationType.error,
+          type:
+              manager.env.state.errorMessage ==
+                  EnvironmentError.cleanupIncomplete
+              ? NotificationType.warning
+              : NotificationType.error,
         );
       }
     } finally {
@@ -307,6 +314,15 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
           _diskUsageTimedOut = false;
         });
         unawaited(_loadDiskUsage(force: true));
+      }
+    } catch (error, stack) {
+      FlutterLogger.log('Reset failed: $error\n$stack', tag: 'Environment');
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.workspaceEnvErrorResetFailed,
+          type: NotificationType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -394,19 +410,71 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
 
   List<Widget> _nativeChildren() {
     final l10n = AppLocalizations.of(context)!;
-    final shell = workspaceEnvNativeShellPath();
+    final provider = context.watch<WorkspaceRuntimeProvider>();
+    final env = context.watch<EnvironmentProvider>();
+    final runtime = provider.runtime;
+    final shell = provider.lastStatus?.shell;
+    final path = shell?.executable ?? l10n.workspaceEnvNativeShellUnavailable;
     return [
       _StatusCard(
         diskUsageBytes: null,
-        rootfsPath: shell,
+        rootfsPath: path,
         desktopNative: true,
-        onCopyPath: () => unawaited(_copyPath(shell)),
+        onCopyPath: shell == null
+            ? null
+            : () => unawaited(_copyPath(shell.executable)),
       ),
       KeyedSubtree(
         key: EnvironmentPane.nativeExplanationKey,
         child: IosSectionFooter(text: l10n.workspaceEnvNativeExplanation),
       ),
       IosSectionFooter(text: l10n.workspaceEnvNativeUnsandboxed),
+      SectionCard(
+        children: [
+          IosNavRow(
+            key: const ValueKey('native-shell-settings'),
+            icon: Lucide.Terminal,
+            label: l10n.workspaceEnvNativeShellTitle,
+            subtitle: env.nativeShellPath.isEmpty
+                ? l10n.workspaceEnvShellAutomatic
+                : env.nativeShellPath,
+            subtitleMaxLines: 2,
+            onTap: runtime is! DesktopProcessRuntime
+                ? null
+                : () async {
+                    await env.loaded;
+                    if (!mounted) return;
+                    await showAppDialog<void>(
+                      context,
+                      maxWidth: 520,
+                      child: NativeShellDialog(
+                        environment: env,
+                        runtime: runtime,
+                        runtimeProvider: provider,
+                      ),
+                    );
+                  },
+          ),
+          const IosRowDivider(),
+          IosNavRow(
+            key: const ValueKey('native-shell-detect'),
+            icon: Lucide.RefreshCw,
+            label: l10n.workspaceEnvNativeShellDetect,
+            trailing: _busy ? const EnvironmentInlineSpinner() : null,
+            onTap: _busy || runtime is! DesktopProcessRuntime
+                ? null
+                : () async {
+                    setState(() => _busy = true);
+                    try {
+                      runtime.refreshShell();
+                      await provider.refresh();
+                    } finally {
+                      if (mounted) setState(() => _busy = false);
+                    }
+                  },
+          ),
+        ],
+      ),
       ..._variablesSection(),
     ];
   }
@@ -652,7 +720,7 @@ class _StatusCard extends StatelessWidget {
           children: [
             IosNavRow(
               icon: icon,
-              label: engine,
+              label: desktopNative ? (status?.shell?.name ?? engine) : engine,
               subtitle: desktopNative
                   ? null
                   : workspaceEnvPhaseLabel(l10n, state.phase),
@@ -682,7 +750,11 @@ class _StatusCard extends StatelessWidget {
             else if (state.phase == EnvironmentPhase.error)
               _ErrorBody(state: state, busy: busy, onRetry: onRetry)
             else if (state.phase == EnvironmentPhase.needsRestart)
-              const _RestartBanner()
+              _RestartBanner(
+                repairInterrupted:
+                    state.errorMessage == 'patch_interrupted' ||
+                    state.errorMessage == 'patch_timeout',
+              )
             else ...[
               const IosRowDivider(),
               EnvironmentMetricRow(
@@ -889,7 +961,9 @@ class _InstallingBody extends StatelessWidget {
               color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
-          if (state.phase == EnvironmentPhase.downloading &&
+          if ((state.phase == EnvironmentPhase.downloading ||
+                  (state.phase == EnvironmentPhase.patching &&
+                      defaultTargetPlatform == TargetPlatform.iOS)) &&
               onCancel != null) ...[
             const SizedBox(height: 12),
             KeyedSubtree(
@@ -959,7 +1033,9 @@ class _ErrorBody extends StatelessWidget {
 }
 
 class _RestartBanner extends StatelessWidget {
-  const _RestartBanner();
+  const _RestartBanner({this.repairInterrupted = false});
+
+  final bool repairInterrupted;
 
   @override
   Widget build(BuildContext context) {
@@ -981,7 +1057,9 @@ class _RestartBanner extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  l10n.workspaceEnvRestartDoneBanner,
+                  repairInterrupted
+                      ? l10n.workspaceEnvRepairRestartBanner
+                      : l10n.workspaceEnvRestartDoneBanner,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: AppFontWeights.medium,
