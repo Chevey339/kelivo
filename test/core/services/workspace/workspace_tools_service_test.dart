@@ -15,8 +15,10 @@ import 'package:path/path.dart' as p;
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/environment_variable.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
+import 'package:Kelivo/core/services/workspace/workspace_app_storage.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/core/services/workspace/desktop_shell.dart';
@@ -65,6 +67,34 @@ class _InterruptedWriter extends FakeWorkspaceRuntime {
     yield const CommandStarted();
     File(p.join(request.cwd, 'partial.txt')).writeAsStringSync('saved');
     if (throwError) throw StateError('stream interrupted');
+  }
+}
+
+class _PausedShellRuntime extends FakeWorkspaceRuntime {
+  final firstStarted = Completer<void>();
+  final secondStarted = Completer<void>();
+  final releaseFirst = Completer<void>();
+
+  @override
+  Stream<CommandEvent> run(CommandRequest request) async* {
+    requests.add(request);
+    yield const CommandStarted();
+    if (request.command == 'first') {
+      firstStarted.complete();
+      await releaseFirst.future;
+    } else {
+      secondStarted.complete();
+    }
+    await File(
+      p.join(request.cwd, '${request.command}.txt'),
+    ).writeAsString('done');
+    yield const CommandExited(
+      exitCode: 0,
+      timedOut: false,
+      cancelled: false,
+      interrupted: false,
+      duration: Duration.zero,
+    );
   }
 }
 
@@ -122,18 +152,23 @@ void main() {
     Set<String> disabledTools = const {},
     List<Mount> externalMounts = const [],
     Future<List<Mount>> Function()? loadExternalMounts,
+    Directory? workspaceOverride,
+    Directory? sessionOverride,
+    String conversationId = 'conv-1',
   }) {
+    final root = workspaceOverride ?? workspaceDir;
+    final session = sessionOverride ?? sessionDir;
     final paths = sandboxed
         ? WorkspacePaths.sandboxed(
             externalMounts: externalMounts,
             loadExternalMounts: loadExternalMounts,
-            workspaceHostRoot: workspaceDir.path,
-            sessionHostDir: sessionDir.path,
+            workspaceHostRoot: root.path,
+            sessionHostDir: session.path,
             skillsHostDir: skillsDir.path,
           )
         : WorkspacePaths.native(
-            workspaceHostRoot: workspaceDir.path,
-            sessionHostDir: sessionDir.path,
+            workspaceHostRoot: root.path,
+            sessionHostDir: session.path,
             skillsHostDir: skillsDir.path,
           );
     return WorkspaceToolContext(
@@ -145,9 +180,9 @@ void main() {
           : ToolPermissionMode.requestApproval,
       binding: WorkspaceBinding(workspaceId: 'ws1', toolsUsed: toolsUsed),
       paths: paths,
-      sessionDir: sessionDir,
-      outputsDir: Directory(p.join(sessionDir.path, 'outputs')),
-      conversationId: 'conv-1',
+      sessionDir: session,
+      outputsDir: Directory(p.join(session.path, 'outputs')),
+      conversationId: conversationId,
       runtimeStatus:
           status ??
           RuntimeStatus(ready: true, engine: 'fake', sandboxed: sandboxed),
@@ -705,6 +740,261 @@ void main() {
         expect(changed, isNotNull);
         expect(changed, anyElement(contains('new.txt')));
         expect(File(p.join(workspaceDir.path, 'new.txt')).existsSync(), isTrue);
+      },
+    );
+
+    test('shared workspace shells attribute only their own changes', () async {
+      final secondSession = await Directory(
+        p.join(tmp.path, 'session-2'),
+      ).create();
+      final projectA = await Directory(
+        p.join(workspaceDir.path, 'project-a'),
+      ).create();
+      final projectB = await Directory(
+        p.join(workspaceDir.path, 'project-b'),
+      ).create();
+      final runtime = _PausedShellRuntime();
+      final first = service(runtime: runtime).handle(ctx(), 'shell', {
+        'command': 'first',
+        'cwd': projectA.path,
+      }, toolCallId: 'first');
+      await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+      final second = service(runtime: runtime).handle(
+        ctx(sessionOverride: secondSession, conversationId: 'conv-2'),
+        'shell',
+        {'command': 'second', 'cwd': projectB.path},
+        toolCallId: 'second',
+      );
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(runtime.secondStarted.isCompleted, isFalse);
+      } finally {
+        runtime.releaseFirst.complete();
+        await Future.wait([first, second]);
+      }
+      for (final pair in [
+        (await first, 'first.txt'),
+        (await second, 'second.txt'),
+      ]) {
+        final files = metaOf(pair.$1).files;
+        expect(files.map((file) => p.basename(file.path)), [pair.$2]);
+        expect(
+          jsonOf(pair.$1)['changed_files'],
+          files.map((file) => file.path).toList(),
+        );
+      }
+    });
+
+    for (final tool in ['write_file', 'edit_file']) {
+      test(
+        '$tool changes cannot become another conversation shell output',
+        () async {
+          final other = File(p.join(workspaceDir.path, 'other.txt'));
+          if (tool == 'edit_file') {
+            await other.writeAsString('original');
+            await other.setLastModified(DateTime.utc(2000));
+          }
+          final runtime = _PausedShellRuntime();
+          final tools = service(runtime: runtime);
+          final first = tools.handle(ctx(), 'shell', {
+            'command': 'first',
+          }, toolCallId: 'first');
+          await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+          final write = tools.handle(ctx(conversationId: 'conv-2'), tool, {
+            'path': other.path,
+            if (tool == 'write_file') 'content': 'updated',
+            if (tool == 'edit_file') ...{
+              'old_string': 'original',
+              'new_string': 'updated',
+            },
+          }, toolCallId: 'write');
+          try {
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            expect(
+              await other.exists() ? await other.readAsString() : null,
+              tool == 'edit_file' ? 'original' : null,
+            );
+          } finally {
+            runtime.releaseFirst.complete();
+            await Future.wait([first, write]);
+          }
+          expect(
+            metaOf(await first).files.map((file) => p.basename(file.path)),
+            ['first.txt'],
+          );
+          expect(
+            metaOf(await write).files.map((file) => p.basename(file.path)),
+            ['other.txt'],
+          );
+          expect(await other.readAsString(), 'updated');
+        },
+      );
+    }
+
+    test('shell snapshot waits for in-flight web app storage writes', () async {
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      final storage = WorkspaceAppStorage(
+        root: await workspaceDir.resolveSymbolicLinks(),
+        directory: 'notes.app.html.data',
+        authorize: (_, write) async {
+          if (write && !entered.isCompleted) {
+            entered.complete();
+            await release.future;
+          }
+        },
+      );
+      final write = storage.write('state.txt', 'web app data', null);
+      await entered.future.timeout(const Duration(seconds: 3));
+      final runtime = _PausedShellRuntime()..releaseFirst.complete();
+      final shell = service(
+        runtime: runtime,
+      ).handle(ctx(), 'shell', {'command': 'first'}, toolCallId: 'shell');
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(runtime.firstStarted.isCompleted, isFalse);
+      } finally {
+        release.complete();
+        await Future.wait<Object?>([write, shell]);
+      }
+      expect(metaOf(await shell).files.map((file) => p.basename(file.path)), [
+        'first.txt',
+      ]);
+      expect((await storage.read('state.txt'))['content'], 'web app data');
+    });
+
+    test(
+      'cancelling a queued shell does not release the active shell',
+      () async {
+        final runtime = _PausedShellRuntime();
+        final tools = service(runtime: runtime);
+        final first = tools.handle(ctx(), 'shell', {
+          'command': 'first',
+        }, toolCallId: 'first');
+        await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+        final cancelled = Completer<void>();
+        final cancellation = ToolCallCancellation(
+          isCancelled: () => cancelled.isCompleted,
+          cancelled: cancelled.future,
+        );
+        final second = cancellation.run(
+          () => tools.handle(ctx(), 'shell', {
+            'command': 'cancelled',
+          }, toolCallId: 'cancelled'),
+        );
+        try {
+          await Future.doWhile(() async {
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            return cancellation.listenerCount == 0;
+          }).timeout(const Duration(seconds: 3));
+          cancelled.complete();
+          final result = await second.timeout(const Duration(seconds: 3));
+          expect(jsonOf(result)['message'], contains('tool_call_cancelled'));
+          expect(cancellation.listenerCount, 0);
+          final third = tools.handle(ctx(), 'shell', {
+            'command': 'third',
+          }, toolCallId: 'third');
+          try {
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            expect(runtime.secondStarted.isCompleted, isFalse);
+          } finally {
+            runtime.releaseFirst.complete();
+            await Future.wait([first, third]);
+          }
+          expect(
+            metaOf(await third).files.map((file) => p.basename(file.path)),
+            ['third.txt'],
+          );
+          expect(runtime.requests.map((request) => request.command), [
+            'first',
+            'third',
+          ]);
+        } finally {
+          if (!runtime.releaseFirst.isCompleted) {
+            runtime.releaseFirst.complete();
+          }
+          if (!cancelled.isCompleted) cancelled.complete();
+          await Future.wait([first, second]);
+        }
+      },
+    );
+
+    test('independent workspace shells still run concurrently', () async {
+      final otherWorkspace = await Directory(
+        p.join(tmp.path, 'workspace-2'),
+      ).create();
+      final otherSession = await Directory(
+        p.join(tmp.path, 'session-2'),
+      ).create();
+      final runtime = _PausedShellRuntime();
+      final tools = service(runtime: runtime);
+      final first = tools.handle(ctx(), 'shell', {
+        'command': 'first',
+      }, toolCallId: 'first');
+      await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+      final second = tools.handle(
+        ctx(
+          workspaceOverride: otherWorkspace,
+          sessionOverride: otherSession,
+          conversationId: 'conv-2',
+        ),
+        'shell',
+        {'command': 'second'},
+        toolCallId: 'second',
+      );
+      try {
+        final result = await second.timeout(const Duration(seconds: 3));
+        expect(metaOf(result).files.map((file) => p.basename(file.path)), [
+          'second.txt',
+        ]);
+        expect(runtime.releaseFirst.isCompleted, isFalse);
+      } finally {
+        runtime.releaseFirst.complete();
+        await Future.wait([first, second]);
+      }
+    });
+
+    test(
+      'native cwd in another workspace shares its snapshot exclusion',
+      () async {
+        final otherWorkspace = await Directory(
+          p.join(tmp.path, 'workspace-2'),
+        ).create();
+        final otherSession = await Directory(
+          p.join(tmp.path, 'session-2'),
+        ).create();
+        final runtime = _PausedShellRuntime();
+        final tools = service(runtime: runtime);
+        final first = tools.handle(ctx(), 'shell', {
+          'command': 'first',
+          'cwd': otherWorkspace.path,
+        }, toolCallId: 'first');
+        await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+        final second = tools.handle(
+          ctx(
+            workspaceOverride: otherWorkspace,
+            sessionOverride: otherSession,
+            conversationId: 'conv-2',
+          ),
+          'shell',
+          {'command': 'second'},
+          toolCallId: 'second',
+        );
+        try {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          expect(runtime.secondStarted.isCompleted, isFalse);
+        } finally {
+          runtime.releaseFirst.complete();
+          await Future.wait([first, second]);
+        }
+        expect(
+          metaOf(await second).files.map((file) => p.basename(file.path)),
+          ['second.txt'],
+        );
+        expect(
+          await File(p.join(otherWorkspace.path, 'first.txt')).readAsString(),
+          'done',
+        );
       },
     );
 

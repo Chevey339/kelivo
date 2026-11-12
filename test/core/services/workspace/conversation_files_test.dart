@@ -45,6 +45,28 @@ void main() {
     expect(changed.map(p.basename).toSet(), {'a.txt', 'b.txt'});
   });
 
+  test(
+    'build and dependency trees do not consume the snapshot limit',
+    () async {
+      for (final name in ['build', 'node_modules', '__pycache__', '.gradle']) {
+        final ignored = Directory(p.join(tmp.path, 'project', name));
+        await ignored.create(recursive: true);
+        for (var i = 0; i < 8; i++) {
+          await File(
+            p.join(ignored.path, 'generated$i.txt'),
+          ).writeAsString('x');
+        }
+      }
+      final source = File(p.join(tmp.path, 'project', 'main.dart'));
+      await source.writeAsString('source');
+      final report = File(p.join(tmp.path, 'report.csv'));
+      await report.writeAsString('result');
+
+      final snap = await FileSnapshot.snapshot([tmp], maxEntries: 3);
+      expect(snap.keys.toSet(), {source.path, report.path});
+    },
+  );
+
   test('snapshot respects maxEntries', () async {
     for (var i = 0; i < 10; i++) {
       File(p.join(tmp.path, 'f$i.txt')).writeAsStringSync('$i');
