@@ -614,7 +614,7 @@ void main() {
           await tester.scrollUntilVisible(find.byKey(inheritKey), 250);
           await tester.pumpAndSettle();
         }
-        expect(find.byKey(inheritKey), findsOneWidget);
+        expect(find.byKey(inheritKey), desktop ? findsOneWidget : findsNothing);
         expect(find.textContaining(l10n.mcpSelectionInherited), findsWidgets);
         final beta = find.byKey(
           desktop

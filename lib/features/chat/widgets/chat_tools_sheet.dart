@@ -22,6 +22,7 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -536,28 +537,58 @@ class _McpGroup extends StatelessWidget {
         ),
         if (expanded && conversationScoped)
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                ToolsSheetRow(
-                  key: const ValueKey('chat-tools-mcp-inherit'),
-                  icon: Lucide.RotateCcw,
-                  label: l10n.mcpInheritAssistant,
-                  subtitle: inherited
-                      ? l10n.mcpSelectionInherited
-                      : l10n.mcpSelectionCustom,
-                  selected: inherited,
-                  onTap: () => unawaited(setIds(null)),
-                ),
-                const SizedBox(height: 8),
-                ToolsSheetRow(
-                  key: const ValueKey('chat-tools-mcp-clear'),
-                  icon: Lucide.CircleX,
-                  label: l10n.mcpAssistantSheetClearAll,
-                  selected: !inherited && selected.isEmpty,
-                  onTap: () => unawaited(setIds(const [])),
-                ),
-                const SizedBox(height: 8),
-              ],
+            child: Padding(
+              // Align this secondary line with the section and server labels.
+              padding: const EdgeInsets.only(left: 42, right: 6),
+              child: OverflowBar(
+                alignment: MainAxisAlignment.spaceBetween,
+                spacing: 8,
+                overflowAlignment: OverflowBarAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        inherited
+                            ? l10n.mcpSelectionInherited
+                            : l10n.mcpSelectionCustom,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    children: [
+                      if (!inherited)
+                        IosTextButton(
+                          key: const ValueKey('chat-tools-mcp-inherit'),
+                          label: l10n.mcpInheritAssistant,
+                          fontSize: 12,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          onPressed: () => unawaited(setIds(null)),
+                        ),
+                      IosTextButton(
+                        key: const ValueKey('chat-tools-mcp-clear'),
+                        label: l10n.mcpAssistantSheetClearAll,
+                        fontSize: 12,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        onPressed: !inherited && selected.isEmpty
+                            ? null
+                            : () => unawaited(setIds(const [])),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         if (expanded)
