@@ -14,6 +14,7 @@ import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
+import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
@@ -62,24 +63,103 @@ class _DelayedImageResolver extends FileLinkResolver {
   }
 }
 
+enum _ImageSource { workspaceMarkdown, networkMarkdown, assistantPart }
+
+class _DelayedImageClient extends Fake implements HttpClient {
+  _DelayedImageClient(this.root);
+
+  final Directory root;
+  final ready = {
+    'above.png': Completer<void>(),
+    'below.png': Completer<void>(),
+  };
+  final requested = <String>{};
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) async {
+    final name = url.pathSegments.last;
+    requested.add(name);
+    return _ImageRequest(
+      ready[name]!.future,
+      File('${root.path}/$name').readAsBytesSync(),
+    );
+  }
+}
+
+class _ImageRequest extends Fake implements HttpClientRequest {
+  _ImageRequest(this.ready, this.bytes);
+
+  final Future<void> ready;
+  final List<int> bytes;
+
+  @override
+  Future<HttpClientResponse> close() async {
+    await ready;
+    return _ImageResponse(bytes);
+  }
+}
+
+class _ImageResponse extends Fake implements HttpClientResponse {
+  _ImageResponse(this.bytes);
+
+  final List<int> bytes;
+
+  @override
+  int get statusCode => HttpStatus.ok;
+  @override
+  int get contentLength => bytes.length;
+  @override
+  HttpClientResponseCompressionState get compressionState =>
+      HttpClientResponseCompressionState.notCompressed;
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int>)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) => Stream.value(bytes).listen(
+    onData,
+    onError: onError,
+    onDone: onDone,
+    cancelOnError: cancelOnError,
+  );
+}
+
 void main() {
-  for (final (sameMessage, simultaneous, inTable) in const [
-    (false, false, false),
-    (false, true, false),
-    (true, false, false),
-    (true, true, false),
-    (false, true, true),
+  for (final (imageSource, sameMessage, simultaneous, inTable, wheelDelta) in [
+    for (final imageSource in _ImageSource.values)
+      for (final (sameMessage, simultaneous, inTable) in const [
+        (false, false, false),
+        (false, true, false),
+        (true, false, false),
+        (true, true, false),
+        (false, true, true),
+      ])
+        if (!inTable || imageSource != _ImageSource.assistantPart)
+          for (final wheelDelta in [
+            -120.0,
+            if (simultaneous && !inTable) 120.0,
+          ])
+            (imageSource, sameMessage, simultaneous, inTable, wheelDelta),
   ]) {
-    testWidgets('wheel reading anchor survives images loading '
-        '${sameMessage ? 'within a long markdown message' : 'in preceding and following messages'} '
+    final name =
+        '${imageSource.name}: wheel reading anchor survives images loading '
+        '${sameMessage ? 'within one message' : 'in preceding and following messages'} '
         '${simultaneous ? 'together with wheel input' : 'separately'}'
-        '${inTable ? ' inside a horizontal table' : ''}', (tester) async {
+        '${inTable ? ' inside a horizontal table' : ''}, wheel=$wheelDelta';
+    testWidgets(name, (tester) async {
+      PaintingBinding.instance.imageCache
+        ..clear()
+        ..clearLiveImages();
+      timelineImageAspects.clear();
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       tester.view.physicalSize = Size(inTable ? 900 : 1400, 1600);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
       for (final name in [
+        'app.desktop_startup',
         'xyz.luan/audioplayers.global',
         'xyz.luan/audioplayers.global/events',
         'xyz.luan/audioplayers',
@@ -124,6 +204,16 @@ void main() {
         workspaces: workspaces,
         root: root,
       );
+      final client = _DelayedImageClient(root);
+      debugNetworkImageHttpClientProvider = () => client;
+      addTearDown(() => debugNetworkImageHttpClientProvider = null);
+      final ready = imageSource == _ImageSource.workspaceMarkdown
+          ? resolver.ready
+          : client.ready;
+      String source(String filename) =>
+          imageSource == _ImageSource.workspaceMarkdown
+          ? 'kelivo://workspace/$filename'
+          : 'https://image.invalid/$filename';
       final controller = ChatAutoFollowScrollController();
       addTearDown(controller.dispose);
       final listController = ListController();
@@ -136,12 +226,12 @@ void main() {
       final above = inTable
           ? '| Screenshot | A | B | C | D |\n'
                 '| --- | --- | --- | --- | --- |\n'
-                '| ![above](kelivo://workspace/above.png) | a | b | c | d |'
-          : 'Image above the reader.\n\n![above](kelivo://workspace/above.png)';
+                '| ![above](${source('above.png')}) | a | b | c | d |'
+          : 'Image above the reader.\n\n![above](${source('above.png')})';
       final reading =
           '${paragraphs('Before reading', 14)}\n\n$_anchorText\n\nAfter reading.';
       final below =
-          'Image below the reader.\n\n![below](kelivo://workspace/below.png)';
+          'Image below the reader.\n\n![below](${source('below.png')})';
       final messages = <ChatMessage>[
         ChatMessage(
           id: 'prefix',
@@ -155,9 +245,16 @@ void main() {
             conversationId: 'image-anchor',
             role: 'assistant',
             parts: [
-              TextPart(
-                '$above\n\n$reading\n\n$below\n\n${paragraphs('Tail', 30)}',
-              ),
+              if (imageSource == _ImageSource.assistantPart) ...[
+                const TextPart('Image above the reader.'),
+                ImagePart(uri: source('above.png'), assetId: 'above'),
+                TextPart(reading),
+                ImagePart(uri: source('below.png'), assetId: 'below'),
+                TextPart(paragraphs('Tail', 30)),
+              ] else
+                TextPart(
+                  '$above\n\n$reading\n\n$below\n\n${paragraphs('Tail', 30)}',
+                ),
             ],
           )
         else ...[
@@ -170,7 +267,17 @@ void main() {
               id: entry.key,
               conversationId: 'image-anchor',
               role: 'assistant',
-              parts: [TextPart(entry.value)],
+              parts:
+                  imageSource == _ImageSource.assistantPart &&
+                      entry.key != 'reading'
+                  ? [
+                      TextPart('Image ${entry.key} the reader.'),
+                      ImagePart(
+                        uri: source('${entry.key}.png'),
+                        assetId: entry.key,
+                      ),
+                    ]
+                  : [TextPart(entry.value)],
             ),
           ChatMessage(
             id: 'tail',
@@ -237,7 +344,12 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
       }
       expect(markdownGlyphCenter(tester, _anchorText).dy, closeTo(300, .5));
-      expect(resolver.requested, containsAll(['above.png', 'below.png']));
+      expect(
+        imageSource == _ImageSource.workspaceMarkdown
+            ? resolver.requested
+            : client.requested,
+        containsAll(['above.png', 'below.png']),
+      );
       if (inTable) {
         expect(
           find.byKey(
@@ -248,12 +360,37 @@ void main() {
         );
       }
 
+      Finder imageFinder(String filename) => find.byWidgetPredicate((widget) {
+        if (widget is! Image) return false;
+        final provider = widget.image;
+        final source = provider is ResizeImage
+            ? provider.imageProvider
+            : provider;
+        return (source is FileImage &&
+                source.file.path.endsWith('/$filename')) ||
+            (source is NetworkImage && source.url.endsWith('/$filename'));
+      }, skipOffstage: false);
+      bool hasDecoded(String filename) {
+        final finder = imageFinder(filename);
+        return finder.evaluate().isNotEmpty &&
+            tester
+                    .widget<RawImage>(
+                      find.descendant(
+                        of: finder,
+                        matching: find.byType(RawImage, skipOffstage: false),
+                        skipOffstage: false,
+                      ),
+                    )
+                    .image !=
+                null;
+      }
+
       Future<void> finishImages(
         List<String> filenames,
         double expectedY,
       ) async {
         for (final filename in filenames) {
-          resolver.ready[filename]!.complete();
+          ready[filename]!.complete();
         }
         var decoded = false;
         for (var i = 0; i < 30; i++) {
@@ -267,31 +404,6 @@ void main() {
             reason:
                 'Loading $filenames must preserve the visible reading glyph on every frame.',
           );
-          bool hasDecoded(String filename) {
-            final imageFinder = find.byWidgetPredicate((widget) {
-              if (widget is! Image) return false;
-              final provider = widget.image;
-              final source = provider is ResizeImage
-                  ? provider.imageProvider
-                  : provider;
-              return source is FileImage &&
-                  source.file.path.endsWith('/$filename');
-            }, skipOffstage: false);
-            return imageFinder.evaluate().isNotEmpty &&
-                tester
-                        .widget<RawImage>(
-                          find.descendant(
-                            of: imageFinder,
-                            matching: find.byType(
-                              RawImage,
-                              skipOffstage: false,
-                            ),
-                            skipOffstage: false,
-                          ),
-                        )
-                        .image !=
-                    null;
-          }
 
           if (filenames.every(hasDecoded)) {
             decoded = true;
@@ -321,9 +433,8 @@ void main() {
         );
       }
 
-      const wheelDelta = -120.0;
       await tester.sendEventToBinding(
-        const PointerScrollEvent(
+        PointerScrollEvent(
           position: Offset(400, 300),
           scrollDelta: Offset(0, wheelDelta),
         ),
@@ -341,8 +452,32 @@ void main() {
         'above.png',
         if (simultaneous) 'below.png',
       ], 300 - wheelDelta);
+      if (!sameMessage && simultaneous && !inTable && wheelDelta < 0) {
+        // Re-enter a recycled row with its decoded pixels evicted. Its
+        // measured aspect must reserve the same height throughout reloading.
+        final returnOffset = controller.offset;
+        controller.jumpTo(controller.position.maxScrollExtent);
+        for (var i = 0; i < 5; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        expect(imageFinder('above.png'), findsNothing);
+        PaintingBinding.instance.imageCache
+          ..clear()
+          ..clearLiveImages();
+        ready['above.png'] = Completer<void>();
+        controller.jumpTo(returnOffset);
+        for (var i = 0; i < 5; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(
+            markdownGlyphCenter(tester, _anchorText).dy,
+            closeTo(300 - wheelDelta, .5),
+          );
+        }
+        await finishImages(['above.png'], 300 - wheelDelta);
+      }
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+      debugNetworkImageHttpClientProvider = null;
       debugDefaultTargetPlatformOverride = null;
     });
   }

@@ -97,6 +97,7 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
   final ChatAutoFollowScrollController controller;
 
   _IndexedScrollActivity beginIndexedAnimation(VoidCallback onCanceled) {
+    clearScrollLayoutAnchor();
     final indexedActivity = _IndexedScrollActivity(this, onCanceled);
     beginActivity(indexedActivity);
     return indexedActivity;
@@ -113,6 +114,22 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
 
   void finishIndexedAnimation(_IndexedScrollActivity indexedActivity) {
     if (identical(activity, indexedActivity)) indexedActivity.finish();
+  }
+
+  @override
+  void jumpTo(double value) {
+    clearScrollLayoutAnchor();
+    super.jumpTo(value);
+  }
+
+  @override
+  Future<void> animateTo(
+    double to, {
+    required Duration duration,
+    required Curve curve,
+  }) {
+    clearScrollLayoutAnchor();
+    return super.animateTo(to, duration: duration, curve: curve);
   }
 
   @override

@@ -31,6 +31,7 @@ import 'dart:io';
 import 'package:open_filex/open_filex.dart';
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
+import 'package:crypto/crypto.dart' show sha256;
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../browser/browser_navigation.dart';
@@ -67,6 +68,7 @@ import 'quote_source_anchor.dart';
 import 'quote_interaction_scope.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/scroll_layout_anchor.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -354,9 +356,41 @@ class _AssistantInlineImage extends StatefulWidget {
 }
 
 class _AssistantInlineImageState extends State<_AssistantInlineImage> {
+  late ImageProvider? _provider = _assistantInlineImageProvider(widget.uri);
+  late String _sourceId = sha256.convert(utf8.encode(widget.uri)).toString();
+  PageStorageBucket? _storage;
+  double? _aspect;
   ImageStream? _stream;
   ImageStreamListener? _listener;
-  String? _listenedIdentity;
+  ImageProvider? _listenedProvider;
+
+  Object get _aspectId => ('assistant-inline-image-aspect', _sourceId);
+
+  void _syncAspect({bool sourceChanged = false}) {
+    final storage = PageStorage.maybeOf(context);
+    if (!sourceChanged && identical(storage, _storage)) return;
+    _stopListening();
+    _listenedProvider = null;
+    _storage = storage;
+    _aspect = storage?.readState(context, identifier: _aspectId) as double?;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAspect();
+  }
+
+  @override
+  void didUpdateWidget(_AssistantInlineImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final changed = oldWidget.uri != widget.uri;
+    if (changed) {
+      _provider = _assistantInlineImageProvider(widget.uri);
+      _sourceId = sha256.convert(utf8.encode(widget.uri)).toString();
+    }
+    _syncAspect(sourceChanged: changed);
+  }
 
   @override
   void dispose() {
@@ -370,31 +404,35 @@ class _AssistantInlineImageState extends State<_AssistantInlineImage> {
     }
     _stream = null;
     _listener = null;
-    _listenedIdentity = null;
   }
 
   void _listenForAspect(ImageProvider provider) {
-    final identity = '${widget.imageKey}:${widget.uri.length}';
-    if (_listenedIdentity == identity) return;
+    if (_listenedProvider == provider) return;
     _stopListening();
-    _listenedIdentity = identity;
-    final stream = provider.resolve(ImageConfiguration.empty);
-    late final ImageStreamListener listener;
-    listener = ImageStreamListener((info, _) {
-      final width = info.image.width;
-      final height = info.image.height;
-      if (width > 0 && height > 0) {
-        widget.onAspectResolved?.call(widget.imageKey, width / height);
+    _listenedProvider = provider;
+    _stream = provider.resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener((info, synchronous) {
+      final aspect = info.image.width / info.image.height;
+      info.dispose();
+      _stopListening();
+      if (!mounted || !aspect.isFinite || aspect <= 0) return;
+      _storage?.writeState(context, aspect, identifier: _aspectId);
+      if (_aspect != aspect) {
+        if (synchronous) {
+          _aspect = aspect;
+        } else {
+          preserveScrollLayoutAnchor(context);
+          setState(() => _aspect = aspect);
+        }
       }
-    });
-    _stream = stream;
-    _listener = listener;
-    stream.addListener(listener);
+      widget.onAspectResolved?.call(widget.imageKey, aspect);
+    }, onError: (Object error, StackTrace? stack) => _stopListening());
+    _stream!.addListener(_listener!);
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = _assistantInlineImageProvider(widget.uri);
+    final provider = _provider ??= _assistantInlineImageProvider(widget.uri);
     return GestureDetector(
       key: ValueKey('assistant-inline-image:${widget.imageKey}'),
       onTap: widget.group.isEmpty
@@ -414,23 +452,27 @@ class _AssistantInlineImageState extends State<_AssistantInlineImage> {
           final cacheWidth = displayWidth.isFinite
               ? math.max(1, (displayWidth * dpr).ceil())
               : null;
+          final resized = provider == null
+              ? null
+              : ResizeImage.resizeIfNeeded(cacheWidth, null, provider);
+          // Share Image's decoded stream; measuring must neither decode a
+          // second full-size copy nor keep animated images playing offscreen.
+          if (resized != null) _listenForAspect(resized);
+          final height = displayWidth.isFinite && _aspect != null
+              ? displayWidth / _aspect!
+              : 36.0;
           final image = provider == null
-              ? const Icon(Icons.broken_image)
+              ? const Icon(Lucide.ImageOff)
               : Image(
-                  image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
+                  image: resized!,
                   width: displayWidth.isFinite ? displayWidth : null,
+                  height: height,
                   fit: BoxFit.contain,
-                  frameBuilder: (context, child, frame, _) {
-                    if (frame != null) {
-                      _listenForAspect(provider);
-                    }
-                    return child;
-                  },
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                  errorBuilder: (_, __, ___) => const Icon(Lucide.ImageOff),
                 );
           return ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: image,
+            child: SizedBox(height: height, child: image),
           );
         },
       ),

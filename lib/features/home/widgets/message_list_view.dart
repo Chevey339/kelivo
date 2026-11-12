@@ -471,7 +471,10 @@ class _MessageListViewState extends State<MessageListView> {
     final previous = timelineImageAspects[imageKey];
     if (previous != null && (previous - aspectRatio).abs() < 0.001) return;
     timelineImageAspects[imageKey] = aspectRatio;
-    _invalidateToolExtentForMessage(messageId);
+    // The mounted image's relayout updates the list's measured extent. Only
+    // discard our estimate here: preserving distance from the end would fight
+    // the image's reading anchor when other images load below it in this frame.
+    _extentEstimateCache.remove(messageId);
   }
 
   void _invalidateToolExtentForMessage(String messageId) {
