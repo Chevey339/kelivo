@@ -4401,7 +4401,6 @@
   "contextSummaryTitle": "7e0c3b6064f8579a9b4a5a4e218dfc84e212771fc4583e9ea9f4382021054abe",
   "contextKeepInvalid": "65a3376643ab1397453b1b438f0a1b6b59f7798b5cc23d150f19a396a696749a",
   "compressTaskAbandon": "b6715c9bec12765b07025e88e3bc82340fe56304c2f33fa303a0c05ec17286dd",
-  "browserAgentTimedOut": "8996fb78109dee77a658b46899af9d60ecde9fe29a4598d2187a19c40c970813",
   "compressCancelledSnack": "0ae52626ba01ed3cd014963c09dfabbc4ad392d66be82ebe15508a6e96ea7772",
   "contextImpactClearTitle": "8cecf853d050eb179a95a560f808ec6ff246e5e70edae9c0cb404905661bef95",
   "compressTaskWaitingApproval": "e6585c8164051d161d47835583fef732851c18198eaa858afb7d091d9969e33d",
@@ -4549,7 +4548,7 @@
   "contextTaskQueued": "b99152e92ac29387d8cae6c71f00f230cd28d552123c71f475973db660a7c30d",
   "contextNewConversation": "279dd4b730b72a094dcd41996a2a3e382bc928e0a5b9555d6c64a95edb71efab",
   "contextUnknownLimit": "953e83fa682fee80ee5f2dea5b1a5d3b0d7dd8a9484bd108c9a0138d37914f5b",
-  "browserErrActionTimeout": "9b8c83904154a2584b367b6b2f2d6a158b0a0221e0a78a156fb87bc7c9bf1ca0",
+  "browserErrActionTimeout": "a321f5a1fe4d54b26f329280b83d473660c8e26c4c2ab0f44ee11186aa093b6f",
   "toolPermissionRequestApprovalDesc": "74324122417cd1f3d1a675f8eefc8ac7b7edfdd1c4fad519becd7953eeea8972",
   "contextLimitedInputHint": "ddece1e606fb691abf66db4cfc9d8b29c85b44005df2f4bbbcf09eaae388b437",
   "contextTaskCancelled": "875f7758108aeca57d2b32fa31a450bfd9709870bc1227f4b35ca6ae2259d296",
@@ -4914,5 +4913,9 @@
   "compressionOutputBudgetHint": "7aa9733de26318ab9f6f10c53a6aaa9365c110765be9362f795dddcce5be76ea",
   "responseOutputLimitReached": "f6905559f5d4cb33870db60ab83ff215f6ac204873d0b3d019f77d708ff25be8",
   "responseContextLimitReached": "30fa379a05d7746496a1017692d9879de23ff3c5d24da2c50478864b05cd8d0a",
-  "responseRetryWithoutImages": "0c9dfb5bb67209c129b54623304623c7a016f0505e82ac07506bd40f79a69c7f"
+  "responseRetryWithoutImages": "0c9dfb5bb67209c129b54623304623c7a016f0505e82ac07506bd40f79a69c7f",
+  "browserOperationTimeout": "6069aefbc1be05562098bd094a54c206d56dea82487eb33519ed18db6872ed5e",
+  "browserOperationTimeoutDescription": "71aad59cf3d2c8b8196738cc6c63a800901029a7b33cfbf4c3e64bc0a8ddf816",
+  "browserOperationTimeoutSeconds": "da4e313cd6d888ef6585038400643d875958f99872baf3f921f63ed110cc8b1c",
+  "browserErrObservationRequired": "4c8d03c1fe3e0ccc276302ac337c2789e76ac301852613fee76c5a293480cc80"
 }

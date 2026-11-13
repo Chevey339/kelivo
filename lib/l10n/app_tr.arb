@@ -4401,7 +4401,6 @@
   "contextSummaryTitle": "Bağlam özeti",
   "contextKeepInvalid": "Pozitif bir kullanıcı mesajı sayısı girin.",
   "compressTaskAbandon": "Vazgeç",
-  "browserAgentTimedOut": "İşlem zaman aşımına uğradı; AI duraklatıldı",
   "compressCancelledSnack": "İptal edildi. Bağlam değişmedi.",
   "contextImpactClearTitle": "Önceki temizleme geri alınsın mı?",
   "compressTaskWaitingApproval": "Bir aracı onaylamanız bekleniyor",
@@ -4549,7 +4548,7 @@
   "contextTaskQueued": "Sıraya alındı — sıkıştırma bekleniyor",
   "contextNewConversation": "Özetle yeni sohbet oluştur",
   "contextUnknownLimit": "limit bilinmiyor",
-  "browserErrActionTimeout": "İşlem zaman aşımına uğradı; sonuç bilinmiyor. AI'nın devam etmesine izin vermeden önce sayfayı kontrol edin.",
+  "browserErrActionTimeout": "İşlem zaman aşımına uğradı; sonuç bilinmiyor. Asistan devam etmeden önce sayfayı inceleyebilir.",
   "toolPermissionRequestApprovalDesc": "Kelivo, çalışma alanı dışındaki dosyalara erişmeden, masaüstü komutlarını çalıştırmadan veya onay gerektiren diğer araçları kullanmadan önce soracaktır.",
   "contextLimitedInputHint": "Yalnızca seçilen karakter aralığı okunur. Değiştirilen geçmişin geri kalanı özete dahil edilmez; orijinal mesajlar görüntülenebilir kalır.",
   "contextTaskCancelled": "Sıkıştırma iptal edildi",
@@ -4914,5 +4913,9 @@
   "compressionOutputBudgetHint": "Düşünme ve özetin kendisini içerir. Özet uzunluğunu kullanmak için boş bırakın. Düşünme açıksa, özeti uzatmadan bu sınırı yükseltebilirsiniz. Modelin kendi çıktı sınırı yine geçerlidir.",
   "responseOutputLimitReached": "Yanıt kesildi: çıktı sınırı akıl yürütmeyi de kapsar. Yeniden denemeden önce çıktı sınırını artırın veya akıl yürütmeyi azaltın.",
   "responseContextLimitReached": "Yanıt kesildi: bu istek {inputTokens} giriş token'ı kullandı ve {contextWindow} token'lık bağlam sınırına yaklaştı. Yeniden denemeden önce bağlamı kısaltın.",
-  "responseRetryWithoutImages": "Görseller olmadan yeniden dene (orijinalleri koru)"
+  "responseRetryWithoutImages": "Görseller olmadan yeniden dene (orijinalleri koru)",
+  "browserOperationTimeout": "İşlem zaman aşımı",
+  "browserOperationTimeoutDescription": "Bir tarayıcı komutu için en uzun bekleme süresi. Zaman aşımından sonra asistan sayfa durumunu kontrol edebilir.",
+  "browserOperationTimeoutSeconds": "{seconds} saniye",
+  "browserErrObservationRequired": "Devam etmeden önce sayfayı inceleyin; önceki işlem doğrulanmadı."
 }

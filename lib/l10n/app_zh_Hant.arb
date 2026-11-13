@@ -4401,7 +4401,6 @@
   "contextSummaryTitle": "壓縮摘要",
   "contextKeepInvalid": "請輸入正整數的使用者訊息數量。",
   "compressTaskAbandon": "放棄",
-  "browserAgentTimedOut": "操作逾時，AI 已暫停",
   "compressCancelledSnack": "已取消，上下文沒有改動。",
   "contextImpactClearTitle": "要撤銷之前的清空嗎？",
   "compressTaskWaitingApproval": "還在等待你批准工具調用",
@@ -4549,7 +4548,7 @@
   "contextTaskQueued": "已排隊，等待壓縮完成",
   "contextNewConversation": "使用摘要建立新聊天",
   "contextUnknownLimit": "上限未知",
-  "browserErrActionTimeout": "操作逾時，結果未確認，請檢查頁面後允許繼續",
+  "browserErrActionTimeout": "操作逾時，結果未確認。AI 可先檢查頁面再繼續。",
   "toolPermissionRequestApprovalDesc": "工作區外檔案存取、桌面命令和其他需要授權的工具將在執行前詢問。",
   "contextLimitedInputHint": "僅讀取所選字元範圍；被替代歷史中的其餘內容不會進入摘要，原始訊息仍可檢視。",
   "contextTaskCancelled": "壓縮已取消",
@@ -4914,5 +4913,9 @@
   "compressionOutputBudgetHint": "包含思考過程和摘要正文。留空則跟摘要目標長度相同。如果開了思考，可以把這個上限調高，摘要目標長度不會跟著變。實際能輸出多少，仍受模型本身上限限制。",
   "responseOutputLimitReached": "回覆已截斷：輸出額度包含推理內容。請提高輸出上限或降低推理強度後重試。",
   "responseContextLimitReached": "回覆已截斷：本次請求輸入為 {inputTokens} token，接近 {contextWindow} token 的上下文上限。請縮短上下文後重試。",
-  "responseRetryWithoutImages": "不傳送圖片重試（保留原圖）"
+  "responseRetryWithoutImages": "不傳送圖片重試（保留原圖）",
+  "browserOperationTimeout": "操作逾時",
+  "browserOperationTimeoutDescription": "單次瀏覽器指令的最長等待時間。逾時後，助手可以檢查頁面狀態。",
+  "browserOperationTimeoutSeconds": "{seconds} 秒",
+  "browserErrObservationRequired": "請先檢查頁面，確認上一操作的結果。"
 }

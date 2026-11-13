@@ -15096,10 +15096,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get compressTaskAbandon => 'Vazgeç';
 
   @override
-  String get browserAgentTimedOut =>
-      'İşlem zaman aşımına uğradı; AI duraklatıldı';
-
-  @override
   String get compressCancelledSnack => 'İptal edildi. Bağlam değişmedi.';
 
   @override
@@ -15639,7 +15635,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get browserErrActionTimeout =>
-      'İşlem zaman aşımına uğradı; sonuç bilinmiyor. AI\'nın devam etmesine izin vermeden önce sayfayı kontrol edin.';
+      'İşlem zaman aşımına uğradı; sonuç bilinmiyor. Asistan devam etmeden önce sayfayı inceleyebilir.';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -16939,4 +16935,20 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get responseRetryWithoutImages =>
       'Görseller olmadan yeniden dene (orijinalleri koru)';
+
+  @override
+  String get browserOperationTimeout => 'İşlem zaman aşımı';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      'Bir tarayıcı komutu için en uzun bekleme süresi. Zaman aşımından sonra asistan sayfa durumunu kontrol edebilir.';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds saniye';
+  }
+
+  @override
+  String get browserErrObservationRequired =>
+      'Devam etmeden önce sayfayı inceleyin; önceki işlem doğrulanmadı.';
 }

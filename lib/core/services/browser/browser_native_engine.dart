@@ -1755,10 +1755,14 @@ class NativeBrowserEngine implements BrowserEngine {
   @override
   Future<void> stop() async {
     if (!_disposed) {
+      final generation = _navigationGeneration;
       _historyDocument = null;
       _historyCommandEpoch++;
       _finishHistoryTraversal();
       await _controller?.stopLoading();
+      // Timeout recovery may have moved on before this acknowledgement. Never
+      // settle a replacement navigation with an older stop's late result.
+      if (_disposed || generation != _navigationGeneration) return;
       final stopped = StateError('browser_navigation_stopped');
       if (!(_commit?.isCompleted ?? true)) _commit!.completeError(stopped);
       if (!(_navigation?.isCompleted ?? true)) {

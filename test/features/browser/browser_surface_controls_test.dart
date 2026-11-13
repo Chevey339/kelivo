@@ -89,6 +89,48 @@ void main() {
     expect((track.decoration as BoxDecoration).color, colors.primary);
   });
 
+  for (final size in [const Size(390, 844), const Size(900, 700)]) {
+    browserTest('operation timeout picker saves and restores at $size', (
+      tester,
+    ) async {
+      final errors = <Object>[];
+      await mount(
+        tester,
+        BrowserSettingsPanel(
+          service: service,
+          onError: errors.add,
+          onDataCleared: () {},
+        ),
+        size: size,
+      );
+      await tester.ensureVisible(find.text('Operation timeout'));
+      expect(find.text('30 seconds'), findsOneWidget);
+      await tester.tap(find.text('Operation timeout'));
+      await tester.pumpAndSettle();
+      final options = find.byKey(
+        const ValueKey('browserOperationTimeoutOptions'),
+      );
+      expect(tester.widget<BrowserSurfaceGroup>(options).filled, isFalse);
+      expect(find.byType(BottomSheet), findsNothing);
+      for (final seconds in [30, 60, 90, 120]) {
+        expect(
+          find.descendant(of: options, matching: find.text('$seconds seconds')),
+          findsOneWidget,
+        );
+      }
+      await tester.tap(find.text('90 seconds'));
+      await tester.pumpAndSettle();
+      expect(service.settings.operationTimeoutSeconds, 90);
+      expect(find.text('90 seconds'), findsOneWidget);
+      final restored = BrowserService(store: store);
+      await restored.initialize();
+      expect(restored.settings.operationTimeoutSeconds, 90);
+      restored.dispose();
+      expect(errors, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   browserTest('UA editor saves custom text and restores both presets', (
     tester,
   ) async {
