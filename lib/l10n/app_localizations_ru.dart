@@ -2320,6 +2320,127 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupPageImportFromChatbox => 'Импорт из Chatbox';
 
   @override
+  String get webDavScheduleTitle =>
+      'Резервное копирование на WebDAV по расписанию';
+
+  @override
+  String get webDavScheduleEnabled => 'Автоматическое резервное копирование';
+
+  @override
+  String get webDavScheduleInterval => 'Интервал повторения';
+
+  @override
+  String get webDavScheduleWifiOnly => 'Только Wi-Fi / Ethernet';
+
+  @override
+  String get webDavScheduleWifiOnlyHint =>
+      'Использовать Wi-Fi или Ethernet для загрузки. Фоновые резервные копии на Android также ожидают подключения без лимита трафика.';
+
+  @override
+  String get webDavScheduleAndroidHint =>
+      'Android создаёт резервные копии в фоне. Ограничения батареи и сети могут задержать запуск. Принудительная остановка приложения приостанавливает копирование до следующего открытия.';
+
+  @override
+  String get webDavScheduleForegroundHint =>
+      'Резервные копии создаются, пока приложение открыто. Пропущенные задания выполняются при возвращении в приложение.';
+
+  @override
+  String get webDavScheduleConfigureFirst =>
+      'Перед включением автоматического резервного копирования настройте и сохраните сервер WebDAV.';
+
+  @override
+  String get webDavScheduleLastSuccess => 'Последняя успешная резервная копия';
+
+  @override
+  String get webDavScheduleNextRun => 'Следующая резервная копия (примерно)';
+
+  @override
+  String get webDavScheduleStatus => 'Статус';
+
+  @override
+  String get webDavScheduleRunNow => 'Создать копию сейчас';
+
+  @override
+  String get webDavScheduleRunning => 'Создание резервной копии…';
+
+  @override
+  String get webDavScheduleFinishingBackgroundBackup =>
+      'Завершение фонового резервного копирования…';
+
+  @override
+  String get webDavScheduleReady =>
+      'Ожидание следующего резервного копирования';
+
+  @override
+  String get webDavScheduleFailed =>
+      'Последнее резервное копирование не удалось';
+
+  @override
+  String get webDavScheduleDisabled => 'Отключено';
+
+  @override
+  String get webDavScheduleNotConfigured => 'Сервер WebDAV не настроен';
+
+  @override
+  String webDavScheduleEveryHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Каждые $hours часа',
+      many: 'Каждые $hours часов',
+      few: 'Каждые $hours часа',
+      one: 'Каждый $hours час',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get webDavScheduleEveryDay => 'Каждый день';
+
+  @override
+  String get webDavScheduleNever => 'Никогда';
+
+  @override
+  String get webDavScheduleDue => 'Когда позволят условия';
+
+  @override
+  String get webDavScheduleSaved =>
+      'Расписание резервного копирования сохранено';
+
+  @override
+  String get webDavScheduleSaveFailed =>
+      'Не удалось сохранить расписание резервного копирования';
+
+  @override
+  String get webDavScheduleSucceeded => 'Резервная копия загружена';
+
+  @override
+  String get webDavScheduleUnavailable => 'Фоновое планирование недоступно';
+
+  @override
+  String get webDavScheduleWifiRequired => 'Ожидание Wi-Fi или Ethernet';
+
+  @override
+  String get webDavScheduleNetworkUnavailable => 'Ожидание подключения к сети';
+
+  @override
+  String get webDavScheduleBackupBusy =>
+      'Выполняется другое резервное копирование или восстановление';
+
+  @override
+  String get webDavScheduleRetry => 'Ожидание повторной попытки';
+
+  @override
+  String get webDavScheduleTimedOut => 'Время резервного копирования истекло';
+
+  @override
+  String get webDavSchedulePasswordRequired =>
+      'Для зашифрованной резервной копии требуется подтверждение пароля. Создайте копию на WebDAV вручную или отключите шифрование для резервного копирования по расписанию.';
+
+  @override
+  String get webDavScheduleCancelled => 'Резервное копирование отменено';
+
+  @override
   String get backupReminderSectionTitle =>
       'Напоминание о резервном копировании';
 

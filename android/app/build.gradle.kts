@@ -122,6 +122,7 @@ tasks.whenTaskAdded {
 tasks.findByName("preBuild")?.dependsOn("fetchProot")
 
 dependencies {
+    implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.browser:browser:1.9.0")
     implementation("org.tukaani:xz:1.10")
     // Required for core library desugaring (used by flutter_local_notifications)

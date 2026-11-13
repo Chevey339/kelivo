@@ -1025,6 +1025,47 @@
     "description": "Error message shown when a Cherry Studio backup uses format version {version} that Kelivo cannot import; advises exporting from Cherry Studio v1 or waiting for v2 support."
   },
   "backupPageImportFromChatbox": "Import from Chatbox",
+  "webDavScheduleTitle": "Scheduled WebDAV Backup",
+  "webDavScheduleEnabled": "Automatic backup",
+  "webDavScheduleInterval": "Repeat interval",
+  "webDavScheduleWifiOnly": "Wi-Fi / Ethernet only",
+  "webDavScheduleWifiOnlyHint": "Use Wi-Fi or Ethernet for uploads. Android background backups also wait for an unmetered connection.",
+  "webDavScheduleAndroidHint": "Android runs backups in the background. Battery and network restrictions may delay them. Force-stopping the app pauses backups until it is opened again.",
+  "webDavScheduleForegroundHint": "Backups run while the app is open. Missed backups run when you return.",
+  "webDavScheduleConfigureFirst": "Configure and save your WebDAV server before enabling automatic backup.",
+  "webDavScheduleLastSuccess": "Last successful backup",
+  "webDavScheduleNextRun": "Next backup (approx.)",
+  "webDavScheduleStatus": "Status",
+  "webDavScheduleRunNow": "Run backup now",
+  "webDavScheduleRunning": "Backing up…",
+  "webDavScheduleFinishingBackgroundBackup": "Finishing background backup…",
+  "webDavScheduleReady": "Waiting for next backup",
+  "webDavScheduleFailed": "Last backup failed",
+  "webDavScheduleDisabled": "Disabled",
+  "webDavScheduleNotConfigured": "WebDAV server is not configured",
+  "webDavScheduleEveryHours": "{hours, plural, =1{Every hour} other{Every {hours} hours}}",
+  "@webDavScheduleEveryHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    },
+    "description": "Repeat interval option for scheduled WebDAV backup. The numeric hours placeholder is the number of hours between backups."
+  },
+  "webDavScheduleEveryDay": "Every day",
+  "webDavScheduleNever": "Never",
+  "webDavScheduleDue": "When conditions allow",
+  "webDavScheduleSaved": "Backup schedule saved",
+  "webDavScheduleSaveFailed": "Could not save the backup schedule",
+  "webDavScheduleSucceeded": "Backup uploaded",
+  "webDavScheduleUnavailable": "Background scheduling is unavailable",
+  "webDavScheduleWifiRequired": "Waiting for Wi-Fi or Ethernet",
+  "webDavScheduleNetworkUnavailable": "Waiting for a network connection",
+  "webDavScheduleBackupBusy": "Another backup or restore is in progress",
+  "webDavScheduleRetry": "Waiting to retry",
+  "webDavScheduleTimedOut": "Backup timed out",
+  "webDavSchedulePasswordRequired": "Encrypted backups require password confirmation. Use manual WebDAV backup, or turn off backup encryption to use scheduled backups.",
+  "webDavScheduleCancelled": "Backup cancelled",
   "backupReminderSectionTitle": "Backup Reminder",
   "backupReminderEnableTitle": "Remind me to back up",
   "backupReminderFrequencyTitle": "Frequency",
@@ -21897,5 +21938,101 @@
   "responseRetryWithoutImages": "Retry without images (keep originals)",
   "@responseRetryWithoutImages": {
     "description": "Action below a truncated assistant reply whose final request contained images. Regenerates once with all image inputs omitted for that generation, including tool follow-ups, without deleting attachments or changing saved settings."
+  },
+  "@webDavScheduleTitle": {
+    "description": "Section heading for the scheduled WebDAV backup settings on mobile and desktop."
+  },
+  "@webDavScheduleEnabled": {
+    "description": "Switch label enabling automatic backups to the saved WebDAV server on this device."
+  },
+  "@webDavScheduleInterval": {
+    "description": "Settings row label for choosing how often the scheduled WebDAV backup repeats."
+  },
+  "@webDavScheduleWifiOnly": {
+    "description": "Switch label restricting scheduled WebDAV uploads to Wi-Fi or Ethernet connections."
+  },
+  "@webDavScheduleWifiOnlyHint": {
+    "description": "Network policy explanation below the scheduled backup switch; Android background work also requires an unmetered connection."
+  },
+  "@webDavScheduleAndroidHint": {
+    "description": "Android scheduling hint explaining background execution, possible battery/network delays, and the effect of force-stopping the app."
+  },
+  "@webDavScheduleForegroundHint": {
+    "description": "Scheduling hint on platforms where automatic backups require the app to be open; overdue work is checked when returning."
+  },
+  "@webDavScheduleConfigureFirst": {
+    "description": "Hint requiring the user to save the WebDAV server configuration before enabling scheduled backup."
+  },
+  "@webDavScheduleLastSuccess": {
+    "description": "Label for the most recent successful scheduled WebDAV backup timestamp."
+  },
+  "@webDavScheduleNextRun": {
+    "description": "Label for the next approximate scheduled WebDAV backup time; execution may be delayed by device conditions."
+  },
+  "@webDavScheduleStatus": {
+    "description": "Label for the current scheduled WebDAV backup status."
+  },
+  "@webDavScheduleRunNow": {
+    "description": "Button to immediately run a WebDAV backup using saved server settings, backup scope, and network policy."
+  },
+  "@webDavScheduleRunning": {
+    "description": "Status while a scheduled or immediate WebDAV backup is being prepared or uploaded."
+  },
+  "@webDavScheduleFinishingBackgroundBackup": {
+    "description": "Startup progress text while waiting for the background WebDAV worker to stop safely before opening business data."
+  },
+  "@webDavScheduleReady": {
+    "description": "Status when automatic WebDAV backup is enabled and waiting for its next scheduled run."
+  },
+  "@webDavScheduleFailed": {
+    "description": "Generic status or notification indicating the most recent WebDAV backup failed."
+  },
+  "@webDavScheduleDisabled": {
+    "description": "Status indicating automatic WebDAV backup is switched off."
+  },
+  "@webDavScheduleNotConfigured": {
+    "description": "Status indicating that the required WebDAV server configuration has not been saved."
+  },
+  "@webDavScheduleEveryDay": {
+    "description": "Repeat interval option for a WebDAV backup once every 24 hours."
+  },
+  "@webDavScheduleNever": {
+    "description": "Placeholder for the last successful backup time when no successful scheduled WebDAV backup has been recorded."
+  },
+  "@webDavScheduleDue": {
+    "description": "Next-run text when a WebDAV backup is due but must wait until its execution conditions are met."
+  },
+  "@webDavScheduleSaved": {
+    "description": "Confirmation that the device-local WebDAV backup schedule settings were saved."
+  },
+  "@webDavScheduleSaveFailed": {
+    "description": "Error notification when the device-local WebDAV backup schedule settings could not be saved."
+  },
+  "@webDavScheduleSucceeded": {
+    "description": "Success notification confirming that the WebDAV backup archive was uploaded."
+  },
+  "@webDavScheduleUnavailable": {
+    "description": "Scheduling status indicating that the background scheduling service is unavailable."
+  },
+  "@webDavScheduleWifiRequired": {
+    "description": "Status when a WebDAV backup must wait for Wi-Fi or Ethernet because of its saved network policy."
+  },
+  "@webDavScheduleNetworkUnavailable": {
+    "description": "Status when a WebDAV backup must wait for a network connection."
+  },
+  "@webDavScheduleBackupBusy": {
+    "description": "Status when a scheduled WebDAV backup must wait because another backup or restore is active."
+  },
+  "@webDavScheduleRetry": {
+    "description": "Status while waiting before retrying a failed WebDAV backup."
+  },
+  "@webDavScheduleTimedOut": {
+    "description": "Error indicating that a scheduled or immediate WebDAV backup exceeded its execution deadline."
+  },
+  "@webDavSchedulePasswordRequired": {
+    "description": "Error explaining that encrypted backups require interactive password confirmation; offer manual WebDAV backup or disabling encryption for scheduled backups."
+  },
+  "@webDavScheduleCancelled": {
+    "description": "Status indicating that the scheduled or immediate WebDAV backup was cancelled."
   }
 }

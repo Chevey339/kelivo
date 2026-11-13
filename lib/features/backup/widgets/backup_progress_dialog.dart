@@ -89,7 +89,14 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
       child: _BackupProgressDialogHost<T>(
         title: title,
         handle: handle,
-        task: task,
+        task: (handle) async {
+          // A user-requested backup or restore takes priority over an automatic
+          // copy. Keep the activity claim while its worker shuts down so a new
+          // scheduled run cannot start before the manual task reaches the data.
+          await BackupActivity.cancelAutomaticAndWait();
+          handle.cancelToken.throwIfCancelled();
+          return task(handle);
+        },
         initiallyCancellable: cancellable,
         backgroundLabel: backgroundLabel,
         errorMessage: errorMessage,

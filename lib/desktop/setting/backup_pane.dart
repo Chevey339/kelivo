@@ -31,6 +31,7 @@ import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../features/backup/widgets/backup_scope_tile.dart';
 import '../../features/backup/widgets/backup_encryption_tile.dart';
 import '../../features/backup/widgets/storage_migration_notice_button.dart';
+import '../../features/backup/widgets/webdav_backup_schedule_section.dart';
 import '../../features/backup/pages/local_snapshots_page.dart';
 import '../../core/database/startup_failure_report.dart' show formatBytes;
 import '../widgets/desktop_select_dropdown.dart';
@@ -599,6 +600,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 ),
               ),
 
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
+              const SliverToBoxAdapter(
+                child: WebDavBackupScheduleSection(desktop: true),
+              ),
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
               // S3 settings card with left label right input, realtime save

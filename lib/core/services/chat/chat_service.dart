@@ -2894,7 +2894,25 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (!_initialized) await init();
     await flushAcceptedUiState();
-    final sourcePath = _databaseFile.path;
+    return createBackupSnapshot(
+      sourceFile: _databaseFile,
+      destinationFile: destinationFile,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+      timeout: timeout,
+    );
+  }
+
+  /// Makes the same cancellable, validated snapshot without initializing chat
+  /// caches or running startup maintenance in a headless backup engine.
+  static Future<ChatDatabaseSnapshotInfo> createBackupSnapshot({
+    required File sourceFile,
+    required File destinationFile,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+    Duration timeout = const Duration(minutes: 10),
+  }) async {
+    final sourcePath = sourceFile.path;
     final destinationPath = destinationFile.path;
     try {
       return await runBackupIsolate<ChatDatabaseSnapshotInfo, List<String>>(

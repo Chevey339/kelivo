@@ -158,7 +158,11 @@ void main() {
       expect(fragment, contains('kelivo://workspace/plot.png'));
       expect(fragment, contains('Linux (PRoot)'));
       expect(fragment, contains('/etc/os-release'));
-      expect(fragment.length, lessThan(1200));
+      // Custom-shell support adds this guidance to the prompt. Keep the
+      // original size budget for the remaining directory/tool instructions.
+      const shellSyntaxHint = 'Use the syntax of the selected shell.';
+      expect(fragment, contains(shellSyntaxHint));
+      expect(fragment.length, lessThan(1200 + shellSyntaxHint.length));
     });
   }
 

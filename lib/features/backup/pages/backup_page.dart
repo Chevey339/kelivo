@@ -38,6 +38,7 @@ import '../widgets/backup_reminder_helpers.dart';
 import '../widgets/backup_scope_tile.dart';
 import '../widgets/backup_encryption_tile.dart';
 import '../widgets/storage_migration_notice_button.dart';
+import '../widgets/webdav_backup_schedule_section.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import '../../../core/database/startup_failure_report.dart' show formatBytes;
@@ -806,6 +807,8 @@ class _BackupPageState extends State<BackupPage> {
                     ),
                   ],
                 ),
+
+                const WebDavBackupScheduleSection(),
 
                 // Section 3: S3 备份
                 header(l10n.backupPageS3Backup),

@@ -4258,6 +4258,204 @@ abstract class AppLocalizations {
   /// **'Import from Chatbox'**
   String get backupPageImportFromChatbox;
 
+  /// Section heading for the scheduled WebDAV backup settings on mobile and desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled WebDAV Backup'**
+  String get webDavScheduleTitle;
+
+  /// Switch label enabling automatic backups to the saved WebDAV server on this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic backup'**
+  String get webDavScheduleEnabled;
+
+  /// Settings row label for choosing how often the scheduled WebDAV backup repeats.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat interval'**
+  String get webDavScheduleInterval;
+
+  /// Switch label restricting scheduled WebDAV uploads to Wi-Fi or Ethernet connections.
+  ///
+  /// In en, this message translates to:
+  /// **'Wi-Fi / Ethernet only'**
+  String get webDavScheduleWifiOnly;
+
+  /// Network policy explanation below the scheduled backup switch; Android background work also requires an unmetered connection.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Wi-Fi or Ethernet for uploads. Android background backups also wait for an unmetered connection.'**
+  String get webDavScheduleWifiOnlyHint;
+
+  /// Android scheduling hint explaining background execution, possible battery/network delays, and the effect of force-stopping the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Android runs backups in the background. Battery and network restrictions may delay them. Force-stopping the app pauses backups until it is opened again.'**
+  String get webDavScheduleAndroidHint;
+
+  /// Scheduling hint on platforms where automatic backups require the app to be open; overdue work is checked when returning.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups run while the app is open. Missed backups run when you return.'**
+  String get webDavScheduleForegroundHint;
+
+  /// Hint requiring the user to save the WebDAV server configuration before enabling scheduled backup.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure and save your WebDAV server before enabling automatic backup.'**
+  String get webDavScheduleConfigureFirst;
+
+  /// Label for the most recent successful scheduled WebDAV backup timestamp.
+  ///
+  /// In en, this message translates to:
+  /// **'Last successful backup'**
+  String get webDavScheduleLastSuccess;
+
+  /// Label for the next approximate scheduled WebDAV backup time; execution may be delayed by device conditions.
+  ///
+  /// In en, this message translates to:
+  /// **'Next backup (approx.)'**
+  String get webDavScheduleNextRun;
+
+  /// Label for the current scheduled WebDAV backup status.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get webDavScheduleStatus;
+
+  /// Button to immediately run a WebDAV backup using saved server settings, backup scope, and network policy.
+  ///
+  /// In en, this message translates to:
+  /// **'Run backup now'**
+  String get webDavScheduleRunNow;
+
+  /// Status while a scheduled or immediate WebDAV backup is being prepared or uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Backing up…'**
+  String get webDavScheduleRunning;
+
+  /// Startup progress text while waiting for the background WebDAV worker to stop safely before opening business data.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing background backup…'**
+  String get webDavScheduleFinishingBackgroundBackup;
+
+  /// Status when automatic WebDAV backup is enabled and waiting for its next scheduled run.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for next backup'**
+  String get webDavScheduleReady;
+
+  /// Generic status or notification indicating the most recent WebDAV backup failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last backup failed'**
+  String get webDavScheduleFailed;
+
+  /// Status indicating automatic WebDAV backup is switched off.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get webDavScheduleDisabled;
+
+  /// Status indicating that the required WebDAV server configuration has not been saved.
+  ///
+  /// In en, this message translates to:
+  /// **'WebDAV server is not configured'**
+  String get webDavScheduleNotConfigured;
+
+  /// Repeat interval option for scheduled WebDAV backup. The numeric hours placeholder is the number of hours between backups.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{Every hour} other{Every {hours} hours}}'**
+  String webDavScheduleEveryHours(int hours);
+
+  /// Repeat interval option for a WebDAV backup once every 24 hours.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day'**
+  String get webDavScheduleEveryDay;
+
+  /// Placeholder for the last successful backup time when no successful scheduled WebDAV backup has been recorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get webDavScheduleNever;
+
+  /// Next-run text when a WebDAV backup is due but must wait until its execution conditions are met.
+  ///
+  /// In en, this message translates to:
+  /// **'When conditions allow'**
+  String get webDavScheduleDue;
+
+  /// Confirmation that the device-local WebDAV backup schedule settings were saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup schedule saved'**
+  String get webDavScheduleSaved;
+
+  /// Error notification when the device-local WebDAV backup schedule settings could not be saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the backup schedule'**
+  String get webDavScheduleSaveFailed;
+
+  /// Success notification confirming that the WebDAV backup archive was uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup uploaded'**
+  String get webDavScheduleSucceeded;
+
+  /// Scheduling status indicating that the background scheduling service is unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Background scheduling is unavailable'**
+  String get webDavScheduleUnavailable;
+
+  /// Status when a WebDAV backup must wait for Wi-Fi or Ethernet because of its saved network policy.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for Wi-Fi or Ethernet'**
+  String get webDavScheduleWifiRequired;
+
+  /// Status when a WebDAV backup must wait for a network connection.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a network connection'**
+  String get webDavScheduleNetworkUnavailable;
+
+  /// Status when a scheduled WebDAV backup must wait because another backup or restore is active.
+  ///
+  /// In en, this message translates to:
+  /// **'Another backup or restore is in progress'**
+  String get webDavScheduleBackupBusy;
+
+  /// Status while waiting before retrying a failed WebDAV backup.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to retry'**
+  String get webDavScheduleRetry;
+
+  /// Error indicating that a scheduled or immediate WebDAV backup exceeded its execution deadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup timed out'**
+  String get webDavScheduleTimedOut;
+
+  /// Error explaining that encrypted backups require interactive password confirmation; offer manual WebDAV backup or disabling encryption for scheduled backups.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted backups require password confirmation. Use manual WebDAV backup, or turn off backup encryption to use scheduled backups.'**
+  String get webDavSchedulePasswordRequired;
+
+  /// Status indicating that the scheduled or immediate WebDAV backup was cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup cancelled'**
+  String get webDavScheduleCancelled;
+
   /// Section header for the backup reminder settings.
   ///
   /// In en, this message translates to:

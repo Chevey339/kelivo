@@ -10,7 +10,15 @@ void main() {
         'lib/core/database/business_migration_engine.dart',
         'lib/core/providers/hotkey_provider.dart',
         'lib/core/providers/settings_provider.dart',
+        // Device-local scheduling policy and outcomes must be accessible
+        // before database admission and after its lease is released. This
+        // store does not contain portable settings or server credentials.
+        'lib/core/services/backup/webdav_backup_schedule.dart',
         'lib/core/services/model_catalog/model_catalog_service.dart',
+        // Disposable endpoint-scoped model metadata stays device-local.
+        'lib/core/services/model_spec/ollama_model_service.dart',
+        // OS login-item preferences belong to this installation, not backups.
+        'lib/desktop/desktop_startup_service.dart',
         'lib/desktop/window_size_manager.dart',
         'lib/features/migration/hive_to_sqlite_migration_service.dart',
         'lib/main.dart',

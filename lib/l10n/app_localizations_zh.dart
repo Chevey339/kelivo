@@ -2198,6 +2198,110 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
+  String get webDavScheduleTitle => 'WebDAV 定时备份';
+
+  @override
+  String get webDavScheduleEnabled => '自动备份';
+
+  @override
+  String get webDavScheduleInterval => '备份间隔';
+
+  @override
+  String get webDavScheduleWifiOnly => '仅使用 Wi-Fi / 以太网';
+
+  @override
+  String get webDavScheduleWifiOnlyHint =>
+      '通过 Wi-Fi 或以太网上传。Android 后台备份还会等待非计费网络。';
+
+  @override
+  String get webDavScheduleAndroidHint =>
+      'Android 可在后台执行备份，但省电和网络限制可能导致延迟。强行停止应用后，需要重新打开应用才能继续自动备份。';
+
+  @override
+  String get webDavScheduleForegroundHint => '应用打开时执行自动备份。错过的备份将在返回应用后执行。';
+
+  @override
+  String get webDavScheduleConfigureFirst => '请先配置并保存 WebDAV 服务器，再开启自动备份。';
+
+  @override
+  String get webDavScheduleLastSuccess => '上次备份成功时间';
+
+  @override
+  String get webDavScheduleNextRun => '预计下次备份';
+
+  @override
+  String get webDavScheduleStatus => '状态';
+
+  @override
+  String get webDavScheduleRunNow => '立即执行备份';
+
+  @override
+  String get webDavScheduleRunning => '正在备份…';
+
+  @override
+  String get webDavScheduleFinishingBackgroundBackup => '正在结束后台备份…';
+
+  @override
+  String get webDavScheduleReady => '等待下次备份';
+
+  @override
+  String get webDavScheduleFailed => '上次备份失败';
+
+  @override
+  String get webDavScheduleDisabled => '已关闭';
+
+  @override
+  String get webDavScheduleNotConfigured => '尚未配置 WebDAV 服务器';
+
+  @override
+  String webDavScheduleEveryHours(int hours) {
+    return '每 $hours 小时';
+  }
+
+  @override
+  String get webDavScheduleEveryDay => '每天';
+
+  @override
+  String get webDavScheduleNever => '从未备份';
+
+  @override
+  String get webDavScheduleDue => '条件满足时执行';
+
+  @override
+  String get webDavScheduleSaved => '已保存备份计划';
+
+  @override
+  String get webDavScheduleSaveFailed => '无法保存备份计划';
+
+  @override
+  String get webDavScheduleSucceeded => '备份已上传';
+
+  @override
+  String get webDavScheduleUnavailable => '后台定时备份不可用';
+
+  @override
+  String get webDavScheduleWifiRequired => '等待 Wi-Fi 或以太网连接';
+
+  @override
+  String get webDavScheduleNetworkUnavailable => '等待网络连接';
+
+  @override
+  String get webDavScheduleBackupBusy => '正在执行其他备份或恢复任务';
+
+  @override
+  String get webDavScheduleRetry => '等待重试';
+
+  @override
+  String get webDavScheduleTimedOut => '备份超时';
+
+  @override
+  String get webDavSchedulePasswordRequired =>
+      '加密备份需要确认密码。请手动执行 WebDAV 备份，或关闭备份加密后使用定时备份。';
+
+  @override
+  String get webDavScheduleCancelled => '已取消备份';
+
+  @override
   String get backupReminderSectionTitle => '备份提醒';
 
   @override
@@ -18155,6 +18259,110 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
+  String get webDavScheduleTitle => 'WebDAV 定时备份';
+
+  @override
+  String get webDavScheduleEnabled => '自动备份';
+
+  @override
+  String get webDavScheduleInterval => '备份间隔';
+
+  @override
+  String get webDavScheduleWifiOnly => '仅使用 Wi-Fi / 以太网';
+
+  @override
+  String get webDavScheduleWifiOnlyHint =>
+      '通过 Wi-Fi 或以太网上传。Android 后台备份还会等待非计费网络。';
+
+  @override
+  String get webDavScheduleAndroidHint =>
+      'Android 可在后台执行备份，但省电和网络限制可能导致延迟。强行停止应用后，需要重新打开应用才能继续自动备份。';
+
+  @override
+  String get webDavScheduleForegroundHint => '应用打开时执行自动备份。错过的备份将在返回应用后执行。';
+
+  @override
+  String get webDavScheduleConfigureFirst => '请先配置并保存 WebDAV 服务器，再开启自动备份。';
+
+  @override
+  String get webDavScheduleLastSuccess => '上次备份成功时间';
+
+  @override
+  String get webDavScheduleNextRun => '预计下次备份';
+
+  @override
+  String get webDavScheduleStatus => '状态';
+
+  @override
+  String get webDavScheduleRunNow => '立即执行备份';
+
+  @override
+  String get webDavScheduleRunning => '正在备份…';
+
+  @override
+  String get webDavScheduleFinishingBackgroundBackup => '正在结束后台备份…';
+
+  @override
+  String get webDavScheduleReady => '等待下次备份';
+
+  @override
+  String get webDavScheduleFailed => '上次备份失败';
+
+  @override
+  String get webDavScheduleDisabled => '已关闭';
+
+  @override
+  String get webDavScheduleNotConfigured => '尚未配置 WebDAV 服务器';
+
+  @override
+  String webDavScheduleEveryHours(int hours) {
+    return '每 $hours 小时';
+  }
+
+  @override
+  String get webDavScheduleEveryDay => '每天';
+
+  @override
+  String get webDavScheduleNever => '从未备份';
+
+  @override
+  String get webDavScheduleDue => '条件满足时执行';
+
+  @override
+  String get webDavScheduleSaved => '已保存备份计划';
+
+  @override
+  String get webDavScheduleSaveFailed => '无法保存备份计划';
+
+  @override
+  String get webDavScheduleSucceeded => '备份已上传';
+
+  @override
+  String get webDavScheduleUnavailable => '后台定时备份不可用';
+
+  @override
+  String get webDavScheduleWifiRequired => '等待 Wi-Fi 或以太网连接';
+
+  @override
+  String get webDavScheduleNetworkUnavailable => '等待网络连接';
+
+  @override
+  String get webDavScheduleBackupBusy => '正在执行其他备份或恢复任务';
+
+  @override
+  String get webDavScheduleRetry => '等待重试';
+
+  @override
+  String get webDavScheduleTimedOut => '备份超时';
+
+  @override
+  String get webDavSchedulePasswordRequired =>
+      '加密备份需要确认密码。请手动执行 WebDAV 备份，或关闭备份加密后使用定时备份。';
+
+  @override
+  String get webDavScheduleCancelled => '已取消备份';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -34115,6 +34323,110 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+
+  @override
+  String get webDavScheduleTitle => 'WebDAV 定時備份';
+
+  @override
+  String get webDavScheduleEnabled => '自動備份';
+
+  @override
+  String get webDavScheduleInterval => '備份間隔';
+
+  @override
+  String get webDavScheduleWifiOnly => '僅使用 Wi-Fi / 乙太網路';
+
+  @override
+  String get webDavScheduleWifiOnlyHint =>
+      '透過 Wi-Fi 或乙太網路上傳。Android 背景備份還會等待非計費網路。';
+
+  @override
+  String get webDavScheduleAndroidHint =>
+      'Android 可在背景執行備份，但省電和網路限制可能導致延遲。強制停止應用程式後，需要重新開啟應用程式才能繼續自動備份。';
+
+  @override
+  String get webDavScheduleForegroundHint => '應用程式開啟時執行自動備份。錯過的備份將在返回應用程式後執行。';
+
+  @override
+  String get webDavScheduleConfigureFirst => '請先設定並儲存 WebDAV 伺服器，再開啟自動備份。';
+
+  @override
+  String get webDavScheduleLastSuccess => '上次備份成功時間';
+
+  @override
+  String get webDavScheduleNextRun => '預計下次備份';
+
+  @override
+  String get webDavScheduleStatus => '狀態';
+
+  @override
+  String get webDavScheduleRunNow => '立即執行備份';
+
+  @override
+  String get webDavScheduleRunning => '正在備份…';
+
+  @override
+  String get webDavScheduleFinishingBackgroundBackup => '正在結束背景備份…';
+
+  @override
+  String get webDavScheduleReady => '等待下次備份';
+
+  @override
+  String get webDavScheduleFailed => '上次備份失敗';
+
+  @override
+  String get webDavScheduleDisabled => '已關閉';
+
+  @override
+  String get webDavScheduleNotConfigured => '尚未設定 WebDAV 伺服器';
+
+  @override
+  String webDavScheduleEveryHours(int hours) {
+    return '每 $hours 小時';
+  }
+
+  @override
+  String get webDavScheduleEveryDay => '每天';
+
+  @override
+  String get webDavScheduleNever => '從未備份';
+
+  @override
+  String get webDavScheduleDue => '條件滿足時執行';
+
+  @override
+  String get webDavScheduleSaved => '已儲存備份排程';
+
+  @override
+  String get webDavScheduleSaveFailed => '無法儲存備份排程';
+
+  @override
+  String get webDavScheduleSucceeded => '備份已上傳';
+
+  @override
+  String get webDavScheduleUnavailable => '背景定時備份無法使用';
+
+  @override
+  String get webDavScheduleWifiRequired => '等待 Wi-Fi 或乙太網路連線';
+
+  @override
+  String get webDavScheduleNetworkUnavailable => '等待網路連線';
+
+  @override
+  String get webDavScheduleBackupBusy => '正在執行其他備份或還原工作';
+
+  @override
+  String get webDavScheduleRetry => '等待重試';
+
+  @override
+  String get webDavScheduleTimedOut => '備份逾時';
+
+  @override
+  String get webDavSchedulePasswordRequired =>
+      '加密備份需要確認密碼。請手動執行 WebDAV 備份，或關閉備份加密後使用定時備份。';
+
+  @override
+  String get webDavScheduleCancelled => '已取消備份';
 
   @override
   String get backupReminderSectionTitle => '備份提醒';

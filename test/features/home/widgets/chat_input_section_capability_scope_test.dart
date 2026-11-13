@@ -9,6 +9,7 @@ import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/world_book_provider.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/desktop/tools_popover.dart';
 import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -84,6 +85,7 @@ void main() {
         providers: [
           Provider<BusinessPreferences>.value(value: preferences),
           ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider(create: (_) => ChatService()),
           ChangeNotifierProvider.value(value: assistants),
           ChangeNotifierProvider(create: (_) => AsrProvider()),
           ChangeNotifierProvider(

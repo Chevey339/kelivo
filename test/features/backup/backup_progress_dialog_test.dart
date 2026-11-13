@@ -46,6 +46,43 @@ void main() {
   setUp(BackupActivity.debugReset);
   tearDown(BackupActivity.debugReset);
 
+  testWidgets(
+    'manual work waits for the automatic worker to release its data',
+    (tester) async {
+      final automatic = Completer<void>();
+      final manual = Completer<void>();
+      var cancellationRequested = false;
+      var manualStarted = false;
+      BackupActivity.registerAutomatic(automatic.future, () {
+        cancellationRequested = true;
+      });
+      await _openDialog(tester, (context) async {
+        await showBackupProgressDialog<void>(
+          context,
+          title: 'Restore backup',
+          task: (_) {
+            manualStarted = true;
+            return manual.future;
+          },
+        );
+      });
+      expect(cancellationRequested, isTrue);
+      expect(manualStarted, isFalse);
+      expect(BackupActivity.isActive, isTrue);
+
+      BackupActivity.clearAutomatic(automatic.future);
+      automatic.complete();
+      await tester.pump();
+      expect(manualStarted, isTrue);
+      expect(BackupActivity.isActive, isTrue);
+      manual.complete();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 650));
+      await tester.pumpAndSettle();
+      expect(BackupActivity.isActive, isFalse);
+    },
+  );
+
   for (final total in <int?>[null, 10]) {
     testWidgets('failure stays visible and copies details (total: $total)', (
       tester,

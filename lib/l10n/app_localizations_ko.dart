@@ -2241,6 +2241,118 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupPageImportFromChatbox => 'Chatbox에서 가져오기';
 
   @override
+  String get webDavScheduleTitle => 'WebDAV 예약 백업';
+
+  @override
+  String get webDavScheduleEnabled => '자동 백업';
+
+  @override
+  String get webDavScheduleInterval => '반복 간격';
+
+  @override
+  String get webDavScheduleWifiOnly => 'Wi-Fi / 이더넷에서만';
+
+  @override
+  String get webDavScheduleWifiOnlyHint =>
+      '업로드에 Wi-Fi 또는 이더넷을 사용합니다. Android 백그라운드 백업은 데이터 사용량 제한이 없는 연결도 기다립니다.';
+
+  @override
+  String get webDavScheduleAndroidHint =>
+      'Android는 백그라운드에서 백업을 실행합니다. 배터리 및 네트워크 제한으로 지연될 수 있습니다. 앱을 강제 중지하면 다시 열 때까지 백업이 중지됩니다.';
+
+  @override
+  String get webDavScheduleForegroundHint =>
+      '앱이 열려 있는 동안 백업을 실행합니다. 놓친 백업은 앱으로 돌아오면 실행합니다.';
+
+  @override
+  String get webDavScheduleConfigureFirst =>
+      '자동 백업을 켜기 전에 WebDAV 서버를 설정하고 저장하세요.';
+
+  @override
+  String get webDavScheduleLastSuccess => '마지막 백업 성공';
+
+  @override
+  String get webDavScheduleNextRun => '다음 백업 (예상)';
+
+  @override
+  String get webDavScheduleStatus => '상태';
+
+  @override
+  String get webDavScheduleRunNow => '지금 백업';
+
+  @override
+  String get webDavScheduleRunning => '백업 중…';
+
+  @override
+  String get webDavScheduleFinishingBackgroundBackup => '백그라운드 백업 마무리 중…';
+
+  @override
+  String get webDavScheduleReady => '다음 백업 대기 중';
+
+  @override
+  String get webDavScheduleFailed => '마지막 백업 실패';
+
+  @override
+  String get webDavScheduleDisabled => '꺼짐';
+
+  @override
+  String get webDavScheduleNotConfigured => 'WebDAV 서버가 설정되지 않았습니다';
+
+  @override
+  String webDavScheduleEveryHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: '$hours시간마다',
+      one: '매시간',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get webDavScheduleEveryDay => '매일';
+
+  @override
+  String get webDavScheduleNever => '없음';
+
+  @override
+  String get webDavScheduleDue => '조건이 충족되면';
+
+  @override
+  String get webDavScheduleSaved => '백업 일정이 저장되었습니다';
+
+  @override
+  String get webDavScheduleSaveFailed => '백업 일정을 저장하지 못했습니다';
+
+  @override
+  String get webDavScheduleSucceeded => '백업이 업로드되었습니다';
+
+  @override
+  String get webDavScheduleUnavailable => '백그라운드 예약을 사용할 수 없습니다';
+
+  @override
+  String get webDavScheduleWifiRequired => 'Wi-Fi 또는 이더넷 대기 중';
+
+  @override
+  String get webDavScheduleNetworkUnavailable => '네트워크 연결 대기 중';
+
+  @override
+  String get webDavScheduleBackupBusy => '다른 백업 또는 복원이 진행 중입니다';
+
+  @override
+  String get webDavScheduleRetry => '재시도 대기 중';
+
+  @override
+  String get webDavScheduleTimedOut => '백업 시간이 초과되었습니다';
+
+  @override
+  String get webDavSchedulePasswordRequired =>
+      '암호화 백업에는 비밀번호 확인이 필요합니다. WebDAV에 수동으로 백업하거나 예약 백업을 사용하려면 백업 암호화를 끄세요.';
+
+  @override
+  String get webDavScheduleCancelled => '백업이 취소되었습니다';
+
+  @override
   String get backupReminderSectionTitle => '백업 알림';
 
   @override
