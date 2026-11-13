@@ -639,6 +639,8 @@
   "backupProgressFailedAt": "b60f6e6268e3d858680f4ef56680a9cf329c3874313a3c7969222fa718acaebc",
   "backupProgressCopyError": "124fe49a49236baa78ef8faa97f1a74c2252cd197627d30a029500663f2817f4",
   "backupProgressErrorCopied": "6c16ba666a5db35e3a4d708cc906de9882b0d8eac256a3ab6c80fd62a8f1b06e",
+  "backupProgressSkippedTitle": "d2825fe83d169e92e182cc180e38dd3a1e0be8caa1d1ffb9ea89c46d2bc60035",
+  "backupProgressSkippedMessage": "d95c55c97b2f4d4a8366be625d4a68c797ed4ccdbf31241c17a0cfab0f9b95fa",
   "backupProgressPreparing": "2d643600db40ec12da5671a759364a714165a6933fb4d4ca7a96ef8d3ae5945b",
   "backupProgressSnapshotting": "e52937dc42c3b4b5e9c2254e8756a4823c29ac27586b88c9267c3e109697e9ce",
   "backupProgressPacking": "ed098109fd4ce96e9e5d54c0a207c9158d9f30904c6aec6452a42658aa715615",

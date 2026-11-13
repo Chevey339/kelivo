@@ -639,6 +639,8 @@
   "backupProgressFailedAt": "Başarısız olduğu aşama: {phase}",
   "backupProgressCopyError": "Hatayı kopyala",
   "backupProgressErrorCopied": "Hata kopyalandı",
+  "backupProgressSkippedTitle": "Yedekleme atlanan öğelerle tamamlandı",
+  "backupProgressSkippedMessage": "Okunamayan dosya veya dizinler atlandı: {count}. Bu yedeğe dahil edilmediler.",
   "backupProgressPreparing": "Hazırlanıyor",
   "backupProgressSnapshotting": "Veritabanı anlık görüntüsü oluşturuluyor",
   "backupProgressPacking": "Paketleniyor",

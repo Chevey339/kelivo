@@ -2117,6 +2117,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupProgressErrorCopied => 'Error copied';
 
   @override
+  String get backupProgressSkippedTitle =>
+      'Backup completed with skipped items';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return 'Unreadable files or directories skipped: $count. They are not included in this backup.';
+  }
+
+  @override
   String get backupProgressPreparing => 'Preparing';
 
   @override

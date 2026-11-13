@@ -3946,6 +3946,18 @@ abstract class AppLocalizations {
   /// **'Error copied'**
   String get backupProgressErrorCopied;
 
+  /// Completion heading in the backup progress dialog when unreadable asset files or directories were skipped; the archive was created successfully but does not include those items.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup completed with skipped items'**
+  String get backupProgressSkippedTitle;
+
+  /// Warning above the skipped path list in the backup completion dialog. {count} is the number of unreadable files or directories omitted; an unreadable directory counts once including all its descendants.
+  ///
+  /// In en, this message translates to:
+  /// **'Unreadable files or directories skipped: {count}. They are not included in this backup.'**
+  String backupProgressSkippedMessage(int count);
+
   /// Progress phase label for the initial preparation stage of a backup or restore task.
   ///
   /// In en, this message translates to:

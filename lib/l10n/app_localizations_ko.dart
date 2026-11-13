@@ -2076,6 +2076,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupProgressErrorCopied => '오류가 복사됨';
 
   @override
+  String get backupProgressSkippedTitle => '건너뛴 항목이 있는 상태로 백업 완료';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return '읽을 수 없는 파일 또는 디렉터리 건너뜀: $count개. 이 항목들은 이 백업에 포함되지 않습니다.';
+  }
+
+  @override
   String get backupProgressPreparing => '준비 중';
 
   @override

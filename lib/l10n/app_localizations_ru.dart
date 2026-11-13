@@ -2152,6 +2152,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupProgressErrorCopied => 'Ошибка скопирована';
 
   @override
+  String get backupProgressSkippedTitle =>
+      'Резервная копия создана с пропущенными элементами';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return 'Пропущено нечитаемых файлов или каталогов: $count. Они не включены в эту резервную копию.';
+  }
+
+  @override
   String get backupProgressPreparing => 'Подготовка';
 
   @override

@@ -2129,6 +2129,15 @@ class AppLocalizationsTr extends AppLocalizations {
   String get backupProgressErrorCopied => 'Hata kopyalandı';
 
   @override
+  String get backupProgressSkippedTitle =>
+      'Yedekleme atlanan öğelerle tamamlandı';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return 'Okunamayan dosya veya dizinler atlandı: $count. Bu yedeğe dahil edilmediler.';
+  }
+
+  @override
   String get backupProgressPreparing => 'Hazırlanıyor';
 
   @override

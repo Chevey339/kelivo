@@ -639,6 +639,8 @@
   "backupProgressFailedAt": "失敗階段：{phase}",
   "backupProgressCopyError": "複製錯誤",
   "backupProgressErrorCopied": "錯誤已複製",
+  "backupProgressSkippedTitle": "備份完成，部分內容已略過",
+  "backupProgressSkippedMessage": "已略過 {count} 個無法讀取的檔案或目錄，以下內容未包含在備份中。",
   "backupProgressPreparing": "準備中",
   "backupProgressSnapshotting": "正在建立資料庫快照",
   "backupProgressPacking": "正在打包",

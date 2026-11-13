@@ -687,6 +687,15 @@
   "backupProgressFailedAt": "失败阶段：{phase}",
   "backupProgressCopyError": "复制错误",
   "backupProgressErrorCopied": "错误已复制",
+  "backupProgressSkippedTitle": "备份完成，部分内容已跳过",
+  "backupProgressSkippedMessage": "已跳过 {count} 个无法读取的文件或目录，以下内容未包含在备份中。",
+  "@backupProgressSkippedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupProgressPreparing": "准备中",
   "backupProgressSnapshotting": "正在创建数据库快照",
   "backupProgressPacking": "正在打包",

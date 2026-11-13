@@ -19,10 +19,12 @@ final class BackupTaskHandle {
 
   final BackupCancelToken cancelToken;
   final ValueNotifier<BackupProgress> _progress;
+  final _skippedEntries = <String>{};
 
   BackupProgress get current => _progress.value;
 
   void report(BackupProgress progress) {
+    _skippedEntries.addAll(progress.skippedEntries);
     _progress.value = progress;
     if (!progress.cancellable) {
       cancelToken.setCancellable(false);
@@ -147,6 +149,7 @@ class _BackupProgressDialogHostState<T>
   Object? _error;
   String? _errorMessage;
   var _errorCopied = false;
+  late T _completedValue;
 
   @override
   void didChangeDependencies() {
@@ -162,6 +165,11 @@ class _BackupProgressDialogHostState<T>
       widget.onStarted(running);
       final value = await running;
       if (!mounted) return;
+      if (widget.handle._skippedEntries.isNotEmpty) {
+        _completedValue = value;
+        setState(() => _outcome = TaskProgressOutcome.warning);
+        return;
+      }
       setState(() => _outcome = TaskProgressOutcome.success);
       await Future<void>.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
@@ -203,6 +211,10 @@ class _BackupProgressDialogHostState<T>
     );
   }
 
+  void _acknowledgeWarning() {
+    Navigator.of(context).pop(BackupTaskResult.success(_completedValue));
+  }
+
   Future<void> _copyError(String phaseLabel) async {
     await Clipboard.setData(
       ClipboardData(text: '${widget.title}\n$phaseLabel\n\n$_errorMessage'),
@@ -218,24 +230,42 @@ class _BackupProgressDialogHostState<T>
       valueListenable: widget.handle._progress,
       builder: (context, progress, _) {
         final failure = _outcome == TaskProgressOutcome.failure;
+        final warning = _outcome == TaskProgressOutcome.warning;
         final phaseLabel = backupPhaseLabel(l10n, progress.phase);
         final failedAt = l10n.backupProgressFailedAt(phaseLabel);
         return TaskProgressDialogCard(
           title: widget.title,
-          phaseLabel: failure ? l10n.backupProgressFailed : phaseLabel,
+          phaseLabel: failure
+              ? l10n.backupProgressFailed
+              : warning
+              ? l10n.backupProgressSkippedTitle
+              : phaseLabel,
           fraction: _outcome == TaskProgressOutcome.success
               ? 1
               : progress.fraction,
-          subtitle: failure ? failedAt : backupProgressSubtitle(l10n, progress),
+          subtitle: failure
+              ? failedAt
+              : warning
+              ? l10n.backupProgressSkippedMessage(
+                  widget.handle._skippedEntries.length,
+                )
+              : backupProgressSubtitle(l10n, progress),
           phaseIcon: backupPhaseIcon(progress.phase),
           cancellable: progress.cancellable && widget.initiallyCancellable,
           onCancel: _cancel,
-          onAcknowledge: failure ? _acknowledgeFailure : null,
+          onAcknowledge: failure
+              ? _acknowledgeFailure
+              : warning
+              ? _acknowledgeWarning
+              : null,
           cancelLabel: l10n.backupProgressCancel,
           acknowledgeLabel: l10n.commonClose,
           onBackground: widget.backgroundLabel == null ? null : _background,
           backgroundLabel: widget.backgroundLabel,
           errorMessage: _errorMessage,
+          warningMessage: warning
+              ? widget.handle._skippedEntries.join('\n')
+              : null,
           onCopyError: failure ? () => unawaited(_copyError(failedAt)) : null,
           copyErrorLabel: _errorCopied
               ? l10n.backupProgressErrorCopied

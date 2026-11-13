@@ -943,6 +943,19 @@
   },
   "backupProgressCopyError": "Copy error",
   "backupProgressErrorCopied": "Error copied",
+  "backupProgressSkippedTitle": "Backup completed with skipped items",
+  "@backupProgressSkippedTitle": {
+    "description": "Completion heading in the backup progress dialog when unreadable asset files or directories were skipped; the archive was created successfully but does not include those items."
+  },
+  "backupProgressSkippedMessage": "Unreadable files or directories skipped: {count}. They are not included in this backup.",
+  "@backupProgressSkippedMessage": {
+    "description": "Warning above the skipped path list in the backup completion dialog. {count} is the number of unreadable files or directories omitted; an unreadable directory counts once including all its descendants.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupProgressPreparing": "Preparing",
   "backupProgressSnapshotting": "Creating database snapshot",
   "backupProgressPacking": "Packing",

@@ -2033,6 +2033,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupProgressErrorCopied => '错误已复制';
 
   @override
+  String get backupProgressSkippedTitle => '备份完成，部分内容已跳过';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return '已跳过 $count 个无法读取的文件或目录，以下内容未包含在备份中。';
+  }
+
+  @override
   String get backupProgressPreparing => '准备中';
 
   @override
@@ -17990,6 +17998,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupProgressErrorCopied => '错误已复制';
+
+  @override
+  String get backupProgressSkippedTitle => '备份完成，部分内容已跳过';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return '已跳过 $count 个无法读取的文件或目录，以下内容未包含在备份中。';
+  }
 
   @override
   String get backupProgressPreparing => '准备中';
@@ -33950,6 +33966,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupProgressErrorCopied => '錯誤已複製';
+
+  @override
+  String get backupProgressSkippedTitle => '備份完成，部分內容已略過';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return '已略過 $count 個無法讀取的檔案或目錄，以下內容未包含在備份中。';
+  }
 
   @override
   String get backupProgressPreparing => '準備中';

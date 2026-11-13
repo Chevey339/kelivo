@@ -639,6 +639,8 @@
   "backupProgressFailedAt": "실패 단계: {phase}",
   "backupProgressCopyError": "오류 복사",
   "backupProgressErrorCopied": "오류가 복사됨",
+  "backupProgressSkippedTitle": "건너뛴 항목이 있는 상태로 백업 완료",
+  "backupProgressSkippedMessage": "읽을 수 없는 파일 또는 디렉터리 건너뜀: {count}개. 이 항목들은 이 백업에 포함되지 않습니다.",
   "backupProgressPreparing": "준비 중",
   "backupProgressSnapshotting": "데이터베이스 스냅샷 생성 중",
   "backupProgressPacking": "패키징 중",

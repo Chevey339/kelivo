@@ -346,6 +346,8 @@ final class RestoreBundleStaging {
       manifest['assetRoots'] = selectedAssetRoots.toList()..sort();
       manifest.remove('secretsIncluded');
       manifest.remove('businessEntityRowIds');
+      // Omitted source paths are export diagnostics, not candidate payload.
+      manifest.remove('skippedEntries');
       // A forward-compatibility declaration describes the SOURCE archive. The
       // candidate is only ever read back by this same build, so it carries no
       // declaration -- matching how the database block below is rebuilt rather

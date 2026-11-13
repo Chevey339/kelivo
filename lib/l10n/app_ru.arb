@@ -639,6 +639,8 @@
   "backupProgressFailedAt": "Ошибка на этапе: {phase}",
   "backupProgressCopyError": "Копировать ошибку",
   "backupProgressErrorCopied": "Ошибка скопирована",
+  "backupProgressSkippedTitle": "Резервная копия создана с пропущенными элементами",
+  "backupProgressSkippedMessage": "Пропущено нечитаемых файлов или каталогов: {count}. Они не включены в эту резервную копию.",
   "backupProgressPreparing": "Подготовка",
   "backupProgressSnapshotting": "Создание снимка базы данных",
   "backupProgressPacking": "Упаковка",
