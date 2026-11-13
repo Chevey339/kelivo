@@ -106,7 +106,6 @@ void main() {
       final l10n = AppLocalizations.of(tester.element(find.text('open')))!;
       expect(find.text(l10n.contextFixedStartDescription), findsNothing);
       expect(find.text(l10n.branchInheritNote), findsNothing);
-      expect(find.byType(Divider), findsNWidgets(3));
       final rows = find.byType(IosCardPress);
       expect(rows, findsNWidgets(8));
       final bounds = [
