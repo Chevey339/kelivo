@@ -16953,30 +16953,24 @@ class AppLocalizationsTr extends AppLocalizations {
       'Devam etmeden önce sayfayı inceleyin; önceki işlem doğrulanmadı.';
 
   @override
-  String get storageAttachmentRetention => 'Ek geri dönüşümü';
+  String get storageAttachmentRetention => 'Ekleri otomatik temizle';
 
   @override
-  String get storageAttachmentRetentionDays => 'Saklama günü';
+  String get storageAttachmentRetentionDays => 'Temizlemeden önceki gün sayısı';
 
   @override
-  String get storageAttachmentRetentionImmediately =>
-      'Son referans kaldırıldıktan hemen sonra';
-
-  @override
-  String storageAttachmentRetentionAfterDays(int days) {
-    return 'Son referans kaldırıldıktan $days gün sonra';
-  }
+  String get storageAttachmentRetentionImmediately => 'Hemen temizle';
 
   @override
   String get storageAttachmentRetentionHint =>
-      '0–3650 gün girin. 0, son mesaj veya sohbet referansı silindikten hemen sonra ekleri geri dönüştürür. Hâlâ kullanımdaki dosyalar korunur. Değişiklikler bekleyen geri dönüşüm tarihlerini de günceller.';
+      'Mesajları veya sohbetleri sildikten sonra artık kullanılmayan görselleri ve dosyaları otomatik olarak kaldır.';
 
   @override
   String get storageAttachmentUnused => 'Kullanılmıyor';
 
   @override
   String storageAttachmentPending(String date) {
-    return 'Geri dönüşüm bekliyor · $date';
+    return 'Temizlenmeyi bekliyor · $date';
   }
 
   @override
@@ -16989,10 +16983,19 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get storageAttachmentProtectedHint =>
-      'Sohbetler, dallar veya taslaklar tarafından kullanılan ekler ile etkin avatarlar ve arka planlar korunur. Bir yanıt oluşturulurken geri dönüşüm duraklatılır.';
+      'Hâlâ kullanımda olan dosyalar korunacak.';
 
   @override
   String storageAttachmentDeleteConfirm(int count) {
     return '$count kullanılmayan dosya şimdi silinsin mi? Hâlâ kullanımda olan dosyalar korunacak.';
   }
+
+  @override
+  String get storageAttachmentRetentionDelayed => 'Daha sonra temizle';
+
+  @override
+  String get storageAttachmentRetentionInvalidDays => '1–3650 gün girin.';
+
+  @override
+  String get storageAttachmentDetailsTitle => 'Dosya bilgisi';
 }

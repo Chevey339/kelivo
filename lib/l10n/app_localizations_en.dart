@@ -16857,35 +16857,29 @@ class AppLocalizationsEn extends AppLocalizations {
       'Inspect the page before continuing; the previous operation is unconfirmed.';
 
   @override
-  String get storageAttachmentRetention => 'Attachment recycling';
+  String get storageAttachmentRetention => 'Auto-clean attachments';
 
   @override
-  String get storageAttachmentRetentionDays => 'Retention days';
+  String get storageAttachmentRetentionDays => 'Days before cleanup';
 
   @override
-  String get storageAttachmentRetentionImmediately =>
-      'Immediately after the last reference is removed';
-
-  @override
-  String storageAttachmentRetentionAfterDays(int days) {
-    return '$days days after the last reference is removed';
-  }
+  String get storageAttachmentRetentionImmediately => 'Clean immediately';
 
   @override
   String get storageAttachmentRetentionHint =>
-      'Enter 0–3650 days. 0 recycles attachments immediately after deleting their last message or conversation reference. Files still in use are protected. Changes also adjust pending recycling dates.';
+      'After you delete messages or chats, automatically remove images and files that are no longer used.';
 
   @override
   String get storageAttachmentUnused => 'Unused';
 
   @override
   String storageAttachmentPending(String date) {
-    return 'Pending recycling · $date';
+    return 'Waiting for cleanup · $date';
   }
 
   @override
   String storageAttachmentConversations(String names) {
-    return 'Conversations: $names';
+    return 'Chats: $names';
   }
 
   @override
@@ -16893,10 +16887,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageAttachmentProtectedHint =>
-      'Attachments used by conversations, branches or drafts, and active avatars and backgrounds, are protected. Recycling pauses while a response is being generated.';
+      'Files still in use will be kept.';
 
   @override
   String storageAttachmentDeleteConfirm(int count) {
     return 'Delete $count unused files now? Files that are still in use will be kept.';
   }
+
+  @override
+  String get storageAttachmentRetentionDelayed => 'Clean later';
+
+  @override
+  String get storageAttachmentRetentionInvalidDays => 'Enter 1–3650 days.';
+
+  @override
+  String get storageAttachmentDetailsTitle => 'File info';
 }

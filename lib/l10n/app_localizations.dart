@@ -29640,34 +29640,28 @@ abstract class AppLocalizations {
   /// **'Inspect the page before continuing; the previous operation is unconfirmed.'**
   String get browserErrObservationRequired;
 
-  /// Storage Images/Files settings row and dialog title. Configures how long unreferenced chat attachments wait before deletion.
+  /// Settings button in the upper-right corner of the Storage Space overview, and its dialog title. Configures automatic deletion of unused chat images and files.
   ///
   /// In en, this message translates to:
-  /// **'Attachment recycling'**
+  /// **'Auto-clean attachments'**
   String get storageAttachmentRetention;
 
-  /// Numeric field in the attachment recycling dialog. Zero means immediate cleanup after the last reference is removed.
+  /// Number field shown only when delayed automatic cleanup is selected. Enter a positive number of days to keep unused attachments before deleting them.
   ///
   /// In en, this message translates to:
-  /// **'Retention days'**
+  /// **'Days before cleanup'**
   String get storageAttachmentRetentionDays;
 
-  /// Storage attachment recycling setting value for zero days. Shared attachments remain protected.
+  /// First option in the automatic attachment cleanup dialog. Selects zero-day retention without requiring the user to type zero.
   ///
   /// In en, this message translates to:
-  /// **'Immediately after the last reference is removed'**
+  /// **'Clean immediately'**
   String get storageAttachmentRetentionImmediately;
 
-  /// Storage attachment recycling setting value; days is the retention period after an attachment becomes unreferenced.
+  /// Short introduction in the automatic attachment cleanup dialog. Explains the purpose in everyday language before the immediate/later choice.
   ///
   /// In en, this message translates to:
-  /// **'{days} days after the last reference is removed'**
-  String storageAttachmentRetentionAfterDays(int days);
-
-  /// Help text in the recycling settings dialog. Explains zero, valid range, shared-file protection and changes to pending deadlines.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter 0–3650 days. 0 recycles attachments immediately after deleting their last message or conversation reference. Files still in use are protected. Changes also adjust pending recycling dates.'**
+  /// **'After you delete messages or chats, automatically remove images and files that are no longer used.'**
   String get storageAttachmentRetentionHint;
 
   /// Attachment badge when no conversation, draft or appearance reference remains and no automatic recycling deadline is recorded. Manual deletion is available.
@@ -29676,28 +29670,28 @@ abstract class AppLocalizations {
   /// **'Unused'**
   String get storageAttachmentUnused;
 
-  /// Attachment badge showing the earliest scheduled recycling date. Actual cleanup runs when the app starts or chat data is deleted. date is a localized date.
+  /// Attachment status showing the earliest scheduled cleanup date. date is a localized calendar date; cleanup may wait for the next maintenance run.
   ///
   /// In en, this message translates to:
-  /// **'Pending recycling · {date}'**
+  /// **'Waiting for cleanup · {date}'**
   String storageAttachmentPending(String date);
 
-  /// Attachment details/label listing all conversations and branches that reference the file; names is a comma-separated list of conversation titles.
+  /// Compact label below an attachment preview and in its information dialog. names lists every chat or branch using this file.
   ///
   /// In en, this message translates to:
-  /// **'Conversations: {names}'**
+  /// **'Chats: {names}'**
   String storageAttachmentConversations(String names);
 
-  /// Button in storage Images/Files selecting all currently unused files for confirmation and immediate recycling regardless of the automatic retention period.
+  /// Action in the Images/Files list. Opens a confirmation to delete files that are no longer used; active files remain protected.
   ///
   /// In en, this message translates to:
   /// **'Clean unused'**
   String get storageAttachmentCleanUnused;
 
-  /// Storage attachment list help and in-use badge tooltip explaining why some items cannot be selected for deletion. Also explains the temporary pause during active responses to protect attachments before tool results are checkpointed.
+  /// Brief explanation in the Images/Files list and automatic cleanup dialog, also used as the in-use badge tooltip. Avoid technical reference-count terminology.
   ///
   /// In en, this message translates to:
-  /// **'Attachments used by conversations, branches or drafts, and active avatars and backgrounds, are protected. Recycling pauses while a response is being generated.'**
+  /// **'Files still in use will be kept.'**
   String get storageAttachmentProtectedHint;
 
   /// Confirmation for manual storage attachment cleanup. count is the selected number; references are checked again before deletion.
@@ -29705,6 +29699,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete {count} unused files now? Files that are still in use will be kept.'**
   String storageAttachmentDeleteConfirm(int count);
+
+  /// Second option in the automatic attachment cleanup dialog. Reveals a field for the number of days to wait before deleting unused attachments.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean later'**
+  String get storageAttachmentRetentionDelayed;
+
+  /// Inline error below the delayed attachment cleanup number field. Only shown when the value is empty, zero, or above the maximum. Immediate cleanup has its own option.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 1–3650 days.'**
+  String get storageAttachmentRetentionInvalidDays;
+
+  /// Title of the information dialog opened by tapping an attachment status label. Shows its chats or cleanup status; this is not the automatic-cleanup settings dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'File info'**
+  String get storageAttachmentDetailsTitle;
 }
 
 class _AppLocalizationsDelegate

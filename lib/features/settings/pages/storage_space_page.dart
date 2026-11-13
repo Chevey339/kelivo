@@ -1,5 +1,5 @@
 import '../widgets/custom_theme_widgets.dart';
-import '../widgets/attachment_retention_setting.dart';
+import '../widgets/attachment_cleanup_button.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -691,6 +691,11 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         ),
         title: Text(l10n.storageSpacePageTitle),
         actions: [
+          AttachmentCleanupButton(
+            onChanged: () async {
+              await _refreshReport();
+            },
+          ),
           IosIconButton(
             icon: Lucide.RefreshCw,
             size: 20,
@@ -734,6 +739,13 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
             ),
           ),
           const Spacer(),
+          AttachmentCleanupButton(
+            size: 18,
+            minSize: 32,
+            onChanged: () async {
+              await _refreshReport();
+            },
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 8, top: 2),
             child: IosIconButton(
@@ -2417,8 +2429,6 @@ class _UploadManagerState extends State<_UploadManager> {
                 ),
               ),
               const SizedBox(height: 12),
-              AttachmentRetentionSetting(onChanged: widget.refreshReport),
-              const SizedBox(height: 12),
               if (widget.images) ...[
                 _StorageImageOrganizer(
                   imageFilter: _imageFilter,
@@ -2428,8 +2438,7 @@ class _UploadManagerState extends State<_UploadManager> {
                 ),
                 const SizedBox(height: 12),
               ],
-              actions,
-              const SizedBox(height: 12),
+              if (entries.isNotEmpty) ...[actions, const SizedBox(height: 12)],
             ],
           ),
         ),
@@ -2790,7 +2799,7 @@ class _AttachmentStatus extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppDialogHeader(title: l10n.storageAttachmentRetention),
+            AppDialogHeader(title: l10n.storageAttachmentDetailsTitle),
             ConstrainedBox(
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.sizeOf(context).height * .5,

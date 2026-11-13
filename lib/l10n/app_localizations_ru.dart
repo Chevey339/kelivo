@@ -17139,30 +17139,24 @@ class AppLocalizationsRu extends AppLocalizations {
       'Проверьте страницу перед продолжением: результат предыдущей операции не подтверждён.';
 
   @override
-  String get storageAttachmentRetention => 'Переработка вложений';
+  String get storageAttachmentRetention => 'Автоочистка вложений';
 
   @override
-  String get storageAttachmentRetentionDays => 'Срок хранения (дней)';
+  String get storageAttachmentRetentionDays => 'Дней до очистки';
 
   @override
-  String get storageAttachmentRetentionImmediately =>
-      'Сразу после удаления последней ссылки';
-
-  @override
-  String storageAttachmentRetentionAfterDays(int days) {
-    return 'Через $days дн. после удаления последней ссылки';
-  }
+  String get storageAttachmentRetentionImmediately => 'Очистить сразу';
 
   @override
   String get storageAttachmentRetentionHint =>
-      'Введите от 0 до 3650 дней. 0 — перерабатывать вложения сразу после удаления последнего сообщения или ссылки из чата. Используемые файлы защищены. Изменения также корректируют запланированные даты переработки.';
+      'После удаления сообщений или чатов автоматически удаляйте неиспользуемые изображения и файлы.';
 
   @override
   String get storageAttachmentUnused => 'Не используется';
 
   @override
   String storageAttachmentPending(String date) {
-    return 'Ожидает переработки · $date';
+    return 'Ожидает очистки · $date';
   }
 
   @override
@@ -17175,10 +17169,20 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get storageAttachmentProtectedHint =>
-      'Вложения, используемые чатами, ветками или черновиками, а также активные аватары и фоны защищены. Очистка приостанавливается, пока генерируется ответ.';
+      'Файлы, которые ещё используются, будут сохранены.';
 
   @override
   String storageAttachmentDeleteConfirm(int count) {
     return 'Удалить сейчас неиспользуемых файлов: $count? Файлы, которые всё ещё используются, будут сохранены.';
   }
+
+  @override
+  String get storageAttachmentRetentionDelayed => 'Очистить позже';
+
+  @override
+  String get storageAttachmentRetentionInvalidDays =>
+      'Введите от 1 до 3650 дней.';
+
+  @override
+  String get storageAttachmentDetailsTitle => 'Информация о файле';
 }

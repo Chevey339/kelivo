@@ -15984,47 +15984,49 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserErrObservationRequired => '请先检查页面，确认上一操作的结果。';
 
   @override
-  String get storageAttachmentRetention => '附件回收';
+  String get storageAttachmentRetention => '自动清理附件';
 
   @override
-  String get storageAttachmentRetentionDays => '保留天数';
+  String get storageAttachmentRetentionDays => '几天后清理';
 
   @override
-  String get storageAttachmentRetentionImmediately => '删除最后一个引用后立即回收';
+  String get storageAttachmentRetentionImmediately => '立即清理';
 
   @override
-  String storageAttachmentRetentionAfterDays(int days) {
-    return '删除最后一个引用后 $days 天回收';
-  }
-
-  @override
-  String get storageAttachmentRetentionHint =>
-      '请输入 0–3650 天。0 表示删除最后一个消息或会话引用后立即回收附件。仍在使用的文件会保留，修改也会调整已排队附件的回收时间。';
+  String get storageAttachmentRetentionHint => '删除消息或对话后，自动清理不再使用的图片和文件。';
 
   @override
   String get storageAttachmentUnused => '未使用';
 
   @override
   String storageAttachmentPending(String date) {
-    return '待回收 · $date';
+    return '待清理 · $date';
   }
 
   @override
   String storageAttachmentConversations(String names) {
-    return '关联会话：$names';
+    return '对话：$names';
   }
 
   @override
-  String get storageAttachmentCleanUnused => '清理未使用附件';
+  String get storageAttachmentCleanUnused => '清理未使用';
 
   @override
-  String get storageAttachmentProtectedHint =>
-      '会话、分支或草稿仍在使用的附件，以及正在使用的头像与背景，会受到保护。生成回复期间暂停回收。';
+  String get storageAttachmentProtectedHint => '仍在使用的文件不会被清理。';
 
   @override
   String storageAttachmentDeleteConfirm(int count) {
     return '立即删除 $count 个未使用文件？仍在使用的文件会保留。';
   }
+
+  @override
+  String get storageAttachmentRetentionDelayed => '延后清理';
+
+  @override
+  String get storageAttachmentRetentionInvalidDays => '请输入 1–3650 天。';
+
+  @override
+  String get storageAttachmentDetailsTitle => '文件信息';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -32007,47 +32009,49 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get browserErrObservationRequired => '请先检查页面，确认上一操作的结果。';
 
   @override
-  String get storageAttachmentRetention => '附件回收';
+  String get storageAttachmentRetention => '自动清理附件';
 
   @override
-  String get storageAttachmentRetentionDays => '保留天数';
+  String get storageAttachmentRetentionDays => '几天后清理';
 
   @override
-  String get storageAttachmentRetentionImmediately => '删除最后一个引用后立即回收';
+  String get storageAttachmentRetentionImmediately => '立即清理';
 
   @override
-  String storageAttachmentRetentionAfterDays(int days) {
-    return '删除最后一个引用后 $days 天回收';
-  }
-
-  @override
-  String get storageAttachmentRetentionHint =>
-      '请输入 0–3650 天。0 表示删除最后一个消息或会话引用后立即回收附件。仍在使用的文件会保留，修改也会调整已排队附件的回收时间。';
+  String get storageAttachmentRetentionHint => '删除消息或对话后，自动清理不再使用的图片和文件。';
 
   @override
   String get storageAttachmentUnused => '未使用';
 
   @override
   String storageAttachmentPending(String date) {
-    return '待回收 · $date';
+    return '待清理 · $date';
   }
 
   @override
   String storageAttachmentConversations(String names) {
-    return '关联会话：$names';
+    return '对话：$names';
   }
 
   @override
-  String get storageAttachmentCleanUnused => '清理未使用附件';
+  String get storageAttachmentCleanUnused => '清理未使用';
 
   @override
-  String get storageAttachmentProtectedHint =>
-      '会话、分支或草稿仍在使用的附件，以及正在使用的头像与背景，会受到保护。生成回复期间暂停回收。';
+  String get storageAttachmentProtectedHint => '仍在使用的文件不会被清理。';
 
   @override
   String storageAttachmentDeleteConfirm(int count) {
     return '立即删除 $count 个未使用文件？仍在使用的文件会保留。';
   }
+
+  @override
+  String get storageAttachmentRetentionDelayed => '延后清理';
+
+  @override
+  String get storageAttachmentRetentionInvalidDays => '请输入 1–3650 天。';
+
+  @override
+  String get storageAttachmentDetailsTitle => '文件信息';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -48037,45 +48041,47 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get browserErrObservationRequired => '請先檢查頁面，確認上一操作的結果。';
 
   @override
-  String get storageAttachmentRetention => '附件回收';
+  String get storageAttachmentRetention => '自動清理附件';
 
   @override
-  String get storageAttachmentRetentionDays => '保留天數';
+  String get storageAttachmentRetentionDays => '幾天後清理';
 
   @override
-  String get storageAttachmentRetentionImmediately => '刪除最後一個引用後立即回收';
+  String get storageAttachmentRetentionImmediately => '立即清理';
 
   @override
-  String storageAttachmentRetentionAfterDays(int days) {
-    return '刪除最後一個引用後 $days 天回收';
-  }
-
-  @override
-  String get storageAttachmentRetentionHint =>
-      '請輸入 0–3650 天。0 表示刪除最後一個訊息或會話引用後立即回收附件。仍在使用的檔案會保留，修改也會調整已排隊附件的回收時間。';
+  String get storageAttachmentRetentionHint => '刪除訊息或對話後，自動清理不再使用的圖片和檔案。';
 
   @override
   String get storageAttachmentUnused => '未使用';
 
   @override
   String storageAttachmentPending(String date) {
-    return '待回收 · $date';
+    return '待清理 · $date';
   }
 
   @override
   String storageAttachmentConversations(String names) {
-    return '關聯會話：$names';
+    return '對話：$names';
   }
 
   @override
-  String get storageAttachmentCleanUnused => '清理未使用附件';
+  String get storageAttachmentCleanUnused => '清理未使用';
 
   @override
-  String get storageAttachmentProtectedHint =>
-      '會話、分支或草稿仍在使用的附件，以及正在使用的頭像與背景，會受到保護。生成回覆期間暫停回收。';
+  String get storageAttachmentProtectedHint => '仍在使用的檔案不會被清理。';
 
   @override
   String storageAttachmentDeleteConfirm(int count) {
     return '立即刪除 $count 個未使用檔案？仍在使用的檔案會保留。';
   }
+
+  @override
+  String get storageAttachmentRetentionDelayed => '延後清理';
+
+  @override
+  String get storageAttachmentRetentionInvalidDays => '請輸入 1–3650 天。';
+
+  @override
+  String get storageAttachmentDetailsTitle => '檔案資訊';
 }
