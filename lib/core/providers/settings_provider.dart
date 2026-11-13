@@ -1,3 +1,4 @@
+import '../models/attachment_retention.dart';
 import '../models/native_compaction.dart';
 import '../../l10n/app_language.dart';
 import '../models/compression_config.dart';
@@ -1108,6 +1109,9 @@ class SettingsProvider extends ChangeNotifier {
     _logElideLargePayloads = prefs.getBool(_logElideLargePayloadsKey) ?? true;
     RequestLogger.elideLargePayloads = _logElideLargePayloads;
     _logAutoDeleteDays = prefs.getInt(_logAutoDeleteDaysKey) ?? 0;
+    _attachmentRetentionDays = AttachmentRetention.days(
+      prefs.getInt(AttachmentRetention.preferenceKey),
+    );
     _logMaxSizeMB = prefs.getInt(_logMaxSizeMBKey) ?? 50;
     _appLaunchCount = prefs.getInt(_appLaunchCountKey) ?? 0;
     // Run log cleanup based on current settings
@@ -5767,6 +5771,15 @@ Requirements:
     await prefs.setBool(_logElideLargePayloadsKey, v);
   }
 
+  int _attachmentRetentionDays = AttachmentRetention.defaultDays;
+  int get attachmentRetentionDays => _attachmentRetentionDays;
+  Future<void> setAttachmentRetentionDays(int days) async {
+    final value = AttachmentRetention.days(days);
+    await _preferences.setInt(AttachmentRetention.preferenceKey, value);
+    _attachmentRetentionDays = value;
+    notifyListeners();
+  }
+
   // Log settings: auto-delete (days)
   int _logAutoDeleteDays = 0;
   int get logAutoDeleteDays => _logAutoDeleteDays;
@@ -6035,6 +6048,7 @@ Requirements:
     copy._logSaveOutput = _logSaveOutput;
     copy._logElideLargePayloads = _logElideLargePayloads;
     copy._logAutoDeleteDays = _logAutoDeleteDays;
+    copy._attachmentRetentionDays = _attachmentRetentionDays;
     copy._logMaxSizeMB = _logMaxSizeMB;
     copy._appLaunchCount = _appLaunchCount;
     copy._newChatOnLaunch = _newChatOnLaunch;

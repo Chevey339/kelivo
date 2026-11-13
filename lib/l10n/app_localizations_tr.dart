@@ -11507,18 +11507,18 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get storageSpaceCategorySessionFilesHint =>
-      'Sohbet başına ekler ve çıktılar.';
+      'Çalışma alanı sohbet ekleri ve çıktıları. Sıradan sohbet yüklemeleri Görseller ve Dosyalar bölümünde listelenir.';
 
   @override
   String get storageSpaceManageSkills => 'Becerileri yönet';
 
   @override
   String get storageSessionFilesCleanOrphans =>
-      'Sohbeti olmayan dosyaları temizle';
+      'Boş ve sahipsiz klasörleri temizle';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return 'Artık bir sohbete bağlı olmayan oturum klasörlerini siler. Geri kazanılabilir: $size.';
+    return 'Boş sohbet klasörlerini ve hiçbir sohbeti veya kalan referansı olmayan klasörleri kaldır. Sahipsiz dosyalar $size yer kaplıyor.';
   }
 
   @override
@@ -16951,4 +16951,48 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get browserErrObservationRequired =>
       'Devam etmeden önce sayfayı inceleyin; önceki işlem doğrulanmadı.';
+
+  @override
+  String get storageAttachmentRetention => 'Ek geri dönüşümü';
+
+  @override
+  String get storageAttachmentRetentionDays => 'Saklama günü';
+
+  @override
+  String get storageAttachmentRetentionImmediately =>
+      'Son referans kaldırıldıktan hemen sonra';
+
+  @override
+  String storageAttachmentRetentionAfterDays(int days) {
+    return 'Son referans kaldırıldıktan $days gün sonra';
+  }
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      '0–3650 gün girin. 0, son mesaj veya sohbet referansı silindikten hemen sonra ekleri geri dönüştürür. Hâlâ kullanımdaki dosyalar korunur. Değişiklikler bekleyen geri dönüşüm tarihlerini de günceller.';
+
+  @override
+  String get storageAttachmentUnused => 'Kullanılmıyor';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return 'Geri dönüşüm bekliyor · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return 'Sohbetler: $names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => 'Kullanılmayanları temizle';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      'Sohbetler, dallar veya taslaklar tarafından kullanılan ekler ile etkin avatarlar ve arka planlar korunur. Bir yanıt oluşturulurken geri dönüşüm duraklatılır.';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return '$count kullanılmayan dosya şimdi silinsin mi? Hâlâ kullanımda olan dosyalar korunacak.';
+  }
 }

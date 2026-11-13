@@ -11436,18 +11436,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceCategorySessionFilesHint =>
-      'Per-conversation attachments and outputs.';
+      'Workspace conversation attachments and outputs. Ordinary chat uploads are listed in Images and Files.';
 
   @override
   String get storageSpaceManageSkills => 'Manage skills';
 
   @override
   String get storageSessionFilesCleanOrphans =>
-      'Clean orphaned conversation files';
+      'Clean empty and orphaned folders';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return 'Deletes session folders that no longer have a conversation. Reclaimable: $size.';
+    return 'Remove empty conversation folders and folders with no conversation or remaining references. Orphaned files occupy $size.';
   }
 
   @override
@@ -16855,4 +16855,48 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get browserErrObservationRequired =>
       'Inspect the page before continuing; the previous operation is unconfirmed.';
+
+  @override
+  String get storageAttachmentRetention => 'Attachment recycling';
+
+  @override
+  String get storageAttachmentRetentionDays => 'Retention days';
+
+  @override
+  String get storageAttachmentRetentionImmediately =>
+      'Immediately after the last reference is removed';
+
+  @override
+  String storageAttachmentRetentionAfterDays(int days) {
+    return '$days days after the last reference is removed';
+  }
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      'Enter 0–3650 days. 0 recycles attachments immediately after deleting their last message or conversation reference. Files still in use are protected. Changes also adjust pending recycling dates.';
+
+  @override
+  String get storageAttachmentUnused => 'Unused';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return 'Pending recycling · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return 'Conversations: $names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => 'Clean unused';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      'Attachments used by conversations, branches or drafts, and active avatars and backgrounds, are protected. Recycling pauses while a response is being generated.';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return 'Delete $count unused files now? Files that are still in use will be kept.';
+  }
 }

@@ -20445,10 +20445,10 @@ abstract class AppLocalizations {
   /// **'Conversation files'**
   String get storageSpaceCategorySessionFiles;
 
-  /// Description of the conversation files category: attachments and outputs per conversation.
+  /// Storage Conversation files category help. Distinguishes workspace session copies and outputs from original uploads shown in Images/Files.
   ///
   /// In en, this message translates to:
-  /// **'Per-conversation attachments and outputs.'**
+  /// **'Workspace conversation attachments and outputs. Ordinary chat uploads are listed in Images and Files.'**
   String get storageSpaceCategorySessionFilesHint;
 
   /// Button label opening the skills management screen, used in the skills popover and storage page.
@@ -20457,16 +20457,16 @@ abstract class AppLocalizations {
   /// **'Manage skills'**
   String get storageSpaceManageSkills;
 
-  /// Button label to delete session folders that no longer have an associated conversation.
+  /// Storage Conversation files action. Removes empty roots including metadata-only folders and unreferenced orphan directories; other conversation references are protected.
   ///
   /// In en, this message translates to:
-  /// **'Clean orphaned conversation files'**
+  /// **'Clean empty and orphaned folders'**
   String get storageSessionFilesCleanOrphans;
 
-  /// Confirmation message for cleaning orphaned session files; {size} is the reclaimable space.
+  /// Confirmation for cleaning empty and orphaned conversation directories. size is the measured disk use of orphan directories before final reference protection checks.
   ///
   /// In en, this message translates to:
-  /// **'Deletes session folders that no longer have a conversation. Reclaimable: {size}.'**
+  /// **'Remove empty conversation folders and folders with no conversation or remaining references. Orphaned files occupy {size}.'**
   String storageSessionFilesCleanOrphansHint(String size);
 
   /// Text field label for the folder path when creating a desktop workspace.
@@ -29639,6 +29639,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Inspect the page before continuing; the previous operation is unconfirmed.'**
   String get browserErrObservationRequired;
+
+  /// Storage Images/Files settings row and dialog title. Configures how long unreferenced chat attachments wait before deletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment recycling'**
+  String get storageAttachmentRetention;
+
+  /// Numeric field in the attachment recycling dialog. Zero means immediate cleanup after the last reference is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Retention days'**
+  String get storageAttachmentRetentionDays;
+
+  /// Storage attachment recycling setting value for zero days. Shared attachments remain protected.
+  ///
+  /// In en, this message translates to:
+  /// **'Immediately after the last reference is removed'**
+  String get storageAttachmentRetentionImmediately;
+
+  /// Storage attachment recycling setting value; days is the retention period after an attachment becomes unreferenced.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days after the last reference is removed'**
+  String storageAttachmentRetentionAfterDays(int days);
+
+  /// Help text in the recycling settings dialog. Explains zero, valid range, shared-file protection and changes to pending deadlines.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 0–3650 days. 0 recycles attachments immediately after deleting their last message or conversation reference. Files still in use are protected. Changes also adjust pending recycling dates.'**
+  String get storageAttachmentRetentionHint;
+
+  /// Attachment badge when no conversation, draft or appearance reference remains and no automatic recycling deadline is recorded. Manual deletion is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Unused'**
+  String get storageAttachmentUnused;
+
+  /// Attachment badge showing the earliest scheduled recycling date. Actual cleanup runs when the app starts or chat data is deleted. date is a localized date.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending recycling · {date}'**
+  String storageAttachmentPending(String date);
+
+  /// Attachment details/label listing all conversations and branches that reference the file; names is a comma-separated list of conversation titles.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations: {names}'**
+  String storageAttachmentConversations(String names);
+
+  /// Button in storage Images/Files selecting all currently unused files for confirmation and immediate recycling regardless of the automatic retention period.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean unused'**
+  String get storageAttachmentCleanUnused;
+
+  /// Storage attachment list help and in-use badge tooltip explaining why some items cannot be selected for deletion. Also explains the temporary pause during active responses to protect attachments before tool results are checkpointed.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments used by conversations, branches or drafts, and active avatars and backgrounds, are protected. Recycling pauses while a response is being generated.'**
+  String get storageAttachmentProtectedHint;
+
+  /// Confirmation for manual storage attachment cleanup. count is the selected number; references are checked again before deletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} unused files now? Files that are still in use will be kept.'**
+  String storageAttachmentDeleteConfirm(int count);
 }
 
 class _AppLocalizationsDelegate

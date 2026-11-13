@@ -9,6 +9,8 @@ import '../../models/message_part.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/kelivo_file_uri.dart';
 import 'workspace_tool_context.dart';
+import '../storage/storage_attachment_usage.dart';
+import 'workspace_file_coordinator.dart';
 
 class AttachmentInfo {
   const AttachmentInfo({
@@ -23,8 +25,6 @@ class AttachmentInfo {
   final String modelPath;
   final String sourceUri;
 }
-
-final _syncTails = <String, Future<void>>{};
 
 /// Copies user-message files/images into the conversation session attachments
 /// folder before generation or while browsing historical attachments.
@@ -44,79 +44,77 @@ Future<List<AttachmentInfo>> syncAttachments(
 Future<T> _serializeSessionMutation<T>(
   Directory session,
   Future<T> Function() action,
-) {
-  final key = p.normalize(session.absolute.path);
-  final result = (_syncTails[key] ?? Future<void>.value()).then(
-    (_) => action(),
-  );
-  final tail = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
-  _syncTails[key] = tail;
-  tail.then((_) {
-    if (identical(_syncTails[key], tail)) _syncTails.remove(key);
-  });
-  return result;
-}
+) => WorkspaceFileCoordinator.run(session.path, action);
 
 /// Removes only copies explicitly associated with deleted uploads. Shares the
 /// copy queue so a copy already in flight cannot finish after cleanup.
 Future<void> deleteSessionAttachmentCopies(
   Set<String> sourcePaths, {
   required Directory sessionsDirectory,
-}) async {
+  Set<String> protectedPaths = const {},
+  bool generationActive = false,
+}) => WorkspaceFileCoordinator.run(sessionsDirectory.path, () async {
   if (!await sessionsDirectory.exists()) return;
   final sources = sourcePaths
       .map((path) => p.normalize(p.absolute(path)))
       .toSet();
   final appRoot = sessionsDirectory.parent.path;
+  final copies = <String>{};
   await for (final session in sessionsDirectory.list(followLinks: false)) {
     if (session is! Directory) continue;
-    await _serializeSessionMutation(session, () async {
-      final attachments = Directory(p.join(session.path, 'attachments'));
-      if (await FileSystemEntity.type(attachments.path, followLinks: false) !=
-          FileSystemEntityType.directory) {
-        return;
+
+    final attachments = Directory(p.join(session.path, 'attachments'));
+    if (await FileSystemEntity.type(attachments.path, followLinks: false) !=
+        FileSystemEntityType.directory) {
+      continue;
+    }
+    final indexFile = File(p.join(session.path, '.attachment-index.json'));
+    if (!await indexFile.exists()) continue;
+    final Map<String, dynamic> index;
+    try {
+      final decoded = jsonDecode(await indexFile.readAsString());
+      if (decoded is! Map<String, dynamic>) continue;
+      index = decoded;
+    } on FormatException {
+      continue;
+    }
+    for (final entry in index.entries) {
+      final record = entry.value;
+      final savedName = record is Map ? record['name'] : null;
+      if (savedName is! String || savedName != _safeName(savedName)) continue;
+      final canonical = KelivoFileUri.isKelivoFileUri(entry.key)
+          ? entry.key
+          : KelivoFileUri.tryEncodeLegacyAbsolutePath(
+              entry.key,
+              allowGenericFallback: false,
+            );
+      final source =
+          (canonical == null
+              ? null
+              : KelivoFileUri.resolveToAbsolute(canonical, root: appRoot)) ??
+          SandboxPathResolver.resolveForIo(entry.key);
+      if (source == null ||
+          !sources.contains(p.normalize(p.absolute(source)))) {
+        continue;
       }
-      final indexFile = File(p.join(session.path, '.attachment-index.json'));
-      if (!await indexFile.exists()) return;
-      final Map<String, dynamic> index;
-      try {
-        final decoded = jsonDecode(await indexFile.readAsString());
-        if (decoded is! Map<String, dynamic>) return;
-        index = decoded;
-      } on FormatException {
-        return;
+      final copy = File(p.join(attachments.path, savedName));
+      if (await FileSystemEntity.type(copy.path, followLinks: false) ==
+          FileSystemEntityType.file) {
+        copies.add(copy.path);
       }
-      for (final entry in index.entries) {
-        final record = entry.value;
-        final savedName = record is Map ? record['name'] : null;
-        if (savedName is! String || savedName != _safeName(savedName)) continue;
-        final canonical = KelivoFileUri.isKelivoFileUri(entry.key)
-            ? entry.key
-            : KelivoFileUri.tryEncodeLegacyAbsolutePath(
-                entry.key,
-                allowGenericFallback: false,
-              );
-        final source =
-            (canonical == null
-                ? null
-                : KelivoFileUri.resolveToAbsolute(canonical, root: appRoot)) ??
-            SandboxPathResolver.resolveForIo(entry.key);
-        if (source == null ||
-            !sources.contains(p.normalize(p.absolute(source)))) {
-          continue;
-        }
-        final copy = File(p.join(attachments.path, savedName));
-        if (await FileSystemEntity.type(copy.path, followLinks: false) ==
-            FileSystemEntityType.file) {
-          await copy.delete();
-        }
-      }
-      // Retain identity records: subsequent turns may still contain these old
-      // message parts. Missing originals must not recreate deleted attachments
-      // or block generation. Restoring an original allows a fresh copy again.
-    });
+    }
+
+    // Retain identity records: subsequent turns may still contain these old
+    // message parts. Missing originals must not recreate deleted attachments
+    // or block generation. Restoring an original allows a fresh copy again.
   }
-}
+  await StorageAttachmentUsage.deleteUnusedFiles(
+    copies,
+    sessionCopies: true,
+    protectedPaths: protectedPaths,
+    generationActive: generationActive,
+  );
+});
 
 Future<List<AttachmentInfo>> _syncAttachments(
   WorkspaceToolContext ctx,

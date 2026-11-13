@@ -11600,18 +11600,18 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get storageSpaceCategorySessionFilesHint =>
-      'Вложения и результаты по каждому чату.';
+      'Вложения и результаты сеансов рабочей области. Обычные загрузки чата перечислены в разделах «Изображения» и «Файлы».';
 
   @override
   String get storageSpaceManageSkills => 'Управление навыками';
 
   @override
   String get storageSessionFilesCleanOrphans =>
-      'Очистить файлы чатов без чатов';
+      'Очистить пустые и осиротевшие папки';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return 'Удаляет папки сеансов, у которых больше нет чата. Можно освободить: $size.';
+    return 'Удалить пустые папки чатов и папки без чатов или оставшихся ссылок. Осиротевшие файлы занимают $size.';
   }
 
   @override
@@ -17137,4 +17137,48 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get browserErrObservationRequired =>
       'Проверьте страницу перед продолжением: результат предыдущей операции не подтверждён.';
+
+  @override
+  String get storageAttachmentRetention => 'Переработка вложений';
+
+  @override
+  String get storageAttachmentRetentionDays => 'Срок хранения (дней)';
+
+  @override
+  String get storageAttachmentRetentionImmediately =>
+      'Сразу после удаления последней ссылки';
+
+  @override
+  String storageAttachmentRetentionAfterDays(int days) {
+    return 'Через $days дн. после удаления последней ссылки';
+  }
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      'Введите от 0 до 3650 дней. 0 — перерабатывать вложения сразу после удаления последнего сообщения или ссылки из чата. Используемые файлы защищены. Изменения также корректируют запланированные даты переработки.';
+
+  @override
+  String get storageAttachmentUnused => 'Не используется';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return 'Ожидает переработки · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return 'Чаты: $names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => 'Очистить неиспользуемые';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      'Вложения, используемые чатами, ветками или черновиками, а также активные аватары и фоны защищены. Очистка приостанавливается, пока генерируется ответ.';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return 'Удалить сейчас неиспользуемых файлов: $count? Файлы, которые всё ещё используются, будут сохранены.';
+  }
 }

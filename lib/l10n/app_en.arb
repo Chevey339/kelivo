@@ -5575,17 +5575,17 @@
   "storageSpaceCategorySkills": "Skills",
   "storageSpaceCategorySkillsHint": "Installed skill files.",
   "storageSpaceCategorySessionFiles": "Conversation files",
-  "storageSpaceCategorySessionFilesHint": "Per-conversation attachments and outputs.",
+  "storageSpaceCategorySessionFilesHint": "Workspace conversation attachments and outputs. Ordinary chat uploads are listed in Images and Files.",
   "storageSpaceManageSkills": "Manage skills",
-  "storageSessionFilesCleanOrphans": "Clean orphaned conversation files",
-  "storageSessionFilesCleanOrphansHint": "Deletes session folders that no longer have a conversation. Reclaimable: {size}.",
+  "storageSessionFilesCleanOrphans": "Clean empty and orphaned folders",
+  "storageSessionFilesCleanOrphansHint": "Remove empty conversation folders and folders with no conversation or remaining references. Orphaned files occupy {size}.",
   "@storageSessionFilesCleanOrphansHint": {
     "placeholders": {
       "size": {
         "type": "String"
       }
     },
-    "description": "Confirmation message for cleaning orphaned session files; {size} is the reclaimable space."
+    "description": "Confirmation for cleaning empty and orphaned conversation directories. size is the measured disk use of orphan directories before final reference protection checks."
   },
   "workspaceDesktopFolderPath": "Folder path",
   "workspaceDesktopFolderMissing": "Choose an existing folder or enter its absolute path.",
@@ -17760,13 +17760,13 @@
     "description": "Storage usage category label for per-conversation files; also passed into the clear-done message."
   },
   "@storageSpaceCategorySessionFilesHint": {
-    "description": "Description of the conversation files category: attachments and outputs per conversation."
+    "description": "Storage Conversation files category help. Distinguishes workspace session copies and outputs from original uploads shown in Images/Files."
   },
   "@storageSpaceManageSkills": {
     "description": "Button label opening the skills management screen, used in the skills popover and storage page."
   },
   "@storageSessionFilesCleanOrphans": {
-    "description": "Button label to delete session folders that no longer have an associated conversation."
+    "description": "Storage Conversation files action. Removes empty roots including metadata-only folders and unreferenced orphan directories; other conversation references are protected."
   },
   "@workspaceDesktopFolderPath": {
     "description": "Text field label for the folder path when creating a desktop workspace."
@@ -21927,5 +21927,69 @@
   "browserErrObservationRequired": "Inspect the page before continuing; the previous operation is unconfirmed.",
   "@browserErrObservationRequired": {
     "description": "Browser tool error summary when a page-changing command was not sent because an earlier command timed out. The assistant must successfully read a snapshot or extract before further changes; no manual resume permission is needed."
+  },
+  "storageAttachmentRetention": "Attachment recycling",
+  "@storageAttachmentRetention": {
+    "description": "Storage Images/Files settings row and dialog title. Configures how long unreferenced chat attachments wait before deletion."
+  },
+  "storageAttachmentRetentionDays": "Retention days",
+  "@storageAttachmentRetentionDays": {
+    "description": "Numeric field in the attachment recycling dialog. Zero means immediate cleanup after the last reference is removed."
+  },
+  "storageAttachmentRetentionImmediately": "Immediately after the last reference is removed",
+  "@storageAttachmentRetentionImmediately": {
+    "description": "Storage attachment recycling setting value for zero days. Shared attachments remain protected."
+  },
+  "storageAttachmentRetentionAfterDays": "{days} days after the last reference is removed",
+  "@storageAttachmentRetentionAfterDays": {
+    "description": "Storage attachment recycling setting value; days is the retention period after an attachment becomes unreferenced.",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "storageAttachmentRetentionHint": "Enter 0–3650 days. 0 recycles attachments immediately after deleting their last message or conversation reference. Files still in use are protected. Changes also adjust pending recycling dates.",
+  "@storageAttachmentRetentionHint": {
+    "description": "Help text in the recycling settings dialog. Explains zero, valid range, shared-file protection and changes to pending deadlines."
+  },
+  "storageAttachmentUnused": "Unused",
+  "@storageAttachmentUnused": {
+    "description": "Attachment badge when no conversation, draft or appearance reference remains and no automatic recycling deadline is recorded. Manual deletion is available."
+  },
+  "storageAttachmentPending": "Pending recycling · {date}",
+  "@storageAttachmentPending": {
+    "description": "Attachment badge showing the earliest scheduled recycling date. Actual cleanup runs when the app starts or chat data is deleted. date is a localized date.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAttachmentConversations": "Conversations: {names}",
+  "@storageAttachmentConversations": {
+    "description": "Attachment details/label listing all conversations and branches that reference the file; names is a comma-separated list of conversation titles.",
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAttachmentCleanUnused": "Clean unused",
+  "@storageAttachmentCleanUnused": {
+    "description": "Button in storage Images/Files selecting all currently unused files for confirmation and immediate recycling regardless of the automatic retention period."
+  },
+  "storageAttachmentProtectedHint": "Attachments used by conversations, branches or drafts, and active avatars and backgrounds, are protected. Recycling pauses while a response is being generated.",
+  "@storageAttachmentProtectedHint": {
+    "description": "Storage attachment list help and in-use badge tooltip explaining why some items cannot be selected for deletion. Also explains the temporary pause during active responses to protect attachments before tool results are checkpointed."
+  },
+  "storageAttachmentDeleteConfirm": "Delete {count} unused files now? Files that are still in use will be kept.",
+  "@storageAttachmentDeleteConfirm": {
+    "description": "Confirmation for manual storage attachment cleanup. count is the selected number; references are checked again before deletion.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

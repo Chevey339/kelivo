@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/mcp/mcp_icon_cache.dart';
-import 'package:Kelivo/core/services/storage/storage_image_usage.dart';
+import 'package:Kelivo/core/services/storage/storage_attachment_usage.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 import 'package:Kelivo/utils/app_directories.dart';
 import 'package:Kelivo/utils/markdown_media_sanitizer.dart';
@@ -100,7 +100,10 @@ void main() {
         'view_image_unused.png',
       ]) {
         expect(byName[name]!.imageKind, StorageImageKind.tool);
-        expect(byName[name]!.isInUse, isFalse);
+        expect(
+          byName[name]!.isInUse,
+          name == 'tool.png' || name == 'preview.png',
+        );
       }
       expect(byName['generated.png']!.imageKind, StorageImageKind.chat);
       expect(byName['orphan.png']!.imageKind, isNull);
@@ -125,9 +128,17 @@ void main() {
           entries.map((e) => e.path),
           images: true,
         ),
-        7,
+        4,
       );
-      for (final file in [avatar, background, provider, user]) {
+      for (final file in [
+        avatar,
+        background,
+        provider,
+        user,
+        tool,
+        preview,
+        chat,
+      ]) {
         expect(await file.exists(), isTrue);
       }
     },

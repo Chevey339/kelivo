@@ -11110,17 +11110,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get storageSpaceCategorySessionFiles => '대화 파일';
 
   @override
-  String get storageSpaceCategorySessionFilesHint => '대화별 첨부 파일 및 출력입니다.';
+  String get storageSpaceCategorySessionFilesHint =>
+      '작업 공간 대화의 첨부 파일과 출력물입니다. 일반 채팅 업로드는 이미지 및 파일에 표시됩니다.';
 
   @override
   String get storageSpaceManageSkills => '스킬 관리';
 
   @override
-  String get storageSessionFilesCleanOrphans => '연결된 대화가 없는 대화 파일 정리';
+  String get storageSessionFilesCleanOrphans => '빈 폴더 및 고아 폴더 정리';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return '더 이상 대화가 없는 세션 폴더를 삭제합니다. 확보 가능: $size.';
+    return '빈 대화 폴더와 대화 또는 남은 참조가 없는 폴더를 제거합니다. 고아 폴더가 $size를 차지합니다.';
   }
 
   @override
@@ -16338,4 +16339,47 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get browserErrObservationRequired =>
       '계속하기 전에 페이지를 확인하세요. 이전 작업이 확인되지 않았습니다.';
+
+  @override
+  String get storageAttachmentRetention => '첨부 파일 재활용';
+
+  @override
+  String get storageAttachmentRetentionDays => '보존 일수';
+
+  @override
+  String get storageAttachmentRetentionImmediately => '마지막 참조가 제거된 직후';
+
+  @override
+  String storageAttachmentRetentionAfterDays(int days) {
+    return '마지막 참조가 제거된 후 $days일';
+  }
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      '0–3650일을 입력하세요. 0은 마지막 메시지 또는 대화 참조를 삭제한 직후 첨부 파일을 재활용합니다. 사용 중인 파일은 보호됩니다. 변경 사항은 대기 중인 재활용 날짜에도 적용됩니다.';
+
+  @override
+  String get storageAttachmentUnused => '사용 안 함';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return '재활용 대기 · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return '대화: $names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => '사용하지 않는 항목 정리';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      '대화, 분기 또는 초안에서 사용 중인 첨부 파일과 활성 아바타 및 배경은 보호됩니다. 응답을 생성하는 동안에는 휴지통 이동이 일시 중지됩니다.';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return '사용하지 않는 파일 $count개를 지금 삭제하시겠습니까? 아직 사용 중인 파일은 유지됩니다.';
+  }
 }

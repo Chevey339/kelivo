@@ -16,13 +16,9 @@ import '../tool_image.dart';
 /// URI (including one persisted before this check) is never a local attachment.
 class McpImageSnapshot {
   static const _prefix = 'mcp_img';
-  static final _deduplicatedName = RegExp(r'^mcp_img_[a-f0-9]{64}\.(png|jpg)$');
 
-  static bool isDeduplicatedFile(String path) =>
-      _deduplicatedName.hasMatch(p.basename(path));
-
-  /// Reusing an unreferenced preview starts a new GC grace period before its
-  /// next tool result has been checkpointed into the message asset registry.
+  /// Verify a cached client-owned preview before reuse. Generation ownership
+  /// protects the file until the tool result has been checkpointed.
   static Future<File?> reuseLocalFile(String uri) async {
     final file = await localFile(uri);
     if (file == null) return null;

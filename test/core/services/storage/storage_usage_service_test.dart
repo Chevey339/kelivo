@@ -12,7 +12,7 @@ import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/services/backup/local_snapshot_schedule.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
-import 'package:Kelivo/core/services/storage/storage_image_usage.dart';
+import 'package:Kelivo/core/services/storage/storage_attachment_usage.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);

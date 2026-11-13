@@ -10948,17 +10948,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategorySessionFiles => '会话文件';
 
   @override
-  String get storageSpaceCategorySessionFilesHint => '各对话的附件与输出。';
+  String get storageSpaceCategorySessionFilesHint =>
+      '工作区会话的附件副本与输出。普通聊天上传的附件列在“图片”和“文件”中。';
 
   @override
   String get storageSpaceManageSkills => '管理技能';
 
   @override
-  String get storageSessionFilesCleanOrphans => '清理无对话的会话文件';
+  String get storageSessionFilesCleanOrphans => '清理空目录与无对话目录';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return '删除已无对应对话的会话目录。可回收 $size。';
+    return '清理空会话目录，以及已无对话且未被其他会话引用的目录。无对话目录占用 $size。';
   }
 
   @override
@@ -15981,6 +15982,49 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserErrObservationRequired => '请先检查页面，确认上一操作的结果。';
+
+  @override
+  String get storageAttachmentRetention => '附件回收';
+
+  @override
+  String get storageAttachmentRetentionDays => '保留天数';
+
+  @override
+  String get storageAttachmentRetentionImmediately => '删除最后一个引用后立即回收';
+
+  @override
+  String storageAttachmentRetentionAfterDays(int days) {
+    return '删除最后一个引用后 $days 天回收';
+  }
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      '请输入 0–3650 天。0 表示删除最后一个消息或会话引用后立即回收附件。仍在使用的文件会保留，修改也会调整已排队附件的回收时间。';
+
+  @override
+  String get storageAttachmentUnused => '未使用';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return '待回收 · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return '关联会话：$names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => '清理未使用附件';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      '会话、分支或草稿仍在使用的附件，以及正在使用的头像与背景，会受到保护。生成回复期间暂停回收。';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return '立即删除 $count 个未使用文件？仍在使用的文件会保留。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -26927,17 +26971,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategorySessionFiles => '会话文件';
 
   @override
-  String get storageSpaceCategorySessionFilesHint => '各对话的附件与输出。';
+  String get storageSpaceCategorySessionFilesHint =>
+      '工作区会话的附件副本与输出。普通聊天上传的附件列在“图片”和“文件”中。';
 
   @override
   String get storageSpaceManageSkills => '管理技能';
 
   @override
-  String get storageSessionFilesCleanOrphans => '清理无对话的会话文件';
+  String get storageSessionFilesCleanOrphans => '清理空目录与无对话目录';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return '删除已无对应对话的会话目录。可回收 $size。';
+    return '清理空会话目录，以及已无对话且未被其他会话引用的目录。无对话目录占用 $size。';
   }
 
   @override
@@ -31960,6 +32005,49 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get browserErrObservationRequired => '请先检查页面，确认上一操作的结果。';
+
+  @override
+  String get storageAttachmentRetention => '附件回收';
+
+  @override
+  String get storageAttachmentRetentionDays => '保留天数';
+
+  @override
+  String get storageAttachmentRetentionImmediately => '删除最后一个引用后立即回收';
+
+  @override
+  String storageAttachmentRetentionAfterDays(int days) {
+    return '删除最后一个引用后 $days 天回收';
+  }
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      '请输入 0–3650 天。0 表示删除最后一个消息或会话引用后立即回收附件。仍在使用的文件会保留，修改也会调整已排队附件的回收时间。';
+
+  @override
+  String get storageAttachmentUnused => '未使用';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return '待回收 · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return '关联会话：$names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => '清理未使用附件';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      '会话、分支或草稿仍在使用的附件，以及正在使用的头像与背景，会受到保护。生成回复期间暂停回收。';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return '立即删除 $count 个未使用文件？仍在使用的文件会保留。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -42907,17 +42995,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategorySessionFiles => '會話檔案';
 
   @override
-  String get storageSpaceCategorySessionFilesHint => '各對話的附件與輸出。';
+  String get storageSpaceCategorySessionFilesHint =>
+      '工作區會話的附件副本與輸出。一般聊天上傳的附件列在「圖片」和「檔案」中。';
 
   @override
   String get storageSpaceManageSkills => '管理技能';
 
   @override
-  String get storageSessionFilesCleanOrphans => '清理無對話的會話檔案';
+  String get storageSessionFilesCleanOrphans => '清理空目錄與無對話目錄';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return '刪除已無對應對話的會話目錄。可回收 $size。';
+    return '清理空會話目錄，以及已無對話且未被其他會話引用的目錄。無對話目錄佔用 $size。';
   }
 
   @override
@@ -47946,4 +48035,47 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get browserErrObservationRequired => '請先檢查頁面，確認上一操作的結果。';
+
+  @override
+  String get storageAttachmentRetention => '附件回收';
+
+  @override
+  String get storageAttachmentRetentionDays => '保留天數';
+
+  @override
+  String get storageAttachmentRetentionImmediately => '刪除最後一個引用後立即回收';
+
+  @override
+  String storageAttachmentRetentionAfterDays(int days) {
+    return '刪除最後一個引用後 $days 天回收';
+  }
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      '請輸入 0–3650 天。0 表示刪除最後一個訊息或會話引用後立即回收附件。仍在使用的檔案會保留，修改也會調整已排隊附件的回收時間。';
+
+  @override
+  String get storageAttachmentUnused => '未使用';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return '待回收 · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return '關聯會話：$names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => '清理未使用附件';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      '會話、分支或草稿仍在使用的附件，以及正在使用的頭像與背景，會受到保護。生成回覆期間暫停回收。';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return '立即刪除 $count 個未使用檔案？仍在使用的檔案會保留。';
+  }
 }
