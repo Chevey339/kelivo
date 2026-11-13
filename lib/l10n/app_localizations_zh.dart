@@ -14241,9 +14241,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressTaskAbandon => '放弃';
 
   @override
-  String get browserAgentTimedOut => '操作超时，AI 已暂停';
-
-  @override
   String get compressCancelledSnack => '已取消，上下文没有改动。';
 
   @override
@@ -14740,7 +14737,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contextUnknownLimit => '上限未知';
 
   @override
-  String get browserErrActionTimeout => '操作超时，结果未确认，请检查页面后允许继续';
+  String get browserErrActionTimeout => '操作超时，结果未确认。助手可先检查页面再继续。';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -15969,6 +15966,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get responseRetryWithoutImages => '不发送图片重试（保留原图）';
+
+  @override
+  String get browserOperationTimeout => '操作超时';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      '单次浏览器操作的最长等待时间。超时后，助手可以检查页面状态。';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get browserErrObservationRequired => '请先检查页面，确认上一操作的结果。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -30208,9 +30220,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressTaskAbandon => '放弃';
 
   @override
-  String get browserAgentTimedOut => '操作超时，AI 已暂停';
-
-  @override
   String get compressCancelledSnack => '已取消，上下文没有改动。';
 
   @override
@@ -30707,7 +30716,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get contextUnknownLimit => '上限未知';
 
   @override
-  String get browserErrActionTimeout => '操作超时，结果未确认，请检查页面后允许继续';
+  String get browserErrActionTimeout => '操作超时，结果未确认。助手可先检查页面再继续。';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -31936,6 +31945,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get responseRetryWithoutImages => '不发送图片重试（保留原图）';
+
+  @override
+  String get browserOperationTimeout => '操作超时';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      '单次浏览器操作的最长等待时间。超时后，助手可以检查页面状态。';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get browserErrObservationRequired => '请先检查页面，确认上一操作的结果。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -46180,9 +46204,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressTaskAbandon => '放棄';
 
   @override
-  String get browserAgentTimedOut => '操作逾時，AI 已暫停';
-
-  @override
   String get compressCancelledSnack => '已取消，上下文沒有改動。';
 
   @override
@@ -46679,7 +46700,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get contextUnknownLimit => '上限未知';
 
   @override
-  String get browserErrActionTimeout => '操作逾時，結果未確認，請檢查頁面後允許繼續';
+  String get browserErrActionTimeout => '操作逾時，結果未確認。AI 可先檢查頁面再繼續。';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -47910,4 +47931,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get responseRetryWithoutImages => '不傳送圖片重試（保留原圖）';
+
+  @override
+  String get browserOperationTimeout => '操作逾時';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      '單次瀏覽器指令的最長等待時間。逾時後，助手可以檢查頁面狀態。';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get browserErrObservationRequired => '請先檢查頁面，確認上一操作的結果。';
 }

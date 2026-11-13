@@ -15252,9 +15252,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressTaskAbandon => 'Отменить';
 
   @override
-  String get browserAgentTimedOut => 'Время операции истекло; ИИ приостановлен';
-
-  @override
   String get compressCancelledSnack => 'Отменено. Контекст не изменён.';
 
   @override
@@ -15815,7 +15812,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get browserErrActionTimeout =>
-      'Время операции истекло; результат неизвестен. Проверьте страницу, прежде чем разрешить ИИ продолжить.';
+      'Время операции истекло; результат неизвестен. Ассистент может проверить страницу перед продолжением.';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -17124,4 +17121,20 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get responseRetryWithoutImages =>
       'Повторить без изображений (сохранить оригиналы)';
+
+  @override
+  String get browserOperationTimeout => 'Тайм-аут операции';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      'Максимальное время ожидания команды браузера. После тайм-аута ассистент может проверить состояние страницы.';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds с';
+  }
+
+  @override
+  String get browserErrObservationRequired =>
+      'Проверьте страницу перед продолжением: результат предыдущей операции не подтверждён.';
 }

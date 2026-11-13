@@ -14544,9 +14544,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressTaskAbandon => '포기';
 
   @override
-  String get browserAgentTimedOut => '작업 시간 초과, AI 일시 중지됨';
-
-  @override
   String get compressCancelledSnack => '취소되었습니다. 컨텍스트는 변경되지 않았습니다.';
 
   @override
@@ -15063,7 +15060,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get browserErrActionTimeout =>
-      '작업 시간 초과, 결과 미확인. 페이지를 확인한 후 AI가 계속하도록 허용하세요.';
+      '작업 시간이 초과되었습니다. 결과를 확인할 수 없습니다. 어시스턴트가 계속하기 전에 페이지를 확인할 수 있습니다.';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -16325,4 +16322,20 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get responseRetryWithoutImages => '이미지 없이 재시도(원본 유지)';
+
+  @override
+  String get browserOperationTimeout => '작업 시간 초과';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      '브라우저 명령의 최대 대기 시간입니다. 시간 초과 후 어시스턴트가 페이지 상태를 확인할 수 있습니다.';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds초';
+  }
+
+  @override
+  String get browserErrObservationRequired =>
+      '계속하기 전에 페이지를 확인하세요. 이전 작업이 확인되지 않았습니다.';
 }

@@ -4401,7 +4401,6 @@
   "contextSummaryTitle": "컨텍스트 요약",
   "contextKeepInvalid": "사용자 메시지 수를 양의 정수로 입력하세요.",
   "compressTaskAbandon": "포기",
-  "browserAgentTimedOut": "작업 시간 초과, AI 일시 중지됨",
   "compressCancelledSnack": "취소되었습니다. 컨텍스트는 변경되지 않았습니다.",
   "contextImpactClearTitle": "이전 지우기를 취소하시겠습니까?",
   "compressTaskWaitingApproval": "도구 승인을 기다리는 중입니다",
@@ -4549,7 +4548,7 @@
   "contextTaskQueued": "대기 중 — 압축 대기",
   "contextNewConversation": "요약으로 새 채팅 만들기",
   "contextUnknownLimit": "한도 알 수 없음",
-  "browserErrActionTimeout": "작업 시간 초과, 결과 미확인. 페이지를 확인한 후 AI가 계속하도록 허용하세요.",
+  "browserErrActionTimeout": "작업 시간이 초과되었습니다. 결과를 확인할 수 없습니다. 어시스턴트가 계속하기 전에 페이지를 확인할 수 있습니다.",
   "toolPermissionRequestApprovalDesc": "작업 공간 외부 파일 접근, 데스크톱 명령 및 기타 승인이 필요한 도구는 실행 전에 확인합니다.",
   "contextLimitedInputHint": "선택한 문자 범위만 읽습니다. 대체된 기록의 나머지 내용은 요약에 포함되지 않으며 원본 메시지는 계속 확인할 수 있습니다.",
   "contextTaskCancelled": "압축이 취소되었습니다",
@@ -4914,5 +4913,9 @@
   "compressionOutputBudgetHint": "사고 과정과 요약 본문을 포함합니다. 비워 두면 요약 목표 길이와 같습니다. 사고가 켜져 있으면 요약 목표 길이를 늘리지 않고 이 한도를 높일 수 있습니다. 모델 자체의 출력 한도는 여전히 적용됩니다.",
   "responseOutputLimitReached": "응답이 잘렸습니다: 출력 한도에 추론이 포함됩니다. 출력 한도를 늘리거나 추론을 줄인 후 다시 시도하세요.",
   "responseContextLimitReached": "응답이 잘렸습니다: 이번 요청은 입력 토큰 {inputTokens}개를 사용해 {contextWindow} 토큰 컨텍스트 한도에 근접했습니다. 컨텍스트를 줄인 후 다시 시도하세요.",
-  "responseRetryWithoutImages": "이미지 없이 재시도(원본 유지)"
+  "responseRetryWithoutImages": "이미지 없이 재시도(원본 유지)",
+  "browserOperationTimeout": "작업 시간 초과",
+  "browserOperationTimeoutDescription": "브라우저 명령의 최대 대기 시간입니다. 시간 초과 후 어시스턴트가 페이지 상태를 확인할 수 있습니다.",
+  "browserOperationTimeoutSeconds": "{seconds}초",
+  "browserErrObservationRequired": "계속하기 전에 페이지를 확인하세요. 이전 작업이 확인되지 않았습니다."
 }

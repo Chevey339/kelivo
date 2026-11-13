@@ -7263,7 +7263,6 @@
     "description": "Detail line describing the summary input mode and its source; {mode} and {source} are filled in."
   },
   "compressTaskAbandon": "Dismiss",
-  "browserAgentTimedOut": "Operation timed out; AI paused",
   "compressCancelledSnack": "Cancelled. The context is unchanged.",
   "contextImpactClearTitle": "Undo the earlier clear?",
   "@contextBudgetInfo": {
@@ -7641,7 +7640,7 @@
   "contextTaskQueued": "Queued — waiting for compression",
   "contextNewConversation": "Create a new chat with the summary",
   "contextUnknownLimit": "unknown limit",
-  "browserErrActionTimeout": "Operation timed out; outcome unknown. Check the page before allowing AI to continue.",
+  "browserErrActionTimeout": "Operation timed out; outcome unknown. AI can inspect the page before continuing.",
   "toolPermissionRequestApprovalDesc": "Kelivo will ask before accessing files outside the workspace, running desktop commands, or using other tools that need approval.",
   "contextLimitedInputHint": "Only the selected character window is read. The rest of the replaced history is not included in the summary; original messages remain available.",
   "contextTaskCancelled": "Compression cancelled",
@@ -20568,9 +20567,6 @@
   "@compressTaskAbandon": {
     "description": "Destructive action label to dismiss/abandon a compression task."
   },
-  "@browserAgentTimedOut": {
-    "description": "Browser agent status chip label shown when an operation timed out and the AI was paused."
-  },
   "@compressCancelledSnack": {
     "description": "Snackbar confirming compression was cancelled and the current context is unchanged."
   },
@@ -20941,7 +20937,7 @@
     "description": "Fallback text shown when the context token limit is unknown."
   },
   "@browserErrActionTimeout": {
-    "description": "Error message when a browser action timed out with unknown outcome; asks the user to check the page before letting the AI continue."
+    "description": "Browser tool error summary for a timed-out command with an unconfirmed outcome. Browser control remains available for the assistant to inspect the page; this does not request manual permission to resume."
   },
   "@toolPermissionRequestApprovalDesc": {
     "description": "Description of the approval-required permission mode: tools accessing files outside the workspace or running desktop commands ask before executing."
@@ -21910,5 +21906,26 @@
   "responseRetryWithoutImages": "Retry without images (keep originals)",
   "@responseRetryWithoutImages": {
     "description": "Action below a truncated assistant reply whose final request contained images. Regenerates once with all image inputs omitted for that generation, including tool follow-ups, without deleting attachments or changing saved settings."
+  },
+  "browserOperationTimeout": "Operation timeout",
+  "browserOperationTimeoutDescription": "Maximum wait for a browser command. The assistant can check the page after a timeout.",
+  "browserOperationTimeoutSeconds": "{seconds} seconds",
+  "@browserOperationTimeout": {
+    "description": "Browser settings row and picker title for the maximum wait for an individual native browser command."
+  },
+  "@browserOperationTimeoutDescription": {
+    "description": "Explanatory text in the browser operation-timeout picker. Describes the command deadline and that the assistant can inspect the page after a timeout."
+  },
+  "@browserOperationTimeoutSeconds": {
+    "description": "Selected value and picker option in browser operation-timeout settings. The integer seconds placeholder is the maximum command wait in seconds.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "browserErrObservationRequired": "Inspect the page before continuing; the previous operation is unconfirmed.",
+  "@browserErrObservationRequired": {
+    "description": "Browser tool error summary when a page-changing command was not sent because an earlier command timed out. The assistant must successfully read a snapshot or extract before further changes; no manual resume permission is needed."
   }
 }

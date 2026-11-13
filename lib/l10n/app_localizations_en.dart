@@ -15006,9 +15006,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressTaskAbandon => 'Dismiss';
 
   @override
-  String get browserAgentTimedOut => 'Operation timed out; AI paused';
-
-  @override
   String get compressCancelledSnack => 'Cancelled. The context is unchanged.';
 
   @override
@@ -15545,7 +15542,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserErrActionTimeout =>
-      'Operation timed out; outcome unknown. Check the page before allowing AI to continue.';
+      'Operation timed out; outcome unknown. AI can inspect the page before continuing.';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -16842,4 +16839,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get responseRetryWithoutImages =>
       'Retry without images (keep originals)';
+
+  @override
+  String get browserOperationTimeout => 'Operation timeout';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      'Maximum wait for a browser command. The assistant can check the page after a timeout.';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds seconds';
+  }
+
+  @override
+  String get browserErrObservationRequired =>
+      'Inspect the page before continuing; the previous operation is unconfirmed.';
 }

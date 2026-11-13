@@ -28,6 +28,18 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('browser tool input contract', () {
+    test('accepts navigation and condition waits up to two minutes', () {
+      for (final timeout in [60000, 120000]) {
+        expect(
+          BrowserToolsService.validateArguments({
+            'action': 'wait',
+            'timeout': timeout,
+          })['timeout'],
+          timeout,
+        );
+      }
+    });
+
     test('rejects local schemes, credentials and malformed action inputs', () {
       for (final arguments in <Map<String, dynamic>>[
         {'action': 'open', 'url': 'file:///etc/passwd'},
@@ -47,7 +59,7 @@ void main() {
         {'action': 'extract', 'offset': -1},
         {'action': 'close_tab'},
         {'action': 'snapshot', 'max_elements': 201},
-        {'action': 'wait', 'timeout': 99999},
+        {'action': 'wait', 'timeout': 120001},
         {'action': 'evaluate', 'script': ''},
         {'action': 'snapshot', 'include_screenshot': 'true'},
         {'action': 'snapshot', 'include_text': 'false'},
@@ -593,6 +605,82 @@ void main() {
     },
   );
 
+  test(
+    'a stalled condition read respects its own remaining wait budget',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      final engine = engines.values.single;
+      final pending = Completer<void>();
+      engine.onEvaluation = () async {
+        if (engine.scripts.last.contains('const action = "wait"')) {
+          await pending.future;
+        }
+      };
+      try {
+        final result = payload(
+          await tools
+              .handle('chat-a', {
+                'action': 'wait',
+                'wait_for': '#late',
+                'timeout': 100,
+              }, capturePreview: false)
+              .timeout(const Duration(seconds: 2)),
+        );
+        expect(result['error_code'], 'browser_wait_timeout');
+        expect(result['outcome_unknown'], isFalse);
+        expect(browser.agentPaused, isFalse);
+        expect(pending.isCompleted, isFalse);
+      } finally {
+        pending.complete();
+      }
+      engine.onEvaluation = null;
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'snapshot'}))['ok'],
+        isTrue,
+      );
+    },
+  );
+
+  for (final action in ['click', 'screenshot']) {
+    test(
+      '$action reports whether it completed before an attached wait failed',
+      () async {
+        await enable();
+        await tools.handle('chat-a', {
+          'action': 'open',
+          'url': 'https://example.com',
+        });
+        final result = payload(
+          await tools.handle('chat-a', {
+            'action': action,
+            if (action == 'click') 'selector': '#submit',
+            'wait_for': '#late',
+            'timeout': 100,
+          }, capturePreview: false),
+        );
+        expect(result['error_code'], 'browser_wait_timeout');
+        expect(result['outcome_unknown'], isFalse);
+        if (action == 'click') {
+          expect(result['details']['action_completed'], isTrue);
+          expect(result['next_action'], contains('Do not repeat'));
+          expect(
+            engines.values.single.scripts.where(
+              (script) => script.contains('const action = "click"'),
+            ),
+            hasLength(1),
+          );
+        } else {
+          expect((result['details'] as Map?)?['action_completed'], isNull);
+        }
+        expect(browser.agentPaused, isFalse);
+      },
+    );
+  }
+
   test('selector wait timeout does not pause later browser actions', () async {
     await enable();
     await tools.handle('chat-a', {
@@ -615,7 +703,112 @@ void main() {
   });
 
   test(
-    'unfinished native operation pauses with a timeout reason, not takeover',
+    'later batch mutations wait for a successful snapshot or extraction',
+    () async {
+      await enable();
+      await tools.handle('chat-a', {
+        'action': 'open',
+        'url': 'https://example.com',
+      });
+      final engine = engines.values.single;
+      final tab = browser.tabsForSession('chat-a').single;
+      engine.evaluationError = TimeoutException(
+        'Missing click acknowledgement',
+      );
+      final first = payload(
+        await tools.handle('chat-a', {
+          'action': 'click',
+          'selector': '#submit',
+        }, capturePreview: false),
+      );
+      expect(first['outcome_unknown'], isTrue);
+      engine.evaluationError = null;
+      final sentBefore = engine.scripts.length;
+      final second = payload(
+        await tools.handle('chat-a', {
+          'action': 'type',
+          'selector': '#next',
+          'text': 'later',
+        }, capturePreview: false),
+      );
+      expect(second['error_code'], 'browser_observation_required');
+      expect(second['details']['phase'], 'not_dispatched');
+      expect(engine.scripts.length, sentBefore);
+      expect(browser.agentPaused, isFalse);
+      expect(browser.requiresAgentObservation(tab.id), isTrue);
+      final listed = payload(
+        await tools.handle('chat-a', {'action': 'list_tabs'}),
+      );
+      expect(listed['page']['tabs'].single['requires_observation'], isTrue);
+      // A wait, a screenshot and a failed snapshot must not acknowledge the outcome.
+      engine.waitReady = true;
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'wait'}))['ok'],
+        isTrue,
+      );
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'screenshot'}))['ok'],
+        isTrue,
+      );
+      engine.domError = 'element_not_found';
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'snapshot'}))['ok'],
+        isFalse,
+      );
+      expect(browser.requiresAgentObservation(tab.id), isTrue);
+      engine.domError = null;
+      engine.waitReady = false;
+      final failedObservation = payload(
+        await tools.handle('chat-a', {
+          'action': 'snapshot',
+          'wait_for': '#never',
+          'timeout': 100,
+        }, capturePreview: false),
+      );
+      expect(failedObservation['error_code'], 'browser_wait_timeout');
+      expect(browser.requiresAgentObservation(tab.id), isTrue);
+      expect(
+        payload(
+          await tools.handle('chat-a', {
+            'action': 'type',
+            'selector': '#next',
+            'text': 'later',
+          }, capturePreview: false),
+        )['error_code'],
+        'browser_observation_required',
+      );
+      // Recovery navigation remains available but still needs a fresh observation.
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'reload'}))['ok'],
+        isTrue,
+      );
+      expect(browser.requiresAgentObservation(tab.id), isTrue);
+      expect(
+        payload(await tools.handle('chat-a', {'action': 'extract'}))['ok'],
+        isTrue,
+      );
+      expect(browser.requiresAgentObservation(tab.id), isFalse);
+      expect(
+        payload(
+          await tools.handle('chat-a', {
+            'action': 'type',
+            'selector': '#next',
+            'text': 'later',
+          }),
+        )['ok'],
+        isTrue,
+      );
+      expect(
+        engine.scripts.where(
+          (script) => script.contains('const action = "type"'),
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'native mutation timeout allows inspection without replay or permission',
     () async {
       await enable();
       await tools.handle('chat-a', {
@@ -632,39 +825,53 @@ void main() {
           'selector': '#submit',
         }),
       );
-      expect(
-        result['error_code'],
-        contains('browser_action_timeout_outcome_unknown'),
-      );
-      expect(
-        browser.agentPauseFor('chat-a')?.reason,
-        BrowserAgentPauseReason.timeout,
-      );
-      expect(browser.agentPaused, isTrue);
-      expect(browser.agentPauseFor('chat-a'), isNotNull);
-      expect(engine.stopCalls, 1);
-      final blocked = payload(
-        await tools.handle('chat-a', {'action': 'snapshot'}),
-      );
-      expect(
-        blocked['error_code'],
-        contains('browser_action_timeout_outcome_unknown'),
-      );
-      expect(blocked['error'], isNot(contains('browser_human_control')));
-
-      engine.evaluationError = null;
-      browser.allowAgentControl(sessionId: 'chat-a');
-      expect(
-        payload(await tools.handle('chat-a', {'action': 'snapshot'}))['ok'],
-        isTrue,
-      );
+      expect(result['error_code'], 'browser_action_timeout_outcome_unknown');
+      expect(result['recoverable'], isTrue);
+      expect(result['outcome_unknown'], isTrue);
+      expect(result['details']['page_responsive'], isTrue);
+      expect(result['details']['may_have_late_effects'], isTrue);
+      expect(engine.stopCalls, 0);
       expect(browser.agentPaused, isFalse);
+      expect(
+        engine.scripts.where(
+          (script) => script.contains('const action = "click"'),
+        ),
+        hasLength(1),
+      );
+      engine.evaluationError = null;
+      for (final action in ['snapshot', 'extract']) {
+        expect(
+          payload(await tools.handle('chat-a', {'action': action}))['ok'],
+          isTrue,
+        );
+      }
     },
   );
 
+  test('read timeout is recoverable without an unknown mutation', () async {
+    await enable();
+    final tab = await browser.createTab(ownerSessionId: 'chat-a');
+    await browser.evaluateJavascript('prepare', tabId: tab.id);
+    final engine = engines[tab.id]!;
+    engine.evaluationError = TimeoutException('Read timed out');
+    final result = payload(
+      await tools.handle('chat-a', {'action': 'snapshot'}),
+    );
+    expect(result['error_code'], 'browser_read_timeout');
+    expect(result['outcome_unknown'], isFalse);
+    expect(result['recoverable'], isTrue);
+    expect(result['details']['may_have_late_effects'], isFalse);
+    expect(browser.agentPaused, isFalse);
+    engine.evaluationError = null;
+    expect(
+      payload(await tools.handle('chat-a', {'action': 'snapshot'}))['ok'],
+      isTrue,
+    );
+  });
+
   for (final siblingOwner in ['chat-a', null]) {
     test(
-      'timeout isolates sessions and only stops the affected tab ($siblingOwner)',
+      'timeout leaves sibling tabs and conversations usable ($siblingOwner)',
       () async {
         await enable();
         final a = await browser.createTab(ownerSessionId: 'chat-a');
@@ -682,8 +889,7 @@ void main() {
           }, capturePreview: false),
         );
         expect(failure['error_code'], 'browser_action_timeout_outcome_unknown');
-        expect(engines[a.id]!.stopCalls, 1);
-        for (final tab in [sibling, b]) {
+        for (final tab in [a, sibling, b]) {
           expect(engines[tab.id]!.stopCalls, 0);
         }
         for (final session in ['chat-a', 'chat-b']) {
@@ -691,34 +897,27 @@ void main() {
             await tools.handle(session, {'action': 'list_tabs'}),
           );
           expect(listed['ok'], isTrue);
-          expect(listed['page']['agent_paused'], session == 'chat-a');
+          expect(listed['page']['agent_paused'], isFalse);
           expect(
             (listed['page']['tabs'] as List).map((tab) => tab['tab_id']),
             session == 'chat-a'
                 ? [a.id, if (siblingOwner == 'chat-a') sibling.id]
                 : [b.id],
           );
-          if (session == 'chat-a') {
-            expect(listed['page']['pause_reason'], 'timeout');
-            expect(listed['page']['paused_tab_id'], a.id);
-          }
         }
-        for (final action in ['new_tab', 'snapshot']) {
+        for (final tab in [if (siblingOwner == 'chat-a') sibling, b]) {
           expect(
             payload(
-              await tools.handle('chat-a', {'action': action}),
-            )['error_code'],
-            'browser_action_timeout_outcome_unknown',
+              await tools.handle(tab.ownerSessionId!, {
+                'action': 'snapshot',
+                'tab_id': tab.id,
+              }, capturePreview: false),
+            )['ok'],
+            isTrue,
           );
         }
-        browser.allowAgentControl(sessionId: 'chat-b');
-        expect(browser.agentPauseFor('chat-a'), isNotNull);
         expect(
-          payload(
-            await tools.handle('chat-b', {
-              'action': 'snapshot',
-            }, capturePreview: false),
-          )['ok'],
+          payload(await tools.handle('chat-a', {'action': 'new_tab'}))['ok'],
           isTrue,
         );
       },
@@ -726,7 +925,7 @@ void main() {
   }
 
   test(
-    'timeout permits owned-tab cleanup without resuming page actions',
+    'timeout permits owned-tab cleanup and replacement without manual resume',
     () async {
       await enable();
       final a = await browser.createTab(ownerSessionId: 'chat-a');
@@ -751,17 +950,7 @@ void main() {
       expect(browser.tabsForSession('chat-a'), isEmpty);
       expect(browser.hasLiveEngine(a.id), isFalse);
       expect(browser.tabsForSession('chat-b').single.id, b.id);
-      expect(
-        browser.agentPauseFor('chat-a')?.reason,
-        BrowserAgentPauseReason.timeout,
-      );
-      expect(
-        payload(
-          await tools.handle('chat-a', {'action': 'new_tab'}),
-        )['error_code'],
-        'browser_action_timeout_outcome_unknown',
-      );
-      browser.allowAgentControl(sessionId: 'chat-a');
+      expect(browser.agentPaused, isFalse);
       expect(
         payload(await tools.handle('chat-a', {'action': 'new_tab'}))['ok'],
         isTrue,
@@ -809,7 +998,7 @@ void main() {
   );
 
   test(
-    'multiple pauses retain independent reasons and resume independently',
+    'timeout recovery never resumes a different conversation under human control',
     () async {
       await enable();
       final a = await browser.createTab(ownerSessionId: 'chat-a');
@@ -820,10 +1009,7 @@ void main() {
         'action': 'snapshot',
       }, capturePreview: false);
       browser.takeOver(sessionId: 'chat-b', tabId: b.id);
-      expect(
-        browser.agentPauseFor('chat-a')?.reason,
-        BrowserAgentPauseReason.timeout,
-      );
+      expect(browser.agentPauseFor('chat-a'), isNull);
       expect(
         browser.agentPauseFor('chat-b')?.reason,
         BrowserAgentPauseReason.user,
@@ -863,7 +1049,7 @@ void main() {
   );
 
   test(
-    'a queued timeout close remains subject to a later human takeover',
+    'a queued recovery close remains subject to a later human takeover',
     () async {
       await enable();
       final a = await browser.createTab(ownerSessionId: 'chat-a');
@@ -1511,6 +1697,13 @@ class _Engine extends BrowserEngine {
 
   @override
   Future<Object?> evaluate(String source, {bool awaitPromise = false}) async {
+    if (source.contains('kelivo_health')) {
+      return jsonEncode({
+        'kelivo_health': true,
+        'url': documentUrl,
+        'ready_state': 'complete',
+      });
+    }
     scripts.add(source);
     lastAwaitPromise = awaitPromise;
     if (onEvaluation != null) await onEvaluation!();

@@ -26538,12 +26538,6 @@ abstract class AppLocalizations {
   /// **'Dismiss'**
   String get compressTaskAbandon;
 
-  /// Browser agent status chip label shown when an operation timed out and the AI was paused.
-  ///
-  /// In en, this message translates to:
-  /// **'Operation timed out; AI paused'**
-  String get browserAgentTimedOut;
-
   /// Snackbar confirming compression was cancelled and the current context is unchanged.
   ///
   /// In en, this message translates to:
@@ -27426,10 +27420,10 @@ abstract class AppLocalizations {
   /// **'unknown limit'**
   String get contextUnknownLimit;
 
-  /// Error message when a browser action timed out with unknown outcome; asks the user to check the page before letting the AI continue.
+  /// Browser tool error summary for a timed-out command with an unconfirmed outcome. Browser control remains available for the assistant to inspect the page; this does not request manual permission to resume.
   ///
   /// In en, this message translates to:
-  /// **'Operation timed out; outcome unknown. Check the page before allowing AI to continue.'**
+  /// **'Operation timed out; outcome unknown. AI can inspect the page before continuing.'**
   String get browserErrActionTimeout;
 
   /// Description of the approval-required permission mode: tools accessing files outside the workspace or running desktop commands ask before executing.
@@ -29621,6 +29615,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry without images (keep originals)'**
   String get responseRetryWithoutImages;
+
+  /// Browser settings row and picker title for the maximum wait for an individual native browser command.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation timeout'**
+  String get browserOperationTimeout;
+
+  /// Explanatory text in the browser operation-timeout picker. Describes the command deadline and that the assistant can inspect the page after a timeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum wait for a browser command. The assistant can check the page after a timeout.'**
+  String get browserOperationTimeoutDescription;
+
+  /// Selected value and picker option in browser operation-timeout settings. The integer seconds placeholder is the maximum command wait in seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} seconds'**
+  String browserOperationTimeoutSeconds(int seconds);
+
+  /// Browser tool error summary when a page-changing command was not sent because an earlier command timed out. The assistant must successfully read a snapshot or extract before further changes; no manual resume permission is needed.
+  ///
+  /// In en, this message translates to:
+  /// **'Inspect the page before continuing; the previous operation is unconfirmed.'**
+  String get browserErrObservationRequired;
 }
 
 class _AppLocalizationsDelegate
