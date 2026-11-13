@@ -3431,14 +3431,14 @@
   "logViewerCurrentLog": "Current Log",
   "logViewerExport": "Export",
   "logViewerOpenFolder": "Open Logs Folder",
-  "logViewerRequestsCount": "{count} requests",
+  "logViewerRequestsCount": "{count} loaded requests",
   "@logViewerRequestsCount": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     },
-    "description": "Header count label showing how many requests are in the log; {count} is the integer total."
+    "description": "Summary in the request log viewer. The count is the number of request instances loaded so far, not a total for the entire file; it increases as earlier pages load."
   },
   "logViewerFieldId": "ID",
   "logViewerFieldMethod": "Method",

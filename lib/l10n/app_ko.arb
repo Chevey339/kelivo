@@ -2270,7 +2270,7 @@
   "logViewerCurrentLog": "현재 로그",
   "logViewerExport": "내보내기",
   "logViewerOpenFolder": "로그 폴더 열기",
-  "logViewerRequestsCount": "요청 {count}개",
+  "logViewerRequestsCount": "요청 {count}개 로드됨",
   "logViewerFieldId": "ID",
   "logViewerFieldMethod": "메서드",
   "logViewerFieldStatus": "상태",

@@ -2695,7 +2695,7 @@
   "logViewerCurrentLog": "当前日志",
   "logViewerExport": "导出",
   "logViewerOpenFolder": "打开日志目录",
-  "logViewerRequestsCount": "{count} 条请求",
+  "logViewerRequestsCount": "已加载 {count} 条请求",
   "logViewerFieldId": "ID",
   "logViewerFieldMethod": "方法",
   "logViewerFieldStatus": "状态",

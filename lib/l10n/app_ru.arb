@@ -2270,7 +2270,7 @@
   "logViewerCurrentLog": "Текущий лог",
   "logViewerExport": "Экспорт",
   "logViewerOpenFolder": "Открыть папку логов",
-  "logViewerRequestsCount": "{count} запросов",
+  "logViewerRequestsCount": "Загружено запросов: {count}",
   "logViewerFieldId": "ID",
   "logViewerFieldMethod": "Метод",
   "logViewerFieldStatus": "Статус",

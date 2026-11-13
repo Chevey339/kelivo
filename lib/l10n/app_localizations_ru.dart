@@ -7676,7 +7676,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String logViewerRequestsCount(int count) {
-    return '$count запросов';
+    return 'Загружено запросов: $count';
   }
 
   @override

@@ -7369,7 +7369,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String logViewerRequestsCount(int count) {
-    return '요청 $count개';
+    return '요청 $count개 로드됨';
   }
 
   @override

@@ -7627,7 +7627,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String logViewerRequestsCount(int count) {
-    return '$count istek';
+    return '$count yüklenen istek';
   }
 
   @override

@@ -2270,7 +2270,7 @@
   "logViewerCurrentLog": "Geçerli Günlük",
   "logViewerExport": "Dışa aktar",
   "logViewerOpenFolder": "Günlük Klasörünü Aç",
-  "logViewerRequestsCount": "{count} istek",
+  "logViewerRequestsCount": "{count} yüklenen istek",
   "logViewerFieldId": "ID",
   "logViewerFieldMethod": "Yöntem",
   "logViewerFieldStatus": "Durum",

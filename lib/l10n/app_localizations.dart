@@ -13741,10 +13741,10 @@ abstract class AppLocalizations {
   /// **'Open Logs Folder'**
   String get logViewerOpenFolder;
 
-  /// Header count label showing how many requests are in the log; {count} is the integer total.
+  /// Summary in the request log viewer. The count is the number of request instances loaded so far, not a total for the entire file; it increases as earlier pages load.
   ///
   /// In en, this message translates to:
-  /// **'{count} requests'**
+  /// **'{count} loaded requests'**
   String logViewerRequestsCount(int count);
 
   /// Field label for the request's numeric ID in the log entry detail summary.

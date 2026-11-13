@@ -7259,7 +7259,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String logViewerRequestsCount(int count) {
-    return '$count 条请求';
+    return '已加载 $count 条请求';
   }
 
   @override
@@ -23226,7 +23226,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String logViewerRequestsCount(int count) {
-    return '$count 条请求';
+    return '已加载 $count 条请求';
   }
 
   @override
@@ -39194,7 +39194,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String logViewerRequestsCount(int count) {
-    return '$count 個請求';
+    return '已載入 $count 筆請求';
   }
 
   @override

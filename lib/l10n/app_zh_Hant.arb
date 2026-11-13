@@ -2270,7 +2270,7 @@
   "logViewerCurrentLog": "目前日誌",
   "logViewerExport": "匯出",
   "logViewerOpenFolder": "開啟日誌目錄",
-  "logViewerRequestsCount": "{count} 個請求",
+  "logViewerRequestsCount": "已載入 {count} 筆請求",
   "logViewerFieldId": "ID",
   "logViewerFieldMethod": "方法",
   "logViewerFieldStatus": "狀態",
