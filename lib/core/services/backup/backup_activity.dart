@@ -14,6 +14,8 @@ final class BackupActivity {
   BackupActivity._();
 
   static int _depth = 0;
+  static Future<void>? _automaticTask;
+  static void Function()? _cancelAutomatic;
 
   /// Whether any backup-class task is running right now.
   static bool get isActive => _depth > 0;
@@ -24,6 +26,33 @@ final class BackupActivity {
     if (_depth > 0) _depth -= 1;
   }
 
+  /// A manual backup or restore takes priority over an unattended upload.
+  /// Callers first [begin], then wait here before touching business data.
+  static Future<void> cancelAutomaticAndWait() async {
+    final task = _automaticTask;
+    if (task == null) return;
+    _cancelAutomatic?.call();
+    await task;
+  }
+
+  static void registerAutomatic(Future<void> task, void Function() cancel) {
+    if (_automaticTask != null) {
+      throw StateError('automatic_backup_already_running');
+    }
+    _automaticTask = task;
+    _cancelAutomatic = cancel;
+  }
+
+  static void clearAutomatic(Future<void> task) {
+    if (!identical(_automaticTask, task)) return;
+    _automaticTask = null;
+    _cancelAutomatic = null;
+  }
+
   /// Test-only: drops any depth a failed test left behind.
-  static void debugReset() => _depth = 0;
+  static void debugReset() {
+    _depth = 0;
+    _automaticTask = null;
+    _cancelAutomatic = null;
+  }
 }

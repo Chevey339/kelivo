@@ -2297,6 +2297,121 @@ class AppLocalizationsTr extends AppLocalizations {
   String get backupPageImportFromChatbox => 'Chatbox\'tan İçe Aktar';
 
   @override
+  String get webDavScheduleTitle => 'Zamanlanmış WebDAV Yedekleme';
+
+  @override
+  String get webDavScheduleEnabled => 'Otomatik yedekleme';
+
+  @override
+  String get webDavScheduleInterval => 'Tekrarlama aralığı';
+
+  @override
+  String get webDavScheduleWifiOnly => 'Yalnızca Wi-Fi / Ethernet';
+
+  @override
+  String get webDavScheduleWifiOnlyHint =>
+      'Yükleme için Wi-Fi veya Ethernet kullanılır. Android arka plan yedekleri ayrıca tarifesiz bir bağlantı bekler.';
+
+  @override
+  String get webDavScheduleAndroidHint =>
+      'Android, yedeklemeleri arka planda çalıştırır. Pil ve ağ kısıtlamaları gecikmeye neden olabilir. Uygulamayı zorla durdurmak, yeniden açılana kadar yedeklemeleri duraklatır.';
+
+  @override
+  String get webDavScheduleForegroundHint =>
+      'Yedeklemeler uygulama açıkken çalışır. Kaçırılan yedeklemeler uygulamaya döndüğünüzde çalışır.';
+
+  @override
+  String get webDavScheduleConfigureFirst =>
+      'Otomatik yedeklemeyi açmadan önce WebDAV sunucunuzu yapılandırıp kaydedin.';
+
+  @override
+  String get webDavScheduleLastSuccess => 'Son başarılı yedekleme';
+
+  @override
+  String get webDavScheduleNextRun => 'Sonraki yedekleme (yaklaşık)';
+
+  @override
+  String get webDavScheduleStatus => 'Durum';
+
+  @override
+  String get webDavScheduleRunNow => 'Şimdi yedekle';
+
+  @override
+  String get webDavScheduleRunning => 'Yedekleniyor…';
+
+  @override
+  String get webDavScheduleFinishingBackgroundBackup =>
+      'Arka plan yedeklemesi tamamlanıyor…';
+
+  @override
+  String get webDavScheduleReady => 'Sonraki yedekleme bekleniyor';
+
+  @override
+  String get webDavScheduleFailed => 'Son yedekleme başarısız oldu';
+
+  @override
+  String get webDavScheduleDisabled => 'Kapalı';
+
+  @override
+  String get webDavScheduleNotConfigured => 'WebDAV sunucusu yapılandırılmadı';
+
+  @override
+  String webDavScheduleEveryHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Her $hours saatte',
+      one: 'Her saat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get webDavScheduleEveryDay => 'Her gün';
+
+  @override
+  String get webDavScheduleNever => 'Hiçbir zaman';
+
+  @override
+  String get webDavScheduleDue => 'Koşullar uygun olduğunda';
+
+  @override
+  String get webDavScheduleSaved => 'Yedekleme zamanlaması kaydedildi';
+
+  @override
+  String get webDavScheduleSaveFailed => 'Yedekleme zamanlaması kaydedilemedi';
+
+  @override
+  String get webDavScheduleSucceeded => 'Yedek yüklendi';
+
+  @override
+  String get webDavScheduleUnavailable =>
+      'Arka plan zamanlaması kullanılamıyor';
+
+  @override
+  String get webDavScheduleWifiRequired => 'Wi-Fi veya Ethernet bekleniyor';
+
+  @override
+  String get webDavScheduleNetworkUnavailable => 'Ağ bağlantısı bekleniyor';
+
+  @override
+  String get webDavScheduleBackupBusy =>
+      'Başka bir yedekleme veya geri yükleme sürüyor';
+
+  @override
+  String get webDavScheduleRetry => 'Yeniden deneme bekleniyor';
+
+  @override
+  String get webDavScheduleTimedOut => 'Yedekleme zaman aşımına uğradı';
+
+  @override
+  String get webDavSchedulePasswordRequired =>
+      'Şifreli yedekler parola onayı gerektirir. WebDAV yedeğini elle alın veya zamanlanmış yedekleme için yedek şifrelemesini kapatın.';
+
+  @override
+  String get webDavScheduleCancelled => 'Yedekleme iptal edildi';
+
+  @override
   String get backupReminderSectionTitle => 'Yedek Hatırlatıcısı';
 
   @override

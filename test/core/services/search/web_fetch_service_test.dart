@@ -56,6 +56,28 @@ void main() {
           });
           server.listen((socket) {
             sockets.add(socket);
+            void onDisconnected() {
+              stream?.cancel();
+              socket.destroy();
+              if (!disconnected.isCompleted) disconnected.complete();
+            }
+
+            void onSocketError(Object error, StackTrace stack) {
+              if (error is! SocketException) {
+                Error.throwWithStackTrace(error, stack);
+              }
+              onDisconnected();
+            }
+
+            // A timed-out client can reset either half of the connection.
+            // Observe sink errors as well as read-side closure before writing
+            // another streaming chunk.
+            unawaited(
+              socket.done.then<void>(
+                (_) => onDisconnected(),
+                onError: onSocketError,
+              ),
+            );
             socket.listen(
               (_) {
                 if (received.isCompleted) return;
@@ -67,15 +89,16 @@ void main() {
                   stream = Timer.periodic(const Duration(milliseconds: 20), (
                     _,
                   ) {
-                    socket.write('1\r\nx\r\n');
+                    try {
+                      socket.write('1\r\nx\r\n');
+                    } on SocketException {
+                      onDisconnected();
+                    }
                   });
                 }
               },
-              onDone: () {
-                stream?.cancel();
-                socket.destroy();
-                if (!disconnected.isCompleted) disconnected.complete();
-              },
+              onError: onSocketError,
+              onDone: onDisconnected,
             );
           });
           final url = 'http://${server.address.address}:${server.port}';

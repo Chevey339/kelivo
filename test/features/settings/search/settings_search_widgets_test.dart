@@ -11,6 +11,7 @@ import 'package:Kelivo/features/settings/widgets/settings_search_field.dart';
 import 'package:Kelivo/features/settings/widgets/settings_search_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
+import 'package:Kelivo/l10n/app_language.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
@@ -548,7 +549,7 @@ void main() {
             .hitTestable(),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Simplified Chinese'));
+      await tester.tap(find.text(AppLanguage.simplifiedChinese.nativeName));
       await tester.pumpAndSettle();
       expect(settings.appLocale.languageCode, 'zh');
       await tester.binding.handlePopRoute();

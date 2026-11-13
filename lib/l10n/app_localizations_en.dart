@@ -2283,6 +2283,122 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromChatbox => 'Import from Chatbox';
 
   @override
+  String get webDavScheduleTitle => 'Scheduled WebDAV Backup';
+
+  @override
+  String get webDavScheduleEnabled => 'Automatic backup';
+
+  @override
+  String get webDavScheduleInterval => 'Repeat interval';
+
+  @override
+  String get webDavScheduleWifiOnly => 'Wi-Fi / Ethernet only';
+
+  @override
+  String get webDavScheduleWifiOnlyHint =>
+      'Use Wi-Fi or Ethernet for uploads. Android background backups also wait for an unmetered connection.';
+
+  @override
+  String get webDavScheduleAndroidHint =>
+      'Android runs backups in the background. Battery and network restrictions may delay them. Force-stopping the app pauses backups until it is opened again.';
+
+  @override
+  String get webDavScheduleForegroundHint =>
+      'Backups run while the app is open. Missed backups run when you return.';
+
+  @override
+  String get webDavScheduleConfigureFirst =>
+      'Configure and save your WebDAV server before enabling automatic backup.';
+
+  @override
+  String get webDavScheduleLastSuccess => 'Last successful backup';
+
+  @override
+  String get webDavScheduleNextRun => 'Next backup (approx.)';
+
+  @override
+  String get webDavScheduleStatus => 'Status';
+
+  @override
+  String get webDavScheduleRunNow => 'Run backup now';
+
+  @override
+  String get webDavScheduleRunning => 'Backing up…';
+
+  @override
+  String get webDavScheduleFinishingBackgroundBackup =>
+      'Finishing background backup…';
+
+  @override
+  String get webDavScheduleReady => 'Waiting for next backup';
+
+  @override
+  String get webDavScheduleFailed => 'Last backup failed';
+
+  @override
+  String get webDavScheduleDisabled => 'Disabled';
+
+  @override
+  String get webDavScheduleNotConfigured => 'WebDAV server is not configured';
+
+  @override
+  String webDavScheduleEveryHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Every $hours hours',
+      one: 'Every hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get webDavScheduleEveryDay => 'Every day';
+
+  @override
+  String get webDavScheduleNever => 'Never';
+
+  @override
+  String get webDavScheduleDue => 'When conditions allow';
+
+  @override
+  String get webDavScheduleSaved => 'Backup schedule saved';
+
+  @override
+  String get webDavScheduleSaveFailed => 'Could not save the backup schedule';
+
+  @override
+  String get webDavScheduleSucceeded => 'Backup uploaded';
+
+  @override
+  String get webDavScheduleUnavailable =>
+      'Background scheduling is unavailable';
+
+  @override
+  String get webDavScheduleWifiRequired => 'Waiting for Wi-Fi or Ethernet';
+
+  @override
+  String get webDavScheduleNetworkUnavailable =>
+      'Waiting for a network connection';
+
+  @override
+  String get webDavScheduleBackupBusy =>
+      'Another backup or restore is in progress';
+
+  @override
+  String get webDavScheduleRetry => 'Waiting to retry';
+
+  @override
+  String get webDavScheduleTimedOut => 'Backup timed out';
+
+  @override
+  String get webDavSchedulePasswordRequired =>
+      'Encrypted backups require password confirmation. Use manual WebDAV backup, or turn off backup encryption to use scheduled backups.';
+
+  @override
+  String get webDavScheduleCancelled => 'Backup cancelled';
+
+  @override
   String get backupReminderSectionTitle => 'Backup Reminder';
 
   @override

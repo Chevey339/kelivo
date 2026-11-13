@@ -78,7 +78,7 @@ void main() {
         : ThemePalettes.defaultPalette.light;
     final original = MarkstreamTheme.fromColorScheme(scheme);
     testWidgets(
-      'transparent PlantUML keeps its canvas; code keeps local colors, dark=$dark',
+      'transparent PlantUML keeps its canvas; code preserves wallpaper contrast, dark=$dark',
       (tester) async {
         final settings = await _settings();
         addTearDown(settings.dispose);
@@ -145,7 +145,7 @@ void main() {
             );
             expect(
               code.theme.code.text.color,
-              dark ? Colors.black : Colors.white,
+              dark ? Colors.white : Colors.black,
             );
             final preview = tester.widget<ColoredBox>(
               find
