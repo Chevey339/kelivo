@@ -6,6 +6,7 @@
  import SwiftUI
  import Translation
  import UniformTypeIdentifiers
+ import Photos
 
 
 @main
@@ -84,7 +85,7 @@
       let fileSaveChannel = FlutterMethodChannel(name: "app.file_save", binaryMessenger: controller.binaryMessenger)
       fileSaveHandler.presentingViewController = controller
       fileSaveChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
-        guard call.method == "saveFileFromPath" else {
+        guard call.method == "saveFileFromPath" || call.method == "saveImageToGallery" else {
           result(FlutterMethodNotImplemented)
           return
         }
@@ -429,6 +430,11 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
       return
     }
 
+    if call.method == "saveImageToGallery" {
+      saveImageToGallery(at: sourceURL, result: result)
+      return
+    }
+
     guard let presenter = topViewController(from: presentingViewController) else {
       result(FlutterError(code: "unavailable", message: "Unable to present document picker.", details: nil))
       return
@@ -475,6 +481,31 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
         }
 
         presenter.present(picker, animated: true)
+      }
+    }
+  }
+
+  private func saveImageToGallery(at source: URL, result: @escaping FlutterResult) {
+    PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+      guard status == .authorized else {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "photo_permission_denied", message: "Permission to add photos was denied.", details: nil))
+        }
+        return
+      }
+
+      PHPhotoLibrary.shared().performChanges({
+        PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: source, options: nil)
+      }) { success, error in
+        // Saving only needs add access. Reading the asset back would fail when
+        // Photos read access is denied, even though the original was saved.
+        DispatchQueue.main.async {
+          if success {
+            result(true)
+          } else {
+            result(FlutterError(code: "save_failed", message: error?.localizedDescription ?? "Unable to save image to Photos.", details: nil))
+          }
+        }
       }
     }
   }

@@ -1,11 +1,26 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/utils/safe_resize_image.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:image/image.dart' as image_lib;
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+
+// Two frames with different colors, a frame delay, and infinite looping.
+const _animatedGifBase64 =
+    'R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAA'
+    'ACwAAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAP8AAAAAAAAAAAAI'
+    'BgABCAQQEAA7';
 
 const _transparentPngDataUrl =
     'data:image/png;base64,'
@@ -181,7 +196,165 @@ Finder _displayTransformFinder(int index) {
   return find.byKey(ValueKey('image-viewer-display-transform-$index'));
 }
 
+class _ViewerSavePathProvider extends PathProviderPlatform {
+  _ViewerSavePathProvider(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getTemporaryPath() async => path;
+}
+
 void main() {
+  group('saving GIFs to the gallery', () {
+    late Directory temporaryDirectory;
+    late PathProviderPlatform previousPaths;
+    const channel = MethodChannel('image_gallery_saver_plus');
+    const nativeChannel = MethodChannel('app.file_save');
+
+    setUp(() {
+      temporaryDirectory = Directory.systemTemp.createTempSync(
+        'kelivo_viewer_save_test_',
+      );
+      previousPaths = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _ViewerSavePathProvider(
+        temporaryDirectory.path,
+      );
+    });
+
+    tearDown(() {
+      PathProviderPlatform.instance = previousPaths;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(nativeChannel, null);
+      temporaryDirectory.deleteSync(recursive: true);
+    });
+
+    for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+      for (final sourceType in ['data', 'local', 'network', 'denied']) {
+        final denied = sourceType == 'denied';
+        final description = denied
+            ? '$platform reports GIF save failure and removes temporary files'
+            : '$platform preserves the original $sourceType GIF';
+        testWidgets(description, (tester) async {
+          _setTestViewSize(tester, _mobileSize);
+          final original = base64Decode(_animatedGifBase64);
+          // Misleading extensions and MIME hints must not turn a GIF into JPEG.
+          final source = switch (sourceType) {
+            'local' => File(
+              '${temporaryDirectory.path}/original.jpg',
+            )..writeAsBytesSync(original),
+            'network' => 'https://example.com/generated-image',
+            _ => 'data:image/png;base64,$_animatedGifBase64',
+          };
+          final sourcePath = source is File ? source.path : source as String;
+          final calls = <MethodCall>[];
+          late Completer<void> saved;
+          File? savedFile;
+          Uint8List? savedBytes;
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(
+                platform == TargetPlatform.iOS ? nativeChannel : channel,
+                (call) async {
+                  calls.add(call);
+                  if (call.method == 'saveFileToGallery' ||
+                      call.method == 'saveImageToGallery') {
+                    final path =
+                        call.arguments[platform == TargetPlatform.iOS
+                                ? 'sourcePath'
+                                : 'file']
+                            as String;
+                    savedFile = File(path);
+                    savedBytes = savedFile!.readAsBytesSync();
+                  }
+                  saved.complete();
+                  if (denied) {
+                    throw PlatformException(code: 'photo_permission_denied');
+                  }
+                  return platform == TargetPlatform.iOS
+                      ? true
+                      : {'isSuccess': true};
+                },
+              );
+
+          // A smaller display preview must never replace the original export.
+          await tester.pumpWidget(
+            _viewerApp(
+              images: [sourcePath],
+              imageProviders: {
+                sourcePath: MemoryImage(
+                  Uint8List.fromList(_transparentPngBytes),
+                ),
+              },
+            ),
+          );
+          await tester.pump();
+          final requests = <Uri>[];
+          await tester.runAsync(() async {
+            saved = Completer<void>();
+            await http
+                .runWithClient(
+                  () async {
+                    await tester.tap(find.byTooltip('Save Image'));
+                    await saved.future.timeout(const Duration(seconds: 5));
+                    if (savedFile != null) {
+                      while (await savedFile!.parent.exists()) {
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 1),
+                        );
+                      }
+                    }
+                  },
+                  () => MockClient((request) async {
+                    requests.add(request.url);
+                    return http.Response.bytes(
+                      original,
+                      200,
+                      headers: {'content-type': 'image/jpeg'},
+                    );
+                  }),
+                )
+                .timeout(const Duration(seconds: 5));
+          });
+          await tester.pumpAndSettle();
+
+          expect(calls, hasLength(1));
+          expect(
+            calls.single.method,
+            platform == TargetPlatform.iOS
+                ? 'saveImageToGallery'
+                : 'saveFileToGallery',
+          );
+          expect(savedFile!.path, endsWith('.gif'));
+          expect(savedBytes, orderedEquals(original));
+          expect(image_lib.decodeGif(savedBytes!)!.numFrames, 2);
+          expect(savedFile!.parent.existsSync(), isFalse);
+          final notification =
+              AppSnackBarManager().activeToasts.first.notification;
+          expect(
+            notification.type,
+            denied ? NotificationType.error : NotificationType.success,
+          );
+          expect(
+            notification.message,
+            denied ? contains('photo_permission_denied') : 'Saved to gallery',
+          );
+          expect(
+            requests,
+            sourceType == 'network' ? [Uri.parse(sourcePath)] : isEmpty,
+          );
+          if (source is File) {
+            expect(source.readAsBytesSync(), orderedEquals(original));
+          }
+          AppSnackBarManager().dismissAll();
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox.shrink());
+        }, variant: TargetPlatformVariant({platform}));
+      }
+    }
+  });
+
   testWidgets('ImageViewerPage uses a preloaded provider for the first frame', (
     tester,
   ) async {
