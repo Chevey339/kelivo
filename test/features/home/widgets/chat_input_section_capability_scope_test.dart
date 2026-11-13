@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/services/chat/chat_service.dart';
+import '../../../support/mcp_presentation_harness.dart';
 import 'dart:convert';
 
 import 'package:Kelivo/core/providers/asr_provider.dart';
@@ -68,6 +70,7 @@ void main() {
     required AssistantProvider assistants,
     required bool isConversationOverride,
     SettingsProvider? settingsOverride,
+    McpProvider? mcpOverride,
     bool supportsReasoning = false,
     String? providerKey = 'SomeProvider',
     String? modelId = 'no-tools-model',
@@ -93,9 +96,13 @@ void main() {
             create: (_) =>
                 InstructionInjectionProvider(preferences: preferences),
           ),
-          ChangeNotifierProvider(
-            create: (_) => McpProvider(preferences: preferences),
-          ),
+          ChangeNotifierProvider(create: (_) => ChatService()),
+          if (mcpOverride != null)
+            ChangeNotifierProvider<McpProvider>.value(value: mcpOverride)
+          else
+            ChangeNotifierProvider(
+              create: (_) => McpProvider(preferences: preferences),
+            ),
           ChangeNotifierProvider(
             create: (_) => QuickPhraseProvider(preferences: preferences),
           ),
@@ -406,6 +413,44 @@ void main() {
       );
     },
   );
+
+  testWidgets('selected offline MCP stays selected and marks the tools entry', (
+    tester,
+  ) async {
+    final assistants = await loadAssistantWithMcp(tester);
+    final mcp = (await tester.runAsync(() async {
+      final provider = PresentationMcpProvider(preferences: preferences);
+      await provider.loaded;
+      return provider;
+    }))!;
+    mcp.items = [presentationServer('server-1', 'Offline')];
+    mcp.statuses['server-1'] = McpStatus.error;
+    addTearDown(mcp.dispose);
+    await pumpComposer(
+      tester,
+      assistants: assistants,
+      isConversationOverride: true,
+      supportsTools: true,
+      mcpOverride: mcp,
+    );
+    expect(
+      tester.widget<ChatInputBar>(find.byType(ChatInputBar)).toolsActive,
+      isTrue,
+    );
+    expect(
+      find.byKey(const ValueKey('chat-tools-connection-issue')),
+      findsOneWidget,
+    );
+    expect(assistants.getById('assistant-1')!.mcpServerIds, ['server-1']);
+    mcp.statuses['server-1'] = McpStatus.connected;
+    mcp.notifyListeners();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('chat-tools-connection-issue')),
+      findsNothing,
+    );
+    expect(assistants.getById('assistant-1')!.mcpServerIds, ['server-1']);
+  });
 
   Future<void> pumpTabletComposer(
     WidgetTester tester, {

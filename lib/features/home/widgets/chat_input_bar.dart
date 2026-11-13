@@ -664,6 +664,7 @@ class ChatInputBar extends StatefulWidget {
     this.supportsReasoning = true,
     this.showToolsButton = false,
     this.toolsActive = false,
+    this.toolsConnectionIssue = false,
     this.showMiniMapButton = false,
     this.onOpenMiniMap,
     this.onPickCamera,
@@ -733,6 +734,7 @@ class ChatInputBar extends StatefulWidget {
   final bool supportsReasoning;
   final bool showToolsButton;
   final bool toolsActive;
+  final bool toolsConnectionIssue;
   final bool showMiniMapButton;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
@@ -3330,12 +3332,35 @@ class _ChatInputBarState extends State<ChatInputBar>
                 conversationId: widget.showWorkspaceButton
                     ? null
                     : widget.conversationId,
-                child: _CompactIconButton(
-                  tooltip: l10n.chatInputBarToolsTooltip,
-                  icon: Lucide.ToolCase,
-                  active: widget.toolsActive,
-                  onTap: lockTap(widget.onOpenTools),
-                  onLongPress: lockTap(widget.onLongPressTools),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    _CompactIconButton(
+                      tooltip: widget.toolsConnectionIssue
+                          ? '${l10n.chatInputBarToolsTooltip} · ${l10n.mcpPageStatusFailed}'
+                          : l10n.chatInputBarToolsTooltip,
+                      icon: Lucide.ToolCase,
+                      active: widget.toolsActive,
+                      onTap: lockTap(widget.onOpenTools),
+                      onLongPress: lockTap(widget.onLongPressTools),
+                    ),
+                    if (widget.toolsConnectionIssue)
+                      Positioned(
+                        right: 3,
+                        bottom: 3,
+                        child: IgnorePointer(
+                          child: Container(
+                            key: const ValueKey('chat-tools-connection-issue'),
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.error,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               menu: DesktopContextMenuItem(

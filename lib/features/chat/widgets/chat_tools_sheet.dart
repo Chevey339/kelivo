@@ -29,6 +29,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'tools_sheet_row.dart';
 import 'image_recall_control.dart';
 import '../../mcp/widgets/mcp_server_avatar.dart';
+import '../../mcp/widgets/mcp_tool_connection_status.dart';
 import '../../mcp/utils/mcp_tool_groups.dart';
 
 /// Everything the model can call in this chat: device-local tools, connected
@@ -614,27 +615,36 @@ class _McpGroup extends StatelessWidget {
                 padding: EdgeInsets.only(
                   top: index == 0 || rows[index - 1].server == null ? 0 : 8,
                 ),
-                child: ToolsSheetRow(
-                  key: ChatToolsSheet.mcpServerKey(server.id),
-                  leading: McpServerAvatar(
-                    server: server,
-                    size: 20,
-                    radius: 7,
-                    showBackground: false,
-                  ),
-                  label: server.name,
-                  selected: selected.contains(server.id),
-                  detail:
-                      '${server.tools.where((tool) => tool.enabled).length}/${server.tools.length}',
-                  onTap: () => unawaited(
-                    setSelected(server.id, !selected.contains(server.id)),
-                  ),
-                  trailing: IosSwitch(
-                    value: selected.contains(server.id),
-                    semanticLabel: server.name,
-                    onChanged: (value) =>
-                        unawaited(setSelected(server.id, value)),
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ToolsSheetRow(
+                      key: ChatToolsSheet.mcpServerKey(server.id),
+                      leading: McpServerAvatar(
+                        server: server,
+                        size: 20,
+                        radius: 7,
+                        showBackground: false,
+                        status: mcp.statusFor(server.id) == McpStatus.connected
+                            ? null
+                            : mcp.statusFor(server.id),
+                      ),
+                      label: server.name,
+                      selected: selected.contains(server.id),
+                      detail:
+                          '${server.tools.where((tool) => tool.enabled).length}/${server.tools.length}',
+                      onTap: () => unawaited(
+                        setSelected(server.id, !selected.contains(server.id)),
+                      ),
+                      trailing: IosSwitch(
+                        value: selected.contains(server.id),
+                        semanticLabel: server.name,
+                        onChanged: (value) =>
+                            unawaited(setSelected(server.id, value)),
+                      ),
+                    ),
+                    McpToolConnectionStatus(serverId: server.id),
+                  ],
                 ),
               );
             },

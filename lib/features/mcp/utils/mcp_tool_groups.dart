@@ -1,14 +1,14 @@
 import '../../../core/models/mcp_presentation.dart';
 import '../../../core/providers/mcp_provider.dart';
 
-/// Connected tools in the same group and server order as MCP settings.
+/// Enabled servers in the same group and server order as MCP settings.
 /// Empty groups are omitted; ungrouped servers come last.
 List<({McpGroup? group, List<McpServerConfig> servers})> mcpToolGroups(
   McpProvider mcp,
 ) {
   final buckets = <String?, List<McpServerConfig>>{};
   for (final server in mcp.servers) {
-    if (mcp.statusFor(server.id) != McpStatus.connected) continue;
+    if (!server.enabled) continue;
     final id = mcp.presentationFor(server.id).groupId;
     (buckets[id] ??= []).add(server);
   }

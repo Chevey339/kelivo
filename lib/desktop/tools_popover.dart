@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../features/mcp/widgets/mcp_server_avatar.dart';
+import '../features/mcp/widgets/mcp_tool_connection_status.dart';
 import '../features/mcp/utils/mcp_tool_groups.dart';
 import 'package:provider/provider.dart';
 
@@ -383,6 +384,9 @@ class _ToolsContent extends StatelessWidget {
               size: 16,
               radius: 7,
               showBackground: false,
+              status: mcp.statusFor(s.id) == McpStatus.connected
+                  ? null
+                  : mcp.statusFor(s.id),
             ),
             detail:
                 '${s.tools.where((t) => t.enabled).length}/${s.tools.length}',
@@ -400,6 +404,11 @@ class _ToolsContent extends StatelessWidget {
             },
           ),
         );
+        if (mcp.statusFor(s.id) != McpStatus.connected) {
+          rows.add(
+            (context) => McpToolConnectionStatus(serverId: s.id, desktop: true),
+          );
+        }
       }
     }
 
