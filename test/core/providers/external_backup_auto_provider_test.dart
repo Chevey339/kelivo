@@ -1,0 +1,257 @@
+import 'dart:async';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/providers/backup_provider.dart';
+import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
+import 'package:Kelivo/core/providers/external_backup_auto_provider.dart';
+import 'package:Kelivo/core/providers/s3_backup_provider.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/backup/backup_activity.dart';
+import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
+import 'package:Kelivo/core/services/backup/backup_encryption.dart';
+import 'package:Kelivo/core/services/backup/backup_secure_password_store.dart';
+import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
+import '../../support/business_test_harness.dart';
+
+class _Vault extends BackupSecurePasswordStore {
+  bool available = true;
+  String? value;
+  @override
+  Future<String?> read() async {
+    if (!available) throw const BackupKeychainUnavailable();
+    return value;
+  }
+
+  @override
+  Future<void> remember(String password) async {
+    if (!available) throw const BackupKeychainUnavailable();
+    value = password;
+  }
+
+  @override
+  Future<void> requireUnlocked() async {
+    if (!available) throw const BackupKeychainUnavailable();
+  }
+
+  @override
+  Future<void> forget() async {
+    if (!available) throw const BackupKeychainUnavailable();
+    value = null;
+  }
+}
+
+class _WebDav extends BackupProvider {
+  _WebDav(BusinessTestHarness db)
+    : super(
+        chatService: ChatService(),
+        businessRepository: db.repository,
+        businessPreferences: db.preferences,
+      );
+  final passwords = <String?>[];
+  Future<bool>? result;
+  @override
+  Future<bool> backup({
+    String? password,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+  }) async {
+    passwords.add(password);
+    return await result ?? true;
+  }
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'foreground due work runs once, waits for busy tasks, never counts failure and honours reminder disable',
+    () async {
+      final db = await createBusinessTestHarness();
+      final store = _Vault();
+      final settings = SettingsProvider(
+        db.preferences,
+        backupPasswordStore: store,
+      );
+      await settings.loaded;
+      await settings.setWebDavConfig(
+        const WebDavConfig(url: 'https://backup.example'),
+      );
+      final reminder = BackupReminderProvider(
+        preferences: db.preferences,
+        autoLoad: false,
+        onDisabled: () => settings.setAutomaticBackup(false),
+      );
+      await reminder.load(startTimer: false);
+      final start = DateTime(2026, 1, 1, 12);
+      var now = start;
+      await reminder.saveSchedule(
+        enabled: true,
+        intervalDays: 1,
+        reminderMinutesOfDay: 600,
+        now: start,
+      );
+      final webdav = _WebDav(db);
+      final auto = ExternalBackupAutoProvider(
+        preferences: db.preferences,
+        settings: settings,
+        reminder: reminder,
+        webdav: webdav,
+        s3: S3BackupProvider(
+          chatService: ChatService(),
+          businessRepository: db.repository,
+          businessPreferences: db.preferences,
+        ),
+        desktop: false,
+        clock: () => now,
+      );
+      await auto.enable(true);
+      expect(await auto.runIfDue(now, foreground: true), false);
+      now = DateTime(2026, 1, 7, 10);
+      expect(await auto.runIfDue(now, foreground: false), false);
+      BackupActivity.begin();
+      try {
+        expect(await auto.runIfDue(now, foreground: true), false);
+      } finally {
+        BackupActivity.end();
+      }
+      final finishing = Completer<bool>();
+      webdav.result = finishing.future;
+      final run = auto.runIfDue(now, foreground: true);
+      expect(auto.busy, true);
+      expect(await auto.runIfDue(now, foreground: true), false);
+      now = now.add(const Duration(minutes: 15));
+      finishing.complete(true);
+      expect(await run, true);
+      expect(reminder.lastBackupAt, now);
+      expect(reminder.nextReminderAt, DateTime(2026, 1, 8, 10));
+      expect(await auto.runIfDue(now, foreground: true), false);
+      expect(webdav.passwords, hasLength(1));
+      now = DateTime(2026, 1, 9, 10);
+      webdav.result = Future.value(false);
+      await expectLater(auto.runIfDue(now, foreground: true), throwsException);
+      expect(auto.failure, isNotNull);
+      expect(reminder.lastBackupAt, DateTime(2026, 1, 7, 10, 15));
+      expect(await auto.runIfDue(now, foreground: true), false);
+      await reminder.setEnabled(false);
+      expect(auto.enabled, false);
+    },
+  );
+
+  test(
+    'credential consent persists across sessions; inaccessible vault blocks automatic use and password rotation disables it',
+    () async {
+      final db = await createBusinessTestHarness();
+      final vault = _Vault();
+      final settings = SettingsProvider(
+        db.preferences,
+        backupPasswordStore: vault,
+      );
+      await settings.setBackupEncryptionPassword('first');
+      vault.available = false;
+      await expectLater(
+        settings.setAutomaticBackup(true, password: 'first'),
+        throwsA(isA<BackupKeychainUnavailable>()),
+      );
+      expect(settings.autoBackupEnabled, false);
+      vault.available = true;
+      await expectLater(
+        settings.setAutomaticBackup(true, password: 'typo'),
+        throwsA(isA<BackupDecryptionException>()),
+      );
+      expect(vault.value, isNull);
+      await settings.setAutomaticBackup(true, password: 'first');
+      final next = SettingsProvider(db.preferences, backupPasswordStore: vault);
+      expect(
+        await next.resolveBackupEncryptionPassword(
+          () async => fail('unexpected prompt'),
+        ),
+        'first',
+      );
+      vault.value = 'unexpected credential';
+      await expectLater(
+        next.automaticBackupPassword(),
+        throwsA(isA<BackupDecryptionException>()),
+      );
+      expect(vault.value, 'unexpected credential');
+      await next.setBackupEncryptionPassword('second');
+      expect(vault.value, 'second');
+      vault.available = false;
+      await expectLater(
+        next.automaticBackupPassword(),
+        throwsA(isA<BackupKeychainUnavailable>()),
+      );
+      expect(next.autoBackupEnabled, true);
+      await expectLater(
+        next.setBackupEncryptionPassword('third'),
+        throwsA(isA<BackupKeychainUnavailable>()),
+      );
+      expect(next.autoBackupEnabled, false);
+      expect(vault.value, 'second');
+      vault.available = true;
+      await next.retryBackupPasswordRemoval();
+      expect(vault.value, null);
+      await next.setAutomaticBackup(true, password: 'third');
+      await next.setAutomaticBackup(false);
+      expect(vault.value, null);
+      var prompted = false;
+      await next.resolveBackupEncryptionPassword(() async {
+        prompted = true;
+        return 'third';
+      });
+      expect(prompted, true);
+      await next.setAutomaticBackup(true, password: 'third');
+      await next.setBackupEncryptionPassword(null);
+      expect(next.autoBackupEnabled, false);
+      expect(vault.value, null);
+    },
+  );
+
+  test(
+    'desktop folder preference on mobile requires explicit selection of a remote',
+    () async {
+      final db = await createBusinessTestHarness(
+        initial: {
+          'backup_auto_destination_v1': 'local',
+          'backup_auto_local_dir_v1': '/chosen',
+        },
+      );
+      final settings = SettingsProvider(db.preferences);
+      await settings.loaded;
+      await settings.setWebDavConfig(
+        const WebDavConfig(url: 'https://backup.example'),
+      );
+      final reminder = BackupReminderProvider(
+        preferences: db.preferences,
+        autoLoad: false,
+      );
+      await reminder.saveSchedule(
+        enabled: true,
+        intervalDays: 1,
+        reminderMinutesOfDay: 0,
+      );
+      final auto = ExternalBackupAutoProvider(
+        preferences: db.preferences,
+        settings: settings,
+        reminder: reminder,
+        webdav: _WebDav(db),
+        s3: S3BackupProvider(
+          chatService: ChatService(),
+          businessRepository: db.repository,
+          businessPreferences: db.preferences,
+        ),
+        desktop: false,
+      );
+      expect(auto.available, [BackupDestination.webdav]);
+      await expectLater(
+        auto.enable(true),
+        throwsA(BackupDestinationError.remote),
+      );
+      await auto.select(BackupDestination.webdav);
+      await auto.enable(true);
+      expect(auto.folder.path, '/chosen');
+      expect(auto.destination, BackupDestination.webdav);
+    },
+  );
+}

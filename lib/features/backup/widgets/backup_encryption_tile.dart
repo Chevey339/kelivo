@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
+import '../backup_restore_error_message.dart';
 import '../../../core/services/backup/backup_encryption.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -19,10 +20,12 @@ class BackupEncryptionTile extends StatelessWidget {
   const BackupEncryptionTile({
     super.key,
     required this.enabled,
+    this.remembered = false,
     required this.onChanged,
   });
 
   final bool enabled;
+  final bool remembered;
   final Future<void> Function(String?)? onChanged;
 
   @override
@@ -41,18 +44,20 @@ class BackupEncryptionTile extends StatelessWidget {
         if (context.mounted) {
           showAppSnackBar(
             context,
-            message: error.toString(),
+            message: backupRestoreErrorMessage(l10n, error),
             type: NotificationType.error,
           );
         }
       }
     }
 
-    return IosNavRow(
+    final toggle = IosNavRow(
       icon: Lucide.Lock,
       label: l10n.backupEncryptionTitle,
       subtitle: !enabled
           ? l10n.backupEncryptionOffHint
+          : remembered
+          ? l10n.backupEncryptionOnHintRemembered
           : l10n.backupEncryptionOnHint,
       subtitleMaxLines: null,
       onTap: onChanged == null ? null : () => change(!enabled),
@@ -62,6 +67,18 @@ class BackupEncryptionTile extends StatelessWidget {
         value: enabled,
         onChanged: onChanged == null ? null : change,
       ),
+    );
+    if (!enabled) return toggle;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        toggle,
+        IosNavRow(
+          icon: Lucide.KeyRound,
+          label: l10n.backupEncryptionChangePassword,
+          onTap: onChanged == null ? null : () => change(true),
+        ),
+      ],
     );
   }
 }

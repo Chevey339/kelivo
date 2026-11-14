@@ -1,3 +1,7 @@
+import '../../../core/providers/external_backup_auto_provider.dart';
+import '../../../core/services/backup/backup_folder_access.dart';
+import '../../../core/services/backup/backup_secure_password_store.dart';
+import '../../backup/backup_restore_error_message.dart';
 import 'package:Kelivo/features/chat/widgets/tool_permission_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
@@ -1545,7 +1549,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   }) {
     if (widget.globalSearchMode || topicsOnly) return const SizedBox.shrink();
     final reminder = context.watch<BackupReminderProvider>();
-    if (!reminder.loaded || !reminder.shouldShowReminder) {
+    final auto = context.watch<ExternalBackupAutoProvider?>();
+    final autoEnabled = context.select<SettingsProvider, bool>(
+      (s) => s.autoBackupEnabled,
+    );
+    final failure = auto?.failure;
+    if (!reminder.loaded ||
+        !reminder.shouldShowReminder ||
+        (autoEnabled && (auto?.busy == true || failure == null))) {
       return const SizedBox.shrink();
     }
 
@@ -1594,7 +1605,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        l10n.backupReminderSidebarSubtitle,
+                        autoEnabled && failure != null
+                            ? (failure is BackupDestinationError ||
+                                      failure is BackupFolderError ||
+                                      failure is BackupKeychainUnavailable
+                                  ? automaticBackupErrorMessage(l10n, failure)
+                                  : l10n.backupReminderSidebarSubtitleAutoFailed)
+                            : l10n.backupReminderSidebarSubtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

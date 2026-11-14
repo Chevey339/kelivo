@@ -1,3 +1,4 @@
+import 'package:uuid/uuid.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:sqlite3/sqlite3.dart' as composer_sqlite;
 import 'dart:async';
@@ -11,7 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+
 import 'package:xml/xml.dart';
 
 import '../../database/business_repository.dart';
@@ -41,7 +42,8 @@ import 'restore_bundle_preparation.dart';
 import 'restore_durability.dart';
 import 'restore_workspace_lock.dart';
 import 'restore_business_lease.dart';
-import 'temporary_restore_file.dart';
+import 'backup_staging.dart';
+import 'backup_partials.dart';
 import 'backup_cancel_token.dart';
 import 'backup_encryption.dart';
 import 'backup_isolate_runner.dart';
@@ -409,10 +411,9 @@ class DataSync {
           !p.equals(lease.lockFile.absolute.path, expectedLeasePath)) {
         throw StateError('restore_startup_business_lease');
       }
-      extractDir = await Directory.systemTemp.createTemp(
-        'kelivo-startup-snapshot-',
+      extractDir = await BackupStaging.createDirectory(
+        'kelivo-startup-snapshot-${const Uuid().v4()}',
       );
-      registerLiveTempPath(extractDir.path);
       await runBackupIsolate<void, _BackupExtractArgs>(
         body: _extractZipInIsolate,
         payload: _BackupExtractArgs(
@@ -494,10 +495,9 @@ class DataSync {
   static Future<ChatDatabaseSnapshotInfo> inspectRecoverySnapshot(
     File snapshot,
   ) async {
-    final extracted = await Directory.systemTemp.createTemp(
-      'kelivo-recovery-check-',
+    final extracted = await BackupStaging.createDirectory(
+      'kelivo-recovery-check-${const Uuid().v4()}',
     );
-    registerLiveTempPath(extracted.path);
     Object? failure;
     try {
       await runBackupIsolate<void, _BackupExtractArgs>(
@@ -759,12 +759,11 @@ class DataSync {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
-    final tmp = await _ensureTempDir();
-    await _cleanupPreviousBackupTempFiles(tmp);
+    await BackupStaging.sweep();
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final workDir = Directory(p.join(tmp.path, 'kelivo_backup_$timestamp'));
-    await workDir.create(recursive: true);
-    registerLiveTempPath(workDir.path);
+    final workDir = await BackupStaging.createDirectory(
+      'kelivo_backup_$timestamp',
+    );
 
     final outPath = p.join(workDir.path, 'kelivo_backup_$timestamp.zip');
     final outFile = File(outPath);
@@ -999,11 +998,9 @@ class DataSync {
         sourceDatabase.path,
       );
     }
-    final tmp = await _ensureTempDir();
-    final stagingDirectory = await Directory(
-      p.join(tmp.path, 'kelivo_adopt_${DateTime.now().microsecondsSinceEpoch}'),
-    ).create(recursive: true);
-    registerLiveTempPath(stagingDirectory.path);
+    final stagingDirectory = await BackupStaging.createDirectory(
+      'kelivo_adopt_${const Uuid().v4()}',
+    );
     try {
       final working = File(
         p.join(stagingDirectory.path, AppDatabase.databaseFileName),
@@ -1135,91 +1132,14 @@ class DataSync {
     );
   }
 
-  static final Set<String> _liveTempPaths = {};
-
-  static void registerLiveTempPath(String path) {
-    _liveTempPaths.add(p.normalize(p.absolute(path)));
-  }
-
-  static void unregisterLiveTempPath(String path) {
-    _liveTempPaths.remove(p.normalize(p.absolute(path)));
-  }
-
-  static bool _isLiveTempPath(String path) {
-    final normalized = p.normalize(p.absolute(path));
-    for (final live in _liveTempPaths) {
-      if (normalized == live ||
-          p.isWithin(live, normalized) ||
-          p.isWithin(normalized, live)) {
-        return true;
-      }
-    }
-    return false;
-  }
+  static void registerLiveTempPath(String path) => BackupStaging.register(path);
+  static void unregisterLiveTempPath(String path) =>
+      BackupStaging.release(path);
 
   @visibleForTesting
-  static Future<void> debugCleanupPreviousBackupTempFiles(Directory tmp) {
-    return _cleanupPreviousBackupTempFiles(tmp);
-  }
+  static Future<void> debugCleanupPreviousBackupTempFiles(Directory tmp) =>
+      BackupStaging.sweep(temporary: tmp);
 
-  /// Parses the creation time out of a `kelivo_backup_<iso-with-dashes>` name
-  /// (see [prepareBackupFile], which replaces ':' with '-'). Returns null for
-  /// names that do not carry a timestamp.
-  static DateTime? _backupTempTimestampFromName(String name) {
-    const prefix = 'kelivo_backup_';
-    if (!name.startsWith(prefix)) return null;
-    var core = name.substring(prefix.length);
-    if (core.endsWith('.zip')) {
-      core = core.substring(0, core.length - 4);
-    }
-    final match = RegExp(
-      r'^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})(.*)$',
-    ).firstMatch(core);
-    if (match == null) return null;
-    return DateTime.tryParse(
-      '${match[1]}T${match[2]}:${match[3]}:${match[4]}${match[5]}',
-    );
-  }
-
-  static Future<void> _cleanupPreviousBackupTempFiles(Directory tmp) async {
-    try {
-      if (!await tmp.exists()) return;
-      // Only reclaim entries that are clearly abandoned. WebDAV, S3 and local
-      // export are independent providers with no shared busy flag, so an
-      // age-blind sweep here would delete the working directory of a backup
-      // that another provider is still packing or uploading.
-      final cutoff = DateTime.now().subtract(const Duration(hours: 6));
-      Future<bool> isStale(FileSystemEntity entity, String name) async {
-        final fromName = _backupTempTimestampFromName(name);
-        if (fromName != null) return fromName.isBefore(cutoff);
-        try {
-          return (await entity.stat()).modified.isBefore(cutoff);
-        } catch (_) {
-          // Unknown age: keep it rather than risk racing a live backup.
-          return false;
-        }
-      }
-
-      await for (final ent in tmp.list(followLinks: false)) {
-        if (_isLiveTempPath(ent.path)) continue;
-        final name = p.basename(ent.path);
-        if (ent is Directory &&
-            (name.startsWith('kelivo_backup_') ||
-                name.startsWith('kelivo_decrypted_'))) {
-          if (await isStale(ent, name)) await _deleteDirectoryQuietly(ent);
-        } else if (ent is File &&
-            ((name.startsWith('kelivo_backup_') && name.endsWith('.zip')) ||
-                name == '_bk_settings.json' ||
-                name == '_bk_chats.json' ||
-                name == '_bk_manifest.json' ||
-                name == '_bk_kelivo.db')) {
-          if (await isStale(ent, name)) await _deleteFileQuietly(ent);
-        }
-      }
-    } catch (_) {}
-  }
-
-  /// Synchronous ZIP packing — runs inside an Isolate.
   static ({int verifiedBytes, List<String> skippedEntries})
   _packAndVerifyInIsolate(BackupIsolateContext ctx, _BackupPackArgs args) {
     final packed = _packZipSync(
@@ -1794,64 +1714,91 @@ class DataSync {
       if (cancelToken?.isCancelled == true) {
         throw const BackupCancelledException();
       }
-      final target = _fileUri(cfg, p.basename(file.path));
-      final fileLen = await file.length();
-      // Use a streamed request so we don't load the entire file into RAM.
-      final req = http.StreamedRequest('PUT', target);
-      req.headers.addAll({
-        'content-type': password == null
-            ? 'application/zip'
-            : 'application/octet-stream',
-        'content-length': fileLen.toString(),
-        ..._authHeaders(cfg),
-        ..._extraHeaders(cfg),
-      });
-      // Pipe the file stream into the request body. addStream honors the
-      // sink's pause signal, so a slow network throttles disk reads instead of
-      // buffering the whole zip in RAM (which OOM-killed large mobile uploads).
-      unawaited(
-        req.sink
-            .addStream(
-              _watchedByteStream(
-                file.openRead(),
-                phase: BackupPhase.uploading,
-                total: fileLen,
-                onProgress: onProgress,
-                cancelToken: cancelToken,
+      final finalName = p.basename(file.path);
+      final name = '$finalName.partial';
+      final target = _fileUri(cfg, name);
+      await BackupPartials(businessPreferences).publish(
+        scope: _webDavScope(cfg),
+        name: name,
+        removePartial: () => _deletePartial(cfg, target),
+        write: () async {
+          final fileLen = await file.length();
+          // Use a streamed request so we don't load the entire file into RAM.
+          final req = http.StreamedRequest('PUT', target);
+          req.headers.addAll({
+            'content-type': password == null
+                ? 'application/zip'
+                : 'application/octet-stream',
+            'content-length': fileLen.toString(),
+            ..._authHeaders(cfg),
+            ..._extraHeaders(cfg),
+          });
+          // Pipe the file stream into the request body. addStream honors the
+          // sink's pause signal, so a slow network throttles disk reads instead of
+          // buffering the whole zip in RAM (which OOM-killed large mobile uploads).
+          unawaited(
+            req.sink
+                .addStream(
+                  _watchedByteStream(
+                    file.openRead(),
+                    phase: BackupPhase.uploading,
+                    total: fileLen,
+                    onProgress: onProgress,
+                    cancelToken: cancelToken,
+                  ),
+                )
+                .then(
+                  (_) => req.sink.close(),
+                  onError: (Object error) {
+                    req.sink.addError(error);
+                    req.sink.close();
+                  },
+                ),
+          );
+          final client = http.Client();
+          StreamSubscription<void>? cancelSub;
+          try {
+            cancelSub = cancelToken?.whenCancelled.asStream().listen((_) {
+              client.close();
+            });
+            final res = await client.send(req).then(http.Response.fromStream);
+            if (cancelToken?.isCancelled == true) {
+              throw const BackupCancelledException();
+            }
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              throw Exception('Upload failed: ${res.statusCode}');
+            }
+            cancelToken?.throwIfCancelled();
+            cancelToken?.setCancellable(false);
+            onProgress?.call(
+              const BackupProgress(
+                phase: BackupPhase.finalizing,
+                processed: 0,
+                cancellable: false,
               ),
-            )
-            .then(
-              (_) => req.sink.close(),
-              onError: (Object error) {
-                req.sink.addError(error);
-                req.sink.close();
-              },
-            ),
+            );
+            final move = http.Request('MOVE', target)..followRedirects = false;
+            move.headers.addAll({
+              ..._authHeaders(cfg),
+              ..._extraHeaders(cfg),
+              'Destination': _fileUri(cfg, finalName).toString(),
+              'Overwrite': 'T',
+            });
+            final result = await client
+                .send(move)
+                .then(http.Response.fromStream);
+            if (!const {200, 201, 204}.contains(result.statusCode)) {
+              throw Exception('WebDAV MOVE failed: ${result.statusCode}');
+            }
+          } catch (error) {
+            cancelToken?.throwIfCancelled();
+            rethrow;
+          } finally {
+            await cancelSub?.cancel();
+            client.close();
+          }
+        },
       );
-      final client = http.Client();
-      StreamSubscription<void>? cancelSub;
-      try {
-        cancelSub = cancelToken?.whenCancelled.asStream().listen((_) {
-          client.close();
-        });
-        final res = await client.send(req).then(http.Response.fromStream);
-        if (cancelToken?.isCancelled == true) {
-          throw const BackupCancelledException();
-        }
-        if (res.statusCode < 200 || res.statusCode >= 300) {
-          throw Exception('Upload failed: ${res.statusCode}');
-        }
-      } catch (error) {
-        if (error is BackupCancelledException ||
-            cancelToken?.isCancelled == true) {
-          await _deleteRemoteQuietly(cfg, target);
-          throw const BackupCancelledException();
-        }
-        rethrow;
-      } finally {
-        await cancelSub?.cancel();
-        client.close();
-      }
     } finally {
       await cleanupTemporaryBackupFile(file);
     }
@@ -1859,6 +1806,7 @@ class DataSync {
 
   Future<List<BackupFileItem>> listBackupFiles(
     WebDavConfig cfg, {
+    bool partialsOnly = false,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
@@ -1943,15 +1891,32 @@ class DataSync {
       DateTime? mtime;
       if (mtimeStr.isNotEmpty) {
         try {
-          mtime = DateTime.parse(mtimeStr.first);
+          mtime =
+              DateTime.tryParse(mtimeStr.first) ??
+              HttpDate.parse(mtimeStr.first);
         } catch (_) {}
       }
       final name = (disp.isNotEmpty && disp.first.trim().isNotEmpty)
           ? disp.first.trim()
           : Uri.parse(href).pathSegments.last;
 
+      final fullHref = Uri.parse(abs);
+      if (fullHref.pathSegments.isEmpty || fullHref.path.endsWith('/')) {
+        continue;
+      }
+      final basename = fullHref.pathSegments.last;
+      if (partialsOnly) {
+        if (!BackupPartials.isRemoteName(basename) ||
+            fullHref != _fileUri(cfg, basename)) {
+          continue;
+        }
+      } else if (basename.toLowerCase().endsWith('.partial') ||
+          name.toLowerCase().endsWith('.partial')) {
+        continue;
+      }
+
       // If mtime is null, try to extract from filename (format: kelivo_backup_2025-01-19T12-34-56.123456.zip)
-      if (mtime == null) {
+      if (!partialsOnly && mtime == null) {
         final match = RegExp(
           r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.(?:zip|kbackup)',
         ).firstMatch(name);
@@ -1971,7 +1936,6 @@ class DataSync {
 
       // Skip directories
       if (abs.endsWith('/')) continue;
-      final fullHref = Uri.parse(abs);
       items.add(
         BackupFileItem(
           href: fullHref,
@@ -2138,8 +2102,7 @@ class DataSync {
         await streamed.stream.drain<void>();
         throw Exception('Download failed: ${streamed.statusCode}');
       }
-      final tmpDir = await _ensureTempDir();
-      file = await createTemporaryRestoreFile(tmpDir);
+      file = await BackupStaging.createDownload();
       final knownLength = item.size > 0 ? item.size : streamed.contentLength;
       final sink = file.openWrite();
       try {
@@ -2152,6 +2115,7 @@ class DataSync {
         ).pipe(sink);
       } catch (error) {
         await _deleteFileQuietly(file);
+        unregisterLiveTempPath(file.path);
         file = null;
         if (error is BackupCancelledException ||
             cancelToken?.isCancelled == true) {
@@ -2179,6 +2143,7 @@ class DataSync {
     } finally {
       await cancelSub?.cancel();
       client.close();
+      if (file != null) unregisterLiveTempPath(file.path);
       await _deleteFileQuietly(file);
     }
   }
@@ -2281,10 +2246,10 @@ class DataSync {
         if (onPassword == null) {
           throw const FormatException('backup_password_required');
         }
-        final tmp = await _ensureTempDir();
-        await _cleanupPreviousBackupTempFiles(tmp);
-        decryptedDirectory = await tmp.createTemp('kelivo_decrypted_');
-        registerLiveTempPath(decryptedDirectory.path);
+        await BackupStaging.sweep();
+        decryptedDirectory = await BackupStaging.createDirectory(
+          'kelivo_decrypted_${const Uuid().v4()}',
+        );
         readable = File(p.join(decryptedDirectory.path, 'backup.zip'));
         var retry = false;
         while (true) {
@@ -2378,30 +2343,39 @@ class DataSync {
     }
   }
 
-  Future<void> _deleteRemoteQuietly(WebDavConfig cfg, Uri target) async {
+  String _webDavScope(WebDavConfig cfg) => BackupPartials.scope([
+    'webdav',
+    _collectionUri(cfg).toString(),
+    cfg.username,
+  ]);
+
+  Future<void> cleanWebDavPartials(WebDavConfig cfg) =>
+      BackupPartials(businessPreferences).sweep(
+        scope: _webDavScope(cfg),
+        owns: BackupPartials.isRemoteName,
+        remove: (name) => _deletePartial(cfg, _fileUri(cfg, name)),
+        list: () async {
+          final items = await listBackupFiles(cfg, partialsOnly: true);
+          return {
+            for (final item in items)
+              item.href.pathSegments.last: item.lastModified,
+          };
+        },
+      );
+
+  Future<void> _deletePartial(WebDavConfig cfg, Uri target) async {
     final client = http.Client();
     try {
-      final req = http.Request('DELETE', target);
+      final req = http.Request('DELETE', target)..followRedirects = false;
       req.headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)});
-      await client.send(req).then(http.Response.fromStream);
-    } catch (_) {
+      final response = await client.send(req).then(http.Response.fromStream);
+      if (response.statusCode != 404 &&
+          (response.statusCode < 200 || response.statusCode >= 300)) {
+        throw Exception('WebDAV DELETE failed: ${response.statusCode}');
+      }
     } finally {
       client.close();
     }
-  }
-
-  /// Ensures the temporary directory exists (some macOS installs may not create the cache folder until first use).
-  static Future<Directory> _ensureTempDir() async {
-    Directory dir = await getTemporaryDirectory();
-    if (!await dir.exists()) {
-      try {
-        await dir.create(recursive: true);
-      } catch (_) {}
-    }
-    if (!await dir.exists()) {
-      dir = await Directory.systemTemp.createTemp('kelivo_tmp_');
-    }
-    return dir;
   }
 
   static Future<File> _writeTempText(
@@ -3444,12 +3418,9 @@ class DataSync {
     // Extract to temp using file-stream decoding to avoid loading the full ZIP
     // into RAM (the old approach called file.readAsBytes() which for a 600-800 MB
     // file would allocate a contiguous byte array of the same size).
-    final tmp = await _ensureTempDir();
-    final extractDir = Directory(
-      p.join(tmp.path, 'restore_${DateTime.now().millisecondsSinceEpoch}'),
+    final extractDir = await BackupStaging.createDirectory(
+      'restore_${const Uuid().v4()}',
     );
-    await extractDir.create(recursive: true);
-    registerLiveTempPath(extractDir.path);
 
     Object? restoreError;
     try {

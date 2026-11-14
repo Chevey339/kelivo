@@ -512,13 +512,86 @@ void main() {
       },
     );
 
+    for (final fallbackStatus in [200, 503]) {
+      test(
+        'unsupported CopyObject streams to the final key; status $fallbackStatus determines publication',
+        () async {
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          final calls = <String>[];
+          var fallbackCancellable = false;
+          final token = BackupCancelToken();
+          addTearDown(token.dispose);
+          server.listen((req) async {
+            final name = req.uri.pathSegments.last;
+            final bytes = await req.fold<List<int>>(
+              [],
+              (all, chunk) => all..addAll(chunk),
+            );
+            if (req.headers.value('x-amz-copy-source') != null) {
+              calls.add('copy');
+              req.response.statusCode = 501;
+            } else if (req.method == 'PUT') {
+              calls.add('put $name');
+              if (name == 'archive.zip') {
+                fallbackCancellable = token.cancellable;
+                expect(bytes, [1, 2, 3]);
+                req.response.statusCode = fallbackStatus;
+              }
+            } else if (req.method == 'DELETE') {
+              calls.add('delete $name');
+              req.response.statusCode = 204;
+            } else {
+              req.response.statusCode = 404;
+              req.response.write(_noSuchKeyXml());
+            }
+            await req.response.close();
+          });
+          final tmp = await Directory.systemTemp.createTemp();
+          addTearDown(() => tmp.delete(recursive: true));
+          final file = File('${tmp.path}/archive.zip')
+            ..writeAsBytesSync([1, 2, 3]);
+          final result = const S3BackupClient().uploadFile(
+            _config(server),
+            key: 'kelivo_backups/archive.zip',
+            file: file,
+            cancelToken: token,
+          );
+          if (fallbackStatus == 200) {
+            await result;
+          } else {
+            await expectLater(result, throwsException);
+          }
+          expect(fallbackCancellable, true);
+          expect(
+            calls,
+            containsAllInOrder([
+              'put archive.zip.partial',
+              'copy',
+              'put archive.zip',
+              'delete archive.zip.partial',
+            ]),
+          );
+          expect(
+            calls.contains('put .kelivo_backups_manifest.json'),
+            fallbackStatus == 200,
+          );
+        },
+      );
+    }
     test('uploadFile marks manifest upsert as non-cancellable', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
         await server.close(force: true);
       });
       server.listen((request) async {
-        if (request.method == 'GET' &&
+        if (request.headers.value('x-amz-copy-source')
+            case final String source) {
+          expect(source, '/backup-bucket/kelivo_backups/demo.zip.partial');
+          request.response.write(
+            '<CopyObjectResult><ETag>ok</ETag></CopyObjectResult>',
+          );
+        } else if (request.method == 'GET' &&
             request.uri.path ==
                 '/backup-bucket/kelivo_backups/.kelivo_backups_manifest.json') {
           request.response.statusCode = HttpStatus.notFound;
@@ -570,7 +643,13 @@ void main() {
       String? manifestBody;
       server.listen((request) async {
         seenPaths.add(request.uri.path);
-        if (request.method == 'GET' &&
+        if (request.headers.value('x-amz-copy-source')
+            case final String source) {
+          expect(source, '/backup-bucket/kelivo_backups/demo.zip.partial');
+          request.response.write(
+            '<CopyObjectResult><ETag>ok</ETag></CopyObjectResult>',
+          );
+        } else if (request.method == 'GET' &&
             request.uri.path ==
                 '/backup-bucket/kelivo_backups/.kelivo_backups_manifest.json') {
           request.response.statusCode = HttpStatus.notFound;
@@ -581,7 +660,8 @@ void main() {
           );
           request.response.write(_noSuchKeyXml());
         } else if (request.method == 'PUT' &&
-            request.uri.path == '/backup-bucket/kelivo_backups/demo.zip') {
+            request.uri.path ==
+                '/backup-bucket/kelivo_backups/demo.zip.partial') {
           await request.drain<void>();
           request.response.statusCode = HttpStatus.ok;
         } else if (request.method == 'PUT' &&
@@ -616,6 +696,15 @@ void main() {
         seenPaths,
         contains('/backup-bucket/kelivo_backups/.kelivo_backups_manifest.json'),
       );
+      expect(
+        seenPaths,
+        containsAllInOrder([
+          '/backup-bucket/kelivo_backups/demo.zip.partial',
+          '/backup-bucket/kelivo_backups/demo.zip',
+          '/backup-bucket/kelivo_backups/demo.zip.partial',
+        ]),
+      );
+      expect(manifestBody, isNot(contains('.partial')));
       expect(manifestBody, contains('"key":"kelivo_backups/demo.zip"'));
     });
 
@@ -855,7 +944,13 @@ void main() {
       final paths = <String>[];
       server.listen((request) async {
         paths.add(request.uri.path);
-        if (request.method == 'GET' &&
+        if (request.headers.value('x-amz-copy-source')
+            case final String source) {
+          expect(source, '/backup-bucket/kelivo_backups/demo.zip.partial');
+          request.response.write(
+            '<CopyObjectResult><ETag>ok</ETag></CopyObjectResult>',
+          );
+        } else if (request.method == 'GET' &&
             request.uri.path ==
                 '/backup-bucket/kelivo_backups/.kelivo_backups_manifest.json') {
           request.response.statusCode = HttpStatus.notFound;
@@ -937,7 +1032,7 @@ void main() {
         final putStarted = Completer<void>();
         server.listen((request) async {
           if (request.method == 'PUT' &&
-              request.uri.path.endsWith('/stall.zip')) {
+              request.uri.path.endsWith('/stall.zip.partial')) {
             await request.drain<void>();
             request.response.statusCode = HttpStatus.ok;
             request.response.contentLength = 1024 * 1024;

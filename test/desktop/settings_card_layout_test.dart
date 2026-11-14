@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/providers/external_backup_auto_provider.dart';
 import 'package:Kelivo/desktop/setting/hotkeys_pane.dart';
 import 'package:Kelivo/core/providers/hotkey_provider.dart';
 import 'dart:io';
@@ -73,6 +74,16 @@ Future<SettingsProvider> _pumpPane(
             businessRepository: business.repository,
             businessPreferences: business.preferences,
             autoLoad: false,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => ExternalBackupAutoProvider(
+            preferences: business.preferences,
+            settings: ctx.read<SettingsProvider>(),
+            reminder: ctx.read<BackupReminderProvider>(),
+            webdav: ctx.read<BackupProvider>(),
+            s3: ctx.read<S3BackupProvider>(),
+            desktop: true,
           ),
         ),
       ],

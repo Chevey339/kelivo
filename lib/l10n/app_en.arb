@@ -22330,5 +22330,160 @@
   "compressionCarryInvalidCount": "Enter a number from 1 to 10,000.",
   "@compressionCarryInvalidCount": {
     "description": "Validation message beside the number of earlier messages to send in compression settings."
+  },
+  "backupRunningInBackground": "Backup will continue in the background",
+  "@backupRunningInBackground": {
+    "description": "Shown in external backup settings or completion notifications. Backup will continue in the background"
+  },
+  "backupBackgroundFailed": "Background backup failed: {error}",
+  "@backupBackgroundFailed": {
+    "description": "Shown in external backup settings or completion notifications. Background backup failed: {error} The error is the localized reason for the failure.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "backupAutoEnableTitle": "Back up automatically when due",
+  "@backupAutoEnableTitle": {
+    "description": "Shown in external backup settings or completion notifications. Back up automatically when due"
+  },
+  "backupAutoEnableHint": "When the scheduled time arrives, Kelivo backs up while the app is in the foreground. If the app is closed or killed, the backup does not keep running and is not resumed; the next time you open the app, a single full backup runs if it is still due.",
+  "@backupAutoEnableHint": {
+    "description": "Shown in external backup settings or completion notifications. When the scheduled time arrives, Kelivo backs up while the app is in the foreground. If the app is closed or killed, the backup does not keep running and is not resumed; the next time you open the app, a single full backup runs if it is still due."
+  },
+  "backupAutoDestinationTitle": "Automatic backup destination",
+  "@backupAutoDestinationTitle": {
+    "description": "Shown in external backup settings or completion notifications. Automatic backup destination"
+  },
+  "backupAutoDestinationWebDav": "WebDAV",
+  "@backupAutoDestinationWebDav": {
+    "description": "Shown in external backup settings or completion notifications. WebDAV"
+  },
+  "backupAutoDestinationS3": "S3",
+  "@backupAutoDestinationS3": {
+    "description": "Shown in external backup settings or completion notifications. S3"
+  },
+  "backupAutoDestinationLocal": "Local folder",
+  "@backupAutoDestinationLocal": {
+    "description": "Desktop automatic backup folder settings or write result. Local folder"
+  },
+  "backupAutoNeedRemoteHint": "Set up WebDAV or S3 first.",
+  "@backupAutoNeedRemoteHint": {
+    "description": "Shown in external backup settings or completion notifications. Set up WebDAV or S3 first."
+  },
+  "backupAutoNeedDestinationHint": "Set up WebDAV or S3, or choose a local folder first.",
+  "@backupAutoNeedDestinationHint": {
+    "description": "Shown in external backup settings or completion notifications. Set up WebDAV or S3, or choose a local folder first."
+  },
+  "backupAutoNeedFolderHint": "Choose a backup folder first.",
+  "@backupAutoNeedFolderHint": {
+    "description": "Desktop automatic backup folder settings or write result. Choose a backup folder first."
+  },
+  "backupAutoLocalFolderChoose": "Choose folder…",
+  "@backupAutoLocalFolderChoose": {
+    "description": "Desktop automatic backup folder settings or write result. Choose folder…"
+  },
+  "backupAutoLocalFolderChange": "Change folder",
+  "@backupAutoLocalFolderChange": {
+    "description": "Desktop automatic backup folder settings or write result. Change folder"
+  },
+  "backupAutoLocalFolderInvalid": "Choose a folder outside the app's own data directory.",
+  "@backupAutoLocalFolderInvalid": {
+    "description": "Desktop automatic backup folder settings or write result. Choose a folder outside the app's own data directory."
+  },
+  "backupAutoLocalRetentionTitle": "Keep at most",
+  "@backupAutoLocalRetentionTitle": {
+    "description": "Desktop automatic backup folder settings or write result. Keep at most"
+  },
+  "backupAutoLocalRetentionCount": "{count} backups",
+  "@backupAutoLocalRetentionCount": {
+    "description": "Desktop automatic backup folder settings or write result. {count} backups The count is the positive number of backups to keep.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "backupAutoLocalRetentionUnlimited": "No limit",
+  "@backupAutoLocalRetentionUnlimited": {
+    "description": "Desktop automatic backup folder settings or write result. No limit"
+  },
+  "backupAutoLocalNow": "Back up to this folder now",
+  "@backupAutoLocalNow": {
+    "description": "Desktop automatic backup folder settings or write result. Back up to this folder now"
+  },
+  "backupAutoLocalDirUnavailable": "Can't write to the chosen folder. Check that it is still available, or choose another one. Kelivo won't change the saved location on its own.",
+  "@backupAutoLocalDirUnavailable": {
+    "description": "Desktop automatic backup folder settings or write result. Can't write to the chosen folder. Check that it is still available, or choose another one. Kelivo won't change the saved location on its own."
+  },
+  "backupAutoLocalDirPermission": "You don't have permission to write to the chosen folder. Please choose the folder again. Kelivo won't change the saved location on its own.",
+  "@backupAutoLocalDirPermission": {
+    "description": "Desktop automatic backup folder settings or write result. You don't have permission to write to the chosen folder. Please choose the folder again. Kelivo won't change the saved location on its own."
+  },
+  "backupAutoLocalDirFull": "There isn't enough disk space, so the backup didn't finish. Your earlier backups are still there.",
+  "@backupAutoLocalDirFull": {
+    "description": "Desktop automatic backup folder settings or write result. There isn't enough disk space, so the backup didn't finish. Your earlier backups are still there."
+  },
+  "backupAutoLocalBookmarkLost": "Kelivo can't access the chosen folder. Please choose it again. The saved location won't be changed automatically.",
+  "@backupAutoLocalBookmarkLost": {
+    "description": "Desktop automatic backup folder settings or write result. Kelivo can't access the chosen folder. Please choose it again. The saved location won't be changed automatically."
+  },
+  "backupAutoNextTitle": "Next automatic backup",
+  "@backupAutoNextTitle": {
+    "description": "Shown in external backup settings or completion notifications. Next automatic backup"
+  },
+  "backupAutoRememberPasswordTitle": "Remember the password on this device?",
+  "@backupAutoRememberPasswordTitle": {
+    "description": "Device-only password consent dialog when enabling encrypted automatic backups. Remember the password on this device?"
+  },
+  "backupAutoRememberPasswordMessage": "Remember the password on this device so automatic backups can run. It stays on this device and is never uploaded.",
+  "@backupAutoRememberPasswordMessage": {
+    "description": "Device-only password consent dialog when enabling encrypted automatic backups. Remember the password on this device so automatic backups can run. It stays on this device and is never uploaded."
+  },
+  "backupAutoRememberPasswordConfirm": "Remember",
+  "@backupAutoRememberPasswordConfirm": {
+    "description": "Device-only password consent dialog when enabling encrypted automatic backups. Remember"
+  },
+  "backupAutoRememberPasswordDecline": "Not now",
+  "@backupAutoRememberPasswordDecline": {
+    "description": "Device-only password consent dialog when enabling encrypted automatic backups. Not now"
+  },
+  "backupAutoRememberDeclined": "Automatic backup was not turned on. You'll still get a reminder when it's due.",
+  "@backupAutoRememberDeclined": {
+    "description": "Device-only password consent dialog when enabling encrypted automatic backups. Automatic backup was not turned on. You'll still get a reminder when it's due."
+  },
+  "backupAutoKeychainUnavailable": "This device has no system keychain available, so encrypted backups can't run automatically. You'll still get a reminder when it's due.",
+  "@backupAutoKeychainUnavailable": {
+    "description": "Shown in external backup settings or completion notifications. This device has no system keychain available, so encrypted backups can't run automatically. You'll still get a reminder when it's due."
+  },
+  "backupAutoSucceeded": "Automatic backup finished",
+  "@backupAutoSucceeded": {
+    "description": "Shown in external backup settings or completion notifications. Automatic backup finished"
+  },
+  "backupAutoFailed": "Automatic backup failed: {error}",
+  "@backupAutoFailed": {
+    "description": "Shown in external backup settings or completion notifications. Automatic backup failed: {error} The error is the localized reason for the failure.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "backupAutoFailedPassword": "Automatic backup failed: the password is incorrect.",
+  "@backupAutoFailedPassword": {
+    "description": "Shown in external backup settings or completion notifications. Automatic backup failed: the password is incorrect."
+  },
+  "backupReminderSidebarSubtitleAutoFailed": "The automatic backup didn't finish. Check the network or back up manually.",
+  "@backupReminderSidebarSubtitleAutoFailed": {
+    "description": "Sidebar reminder after a due automatic external backup fails."
+  },
+  "backupEncryptionOnHintRemembered": "Backups will be encrypted. The password is remembered on this device for automatic backups.",
+  "@backupEncryptionOnHintRemembered": {
+    "description": "Shown in external backup settings or completion notifications. Backups will be encrypted. The password is remembered on this device for automatic backups."
+  },
+  "backupEncryptionChangePassword": "Change backup password",
+  "@backupEncryptionChangePassword": {
+    "description": "Action in backup encryption settings to choose a new password for future external backups while keeping encryption enabled."
   }
 }

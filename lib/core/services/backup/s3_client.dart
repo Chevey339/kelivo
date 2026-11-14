@@ -9,10 +9,12 @@ import 'package:xml/xml.dart';
 
 import '../../models/backup.dart';
 import 'backup_cancel_token.dart';
+import 'backup_partials.dart';
 import 'backup_task_progress.dart';
 
 class S3BackupClient {
-  const S3BackupClient();
+  const S3BackupClient({this.partials = const BackupPartials(null)});
+  final BackupPartials partials;
   static const String _manifestObjectName = '.kelivo_backups_manifest.json';
 
   static List<String> _normalizedBasePathSegments(Uri base, S3Config cfg) {
@@ -726,6 +728,7 @@ class S3BackupClient {
 
   Future<List<BackupFileItem>> _listBucketObjects(
     S3Config cfg, {
+    bool partialsOnly = false,
     BackupCancelToken? cancelToken,
   }) async {
     final prefix = _normalizePrefix(cfg.prefix);
@@ -761,7 +764,11 @@ class S3BackupClient {
         final size = int.tryParse(sizeStr.trim()) ?? 0;
         final mtime = _parseDateTime(mtimeStr);
         final name = _displayNameFromKey(key);
-        if (!name.toLowerCase().endsWith('.zip') &&
+        if (partialsOnly) {
+          if (key != '$prefix$name' || !BackupPartials.isRemoteName(name)) {
+            continue;
+          }
+        } else if (!name.toLowerCase().endsWith('.zip') &&
             !name.toLowerCase().endsWith('.kbackup')) {
           continue;
         }
@@ -965,53 +972,90 @@ class S3BackupClient {
     BackupCancelToken? cancelToken,
   }) async {
     _validateConfigBasics(cfg);
-    final uri = _buildObjectUri(cfg, key);
     final size = await file.length();
-    try {
+    final partial = '$key.partial';
+    final name = _displayNameFromKey(partial);
+    Future<void> put(String objectKey) async {
       final res = await _sendSignedStreamedFile(
         cfg,
         method: 'PUT',
-        uri: uri,
+        uri: _buildObjectUri(cfg, objectKey),
         bodyFile: file,
         headers: {
           'content-type': key.toLowerCase().endsWith('.kbackup')
               ? 'application/octet-stream'
               : 'application/zip',
         },
-        onProgress: onProgress,
         cancelToken: cancelToken,
+        onProgress: onProgress,
       );
-      if (cancelToken?.isCancelled == true) {
-        throw const BackupCancelledException();
-      }
+      cancelToken?.throwIfCancelled();
       if (res.statusCode < 200 || res.statusCode >= 300) {
         throw Exception('S3 upload failed: ${_extractErrorMessage(res)}');
       }
-    } catch (error) {
-      if (error is BackupCancelledException ||
-          cancelToken?.isCancelled == true) {
-        try {
-          await deleteObject(cfg, key: key);
-        } catch (_) {}
-        throw const BackupCancelledException();
-      }
-      rethrow;
     }
-    if (cancelToken?.isCancelled == true) {
-      try {
-        await deleteObject(cfg, key: key);
-      } catch (_) {}
-      throw const BackupCancelledException();
-    }
-    cancelToken?.setCancellable(false);
-    onProgress?.call(
-      BackupProgress(
-        phase: BackupPhase.uploading,
-        processed: size,
-        total: size,
-        unit: BackupProgressUnit.bytes,
-        cancellable: false,
-      ),
+
+    await partials.publish(
+      scope: _scope(cfg),
+      name: name,
+      removePartial: () => _deletePartial(cfg, partial),
+      write: () async {
+        await put(partial);
+        cancelToken?.throwIfCancelled();
+        final source = [
+          cfg.bucket.trim(),
+          ...partial.split('/'),
+        ].map(_awsEncode).join('/');
+        // Publication is the commit point. Cancelling it could report failure
+        // after the server had already made the final object visible.
+        cancelToken?.setCancellable(false);
+        onProgress?.call(
+          BackupProgress(
+            phase: BackupPhase.finalizing,
+            processed: size,
+            total: size,
+            unit: BackupProgressUnit.bytes,
+            cancellable: false,
+          ),
+        );
+        final copy = await _sendSigned(
+          cfg,
+          method: 'PUT',
+          uri: _buildObjectUri(cfg, key),
+          headers: {'x-amz-copy-source': '/$source'},
+        );
+        final code = _extractErrorCode(copy);
+        final copied =
+            copy.statusCode >= 200 &&
+            copy.statusCode < 300 &&
+            copy.body.trim().isNotEmpty &&
+            _copySucceeded(copy.body);
+        if (!copied) {
+          if (copy.statusCode == 405 ||
+              copy.statusCode == 501 ||
+              const {
+                'NotImplemented',
+                'UnsupportedOperation',
+                'InvalidRequest',
+                'InvalidArgument',
+              }.contains(code)) {
+            cancelToken?.setCancellable(true);
+            await put(key);
+            cancelToken?.setCancellable(false);
+            onProgress?.call(
+              BackupProgress(
+                phase: BackupPhase.finalizing,
+                processed: size,
+                total: size,
+                unit: BackupProgressUnit.bytes,
+                cancellable: false,
+              ),
+            );
+          } else {
+            throw Exception('S3 copy failed: ${_extractErrorMessage(copy)}');
+          }
+        }
+      },
     );
     await _upsertManifestItem(
       cfg,
@@ -1020,6 +1064,46 @@ class S3BackupClient {
       lastModified: DateTime.now().toUtc(),
     );
   }
+
+  static bool _copySucceeded(String response) {
+    try {
+      return XmlDocument.parse(response).rootElement.name.local ==
+          'CopyObjectResult';
+    } on XmlException {
+      return false;
+    }
+  }
+
+  static String _scope(S3Config cfg) => BackupPartials.scope([
+    's3',
+    _buildBucketUri(cfg).toString(),
+    cfg.bucket.trim(),
+    _normalizePrefix(cfg.prefix),
+    cfg.accessKeyId,
+  ]);
+
+  Future<void> _deletePartial(S3Config cfg, String key) async {
+    final res = await _sendSigned(
+      cfg,
+      method: 'DELETE',
+      uri: _buildObjectUri(cfg, key),
+    );
+    if (!_isMissingObjectResponse(res) &&
+        (res.statusCode < 200 || res.statusCode >= 300)) {
+      throw Exception('S3 delete failed: ${_extractErrorMessage(res)}');
+    }
+  }
+
+  Future<void> cleanPartials(S3Config cfg) => partials.sweep(
+    scope: _scope(cfg),
+    owns: BackupPartials.isRemoteName,
+    remove: (name) =>
+        _deletePartial(cfg, '${_normalizePrefix(cfg.prefix)}$name'),
+    list: () async => {
+      for (final item in await _listBucketObjects(cfg, partialsOnly: true))
+        item.displayName: item.lastModified,
+    },
+  );
 
   /// Download an S3 object directly to a local file using a streamed response.
   /// This avoids buffering the full object in memory.

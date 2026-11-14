@@ -117,7 +117,12 @@ void main() {
 
       expect(await relativeSentinel.readAsString(), 'keep relative');
       expect(await absoluteSentinel.readAsString(), 'keep absolute');
-      expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+      expect(
+        await Directory(
+          '${root.path}/tmp/kelivo_backup_staging',
+        ).list().toList(),
+        isEmpty,
+      );
     });
   });
 }

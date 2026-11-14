@@ -1,3 +1,4 @@
+import '../backup/backup_staging.dart';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
@@ -449,6 +450,7 @@ final class WindowsDataDirectory {
   }
 
   bool _excluded(Directory root, String name) =>
+      name == BackupStaging.directoryName ||
       name == RestoreBusinessLease.leaseDirectoryName ||
       name == identityName ||
       (name.startsWith('$identityName.') && name.endsWith('.tmp')) ||

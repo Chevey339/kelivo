@@ -41,6 +41,9 @@ class BackupProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> cleanPartials(WebDavConfig cfg) =>
+      _dataSync.cleanWebDavPartials(cfg);
+
   Future<void> test() async {
     _busy = true;
     _message = null;

@@ -5,7 +5,11 @@ import 'package:flutter/foundation.dart';
 import '../database/business_preferences.dart';
 
 class BackupReminderProvider extends ChangeNotifier {
-  BackupReminderProvider({required this.preferences, bool autoLoad = true}) {
+  BackupReminderProvider({
+    required this.preferences,
+    this.onDisabled,
+    bool autoLoad = true,
+  }) {
     if (autoLoad) {
       unawaited(load());
     }
@@ -20,6 +24,9 @@ class BackupReminderProvider extends ChangeNotifier {
   static const String _lastBackupAtKey = 'backup_reminder_last_backup_at_v1';
 
   final BusinessPreferences preferences;
+  final Future<void> Function()? onDisabled;
+  final _ticks = StreamController<DateTime>.broadcast(sync: true);
+  Stream<DateTime> get ticks => _ticks.stream;
   bool _loaded = false;
   bool _enabled = false;
   int _intervalDays = 7;
@@ -86,9 +93,13 @@ class BackupReminderProvider extends ChangeNotifier {
       _shouldShowReminder = false;
     }
 
-    await _persist();
-    evaluateDue(currentTime, notify: false);
-    notifyListeners();
+    try {
+      if (!enabled) await onDisabled?.call();
+    } finally {
+      await _persist();
+      evaluateDue(currentTime, notify: false);
+      notifyListeners();
+    }
   }
 
   Future<void> setEnabled(bool value, {DateTime? now}) async {
@@ -109,8 +120,12 @@ class BackupReminderProvider extends ChangeNotifier {
     _enabled = false;
     _snoozedForSession = false;
     _shouldShowReminder = false;
-    await _persist();
-    notifyListeners();
+    try {
+      await onDisabled?.call();
+    } finally {
+      await _persist();
+      notifyListeners();
+    }
   }
 
   Future<void> recordBackupCompleted({DateTime? now}) async {
@@ -140,6 +155,7 @@ class BackupReminderProvider extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    unawaited(_ticks.close());
     super.dispose();
   }
 
@@ -158,7 +174,9 @@ class BackupReminderProvider extends ChangeNotifier {
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(minutes: 1), (_) {
-      evaluateDue(DateTime.now());
+      final now = DateTime.now();
+      evaluateDue(now);
+      _ticks.add(now);
     });
   }
 

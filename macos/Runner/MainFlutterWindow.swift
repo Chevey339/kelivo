@@ -1,9 +1,11 @@
+import Security
 import ServiceManagement
 import Cocoa
 import FlutterMacOS
 import WebKit
 
 class MainFlutterWindow: NSWindow {
+  private var backupFolderAccess: BackupFolderAccessChannel?
   private let systemPower = DesktopSystemPowerState()
   private var powerChannel: FlutterMethodChannel?
   private var browserShortcutCommands: Set<String> = ["cmd+f", "cmd+l", "cmd+t", "cmd+w", "cmd+r"]
@@ -453,6 +455,13 @@ class MainFlutterWindow: NSWindow {
         result(FlutterMethodNotImplemented)
       }
     }
+    let keychainChannel = FlutterMethodChannel(name: "kelivo/backup_keychain", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    keychainChannel.setMethodCallHandler { call, result in
+      guard call.method == "unlocked" else { result(FlutterMethodNotImplemented); return }
+      var status: SecKeychainStatus = 0
+      result(SecKeychainGetStatus(nil, &status) == errSecSuccess && (status & UInt32(kSecUnlockStateStatus)) != 0)
+    }
+    backupFolderAccess = BackupFolderAccessChannel(messenger: flutterViewController.engine.binaryMessenger)
     RegisterGeneratedPlugins(registry: flutterViewController)
     let glassRegistrar = flutterViewController.registrar(forPlugin: "BrowserGlass")
     glassRegistrar.register(
@@ -601,4 +610,60 @@ class MainFlutterWindow: NSWindow {
     flutterViewController.engine.run(withEntrypoint: nil)
     super.awakeFromNib()
   }
+}
+
+/// Scoped URLs are held only for the duration of a single Dart file operation.
+private final class BackupFolderAccessChannel {
+  private let channel: FlutterMethodChannel
+  private var leases: [String: URL] = [:]
+
+  init(messenger: FlutterBinaryMessenger) {
+    channel = FlutterMethodChannel(name: "kelivo/backup_folder", binaryMessenger: messenger)
+    channel.setMethodCallHandler { [weak self] call, reply in
+      guard let self = self else { reply(FlutterMethodNotImplemented); return }
+      do {
+        switch call.method {
+        case "choose":
+          let panel = NSOpenPanel()
+          panel.canChooseDirectories = true
+          panel.canChooseFiles = false
+          panel.canCreateDirectories = true
+          guard panel.runModal() == .OK, let url = panel.url else { reply(nil); return }
+          let scoped = url.startAccessingSecurityScopedResource()
+          defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+          reply(["path": url.path, "bookmark": try self.bookmark(url)])
+        case "start":
+          guard let raw = call.arguments as? String, let data = Data(base64Encoded: raw) else {
+            reply(self.lost); return
+          }
+          var stale = false
+          let url = try URL(resolvingBookmarkData: data, options: [.withSecurityScope, .withoutUI, .withoutMounting],
+                            relativeTo: nil, bookmarkDataIsStale: &stale)
+          guard url.startAccessingSecurityScopedResource() else { reply(self.lost); return }
+          let lease = UUID().uuidString
+          var value = ["path": url.path, "lease": lease]
+          do {
+            if stale { value["bookmark"] = try self.bookmark(url) }
+          } catch {
+            url.stopAccessingSecurityScopedResource()
+            throw error
+          }
+          self.leases[lease] = url
+          reply(value)
+        case "stop":
+          if let lease = call.arguments as? String {
+            self.leases.removeValue(forKey: lease)?.stopAccessingSecurityScopedResource()
+          }
+          reply(nil)
+        default: reply(FlutterMethodNotImplemented)
+        }
+      } catch { reply(self.lost) }
+    }
+  }
+
+  private var lost: FlutterError { FlutterError(code: "backup_bookmark_lost", message: nil, details: nil) }
+  private func bookmark(_ url: URL) throws -> String {
+    try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil).base64EncodedString()
+  }
+  deinit { for url in leases.values { url.stopAccessingSecurityScopedResource() } }
 }

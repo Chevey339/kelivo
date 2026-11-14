@@ -16254,6 +16254,122 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compressionCarryInvalidCount => '请输入 1 到 10000 之间的条数。';
+
+  @override
+  String get backupRunningInBackground => '备份会在后台继续';
+
+  @override
+  String backupBackgroundFailed(String error) {
+    return '后台备份失败：$error';
+  }
+
+  @override
+  String get backupAutoEnableTitle => '到期后自动备份';
+
+  @override
+  String get backupAutoEnableHint =>
+      '到期后，在应用处于前台时自动备份。应用被关闭或清掉后不会继续跑，也不会接着传；再次打开时若已到期，只完整备份一次。';
+
+  @override
+  String get backupAutoDestinationTitle => '自动备份到';
+
+  @override
+  String get backupAutoDestinationWebDav => 'WebDAV';
+
+  @override
+  String get backupAutoDestinationS3 => 'S3';
+
+  @override
+  String get backupAutoDestinationLocal => '本地文件夹';
+
+  @override
+  String get backupAutoNeedRemoteHint => '请先配置 WebDAV 或 S3。';
+
+  @override
+  String get backupAutoNeedDestinationHint => '请先配置 WebDAV 或 S3，或选择一个本地文件夹。';
+
+  @override
+  String get backupAutoNeedFolderHint => '请先选择一个备份文件夹。';
+
+  @override
+  String get backupAutoLocalFolderChoose => '选择文件夹…';
+
+  @override
+  String get backupAutoLocalFolderChange => '更改文件夹';
+
+  @override
+  String get backupAutoLocalFolderInvalid => '不能把备份文件夹选在应用自己的数据目录里，请另选一个位置。';
+
+  @override
+  String get backupAutoLocalRetentionTitle => '最多保留';
+
+  @override
+  String backupAutoLocalRetentionCount(int count) {
+    return '$count 份';
+  }
+
+  @override
+  String get backupAutoLocalRetentionUnlimited => '不限制';
+
+  @override
+  String get backupAutoLocalNow => '立即备份到此文件夹';
+
+  @override
+  String get backupAutoLocalDirUnavailable =>
+      '无法写入所选文件夹，请检查它是否仍可用，或改选一个。已保存的位置不会被自动更改。';
+
+  @override
+  String get backupAutoLocalDirPermission =>
+      '没有所选文件夹的写入权限。请重新选择文件夹。已保存的位置不会被自动更改。';
+
+  @override
+  String get backupAutoLocalDirFull => '磁盘空间不足，备份未完成。先前的备份都还在。';
+
+  @override
+  String get backupAutoLocalBookmarkLost => '无法访问所选文件夹，请重新选择一次。已保存的位置不会被自动更改。';
+
+  @override
+  String get backupAutoNextTitle => '下次自动备份';
+
+  @override
+  String get backupAutoRememberPasswordTitle => '在本机记住密码？';
+
+  @override
+  String get backupAutoRememberPasswordMessage =>
+      '在这台设备上记住密码，以便自动备份。密码只存在本机，不会上传。';
+
+  @override
+  String get backupAutoRememberPasswordConfirm => '记住';
+
+  @override
+  String get backupAutoRememberPasswordDecline => '不了';
+
+  @override
+  String get backupAutoRememberDeclined => '未开启自动备份，仍会到期提醒。';
+
+  @override
+  String get backupAutoKeychainUnavailable =>
+      '这台设备没有可用的系统钥匙串，加密备份无法自动进行。仍会到期提醒。';
+
+  @override
+  String get backupAutoSucceeded => '已完成自动备份';
+
+  @override
+  String backupAutoFailed(String error) {
+    return '自动备份失败：$error';
+  }
+
+  @override
+  String get backupAutoFailedPassword => '自动备份失败：密码不正确。';
+
+  @override
+  String get backupReminderSidebarSubtitleAutoFailed => '自动备份没成功，请检查网络或手动备份。';
+
+  @override
+  String get backupEncryptionOnHintRemembered => '备份将加密保存。已在本机记住口令，可用于自动备份。';
+
+  @override
+  String get backupEncryptionChangePassword => '更改备份密码';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -32506,6 +32622,122 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get compressionCarryInvalidCount => '请输入 1 到 10000 之间的条数。';
+
+  @override
+  String get backupRunningInBackground => '备份会在后台继续';
+
+  @override
+  String backupBackgroundFailed(String error) {
+    return '后台备份失败：$error';
+  }
+
+  @override
+  String get backupAutoEnableTitle => '到期后自动备份';
+
+  @override
+  String get backupAutoEnableHint =>
+      '到期后，在应用处于前台时自动备份。应用被关闭或清掉后不会继续跑，也不会接着传；再次打开时若已到期，只完整备份一次。';
+
+  @override
+  String get backupAutoDestinationTitle => '自动备份到';
+
+  @override
+  String get backupAutoDestinationWebDav => 'WebDAV';
+
+  @override
+  String get backupAutoDestinationS3 => 'S3';
+
+  @override
+  String get backupAutoDestinationLocal => '本地文件夹';
+
+  @override
+  String get backupAutoNeedRemoteHint => '请先配置 WebDAV 或 S3。';
+
+  @override
+  String get backupAutoNeedDestinationHint => '请先配置 WebDAV 或 S3，或选择一个本地文件夹。';
+
+  @override
+  String get backupAutoNeedFolderHint => '请先选择一个备份文件夹。';
+
+  @override
+  String get backupAutoLocalFolderChoose => '选择文件夹…';
+
+  @override
+  String get backupAutoLocalFolderChange => '更改文件夹';
+
+  @override
+  String get backupAutoLocalFolderInvalid => '不能把备份文件夹选在应用自己的数据目录里，请另选一个位置。';
+
+  @override
+  String get backupAutoLocalRetentionTitle => '最多保留';
+
+  @override
+  String backupAutoLocalRetentionCount(int count) {
+    return '$count 份';
+  }
+
+  @override
+  String get backupAutoLocalRetentionUnlimited => '不限制';
+
+  @override
+  String get backupAutoLocalNow => '立即备份到此文件夹';
+
+  @override
+  String get backupAutoLocalDirUnavailable =>
+      '无法写入所选文件夹，请检查它是否仍可用，或改选一个。已保存的位置不会被自动更改。';
+
+  @override
+  String get backupAutoLocalDirPermission =>
+      '没有所选文件夹的写入权限。请重新选择文件夹。已保存的位置不会被自动更改。';
+
+  @override
+  String get backupAutoLocalDirFull => '磁盘空间不足，备份未完成。先前的备份都还在。';
+
+  @override
+  String get backupAutoLocalBookmarkLost => '无法访问所选文件夹，请重新选择一次。已保存的位置不会被自动更改。';
+
+  @override
+  String get backupAutoNextTitle => '下次自动备份';
+
+  @override
+  String get backupAutoRememberPasswordTitle => '在本机记住密码？';
+
+  @override
+  String get backupAutoRememberPasswordMessage =>
+      '在这台设备上记住密码，以便自动备份。密码只存在本机，不会上传。';
+
+  @override
+  String get backupAutoRememberPasswordConfirm => '记住';
+
+  @override
+  String get backupAutoRememberPasswordDecline => '不了';
+
+  @override
+  String get backupAutoRememberDeclined => '未开启自动备份，仍会到期提醒。';
+
+  @override
+  String get backupAutoKeychainUnavailable =>
+      '这台设备没有可用的系统钥匙串，加密备份无法自动进行。仍会到期提醒。';
+
+  @override
+  String get backupAutoSucceeded => '已完成自动备份';
+
+  @override
+  String backupAutoFailed(String error) {
+    return '自动备份失败：$error';
+  }
+
+  @override
+  String get backupAutoFailedPassword => '自动备份失败：密码不正确。';
+
+  @override
+  String get backupReminderSidebarSubtitleAutoFailed => '自动备份没成功，请检查网络或手动备份。';
+
+  @override
+  String get backupEncryptionOnHintRemembered => '备份将加密保存。已在本机记住口令，可用于自动备份。';
+
+  @override
+  String get backupEncryptionChangePassword => '更改备份密码';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -48775,4 +49007,120 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get compressionCarryInvalidCount => '請輸入 1 到 10000 之間的則數。';
+
+  @override
+  String get backupRunningInBackground => '備份會在背景繼續';
+
+  @override
+  String backupBackgroundFailed(String error) {
+    return '背景備份失敗：$error';
+  }
+
+  @override
+  String get backupAutoEnableTitle => '到期後自動備份';
+
+  @override
+  String get backupAutoEnableHint =>
+      '到期後，在應用程式處於前景時自動備份。應用程式被關閉或清除後不會繼續跑，也不會接著傳；再次開啟時若已到期，只完整備份一次。';
+
+  @override
+  String get backupAutoDestinationTitle => '自動備份到';
+
+  @override
+  String get backupAutoDestinationWebDav => 'WebDAV';
+
+  @override
+  String get backupAutoDestinationS3 => 'S3';
+
+  @override
+  String get backupAutoDestinationLocal => '本機資料夾';
+
+  @override
+  String get backupAutoNeedRemoteHint => '請先設定 WebDAV 或 S3。';
+
+  @override
+  String get backupAutoNeedDestinationHint => '請先設定 WebDAV 或 S3，或選擇一個本機資料夾。';
+
+  @override
+  String get backupAutoNeedFolderHint => '請先選擇一個備份資料夾。';
+
+  @override
+  String get backupAutoLocalFolderChoose => '選擇資料夾…';
+
+  @override
+  String get backupAutoLocalFolderChange => '更改資料夾';
+
+  @override
+  String get backupAutoLocalFolderInvalid => '不能把備份資料夾選在應用程式自己的資料目錄裡，請另選一個位置。';
+
+  @override
+  String get backupAutoLocalRetentionTitle => '最多保留';
+
+  @override
+  String backupAutoLocalRetentionCount(int count) {
+    return '$count 份';
+  }
+
+  @override
+  String get backupAutoLocalRetentionUnlimited => '不限制';
+
+  @override
+  String get backupAutoLocalNow => '立即備份到此資料夾';
+
+  @override
+  String get backupAutoLocalDirUnavailable =>
+      '無法寫入所選資料夾，請檢查它是否仍可用，或改選一個。已儲存的位置不會被自動更改。';
+
+  @override
+  String get backupAutoLocalDirPermission =>
+      '沒有所選資料夾的寫入權限。請重新選擇資料夾。已儲存的位置不會被自動更改。';
+
+  @override
+  String get backupAutoLocalDirFull => '磁碟空間不足，備份未完成。先前的備份都還在。';
+
+  @override
+  String get backupAutoLocalBookmarkLost => '無法存取所選資料夾，請重新選擇一次。已儲存的位置不會被自動更改。';
+
+  @override
+  String get backupAutoNextTitle => '下次自動備份';
+
+  @override
+  String get backupAutoRememberPasswordTitle => '在本機記住密碼？';
+
+  @override
+  String get backupAutoRememberPasswordMessage =>
+      '在這台裝置上記住密碼，以便自動備份。密碼只存在本機，不會上傳。';
+
+  @override
+  String get backupAutoRememberPasswordConfirm => '記住';
+
+  @override
+  String get backupAutoRememberPasswordDecline => '不用了';
+
+  @override
+  String get backupAutoRememberDeclined => '未開啟自動備份，仍會到期提醒。';
+
+  @override
+  String get backupAutoKeychainUnavailable =>
+      '這台裝置沒有可用的系統鑰匙圈，加密備份無法自動進行。仍會到期提醒。';
+
+  @override
+  String get backupAutoSucceeded => '已完成自動備份';
+
+  @override
+  String backupAutoFailed(String error) {
+    return '自動備份失敗：$error';
+  }
+
+  @override
+  String get backupAutoFailedPassword => '自動備份失敗：密碼不正確。';
+
+  @override
+  String get backupReminderSidebarSubtitleAutoFailed => '自動備份沒成功，請檢查網路或手動備份。';
+
+  @override
+  String get backupEncryptionOnHintRemembered => '備份將加密保存。已在本機記住口令，可用於自動備份。';
+
+  @override
+  String get backupEncryptionChangePassword => '變更備份密碼';
 }

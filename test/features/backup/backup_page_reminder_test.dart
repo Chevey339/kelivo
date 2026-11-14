@@ -1,3 +1,7 @@
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/core/providers/s3_backup_provider.dart';
+import 'package:Kelivo/core/providers/backup_provider.dart';
+import 'package:Kelivo/core/providers/external_backup_auto_provider.dart';
 import '../../support/business_test_harness.dart';
 
 import 'dart:io';
@@ -59,6 +63,32 @@ Widget _buildHarness({
           autoLoad: false,
         ),
       ),
+      ChangeNotifierProvider(
+        create: (ctx) => BackupProvider(
+          chatService: ctx.read<ChatService>(),
+          businessPreferences: businessPreferences,
+          businessRepository: businessRepository,
+          initialConfig: settings.webDavConfig,
+        ),
+      ),
+      ChangeNotifierProvider(
+        create: (ctx) => S3BackupProvider(
+          chatService: ctx.read<ChatService>(),
+          businessPreferences: businessPreferences,
+          businessRepository: businessRepository,
+          initialConfig: settings.s3Config,
+        ),
+      ),
+      ChangeNotifierProvider(
+        create: (ctx) => ExternalBackupAutoProvider(
+          preferences: businessPreferences,
+          settings: ctx.read<SettingsProvider>(),
+          reminder: ctx.read<BackupReminderProvider>(),
+          webdav: ctx.read<BackupProvider>(),
+          s3: ctx.read<S3BackupProvider>(),
+          desktop: false,
+        ),
+      ),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -95,6 +125,10 @@ void main() {
       expect(find.text('Backup Reminder'), findsOneWidget);
       expect(find.text('Remind me to back up'), findsOneWidget);
       expect(find.text('Frequency'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('external-backup-auto-switch')),
+        findsNothing,
+      );
     });
 
     testWidgets('shows frequency and reminder status when enabled', (
@@ -125,6 +159,12 @@ void main() {
       expect(find.text('Every week'), findsOneWidget);
       expect(find.text('Last Backup'), findsOneWidget);
       expect(find.text('Next Reminder'), findsOneWidget);
+      expect(find.text('Set up WebDAV or S3 first.'), findsOneWidget);
+      expect(find.text('Choose folder…'), findsNothing);
+      final toggle = tester.widget<IosSwitch>(
+        find.byKey(const ValueKey('external-backup-auto-switch')),
+      );
+      expect(toggle.onChanged, isNull);
     });
   });
 }

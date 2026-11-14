@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/providers/external_backup_auto_provider.dart';
 import '../../support/business_test_harness.dart';
 
 import 'dart:io';
@@ -55,6 +56,32 @@ Widget _buildHarness({
           autoLoad: false,
         ),
       ),
+      ChangeNotifierProvider(
+        create: (ctx) => BackupProvider(
+          chatService: ctx.read<ChatService>(),
+          businessPreferences: businessPreferences,
+          businessRepository: businessRepository,
+          initialConfig: settings.webDavConfig,
+        ),
+      ),
+      ChangeNotifierProvider(
+        create: (ctx) => S3BackupProvider(
+          chatService: ctx.read<ChatService>(),
+          businessPreferences: businessPreferences,
+          businessRepository: businessRepository,
+          initialConfig: settings.s3Config,
+        ),
+      ),
+      ChangeNotifierProvider(
+        create: (ctx) => ExternalBackupAutoProvider(
+          preferences: businessPreferences,
+          settings: ctx.read<SettingsProvider>(),
+          reminder: ctx.read<BackupReminderProvider>(),
+          webdav: ctx.read<BackupProvider>(),
+          s3: ctx.read<S3BackupProvider>(),
+          desktop: false,
+        ),
+      ),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -104,6 +131,16 @@ Widget _buildDesktopHarness({
           businessRepository: businessRepository,
           businessPreferences: businessPreferences,
           initialConfig: settings.s3Config,
+        ),
+      ),
+      ChangeNotifierProvider(
+        create: (ctx) => ExternalBackupAutoProvider(
+          preferences: businessPreferences,
+          settings: ctx.read<SettingsProvider>(),
+          reminder: ctx.read<BackupReminderProvider>(),
+          webdav: ctx.read<BackupProvider>(),
+          s3: ctx.read<S3BackupProvider>(),
+          desktop: true,
         ),
       ),
     ],
@@ -208,6 +245,16 @@ void main() {
         }
         await tester.pump();
         await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        // Argon2 runs outside the widget tester's fake clock.
+        final deadline = DateTime.now().add(const Duration(seconds: 12));
+        while (!settings.backupEncryptionEnabled &&
+            DateTime.now().isBefore(deadline)) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 25)),
+          );
+          await tester.pump();
+        }
         await tester.pumpAndSettle();
         expect(settings.backupEncryptionEnabled, isTrue);
         expect(tester.widget<IosSwitch>(control).value, isTrue);

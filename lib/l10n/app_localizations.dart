@@ -30131,6 +30131,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a number from 1 to 10,000.'**
   String get compressionCarryInvalidCount;
+
+  /// Shown in external backup settings or completion notifications. Backup will continue in the background
+  ///
+  /// In en, this message translates to:
+  /// **'Backup will continue in the background'**
+  String get backupRunningInBackground;
+
+  /// Shown in external backup settings or completion notifications. Background backup failed: {error} The error is the localized reason for the failure.
+  ///
+  /// In en, this message translates to:
+  /// **'Background backup failed: {error}'**
+  String backupBackgroundFailed(String error);
+
+  /// Shown in external backup settings or completion notifications. Back up automatically when due
+  ///
+  /// In en, this message translates to:
+  /// **'Back up automatically when due'**
+  String get backupAutoEnableTitle;
+
+  /// Shown in external backup settings or completion notifications. When the scheduled time arrives, Kelivo backs up while the app is in the foreground. If the app is closed or killed, the backup does not keep running and is not resumed; the next time you open the app, a single full backup runs if it is still due.
+  ///
+  /// In en, this message translates to:
+  /// **'When the scheduled time arrives, Kelivo backs up while the app is in the foreground. If the app is closed or killed, the backup does not keep running and is not resumed; the next time you open the app, a single full backup runs if it is still due.'**
+  String get backupAutoEnableHint;
+
+  /// Shown in external backup settings or completion notifications. Automatic backup destination
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic backup destination'**
+  String get backupAutoDestinationTitle;
+
+  /// Shown in external backup settings or completion notifications. WebDAV
+  ///
+  /// In en, this message translates to:
+  /// **'WebDAV'**
+  String get backupAutoDestinationWebDav;
+
+  /// Shown in external backup settings or completion notifications. S3
+  ///
+  /// In en, this message translates to:
+  /// **'S3'**
+  String get backupAutoDestinationS3;
+
+  /// Desktop automatic backup folder settings or write result. Local folder
+  ///
+  /// In en, this message translates to:
+  /// **'Local folder'**
+  String get backupAutoDestinationLocal;
+
+  /// Shown in external backup settings or completion notifications. Set up WebDAV or S3 first.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up WebDAV or S3 first.'**
+  String get backupAutoNeedRemoteHint;
+
+  /// Shown in external backup settings or completion notifications. Set up WebDAV or S3, or choose a local folder first.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up WebDAV or S3, or choose a local folder first.'**
+  String get backupAutoNeedDestinationHint;
+
+  /// Desktop automatic backup folder settings or write result. Choose a backup folder first.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a backup folder first.'**
+  String get backupAutoNeedFolderHint;
+
+  /// Desktop automatic backup folder settings or write result. Choose folder…
+  ///
+  /// In en, this message translates to:
+  /// **'Choose folder…'**
+  String get backupAutoLocalFolderChoose;
+
+  /// Desktop automatic backup folder settings or write result. Change folder
+  ///
+  /// In en, this message translates to:
+  /// **'Change folder'**
+  String get backupAutoLocalFolderChange;
+
+  /// Desktop automatic backup folder settings or write result. Choose a folder outside the app's own data directory.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a folder outside the app\'s own data directory.'**
+  String get backupAutoLocalFolderInvalid;
+
+  /// Desktop automatic backup folder settings or write result. Keep at most
+  ///
+  /// In en, this message translates to:
+  /// **'Keep at most'**
+  String get backupAutoLocalRetentionTitle;
+
+  /// Desktop automatic backup folder settings or write result. {count} backups The count is the positive number of backups to keep.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} backups'**
+  String backupAutoLocalRetentionCount(int count);
+
+  /// Desktop automatic backup folder settings or write result. No limit
+  ///
+  /// In en, this message translates to:
+  /// **'No limit'**
+  String get backupAutoLocalRetentionUnlimited;
+
+  /// Desktop automatic backup folder settings or write result. Back up to this folder now
+  ///
+  /// In en, this message translates to:
+  /// **'Back up to this folder now'**
+  String get backupAutoLocalNow;
+
+  /// Desktop automatic backup folder settings or write result. Can't write to the chosen folder. Check that it is still available, or choose another one. Kelivo won't change the saved location on its own.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t write to the chosen folder. Check that it is still available, or choose another one. Kelivo won\'t change the saved location on its own.'**
+  String get backupAutoLocalDirUnavailable;
+
+  /// Desktop automatic backup folder settings or write result. You don't have permission to write to the chosen folder. Please choose the folder again. Kelivo won't change the saved location on its own.
+  ///
+  /// In en, this message translates to:
+  /// **'You don\'t have permission to write to the chosen folder. Please choose the folder again. Kelivo won\'t change the saved location on its own.'**
+  String get backupAutoLocalDirPermission;
+
+  /// Desktop automatic backup folder settings or write result. There isn't enough disk space, so the backup didn't finish. Your earlier backups are still there.
+  ///
+  /// In en, this message translates to:
+  /// **'There isn\'t enough disk space, so the backup didn\'t finish. Your earlier backups are still there.'**
+  String get backupAutoLocalDirFull;
+
+  /// Desktop automatic backup folder settings or write result. Kelivo can't access the chosen folder. Please choose it again. The saved location won't be changed automatically.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo can\'t access the chosen folder. Please choose it again. The saved location won\'t be changed automatically.'**
+  String get backupAutoLocalBookmarkLost;
+
+  /// Shown in external backup settings or completion notifications. Next automatic backup
+  ///
+  /// In en, this message translates to:
+  /// **'Next automatic backup'**
+  String get backupAutoNextTitle;
+
+  /// Device-only password consent dialog when enabling encrypted automatic backups. Remember the password on this device?
+  ///
+  /// In en, this message translates to:
+  /// **'Remember the password on this device?'**
+  String get backupAutoRememberPasswordTitle;
+
+  /// Device-only password consent dialog when enabling encrypted automatic backups. Remember the password on this device so automatic backups can run. It stays on this device and is never uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember the password on this device so automatic backups can run. It stays on this device and is never uploaded.'**
+  String get backupAutoRememberPasswordMessage;
+
+  /// Device-only password consent dialog when enabling encrypted automatic backups. Remember
+  ///
+  /// In en, this message translates to:
+  /// **'Remember'**
+  String get backupAutoRememberPasswordConfirm;
+
+  /// Device-only password consent dialog when enabling encrypted automatic backups. Not now
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get backupAutoRememberPasswordDecline;
+
+  /// Device-only password consent dialog when enabling encrypted automatic backups. Automatic backup was not turned on. You'll still get a reminder when it's due.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic backup was not turned on. You\'ll still get a reminder when it\'s due.'**
+  String get backupAutoRememberDeclined;
+
+  /// Shown in external backup settings or completion notifications. This device has no system keychain available, so encrypted backups can't run automatically. You'll still get a reminder when it's due.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has no system keychain available, so encrypted backups can\'t run automatically. You\'ll still get a reminder when it\'s due.'**
+  String get backupAutoKeychainUnavailable;
+
+  /// Shown in external backup settings or completion notifications. Automatic backup finished
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic backup finished'**
+  String get backupAutoSucceeded;
+
+  /// Shown in external backup settings or completion notifications. Automatic backup failed: {error} The error is the localized reason for the failure.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic backup failed: {error}'**
+  String backupAutoFailed(String error);
+
+  /// Shown in external backup settings or completion notifications. Automatic backup failed: the password is incorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic backup failed: the password is incorrect.'**
+  String get backupAutoFailedPassword;
+
+  /// Sidebar reminder after a due automatic external backup fails.
+  ///
+  /// In en, this message translates to:
+  /// **'The automatic backup didn\'t finish. Check the network or back up manually.'**
+  String get backupReminderSidebarSubtitleAutoFailed;
+
+  /// Shown in external backup settings or completion notifications. Backups will be encrypted. The password is remembered on this device for automatic backups.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups will be encrypted. The password is remembered on this device for automatic backups.'**
+  String get backupEncryptionOnHintRemembered;
+
+  /// Action in backup encryption settings to choose a new password for future external backups while keeping encryption enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Change backup password'**
+  String get backupEncryptionChangePassword;
 }
 
 class _AppLocalizationsDelegate

@@ -49,6 +49,8 @@ import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
 import '../../utils/image_compressor.dart';
 import '../database/business_preferences.dart';
+import '../services/backup/backup_secure_password_store.dart';
+import '../services/backup/backup_encryption.dart';
 import '../services/backup/backup_cancel_token.dart';
 import '../services/memory/memory_prompts.dart';
 import '../services/memory/memory_trace.dart';
@@ -665,14 +667,19 @@ class SettingsProvider extends ChangeNotifier {
   int _appLaunchCount = 0;
   int get appLaunchCount => _appLaunchCount;
 
-  SettingsProvider(this._preferences, {this.onProviderModelsRetired}) {
+  SettingsProvider(
+    this._preferences, {
+    this.onProviderModelsRetired,
+    this.backupPasswordStore = const BackupSecurePasswordStore(),
+  }) {
     ProviderOAuthService.instance.bind(this);
     _appLocaleTag = _readAppLocaleTag(_preferences);
     _loaded = _load();
   }
 
   SettingsProvider._withoutLoad(this._preferences)
-    : onProviderModelsRetired = null,
+    : backupPasswordStore = const BackupSecurePasswordStore(),
+      onProviderModelsRetired = null,
       _loaded = Future<void>.value();
 
   final BusinessPreferences _preferences;
@@ -2193,31 +2200,160 @@ class SettingsProvider extends ChangeNotifier {
   String? _backupEncryptionPassword;
   bool get backupEncryptionEnabled => _backupEncryptionEnabled;
 
-  /// Persist only the preference. The password stays in this app session, so
-  /// navigating away cannot silently disable encryption or lose the password.
+  final BackupSecurePasswordStore backupPasswordStore;
+  static const autoBackupEnabledKey = 'backup_auto_enabled_v1';
+  bool get autoBackupEnabled =>
+      _preferences.getBool(autoBackupEnabledKey) ?? false;
+
+  static const _verifierKey = 'backup_password_verifier_v1';
+  static const _purgeKey = 'backup_password_forget_pending_v1';
+
+  Future<void> _verifyPassword(String password) async {
+    final saved = _preferences.getString(_verifierKey);
+    if (saved != null &&
+        saved.isNotEmpty &&
+        await BackupEncryption.passwordVerifier(password, existing: saved) !=
+            saved) {
+      throw const BackupDecryptionException();
+    }
+  }
+
+  /// A user may revoke consent while the OS credential service is offline.
+  /// Keep the revocation until deletion succeeds, even across cold starts.
+  Future<void> retryBackupPasswordRemoval() async {
+    await loaded;
+    await _preferences.runExclusiveMutation(() async {
+      if (_preferences.getBool(_purgeKey) == true &&
+          (!autoBackupEnabled || !_backupEncryptionEnabled)) {
+        await backupPasswordStore.requireUnlocked();
+        await backupPasswordStore.forget();
+        await _preferences.remove(_purgeKey);
+      }
+    });
+  }
+
+  Future<void> setAutomaticBackup(bool value, {String? password}) async {
+    await loaded;
+    await _preferences
+        .runExclusiveMutation(() async {
+          if (value && _backupEncryptionEnabled) {
+            if (password == null || password.isEmpty) {
+              throw const BackupCancelledException();
+            }
+            await _verifyPassword(password);
+            final saved = _preferences.getString(_verifierKey);
+            final verifier = saved == null || saved.isEmpty
+                ? await BackupEncryption.passwordVerifier(password)
+                : saved;
+            await _preferences.setBool(_purgeKey, true);
+            await backupPasswordStore.remember(password);
+            await _preferences.setMany({
+              autoBackupEnabledKey: true,
+              _purgeKey: false,
+              _verifierKey: verifier,
+            });
+            _backupEncryptionPassword = password;
+          } else if (!value &&
+              (autoBackupEnabled && _backupEncryptionEnabled ||
+                  _preferences.getBool(_purgeKey) == true)) {
+            await _preferences.setMany({
+              autoBackupEnabledKey: false,
+              _purgeKey: true,
+            });
+            _backupEncryptionPassword = null;
+            await backupPasswordStore.forget();
+            await _preferences.remove(_purgeKey);
+          } else {
+            await _preferences.setBool(autoBackupEnabledKey, value);
+            if (!value) _backupEncryptionPassword = null;
+          }
+        })
+        .whenComplete(notifyListeners);
+  }
+
   Future<void> setBackupEncryptionPassword(String? password) async {
     if (password != null && password.isEmpty) {
       throw ArgumentError('backup_password_empty');
     }
     await loaded;
-    await _preferences.setBool(_backupEncryptionEnabledKey, password != null);
-    _backupEncryptionEnabled = password != null;
-    _backupEncryptionPassword = password;
-    notifyListeners();
+    await _preferences
+        .runExclusiveMutation(() async {
+          final wasEnabled = _backupEncryptionEnabled;
+          final wasAutomatic = autoBackupEnabled;
+          final enabled = password != null;
+          final purge =
+              !enabled &&
+              ((wasAutomatic && wasEnabled) ||
+                  _preferences.getBool(_purgeKey) == true);
+          await _preferences.setMany({
+            _backupEncryptionEnabledKey: enabled,
+            _verifierKey: password == null
+                ? ''
+                : await BackupEncryption.passwordVerifier(password),
+            if (wasAutomatic && (!enabled || !wasEnabled))
+              autoBackupEnabledKey: false,
+            if (purge) _purgeKey: true,
+          });
+          _backupEncryptionEnabled = enabled;
+          _backupEncryptionPassword = password;
+          if (purge) {
+            await backupPasswordStore.forget();
+            await _preferences.remove(_purgeKey);
+          } else if (wasAutomatic && wasEnabled && password != null) {
+            try {
+              await backupPasswordStore.remember(password);
+            } on BackupKeychainUnavailable {
+              await _preferences.setMany({
+                autoBackupEnabledKey: false,
+                _purgeKey: true,
+              });
+              _backupEncryptionPassword = null;
+              try {
+                await backupPasswordStore.forget();
+                await _preferences.remove(_purgeKey);
+              } on BackupKeychainUnavailable {
+                /* Retain the revocation for startup. */
+              }
+              rethrow;
+            }
+          }
+        })
+        .whenComplete(notifyListeners);
   }
 
-  /// An enabled preference without a session password must prompt or cancel;
-  /// null is returned only when the user has disabled encryption.
+  Future<String?> automaticBackupPassword() async {
+    await loaded;
+    if (!_backupEncryptionEnabled) return null;
+    if (!autoBackupEnabled) throw const BackupKeychainUnavailable();
+    final password = await backupPasswordStore.read();
+    if (password == null || password.isEmpty) {
+      throw const BackupKeychainUnavailable();
+    }
+    if (_backupEncryptionPassword != password) await _verifyPassword(password);
+    _backupEncryptionPassword = password;
+    return password;
+  }
+
   Future<String?> resolveBackupEncryptionPassword(
     Future<String?> Function() prompt,
   ) async {
     await loaded;
     if (!_backupEncryptionEnabled) return null;
     if (_backupEncryptionPassword case final String password) return password;
+    if (autoBackupEnabled) {
+      try {
+        return await automaticBackupPassword();
+      } on BackupKeychainUnavailable {
+        /* Manual backups may still prompt. */
+      } on BackupDecryptionException {
+        /* Let the user supply the correct password. */
+      }
+    }
     final password = await prompt();
     if (password == null || password.isEmpty || !_backupEncryptionEnabled) {
       throw const BackupCancelledException();
     }
+    await _verifyPassword(password);
     _backupEncryptionPassword = password;
     return password;
   }

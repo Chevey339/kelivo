@@ -17442,4 +17442,137 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionCarryInvalidCount => 'Введите число от 1 до 10 000.';
+
+  @override
+  String get backupRunningInBackground =>
+      'Резервное копирование продолжится в фоновом режиме';
+
+  @override
+  String backupBackgroundFailed(String error) {
+    return 'Фоновое резервное копирование не удалось: $error';
+  }
+
+  @override
+  String get backupAutoEnableTitle =>
+      'Автоматически создавать резервную копию по расписанию';
+
+  @override
+  String get backupAutoEnableHint =>
+      'Когда наступает запланированное время, Kelivo создаёт резервную копию, пока приложение на переднем плане. Если приложение закрыто или остановлено, резервное копирование не продолжается и не возобновляется; при следующем открытии приложения выполняется одна полная резервная копия, если срок всё ещё наступил.';
+
+  @override
+  String get backupAutoDestinationTitle =>
+      'Место автоматического резервного копирования';
+
+  @override
+  String get backupAutoDestinationWebDav => 'WebDAV';
+
+  @override
+  String get backupAutoDestinationS3 => 'S3';
+
+  @override
+  String get backupAutoDestinationLocal => 'Локальная папка';
+
+  @override
+  String get backupAutoNeedRemoteHint => 'Сначала настройте WebDAV или S3.';
+
+  @override
+  String get backupAutoNeedDestinationHint =>
+      'Сначала настройте WebDAV или S3 либо выберите локальную папку.';
+
+  @override
+  String get backupAutoNeedFolderHint =>
+      'Сначала выберите папку для резервных копий.';
+
+  @override
+  String get backupAutoLocalFolderChoose => 'Выбрать папку…';
+
+  @override
+  String get backupAutoLocalFolderChange => 'Изменить папку';
+
+  @override
+  String get backupAutoLocalFolderInvalid =>
+      'Выберите папку вне собственного каталога данных приложения.';
+
+  @override
+  String get backupAutoLocalRetentionTitle => 'Хранить не более';
+
+  @override
+  String backupAutoLocalRetentionCount(int count) {
+    return '$count резервных копий';
+  }
+
+  @override
+  String get backupAutoLocalRetentionUnlimited => 'Без ограничений';
+
+  @override
+  String get backupAutoLocalNow =>
+      'Создать резервную копию в этой папке сейчас';
+
+  @override
+  String get backupAutoLocalDirUnavailable =>
+      'Не удаётся записать в выбранную папку. Проверьте, доступна ли она, или выберите другую. Kelivo не изменит сохранённое расположение самостоятельно.';
+
+  @override
+  String get backupAutoLocalDirPermission =>
+      'У вас нет разрешения на запись в выбранную папку. Выберите папку снова. Kelivo не изменит сохранённое расположение самостоятельно.';
+
+  @override
+  String get backupAutoLocalDirFull =>
+      'Недостаточно места на диске, поэтому резервное копирование не завершилось. Ваши предыдущие резервные копии сохранены.';
+
+  @override
+  String get backupAutoLocalBookmarkLost =>
+      'Kelivo не может получить доступ к выбранной папке. Выберите её снова. Сохранённое расположение не будет изменено автоматически.';
+
+  @override
+  String get backupAutoNextTitle =>
+      'Следующее автоматическое резервное копирование';
+
+  @override
+  String get backupAutoRememberPasswordTitle =>
+      'Запомнить пароль на этом устройстве?';
+
+  @override
+  String get backupAutoRememberPasswordMessage =>
+      'Запомните пароль на этом устройстве, чтобы автоматические резервные копии могли выполняться. Он хранится только на этом устройстве и никогда не загружается.';
+
+  @override
+  String get backupAutoRememberPasswordConfirm => 'Запомнить';
+
+  @override
+  String get backupAutoRememberPasswordDecline => 'Не сейчас';
+
+  @override
+  String get backupAutoRememberDeclined =>
+      'Автоматическое резервное копирование не включено. Напоминание всё равно придёт, когда наступит срок.';
+
+  @override
+  String get backupAutoKeychainUnavailable =>
+      'На этом устройстве нет доступной системной связки ключей, поэтому зашифрованные резервные копии не могут создаваться автоматически. Напоминание всё равно придёт, когда наступит срок.';
+
+  @override
+  String get backupAutoSucceeded =>
+      'Автоматическое резервное копирование завершено';
+
+  @override
+  String backupAutoFailed(String error) {
+    return 'Автоматическое резервное копирование не удалось: $error';
+  }
+
+  @override
+  String get backupAutoFailedPassword =>
+      'Автоматическое резервное копирование не удалось: неверный пароль.';
+
+  @override
+  String get backupReminderSidebarSubtitleAutoFailed =>
+      'Автоматическое резервное копирование не завершилось. Проверьте сеть или создайте резервную копию вручную.';
+
+  @override
+  String get backupEncryptionOnHintRemembered =>
+      'Резервные копии будут зашифрованы. Пароль запомнен на этом устройстве для автоматического резервного копирования.';
+
+  @override
+  String get backupEncryptionChangePassword =>
+      'Изменить пароль резервной копии';
 }

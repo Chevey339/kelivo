@@ -46,6 +46,39 @@ void main() {
   setUp(BackupActivity.debugReset);
   tearDown(BackupActivity.debugReset);
 
+  for (final failTask in [false, true]) {
+    testWidgets(
+      'detached task delivers its final result once (failure=$failTask)',
+      (tester) async {
+        final pending = Completer<void>();
+        final settled = <BackupTaskResult<void>>[];
+        await _openDialog(tester, (context) async {
+          await runBackupTask(
+            context,
+            title: 'Upload',
+            backgroundLabel: 'Hide',
+            task: (_) => pending.future,
+            onSettled: (result, detached) async {
+              expect(detached, true);
+              settled.add(result);
+            },
+          );
+        });
+        await tester.tap(find.text('Hide'));
+        await tester.pumpAndSettle();
+        expect(BackupActivity.isActive, true);
+        if (failTask) {
+          pending.completeError(StateError('upload'));
+        } else {
+          pending.complete();
+        }
+        await tester.pumpAndSettle();
+        expect(settled, hasLength(1));
+        expect(settled.single.isSuccess, !failTask);
+        expect(BackupActivity.isActive, false);
+      },
+    );
+  }
   for (final total in <int?>[null, 10]) {
     testWidgets('failure stays visible and copies details (total: $total)', (
       tester,

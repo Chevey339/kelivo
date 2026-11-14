@@ -12,6 +12,16 @@ final class BackupPortability {
 
   static const devicePreferenceKeys = {
     'backup_encryption_enabled_v1',
+    'backup_auto_enabled_v1',
+    'backup_auto_destination_v1',
+    'backup_auto_last_destination_v1',
+    'backup_auto_local_dir_v1',
+    'backup_auto_local_bookmark_v1',
+    'backup_auto_local_retention_v1',
+    'backup_password_forget_pending_v1',
+    'backup_password_verifier_v1',
+    'backup_install_id_v1',
+    'backup_outstanding_partial_v1',
     'desktop_scheduled_tasks_v1',
     'scheduled_task_results_v1',
     'environment_state_v1',

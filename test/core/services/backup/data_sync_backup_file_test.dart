@@ -1607,8 +1607,7 @@ void main() {
         await fontFile.writeAsBytes(List<int>.filled(256, 9));
 
         final tmpDir = Directory('${root.path}/tmp');
-        // Abandoned entries (older than the 6h reclaim threshold) carry their
-        // age in the name, matching prepareBackupFile's naming.
+        // Previous releases put these working files in the cache root.
         final staleWorkDir = Directory(
           '${tmpDir.path}/kelivo_backup_2000-01-01T00-00-00.000000',
         );
@@ -1621,13 +1620,13 @@ void main() {
         final staleLegacy = File('${tmpDir.path}/_bk_chats.json');
         await staleLegacy.writeAsString('{}');
         await staleLegacy.setLastModified(DateTime(2000));
-        // A fresh leftover looks like a backup another provider is running
-        // right now and must survive the sweep.
+        // Another live task owns this directory.
         final freshWorkDir = Directory(
           '${tmpDir.path}/kelivo_backup_'
           '${DateTime.now().toIso8601String().replaceAll(':', '-')}',
         );
         await freshWorkDir.create(recursive: true);
+        DataSync.registerLiveTempPath(freshWorkDir.path);
 
         final sync = DataSync(
           businessRepository: businessRepository,
@@ -1643,6 +1642,7 @@ void main() {
         expect(await staleZip.exists(), isFalse);
         expect(await staleLegacy.exists(), isFalse);
         expect(await freshWorkDir.exists(), isTrue);
+        DataSync.unregisterLiveTempPath(freshWorkDir.path);
         await freshWorkDir.delete(recursive: true);
 
         final input = InputFileStream(backupFile.path);
@@ -1826,7 +1826,7 @@ void main() {
       await File(
         '${uploadDir.path}/payload.bin',
       ).writeAsBytes(List<int>.filled(32 * 1024, 5), flush: true);
-      final tmpDir = Directory('${root.path}/tmp');
+      final tmpDir = Directory('${root.path}/tmp/kelivo_backup_staging');
       await tmpDir.create(recursive: true);
       final createdVerify = <String>[];
       final watch = tmpDir.watch(recursive: true).listen((event) {
@@ -1943,7 +1943,7 @@ void main() {
         throwsA(isA<BackupCancelledException>()),
       );
 
-      final tmp = Directory('${root.path}/tmp');
+      final tmp = Directory('${root.path}/tmp/kelivo_backup_staging');
       if (await tmp.exists()) {
         final leftovers = tmp
             .listSync(recursive: true, followLinks: false)
@@ -2004,7 +2004,7 @@ void main() {
         events.map((event) => event.phase),
         contains(BackupPhase.verifying),
       );
-      final tmp = Directory('${root.path}/tmp');
+      final tmp = Directory('${root.path}/tmp/kelivo_backup_staging');
       if (await tmp.exists()) {
         final leftovers = tmp
             .listSync(recursive: true, followLinks: false)
@@ -2154,7 +2154,7 @@ void main() {
         throwsA(isA<BackupCancelledException>()),
       );
 
-      final tmp = Directory('${root.path}/tmp');
+      final tmp = Directory('${root.path}/tmp/kelivo_backup_staging');
       if (await tmp.exists()) {
         final leftovers = tmp
             .listSync(followLinks: false)
@@ -2311,7 +2311,10 @@ void main() {
             ),
           ),
         );
-        expect(await Directory('${root.path}/tmp').exists(), isFalse);
+        expect(
+          await Directory('${root.path}/tmp/kelivo_backup_staging').exists(),
+          isFalse,
+        );
         expect(preferences.getBool('backup_encryption_enabled_v1'), isTrue);
       },
     );
@@ -2372,7 +2375,9 @@ void main() {
         );
         expect(await backup.readAsBytes(), original);
         expect(
-          (await Directory('${root.path}/tmp').list().toList()).where(
+          (await Directory(
+            '${root.path}/tmp/kelivo_backup_staging',
+          ).list().toList()).where(
             (e) => p.basename(e.path).startsWith('kelivo_decrypted_'),
           ),
           isEmpty,
@@ -2392,7 +2397,9 @@ void main() {
           'keep-on-cancel',
         );
         expect(
-          (await Directory('${root.path}/tmp').list().toList()).where(
+          (await Directory(
+            '${root.path}/tmp/kelivo_backup_staging',
+          ).list().toList()).where(
             (e) => p.basename(e.path).startsWith('kelivo_decrypted_'),
           ),
           isEmpty,
@@ -2482,10 +2489,64 @@ void main() {
           await RestoreStartupGate.inspect(appDataDirectory: root),
           isNull,
         );
-        expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+        expect(
+          await Directory(
+            '${root.path}/tmp/kelivo_backup_staging',
+          ).list().toList(),
+          isEmpty,
+        );
       },
     );
 
+    test(
+      'WebDAV multistatus MOVE failures never publish a backup and remove only the partial',
+      () async {
+        HttpOverrides.global = null;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        final methods = <String>[];
+        server.listen((req) async {
+          await req.drain<void>();
+          switch (req.method) {
+            case 'PROPFIND':
+              req.response.statusCode = 207;
+              req.response.write('<d:multistatus xmlns:d="DAV:"/>');
+            case 'MKCOL':
+              req.response.statusCode = 201;
+            case 'PUT':
+              methods.add('put ${req.uri.path}');
+              req.response.statusCode = 201;
+            case 'MOVE':
+              methods.add('move ${req.uri.path}');
+              req.response.statusCode = 207;
+              req.response.write(
+                '<d:multistatus xmlns:d="DAV:"><d:response><d:status>HTTP/1.1 507 Insufficient Storage</d:status></d:response></d:multistatus>',
+              );
+            case 'DELETE':
+              methods.add('delete ${req.uri.path}');
+              req.response.statusCode = 204;
+          }
+          await req.response.close();
+        });
+        final cfg = WebDavConfig(
+          url: 'http://127.0.0.1:${server.port}',
+          scope: _withoutChatsOrAssets.scope,
+        );
+        await expectLater(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).backupToWebDav(cfg),
+          throwsException,
+        );
+        expect(methods.map((m) => m.split(' ').first), [
+          'put',
+          'move',
+          'delete',
+        ]);
+        expect(methods.every((m) => m.endsWith('.zip.partial')), true);
+      },
+    );
     for (final useS3 in [false, true]) {
       test(
         '${useS3 ? 'S3' : 'WebDAV'} uploads, lists and restores encrypted backups',
@@ -2498,7 +2559,24 @@ void main() {
           var denyBucketListing = false;
           server.listen((request) async {
             final path = request.uri.path;
-            if (request.method == 'PUT') {
+            if (request.method == 'MOVE') {
+              final destination = Uri.parse(
+                request.headers.value('Destination')!,
+              ).path;
+              objects[destination] = objects.remove(path)!;
+              mimeTypes[destination] = mimeTypes.remove(path);
+              request.response.statusCode = 201;
+            } else if (request.method == 'DELETE') {
+              objects.remove(path);
+              request.response.statusCode = 204;
+            } else if (request.headers.value('x-amz-copy-source')
+                case final String source) {
+              objects[path] = objects[source]!;
+              mimeTypes[path] = mimeTypes[source];
+              request.response.write(
+                '<CopyObjectResult><ETag>ok</ETag></CopyObjectResult>',
+              );
+            } else if (request.method == 'PUT') {
               objects[path] = await request.fold<List<int>>(
                 [],
                 (all, chunk) => all..addAll(chunk),
@@ -2580,7 +2658,12 @@ void main() {
             'KELIVENC',
           );
           expect(mimeTypes[archivePath], 'application/octet-stream');
-          expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+          expect(
+            await Directory(
+              '${root.path}/tmp/kelivo_backup_staging',
+            ).list().toList(),
+            isEmpty,
+          );
           final items = useS3 ? await s3.listRemote() : await dav.listRemote();
           expect(
             items.map((item) => item.displayName),
@@ -2614,7 +2697,12 @@ void main() {
             (await service.exportSettings())['global_proxy_password_v1'],
             'remote-secret',
           );
-          expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+          expect(
+            await Directory(
+              '${root.path}/tmp/kelivo_backup_staging',
+            ).list().toList(),
+            isEmpty,
+          );
 
           // A compromised endpoint must not downgrade the selected .kbackup
           // to an ordinary ZIP when the downloaded file has a temporary name.
@@ -2647,7 +2735,12 @@ void main() {
             (await service.exportSettings())['global_proxy_password_v1'],
             'keep-secret',
           );
-          expect(await Directory('${root.path}/tmp').list().toList(), isEmpty);
+          expect(
+            await Directory(
+              '${root.path}/tmp/kelivo_backup_staging',
+            ).list().toList(),
+            isEmpty,
+          );
         },
       );
     }
@@ -5799,7 +5892,7 @@ void main() {
         encoder.addFileSync(untrustedCandidate, 'candidate.sqlite');
         encoder.closeSync();
         final chatService = _CandidateCleanupChatService(
-          Directory('${root.path}/tmp'),
+          Directory('${root.path}/tmp/kelivo_backup_staging'),
         );
 
         await DataSync(
@@ -6361,7 +6454,7 @@ void main() {
           businessRepository: businessRepository,
           chatService: ChatService(),
         );
-        final tmpDir = Directory('${root.path}/tmp');
+        final tmpDir = Directory('${root.path}/tmp/kelivo_backup_staging');
         final relativeSentinel = File('${root.path}/webdav_relative.zip');
         final absoluteSentinel = File('${root.path}/webdav_absolute.zip');
         await relativeSentinel.writeAsString('keep relative');
