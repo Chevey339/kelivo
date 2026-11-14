@@ -52,7 +52,6 @@ dependencies:
   lucide_icons_flutter: ^3.1.13
   shared_preferences: ^2.2.3
   image_picker: 1.1.2
-  image_cropper: ^12.2.1
   flutter_svg: ^2.2.1
   fl_chart: 1.3.0
   http: ^1.5.0
@@ -167,6 +166,7 @@ dev_dependencies:
   fake_async: ^1.3.3
 
   path_provider_platform_interface: ^2.1.3
+  image_picker_platform_interface: ^2.11.1
   timezone: ^0.9.4
   irondash_message_channel: ^0.7.0
   super_native_extensions: ^0.9.1
@@ -214,8 +214,6 @@ dependency_overrides:
 flutter:
   generate: true
   config:
-    # Existing iOS plugins require incompatible TOCropViewController ranges.
-    # Keep CocoaPods until those plugins can share an SPM dependency graph.
     enable-swift-package-manager: false
 
   # The following line ensures that the Material Icons font is

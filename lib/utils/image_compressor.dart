@@ -31,10 +31,10 @@ class ImageCompressor {
     ImageCompressConfig config, {
     bool ownsSource = false,
     bool reuseSourceInPlace = false,
+    Future<UploadWrite> Function(String sourcePath)? renderEdits,
   }) async {
     try {
       final bytes = await File(sourcePath).readAsBytes();
-      final compressed = await compressBytes(bytes, config);
       final source =
           (ownsSource || reuseSourceInPlace) &&
               _inDirectory(sourcePath, directory)
@@ -45,8 +45,12 @@ class ImageCompressor {
               bytes,
               asJpeg: false,
             );
-      if (compressed == null) return (source: source, image: source);
       try {
+        if (renderEdits != null) {
+          return (source: source, image: await renderEdits(source.path));
+        }
+        final compressed = await compressBytes(bytes, config);
+        if (compressed == null) return (source: source, image: source);
         final image = await _writeToUploadDir(
           sourcePath,
           directory,
@@ -56,7 +60,7 @@ class ImageCompressor {
         return (source: source, image: image);
       } catch (error) {
         debugPrint(
-          '[ImageCompressor] Failed to store compressed image $sourcePath: $error',
+          '[ImageCompressor] Failed to prepare image $sourcePath: $error',
         );
         return (source: source, image: null);
       }

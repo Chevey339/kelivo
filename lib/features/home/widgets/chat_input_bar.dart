@@ -262,25 +262,37 @@ class ChatInputBarController {
     List<String> paths,
     ImageCompressConfig config, {
     bool deleteSourcesAfterProcessing = false,
+    Map<int, ImageEditDocument> editsByIndex = const {},
   }) {
     if (_currentTarget) {
       _root._state?._enqueueImages(
         paths,
         config,
         deleteSourcesAfterProcessing: deleteSourcesAfterProcessing,
+        editsByIndex: editsByIndex,
       );
     } else {
       _mutate(
         (input) => input.copyWith(
           images: [
             ...input.images,
-            for (final path in paths)
-              DraftImage(path: path, sourcePath: path, processing: true),
+            for (final (index, path) in paths.indexed)
+              DraftImage(
+                path: path,
+                sourcePath: path,
+                edits: editsByIndex[index] ?? const ImageEditDocument(),
+                processing: true,
+              ),
           ],
         ),
       );
       unawaited(
-        _processCapturedImages(paths, config, deleteSourcesAfterProcessing),
+        _processCapturedImages(
+          paths,
+          config,
+          deleteSourcesAfterProcessing,
+          editsByIndex,
+        ),
       );
     }
   }
@@ -289,16 +301,19 @@ class ChatInputBarController {
     List<String> paths,
     ImageCompressConfig config,
     bool deleteSources,
+    Map<int, ImageEditDocument> editsByIndex,
   ) async {
-    for (final path in paths) {
+    for (final (index, path) in paths.indexed) {
+      final edits = editsByIndex[index] ?? const ImageEditDocument();
       UploadWrite? saved;
       String? original;
       UploadWrite? sourceCopy;
       try {
-        final prepared = await ImageCompressor.prepareForEditing(
+        final prepared = await ImageEditRenderer.prepareDraft(
           path,
           await uploadDirectory(),
           config,
+          edits,
           ownsSource: deleteSources,
           reuseSourceInPlace: persistent,
         );
@@ -306,7 +321,7 @@ class ChatInputBarController {
         original = sourceCopy?.path;
         saved = prepared?.image;
       } catch (_) {}
-      replaceProcessedImage(path, saved?.path, originalPath: original);
+      _replaceProcessedImage(path, saved?.path, edits, originalPath: original);
       if (persistent) {
         await _root.draftStore!.releaseReplacedFiles(_owner!, [
           path,
@@ -331,9 +346,10 @@ class ChatInputBarController {
     }
   }
 
-  void replaceProcessedImage(
+  void _replaceProcessedImage(
     String source,
-    String? result, {
+    String? result,
+    ImageEditDocument edits, {
     String? originalPath,
   }) {
     _mutate(
@@ -348,7 +364,8 @@ class ChatInputBarController {
                               source,
                             ) ??
                             false))) &&
-                image.processing)
+                image.processing &&
+                image.edits.sameValue(edits))
               image.copyWith(
                 path: result ?? source,
                 sourcePath: originalPath ?? image.sourcePath ?? source,
@@ -661,6 +678,7 @@ class _ImageProcessingTask {
     required this.id,
     required this.sourcePath,
     required this.config,
+    required this.edits,
     required this.deleteSourceAfterProcessing,
     this.target,
   });
@@ -668,6 +686,7 @@ class _ImageProcessingTask {
   final int id;
   final String sourcePath;
   final ImageCompressConfig config;
+  final ImageEditDocument edits;
   final ChatInputBarController? target;
 
   /// Only ever true for app-owned temp sources (clipboard paste temps);
@@ -1112,14 +1131,16 @@ class _ChatInputBarState extends State<ChatInputBar>
     List<String> paths,
     ImageCompressConfig config, {
     required bool deleteSourcesAfterProcessing,
+    Map<int, ImageEditDocument> editsByIndex = const {},
   }) {
     if (paths.isEmpty) return;
     setState(() {
-      for (final path in paths) {
+      for (final (index, path) in paths.indexed) {
         final image = _DraftImage(
           id: _nextImageId++,
           path: path,
           sourcePath: path,
+          edits: editsByIndex[index] ?? const ImageEditDocument(),
         );
         if (deleteSourcesAfterProcessing) image.ownedFiles.add(path);
         _images.add(image);
@@ -1129,6 +1150,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             id: image.id,
             sourcePath: path,
             config: config,
+            edits: image.edits,
             deleteSourceAfterProcessing: deleteSourcesAfterProcessing,
             target: widget.mediaController?.capture(),
           ),
@@ -1157,10 +1179,11 @@ class _ChatInputBarState extends State<ChatInputBar>
       final dir =
           await (task.target?.uploadDirectory() ??
               AppDirectories.getUploadDirectory());
-      final prepared = await ImageCompressor.prepareForEditing(
+      final prepared = await ImageEditRenderer.prepareDraft(
         task.sourcePath,
         dir,
         task.config,
+        task.edits,
         ownsSource: task.deleteSourceAfterProcessing,
         reuseSourceInPlace: task.target?.persistent ?? false,
       );
@@ -1196,9 +1219,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       final target = task.target;
       final files = [sourceCopy, saved].whereType<UploadWrite>();
       if (target != null && target.persistent) {
-        target.replaceProcessedImage(
+        target._replaceProcessedImage(
           task.sourcePath,
           savedPath,
+          task.edits,
           originalPath: originalPath,
         );
         await _releaseReplacedImageFiles(target, [
@@ -1414,8 +1438,9 @@ class _ChatInputBarState extends State<ChatInputBar>
           _imageProcessingQueue.add(
             _ImageProcessingTask(
               id: image.id,
-              sourcePath: path,
+              sourcePath: image.sourcePath ?? path,
               config: config,
+              edits: image.edits,
               deleteSourceAfterProcessing: false,
               target: widget.mediaController?.capture(),
             ),
@@ -4201,32 +4226,18 @@ class _ChatInputBarState extends State<ChatInputBar>
                   image.customQuality ?? settings.imageCompressCustomQuality,
               includeTransparent: settings.imageCompressTransparentEnabled,
             );
-            UploadWrite? importedSource;
-            final UploadWrite saved;
-            if (image.edits.isEmpty) {
-              final prepared = await ImageCompressor.prepareForEditing(
-                source,
-                dir,
-                config,
-                reuseSourceInPlace:
-                    target.persistent || image.ownedFiles.contains(source),
-              );
-              if (prepared?.image == null) return null;
-              importedSource = prepared!.source;
-              saved = prepared.image!;
-            } else {
-              saved = await ImageEditRenderer.export(
-                sourcePath: source,
-                document: image.edits,
-                directory: dir,
-                config: config,
-              );
-            }
+            final prepared = await ImageEditRenderer.prepareDraft(
+              source,
+              dir,
+              config,
+              image.edits,
+              reuseSourceInPlace:
+                  target.persistent || image.ownedFiles.contains(source),
+            );
+            if (prepared == null) return null;
+            final writes = [prepared.source, ?prepared.image];
             if (!_sameImageSession(revision, images) || !target.isValid) {
-              for (final write in [
-                saved,
-                importedSource,
-              ].whereType<UploadWrite>()) {
+              for (final write in writes) {
                 if (!write.reused && write.path != source) {
                   await UploadDedupe.deleteIfUnshared(write.path);
                 }
@@ -4234,19 +4245,18 @@ class _ChatInputBarState extends State<ChatInputBar>
               return null;
             }
             setState(() {
-              image.path = saved.path;
-              image.sourcePath = importedSource?.path ?? source;
-              for (final write in [
-                saved,
-                importedSource,
-              ].whereType<UploadWrite>()) {
+              image.sourcePath = prepared.source.path;
+              for (final write in writes) {
                 if (!write.reused && write.path != source) {
                   image.ownedFiles.add(write.path);
                 }
               }
-              _failedImageIds.remove(id);
+              if (prepared.image case final saved?) {
+                image.path = saved.path;
+                _failedImageIds.remove(id);
+              }
             });
-            return _editorInput(image);
+            return prepared.image == null ? null : _editorInput(image);
           },
           onRemove: (id) {
             if (!_sameImageSession(revision, images)) return;

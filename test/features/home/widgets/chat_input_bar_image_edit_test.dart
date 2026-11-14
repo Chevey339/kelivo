@@ -8,8 +8,10 @@ import 'package:Kelivo/core/database/composer_draft_store.dart';
 import 'package:Kelivo/core/models/image_edit_document.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:image/image.dart' as image;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
@@ -17,10 +19,31 @@ import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
+import 'package:Kelivo/features/home/services/file_upload_service.dart';
 import 'package:Kelivo/features/chat/pages/image_editor_page.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import '../../../support/business_test_harness.dart';
+
+class _Picker extends ImagePickerPlatform {
+  _Picker(this.gallery, this.camera);
+  final List<String> gallery;
+  final String camera;
+
+  @override
+  Future<List<XFile>> getMultiImageWithOptions({
+    MultiImagePickerOptions options = const MultiImagePickerOptions(),
+  }) async => gallery.map(XFile.new).toList();
+
+  @override
+  Future<XFile?> getImageFromSource({
+    required ImageSource source,
+    ImagePickerOptions options = const ImagePickerOptions(),
+  }) async {
+    expect(source, ImageSource.camera);
+    return XFile(camera);
+  }
+}
 
 class _Paths extends PathProviderPlatform {
   _Paths(this.path);
@@ -83,8 +106,9 @@ void main() {
   open(
     WidgetTester tester, {
     ChatInputSubmissionResult submission = ChatInputSubmissionResult.rejected,
+    Size size = const Size(1000, 800),
   }) async {
-    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -131,6 +155,183 @@ void main() {
     await tester.pumpAndSettle();
     return (media, controller, focus, sent);
   }
+
+  FileUploadService pickerService(
+    WidgetTester tester,
+    ChatInputBarController media, {
+    List<String>? gallery,
+  }) {
+    final context = tester.element(find.byType(ChatInputBar));
+    final settings = context.read<SettingsProvider>();
+    final previous = ImagePickerPlatform.instance;
+    ImagePickerPlatform.instance = _Picker(gallery ?? [paths[0]], paths[1]);
+    addTearDown(() => ImagePickerPlatform.instance = previous);
+    const haptics = MethodChannel('haptic_feedback');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(haptics, (_) async => null);
+    addTearDown(() => messenger.setMockMethodCallHandler(haptics, null));
+    return FileUploadService(
+      getContext: () => context,
+      mediaController: media,
+      isImageCropperEnabled: () => settings.imageCropperEnabled,
+      getImageCompressConfig: settings.resolveImageCompressConfig,
+    );
+  }
+
+  final mobilePlatforms = TargetPlatformVariant({
+    TargetPlatform.iOS,
+    TargetPlatform.android,
+  });
+  testWidgets(
+    'mobile gallery opens crop for the picked batch; each edit retains its full original',
+    (tester) async {
+      final (media, text, _, sent) = await open(
+        tester,
+        size: const Size(393, 852),
+      );
+      final service = pickerService(
+        tester,
+        media,
+        gallery: [paths[0], paths[0]],
+      );
+      final settings = service.getContext().read<SettingsProvider>();
+      await settings.setImageCropperEnabled(true);
+      media.addImages([paths[2]]);
+      final picking = service.onPickPhotos();
+      await tester.pump();
+      await drain(tester);
+      expect(
+        tester.widget<ImageEditorPage>(find.byType(ImageEditorPage)).images,
+        hasLength(2),
+      );
+      expect(find.byTooltip('Rotate left'), findsOneWidget);
+      expect(media.snapshotInput(text.text).imagePaths, [paths[2]]);
+      await tester.tap(find.text('1:1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('image-editor-thumbnail-1')));
+      await drain(tester);
+      await tester.tap(find.byTooltip('Rotate left'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Done'));
+      await drain(tester, done: () => !media.hasUnreadyImages);
+      await picking;
+      final imported = media.snapshotDraft(text.text).images;
+      expect(imported, hasLength(3));
+      expect(imported[0].path, paths[2]);
+      expect(imported[1].edits.crop, isNotNull);
+      expect(imported[2].edits.quarterTurns, 3);
+      final pixels = await tester.runAsync(() async {
+        Future<(int, int)> dimensions(String path) async {
+          final decoded = image.decodeImage(await File(path).readAsBytes())!;
+          return (decoded.width, decoded.height);
+        }
+
+        return [
+          for (final item in imported.skip(1)) ...[
+            await dimensions(item.path),
+            await dimensions(item.sourcePath!),
+          ],
+        ];
+      });
+      expect(pixels, [(80, 80), (120, 80), (80, 120), (120, 80)]);
+      await tester.tap(
+        find.byKey(const ValueKey('chat-input-image-preview:1')),
+      );
+      await drain(tester);
+      await tester.tap(find.text('Edit'));
+      await drain(tester);
+      await tester.tap(find.text('Revert'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Done'));
+      await drain(tester);
+      final restored = media.snapshotDraft(text.text).images[1];
+      expect(restored.edits.isEmpty, isTrue);
+      expect(restored.path, restored.sourcePath);
+      expect(text.text, 'keep my draft');
+      expect(sent.value, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: mobilePlatforms,
+  );
+
+  testWidgets(
+    'wide tablet crop keeps batch navigation and requires removing an unreadable photo',
+    (tester) async {
+      final (media, text, _, sent) = await open(
+        tester,
+        size: const Size(1366, 1024),
+      );
+      final corrupt = File('${dir.path}/corrupt.jpg');
+      await tester.runAsync(() => corrupt.writeAsBytes([1, 2, 3]));
+      final service = pickerService(
+        tester,
+        media,
+        gallery: [paths[0], corrupt.path],
+      );
+      await service
+          .getContext()
+          .read<SettingsProvider>()
+          .setImageCropperEnabled(true);
+      final picking = service.onPickPhotos();
+      await tester.pump();
+      await drain(tester);
+      expect(find.byTooltip('Rotate left'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('image-editor-thumbnail-1')),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Done'));
+      await drain(tester);
+      expect(find.text('Retry'), findsOneWidget);
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      expect(media.hasDraftMedia, isFalse);
+      await tester.tap(find.text('Remove'));
+      await drain(tester);
+      await tester.tap(find.text('Done'));
+      await drain(tester, done: () => !media.hasUnreadyImages);
+      await picking;
+      final imported = media.snapshotInput(text.text).imagePaths.single;
+      expect(image.decodeImage(File(imported).readAsBytesSync())!.width, 120);
+      expect(sent.value, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets(
+    'mobile camera honors the crop preference and cancelling leaves the draft intact',
+    (tester) async {
+      final (media, text, _, sent) = await open(
+        tester,
+        size: const Size(393, 852),
+      );
+      final service = pickerService(tester, media);
+      final context = service.getContext(),
+          settings = context.read<SettingsProvider>();
+      await service.onPickCamera(context);
+      await drain(tester, done: () => !media.hasUnreadyImages);
+      expect(find.byType(ImageEditorPage), findsNothing);
+      final original = media.snapshotDraft(text.text).images.single;
+      expect(original.edits.isEmpty, isTrue);
+      await settings.setImageCropperEnabled(true);
+      final picking = service.onPickCamera(context);
+      await tester.pump();
+      await drain(tester);
+      expect(find.byTooltip('Rotate left'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      await picking;
+      expect(
+        media.snapshotDraft(text.text).images.single.sameValue(original),
+        isTrue,
+      );
+      expect(text.text, 'keep my draft');
+      expect(sent.value, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: mobilePlatforms,
+  );
 
   testWidgets(
     'duplicate source paths keep separate attachment identities in preview',

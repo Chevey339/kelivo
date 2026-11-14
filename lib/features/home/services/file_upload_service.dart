@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -12,7 +11,9 @@ import '../../../utils/image_compressor.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/models/chat_input_data.dart';
+import '../../../core/models/image_edit_document.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
+import '../../chat/pages/image_editor_page.dart';
 import '../widgets/chat_input_bar.dart';
 
 /// 文件选取和上传服务
@@ -176,19 +177,13 @@ class FileUploadService {
             toCopy.add(XFile(f.path!));
           }
         }
-        if (toCopy.isEmpty) return;
-        final croppedFiles = await _maybeCropImages(toCopy);
-        if (croppedFiles.isEmpty) return;
-        _enqueuePickedImages(croppedFiles, target);
+        _enqueuePickedImages(toCopy, target);
         return;
       }
 
       final picker = ImagePicker();
       final files = await picker.pickMultiImage();
-      if (files.isEmpty) return;
-      final croppedFiles = await _maybeCropImages(files);
-      if (croppedFiles.isEmpty) return;
-      _enqueuePickedImages(croppedFiles, target);
+      await _addCameraOrGalleryImages(files, target);
     } catch (_) {}
   }
 
@@ -226,11 +221,8 @@ class FileUploadService {
       }
       final picker = ImagePicker();
       final file = await picker.pickImage(source: ImageSource.camera);
-      if (file == null) return;
-      final croppedFiles = await _maybeCropImages([file]);
-      if (croppedFiles.isEmpty) return;
-      if (!context.mounted) return;
-      _enqueuePickedImages(croppedFiles, target);
+      if (file == null || !context.mounted) return;
+      await _addCameraOrGalleryImages([file], target);
     } catch (e) {
       try {
         if (!context.mounted) return;
@@ -245,42 +237,45 @@ class FileUploadService {
     }
   }
 
-  Future<List<XFile>> _maybeCropImages(List<XFile> files) async {
-    if (!isImageCropperEnabled()) return files;
-
-    final context = getContext();
-    if (!context.mounted) return files;
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final croppedFiles = <XFile>[];
-
-    for (final file in files) {
-      try {
-        final croppedFile = await ImageCropper().cropImage(
-          sourcePath: file.path,
-          uiSettings: [
-            AndroidUiSettings(
-              toolbarTitle: l10n.displaySettingsPageEnableImageCropperTitle,
-              toolbarColor: cs.surface,
-              toolbarWidgetColor: cs.onSurface,
-              activeControlsWidgetColor: cs.primary,
-              initAspectRatio: CropAspectRatioPreset.original,
-              lockAspectRatio: false,
-            ),
-            IOSUiSettings(
-              title: l10n.displaySettingsPageEnableImageCropperTitle,
-            ),
-          ],
-        );
-        if (croppedFile != null) {
-          croppedFiles.add(XFile(croppedFile.path));
-        }
-      } catch (_) {
-        croppedFiles.add(file);
-      }
+  Future<void> _addCameraOrGalleryImages(
+    List<XFile> files,
+    ChatInputBarController target,
+  ) async {
+    if (files.isEmpty || !target.isValid) return;
+    if (!PlatformUtils.isMobileTarget || !isImageCropperEnabled()) {
+      _enqueuePickedImages(files, target);
+      return;
     }
-
-    return croppedFiles;
+    final context = getContext();
+    if (!context.mounted) return;
+    final selected = {
+      for (final (id, file) in files.indexed)
+        if (file.path.isNotEmpty) id: EditorImage(id: id, path: file.path),
+    };
+    if (selected.isEmpty) return;
+    var edits = <int, ImageEditDocument>{};
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ImageEditorPage(
+          images: selected.values.toList(),
+          startInCropMode: true,
+          onRetry: (id) async => selected[id],
+          onRemove: selected.remove,
+          onSave: (documents) async {
+            edits = documents;
+          },
+        ),
+      ),
+    );
+    if (confirmed != true || selected.isEmpty || !target.isValid) return;
+    target.enqueueImages(
+      [for (final image in selected.values) image.path],
+      getImageCompressConfig(),
+      editsByIndex: {
+        for (final (index, image) in selected.values.indexed)
+          if (edits[image.id] case final document?) index: document,
+      },
+    );
   }
 
   /// 根据文件扩展名推断 MIME 类型

@@ -48,12 +48,14 @@ class ImageEditorPage extends StatefulWidget {
     super.key,
     required this.images,
     this.initialIndex = 0,
+    this.startInCropMode = false,
     required this.onSave,
     required this.onRetry,
     required this.onRemove,
   });
   final List<EditorImage> images;
   final int initialIndex;
+  final bool startInCropMode;
   final Future<void> Function(Map<int, ImageEditDocument>) onSave;
   final Future<EditorImage?> Function(int id) onRetry;
   final void Function(int id) onRemove;
@@ -79,7 +81,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     0,
     math.max(0, _images.length - 1),
   );
-  _Tool? _tool;
+  late _Tool? _tool = widget.startInCropMode ? _Tool.crop : null;
   _Pen _pen = _Pen.pen;
   bool _boxMosaic = false,
       _saving = false,
@@ -107,6 +109,8 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
   ImageEditDocument get _doc => _docs[_image.id]!;
   ui.Image? get _source => _decoded[_image.id];
   bool get _unavailable => _source == null || _failed.contains(_image.id);
+  bool get _canSave =>
+      !_saving && !(widget.startInCropMode && _failed.contains(_image.id));
   bool get _dirty =>
       _docs.entries.any((e) => !_initial[e.key]!.sameValue(e.value));
   AppLocalizations get _l => AppLocalizations.of(context)!;
@@ -272,7 +276,8 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     setState(() {
       _index = index;
       _selectedText = null;
-      _tool = null;
+      _tool = widget.startInCropMode ? _Tool.crop : null;
+      _aspect = null;
       _zoom.value = Matrix4.identity();
     });
     unawaited(_load(_image));
@@ -353,10 +358,23 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     ),
   );
   Future<void> _save() async {
-    if (_saving) return;
+    if (!_canSave) return;
     _finishText();
     setState(() => _saving = true);
     try {
+      if (widget.startInCropMode) {
+        final unreadable = await _firstUnreadableSelection();
+        if (!mounted) return;
+        if (unreadable != null) {
+          setState(() {
+            _index = _images.indexOf(unreadable);
+            _failed.add(unreadable.id);
+            _selectedText = null;
+            _zoom.value = Matrix4.identity();
+          });
+          return;
+        }
+      }
       await widget.onSave({
         for (final e in _docs.entries)
           if (!_initial[e.key]!.sameValue(e.value)) e.key: e.value,
@@ -377,6 +395,23 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<EditorImage?> _firstUnreadableSelection() async {
+    for (final image in _images) {
+      if (_failed.contains(image.id)) return image;
+      if (_decoded.containsKey(image.id) || _previews.containsKey(image.id)) {
+        continue;
+      }
+      // An untouched photo can be sent byte-for-byte. Verify that it decodes
+      // before accepting a batch, including photos the user never opened.
+      try {
+        (await ImageEditRenderer.decode(image.path, maxEdge: 88)).dispose();
+      } catch (_) {
+        return image;
+      }
+    }
+    return null;
   }
 
   Future<void> _retry() async {
@@ -401,6 +436,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
   }
 
   void _remove() {
+    if (_saving) return;
     final id = _image.id;
     widget.onRemove(id);
     setState(() {
@@ -916,7 +952,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     children: [
       _topBar(true),
       Expanded(child: _stage(false)),
-      SizedBox(height: 60, child: _bottomSlot()),
+      _editorControls(),
       Padding(padding: const EdgeInsets.only(bottom: 16), child: _rail(true)),
     ],
   );
@@ -927,8 +963,20 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         child: typing ? const SizedBox.shrink() : _topBar(false),
       ),
       Expanded(child: _stage(typing)),
-      SizedBox(height: 60, child: _bottomSlot()),
+      _editorControls(typing: typing),
       if (!typing) SizedBox(height: 64, child: _rail(false)),
+    ],
+  );
+  Widget _editorControls({bool typing = false}) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (widget.startInCropMode &&
+          _images.length > 1 &&
+          !typing &&
+          _tool != null &&
+          !_unavailable)
+        SizedBox(height: 56, child: Center(child: _filmstrip())),
+      SizedBox(height: 60, child: _bottomSlot()),
     ],
   );
   Widget _topBar(bool desktop) => SizedBox(
@@ -981,7 +1029,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
                   Flexible(
                     child: _button(
                       _l.imageEditorDone,
-                      _saving ? null : _save,
+                      _canSave ? _save : null,
                       color: const Color(0xff1d2550),
                       fill: _accent,
                       busy: _saving,

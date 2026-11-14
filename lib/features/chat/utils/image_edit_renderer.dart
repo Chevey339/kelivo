@@ -37,6 +37,30 @@ class ImageEditGeometry {
 }
 
 class ImageEditRenderer {
+  /// Imports the original once and builds the sendable image from the edits.
+  static Future<({UploadWrite source, UploadWrite? image})?> prepareDraft(
+    String sourcePath,
+    Directory directory,
+    ImageCompressConfig config,
+    ImageEditDocument edits, {
+    bool ownsSource = false,
+    bool reuseSourceInPlace = false,
+  }) => ImageCompressor.prepareForEditing(
+    sourcePath,
+    directory,
+    config,
+    ownsSource: ownsSource,
+    reuseSourceInPlace: reuseSourceInPlace,
+    renderEdits: edits.isEmpty
+        ? null
+        : (original) => export(
+            sourcePath: original,
+            document: edits,
+            directory: directory,
+            config: config,
+          ),
+  );
+
   static Future<ui.Image> decode(String path, {int? maxEdge}) async {
     final buffer = await ui.ImmutableBuffer.fromFilePath(path);
     ui.ImageDescriptor? descriptor;

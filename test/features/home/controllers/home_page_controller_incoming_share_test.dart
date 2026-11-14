@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
+import 'package:Kelivo/core/models/image_edit_document.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -112,6 +113,7 @@ class _Media extends ChatInputBarController {
     List<String> paths,
     ImageCompressConfig config, {
     bool deleteSourcesAfterProcessing = false,
+    Map<int, ImageEditDocument> editsByIndex = const {},
   }) {
     images.addAll(paths);
     deletesOwnedSources = deleteSourcesAfterProcessing;
