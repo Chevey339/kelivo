@@ -9,6 +9,7 @@ import 'block_builder.dart';
 import 'streaming_text.dart';
 import '../performance_limits.dart';
 import 'native_paragraph_run.dart';
+import 'prose_direction.dart';
 import '../selection/selectable_rich_text.dart';
 
 /// Retains native paragraphs and their exact fractional block spacing while
@@ -41,6 +42,7 @@ class _ParagraphRunState extends State<ParagraphRun> {
   Widget build(BuildContext context) {
     final renderer = widget.renderer;
     final defaults = DefaultTextStyle.of(context);
+    final ambient = Directionality.of(context);
     final base = defaults.style.merge(renderer.theme.body);
     final locale = Localizations.maybeLocaleOf(context);
     final color = DefaultSelectionStyle.of(context).selectionColor;
@@ -54,6 +56,7 @@ class _ParagraphRunState extends State<ParagraphRun> {
       renderer.trackSelection,
       renderer.highlights,
       base,
+      ambient,
       locale,
       color,
       selectable,
@@ -93,17 +96,19 @@ class _ParagraphRunState extends State<ParagraphRun> {
           return !embedded;
         });
         final Widget body;
-        if (!embedded &&
+        final direction = proseDirection(node.children) ?? ambient;
+        final short =
             node.span.length <=
-                (active
-                    ? PerformanceLimits.streamingNativeCharacters
-                    : PerformanceLimits.staticNativeCharacters)) {
+            (active
+                ? PerformanceLimits.streamingNativeCharacters
+                : PerformanceLimits.staticNativeCharacters);
+        if (!embedded && short) {
           body = RichText(
             key: ValueKey(node.span.start),
             text: TextSpan(style: base, children: [inline.span]),
             textAlign: defaults.textAlign ?? TextAlign.start,
             locale: locale,
-            textDirection: Directionality.of(context),
+            textDirection: direction,
             textScaler: MediaQuery.textScalerOf(context),
             softWrap: defaults.softWrap,
             overflow: defaults.overflow,
@@ -112,16 +117,20 @@ class _ParagraphRunState extends State<ParagraphRun> {
             selectionRegistrar: selectable ? _selection : null,
           );
         } else {
-          final text = Text.rich(inline.span, style: renderer.theme.body);
+          final text = Text.rich(
+            inline.span,
+            style: renderer.theme.body,
+            textDirection: direction,
+          );
           body = KeyedSubtree(
             key: ValueKey(node.span.start),
-            child:
-                node.span.length <=
-                    (active
-                        ? PerformanceLimits.streamingNativeCharacters
-                        : PerformanceLimits.staticNativeCharacters)
-                ? buildSelectableText(text)
-                : StreamingText(streaming: active, text: text),
+            child: directionalBlock(
+              context,
+              direction,
+              short
+                  ? buildSelectableText(text)
+                  : StreamingText(streaming: active, text: text),
+            ),
           );
         }
         _cached.add((node, active, inline, body));
@@ -155,10 +164,8 @@ class _ParagraphRunState extends State<ParagraphRun> {
         ),
       );
     }
-    Widget body = Column(
+    Widget body = proseColumn(
       spacing: renderer.theme.blockSpacing,
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: compressed,
     );
     if (selectable)

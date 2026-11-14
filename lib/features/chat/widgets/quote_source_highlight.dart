@@ -36,12 +36,19 @@ List<SourceSpan> quoteSourceHighlights(
 TextSpan highlightedQuoteSource(
   String text,
   List<SourceSpan> ranges,
-  Color color,
-) {
+  Color color, {
+  int start = 0,
+  int? end,
+}) {
+  final limit = end ?? text.length;
   final points = {
-    0,
-    text.length,
-    for (final range in ranges) ...[range.start, range.end],
+    start,
+    limit,
+    for (final range in ranges)
+      if (range.start < limit && range.end > start) ...[
+        range.start.clamp(start, limit),
+        range.end.clamp(start, limit),
+      ],
   }.toList()..sort();
   return TextSpan(
     children: [

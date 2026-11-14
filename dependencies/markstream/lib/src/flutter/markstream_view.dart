@@ -17,6 +17,7 @@ import 'render/block_list.dart';
 import 'render/chrome.dart';
 import 'performance_limits.dart';
 import 'render/paragraph_run.dart';
+import 'render/prose_direction.dart';
 import 'selection/document_selection.dart';
 import 'selection/selection_controller.dart';
 import 'theme/markstream_theme.dart';
@@ -335,6 +336,9 @@ class _MarkstreamViewState extends State<MarkstreamView> {
           root: true,
           child: BlockList(
             blocks: entries,
+            hasDirectionalBlocks:
+                Directionality.of(context) == TextDirection.rtl ||
+                entries.any((entry) => entry.hasRtl),
             selectionSeparator: '\n\n',
             cullToViewport: widget.cullToViewport && !widget.exporting,
             signature: (
@@ -382,8 +386,9 @@ class _MarkstreamViewState extends State<MarkstreamView> {
 }
 
 class _BlockEntry {
-  const _BlockEntry(this.nodes, this.streaming);
+  _BlockEntry(this.nodes, this.streaming);
   final List<BlockNode> nodes;
+  late final bool hasRtl = nodes.any(hasRtlBlock);
   BlockNode get node => nodes.first;
   final bool streaming;
 }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../selection/selectable_rich_text.dart';
 import 'block_list.dart';
+import 'prose_direction.dart';
 import '../performance_limits.dart';
 
 /// Shapes long text in bounded windows, committing only complete visual lines.
@@ -99,7 +100,8 @@ class _StreamingTextState extends State<StreamingText> {
             prefixLength = previous.text.length;
           }
         }
-        if (_contextualText.hasMatch(content.substring(prefixLength))) {
+        final appended = content.substring(prefixLength);
+        if (_contextualText.hasMatch(appended) || containsStrongRtl(appended)) {
           return false;
         }
         runs.add(

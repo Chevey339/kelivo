@@ -13,6 +13,7 @@ import '../interfaces/renderers.dart';
 import '../theme/markstream_theme.dart';
 import 'inline_builder.dart';
 import 'optical_baseline.dart';
+import 'prose_direction.dart';
 import 'source_highlights.dart';
 import 'streaming_text.dart';
 import 'chrome.dart';
@@ -159,6 +160,7 @@ class MarkstreamRenderer {
     List<InlineNode> nodes,
     TextStyle style, {
     required bool streaming,
+    bool align = true,
   }) {
     if (nodes.any(
       (node) => node is HtmlElementNode && htmlBlockTags.contains(node.tag),
@@ -166,9 +168,15 @@ class MarkstreamRenderer {
       return htmlFlow(context, nodes, style, streaming: streaming);
     }
     final content = inlineContent(context, nodes, style, streaming: streaming);
-    final child = StreamingText(
-      streaming: streaming,
-      text: Text.rich(content.span, style: style),
+    final direction = proseDirection(nodes);
+    final child = directionalBlock(
+      context,
+      direction,
+      StreamingText(
+        streaming: streaming,
+        text: Text.rich(content.span, style: style, textDirection: direction),
+      ),
+      align: align,
     );
     return !trackSelection
         ? child
@@ -191,9 +199,7 @@ class MarkstreamRenderer {
     final visible = nodes
         .where((node) => node is! ReferenceDefinitionNode)
         .toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    return proseColumn(
       children: [
         for (var i = 0; i < visible.length; i++)
           Padding(
@@ -247,7 +253,15 @@ class MarkstreamRenderer {
   }) {
     final custom = extensions.blockBuilderFor(node);
     if (custom != null) {
-      final child = custom(context, node, contextFor(context, streaming));
+      Widget buildCustom(BuildContext context) =>
+          custom(context, node, contextFor(context, streaming));
+      final child = node is ParagraphNode || node is HeadingNode
+          ? directionalBlock(
+              context,
+              proseDirection(node.children),
+              Builder(builder: buildCustom),
+            )
+          : buildCustom(context);
       // Code extensions use MarkstreamCodeContent, which paints exact ranges.
       return node is CodeBlockNode ? child : highlights.atom(node.span, child);
     }
@@ -297,6 +311,7 @@ class MarkstreamRenderer {
           cell.children,
           style,
           streaming: streaming,
+          align: false,
         ),
       );
     if (node is MathBlockNode)
@@ -374,27 +389,36 @@ class MarkstreamRenderer {
           child: SizedBox(height: theme.ruleThickness, width: double.infinity),
         ),
       );
-    if (node is BlockQuoteNode)
-      return Padding(
-        padding: theme.quote.margin,
-        child: CustomPaint(
-          key: const ValueKey('markstream-quote'),
-          painter: _QuoteBar(theme.quote, Directionality.of(context)),
-          child: Padding(
-            padding: theme.quote.padding,
-            child: DefaultTextStyle.merge(
-              style: TextStyle(color: theme.quote.textColor),
-              child: children(
-                context,
-                node.children,
-                streaming: streaming,
-                style: body.copyWith(color: theme.quote.textColor),
-                listDepth: listDepth,
+    if (node is BlockQuoteNode) {
+      final direction =
+          proseDirection(node.children) ?? Directionality.of(context);
+      return directionalBlock(
+        context,
+        direction,
+        Padding(
+          padding: theme.quote.margin,
+          child: CustomPaint(
+            key: const ValueKey('markstream-quote'),
+            painter: _QuoteBar(theme.quote, direction),
+            child: Padding(
+              padding: theme.quote.padding,
+              child: DefaultTextStyle.merge(
+                style: TextStyle(color: theme.quote.textColor),
+                child: Builder(
+                  builder: (context) => children(
+                    context,
+                    node.children,
+                    streaming: streaming,
+                    style: body.copyWith(color: theme.quote.textColor),
+                    listDepth: listDepth,
+                  ),
+                ),
               ),
             ),
           ),
         ),
       );
+    }
     if (node is ListNode) {
       final b = theme.body.fontSize!;
       final markerWidth = node.ordered
@@ -420,59 +444,67 @@ class MarkstreamRenderer {
                         ? '(${node.children[i].checked! ? 'x' : ' '}) '
                         : '[${node.children[i].checked! ? 'x' : ' '}] '}',
                 continuation: '  ',
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Padding(
-                      padding: theme.listMarkerPadding,
-                      child: SelectionContainer.disabled(
-                        child: node.children[i].checked == null
-                            ? SizedBox(
-                                width: node.ordered
-                                    ? MediaQuery.textScalerOf(
-                                        context,
-                                      ).scale(markerWidth)
-                                    : markerWidth,
-                                child: Text(
-                                  node.ordered
-                                      ? '${node.start + i}.'
-                                      : const ['•', '◦', '▪'][listDepth % 3],
-                                  textAlign: node.ordered
-                                      ? TextAlign.end
-                                      : TextAlign.center,
-                                  style: body.copyWith(
-                                    color: theme.proseInk.withValues(
-                                      alpha: theme.colors.ink3.a,
+                child: directionalBlock(
+                  context,
+                  proseDirection(node.children[i].children),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Padding(
+                        padding: theme.listMarkerPadding,
+                        child: SelectionContainer.disabled(
+                          child: node.children[i].checked == null
+                              ? SizedBox(
+                                  width: node.ordered
+                                      ? MediaQuery.textScalerOf(
+                                          context,
+                                        ).scale(markerWidth)
+                                      : markerWidth,
+                                  child: Text(
+                                    node.ordered
+                                        ? '${node.start + i}.'
+                                        : const ['•', '◦', '▪'][listDepth % 3],
+                                    textAlign: node.ordered
+                                        ? TextAlign.end
+                                        : TextAlign.center,
+                                    style: body.copyWith(
+                                      color: theme.proseInk.withValues(
+                                        alpha: theme.colors.ink3.a,
+                                      ),
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
                                     ),
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
                                   ),
+                                )
+                              : _TaskIndicator(
+                                  checked: node.children[i].checked!,
+                                  radio: node.children[i].radio,
+                                  theme: theme.task,
+                                  opticalCenter: theme.inlineCode.opticalCenter,
                                 ),
-                              )
-                            : _TaskIndicator(
-                                checked: node.children[i].checked!,
-                                radio: node.children[i].radio,
-                                theme: theme.task,
-                                opticalCenter: theme.inlineCode.opticalCenter,
-                              ),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: children(
-                        context,
-                        node.children[i].children,
-                        streaming: streaming && i == node.children.length - 1,
-                        spacing: node.tight ? 0 : theme.blockSpacing,
-                        listDepth: listDepth + 1,
-                        style: body,
-                        firstStyle: node.children[i].checked == true
-                            ? theme.task.checkedText
-                            : null,
+                      Expanded(
+                        child: Builder(
+                          builder: (context) => children(
+                            context,
+                            node.children[i].children,
+                            streaming:
+                                streaming && i == node.children.length - 1,
+                            spacing: node.tight ? 0 : theme.blockSpacing,
+                            listDepth: listDepth + 1,
+                            style: body,
+                            firstStyle: node.children[i].checked == true
+                                ? theme.task.checkedText
+                                : null,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  align: false,
                 ),
               ),
             ),
@@ -480,31 +512,36 @@ class MarkstreamRenderer {
       );
     }
     if (node is TaskItemNode)
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Padding(
-            padding: theme.listMarkerPadding,
-            child: SelectionContainer.disabled(
-              child: _TaskIndicator(
-                checked: node.checked,
-                radio: node.radio,
-                theme: theme.task,
-                opticalCenter: theme.inlineCode.opticalCenter,
+      return directionalBlock(
+        context,
+        proseDirection(node.children),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Padding(
+              padding: theme.listMarkerPadding,
+              child: SelectionContainer.disabled(
+                child: _TaskIndicator(
+                  checked: node.checked,
+                  radio: node.radio,
+                  theme: theme.task,
+                  opticalCenter: theme.inlineCode.opticalCenter,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: inlineText(
-              context,
-              node,
-              node.children,
-              node.checked ? theme.task.checkedText : body,
-              streaming: streaming,
+            Expanded(
+              child: inlineText(
+                context,
+                node,
+                node.children,
+                node.checked ? theme.task.checkedText : body,
+                streaming: streaming,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+        align: false,
       );
     if (node is ListItemNode)
       return children(context, node.children, streaming: streaming);

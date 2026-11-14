@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
 import '../selection/document_selection.dart';
+import 'prose_direction.dart';
 
 /// Retains completed Markdown subtrees. An append rebuilds and lays out only
 /// the changed leaf and its ancestors, rather than every previous paragraph.
@@ -25,10 +26,12 @@ class BlockList extends StatefulWidget {
     required this.itemBuilder,
     this.cullToViewport = true,
     this.selectionSeparator = '',
+    this.hasDirectionalBlocks = false,
   });
 
   final List<Object> blocks;
   final Object signature;
+  final bool hasDirectionalBlocks;
   final IndexedWidgetBuilder itemBuilder;
 
   /// Disable viewport clipping for image/export capture, including nested lists.
@@ -66,6 +69,15 @@ class _BlockListState extends State<BlockList> {
     _previous = widget.blocks;
     _signature = widget.signature;
     final content = _root.widget;
+    // A compact document first measures its content with loose constraints,
+    // then gives every block that common width so each can align inside it.
+    final directional = _DirectionalDocument(
+      enabled: widget.hasDirectionalBlocks,
+      child: ProseWidthScope(
+        enabled: widget.hasDirectionalBlocks,
+        child: content,
+      ),
+    );
     final layout = LayoutBuilder(
       builder: (_, constraints) => constraints.hasBoundedHeight
           ? OverflowBox(
@@ -73,9 +85,9 @@ class _BlockListState extends State<BlockList> {
               fit: OverflowBoxFit.deferToChild,
               minHeight: 0,
               maxHeight: double.infinity,
-              child: content,
+              child: directional,
             )
-          : content,
+          : directional,
     );
     // Rich-text line chunks nest inside Markdown source blocks. Observe once
     // per document/viewport, rather than registering every paragraph.
@@ -103,6 +115,41 @@ class _BlockListState extends State<BlockList> {
         child: observed,
       ),
     );
+  }
+}
+
+class _DirectionalDocument extends SingleChildRenderObjectWidget {
+  const _DirectionalDocument({required this.enabled, required super.child});
+  final bool enabled;
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderDirectionalDocument(enabled);
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderDirectionalDocument renderObject,
+  ) => renderObject.enabled = enabled;
+}
+
+class _RenderDirectionalDocument extends RenderProxyBox {
+  _RenderDirectionalDocument(this._enabled);
+  bool _enabled;
+  set enabled(bool value) {
+    if (_enabled == value) return;
+    _enabled = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void performLayout() {
+    if (!_enabled || constraints.hasTightWidth) {
+      super.performLayout();
+      return;
+    }
+    child!.layout(constraints, parentUsesSize: true);
+    final width = child!.size.width;
+    child!.layout(constraints.tighten(width: width), parentUsesSize: true);
+    size = child!.size;
   }
 }
 
@@ -287,13 +334,31 @@ class _BlockSelectionGroupState extends State<_BlockSelectionGroup> {
       : SelectionContainer(delegate: _delegate, child: widget.child);
 }
 
-class _BlockColumn extends MultiChildRenderObjectWidget {
-  const _BlockColumn({required super.children});
+class _BlockColumn extends StatelessWidget {
+  const _BlockColumn({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => _BlockFlex(
+      alignment:
+          constraints.hasTightWidth && ProseWidthScope.isDirectional(context)
+          ? CrossAxisAlignment.stretch
+          : CrossAxisAlignment.start,
+      children: children,
+    ),
+  );
+}
+
+class _BlockFlex extends MultiChildRenderObjectWidget {
+  const _BlockFlex({required this.alignment, required super.children});
+  final CrossAxisAlignment alignment;
 
   @override
   RenderObject createRenderObject(BuildContext context) => _RenderBlockColumn(
     _BlockCullScope.of(context),
     Directionality.of(context),
+    alignment,
   );
 
   @override
@@ -303,6 +368,7 @@ class _BlockColumn extends MultiChildRenderObjectWidget {
   ) {
     renderObject.cullToViewport = _BlockCullScope.of(context);
     renderObject.textDirection = Directionality.of(context);
+    renderObject.crossAxisAlignment = alignment;
   }
 }
 
@@ -339,11 +405,14 @@ ViewportClips viewportClips(RenderBox target, {double paintOverflow = 32}) {
 }
 
 class _RenderBlockColumn extends RenderFlex implements ViewportClipParticipant {
-  _RenderBlockColumn(this._cullToViewport, TextDirection textDirection)
-    : super(
+  _RenderBlockColumn(
+    this._cullToViewport,
+    TextDirection textDirection,
+    CrossAxisAlignment alignment,
+  ) : super(
         direction: Axis.vertical,
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: alignment,
         textDirection: textDirection,
       );
 

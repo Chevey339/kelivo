@@ -16,6 +16,7 @@ import '../../selection/selection_controller.dart';
 import '../../theme/markstream_theme.dart';
 import '../block_list.dart';
 import '../chrome.dart';
+import '../prose_direction.dart';
 import '../../performance_limits.dart';
 
 class MarkstreamTableBlock extends StatefulWidget {
@@ -136,36 +137,44 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
   );
 
   Widget _cell(TableRowNode row, int column) {
+    final cell = column < row.children.length ? row.children[column] : null;
     final alignment = column < widget.node.alignments.length
         ? widget.node.alignments[column]
         : TableAlignment.none;
-    return Padding(
-      padding: widget.theme.table.cellPadding,
-      child: DefaultTextStyle.merge(
-        textAlign: switch (alignment) {
-          TableAlignment.center => TextAlign.center,
-          TableAlignment.right => TextAlign.right,
-          _ => TextAlign.left,
-        },
-        child: Align(
-          alignment: switch (alignment) {
-            TableAlignment.center => Alignment.center,
-            TableAlignment.right => Alignment.centerRight,
-            _ => Alignment.centerLeft,
+    return directionalBlock(
+      context,
+      cell == null ? null : proseDirection(cell.children),
+      Padding(
+        padding: widget.theme.table.cellPadding,
+        child: DefaultTextStyle.merge(
+          textAlign: switch (alignment) {
+            TableAlignment.center => TextAlign.center,
+            TableAlignment.right => TextAlign.right,
+            TableAlignment.left => TextAlign.left,
+            TableAlignment.none => TextAlign.start,
           },
-          child: column < row.children.length
-              ? Builder(
-                  builder: (context) => widget.buildCell(
-                    context,
-                    row.children[column],
-                    row.header
-                        ? widget.theme.table.heading
-                        : widget.theme.table.body,
-                  ),
-                )
-              : const SizedBox.shrink(),
+          child: Align(
+            alignment: switch (alignment) {
+              TableAlignment.center => Alignment.center,
+              TableAlignment.right => Alignment.centerRight,
+              TableAlignment.left => Alignment.centerLeft,
+              TableAlignment.none => AlignmentDirectional.centerStart,
+            },
+            child: cell != null
+                ? Builder(
+                    builder: (context) => widget.buildCell(
+                      context,
+                      cell,
+                      row.header
+                          ? widget.theme.table.heading
+                          : widget.theme.table.body,
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
         ),
       ),
+      align: false,
     );
   }
 

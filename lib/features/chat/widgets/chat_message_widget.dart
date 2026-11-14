@@ -64,6 +64,7 @@ import '../../../shared/markdown/quote_syntax.dart';
 import '../controllers/quote_editing_controller.dart' show buildQuoteTextSpan;
 import 'quote_chip.dart';
 import 'quote_source_highlight.dart';
+import 'plain_message_text.dart';
 import 'quote_source_anchor.dart';
 import 'quote_interaction_scope.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
@@ -2366,19 +2367,29 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ),
       );
     } else {
-      content = Text.rich(
-        widget.message.quotes.isNotEmpty
+      final text = widget.message.quotes.isEmpty
+          ? UnicodeSanitizer.sanitize(visualText)
+          : visualText;
+      content = plainMessageText(
+        text: text,
+        buildSpan: (start, end) => widget.message.quotes.isNotEmpty
             ? buildQuoteTextSpan(
-                text: visualText,
+                text: text.substring(start, end),
                 quotes: widget.message.quotes,
                 quoteAtOffset: (offset) => quoteAtSourceOffset(
                   widget.message.content,
                   widget.message.quotes,
-                  sourceMap.sourceRange(offset, offset + 1).start,
+                  sourceMap
+                      .sourceRange(start + offset, start + offset + 1)
+                      .start,
                 ),
                 highlights: [
                   for (final range in highlights)
-                    TextRange(start: range.start, end: range.end),
+                    if (range.start < end && range.end > start)
+                      TextRange(
+                        start: range.start.clamp(start, end) - start,
+                        end: range.end.clamp(start, end) - start,
+                      ),
                 ],
                 highlightColor: highlightColor,
                 token: (quote, offset) => SelectableSpanAdapter(
@@ -2386,16 +2397,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   child: QuoteChip(
                     quote: quote,
                     selected: highlights.any(
-                      (range) => range.start <= offset && range.end > offset,
+                      (range) =>
+                          range.start <= start + offset &&
+                          range.end > start + offset,
                     ),
                     style: TextStyle(fontSize: baseUser, height: 1.4),
                   ),
                 ),
               )
             : highlightedQuoteSource(
-                UnicodeSanitizer.sanitize(visualText),
+                text,
                 highlights,
                 highlightColor,
+                start: start,
+                end: end,
               ),
         style: TextStyle(
           fontSize: baseUser,
@@ -2887,11 +2902,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         conversationId: widget.message.conversationId,
       );
     } else {
-      assistantContent = Text.rich(
-        highlightedQuoteSource(
-          UnicodeSanitizer.sanitize(visualContent),
+      final text = UnicodeSanitizer.sanitize(visualContent);
+      assistantContent = plainMessageText(
+        text: text,
+        buildSpan: (start, end) => highlightedQuoteSource(
+          text,
           highlights,
           Theme.of(context).colorScheme.primary.withValues(alpha: .22),
+          start: start,
+          end: end,
         ),
         style: TextStyle(
           fontSize: baseAssistant,
@@ -3756,8 +3775,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                                   widget.message.conversationId,
                                             );
                                       } else {
-                                        translationContent = Text(
-                                          UnicodeSanitizer.sanitize(
+                                        translationContent = plainMessageText(
+                                          text: UnicodeSanitizer.sanitize(
                                             translationText,
                                           ),
                                           style: TextStyle(
@@ -5821,8 +5840,8 @@ class _ChainOfThoughtReasoningStepState
           ),
         );
       }
-      return Text(
-        text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
+      return plainMessageText(
+        text: text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
         style: TextStyle(fontSize: 12.5, height: 1.32),
       );
     }
@@ -8390,8 +8409,8 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
           ),
         );
       }
-      return Text(
-        text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
+      return plainMessageText(
+        text: text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
         style: baseStyle,
         strutStyle: baseStrut,
         textHeightBehavior: baseTHB,

@@ -264,6 +264,58 @@ void main() {
   });
 
   testWidgets(
+    'draft direction changes only when its first strong character changes',
+    (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      await show(tester, controller);
+      final field = find.byType(TextField);
+      final editable = tester.state<EditableTextState>(
+        find.byType(EditableText),
+      );
+      await tester.tap(field);
+      for (final (draft, direction) in [
+        ('🙂 ۱۲۳', TextDirection.ltr),
+        ('🙂 ۱۲۳ سلام Gemini؟', TextDirection.rtl),
+        ('Gemini چیه و چطور کار می‌کنه؟', TextDirection.ltr),
+        ('中文 עברית', TextDirection.ltr),
+        ('שלום! English', TextDirection.rtl),
+        ('', TextDirection.ltr),
+      ]) {
+        await tester.enterText(field, draft);
+        await tester.pump();
+        expect(editable.renderEditable.textDirection, direction);
+        expect(controller.value.text, draft);
+        expect(
+          controller.selection,
+          TextSelection.collapsed(offset: draft.length),
+        );
+        expect(editable.widget.focusNode.hasFocus, isTrue);
+      }
+      // A supplementary RTL letter must also leave the LTR-only line editor.
+      controller.text = 'x' * 3000;
+      await tester.pump();
+      final lines = tester
+          .widget<CodeEditor>(find.byType(CodeEditor))
+          .controller!;
+      lines.selection = const CodeLineSelection.collapsed(index: 0, offset: 0);
+      lines.replaceSelection('𞤀');
+      await tester.pump();
+      await tester.pump();
+      expect(
+        tester
+            .state<EditableTextState>(find.byType(EditableText))
+            .renderEditable
+            .textDirection,
+        TextDirection.rtl,
+      );
+      expect(controller.text, '𞤀${'x' * 3000}');
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 200));
+    },
+  );
+
+  testWidgets(
     'inserted bidi text switches back without changing the document',
     (tester) async {
       final text = TextEditingController(text: source);

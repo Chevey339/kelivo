@@ -80,17 +80,25 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
           ),
         );
       } else if (node.tag == 'blockquote') {
-        child = Padding(
-          padding: theme.quote.margin,
-          child: CustomPaint(
-            painter: _QuoteBar(theme.quote, Directionality.of(context)),
-            child: Padding(
-              padding: theme.quote.padding,
-              child: htmlFlow(
-                context,
-                node.children,
-                style,
-                streaming: streaming,
+        final direction =
+            proseDirection(node.children) ?? Directionality.of(context);
+        child = directionalBlock(
+          context,
+          direction,
+          Padding(
+            padding: theme.quote.margin,
+            child: CustomPaint(
+              painter: _QuoteBar(theme.quote, direction),
+              child: Padding(
+                padding: theme.quote.padding,
+                child: Builder(
+                  builder: (context) => htmlFlow(
+                    context,
+                    node.children,
+                    style,
+                    streaming: streaming,
+                  ),
+                ),
               ),
             ),
           ),
@@ -146,10 +154,28 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
       } else {
         child = htmlFlow(context, node.children, style, streaming: streaming);
       }
-      if (node.tag == 'center' || node.attributes['align'] == 'center') {
-        child = Align(alignment: Alignment.topCenter, child: child);
-      } else if (node.attributes['align'] == 'right') {
-        child = Align(alignment: Alignment.topRight, child: child);
+      final alignment = node.tag == 'center'
+          ? 'center'
+          : node.attributes['align'];
+      if (alignment == 'center' ||
+          alignment == 'right' ||
+          alignment == 'left') {
+        final textAlign = switch (alignment) {
+          'center' => TextAlign.center,
+          'right' => TextAlign.right,
+          _ => TextAlign.left,
+        };
+        child = DefaultTextStyle.merge(
+          textAlign: textAlign,
+          child: Align(
+            alignment: switch (textAlign) {
+              TextAlign.center => Alignment.topCenter,
+              TextAlign.right => Alignment.topRight,
+              _ => Alignment.topLeft,
+            },
+            child: child,
+          ),
+        );
       }
       widgets.add(
         DocumentSelectionGroup(
@@ -160,9 +186,7 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
       );
     }
     flush();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    return proseColumn(
       children: [
         for (var i = 0; i < widgets.length; i++)
           Padding(
@@ -200,25 +224,35 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
           node: item,
           prefix: node.tag == 'ol' ? '$index. ' : '- ',
           continuation: '  ',
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Padding(
-                padding: theme.listMarkerPadding,
-                child: SelectionContainer.disabled(
-                  child: Text(node.tag == 'ol' ? '$index.' : '•', style: style),
+          child: directionalBlock(
+            context,
+            proseDirection(item.children),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Padding(
+                  padding: theme.listMarkerPadding,
+                  child: SelectionContainer.disabled(
+                    child: Text(
+                      node.tag == 'ol' ? '$index.' : '•',
+                      style: style,
+                    ),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: htmlFlow(
-                  context,
-                  item.children,
-                  style,
-                  streaming: streaming,
+                Expanded(
+                  child: Builder(
+                    builder: (context) => htmlFlow(
+                      context,
+                      item.children,
+                      style,
+                      streaming: streaming,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+            align: false,
           ),
         ),
       );
@@ -343,6 +377,7 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
           cell.children,
           style,
           streaming: streaming,
+          align: false,
         );
         if (owner == null) return content;
         return DocumentSelectionGroup(
@@ -351,12 +386,14 @@ extension _HtmlBlockRenderer on MarkstreamRenderer {
             textAlign: switch (owner.attributes['align']) {
               'center' => TextAlign.center,
               'right' => TextAlign.right,
+              'left' => TextAlign.left,
               _ => TextAlign.start,
             },
             child: Align(
               alignment: switch (owner.attributes['align']) {
                 'center' => Alignment.center,
                 'right' => Alignment.centerRight,
+                'left' => Alignment.centerLeft,
                 _ => AlignmentDirectional.centerStart,
               },
               child: content,

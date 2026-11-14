@@ -15,6 +15,77 @@ import '../../../support/business_test_harness.dart';
 import '../../../support/markdown_render_helpers.dart';
 
 void main() {
+  testWidgets(
+    'user and assistant plaintext preserve LTR and independently align Persian paragraphs',
+    (tester) async {
+      late SettingsProvider settings;
+      await tester.runAsync(() async {
+        settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        await settings.setEnableUserMarkdown(false);
+        await settings.setEnableAssistantMarkdown(false);
+      });
+      addTearDown(settings.dispose);
+      const source = '中文 Gemini שלום\r\n\r\n🙂 ۱۲۳ سلام ؟';
+      for (final role in ['user', 'assistant']) {
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider.value(value: settings),
+              ChangeNotifierProvider(
+                create: (_) =>
+                    UserProvider(preferences: createBusinessTestPreferences()),
+              ),
+              ChangeNotifierProvider(
+                create: (_) =>
+                    TtsProvider(preferences: createBusinessTestPreferences()),
+              ),
+              ChangeNotifierProvider(create: (_) => ToolApprovalService()),
+              ChangeNotifierProvider(
+                create: (_) => AskUserInteractionService(),
+              ),
+            ],
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: ChatMessageWidget(
+                    message: ChatMessage(
+                      id: role,
+                      role: role,
+                      content: source,
+                      conversationId: 'bidi',
+                    ),
+                    showModelIcon: false,
+                    showUserAvatar: false,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final ltr = renderedParagraphsWith('中文 Gemini').single;
+        final rtl = renderedParagraphsWith('سلام').single;
+        expect(ltr.textDirection, TextDirection.ltr);
+        expect(rtl.textDirection, TextDirection.rtl);
+        expect(
+          rtl.localToGlobal(Offset.zero).dx,
+          greaterThan(ltr.localToGlobal(Offset.zero).dx),
+        );
+        if (role == 'user') {
+          final bubble = find.byKey(
+            const ValueKey('user-message-text-bubble:user'),
+          );
+          expect(tester.getSize(bubble).width, closeTo(ltr.size.width + 24, 1));
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
   for (final platform in [TargetPlatform.macOS, TargetPlatform.android]) {
     for (final translation in [false, true]) {
       testWidgets(
@@ -102,6 +173,19 @@ void main() {
                 .conversationId,
             'static-conversation',
           );
+          source.value = '[cite:abcd] سلام';
+          await tester.pumpAndSettle();
+          final persian = markdownParagraph(tester, 'سلام');
+          expect(persian.textDirection, TextDirection.rtl);
+          if (!translation) {
+            final bubble = find.byKey(
+              const ValueKey('user-message-text-bubble:static'),
+            );
+            expect(
+              tester.getSize(bubble).width,
+              closeTo(persian.size.width + 24, 1),
+            );
+          }
           await tester.runAsync(() async {
             if (translation) {
               await settings.setEnableAssistantMarkdown(false);

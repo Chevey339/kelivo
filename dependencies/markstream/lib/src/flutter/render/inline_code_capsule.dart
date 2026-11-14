@@ -48,6 +48,7 @@ class InlineCodeCapsule extends StatelessWidget {
         padding: padding,
         child: Text.rich(
           textSpan ?? TextSpan(text: text),
+          textDirection: TextDirection.ltr,
           style: style,
           textHeightBehavior: const TextHeightBehavior(
             leadingDistribution: TextLeadingDistribution.even,

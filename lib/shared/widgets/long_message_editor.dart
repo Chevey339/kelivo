@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:re_editor/re_editor.dart';
+import 'package:markstream/markstream.dart'
+    show containsStrongRtl, firstStrongDirection;
 import 'dart:async';
 import '../text_input/message_editing_controller.dart';
 import 'app_text_selection_toolbar.dart';
@@ -85,6 +87,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
   late CodeScrollController _scroll;
   bool _mirroring = false;
   late String _text;
+  TextDirection? _textDirection;
   List<int>? _lineStarts;
   CodeLines? _lastLines;
   bool _long = false;
@@ -119,6 +122,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
   void initState() {
     super.initState();
     _text = widget.controller.text;
+    _textDirection = firstStrongDirection(_text);
     _focus = widget.focusNode ?? FocusNode();
     _long = _supportsLineEditing(_text);
     _scroll = _makeScrollController();
@@ -202,7 +206,10 @@ class LongMessageEditorState extends State<LongMessageEditor>
 
   bool _supportsLineEditing(String text) =>
       (text.length >= _threshold || _retainNativeEditor) &&
-      !_requiresParagraph.hasMatch(text);
+      !_needsParagraphEditor(text);
+
+  bool _needsParagraphEditor(String text) =>
+      _requiresParagraph.hasMatch(text) || containsStrongRtl(text);
 
   bool _supportsChangedLines(CodeLines previous, CodeLines next) {
     // Each untouched line is already known to be LTR/LF. The library uses
@@ -226,7 +233,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
           continue;
         }
         if (unchanged?.contains(lines[line]) == true) continue;
-        if (_requiresParagraph.hasMatch(lines[line].text)) return false;
+        if (_needsParagraphEditor(lines[line].text)) return false;
       }
     }
     return true;
@@ -397,6 +404,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
   void _replaceText(String text) {
     if (identical(_text, text)) return;
     _text = text;
+    _textDirection = firstStrongDirection(text);
     _lineStarts = null;
   }
 
@@ -456,19 +464,20 @@ class LongMessageEditorState extends State<LongMessageEditor>
     }
     final value = widget.controller.value;
     final textChanged = !identical(_text, value.text);
+    final previousDirection = _textDirection;
     _replaceText(value.text);
     final nextLong = textChanged ? _supportsLineEditing(value.text) : _long;
-    final changedMode = _long != nextLong;
+    final rebuild = _long != nextLong || previousDirection != _textDirection;
     _long = nextLong;
     if (_lineController == null) {
-      if (changedMode && mounted) setState(() {});
+      if (rebuild && mounted) setState(() {});
       return;
     }
     if (textChanged && !nextLong && _inputFactory != null) {
       // Keep the raw model intact while transferring to the paragraph editor.
       // Its CRLF/bidi/accessibility path must not receive a normalized line
       // controller echo before the old input client detaches.
-      if (changedMode && mounted) setState(() {});
+      if (rebuild && mounted) setState(() {});
       return;
     }
     _mirroring = true;
@@ -508,7 +517,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
     } finally {
       _mirroring = false;
     }
-    if (changedMode && mounted) setState(() {});
+    if (rebuild && mounted) setState(() {});
   }
 
   void _copyToTextController() {
@@ -526,7 +535,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
             (_text.length >= _threshold || _retainNativeEditor) &&
             (_long && previous != null
                 ? _supportsChangedLines(previous, _lines.codeLines)
-                : !_requiresParagraph.hasMatch(_text));
+                : !_needsParagraphEditor(_text));
         _lastLines = _lines.codeLines;
       }
       final selection = _lines.selection;
@@ -810,6 +819,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
       return RepaintBoundary(
         child: TextField(
           controller: widget.controller,
+          textDirection: _textDirection,
           focusNode: _focus,
           scrollController: widget.scrollController,
           autofocus: widget.autofocus,
