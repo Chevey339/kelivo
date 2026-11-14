@@ -280,6 +280,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         if (maxTokens != null) 'max_output_tokens': maxTokens,
         if (responsesIncludeParam != null) 'include': responsesIncludeParam,
       };
+      applyOpenRouterClaudePromptCaching(body2, config: config, spec: spec);
       applyOpenAIResolvedRequest(
         body2,
         config: config,
