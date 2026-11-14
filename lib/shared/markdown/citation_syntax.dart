@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:markstream/markstream.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -56,6 +57,58 @@ class CitationSyntax extends InlineSyntax {
 class CitationRef {
   const CitationRef(this.index, this.id);
   final String index, id;
+
+  String label(String? Function(String)? resolve) {
+    final resolved = resolve?.call(id);
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    return index != id || int.tryParse(index) != null ? index : '?';
+  }
+}
+
+/// Latest search results win when several tools return the same citation.
+List<Map<String, dynamic>> citationSearchItems(
+  Iterable<({String name, String? content})> newestFirst,
+) {
+  final items = <Map<String, dynamic>>[];
+  final seen = <String>{};
+  for (final tool in newestFirst) {
+    if (tool.name != 'search_web' && tool.name != 'builtin_search') continue;
+    final content = tool.content;
+    if (content == null || content.isEmpty) continue;
+    try {
+      final result = jsonDecode(content);
+      if (result is! Map || result['items'] is! List) continue;
+      for (final item in result['items'] as List) {
+        if (item is! Map<String, dynamic>) continue;
+        final key = (item['id'] ?? item['url'] ?? '').toString();
+        if (key.isEmpty || seen.add(key)) items.add(item);
+      }
+    } on FormatException {
+      // An unfinished or malformed tool result contributes no citations.
+    }
+  }
+  return items;
+}
+
+Map<String, String> citationIndexLookup(List<Map<String, dynamic>> items) {
+  final lookup = <String, String>{};
+  for (final item in items) {
+    final id = item['id']?.toString() ?? '';
+    final index = item['index']?.toString() ?? '';
+    if (id.isNotEmpty && index.isNotEmpty) lookup[id] ??= index;
+  }
+  for (final item in items) {
+    final index = item['index']?.toString() ?? '';
+    if (index.isNotEmpty) lookup[index] ??= index;
+  }
+  return lookup;
+}
+
+String? resolveCitationIndex(Map<String, String> lookup, String id) {
+  final key = id.trim();
+  if (lookup[key] case final String value) return value;
+  final number = int.tryParse(key);
+  return number == null ? null : lookup[number.toString()];
 }
 
 final _citationIndex = RegExp(r'^[A-Za-z0-9_-]+$');
@@ -159,7 +212,7 @@ class _CitationChips extends StatelessWidget {
                   child: Center(
                     widthFactor: 1,
                     child: Text(
-                      _label(ref, scope),
+                      ref.label(scope?.resolve),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: AppFontWeights.semibold,
@@ -175,14 +228,5 @@ class _CitationChips extends StatelessWidget {
           ),
       ],
     );
-  }
-
-  String _label(CitationRef ref, CitationScope? scope) {
-    final resolved = scope?.resolve?.call(ref.id);
-    if (resolved != null && resolved.isNotEmpty) return resolved;
-    if (ref.index != ref.id || int.tryParse(ref.index) != null) {
-      return ref.index;
-    }
-    return '?';
   }
 }

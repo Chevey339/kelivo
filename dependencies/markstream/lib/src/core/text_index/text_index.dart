@@ -36,7 +36,10 @@ final class TextIndex {
     return TextIndex._(text.toString(), entries);
   }
 
-  factory TextIndex.fromDocument(DocumentNode document) {
+  factory TextIndex.fromDocument(
+    DocumentNode document, {
+    String? Function(NamedInlineNode node)? inlineText,
+  }) {
     final segments = <TextSegment>[];
     final pending = <MarkdownNode>[document];
     void emit(String text, MarkdownNode node, [SourceSpan? span]) =>
@@ -63,6 +66,13 @@ final class TextIndex {
 
     while (pending.isNotEmpty) {
       final node = pending.removeLast();
+      if (node is NamedInlineNode && inlineText != null) {
+        final label = inlineText(node);
+        if (label != null) {
+          emit(label, node);
+          continue;
+        }
+      }
       if (node is TextNode) {
         emit(node.text, node);
       } else if (node is LineBreakNode) {

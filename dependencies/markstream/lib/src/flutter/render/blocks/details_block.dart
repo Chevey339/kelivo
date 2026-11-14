@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/ast/nodes.dart';
 import '../../theme/markstream_theme.dart';
 import '../chrome.dart';
+import '../../selection/selection_controller.dart';
 
 class MarkstreamDetailsBlock extends StatefulWidget {
   const MarkstreamDetailsBlock({
@@ -72,7 +73,7 @@ class _MarkstreamDetailsBlockState extends State<MarkstreamDetailsBlock> {
   Widget build(BuildContext context) {
     final expanded = _manual ?? widget.open;
     final theme = widget.theme.details;
-    return Container(
+    final contentBlock = Container(
       key: const ValueKey('markstream-details-surface'),
       margin: theme.margin,
       decoration: BoxDecoration(
@@ -134,6 +135,16 @@ class _MarkstreamDetailsBlockState extends State<MarkstreamDetailsBlock> {
           ],
         ),
       ),
+    );
+    return SourceRangePreparer(
+      span: widget.node.span,
+      prepare: (range) {
+        if (expanded) return true;
+        setState(() => _manual = true);
+        _remember();
+        return false;
+      },
+      child: contentBlock,
     );
   }
 }

@@ -36,6 +36,7 @@ class StreamController {
     required this.getSettingsProvider,
     required this.getCurrentConversationId,
     this.onStreamTick,
+    this.onMessagePresented,
   });
 
   /// Callback when state changes (trigger setState in the widget).
@@ -45,6 +46,7 @@ class StreamController {
 
   /// Optional callback fired during streaming updates (e.g., auto-scroll).
   final VoidCallback? onStreamTick;
+  final ValueChanged<String>? onMessagePresented;
 
   /// Lightweight notifier for streaming content updates.
   /// This avoids triggering full page rebuilds during streaming.
@@ -586,6 +588,7 @@ class StreamController {
       state.targetContent,
       state.totalTokens,
     );
+    onMessagePresented?.call(messageId);
     onStreamTick?.call();
   }
 

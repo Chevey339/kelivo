@@ -1,3 +1,5 @@
+import '../services/conversation_find_service.dart';
+import 'conversation_find_highlights.dart';
 import 'package:Kelivo/desktop/desktop_overlay_backdrop.dart';
 import '../utils/message_reasoning_source.dart';
 import '../../intelligent_ui/host/ui_copy_actions.dart';
@@ -99,6 +101,7 @@ import '../../../core/models/message_part_snapshot.dart';
 import 'select_copy_sheet.dart';
 import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
+import '../../../shared/markdown/citation_syntax.dart';
 import 'chat_surface.dart';
 import 'collapsible_user_text.dart';
 import 'chat_suggestion_bubbles.dart';
@@ -2345,15 +2348,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseUser = isDesktop ? 14.0 : 15.5;
-    final highlights = quoteSourceHighlights(
+    final quoteRanges = quoteSourceHighlights(
       context,
       widget.message,
       visualText,
       sourceMap: sourceMap,
     );
-    final highlightColor = Theme.of(
-      context,
-    ).colorScheme.primary.withValues(alpha: .22);
+    final find = ConversationFindHighlights.of(context);
+    final highlights = [...quoteRanges, ...?find?.ranges(FindPart.body, 0)];
+    final highlightColor = quoteRanges.isEmpty && highlights.isNotEmpty
+        ? context.appColors.searchHighlight
+        : Theme.of(context).colorScheme.primary.withValues(alpha: .22);
 
     Widget content;
     if (enableUserMarkdown) {
@@ -2364,6 +2369,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           baseStyle: TextStyle(fontSize: baseUser, height: 1.45),
           conversationId: widget.message.conversationId,
           highlightRanges: highlights,
+          highlightColor: highlightColor,
         ),
       );
     } else {
@@ -2446,7 +2452,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         key: ValueKey('user-collapse:${widget.message.id}'),
         collapsedHeight: lineHeight * _collapsedUserTextLines,
         reveal:
-            highlights.isNotEmpty ||
+            quoteRanges.isNotEmpty ||
+            find?.current?.part == FindPart.body ||
             QuoteInteractionScope.maybeOf(
                   context,
                 )?.navigationFor(widget.message.id) !=
@@ -2865,6 +2872,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     String contentKey = '',
+    required int findBlock,
+    SourceTextMap? findParagraph,
     Object? detailsStateKey,
     UiTextSlice? uiSource,
     SourceTextMap? sourceMap,
@@ -2874,12 +2883,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseAssistant = isDesktop ? 14.0 : 15.7;
-    final highlights = quoteSourceHighlights(
+    final quoteRanges = quoteSourceHighlights(
       context,
       widget.message,
       visualContent,
       sourceMap: sourceMap,
     );
+    final highlights = [
+      ...quoteRanges,
+      ...?ConversationFindHighlights.of(
+        context,
+      )?.ranges(FindPart.body, findBlock, paragraph: findParagraph),
+    ];
+    final highlightColor = quoteRanges.isEmpty && highlights.isNotEmpty
+        ? context.appColors.searchHighlight
+        : Theme.of(context).colorScheme.primary.withValues(alpha: .22);
 
     Widget assistantContent;
     if (enableAssistantMarkdown) {
@@ -2887,6 +2905,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         text: visualContent,
         detailsStateKey: detailsStateKey,
         highlightRanges: highlights,
+        highlightColor: highlightColor,
         uiHost: widget.message.role != 'assistant' || uiSource == null
             ? null
             : UiHostBinding(
@@ -2908,7 +2927,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         buildSpan: (start, end) => highlightedQuoteSource(
           text,
           highlights,
-          Theme.of(context).colorScheme.primary.withValues(alpha: .22),
+          highlightColor,
           start: start,
           end: end,
         ),
@@ -2937,6 +2956,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       message: widget.message,
       source: visualContent,
       sourceMap: sourceMap,
+      findBlock: findBlock,
+      findParagraph: findParagraph,
       markdown: enableAssistantMarkdown,
       child: RepaintBoundary(
         child: AppSelectionArea(
@@ -3004,20 +3025,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     required String blockKey,
+    int findBlock = 0,
     UiTextSlice? uiSource,
     SourceTextMap? sourceMap,
   }) {
     final split = context.select<SettingsProvider, bool>(
       (s) => s.assistantBubbleSplitParagraphs,
     );
-    final parts = split
-        ? splitAssistantParagraphsWithSource(visualContent)
-        : <AssistantParagraph>[
-            AssistantParagraph(
-              visualContent,
-              SourceSpan(0, visualContent.length),
-            ),
-          ];
+    final parts = assistantDisplayParagraphs(
+      visualContent,
+      split: split,
+      uiSource: uiSource,
+    );
     final detailsBlockKey = sourceMap == null
         ? blockKey
         : ('source', sourceMap.sourceRange(0, 0).start);
@@ -3025,17 +3044,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       for (var i = 0; i < parts.length; i++)
         _buildAssistantTextBlock(
           context,
-          uiSource == null ? parts[i].text : parts[i].span.slice(visualContent),
-          uiSource: uiSource?.slice(parts[i].span.start, parts[i].span.end),
+          parts[i].text,
+          uiSource: parts[i].uiSource,
           enableAssistantMarkdown,
           citationIndexResolver,
+          findBlock: findBlock,
+          findParagraph: parts[i].blockMap,
           contentKey: parts.length == 1 ? '' : '$blockKey.$i',
           detailsStateKey: (widget.message.id, detailsBlockKey, i),
           sourceMap: sourceMap == null
               ? null
-              : uiSource == null
-              ? parts[i].sourceMap.through(sourceMap)
-              : sourceMap.slice(parts[i].span.start, parts[i].span.end),
+              : parts[i].blockMap?.through(sourceMap) ?? sourceMap,
         ),
     ];
   }
@@ -3046,6 +3065,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     bool enableAssistantMarkdown,
     String? Function(String) citationIndexResolver, {
     String contentKey = '',
+    required int findBlock,
+    SourceTextMap? findParagraph,
     Object? detailsStateKey,
     UiTextSlice? uiSource,
     SourceTextMap? sourceMap,
@@ -3060,6 +3081,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           enableAssistantMarkdown,
           citationIndexResolver,
           contentKey: contentKey,
+          findBlock: findBlock,
+          findParagraph: findParagraph,
           detailsStateKey: detailsStateKey,
           uiSource: uiSource,
           sourceMap: sourceMap,
@@ -3418,8 +3441,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               const SizedBox(height: 8),
             ],
             ...() {
+              final find = ConversationFindHighlights.of(context);
+              final target = find?.current;
               final showThinkingCards =
-                  widget.showThinkingCards ?? showThinkingCardsSetting;
+                  target?.part == FindPart.reasoning ||
+                  (widget.showThinkingCards ?? showThinkingCardsSetting);
               final showToolCards =
                   widget.showToolCards ?? showToolCardsSetting;
               ToolApprovalService? approval;
@@ -3500,6 +3526,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   if (block.isImage)
                     _resolveAttachmentImageUri(block.imageUri!),
               ];
+              final findBodyIndices = <int, int>{};
+              if (find?.hits.isNotEmpty == true) {
+                for (var i = 0; i < visibleBlocks.length; i++) {
+                  if (visibleBlocks[i].isText) {
+                    findBodyIndices[i] = findBodyIndices.length;
+                  }
+                }
+              }
               Object blockKey(int index) {
                 final block = visibleBlocks[index];
                 return (
@@ -3521,7 +3555,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     final quote = QuoteInteractionScope.maybeOf(
                       context,
                     )?.navigationFor(widget.message.id);
-                    if (quote == null) return null;
+                    if (quote == null) {
+                      if (target == null) return null;
+                      if (target.part == FindPart.reasoning) {
+                        return visibleBlocks.indexWhere(
+                          (b) => b.thinkingSteps.any(
+                            (s) =>
+                                s.isReasoning &&
+                                s.sourceOrdinal == target.block,
+                          ),
+                        );
+                      }
+                      return findBodyIndices.entries
+                          .where((e) => e.value == target.block)
+                          .firstOrNull
+                          ?.key;
+                    }
                     return visibleBlocks.indexWhere(
                       (block) =>
                           block.isText &&
@@ -3586,6 +3635,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             enableAssistantMarkdown,
                             citationIndexResolver,
                             blockKey: 'text$index',
+                            findBlock: findBodyIndices[index] ?? 0,
                             uiSource: block.uiSource,
                             sourceMap: block.sourceMap,
                           ),
@@ -3743,10 +3793,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             Padding(
                               padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
                               child: RepaintBoundary(
-                                child: AppSelectionArea(
-                                  key: ValueKey(
-                                    'translation_${widget.message.id}',
-                                  ),
+                                child: QuoteSourceAnchor(
+                                  message: widget.message,
+                                  source: translationText,
+                                  markdown: enableAssistantMarkdown,
+                                  findPart: FindPart.translation,
                                   child: Builder(
                                     builder: (context) {
                                       final bool isDesktop =
@@ -3759,11 +3810,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                       final double baseTranslation = isDesktop
                                           ? 14.0
                                           : 15.5;
+                                      final ranges =
+                                          ConversationFindHighlights.of(
+                                            context,
+                                          )?.ranges(FindPart.translation, 0) ??
+                                          const <SourceSpan>[];
                                       Widget translationContent;
                                       if (enableAssistantMarkdown) {
                                         translationContent =
                                             MarkdownWithCodeHighlight(
                                               text: translationText,
+                                              highlightRanges: ranges,
+                                              highlightColor: context
+                                                  .appColors
+                                                  .searchHighlight,
                                               onCitationTap: _handleCitationTap,
                                               citationIndexResolver:
                                                   citationIndexResolver,
@@ -3779,6 +3839,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                           text: UnicodeSanitizer.sanitize(
                                             translationText,
                                           ),
+                                          buildSpan: ranges.isEmpty
+                                              ? null
+                                              : (start, end) =>
+                                                    highlightedQuoteSource(
+                                                      UnicodeSanitizer.sanitize(
+                                                        translationText,
+                                                      ),
+                                                      ranges,
+                                                      context
+                                                          .appColors
+                                                          .searchHighlight,
+                                                      start: start,
+                                                      end: end,
+                                                    ),
                                           style: TextStyle(
                                             fontSize: baseTranslation,
                                             height: 1.4,
@@ -3793,7 +3867,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                           fontSize: baseTranslation,
                                           height: 1.4,
                                         ),
-                                        child: translationContent,
+                                        child: AppSelectionArea(
+                                          key: ValueKey(
+                                            'translation_${widget.message.id}',
+                                          ),
+                                          child: translationContent,
+                                        ),
                                       );
                                     },
                                   ),
@@ -4092,27 +4171,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   String? Function(String) _buildCitationIndexResolver(
     List<Map<String, dynamic>> items,
   ) {
-    final lookup = <String, String>{};
-    // An exact ID match wins over a legacy numeric index.
-    for (final item in items) {
-      final id = item['id']?.toString() ?? '';
-      final index = item['index']?.toString() ?? '';
-      if (id.isNotEmpty && index.isNotEmpty) lookup[id] ??= index;
-    }
-    for (final item in items) {
-      final index = item['index']?.toString() ?? '';
-      if (index.isNotEmpty) lookup[index] ??= index;
-    }
+    final lookup = citationIndexLookup(items);
     if (!mapEquals(lookup, _citationIndexLookup)) {
       _citationIndexLookup = lookup;
-      _citationIndexResolver = (id) {
-        final key = id.trim();
-        if (key.isEmpty) return null;
-        final direct = lookup[key];
-        if (direct != null) return direct;
-        final asIndex = int.tryParse(key);
-        return asIndex == null ? null : lookup[asIndex.toString()];
-      };
+      _citationIndexResolver = (id) => resolveCitationIndex(lookup, id);
     }
     return _citationIndexResolver;
   }
@@ -4194,41 +4256,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (identical(parts, _searchItemsParts) && _searchItemsCache != null) {
       return _searchItemsCache!;
     }
-    if (parts.isEmpty) {
-      _searchItemsParts = parts;
-      _searchItemsCache = const <Map<String, dynamic>>[];
-      return _searchItemsCache!;
-    }
-
-    final out = <Map<String, dynamic>>[];
-    final seen = <String>{};
-
-    for (int i = parts.length - 1; i >= 0; i--) {
-      final p = parts[i];
-      if ((p.toolName != 'search_web' && p.toolName != 'builtin_search') ||
-          (p.content?.isNotEmpty ?? false) == false) {
-        continue;
-      }
-      try {
-        final obj = jsonDecode(p.content!) as Map<String, dynamic>;
-        final arr = obj['items'] as List? ?? const <dynamic>[];
-        for (final it in arr) {
-          if (it is! Map) continue;
-          final m = it.cast<String, dynamic>();
-          final key = (m['id'] ?? m['url'] ?? '')
-              .toString(); // builtin_search no id
-          if (key.isNotEmpty) {
-            if (!seen.add(key)) continue;
-          }
-          out.add(m);
-        }
-      } catch (_) {
-        // ignore broken tool payload
-      }
-    }
     _searchItemsParts = parts;
-    _searchItemsCache = out;
-    return out;
+    return _searchItemsCache = citationSearchItems(
+      parts.reversed.map((p) => (name: p.toolName, content: p.content)),
+    );
   }
 
   void _showCitationsSheet(List<Map<String, dynamic>> items) {
@@ -5183,6 +5214,15 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
         filteredSteps.every((step) => step.isReasoning) &&
         !filteredSteps.any((step) => step.isReasoning && step.loading);
     final canCollapse = collapseThinkingSteps && filteredSteps.length > 2;
+    final target = ConversationFindHighlights.of(context)?.current;
+    final findStep = target?.part == FindPart.reasoning
+        ? filteredSteps.indexWhere(
+            (s) => s.isReasoning && s.sourceOrdinal == target!.block,
+          )
+        : -1;
+    if (findStep >= 0 && findStep < filteredSteps.length - 2) {
+      _showAllSteps = true;
+    }
     final hiddenCount = canCollapse && !_showAllSteps
         ? filteredSteps.length - 2
         : 0;
@@ -5262,6 +5302,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                   ),
                 ViewportBlockList(
                   storageId: ('steps', widget.key),
+                  revealIndex: findStep >= 0 ? findStep - hiddenCount : null,
                   itemCount: visibleSteps.length,
                   structureToken: (visibleSteps.length, hiddenCount),
                   itemKey: (i) {
@@ -5703,10 +5744,6 @@ class _ChainOfThoughtReasoningStepState
         : _ReasoningStepState.collapsed;
   }
 
-  String _sanitize(String s) {
-    return s.replaceAll('\r', '').trim();
-  }
-
   String _elapsed() {
     final start = widget.step.startAt;
     if (start == null) return '';
@@ -5792,8 +5829,17 @@ class _ChainOfThoughtReasoningStepState
     final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableReasoningMarkdown,
     );
-    final state = _stepState;
-    final display = _sanitize(widget.step.text);
+    final find = ConversationFindHighlights.of(context);
+    final target = find?.current;
+    final selected =
+        target?.part == FindPart.reasoning &&
+        target?.block == widget.sourceOrdinal;
+    if (selected) _localExpanded = true;
+    final state = selected ? _ReasoningStepState.expanded : _stepState;
+    final display = reasoningDisplayText(widget.step.text);
+    final ranges =
+        find?.ranges(FindPart.reasoning, widget.sourceOrdinal) ??
+        const <SourceSpan>[];
     final label = ThinkingSheen(
       enabled: widget.step.loading,
       color: fg.strong,
@@ -5831,18 +5877,41 @@ class _ChainOfThoughtReasoningStepState
     );
 
     Widget reasoningContent(String text) {
-      if (enableReasoningMarkdown) {
-        return RepaintBoundary(
-          child: MarkdownWithCodeHighlight(
-            text: text.isNotEmpty ? text : '…',
-            baseStyle: TextStyle(fontSize: 12.5, height: 1.32),
-            streaming: widget.step.loading,
-          ),
-        );
-      }
-      return plainMessageText(
-        text: text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…',
-        style: TextStyle(fontSize: 12.5, height: 1.32),
+      final source = text.isNotEmpty ? UnicodeSanitizer.sanitize(text) : '…';
+      const style = TextStyle(fontSize: 12.5, height: 1.32);
+      return QuoteSourceAnchor(
+        message: widget.message,
+        source: source,
+        findPart: FindPart.reasoning,
+        findBlock: widget.sourceOrdinal,
+        markdown: enableReasoningMarkdown,
+        child: AppSelectionArea(
+          message: widget.message,
+          quoteTextOnly: true,
+          child: enableReasoningMarkdown
+              ? RepaintBoundary(
+                  child: MarkdownWithCodeHighlight(
+                    text: source,
+                    highlightRanges: ranges,
+                    highlightColor: context.appColors.searchHighlight,
+                    baseStyle: style,
+                    streaming: widget.step.loading,
+                  ),
+                )
+              : plainMessageText(
+                  text: source,
+                  style: style,
+                  buildSpan: ranges.isEmpty
+                      ? null
+                      : (start, end) => highlightedQuoteSource(
+                          source,
+                          ranges,
+                          context.appColors.searchHighlight,
+                          start: start,
+                          end: end,
+                        ),
+                ),
+        ),
       );
     }
 
@@ -5876,20 +5945,12 @@ class _ChainOfThoughtReasoningStepState
             // Bouncing physics already declines drags when content fits.
             // Keeping it stable also retains ScrollPosition on overflow.
             physics: const BouncingScrollPhysics(),
-            child: AppSelectionArea(
-              message: widget.message,
-              quoteTextOnly: true,
-              child: reasoningContent(display),
-            ),
+            child: reasoningContent(display),
           ),
         ),
       );
     } else if (state == _ReasoningStepState.expanded) {
-      content = AppSelectionArea(
-        message: widget.message,
-        quoteTextOnly: true,
-        child: reasoningContent(display),
-      );
+      content = reasoningContent(display);
     }
 
     return _TimelineStepShell(

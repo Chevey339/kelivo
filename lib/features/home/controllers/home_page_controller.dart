@@ -23,7 +23,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
@@ -93,6 +92,12 @@ class UserMessageEditState {
   final String messageId;
   final String previewText;
 }
+
+typedef RevealMessageMatch =
+    Future<bool> Function(
+      bool Function() isCurrent, {
+      required bool waitForMount,
+    });
 
 /// Controller that manages all state and service wiring for HomePage.
 ///
@@ -192,6 +197,8 @@ class HomePageController extends ChangeNotifier {
   int _switchSerial = 0;
   int _messageJumpSerial = 0;
   bool _messageJumpInProgress = false;
+  bool _findingMessage = false;
+  final findViewportSnapshot = SnapshotController();
 
   // Startup warm-up (cache plan measure 14): after the initial restore
   // completes, an idle-time serial prefetch of the most recent conversations.
@@ -263,6 +270,8 @@ class HomePageController extends ChangeNotifier {
 
   /// Reveal a conversation opened from a notification or scheduled run history.
   VoidCallback? onRevealConversation;
+  ValueChanged<String>? onFindTextChanged;
+  ValueChanged<String>? onFindGenerationFinished;
 
   // Desktop global-search mode
   bool _isGlobalSearchMode = false;
@@ -802,6 +811,7 @@ class HomePageController extends ChangeNotifier {
       getSettingsProvider: () => _context.read<SettingsProvider>(),
       getCurrentConversationId: () => currentConversation?.id,
       onStreamTick: _handleStreamTick,
+      onMessagePresented: (id) => onFindTextChanged?.call(id),
     );
   }
 
@@ -1004,6 +1014,7 @@ class HomePageController extends ChangeNotifier {
       _scrollCtrl.positionAtBottomOnNextLayout();
     };
     _viewModel.onStreamFinished = (conversationId) {
+      onFindGenerationFinished?.call(conversationId);
       // Trigger UI update when streaming finishes
       notifyListeners();
       if (currentConversation?.id == conversationId) {
@@ -2748,6 +2759,7 @@ class HomePageController extends ChangeNotifier {
         // collapsed/grouped views reflect updates immediately.
         _chatController.invalidateCache();
         _translations[message.id] = TranslationData();
+        onFindTextChanged?.call(message.id);
         notifyListeners();
       },
       onTranslationUpdate: (translation) {
@@ -2757,6 +2769,7 @@ class HomePageController extends ChangeNotifier {
           messages[index] = updatingMessage;
         }
         _chatController.invalidateCache();
+        onFindTextChanged?.call(message.id);
         notifyListeners();
       },
       onTranslationCleared: () {
@@ -2767,10 +2780,12 @@ class HomePageController extends ChangeNotifier {
         }
         _chatController.invalidateCache();
         _translations.remove(message.id);
+        onFindTextChanged?.call(message.id);
         notifyListeners();
       },
     );
 
+    onFindGenerationFinished?.call(message.conversationId);
     if (result.isCancelled) return;
     if (!ctx.mounted) return;
 
@@ -3183,6 +3198,54 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
   // Public Methods - UI State
   // ============================================================================
+
+  /// Read the same published snapshot as the streaming bubble, including
+  /// reasoning steps and text split positions that may precede the DB checkpoint.
+  ChatMessage conversationFindStreamSnapshot(ChatMessage message) {
+    final id = message.id;
+    final data = streamingContentNotifier.getNotifier(id).value;
+    final splits = contentSplits[id];
+    final segments = reasoningSegments[id];
+    return message.copyWith(
+      parts: data.parts,
+      content: data.parts == null && data.content.isNotEmpty
+          ? data.content
+          : null,
+      reasoningText: data.reasoningText,
+      reasoningSegmentsJson:
+          segments == null && data.contentSplitOffsets == null && splits == null
+          ? null
+          : _streamController.serializeReasoningSegmentsWithSplits(
+              segments ?? [],
+              contentSplitOffsets: data.contentSplitOffsets ?? splits?.offsets,
+              reasoningCountAtSplit:
+                  data.reasoningCountAtSplit ?? splits?.reasoningCounts,
+              toolCountAtSplit: data.toolCountAtSplit ?? splits?.toolCounts,
+            ),
+    );
+  }
+
+  void ensureReasoningExpanded(String messageId) {
+    if (reasoning[messageId]?.expanded == false) toggleReasoning(messageId);
+  }
+
+  void ensureReasoningSegmentExpanded(String messageId, int index) {
+    final segments = reasoningSegments[messageId];
+    if (segments != null &&
+        index >= 0 &&
+        index < segments.length &&
+        !segments[index].expanded) {
+      toggleReasoningSegment(messageId, index);
+    }
+  }
+
+  void ensureTranslationExpanded(String messageId) {
+    final state = _translations[messageId];
+    if (state != null && !state.expanded) {
+      state.expanded = true;
+      notifyListeners();
+    }
+  }
 
   void toggleReasoning(String messageId) {
     final r = reasoning[messageId];
@@ -3766,16 +3829,21 @@ class HomePageController extends ChangeNotifier {
   Future<List<ChatMessage>> loadAllCollapsedMessagesForCurrentConversation() =>
       _chatController.loadAllCollapsedMessagesForCurrentConversation();
 
-  Future<List<MiniMapSearchHit>> searchMiniMapMatches(String query) =>
-      _chatController.searchMiniMapMatches(query);
-
   void _cancelMessageJump() {
     if (_messageJumpInProgress) _chatController.cancelPendingWindowLoad();
     _resetMessageJump();
   }
 
-  int _beginMessageJump() {
+  void cancelFindJump() {
+    if (!_findingMessage) return;
+    uiSearchNavigation.clear();
+    _cancelMessageJump();
+  }
+
+  int _beginMessageJump({bool finding = false}) {
     if (_messageJumpInProgress) _chatController.cancelPendingWindowLoad();
+    _findingMessage = finding;
+    if (!finding) findViewportSnapshot.allowSnapshotting = false;
     _messageJumpInProgress = true;
     return ++_messageJumpSerial;
   }
@@ -3783,6 +3851,8 @@ class HomePageController extends ChangeNotifier {
   void _resetMessageJump() {
     _messageJumpSerial++;
     _messageJumpInProgress = false;
+    _findingMessage = false;
+    findViewportSnapshot.allowSnapshotting = false;
     // This opacity wraps every conversation. An old page read must not keep
     // a newly selected conversation invisible until that read completes.
     _messageJumpTransitionController.value = 1.0;
@@ -3800,36 +3870,65 @@ class HomePageController extends ChangeNotifier {
     String targetId, {
     bool useRikkaTransition = false,
     String? surfaceKey,
+    bool Function()? stillCurrent,
+    VoidCallback? beforeScroll,
+    RevealMessageMatch? revealMatch,
   }) async {
     _warmupSerial++;
     uiSearchNavigation.clear();
-    final serial = _beginMessageJump();
+    final serial = _beginMessageJump(finding: revealMatch != null);
     final conversationId = currentConversation?.id;
 
+    bool current() =>
+        _isMessageJumpCurrent(serial, conversationId) &&
+        (stillCurrent?.call() ?? true);
     try {
       if (useRikkaTransition) {
         await _messageJumpTransitionController.reverse().orCancel;
       } else {
         _messageJumpTransitionController.value = 1.0;
       }
-      if (!_isMessageJumpCurrent(serial, conversationId)) return;
-      if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
+      if (!current()) return;
+      final needsWindow =
+          _chatController.indexOfCollapsedMessageId(targetId) < 0;
+      if (revealMatch != null) {
+        _scrollCtrl.beginSourceNavigation();
+        if (!needsWindow) {
+          beforeScroll?.call();
+          if (await revealMatch(current, waitForMount: false) || !current()) {
+            return;
+          }
+        }
+        // Mounting a distant message can take several layouts. Keep displaying
+        // the previous viewport until the glyph (or fallback row) is in place.
+        findViewportSnapshot.allowSnapshotting = true;
+        await WidgetsBinding.instance.endOfFrame;
+        if (!current()) return;
+      }
+      if (needsWindow) {
         final loaded = await _viewModel.loadUntilMessageVisible(targetId);
-        if (!loaded || !_isMessageJumpCurrent(serial, conversationId)) return;
+        if (!loaded || !current()) return;
         try {
           await WidgetsBinding.instance.endOfFrame;
         } catch (_) {}
       }
-      if (!_isMessageJumpCurrent(serial, conversationId)) return;
+      if (!current()) return;
       final index = _chatController.indexOfCollapsedMessageId(targetId);
       if (index < 0) return;
+      if (beforeScroll != null && (needsWindow || revealMatch == null)) {
+        beforeScroll();
+        await WidgetsBinding.instance.endOfFrame;
+        if (!current()) return;
+      }
       await _scrollCtrl.scrollToMessageId(
         targetId: targetId,
         targetIndex: index,
+        isCurrent: current,
       );
-      if (surfaceKey != null &&
-          conversationId != null &&
-          _isMessageJumpCurrent(serial, conversationId)) {
+      if (!current()) return;
+      if (revealMatch != null) {
+        await revealMatch(current, waitForMount: true);
+      } else if (surfaceKey != null && conversationId != null) {
         uiSearchNavigation.reveal(conversationId, targetId, surfaceKey);
       }
     } on TickerCanceled {
@@ -3842,7 +3941,11 @@ class HomePageController extends ChangeNotifier {
           // Superseded while revealing the list.
         }
       }
-      if (serial == _messageJumpSerial) _messageJumpInProgress = false;
+      if (_ownsMessageJump(serial)) {
+        _messageJumpInProgress = false;
+        _findingMessage = false;
+        findViewportSnapshot.allowSnapshotting = false;
+      }
     }
   }
 
@@ -4244,6 +4347,7 @@ class HomePageController extends ChangeNotifier {
     _ocrService.onError = null;
     _convoFadeController.dispose();
     _messageJumpTransitionController.dispose();
+    findViewportSnapshot.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
     _scrollCtrl.dispose();
     try {

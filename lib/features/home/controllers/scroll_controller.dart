@@ -939,6 +939,7 @@ class ChatScrollController {
   Future<void> scrollToMessageId({
     required String targetId,
     required int targetIndex,
+    bool Function()? isCurrent,
   }) async {
     try {
       if (!_scrollController.hasClients || !_messageListController.isAttached) {
@@ -957,6 +958,7 @@ class ChatScrollController {
       for (var pass = 0; pass < 3; pass++) {
         await WidgetsBinding.instance.endOfFrame;
         if (request != _indexedNavigationRequest ||
+            isCurrent?.call() == false ||
             !_scrollController.hasClients ||
             !_messageListController.isAttached ||
             targetIndex >= _messageListController.numberOfItems) {
@@ -970,15 +972,19 @@ class ChatScrollController {
     } catch (_) {}
   }
 
-  /// Center the quoted line inside the unobscured part of the chat viewport.
+  void beginSourceNavigation() {
+    _cancelProgrammaticNavigation(stopDrivenScroll: true);
+    _autoStickToBottom = false;
+  }
+
+  /// Center the source line inside the unobscured part of the chat viewport.
   /// Its global geometry is re-read by the caller as lazy block heights settle.
   void scrollToSourceRect(Rect rect, {required double bottomInset}) {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
     final box = position.context.storageContext.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return;
-    _cancelProgrammaticNavigation(stopDrivenScroll: true);
-    _autoStickToBottom = false;
+    beginSourceNavigation();
     final top = box.localToGlobal(Offset.zero).dy + _currentTopRevealInset();
     final bottom =
         box.localToGlobal(Offset(0, box.size.height)).dy - bottomInset;

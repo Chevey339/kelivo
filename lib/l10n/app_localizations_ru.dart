@@ -5039,12 +5039,37 @@ class AppLocalizationsRu extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => 'Прокрутить вниз';
 
   @override
-  String miniMapSearchMatchCount(int count) {
-    return '$count';
+  String get conversationFindHint => 'Найти';
+
+  @override
+  String get conversationFindPrevious => 'Предыдущее совпадение';
+
+  @override
+  String get conversationFindNext => 'Следующее совпадение';
+
+  @override
+  String get conversationFindOptions => 'Параметры поиска';
+
+  @override
+  String conversationFindMatchPosition(int current, int total) {
+    return '$current/$total';
   }
 
   @override
-  String get miniMapSearchNoResults => 'Нет подходящих сообщений';
+  String get conversationFindCaseSensitive => 'С учётом регистра';
+
+  @override
+  String get conversationFindWholeWord => 'Слово целиком';
+
+  @override
+  String get conversationFindWholeWordTooltip =>
+      'Совпадения по целым словам для письменностей с границами слов (например, английский). Запросы с китайскими, японскими или корейскими символами по-прежнему ищутся как подстроки.';
+
+  @override
+  String get conversationFindIncludeThinking => 'Включая рассуждения';
+
+  @override
+  String get conversationFindOpenTooltip => 'Найти в чате';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => 'Требуется API-ключ';

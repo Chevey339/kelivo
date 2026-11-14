@@ -75,6 +75,25 @@ Future<void> _press(
 
 void main() {
   testWidgets(
+    'conversation find yields only to registered app-wide shortcuts',
+    (tester) async {
+      final hotkeys = await _hotkeys(tester);
+      final mac = defaultTargetPlatform == TargetPlatform.macOS;
+      final find = SingleActivator(
+        LogicalKeyboardKey.keyF,
+        control: !mac,
+        meta: mac,
+      );
+      expect(hotkeys.handlesShortcut(find), isFalse);
+      await hotkeys.setCommand('side_panel_address', '$_modifier+f');
+      expect(hotkeys.handlesShortcut(find), isFalse);
+      await hotkeys.setCommand('new_topic', '$_modifier+f');
+      expect(hotkeys.handlesShortcut(find), isTrue);
+      await hotkeys.setEnabled('new_topic', false);
+      expect(hotkeys.handlesShortcut(find), isFalse);
+    },
+  );
+  testWidgets(
     'address shortcut stays out of app-wide registration after rebinding',
     (tester) async {
       final hotkeys = await _hotkeys(tester);

@@ -1,3 +1,4 @@
+import 'package:Kelivo/utils/utf16_safe_cut.dart';
 import '../models/carried_original.dart';
 import '../models/attachment_retention.dart';
 import 'compression_repository.dart';
@@ -7,7 +8,7 @@ import '../models/image_context.dart';
 import '../utils/chat_image_result.dart';
 import '../utils/conversation_fork_title.dart';
 import '../models/quote_ref.dart';
-import 'package:Kelivo/utils/utf16_safe_cut.dart';
+import '../../features/chat/models/conversation_find_candidate.dart';
 import 'package:Kelivo/features/search/utils/searchable_text.dart';
 import 'package:Kelivo/features/intelligent_ui/storage/ui_search_index.dart';
 import 'package:Kelivo/features/intelligent_ui/text/ui_search_text.dart';
@@ -2946,192 +2947,56 @@ class ChatDatabaseRepository {
     return (targetGroupId: target, removedGroups: removed);
   });
 
-  /// Searches the selected visible revision of each message group.
-  ///
-  /// SQLite `LOWER` / `INSTR` only fold ASCII case. Non-ASCII case variants
-  /// (for example Greek or Cyrillic) are not matched; this path does not load
-  /// ICU.
-  Future<List<MiniMapSearchHit>> searchMiniMapMatches(
+  /// Read only this conversation's visible revisions, in timeline order.
+  /// Visual substitutions and Unicode folds make raw-text LIKE filters lossy.
+  Stream<List<ConversationFindCandidate>> conversationFindCandidates(
     String conversationId,
-    String query, {
-    int snippetRadius = 40,
-    int snippetLength = 120,
-  }) {
-    return _observer.measure(
-      ChatDatabaseOperation.querySearch,
-      () => _searchMiniMapMatches(
-        conversationId,
-        query,
-        snippetRadius: snippetRadius,
-        snippetLength: snippetLength,
-      ),
-      resultCount: (rows) => rows.length,
-    );
-  }
-
-  Future<List<MiniMapSearchHit>> _searchMiniMapMatches(
-    String conversationId,
-    String query, {
-    required int snippetRadius,
-    required int snippetLength,
-  }) async {
-    final needle = query.trim().toLowerCase();
-    if (needle.isEmpty) return const <MiniMapSearchHit>[];
+  ) async* {
+    await _timelineIndex.ensureConversation(conversationId);
     await _genUiSearch.ensure();
-    return _db.transaction(() async {
-      final radius = snippetRadius < 0 ? 0 : snippetRadius;
-      final length = miniMapSnippetLength(
-        needleLength: needle.length,
-        snippetRadius: snippetRadius,
-        snippetLength: snippetLength,
-      );
-      final rows = await _db
-          .customSelect(
-            '''
-          WITH group_rows AS (
-            SELECT
-              COALESCE(m.group_id, m.id) AS group_id,
-              MIN(m.message_order) AS anchor_order,
-              MAX(m.version) AS latest_version
-            FROM message_rows m
-            WHERE m.conversation_id = ?
-            GROUP BY COALESCE(m.group_id, m.id)
-          ),
-          selections AS (
-            SELECT j.key AS group_id, CAST(j.value AS INTEGER) AS version
-            FROM conversation_rows c, json_each(c.version_selections_json) j
-            WHERE c.id = ?
-          ),
-          ranked AS (
-            SELECT
-              m.id,
-              m.role,
-              COALESCE(m.group_id, m.id) AS group_id,
-              g.anchor_order,
-              ROW_NUMBER() OVER (
-                PARTITION BY g.group_id
-                ORDER BY
-                  CASE
-                    WHEN m.version = COALESCE(s.version, g.latest_version)
-                    THEN 0 ELSE 1
-                  END,
-                  m.version DESC,
-                  m.message_order DESC,
-                  m.id DESC
-              ) AS version_rank
-            FROM group_rows g
-            JOIN message_rows m
-              ON m.conversation_id = ?
-             AND COALESCE(m.group_id, m.id) = g.group_id
-            LEFT JOIN selections s ON s.group_id = g.group_id
-          ),
-          text_bodies AS (
-            SELECT revision_id, GROUP_CONCAT(payload, '') AS txt
-            FROM (
-              SELECT p.revision_id AS revision_id, p.payload AS payload
-              FROM message_part_rows p
-              WHERE p.conversation_id = ?
-                AND p.kind = 'text'
-              ORDER BY p.revision_id, p.ordinal
+    const batchSize = 48;
+    (int, String)? cursor;
+    while (true) {
+      final after = cursor;
+      final batch = await _db.transaction(() async {
+        final rows = await _db
+            .customSelect(
+              'SELECT g.anchor_order,g.group_id,m.id FROM timeline_group_rows g '
+              'LEFT JOIN timeline_selection_rows s ON s.conversation_id=g.conversation_id AND s.group_id=g.group_id '
+              'JOIN message_rows m ON m.id=${MessageTimelineIndex.selectedRevision('g')} '
+              "WHERE g.conversation_id=? AND m.role IN ('user','assistant') "
+              "${after == null ? '' : 'AND (g.anchor_order,g.group_id)>(?,?) '} "
+              'ORDER BY g.anchor_order,g.group_id LIMIT ?',
+              variables: [
+                Variable<String>(conversationId),
+                if (after != null) ...[
+                  Variable<int>(after.$1),
+                  Variable<String>(after.$2),
+                ],
+                Variable<int>(batchSize),
+              ],
             )
-            GROUP BY revision_id
-          ),
-          params AS (
-            SELECT ? AS needle, ? AS radius, ? AS snippet_len
-          )
-          SELECT
-            ranked.id AS message_id,
-            CASE WHEN ranked.role='assistant' AND INSTR(t.txt, 'kelivo-ui') > 0 THEN t.txt END AS message_content,
-            (LENGTH(t.txt) - LENGTH(REPLACE(LOWER(t.txt), p.needle, '')))
-              / LENGTH(p.needle) AS match_count,
-            SUBSTR(
-              t.txt,
-              MAX(1, INSTR(LOWER(t.txt), p.needle) - p.radius),
-              p.snippet_len
-            ) AS snippet,
-            MAX(1, INSTR(LOWER(t.txt), p.needle) - p.radius) AS snippet_start
-          FROM ranked
-          JOIN text_bodies t ON t.revision_id = ranked.id
-          CROSS JOIN params p
-          WHERE ranked.version_rank = 1
-            AND ranked.role IN ('user', 'assistant')
-            AND (INSTR(LOWER(t.txt), p.needle) > 0 OR EXISTS (
-              SELECT 1 FROM gen_ui_surface_state_rows u WHERE u.revision_id=ranked.id
-                AND INSTR(LOWER(u.search_text), p.needle) > 0
-            ))
-          ORDER BY ranked.anchor_order, ranked.group_id;
-          ''',
-            variables: [
-              Variable<String>(conversationId),
-              Variable<String>(conversationId),
-              Variable<String>(conversationId),
-              Variable<String>(conversationId),
-              Variable<String>(needle),
-              Variable<int>(radius),
-              Variable<int>(length),
-            ],
-            readsFrom: {
-              _db.conversationRows,
-              _db.messageRows,
-              _db.messagePartRows,
-              _db.genUiSurfaceStateRows,
-            },
-          )
-          .get();
-      final projections = await _searchTextForCandidates({
-        for (final row in rows)
-          if (row.readNullable<String>('message_content') != null)
-            row.read<String>('message_id'),
-      });
-      final result = <MiniMapSearchHit>[];
-      for (final row in rows) {
-        final id = row.read<String>('message_id');
-        final projection = projections[id];
-        if (projection == null) {
-          result.add(
-            MiniMapSearchHit(
-              messageId: id,
-              matchCount: row.read<int>('match_count'),
-              snippet: row.readNullable<String>('snippet') ?? '',
-              snippetStart: row.read<int>('snippet_start') - 1,
+            .get();
+        if (rows.isEmpty) return <ConversationFindCandidate>[];
+        cursor = (
+          rows.last.read<int>('anchor_order'),
+          rows.last.read<String>('group_id'),
+        );
+        final ids = rows.map((r) => r.read<String>('id')).toList();
+        final messages = await getMessagesByIds(ids);
+        final surfaces = await _genUiSearch.read(ids);
+        return [
+          for (final message in messages)
+            ConversationFindCandidate(
+              message,
+              surfaces: surfaces[message.id] ?? const {},
             ),
-          );
-          continue;
-        }
-        // Match SQLite's existing ASCII case-folding without changing UTF-16
-        // offsets (some Unicode lowercase mappings change string length).
-        final lower = projection.text.replaceAllMapped(
-          RegExp('[A-Z]'),
-          (m) => m[0]!.toLowerCase(),
-        );
-        final matches = RegExp(
-          RegExp.escape(needle),
-        ).allMatches(lower).toList();
-        if (matches.isEmpty) {
-          continue; // DSL-only candidates are not visible hits.
-        }
-        final offset = matches.first.start;
-        final from = utf16SafeTailStart(
-          projection.text,
-          (offset - radius).clamp(0, projection.text.length),
-        );
-        final to = utf16SafeHeadEnd(
-          projection.text,
-          (from + length).clamp(from, projection.text.length),
-        );
-        result.add(
-          MiniMapSearchHit(
-            messageId: id,
-            matchCount: matches.length,
-            snippet: projection.text.substring(from, to),
-            snippetStart: from,
-            searchableText: projection.text,
-            matchedSurfaceKey: projection.surfaceAt(offset),
-          ),
-        );
-      }
-      return result;
-    });
+        ];
+      });
+      if (batch.isEmpty) return;
+      yield batch;
+      if (batch.length < batchSize) return;
+    }
   }
 
   Future<Set<String>> getMessageIdsForGroups(
@@ -9334,40 +9199,6 @@ class ConversationSearchMatch {
   final String? groupId;
   final int? version;
   final int? maxVersion;
-}
-
-class MiniMapSearchHit {
-  const MiniMapSearchHit({
-    required this.messageId,
-    required this.matchCount,
-    required this.snippet,
-    required this.snippetStart,
-    this.searchableText,
-    this.matchedSurfaceKey,
-  });
-
-  final String messageId;
-  final int matchCount;
-  final String snippet;
-
-  /// Offset into the independent searchable text, never a Markdown selection.
-  final int snippetStart;
-  final String? searchableText;
-  final String? matchedSurfaceKey;
-}
-
-/// Grows the snippet window so the first hit is not cut mid-keyword.
-///
-/// Default radius 40 + length 120 leaves only 80 characters for the needle.
-int miniMapSnippetLength({
-  required int needleLength,
-  int snippetRadius = 40,
-  int snippetLength = 120,
-}) {
-  final radius = snippetRadius < 0 ? 0 : snippetRadius;
-  final length = snippetLength < 0 ? 0 : snippetLength;
-  final needed = radius + needleLength;
-  return length < needed ? needed : length;
 }
 
 final class ChatStatsTotals {

@@ -1,3 +1,7 @@
+import 'package:Kelivo/features/chat/controllers/conversation_find_controller.dart';
+import 'package:Kelivo/features/chat/services/conversation_find_service.dart';
+import 'package:Kelivo/features/chat/widgets/conversation_find_highlights.dart';
+import 'package:markstream/markstream_core.dart' show SourceSpan;
 import '../../../support/business_test_harness.dart';
 import '../../../support/markdown_render_helpers.dart';
 
@@ -24,6 +28,65 @@ const _messageText = 'alpha bravo charlie';
 const _wordSelection = TextSelection(baseOffset: 6, extentOffset: 11);
 
 void main() {
+  testWidgets(
+    'cycling conversation find highlights the words without animating the whole row',
+    (tester) async {
+      final matches = [
+        for (final start in [0, 6])
+          (
+            messageId: 'message-1',
+            part: FindPart.body,
+            block: 0,
+            segment: null,
+            range: SourceSpan(start, start + 5),
+            surfaceKey: null,
+          ),
+      ];
+      final controller = ConversationFindController(
+        search: (_, _, _) async => {'message-1': matches},
+        onReveal: (_, _) {},
+      );
+      addTearDown(controller.dispose);
+      await _pumpTimeline(
+        tester,
+        conversationFind: controller,
+        content: 'alpha alpha',
+      );
+      controller.open(selection: 'alpha');
+      await tester.pump();
+      controller.move(1);
+      await tester.pump();
+      final highlights = tester.widget<ConversationFindHighlights>(
+        find.byType(ConversationFindHighlights),
+      );
+      expect(highlights.current, matches.last);
+      expect(highlights.ranges(FindPart.body, 0), matches.map((h) => h.range));
+      final paint = find.byWidgetPredicate(
+        (w) =>
+            w is DecoratedBox &&
+            w.decoration is BoxDecoration &&
+            ((w.decoration as BoxDecoration).color
+                    ?.withValues(alpha: 1)
+                    .toARGB32() ==
+                0xffffa726),
+      );
+      expect(
+        find.descendant(of: find.byType(MessageListView), matching: paint),
+        findsNothing,
+      );
+      controller.close();
+      await tester.pump();
+      expect(
+        tester
+            .widget<ConversationFindHighlights>(
+              find.byType(ConversationFindHighlights),
+            )
+            .hits,
+        isEmpty,
+      );
+    },
+  );
+
   testWidgets(
     'selection edge scroll expresses user intent before auto-follow can pin the page',
     (tester) async {
@@ -198,6 +261,7 @@ Future<FocusNode> _pumpTimeline(
   String content = _messageText,
   ScrollController? controller,
   VoidCallback? onUserScrollIntent,
+  ConversationFindController? conversationFind,
 }) async {
   final scrollController = controller ?? ScrollController();
   final listController = ListController();
@@ -242,6 +306,7 @@ Future<FocusNode> _pumpTimeline(
             children: [
               Expanded(
                 child: MessageListView(
+                  conversationFind: conversationFind,
                   scrollController: scrollController,
                   listController: listController,
                   messages: [

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -744,14 +743,6 @@ class ChatController extends ChangeNotifier {
     final conversation = _currentConversation;
     if (conversation == null) return const <ChatMessage>[];
     return _chatService.loadSelectedMessageProjections(conversation.id);
-  }
-
-  Future<List<MiniMapSearchHit>> searchMiniMapMatches(String query) {
-    final conversation = _currentConversation;
-    if (conversation == null) {
-      return Future<List<MiniMapSearchHit>>.value(const <MiniMapSearchHit>[]);
-    }
-    return _chatService.searchMiniMapMatches(conversation.id, query);
   }
 
   Future<List<ChatMessage>> allMessagesForCurrentConversationContext() async {

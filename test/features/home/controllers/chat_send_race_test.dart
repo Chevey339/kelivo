@@ -1,3 +1,5 @@
+import 'package:Kelivo/features/home/controllers/stream_controller.dart'
+    show ReasoningSegmentData;
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/compression_repository.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
@@ -3083,6 +3085,94 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'find reads presented text and reasoning before the streaming checkpoint',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      final message = ChatMessage(
+        id: 'live-find',
+        conversationId: 'c',
+        role: 'assistant',
+        content: 'stored',
+        isStreaming: true,
+      );
+      final notifier = controller.streamingContentNotifier;
+      notifier.getNotifier(message.id);
+      controller.reasoningSegments[message.id] = [
+        ReasoningSegmentData()..text = 'first step',
+        ReasoningSegmentData()..text = 'new step',
+      ];
+      notifier.updateContent(
+        message.id,
+        'published',
+        3,
+        reasoningText: 'new step',
+        contentSplitOffsets: [3],
+        reasoningCountAtSplit: [1],
+        toolCountAtSplit: [0],
+      );
+      final snapshot = controller.conversationFindStreamSnapshot(message);
+      expect(snapshot.content, 'published');
+      expect(snapshot.reasoningText, 'new step');
+      final payload = jsonDecode(snapshot.reasoningSegmentsJson!);
+      expect((payload['segments'] as List).map((s) => s['text']), [
+        'first step',
+        'new step',
+      ]);
+      expect(payload['contentSplits']['offsets'], [3]);
+    },
+  );
+
+  testWidgets(
+    'find navigation to a different message keeps the unsaved user edit',
+    (tester) async {
+      final controller = await pumpHarness(tester, withComposer: true);
+      final state = tester.state<_ControllerHarnessState>(
+        find.byType(_ControllerHarness),
+      );
+      late ChatMessage original, target;
+      await tester.runAsync(() async {
+        final conversation = await service.createConversation(
+          title: 'Find during edit',
+        );
+        original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'original',
+        );
+        target = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'target',
+        );
+        await controller.debugViewModel.switchConversation(conversation.id);
+        await waitFor(
+          () => state._mediaController.draftOwnerId == conversation.id,
+          'composer',
+        );
+      });
+      await controller.startUserMessageEdit(original);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(EditableText), 'unsaved changes');
+      await finishWidget(
+        tester,
+        controller.scrollToMessageId(
+          target.id,
+          stillCurrent: () => true,
+          beforeScroll: () {},
+        ),
+      );
+      expect(controller.userMessageEditState?.messageId, original.id);
+      expect(state._inputController.text, 'unsaved changes');
+      expect(
+        (await tester.runAsync(
+          () => service.loadMessagesByIds([original.id]),
+        ))!.single.content,
+        'original',
+      );
+    },
+  );
 
   for (final saveOnly in [false, true]) {
     testWidgets(

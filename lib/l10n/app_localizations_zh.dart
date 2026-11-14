@@ -4797,12 +4797,37 @@ class AppLocalizationsZh extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => '滚动到底部';
 
   @override
-  String miniMapSearchMatchCount(int count) {
-    return '$count 处';
+  String get conversationFindHint => '查找';
+
+  @override
+  String get conversationFindPrevious => '上一个匹配项';
+
+  @override
+  String get conversationFindNext => '下一个匹配项';
+
+  @override
+  String get conversationFindOptions => '查找选项';
+
+  @override
+  String conversationFindMatchPosition(int current, int total) {
+    return '$current/$total';
   }
 
   @override
-  String get miniMapSearchNoResults => '没有匹配的消息';
+  String get conversationFindCaseSensitive => '区分大小写';
+
+  @override
+  String get conversationFindWholeWord => '全词匹配';
+
+  @override
+  String get conversationFindWholeWordTooltip =>
+      '对英文、数字等按单词边界匹配；查询里若含汉字、假名、韩文，此项不改变结果。';
+
+  @override
+  String get conversationFindIncludeThinking => '包含思考过程';
+
+  @override
+  String get conversationFindOpenTooltip => '在会话中查找';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => '需要 API Key';
@@ -21024,12 +21049,37 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get miniMapScrollToBottomTooltip => '滚动到底部';
 
   @override
-  String miniMapSearchMatchCount(int count) {
-    return '$count 处';
+  String get conversationFindHint => '查找';
+
+  @override
+  String get conversationFindPrevious => '上一个匹配项';
+
+  @override
+  String get conversationFindNext => '下一个匹配项';
+
+  @override
+  String get conversationFindOptions => '查找选项';
+
+  @override
+  String conversationFindMatchPosition(int current, int total) {
+    return '$current/$total';
   }
 
   @override
-  String get miniMapSearchNoResults => '没有匹配的消息';
+  String get conversationFindCaseSensitive => '区分大小写';
+
+  @override
+  String get conversationFindWholeWord => '全词匹配';
+
+  @override
+  String get conversationFindWholeWordTooltip =>
+      '对英文、数字等按单词边界匹配；查询里若含汉字、假名、韩文，此项不改变结果。';
+
+  @override
+  String get conversationFindIncludeThinking => '包含思考过程';
+
+  @override
+  String get conversationFindOpenTooltip => '在会话中查找';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => '需要 API Key';
@@ -37250,12 +37300,37 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get miniMapScrollToBottomTooltip => '捲動到底部';
 
   @override
-  String miniMapSearchMatchCount(int count) {
-    return '$count 處';
+  String get conversationFindHint => '查找';
+
+  @override
+  String get conversationFindPrevious => '上一個符合項';
+
+  @override
+  String get conversationFindNext => '下一個符合項';
+
+  @override
+  String get conversationFindOptions => '查找選項';
+
+  @override
+  String conversationFindMatchPosition(int current, int total) {
+    return '$current/$total';
   }
 
   @override
-  String get miniMapSearchNoResults => '沒有匹配的訊息';
+  String get conversationFindCaseSensitive => '區分大小寫';
+
+  @override
+  String get conversationFindWholeWord => '全詞符合';
+
+  @override
+  String get conversationFindWholeWordTooltip =>
+      '對英文、數字等依單詞邊界符合；查詢若含漢字、假名、韓文，此項不改變結果。';
+
+  @override
+  String get conversationFindIncludeThinking => '包含思考過程';
+
+  @override
+  String get conversationFindOpenTooltip => '在對話中查找';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => '需要 API Key';

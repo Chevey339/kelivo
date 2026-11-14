@@ -4977,12 +4977,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => 'Scroll to bottom';
 
   @override
-  String miniMapSearchMatchCount(int count) {
-    return '$count';
+  String get conversationFindHint => 'Find';
+
+  @override
+  String get conversationFindPrevious => 'Previous match';
+
+  @override
+  String get conversationFindNext => 'Next match';
+
+  @override
+  String get conversationFindOptions => 'Find options';
+
+  @override
+  String conversationFindMatchPosition(int current, int total) {
+    return '$current/$total';
   }
 
   @override
-  String get miniMapSearchNoResults => 'No matching messages';
+  String get conversationFindCaseSensitive => 'Match case';
+
+  @override
+  String get conversationFindWholeWord => 'Whole word';
+
+  @override
+  String get conversationFindWholeWordTooltip =>
+      'Matches whole words for scripts with word boundaries (e.g. English). Queries that contain Chinese, Japanese, or Korean characters still use substring matching.';
+
+  @override
+  String get conversationFindIncludeThinking => 'Include thinking';
+
+  @override
+  String get conversationFindOpenTooltip => 'Find in conversation';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => 'API Key Required';

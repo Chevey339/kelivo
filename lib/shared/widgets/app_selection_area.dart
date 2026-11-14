@@ -29,6 +29,16 @@ import '../../l10n/app_localizations.dart';
 
 /// App-owned selection actions shared by messages and Markdown previews.
 class AppSelectionArea extends StatefulWidget {
+  /// Read the focused native selection without changing it or the clipboard.
+  static String? get focusedSelection {
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    final state = ctx?.findAncestorStateOfType<_AppSelectionAreaState>();
+    if (state == null || !state._regionFocus.hasFocus) return null;
+    return state._markdownSelection.hasSelection
+        ? state._markdownSelection.selectedPlainText
+        : state._selectionKey.currentState?.selectedText ?? state._selectedText;
+  }
+
   const AppSelectionArea({
     super.key,
     required this.child,

@@ -4866,12 +4866,37 @@ class AppLocalizationsKo extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => '맨 아래로 스크롤';
 
   @override
-  String miniMapSearchMatchCount(int count) {
-    return '$count';
+  String get conversationFindHint => '찾기';
+
+  @override
+  String get conversationFindPrevious => '이전 일치 항목';
+
+  @override
+  String get conversationFindNext => '다음 일치 항목';
+
+  @override
+  String get conversationFindOptions => '찾기 옵션';
+
+  @override
+  String conversationFindMatchPosition(int current, int total) {
+    return '$current/$total';
   }
 
   @override
-  String get miniMapSearchNoResults => '일치하는 메시지 없음';
+  String get conversationFindCaseSensitive => '대/소문자 구분';
+
+  @override
+  String get conversationFindWholeWord => '단어 단위';
+
+  @override
+  String get conversationFindWholeWordTooltip =>
+      '단어 경계가 있는 문자 체계(예: 영어)에서는 단어 단위로 일치합니다. 중국어, 일본어, 한국어 문자가 포함된 검색어는 여전히 부분 문자열로 일치합니다.';
+
+  @override
+  String get conversationFindIncludeThinking => '사고 과정 포함';
+
+  @override
+  String get conversationFindOpenTooltip => '대화에서 찾기';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => 'API Key 필요';

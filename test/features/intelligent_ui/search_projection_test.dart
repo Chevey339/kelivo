@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/services/conversation_find_service.dart';
 import 'dart:convert';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -109,6 +110,13 @@ void main() {
     }
   }
 
+  Future<List<ConversationFindHit>> conversationFind(String query) async =>
+      (await const ConversationFindService().search(
+        repo.conversationFindCandidates('c'),
+        query,
+        defaultFindOptions,
+      )).values.expand((h) => h).toList();
+
   Future<List<GlobalSessionSearchResult>> search(String query) =>
       GlobalSessionSearchService.search(chatService: service, query: query);
 
@@ -130,7 +138,7 @@ void main() {
       expect(result.matchedSurfaceKey, '0:0');
       expect(result.snippet, contains('14'));
       expect(await search('rowKey'), isEmpty);
-      expect(await repo.searchMiniMapMatches('c', 'rowKey'), isEmpty);
+      expect(await conversationFind('rowKey'), isEmpty);
     },
   );
   test(
@@ -164,10 +172,10 @@ void main() {
       expect((await search('概览 净利润')).single.conversationId, 'c');
       expect((await search('净利润 50%_')).single.firstMatchedMessageId, 'r');
       expect(await search('净利润 51%_'), isEmpty);
-      final mini = (await repo.searchMiniMapMatches('c', '净利润')).single;
-      expect(mini.matchedSurfaceKey, '0:0');
-      expect(mini.snippet, contains('净利润'));
-      expect(mini.searchableText, isNot(contains('Text(text=')));
+      final hit = (await conversationFind('净利润')).single;
+      expect(hit.surfaceKey, '0:0');
+      expect(hit.range.length, '净利润'.length);
+      expect(await conversationFind('Text(text='), isEmpty);
     },
   );
   test(
@@ -575,17 +583,13 @@ void main() {
     },
   );
   test(
-    'minimap snippets never split an emoji at either projected boundary',
+    'surface hits retain UTF-16 offsets after supplementary characters',
     () async {
       await put('r', _fence('root = Text(text="🙂🙂Target🙂🙂")'));
-      final hit = (await repo.searchMiniMapMatches(
-        'c',
-        'Target',
-        snippetRadius: 1,
-        snippetLength: 7,
-      )).single;
-      expect(hit.snippet, 'Target');
-      expect(hit.matchedSurfaceKey, '0:0');
+      final hit = (await conversationFind('Target')).single;
+      expect(hit.range.start, greaterThanOrEqualTo('🙂🙂'.length));
+      expect(hit.range.length, 'Target'.length);
+      expect(hit.surfaceKey, '0:0');
     },
   );
 }

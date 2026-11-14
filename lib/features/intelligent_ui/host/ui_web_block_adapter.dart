@@ -3,10 +3,12 @@ import 'package:flutter/widgets.dart';
 import 'package:markstream/markstream.dart';
 import 'package:Kelivo/features/chat/widgets/message_export_sheet.dart';
 import '../runtime/ui_surface_controller.dart';
+import '../runtime/ui_surface_state.dart';
 import '../widgets/genui_theme.dart';
 import '../widgets/genui_web_card.dart';
 import 'ui_host_scope.dart';
 import 'ui_source_map.dart';
+import 'ui_search_navigation.dart';
 import 'ui_web_controller.dart';
 import 'ui_web_document.dart';
 import 'ui_web_preview.dart';
@@ -63,16 +65,24 @@ class _UiWebBlockAdapterState extends State<UiWebBlockAdapter> {
   Widget build(BuildContext context) => GenUiThemeScope(
     markdownTheme: widget.theme,
     opaque: widget.host.exporting,
-    child: GenUiWebCard(
-      document: _document,
-      exporting: widget.host.exporting,
-      supported: uiWebPreviewSupported(defaultTargetPlatform),
-      onOpen: (document) => showUiWebPreview(context, document),
-      onExportHtml: (document) => saveExportTextWithPicker(
-        context,
-        filename: 'kelivo-web-${DateTime.now().microsecondsSinceEpoch}.html',
-        content: document.html,
-        allowedExtensions: const ['html'],
+    child: UiSearchReveal(
+      conversationId: widget.host.binding.conversationId,
+      owner: UiSurfaceOwner(
+        revisionId: widget.host.binding.revisionId,
+        surfaceKey: widget.fence.surfaceKey,
+      ),
+      enabled: !widget.host.exporting,
+      child: GenUiWebCard(
+        document: _document,
+        exporting: widget.host.exporting,
+        supported: uiWebPreviewSupported(defaultTargetPlatform),
+        onOpen: (document) => showUiWebPreview(context, document),
+        onExportHtml: (document) => saveExportTextWithPicker(
+          context,
+          filename: 'kelivo-web-${DateTime.now().microsecondsSinceEpoch}.html',
+          content: document.html,
+          allowedExtensions: const ['html'],
+        ),
       ),
     ),
   );

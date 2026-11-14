@@ -9109,17 +9109,65 @@ abstract class AppLocalizations {
   /// **'Scroll to bottom'**
   String get miniMapScrollToBottomTooltip;
 
-  /// Label showing how many messages match the minimap search; {count} is the match number.
+  /// Placeholder in the search field of the current conversation’s find bar.
   ///
   /// In en, this message translates to:
-  /// **'{count}'**
-  String miniMapSearchMatchCount(int count);
+  /// **'Find'**
+  String get conversationFindHint;
 
-  /// Empty-state text in the minimap search showing no messages matched the query.
+  /// Tooltip for the find bar button that selects the previous occurrence in the current conversation.
   ///
   /// In en, this message translates to:
-  /// **'No matching messages'**
-  String get miniMapSearchNoResults;
+  /// **'Previous match'**
+  String get conversationFindPrevious;
+
+  /// Tooltip for the find bar button that selects the next occurrence in the current conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get conversationFindNext;
+
+  /// Tooltip for the find bar button that opens the search options menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Find options'**
+  String get conversationFindOptions;
+
+  /// Match counter in the conversation find bar. current is the one-based occurrence index and total is the number of occurrences. Both are zero for no matches.
+  ///
+  /// In en, this message translates to:
+  /// **'{current}/{total}'**
+  String conversationFindMatchPosition(int current, int total);
+
+  /// Toggle in the conversation find menu requiring the query to match uppercase and lowercase letters exactly.
+  ///
+  /// In en, this message translates to:
+  /// **'Match case'**
+  String get conversationFindCaseSensitive;
+
+  /// Toggle in the conversation find menu limiting matches to whole words.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole word'**
+  String get conversationFindWholeWord;
+
+  /// Tooltip beside the whole-word search option explaining word boundaries and how CJK queries behave.
+  ///
+  /// In en, this message translates to:
+  /// **'Matches whole words for scripts with word boundaries (e.g. English). Queries that contain Chinese, Japanese, or Korean characters still use substring matching.'**
+  String get conversationFindWholeWordTooltip;
+
+  /// Toggle in the conversation find menu to also search the assistant’s reasoning steps.
+  ///
+  /// In en, this message translates to:
+  /// **'Include thinking'**
+  String get conversationFindIncludeThinking;
+
+  /// Tooltip for the message map button that opens the find bar in the current conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in conversation'**
+  String get conversationFindOpenTooltip;
 
   /// Status label indicating a search service still needs an API key to be configured.
   ///

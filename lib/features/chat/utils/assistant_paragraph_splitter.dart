@@ -1,5 +1,6 @@
 import 'package:markstream/markstream_core.dart';
 import '../../../utils/source_text_map.dart';
+import '../../intelligent_ui/host/ui_source_map.dart';
 
 /// Splits assistant markdown into paragraph chunks, one per bubble.
 ///
@@ -27,6 +28,27 @@ class AssistantParagraph {
   final SourceTextMap? _sourceMap;
   SourceTextMap get sourceMap =>
       _sourceMap ?? SourceTextMap.identity(text.length, offset: span.start);
+}
+
+/// Documents rendered as individual assistant bubbles. A native surface must
+/// retain its exact source, while ordinary paragraphs may normalize gaps.
+List<({String text, SourceTextMap? blockMap, UiTextSlice? uiSource})>
+assistantDisplayParagraphs(
+  String text, {
+  required bool split,
+  UiTextSlice? uiSource,
+}) {
+  if (!split) return [(text: text, blockMap: null, uiSource: uiSource)];
+  return [
+    for (final part in splitAssistantParagraphsWithSource(text))
+      (
+        text: uiSource == null ? part.text : part.span.slice(text),
+        blockMap: uiSource == null
+            ? part.sourceMap
+            : SourceTextMap.identity(part.span.length, offset: part.span.start),
+        uiSource: uiSource?.slice(part.span.start, part.span.end),
+      ),
+  ];
 }
 
 List<AssistantParagraph> splitAssistantParagraphsWithSource(String text) {

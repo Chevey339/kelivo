@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/database/composer_draft_store.dart';
@@ -21,6 +22,7 @@ import 'package:Kelivo/features/home/controllers/stream_controller.dart'
     show ReasoningData, ReasoningSegmentData;
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/source_rect_scroll.dart';
 
 class _PageRequest {
   _PageRequest({required this.conversationId, required this.completer});
@@ -262,8 +264,9 @@ void main() {
 
   Future<HomePageController> pumpHarness(
     WidgetTester tester,
-    _ControlledChatService service,
-  ) async {
+    _ControlledChatService service, {
+    Widget Function(HomePageController)? timeline,
+  }) async {
     HomePageController? controller;
     await tester.pumpWidget(
       MultiProvider(
@@ -280,7 +283,10 @@ void main() {
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: _ControllerHarness(onCreated: (value) => controller = value),
+          home: _ControllerHarness(
+            onCreated: (value) => controller = value,
+            timeline: timeline,
+          ),
         ),
       ),
     );
@@ -436,6 +442,116 @@ void main() {
       }
     }, platform: TargetPlatform.iOS);
   });
+
+  testWidgets(
+    'find jumps between laid-out lines without visiting the message header',
+    (tester) async {
+      final message = _message('conv-a', 0);
+      final service = _ControlledChatService({
+        'conv-a': [message],
+      });
+      final first = GlobalKey();
+      final last = GlobalKey();
+      final controller = await pumpHarness(
+        tester,
+        service,
+        timeline: (c) => SuperListView.builder(
+          controller: c.scrollController,
+          listController: c.scrollCtrl.messageListController,
+          itemCount: c.messages.length,
+          itemBuilder: (_, _) => Column(
+            children: [
+              const SizedBox(height: 1400),
+              Text('first occurrence', key: first),
+              const SizedBox(height: 2300),
+              Text('last occurrence', key: last),
+              const SizedBox(height: 800),
+            ],
+          ),
+        ),
+      );
+      await switchAndSettle(tester, controller, service, 'conv-a');
+      Future<void> jump(GlobalKey key) => controller.scrollToMessageId(
+        message.id,
+        revealMatch: (current, {required waitForMount}) =>
+            scrollToSourceGeometry(
+              locate: () {
+                final box =
+                    key.currentContext!.findRenderObject()! as RenderBox;
+                return box.localToGlobal(Offset.zero) & box.size;
+              },
+              scrollToRect: controller.scrollToSourceRect,
+              isCurrent: current,
+              waitForMount: waitForMount,
+            ),
+      );
+      await pumpUntilDone(tester, [jump(first)]);
+      final firstOffset = controller.scrollController.offset;
+      expect(firstOffset, greaterThan(900));
+      final offsets = <double>[];
+      void record() => offsets.add(controller.scrollController.offset);
+      controller.scrollController.addListener(record);
+      await pumpUntilDone(tester, [jump(last)]);
+      final lastOffset = controller.scrollController.offset;
+      expect(lastOffset, greaterThan(firstOffset + 2200));
+      expect(offsets, everyElement(greaterThanOrEqualTo(firstOffset)));
+      offsets.clear();
+      await pumpUntilDone(tester, [jump(first)]);
+      expect(controller.scrollController.offset, closeTo(firstOffset, 0.5));
+      expect(
+        offsets,
+        everyElement(inInclusiveRange(firstOffset - .5, lastOffset + .5)),
+      );
+      controller.scrollController.removeListener(record);
+    },
+  );
+
+  testWidgets(
+    'find presents a distant window only after its target is positioned',
+    (tester) async {
+      final recent = _message('conv-a', 84);
+      final older = _message('conv-a', 9);
+      final service = _ControlledChatService({
+        'conv-a': [recent],
+      });
+      final controller = await pumpHarness(tester, service);
+      await switchAndSettle(tester, controller, service, 'conv-a');
+      final positioned = Completer<bool>();
+      var locatingOlder = false;
+      final jump = controller.scrollToMessageId(
+        older.id,
+        revealMatch: (valid, {required waitForMount}) {
+          locatingOlder = valid() && waitForMount;
+          return positioned.future;
+        },
+      );
+      await tester.pump();
+      expect(controller.findViewportSnapshot.allowSnapshotting, isTrue);
+      service.completePage(service.pageRequests.last, [older], startIndex: 9);
+      for (var i = 0; i < 8; i++) {
+        await tester.pump();
+      }
+      expect(controller.messages.single.id, older.id);
+      expect(locatingOlder, isTrue);
+      expect(controller.findViewportSnapshot.allowSnapshotting, isTrue);
+      positioned.complete(true);
+      await pumpUntilDone(tester, [jump]);
+      expect(controller.findViewportSnapshot.allowSnapshotting, isFalse);
+
+      final cancelled = controller.scrollToMessageId(
+        recent.id,
+        revealMatch: (_, {required waitForMount}) =>
+            throw StateError('stale hit'),
+      );
+      await tester.pump();
+      expect(controller.findViewportSnapshot.allowSnapshotting, isTrue);
+      controller.cancelFindJump();
+      expect(controller.findViewportSnapshot.allowSnapshotting, isFalse);
+      service.completePage(service.pageRequests.last, [recent], startIndex: 84);
+      await pumpUntilDone(tester, [cancelled]);
+      expect(controller.messages.single.id, older.id);
+    },
+  );
 
   testWidgets('superseded conversation fade completes its switch future', (
     tester,
@@ -1392,9 +1508,10 @@ void main() {
 }
 
 class _ControllerHarness extends StatefulWidget {
-  const _ControllerHarness({required this.onCreated});
+  const _ControllerHarness({required this.onCreated, this.timeline});
 
   final ValueChanged<HomePageController> onCreated;
+  final Widget Function(HomePageController)? timeline;
 
   @override
   State<_ControllerHarness> createState() => _ControllerHarnessState();
@@ -1436,5 +1553,13 @@ class _ControllerHarnessState extends State<_ControllerHarness>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(key: _scaffoldKey);
+  Widget build(BuildContext context) => Scaffold(
+    key: _scaffoldKey,
+    body: widget.timeline == null
+        ? null
+        : ListenableBuilder(
+            listenable: _controller,
+            builder: (_, _) => widget.timeline!(_controller),
+          ),
+  );
 }

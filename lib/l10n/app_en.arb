@@ -2326,16 +2326,56 @@
   "miniMapTitle": "Minimap",
   "miniMapTooltip": "Minimap",
   "miniMapScrollToBottomTooltip": "Scroll to bottom",
-  "miniMapSearchMatchCount": "{count}",
-  "@miniMapSearchMatchCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    },
-    "description": "Label showing how many messages match the minimap search; {count} is the match number."
+  "conversationFindHint": "Find",
+  "@conversationFindHint": {
+    "description": "Placeholder in the search field of the current conversation’s find bar."
   },
-  "miniMapSearchNoResults": "No matching messages",
+  "conversationFindPrevious": "Previous match",
+  "@conversationFindPrevious": {
+    "description": "Tooltip for the find bar button that selects the previous occurrence in the current conversation."
+  },
+  "conversationFindNext": "Next match",
+  "@conversationFindNext": {
+    "description": "Tooltip for the find bar button that selects the next occurrence in the current conversation."
+  },
+  "conversationFindOptions": "Find options",
+  "@conversationFindOptions": {
+    "description": "Tooltip for the find bar button that opens the search options menu."
+  },
+  "conversationFindMatchPosition": "{current}/{total}",
+  "@conversationFindMatchPosition": {
+    "description": "Match counter in the conversation find bar. current is the one-based occurrence index and total is the number of occurrences. Both are zero for no matches.",
+    "placeholders": {
+      "current": {
+        "type": "int",
+        "example": "3"
+      },
+      "total": {
+        "type": "int",
+        "example": "12"
+      }
+    }
+  },
+  "conversationFindCaseSensitive": "Match case",
+  "@conversationFindCaseSensitive": {
+    "description": "Toggle in the conversation find menu requiring the query to match uppercase and lowercase letters exactly."
+  },
+  "conversationFindWholeWord": "Whole word",
+  "@conversationFindWholeWord": {
+    "description": "Toggle in the conversation find menu limiting matches to whole words."
+  },
+  "conversationFindWholeWordTooltip": "Matches whole words for scripts with word boundaries (e.g. English). Queries that contain Chinese, Japanese, or Korean characters still use substring matching.",
+  "@conversationFindWholeWordTooltip": {
+    "description": "Tooltip beside the whole-word search option explaining word boundaries and how CJK queries behave."
+  },
+  "conversationFindIncludeThinking": "Include thinking",
+  "@conversationFindIncludeThinking": {
+    "description": "Toggle in the conversation find menu to also search the assistant’s reasoning steps."
+  },
+  "conversationFindOpenTooltip": "Find in conversation",
+  "@conversationFindOpenTooltip": {
+    "description": "Tooltip for the message map button that opens the find bar in the current conversation."
+  },
   "searchServicesPageApiKeyRequiredStatus": "API Key Required",
   "searchServicesPageUrlRequiredStatus": "URL Required",
   "searchServicesAddDialogTitle": "Add Search Service",
@@ -12567,9 +12607,6 @@
   },
   "@miniMapScrollToBottomTooltip": {
     "description": "Tooltip for the button in the minimap that scrolls the chat to the bottom."
-  },
-  "@miniMapSearchNoResults": {
-    "description": "Empty-state text in the minimap search showing no messages matched the query."
   },
   "@searchServicesPageApiKeyRequiredStatus": {
     "description": "Status label indicating a search service still needs an API key to be configured."

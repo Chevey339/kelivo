@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../desktop/widgets/desktop_pointer_surface.dart';
-import '../../../shared/widgets/ios_tactile.dart';
+import '../../../desktop/widgets/desktop_menu.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../theme/surface_ladder.dart';
 import '../../browser/widgets/browser_text_field.dart';
@@ -118,151 +117,100 @@ class _PanelMenuState extends State<_PanelMenu> {
               math.max(8, size.height - height - 8),
             ),
             width: width,
-            child: Material(
-              color: Color.alphaBlend(
-                AppOverlayColors.desktopPopoverSurface(cs),
-                cs.surface,
-              ),
-              elevation: 12,
-              shadowColor: cs.shadow.withValues(alpha: .18),
-              borderRadius: BorderRadius.circular(16),
-              clipBehavior: Clip.antiAlias,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: height),
-                child: DesktopPointerSurface(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: SurfaceLadder.fromScheme(cs).surfaceFill,
-                            borderRadius: BorderRadius.circular(
-                              AppRadii.capsule,
-                            ),
-                          ),
-                          child: BrowserTextField(
-                            controller: _search,
-                            autofocus: true,
-                            placeholder: l.sidePanelSearchTabs,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            prefix: const Padding(
-                              padding: EdgeInsets.only(left: 8),
-                              child: Icon(LucideIcons.search, size: 14),
-                            ),
-                            onChanged: (_) => setState(() {}),
-                            style: const TextStyle(fontSize: 13),
-                          ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: height),
+              child: DesktopMenuSurface(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: SurfaceLadder.fromScheme(cs).surfaceFill,
+                        borderRadius: BorderRadius.circular(AppRadii.capsule),
+                      ),
+                      child: BrowserTextField(
+                        controller: _search,
+                        autofocus: true,
+                        placeholder: l.sidePanelSearchTabs,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        prefix: const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(LucideIcons.search, size: 14),
                         ),
-                        const SizedBox(height: 4),
-                        if (widget.hint != null)
-                          Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Text(
-                              widget.hint!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        Flexible(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                for (final (index, entry)
-                                    in entries.indexed) ...[
-                                  if (entry.group != null &&
-                                      (index == 0 ||
-                                          entries[index - 1].group !=
-                                              entry.group))
-                                    Builder(
-                                      builder: (context) {
-                                        return Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: Padding(
-                                            padding: const EdgeInsets.fromLTRB(
-                                              8,
-                                              10,
-                                              8,
-                                              4,
-                                            ),
-                                            child: Text(
-                                              entry.group!,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: cs.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  IosCardPress(
-                                    mouseCursor: SystemMouseCursors.basic,
-                                    haptics: false,
-                                    focusable: true,
-                                    borderRadius: BorderRadius.circular(8),
-                                    baseColor: entry.selected
-                                        ? SurfaceLadder.fromScheme(
-                                            cs,
-                                          ).surfaceFill
-                                        : Colors.transparent,
-                                    padding: EdgeInsets.zero,
-                                    onTap: entry.onTap == null
-                                        ? null
-                                        : () {
-                                            Navigator.of(context).pop();
-                                            entry.onTap!();
-                                          },
-                                    child: SizedBox(
-                                      height: 32,
-                                      child: Row(
-                                        children: [
-                                          const SizedBox(width: 8),
-                                          if (entry.leading != null) ...[
-                                            entry.leading!,
-                                            const SizedBox(width: 8),
-                                          ],
-                                          Expanded(
-                                            child: Tooltip(
-                                              message: entry.subtitle ?? '',
-                                              child: Text(
-                                                entry.title,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: entry.onTap == null
-                                                      ? cs.onSurfaceVariant
-                                                      : cs.onSurface,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          if (entry.onClose != null)
-                                            SidePanelIconButton(
-                                              icon: LucideIcons.x,
-                                              label: l.browserCloseTab,
-                                              onTap: entry.onClose,
-                                            ),
-                                          const SizedBox(width: 8),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    if (widget.hint != null)
+                      Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text(
+                          widget.hint!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final (index, entry) in entries.indexed) ...[
+                              if (entry.group != null &&
+                                  (index == 0 ||
+                                      entries[index - 1].group != entry.group))
+                                Builder(
+                                  builder: (context) {
+                                    return Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          8,
+                                          10,
+                                          8,
+                                          4,
+                                        ),
+                                        child: Text(
+                                          entry.group!,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              DesktopMenuRow(
+                                label: entry.title,
+                                tooltip: entry.subtitle,
+                                leading: entry.leading,
+                                selected: entry.selected,
+                                trailing: entry.onClose == null
+                                    ? null
+                                    : SidePanelIconButton(
+                                        icon: LucideIcons.x,
+                                        label: l.browserCloseTab,
+                                        onTap: entry.onClose,
+                                      ),
+                                onTap: entry.onTap == null
+                                    ? null
+                                    : () {
+                                        Navigator.of(context).pop();
+                                        entry.onTap!();
+                                      },
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

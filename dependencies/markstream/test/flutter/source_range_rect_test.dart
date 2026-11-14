@@ -4,6 +4,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
 
 void main() {
+  testWidgets('preparing a source hit opens nested details and folded code', (
+    tester,
+  ) async {
+    final controller = MarkstreamSelectionController();
+    addTearDown(controller.dispose);
+    final source =
+        '<details>\n<summary>Fold</summary>\n\n```dart\n${List.generate(18, (i) => 'line $i').join('\n')}\nneedle\n```\n\n</details>';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MarkstreamSelectionScope(
+            controller: controller,
+            child: MarkstreamView(
+              source: source,
+              codeOptions: const CodeBlockOptions(
+                autoCollapse: true,
+                collapsedLines: 2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final start = source.indexOf('needle'),
+        range = SourceSpan(start, start + 6);
+    expect(controller.rectForSourceRange(range), isNull);
+    for (var i = 0; i < 8 && !controller.prepareSourceRange(range); i++) {
+      await tester.pumpAndSettle();
+    }
+    expect(controller.rectForSourceRange(range), isNotNull);
+    expect(
+      find.byKey(const ValueKey('markstream-code-collapse-fade')),
+      findsNothing,
+    );
+    expect(controller.hasSelection, isFalse);
+  });
   testWidgets(
     'source geometry accounts for inline atoms without a SelectionArea',
     (tester) async {

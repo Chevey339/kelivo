@@ -1,5 +1,7 @@
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/quote_ref.dart';
+import 'package:Kelivo/features/chat/services/conversation_find_service.dart';
+import 'package:Kelivo/features/chat/widgets/conversation_find_highlights.dart';
 import 'package:Kelivo/features/chat/widgets/quote_interaction_scope.dart';
 import 'package:Kelivo/features/chat/widgets/quote_source_anchor.dart';
 import 'package:Kelivo/features/chat/widgets/viewport_block_list.dart';
@@ -11,6 +13,70 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
 
 void main() {
+  testWidgets(
+    'active word outline follows wrapping and remount without another jump',
+    (tester) async {
+      final source = '${'word ' * 24}needle';
+      final message = ChatMessage(
+        id: 'm',
+        conversationId: 'c',
+        role: 'assistant',
+        content: source,
+      );
+      final hit = (
+        messageId: 'm',
+        part: FindPart.body,
+        block: 0,
+        segment: null,
+        range: SourceSpan(source.length - 6, source.length),
+        surfaceKey: null,
+      );
+      Widget app(double width) => MaterialApp(
+        home: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: width,
+            child: ConversationFindHighlights(
+              hits: [hit],
+              current: hit,
+              child: QuoteSourceAnchor(
+                message: message,
+                source: source,
+                markdown: false,
+                child: Text(source),
+              ),
+            ),
+          ),
+        ),
+      );
+      double paintedLine() {
+        final paint = tester.widget<CustomPaint>(
+          find
+              .descendant(
+                of: find.byType(QuoteSourceAnchor),
+                matching: find.byType(CustomPaint),
+              )
+              .first,
+        );
+        final canvas = TestRecordingCanvas();
+        paint.foregroundPainter!.paint(canvas, Size.zero);
+        final call = canvas.invocations.firstWhere(
+          (e) => e.invocation.memberName == #drawRRect,
+        );
+        return (call.invocation.positionalArguments.first as RRect).top;
+      }
+
+      await tester.pumpWidget(app(600));
+      final wide = paintedLine();
+      await tester.pumpWidget(app(160));
+      final narrow = paintedLine();
+      expect(narrow, greaterThan(wide + 10));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(app(160));
+      expect(paintedLine(), closeTo(narrow, .5));
+    },
+  );
+
   for (final markdown in [false, true]) {
     testWidgets(
       'quote scroll centers its first line past repeated text (markdown: $markdown)',

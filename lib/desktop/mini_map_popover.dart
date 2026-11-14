@@ -3,6 +3,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../icons/lucide_adapter.dart';
+import '../l10n/app_localizations.dart';
+import '../shared/widgets/ios_tactile.dart';
 import '../core/models/chat_message.dart';
 import '../core/models/message_part.dart';
 import '../theme/design_tokens.dart';
@@ -13,6 +16,7 @@ Future<String?> showDesktopMiniMapPopover(
   required GlobalKey anchorKey,
   required List<ChatMessage> messages,
   bool selecting = false,
+  VoidCallback? onOpenConversationFind,
   Set<String>? selectedMessageIds,
   Listenable? selectionListenable,
   ValueChanged<String>? onToggleSelection,
@@ -57,6 +61,7 @@ Future<String?> showDesktopMiniMapPopover(
               } catch (_) {}
               if (!completer.isCompleted) completer.complete(id);
             },
+      onOpenConversationFind: onOpenConversationFind,
       onClose: () {
         try {
           entry.remove();
@@ -80,6 +85,7 @@ class _MiniMapPopover extends StatefulWidget {
     required this.selectionListenable,
     required this.onToggleSelection,
     required this.onClose,
+    this.onOpenConversationFind,
   });
 
   final Rect anchorRect;
@@ -91,6 +97,7 @@ class _MiniMapPopover extends StatefulWidget {
   final Listenable? selectionListenable;
   final ValueChanged<String>? onToggleSelection;
   final VoidCallback onClose;
+  final VoidCallback? onOpenConversationFind;
 
   @override
   State<_MiniMapPopover> createState() => _MiniMapPopoverState();
@@ -184,19 +191,71 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(14),
                         ),
-                        child: _MiniMapList(
-                          messages: widget.messages,
-                          selecting: widget.selecting,
-                          selectedMessageIds: widget.selectedMessageIds,
-                          selectionListenable: widget.selectionListenable,
-                          onTapMessage: (id) {
-                            if (_closing) return;
-                            if (widget.selecting) {
-                              widget.onToggleSelection?.call(id);
-                            } else {
-                              widget.onSelect?.call(id);
-                            }
-                          },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 6, 8, 0),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Lucide.Map,
+                                    size: 17,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.miniMapTitle,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
+                                    ),
+                                  ),
+                                  if (!widget.selecting &&
+                                      widget.onOpenConversationFind != null)
+                                    IosIconButton(
+                                      key: const ValueKey(
+                                        'miniMapSearchButton',
+                                      ),
+                                      icon: Lucide.Search,
+                                      size: 17,
+                                      minSize: 32,
+                                      tooltip: AppLocalizations.of(
+                                        context,
+                                      )!.conversationFindOpenTooltip,
+                                      onTap: () async {
+                                        if (_closing) return;
+                                        final open =
+                                            widget.onOpenConversationFind!;
+                                        await _close();
+                                        open();
+                                      },
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Flexible(
+                              child: _MiniMapList(
+                                messages: widget.messages,
+                                selecting: widget.selecting,
+                                selectedMessageIds: widget.selectedMessageIds,
+                                selectionListenable: widget.selectionListenable,
+                                onTapMessage: (id) {
+                                  if (_closing) return;
+                                  if (widget.selecting) {
+                                    widget.onToggleSelection?.call(id);
+                                  } else {
+                                    widget.onSelect?.call(id);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

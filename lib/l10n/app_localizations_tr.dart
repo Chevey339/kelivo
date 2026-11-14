@@ -5006,12 +5006,37 @@ class AppLocalizationsTr extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => 'En alta kaydır';
 
   @override
-  String miniMapSearchMatchCount(int count) {
-    return '$count';
+  String get conversationFindHint => 'Bul';
+
+  @override
+  String get conversationFindPrevious => 'Önceki eşleşme';
+
+  @override
+  String get conversationFindNext => 'Sonraki eşleşme';
+
+  @override
+  String get conversationFindOptions => 'Bulma seçenekleri';
+
+  @override
+  String conversationFindMatchPosition(int current, int total) {
+    return '$current/$total';
   }
 
   @override
-  String get miniMapSearchNoResults => 'Eşleşen mesaj yok';
+  String get conversationFindCaseSensitive => 'Büyük/küçük harf eşleştir';
+
+  @override
+  String get conversationFindWholeWord => 'Tam kelime';
+
+  @override
+  String get conversationFindWholeWordTooltip =>
+      'Kelime sınırları olan yazı sistemlerinde (ör. İngilizce) tam kelimeleri eşleştirir. Çince, Japonca veya Korece karakter içeren sorgular yine alt dize eşleştirmesi kullanır.';
+
+  @override
+  String get conversationFindIncludeThinking => 'Akıl yürütmeyi dahil et';
+
+  @override
+  String get conversationFindOpenTooltip => 'Sohbette bul';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => 'API Anahtarı Gerekli';

@@ -158,6 +158,17 @@ class HotkeyProvider extends ChangeNotifier {
   List<AppHotkey> get items => _items.values.toList(growable: false);
   AppHotkey getById(String id) => _items[id]!;
 
+  /// Focus-scoped shortcuts yield to bindings registered with the OS or app.
+  bool handlesShortcut(SingleActivator shortcut) =>
+      _registered.values.any((hotkey) {
+        final modifiers = hotkey.modifiers ?? const <HotKeyModifier>[];
+        return hotkey.logicalKey == shortcut.trigger &&
+            modifiers.contains(HotKeyModifier.control) == shortcut.control &&
+            modifiers.contains(HotKeyModifier.meta) == shortcut.meta &&
+            modifiers.contains(HotKeyModifier.alt) == shortcut.alt &&
+            modifiers.contains(HotKeyModifier.shift) == shortcut.shift;
+      });
+
   Future<void> initialize() async {
     if (_initialized) return;
     final prefs = await SharedPreferences.getInstance();

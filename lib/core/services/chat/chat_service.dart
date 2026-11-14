@@ -1,3 +1,4 @@
+import '../../../features/chat/models/conversation_find_candidate.dart';
 import '../../models/carried_original.dart';
 import '../../../shared/markdown/markdown_image_sources.dart';
 import '../api/request_image_context.dart';
@@ -1881,91 +1882,24 @@ class ChatService extends ChangeNotifier {
     );
   }
 
-  Future<List<MiniMapSearchHit>> searchMiniMapMatches(
+  Stream<List<ConversationFindCandidate>> conversationFindCandidates(
     String conversationId,
-    String query, {
-    int snippetRadius = 40,
-    int snippetLength = 120,
-  }) async {
-    if (!_initialized) return const <MiniMapSearchHit>[];
+  ) async* {
+    if (!_initialized) return;
     if (_temporaryConversationIds.contains(conversationId) ||
         _draftConversations.containsKey(conversationId)) {
-      return _miniMapHitsFromCachedMessages(
-        conversationId,
-        query,
-        snippetRadius: snippetRadius,
-        snippetLength: snippetLength,
+      final selected = _collapseTitleVersions(
+        _messagesCache[conversationId] ?? [],
+        getVersionSelections(conversationId),
       );
+      yield [
+        for (final message in selected)
+          if (message.role == 'assistant' || message.role == 'user')
+            ConversationFindCandidate(message),
+      ];
+    } else {
+      yield* _repo.conversationFindCandidates(conversationId);
     }
-    return _repo.searchMiniMapMatches(
-      conversationId,
-      query,
-      snippetRadius: snippetRadius,
-      snippetLength: snippetLength,
-    );
-  }
-
-  List<MiniMapSearchHit> _miniMapHitsFromCachedMessages(
-    String conversationId,
-    String query, {
-    required int snippetRadius,
-    required int snippetLength,
-  }) {
-    final needle = query.trim().toLowerCase();
-    if (needle.isEmpty) return const <MiniMapSearchHit>[];
-    final radius = snippetRadius < 0 ? 0 : snippetRadius;
-    final length = miniMapSnippetLength(
-      needleLength: needle.length,
-      snippetRadius: snippetRadius,
-      snippetLength: snippetLength,
-    );
-    final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
-    final groups = <String, List<ChatMessage>>{};
-    final order = <String>[];
-    for (final message in messages) {
-      final groupId = message.groupId ?? message.id;
-      if (!groups.containsKey(groupId)) order.add(groupId);
-      groups.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
-    }
-    final selections = getVersionSelections(conversationId);
-    final hits = <MiniMapSearchHit>[];
-    for (final groupId in order) {
-      final versions = groups[groupId]!
-        ..sort((a, b) => a.version.compareTo(b.version));
-      final version = selections[groupId];
-      final selected =
-          versions.cast<ChatMessage?>().firstWhere(
-            (message) => message!.version == version,
-            orElse: () => null,
-          ) ??
-          versions.last;
-      if (selected.role != 'user' && selected.role != 'assistant') continue;
-      final text = selected.content;
-      final lower = text.toLowerCase();
-      final first = lower.indexOf(needle);
-      if (first < 0) continue;
-      var matchCount = 0;
-      var pos = 0;
-      while (true) {
-        final index = lower.indexOf(needle, pos);
-        if (index < 0) break;
-        matchCount++;
-        pos = index + needle.length;
-      }
-      final snippetStart = first < radius ? 0 : first - radius;
-      final snippetEnd = snippetStart + length > text.length
-          ? text.length
-          : snippetStart + length;
-      hits.add(
-        MiniMapSearchHit(
-          messageId: selected.id,
-          matchCount: matchCount,
-          snippet: text.substring(snippetStart, snippetEnd),
-          snippetStart: snippetStart,
-        ),
-      );
-    }
-    return hits;
   }
 
   Future<bool> messageExists(String id) async {

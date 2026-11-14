@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import '../../../core/models/quote_ref.dart';
+import '../../../shared/widgets/source_rect_scroll.dart';
+import '../services/conversation_find_service.dart';
 
 class QuoteInteractionController extends ChangeNotifier {
   QuoteInteractionController({
@@ -18,6 +20,21 @@ class QuoteInteractionController extends ChangeNotifier {
   QuoteRef? _navigation;
   int _navigationSerial = 0;
   final _sourceRects = <Object, ({int start, Rect rect})? Function(QuoteRef)>{};
+  final _findRects = <Object, Rect? Function(ConversationFindHit)>{};
+  void registerFindRect(
+    Object owner,
+    Rect? Function(ConversationFindHit) locate,
+  ) => _findRects[owner] = locate;
+  void unregisterFindRect(Object owner) => _findRects.remove(owner);
+
+  Rect? findRect(ConversationFindHit hit) {
+    for (final locate in _findRects.values) {
+      final rect = locate(hit);
+      if (rect != null) return rect;
+    }
+    return null;
+  }
+
   int sourceRevision = 0;
 
   QuoteRef? navigationFor(String messageId) =>
@@ -42,26 +59,21 @@ class QuoteInteractionController extends ChangeNotifier {
     _navigation = quote;
     notifyListeners();
     try {
-      Rect? previous;
-      for (var pass = 0; pass < 8; pass++) {
-        await WidgetsBinding.instance.endOfFrame;
-        if (serial != _navigationSerial || !isCurrent()) return;
-        ({int start, Rect rect})? first;
-        for (final locate in _sourceRects.values) {
-          final target = locate(quote);
-          if (target != null && (first == null || target.start < first.start)) {
-            first = target;
+      await scrollToSourceGeometry(
+        isCurrent: () => serial == _navigationSerial && isCurrent(),
+        scrollToRect: scrollToRect,
+        locate: () {
+          ({int start, Rect rect})? first;
+          for (final locate in _sourceRects.values) {
+            final target = locate(quote);
+            if (target != null &&
+                (first == null || target.start < first.start)) {
+              first = target;
+            }
           }
-        }
-        if (first != null) {
-          scrollToRect(first.rect);
-          if (previous != null &&
-              (previous.center - first.rect.center).distance < .5) {
-            break;
-          }
-        }
-        previous = first?.rect;
-      }
+          return first?.rect;
+        },
+      );
     } finally {
       if (serial == _navigationSerial) {
         _navigation = null;
@@ -101,6 +113,7 @@ class QuoteInteractionController extends ChangeNotifier {
   void dispose() {
     _navigationSerial++;
     _sourceRects.clear();
+    _findRects.clear();
     _timer?.cancel();
     super.dispose();
   }

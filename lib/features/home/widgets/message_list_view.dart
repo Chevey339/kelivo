@@ -1,3 +1,5 @@
+import '../../chat/controllers/conversation_find_controller.dart';
+import '../../chat/widgets/conversation_find_highlights.dart';
 import '../../intelligent_ui/host/ui_persistence_host.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_runtime_registry.dart';
 import 'package:Kelivo/features/intelligent_ui/widgets/genui_control_region.dart';
@@ -133,6 +135,7 @@ class MessageListView extends StatefulWidget {
     this.isPinnedIndicatorActive = false,
     required this.processingFilesMessageId,
     this.streamingContentNotifier,
+    this.conversationFind,
     this.spotlightMessageId,
     this.spotlightToken = 0,
     this.removingSlotIds = const <String>{},
@@ -229,6 +232,7 @@ class MessageListView extends StatefulWidget {
 
   /// When set, the message with this ID will receive a spotlight pulse animation.
   final String? spotlightMessageId;
+  final ConversationFindController? conversationFind;
 
   /// Incremented each time a new spotlight is triggered. Used as an animation key
   /// so re-selecting the same message re-triggers the pulse.
@@ -2368,40 +2372,48 @@ class _MessageListViewState extends State<MessageListView> {
           widget.footer!,
       ],
     );
-    final isSpotlight =
-        widget.spotlightMessageId != null &&
-        message.id == widget.spotlightMessageId;
-    final Widget item = isSpotlight
-        ? RepaintBoundary(
-            child: TweenAnimationBuilder<double>(
-              key: ValueKey('spotlight-${widget.spotlightToken}'),
-              tween: Tween<double>(begin: 1.0, end: 0.0),
-              duration: const Duration(milliseconds: 1200),
-              curve: Curves.easeOut,
-              builder: (context, opacity, child) {
-                return Stack(
-                  children: [
-                    child!,
-                    if (opacity > 0.0)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFFFA726,
-                              ).withValues(alpha: opacity * 0.30),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-              child: messageColumn,
+    final find = widget.conversationFind;
+    Widget highlightedMessage() {
+      final current = find?.current;
+      return ConversationFindHighlights(
+        hits: find?.hitsFor(message.id) ?? const [],
+        current: current?.messageId == message.id ? current : null,
+        child: messageColumn,
+      );
+    }
+
+    final item = RepaintBoundary(
+      child: Stack(
+        children: [
+          if (find == null)
+            highlightedMessage()
+          else
+            ListenableBuilder(
+              listenable: find,
+              builder: (_, _) => highlightedMessage(),
             ),
-          )
-        : RepaintBoundary(child: messageColumn);
+          if (widget.spotlightMessageId == message.id)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: TweenAnimationBuilder<double>(
+                  key: ValueKey('spotlight-${widget.spotlightToken}'),
+                  tween: Tween<double>(begin: 1, end: 0),
+                  duration: const Duration(milliseconds: 1200),
+                  curve: Curves.easeOut,
+                  builder: (context, opacity, _) => DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(
+                        0xFFFFA726,
+                      ).withValues(alpha: opacity * .30),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
 
     // The animator wraps the item's RepaintBoundary so the fade only
     // re-composites the boundary's cached layer instead of repainting the
