@@ -26,6 +26,10 @@ void main() {
   late Set<String> audioEventChannels;
   late int speakCallCount;
   late List<String> spokenTexts;
+  double? systemRate;
+  double? networkRate;
+  var failedSystemSpeaks = 0;
+  var deferSystemStart = false;
   late String? audioPlayerEventChannel;
   late BusinessPreferencesTestHarness harness;
   late BusinessPreferencesTestSession session;
@@ -39,6 +43,9 @@ void main() {
   Completer<void>? stopEntered;
   Completer<void>? stopGate;
   Completer<void>? speechGate;
+  Completer<void>? systemRateGate;
+  Completer<void>? systemStopGate;
+  var systemStops = 0;
   final terminalAudioOwners = <Set<String>>[];
 
   setUp(() async {
@@ -53,6 +60,9 @@ void main() {
     stopEntered = null;
     stopGate = null;
     speechGate = null;
+    systemRateGate = null;
+    systemStopGate = null;
+    systemStops = 0;
     terminalAudioOwners.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(backgroundChannel, (call) async {
@@ -72,6 +82,10 @@ void main() {
     audioEventChannels = <String>{};
     speakCallCount = 0;
     spokenTexts = <String>[];
+    systemRate = null;
+    networkRate = null;
+    failedSystemSpeaks = 0;
+    deferSystemStart = false;
     audioPlayerEventChannel = null;
     _mockAudioEventStream('xyz.luan/audioplayers.global/events');
     audioEventChannels.add('xyz.luan/audioplayers.global/events');
@@ -88,6 +102,9 @@ void main() {
             throw PlatformException(code: 'audio_services_reset');
           }
           final args = call.arguments as Map<dynamic, dynamic>;
+          if (call.method == 'setPlaybackRate') {
+            networkRate = args['playbackRate'] as double;
+          }
           final playerId = args['playerId'] as String;
           final eventChannel = 'xyz.luan/audioplayers/events/$playerId';
           if (call.method == 'create') {
@@ -122,6 +139,13 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           switch (call.method) {
+            case 'setSpeechRate':
+              await systemRateGate?.future;
+              systemRate = call.arguments as double;
+              return 1;
+            case 'setEngine':
+              systemRate = null;
+              return 1;
             case 'getLanguages':
               return const <String>['en-US', 'zh-CN'];
             case 'getEngines':
@@ -130,15 +154,21 @@ void main() {
               return true;
             case 'speak':
               speakCallCount++;
+              if (failedSystemSpeaks > 0) {
+                failedSystemSpeaks--;
+                return 0;
+              }
               final arguments = call.arguments;
               final text = arguments is Map
                   ? arguments['text']?.toString()
                   : arguments?.toString();
               spokenTexts.add(text ?? '');
-              await _emitTtsCallback('speak.onStart');
+              if (!deferSystemStart) await _emitTtsCallback('speak.onStart');
               await speechGate?.future;
               return 1;
             case 'stop':
+              systemStops++;
+              await systemStopGate?.future;
               await _emitTtsCallback('speak.onComplete');
               return 1;
             default:
@@ -1014,6 +1044,115 @@ void main() {
       ),
     );
   }
+
+  test('the last chat speed survives restart for both TTS engines', () async {
+    await session.preferences.setDouble('tts_speech_rate_v1', 0.6);
+    final (first, service) = await networkPlayer((request) async {
+      await request.drain<void>();
+      request.response.add([1]);
+      await request.response.close();
+    }, cache: false);
+
+    final playback = first.speakWithNetworkService(service, 'First reply');
+    await _waitUntil(() => networkRate == 1.2);
+    await first.cyclePlaybackSpeed();
+    expect(networkRate, 1.5);
+    await first.stop();
+    await playback;
+    await session.close();
+
+    session = await harness.open();
+    final restored = TtsProvider(preferences: session.preferences);
+    addTearDown(restored.dispose);
+    await _waitUntil(() => restored.isAvailable);
+    expect(restored.speechRate, 0.6);
+    expect(restored.playbackState.speed, 1.5);
+
+    networkRate = null;
+    final next = restored.speakWithNetworkService(service, 'Next reply');
+    await _waitUntil(() => networkRate == 1.5);
+    await restored.stop();
+    await next;
+    // Force engine reselection and recreation on the first system reply.
+    failedSystemSpeaks = 6;
+    await restored.speak('System reply', waitForCompletion: false);
+    await _waitUntil(() => spokenTexts.contains('System reply'));
+    expect(systemRate, 0.75);
+    await restored.stop();
+  });
+
+  test('reselecting the system rate applies to the next playback', () async {
+    final provider = TtsProvider(preferences: session.preferences);
+    addTearDown(provider.dispose);
+    await _waitUntil(() => provider.isAvailable);
+    await provider.speak('First reply', waitForCompletion: false);
+    await _waitUntil(() => spokenTexts.isNotEmpty);
+    await provider.cyclePlaybackSpeed();
+    expect(provider.playbackState.speed, 1.2);
+    await provider.setSpeechRate(0.5);
+    await provider.stop();
+    await provider.speak('Second reply', waitForCompletion: false);
+    await _waitUntil(() => spokenTexts.contains('Second reply'));
+    expect(provider.playbackState.speed, 1.0);
+    expect(systemRate, 0.5);
+    await provider.stop();
+  });
+
+  test(
+    'speed taps during system buffering do not queue duplicate speech',
+    () async {
+      final provider = TtsProvider(preferences: session.preferences);
+      addTearDown(provider.dispose);
+      await _waitUntil(() => provider.isAvailable);
+      systemRateGate = Completer<void>();
+      await provider.speak('One reply', waitForCompletion: false);
+      expect(provider.playbackState.status, TtsPlaybackStatus.buffering);
+      final firstTap = provider.cyclePlaybackSpeed();
+      systemRateGate!.complete();
+      await firstTap;
+      await _waitUntil(() => spokenTexts.isNotEmpty);
+      expect(systemRate, 0.6);
+      expect(spokenTexts, ['One reply']);
+
+      final previousStops = systemStops;
+      systemStopGate = Completer<void>();
+      final restart = provider.cyclePlaybackSpeed();
+      await _waitUntil(() => systemStops > previousStops);
+      final lastTap = provider.cyclePlaybackSpeed();
+      systemStopGate!.complete();
+      await Future.wait([restart, lastTap]);
+      expect(systemRate, 1.0);
+      expect(spokenTexts, ['One reply', 'One reply']);
+      await provider.stop();
+      await session.close();
+      final reopened = await harness.open();
+      final restored = TtsProvider(preferences: reopened.preferences);
+      addTearDown(restored.dispose);
+      await _waitUntil(() => restored.isAvailable);
+      expect(restored.playbackState.speed, 2.0);
+    },
+  );
+
+  test(
+    'changing speed after native submission replaces the pending speech',
+    () async {
+      final provider = TtsProvider(preferences: session.preferences);
+      addTearDown(provider.dispose);
+      await _waitUntil(() => provider.isAvailable);
+      deferSystemStart = true;
+      await provider.speak('Queued reply', waitForCompletion: false);
+      await _waitUntil(() => spokenTexts.isNotEmpty);
+      expect(provider.playbackState.status, TtsPlaybackStatus.buffering);
+      final previousStops = systemStops;
+      await provider.cyclePlaybackSpeed();
+      expect(systemStops, previousStops + 1);
+      expect(spokenTexts, ['Queued reply', 'Queued reply']);
+      expect(systemRate, 0.6);
+      await _emitTtsCallback('speak.onStart');
+      expect(provider.playbackState.speed, 1.2);
+      await provider.stop();
+    },
+  );
 
   test('a rejected audio source is regenerated on the next playback', () async {
     var requests = 0;

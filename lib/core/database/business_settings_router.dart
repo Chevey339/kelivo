@@ -73,6 +73,7 @@ final class BusinessKeyRegistry {
     'tts_auto_play_assistant_replies_v1',
     'tts_text_selection_mode_v1',
     'tts_speech_rate_v1',
+    'tts_playback_speed_v1',
     'tts_pitch_v1',
     'tts_engine_v1',
     'tts_language_v1',

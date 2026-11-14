@@ -48,6 +48,7 @@ String ttsAudioFileExtensionForMime(String? mime) {
 /// flutter_tts with progress callbacks.
 class TtsProvider extends ChangeNotifier {
   static const String _rateKey = 'tts_speech_rate_v1';
+  static const String _playbackSpeedKey = 'tts_playback_speed_v1';
   static const String _pitchKey = 'tts_pitch_v1';
   static const String _engineKey = 'tts_engine_v1';
   static const String _langKey = 'tts_language_v1';
@@ -86,6 +87,7 @@ class TtsProvider extends ChangeNotifier {
 
   // Settings
   double _speechRate = 0.5; // flutter_tts platform value, 0.5 is normal.
+  double _preferredPlaybackSpeed = 1.0;
   double _pitch = 1.0;
   bool _cacheNetworkAudioForReplay = false;
   String? _engineId;
@@ -93,6 +95,8 @@ class TtsProvider extends ChangeNotifier {
 
   int _sessionId = 0;
   int _readySessionId = 0;
+  Object? _systemUtterance;
+  double? _submittedSystemSpeed;
   int _currentChunkIndex = 0;
   int _currentChunkTextOffset = 0;
   Duration _currentChunkPosition = Duration.zero;
@@ -163,9 +167,10 @@ class TtsProvider extends ChangeNotifier {
           preferences.getBool(_cacheNetworkAudioForReplayKey) ?? false;
       _engineId = preferences.getString(_engineKey);
       _languageTag = preferences.getString(_langKey);
-      _playbackState = _playbackState.copyWith(
-        speed: TtsPlaybackSpeed.normalize(_speechRate * 2),
+      _preferredPlaybackSpeed = TtsPlaybackSpeed.normalize(
+        preferences.getDouble(_playbackSpeedKey) ?? _speechRate * 2,
       );
+      _playbackState = _playbackState.copyWith(speed: _preferredPlaybackSpeed);
 
       _bindTtsHandlers();
       _bindAudioPlayerHandlers();
@@ -282,10 +287,14 @@ class TtsProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> _applyConfig() async {
+  Future<void> _setSystemSpeechRate(double rate) async {
     try {
-      await _tts.setSpeechRate(_speechRate);
+      await _tts.setSpeechRate(rate);
     } catch (_) {}
+  }
+
+  Future<void> _applyConfig() async {
+    await _setSystemSpeechRate(_speechRate);
     try {
       await _tts.setPitch(_pitch);
     } catch (_) {}
@@ -386,18 +395,21 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> setSpeechRate(double rate) async {
     final r = rate.clamp(0.1, 1.0).toDouble();
-    if (_speechRate == r) return;
+    final speed = TtsPlaybackSpeed.normalize(r * 2);
+    if (_speechRate == r && _preferredPlaybackSpeed == speed) return;
     _speechRate = r;
+    _preferredPlaybackSpeed = speed;
     if (!_playbackState.isActive) {
-      _playbackState = _playbackState.copyWith(
-        speed: TtsPlaybackSpeed.normalize(_speechRate * 2),
-      );
+      _playbackState = _playbackState.copyWith(speed: _preferredPlaybackSpeed);
     }
-    try {
-      await _tts.setSpeechRate(_speechRate);
-    } catch (_) {}
+    await Future.wait<void>([
+      preferences.setMany({
+        _rateKey: r,
+        _playbackSpeedKey: _preferredPlaybackSpeed,
+      }),
+      _setSystemSpeechRate(r),
+    ]);
     notifyListeners();
-    await preferences.setDouble(_rateKey, _speechRate);
   }
 
   Future<void> setPitch(double v) async {
@@ -515,6 +527,8 @@ class TtsProvider extends ChangeNotifier {
         .trim();
     if (content.isEmpty) return;
     final session = ++_sessionId;
+    _systemUtterance = null;
+    _submittedSystemSpeed = null;
     final previousService = _lastReplayNetworkService;
     _speakingCompleter?.complete();
     _speakingCompleter = null;
@@ -575,7 +589,7 @@ class TtsProvider extends ChangeNotifier {
     _playbackState = TtsPlaybackState(
       status: TtsPlaybackStatus.buffering,
       duration: _timeline.estimatedDuration,
-      speed: _playbackState.speed,
+      speed: _preferredPlaybackSpeed,
       totalChunks: _chunks.length,
       usingNetwork: _usingNetwork,
     );
@@ -734,24 +748,31 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> setPlaybackSpeed(double speed) async {
     final normalized = TtsPlaybackSpeed.normalize(speed);
+    _preferredPlaybackSpeed = normalized;
     _playbackState = _playbackState.copyWith(speed: normalized);
+    await Future.wait<void>([
+      preferences.setDouble(_playbackSpeedKey, normalized),
+      _applyPlaybackSpeed(normalized),
+    ]);
+  }
+
+  Future<void> _applyPlaybackSpeed(double speed) async {
+    notifyListeners();
     if (_usingNetwork) {
       try {
-        await _player.setPlaybackRate(normalized);
+        await _player.setPlaybackRate(speed);
       } catch (_) {}
-    } else {
-      try {
-        await _tts.setSpeechRate(TtsPlaybackSpeed.toSystemRate(normalized));
-      } catch (_) {}
-      if (_playbackState.isActive && !_isPaused) {
-        await _restartSystemAt(
-          _sessionId,
-          _currentChunkIndex,
-          _currentChunkPosition,
-        );
-      }
+    } else if (_submittedSystemSpeed != null &&
+        _submittedSystemSpeed != speed &&
+        !_isPaused &&
+        _playbackState.isActive) {
+      // Native speech captures its rate when the utterance is submitted.
+      await _restartSystemAt(
+        _sessionId,
+        _currentChunkIndex,
+        _currentChunkPosition,
+      );
     }
-    notifyListeners();
   }
 
   Future<String?> testNetworkService(
@@ -1088,14 +1109,18 @@ class TtsProvider extends ChangeNotifier {
       return;
     }
     final chunk = _chunks[_currentChunkIndex];
+    final utterance = _systemUtterance = Object();
+    _submittedSystemSpeed = null;
     _currentChunkTextOffset = 0;
     _currentChunkPosition = Duration.zero;
     _updatePlaybackState(
       status: TtsPlaybackStatus.buffering,
       currentChunkIndex: _currentChunkIndex,
     );
-    final ok = await _trySpeak(chunk.text, session);
-    if (!ok && session == _sessionId) {
+    final ok = await _trySpeak(chunk.text, session, utterance);
+    if (!ok &&
+        session == _sessionId &&
+        identical(utterance, _systemUtterance)) {
       _error = 'TTS speak failed';
       _finishPlayback(status: TtsPlaybackStatus.error, error: _error);
     }
@@ -1108,6 +1133,8 @@ class TtsProvider extends ChangeNotifier {
     TtsPlaybackStatus status = TtsPlaybackStatus.buffering,
   }) async {
     if (session != _sessionId || _chunks.isEmpty) return;
+    final utterance = _systemUtterance = Object();
+    _submittedSystemSpeed = null;
     _currentChunkIndex = chunkIndex.clamp(0, _chunks.length - 1).toInt();
     final chunk = _chunks[_currentChunkIndex];
     final charOffset = _charOffsetForChunkPosition(chunk, offset);
@@ -1115,20 +1142,27 @@ class TtsProvider extends ChangeNotifier {
     _currentChunkPosition = _estimatedPositionInChunk(chunk, charOffset);
     _updatePositionFromCurrentChunk(status: status);
     await _stopSystemTtsIgnoringCallbacks();
+    if (session != _sessionId || !identical(utterance, _systemUtterance)) {
+      return;
+    }
     if (charOffset >= chunk.text.length) {
       _advanceSystemChunkOrFinish();
       return;
     }
     final text = chunk.text.substring(charOffset);
-    final ok = await _trySpeak(text, session);
-    if (!ok && session == _sessionId) {
+    final ok = await _trySpeak(text, session, utterance);
+    if (!ok &&
+        session == _sessionId &&
+        identical(utterance, _systemUtterance)) {
       _error = 'TTS speak failed';
       _finishPlayback(status: TtsPlaybackStatus.error, error: _error);
     }
   }
 
-  Future<bool> _trySpeak(String text, int session) async {
-    if (session != _sessionId) return true;
+  Future<bool> _trySpeak(String text, int session, Object utterance) async {
+    bool isCurrent() =>
+        session == _sessionId && identical(utterance, _systemUtterance);
+    if (!isCurrent()) return true;
     if (_isPaused || !_backgroundSpeechAllowed) {
       _isPaused = true;
       _updatePlaybackState(status: TtsPlaybackStatus.paused);
@@ -1143,37 +1177,41 @@ class TtsProvider extends ChangeNotifier {
       await _tts.setSharedInstance(true);
     }
     await _ensureBound();
-    try {
-      await _tts.setSpeechRate(
-        TtsPlaybackSpeed.toSystemRate(_playbackState.speed),
-      );
-    } catch (_) {}
-    if (session != _sessionId) return true;
-    if (_isPaused || !_backgroundSpeechAllowed) {
-      _isPaused = true;
-      _updatePlaybackState(status: TtsPlaybackStatus.paused);
-      return true;
-    }
-    dynamic res;
-    try {
-      res = await _tts.speak(text, focus: true);
-    } catch (_) {}
-    if (_speakOk(res)) return true;
-    await _selectEngine();
-    for (var i = 0; i < 5; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 180));
+    Future<bool> submit() async {
+      double speed;
+      do {
+        if (!isCurrent()) return true;
+        speed = _playbackState.speed;
+        await _setSystemSpeechRate(TtsPlaybackSpeed.toSystemRate(speed));
+        if (!isCurrent()) return true;
+      } while (_playbackState.speed != speed);
+      if (_isPaused || !_backgroundSpeechAllowed) {
+        _isPaused = true;
+        _updatePlaybackState(status: TtsPlaybackStatus.paused);
+        return true;
+      }
+      _submittedSystemSpeed = speed;
       try {
-        res = await _tts.speak(text, focus: true);
+        if (_speakOk(await _tts.speak(text, focus: true))) return true;
       } catch (_) {}
-      if (_speakOk(res)) return true;
+      if (!isCurrent()) return true;
+      _submittedSystemSpeed = null;
+      return false;
     }
-    await _recreateEngine();
-    for (var i = 0; i < 5; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      try {
-        res = await _tts.speak(text, focus: true);
-      } catch (_) {}
-      if (_speakOk(res)) return true;
+
+    if (await submit()) return true;
+    for (final recreate in [false, true]) {
+      if (!isCurrent()) return true;
+      if (recreate) {
+        await _recreateEngine();
+      } else {
+        await _selectEngine();
+      }
+      final delay = Duration(milliseconds: recreate ? 200 : 180);
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(delay);
+        if (await submit()) return true;
+      }
     }
     return false;
   }
@@ -1281,6 +1319,8 @@ class TtsProvider extends ChangeNotifier {
   }
 
   void _finishPlayback({required TtsPlaybackStatus status, String? error}) {
+    _systemUtterance = null;
+    _submittedSystemSpeed = null;
     _releaseSpeechWork();
     _isSpeaking = false;
     _isPaused = false;
@@ -1312,6 +1352,8 @@ class TtsProvider extends ChangeNotifier {
   }
 
   void _stopInternal({bool updateState = false}) {
+    _systemUtterance = null;
+    _submittedSystemSpeed = null;
     _previewPlaying = false;
     _releaseSpeechWork();
     _chunks.clear();
