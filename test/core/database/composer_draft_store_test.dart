@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/image_edit_document.dart';
+import 'package:Kelivo/core/models/image_upload_quality.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 import 'dart:async';
 import 'dart:io';
@@ -55,6 +57,140 @@ void main() {
       sourceHash: 'a' * 64,
     ),
     text: UiContextText(title: 'Parameters', body: 'value: $value'),
+  );
+
+  test(
+    'replacing an edited file reclaims it after commit and keeps the original',
+    () async {
+      await store.load('a');
+      final dir = await store.directoryFor('a');
+      final source = await File(
+        '${dir.path}/source.png',
+      ).writeAsString('source');
+      final first = await File(
+        '${dir.path}/edit_first.png',
+      ).writeAsString('first');
+      final second = await File(
+        '${dir.path}/edit_second.png',
+      ).writeAsString('second');
+      store.setInput(
+        'a',
+        ComposerDraftInput(
+          images: [DraftImage(path: first.path, sourcePath: source.path)],
+        ),
+      );
+      await store.flush();
+      store.setInput(
+        'a',
+        ComposerDraftInput(
+          images: [DraftImage(path: second.path, sourcePath: source.path)],
+        ),
+      );
+      await store.releaseReplacedFiles('a', [
+        first.path,
+        source.path,
+        second.path,
+      ]);
+      expect(await first.exists(), isFalse);
+      expect(await source.exists(), isTrue);
+      expect(await second.exists(), isTrue);
+      await reopen();
+      expect((await store.load('a')).active.images.single.path, second.path);
+    },
+  );
+
+  test('retirement follows edits made during the first disk commit', () async {
+    await store.load('a');
+    final dir = await store.directoryFor('a');
+    final old = await File('${dir.path}/old.png').writeAsString('old');
+    store.setInput(
+      'a',
+      ComposerDraftInput(images: [DraftImage(path: old.path)]),
+    );
+    await store.flush();
+    store.setInput('a', const ComposerDraftInput(text: 'next'));
+    final writing = Completer<void>(), proceed = Completer<void>();
+    commits.onNextCommit = () async {
+      writing.complete();
+      await proceed.future;
+    };
+    final retirement = store.releaseReplacedFiles('a', [old.path]);
+    await writing.future;
+    store.setInput('a', const ComposerDraftInput(text: 'typing'));
+    expect(await old.exists(), isTrue);
+    proceed.complete();
+    await retirement;
+    expect(await old.exists(), isFalse);
+    await reopen();
+    expect((await store.load('a')).active.text, 'typing');
+  });
+
+  test(
+    'retiring and re-adding an external image recreates its private copy',
+    () async {
+      await store.load('a');
+      final source = await File(
+        '${root.path}/picked.png',
+      ).writeAsString('pixels');
+      final input = ComposerDraftInput(images: [DraftImage(path: source.path)]);
+      store.setInput('a', input);
+      await store.flush();
+      final first = store.peek('a')!.active.images.single.path;
+      store.setInput('a', const ComposerDraftInput());
+      await store.releaseReplacedFiles('a', [source.path]);
+      expect(await File(first).exists(), isFalse);
+      expect(await source.exists(), isTrue);
+      store.setInput('a', input);
+      await store.flush();
+      await reopen();
+      final second = (await store.load('a')).active.images.single.path;
+      expect(await File(second).readAsString(), 'pixels');
+    },
+  );
+
+  test(
+    'edited draft retains its source and edit document across restart and transfer',
+    () async {
+      await store.load('a');
+      final source = await File(
+        '${root.path}/source.png',
+      ).writeAsString('source pixels');
+      final edited = await File(
+        '${root.path}/edited.png',
+      ).writeAsString('edited pixels');
+      const edits = ImageEditDocument(quarterTurns: 1);
+      store.setInput(
+        'a',
+        ComposerDraftInput(
+          images: [
+            DraftImage(
+              path: edited.path,
+              sourcePath: source.path,
+              edits: edits,
+              quality: ImageUploadQuality.high,
+            ),
+          ],
+        ),
+      );
+      await store.flush();
+      await source.delete();
+      await edited.delete();
+      await reopen();
+      final restored = (await store.load('a')).active.images.single;
+      expect(await File(restored.path).readAsString(), 'edited pixels');
+      expect(await File(restored.sourcePath!).readAsString(), 'source pixels');
+      expect(restored.edits.sameValue(edits), isTrue);
+      expect(restored.quality, ImageUploadQuality.high);
+      await store.load('b');
+      await store.transfer('a', 'b', append: true);
+      await reopen();
+      final transferred = (await store.load('b')).active.images.single;
+      expect(
+        await File(transferred.sourcePath!).readAsString(),
+        'source pixels',
+      );
+      expect(transferred.edits.sameValue(edits), isTrue);
+    },
   );
 
   test(

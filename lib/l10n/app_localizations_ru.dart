@@ -6511,27 +6511,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get imageViewerPageNextButton => 'Следующее изображение';
 
   @override
-  String get imageViewerPageZoomInButton => 'Увеличить';
-
-  @override
-  String get imageViewerPageZoomOutButton => 'Уменьшить';
-
-  @override
-  String get imageViewerPageResetZoomButton => 'Сбросить масштаб';
-
-  @override
-  String get imageViewerPageFlipHorizontalButton => 'Отразить по горизонтали';
-
-  @override
-  String get imageViewerPageFlipVerticalButton => 'Отразить по вертикали';
-
-  @override
-  String get imageViewerPageRotateLeftButton => 'Повернуть влево';
-
-  @override
-  String get imageViewerPageRotateRightButton => 'Повернуть вправо';
-
-  @override
   String imageViewerPageCounter(int index, int total) {
     return '$index/$total';
   }
@@ -17305,4 +17284,99 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextCarriedRemoveReply => 'Не отправлять ответ';
+
+  @override
+  String get imageEditorCancel => 'Отмена';
+
+  @override
+  String get imageEditorDone => 'Готово';
+
+  @override
+  String get imageEditorUndo => 'Отменить';
+
+  @override
+  String get imageEditorRedo => 'Повторить';
+
+  @override
+  String get imageEditorToolCrop => 'Обрезать';
+
+  @override
+  String get imageEditorToolDraw => 'Рисовать';
+
+  @override
+  String get imageEditorToolText => 'Текст';
+
+  @override
+  String get imageEditorToolMosaic => 'Мозаика';
+
+  @override
+  String get imageEditorPen => 'Перо';
+
+  @override
+  String get imageEditorArrow => 'Стрелка';
+
+  @override
+  String get imageEditorEraser => 'Ластик';
+
+  @override
+  String get imageEditorAspectFree => 'Свободно';
+
+  @override
+  String get imageEditorAspectOriginal => 'Оригинал';
+
+  @override
+  String get imageEditorRotate => 'Повернуть влево';
+
+  @override
+  String get imageEditorFlip => 'Отразить';
+
+  @override
+  String get imageEditorTextPlain => 'Обычный';
+
+  @override
+  String get imageEditorTextOutline => 'Обводка';
+
+  @override
+  String get imageEditorTextFill => 'Заливка';
+
+  @override
+  String get imageEditorAlign => 'Выравнивание';
+
+  @override
+  String get imageEditorMosaicBrush => 'Кисть';
+
+  @override
+  String get imageEditorMosaicRect => 'Рамка';
+
+  @override
+  String get imageEditorDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get imageEditorKeepEditing => 'Продолжить редактирование';
+
+  @override
+  String get imageEditorDiscard => 'Отменить изменения';
+
+  @override
+  String get imageEditorProcessFailed => 'Не удалось обработать изображение';
+
+  @override
+  String get imageEditorRetry => 'Повторить';
+
+  @override
+  String get imageEditorRemove => 'Удалить';
+
+  @override
+  String get imageEditorRestore => 'Восстановить';
+
+  @override
+  String imageEditorColor(String color) {
+    return 'Цвет $color';
+  }
+
+  @override
+  String get imageViewerPageEditButton => 'Редактировать';
+
+  @override
+  String get imageViewerPageFileSize => 'Размер изображения';
 }

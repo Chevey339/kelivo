@@ -2940,13 +2940,6 @@
   "imageViewerPageCopyButton": "Copy Image",
   "imageViewerPagePreviousButton": "Previous Image",
   "imageViewerPageNextButton": "Next Image",
-  "imageViewerPageZoomInButton": "Zoom In",
-  "imageViewerPageZoomOutButton": "Zoom Out",
-  "imageViewerPageResetZoomButton": "Reset Zoom",
-  "imageViewerPageFlipHorizontalButton": "Flip Horizontal",
-  "imageViewerPageFlipVerticalButton": "Flip Vertical",
-  "imageViewerPageRotateLeftButton": "Rotate Left",
-  "imageViewerPageRotateRightButton": "Rotate Right",
   "imageViewerPageCounter": "{index}/{total}",
   "@imageViewerPageCounter": {
     "placeholders": {
@@ -13787,27 +13780,6 @@
   "@imageViewerPageNextButton": {
     "description": "Label of the button that navigates to the next image in the viewer."
   },
-  "@imageViewerPageZoomInButton": {
-    "description": "Label of the button that zooms the image in."
-  },
-  "@imageViewerPageZoomOutButton": {
-    "description": "Label of the button that zooms the image out."
-  },
-  "@imageViewerPageResetZoomButton": {
-    "description": "Label of the button that resets the image zoom to its default level."
-  },
-  "@imageViewerPageFlipHorizontalButton": {
-    "description": "Label of the button that mirrors the image left-to-right."
-  },
-  "@imageViewerPageFlipVerticalButton": {
-    "description": "Label of the button that mirrors the image top-to-bottom."
-  },
-  "@imageViewerPageRotateLeftButton": {
-    "description": "Label of the button that rotates the image counterclockwise."
-  },
-  "@imageViewerPageRotateRightButton": {
-    "description": "Label of the button that rotates the image clockwise."
-  },
   "@imageViewerPageImageLoadFailed": {
     "description": "Accessibility label and error placeholder shown when an image cannot be loaded."
   },
@@ -22158,5 +22130,134 @@
   "contextCarriedRemoveReply": "Don’t send the reply",
   "@contextCarriedRemoveReply": {
     "description": "Context operation details and carried message editor: Don’t send the reply Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "imageEditorCancel": "Cancel",
+  "@imageEditorCancel": {
+    "description": "In the full-screen draft image editor: Cancel control or status for editing draft image pixels."
+  },
+  "imageEditorDone": "Done",
+  "@imageEditorDone": {
+    "description": "In the full-screen draft image editor: finish editing and return to the composer without sending."
+  },
+  "imageEditorUndo": "Undo",
+  "@imageEditorUndo": {
+    "description": "In the full-screen draft image editor: Undo control or status for editing draft image pixels."
+  },
+  "imageEditorRedo": "Redo",
+  "@imageEditorRedo": {
+    "description": "In the full-screen draft image editor: Redo control or status for editing draft image pixels."
+  },
+  "imageEditorToolCrop": "Crop",
+  "@imageEditorToolCrop": {
+    "description": "In the full-screen draft image editor: Crop control or status for editing draft image pixels."
+  },
+  "imageEditorToolDraw": "Draw",
+  "@imageEditorToolDraw": {
+    "description": "In the full-screen draft image editor: Draw control or status for editing draft image pixels."
+  },
+  "imageEditorToolText": "Text",
+  "@imageEditorToolText": {
+    "description": "In the full-screen draft image editor: Text control or status for editing draft image pixels."
+  },
+  "imageEditorToolMosaic": "Mosaic",
+  "@imageEditorToolMosaic": {
+    "description": "In the full-screen draft image editor: Mosaic control or status for editing draft image pixels."
+  },
+  "imageEditorPen": "Pen",
+  "@imageEditorPen": {
+    "description": "In the full-screen draft image editor: Pen control or status for editing draft image pixels."
+  },
+  "imageEditorArrow": "Arrow",
+  "@imageEditorArrow": {
+    "description": "In the full-screen draft image editor: Arrow control or status for editing draft image pixels."
+  },
+  "imageEditorEraser": "Eraser",
+  "@imageEditorEraser": {
+    "description": "In the full-screen draft image editor: Eraser control or status for editing draft image pixels."
+  },
+  "imageEditorAspectFree": "Free",
+  "@imageEditorAspectFree": {
+    "description": "In the full-screen draft image editor: Free control or status for editing draft image pixels."
+  },
+  "imageEditorAspectOriginal": "Original",
+  "@imageEditorAspectOriginal": {
+    "description": "In the full-screen draft image editor: Original control or status for editing draft image pixels."
+  },
+  "imageEditorRotate": "Rotate left",
+  "@imageEditorRotate": {
+    "description": "In the full-screen draft image editor: Rotate left control or status for editing draft image pixels."
+  },
+  "imageEditorFlip": "Flip",
+  "@imageEditorFlip": {
+    "description": "In the full-screen draft image editor: Flip control or status for editing draft image pixels."
+  },
+  "imageEditorTextPlain": "Plain",
+  "@imageEditorTextPlain": {
+    "description": "In the full-screen draft image editor: Plain control or status for editing draft image pixels."
+  },
+  "imageEditorTextOutline": "Outline",
+  "@imageEditorTextOutline": {
+    "description": "In the full-screen draft image editor: Outline control or status for editing draft image pixels."
+  },
+  "imageEditorTextFill": "Fill",
+  "@imageEditorTextFill": {
+    "description": "In the full-screen draft image editor: Fill control or status for editing draft image pixels."
+  },
+  "imageEditorAlign": "Align",
+  "@imageEditorAlign": {
+    "description": "In the full-screen draft image editor: Align control or status for editing draft image pixels."
+  },
+  "imageEditorMosaicBrush": "Brush",
+  "@imageEditorMosaicBrush": {
+    "description": "In the full-screen draft image editor: Brush control or status for editing draft image pixels."
+  },
+  "imageEditorMosaicRect": "Box",
+  "@imageEditorMosaicRect": {
+    "description": "In the full-screen draft image editor: Box control or status for editing draft image pixels."
+  },
+  "imageEditorDiscardTitle": "Discard changes?",
+  "@imageEditorDiscardTitle": {
+    "description": "In the full-screen draft image editor: Discard changes? control or status for editing draft image pixels."
+  },
+  "imageEditorKeepEditing": "Keep editing",
+  "@imageEditorKeepEditing": {
+    "description": "In the full-screen draft image editor: Keep editing control or status for editing draft image pixels."
+  },
+  "imageEditorDiscard": "Discard",
+  "@imageEditorDiscard": {
+    "description": "In the full-screen draft image editor: Discard control or status for editing draft image pixels."
+  },
+  "imageEditorProcessFailed": "Couldn't process image",
+  "@imageEditorProcessFailed": {
+    "description": "In the full-screen draft image editor: Couldn't process image control or status for editing draft image pixels."
+  },
+  "imageEditorRetry": "Retry",
+  "@imageEditorRetry": {
+    "description": "In the full-screen draft image editor: Retry control or status for editing draft image pixels."
+  },
+  "imageEditorRemove": "Remove",
+  "@imageEditorRemove": {
+    "description": "In the full-screen draft image editor: Remove control or status for editing draft image pixels."
+  },
+  "imageEditorRestore": "Revert",
+  "@imageEditorRestore": {
+    "description": "In the full-screen draft image editor: revert the current image to its original imported pixels; this operation is undoable."
+  },
+  "imageEditorColor": "Color {color}",
+  "@imageEditorColor": {
+    "description": "In the full-screen draft image editor: accessible label of a color swatch; color is its six-digit hexadecimal RGB value.",
+    "placeholders": {
+      "color": {
+        "type": "String"
+      }
+    }
+  },
+  "imageViewerPageEditButton": "Edit",
+  "@imageViewerPageEditButton": {
+    "description": "Button in draft image preview that opens the image editor; absent for sent images."
+  },
+  "imageViewerPageFileSize": "Image size",
+  "@imageViewerPageFileSize": {
+    "description": "Accessible label and tooltip of the draft image size chip that opens per-image compression quality controls."
   }
 }

@@ -1,3 +1,9 @@
+import 'dart:async';
+import 'package:flutter/gestures.dart';
+import 'package:syncfusion_flutter_sliders/sliders.dart';
+import 'package:syncfusion_flutter_core/theme.dart';
+import '../../../core/models/image_upload_quality.dart';
+import '../models/image_viewer_draft_mode.dart';
 import 'dart:convert';
 import 'package:Kelivo/utils/svg_image_provider.dart';
 import 'dart:io';
@@ -286,11 +292,13 @@ class ImageViewerPage extends StatefulWidget {
     super.key,
     required this.images,
     this.initialIndex = 0,
+    this.draft,
     this.imageProviders = const <String, ImageProvider>{},
   });
 
   final List<String> images; // local paths, http urls, or data urls
   final int initialIndex;
+  final ImageViewerDraftMode? draft;
   final Map<String, ImageProvider> imageProviders;
 
   @override
@@ -303,7 +311,20 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   late int _index;
   late final AnimationController _restoreCtrl;
   late final List<TransformationController> _zoomCtrls;
-  late final List<_ImageDisplayTransform> _displayTransforms;
+  late final List<String> _images = List.of(widget.images);
+  final Set<String> _failedImages = {};
+  final Map<String, int> _reloadVersions = {};
+  final Set<int> _qualityBusy = {};
+  final Map<int, int> _qualityVersions = {};
+  final Map<int, ImageUploadQuality> _pendingQuality = {};
+  final Map<int, int> _pendingCustom = {};
+  final Map<String, int> _fileSizes = {};
+  bool _qualityPanelOpen = false;
+  bool _openingEditor = false;
+  Timer? _zoomBadgeTimer;
+  bool _zoomBadgeVisible = false;
+  bool get _currentFailed =>
+      !_hasImages || _failedImages.contains(_images[_index]);
   late final List<GlobalKey> _imageFrameKeys;
   late final AnimationController _zoomCtrl;
   VoidCallback? _zoomTick;
@@ -340,10 +361,10 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       defaultTargetPlatform == TargetPlatform.linux ||
       defaultTargetPlatform == TargetPlatform.macOS;
 
-  bool get _hasImages => widget.images.isNotEmpty;
-  bool get _hasMultipleImages => widget.images.length > 1;
+  bool get _hasImages => _images.isNotEmpty;
+  bool get _hasMultipleImages => _images.length > 1;
   bool get _canGoPrevious => _index > 0;
-  bool get _canGoNext => _index < widget.images.length - 1;
+  bool get _canGoNext => _index < _images.length - 1;
   TransformationController? get _currentZoomCtrl =>
       _hasImages && _index >= 0 && _index < _zoomCtrls.length
       ? _zoomCtrls[_index]
@@ -354,23 +375,16 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     super.initState();
     _index = widget.initialIndex.clamp(
       0,
-      widget.images.isEmpty ? 0 : widget.images.length - 1,
+      _images.isEmpty ? 0 : _images.length - 1,
     );
     _controller = PageController(initialPage: _index);
-    _zoomCtrls = List<TransformationController>.generate(widget.images.length, (
-      _,
-    ) {
+    _zoomCtrls = List<TransformationController>.generate(_images.length, (_) {
       final ctrl = TransformationController();
       ctrl.addListener(_handleZoomChanged);
       return ctrl;
     }, growable: false);
-    _displayTransforms = List<_ImageDisplayTransform>.generate(
-      widget.images.length,
-      (_) => const _ImageDisplayTransform(),
-      growable: false,
-    );
     _imageFrameKeys = List<GlobalKey>.generate(
-      widget.images.length,
+      _images.length,
       (_) => GlobalKey(),
       growable: false,
     );
@@ -391,6 +405,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     );
     _focusNode = FocusNode(debugLabel: 'ImageViewerPage');
     _baseProviderCache.addAll(widget.imageProviders);
+    if (widget.draft != null && _hasImages) unawaited(_readSize(_index));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -421,6 +436,10 @@ class _ImageViewerPageState extends State<ImageViewerPage>
 
   @override
   void dispose() {
+    _zoomBadgeTimer?.cancel();
+    if (!_isDesktop) {
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    }
     _controller.dispose();
     for (final c in _zoomCtrls) {
       c.removeListener(_handleZoomChanged);
@@ -489,48 +508,24 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   }
 
   void _toggleChrome() {
-    setState(() => _chromeVisible = !_chromeVisible);
-  }
-
-  void _updateCurrentDisplayTransform(
-    _ImageDisplayTransform Function(_ImageDisplayTransform current) update,
-  ) {
-    if (!_hasImages || _index < 0 || _index >= _displayTransforms.length) {
+    if (_qualityPanelOpen) {
+      setState(() => _qualityPanelOpen = false);
       return;
     }
-    final previous = _displayTransforms[_index];
-    final next = update(previous);
-    if (previous.isOddQuarterTurn != next.isOddQuarterTurn &&
-        _index < widget.images.length) {
-      _displayProviderCache.remove(widget.images[_index]);
+    setState(() => _chromeVisible = !_chromeVisible);
+    _syncSystemChrome();
+  }
+
+  void _syncSystemChrome() {
+    if (!_isDesktop) {
+      unawaited(
+        SystemChrome.setEnabledSystemUIMode(
+          _chromeVisible
+              ? SystemUiMode.edgeToEdge
+              : SystemUiMode.immersiveSticky,
+        ),
+      );
     }
-    setState(() {
-      _displayTransforms[_index] = next;
-    });
-  }
-
-  void _flipCurrentHorizontally() {
-    _updateCurrentDisplayTransform(
-      (current) => current.copyWith(flipX: !current.flipX),
-    );
-  }
-
-  void _flipCurrentVertically() {
-    _updateCurrentDisplayTransform(
-      (current) => current.copyWith(flipY: !current.flipY),
-    );
-  }
-
-  void _rotateCurrentLeft() {
-    _updateCurrentDisplayTransform(
-      (current) => current.copyWith(quarterTurns: current.quarterTurns - 1),
-    );
-  }
-
-  void _rotateCurrentRight() {
-    _updateCurrentDisplayTransform(
-      (current) => current.copyWith(quarterTurns: current.quarterTurns + 1),
-    );
   }
 
   bool _isZoomed(TransformationController ctrl) =>
@@ -540,12 +535,17 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     final ctrl = _currentZoomCtrl;
     if (ctrl == null) return;
     final zoomed = _isZoomed(ctrl);
-    if (zoomed == _currentImageZoomed) return;
-    if (!mounted) {
+    if (!mounted) return;
+    setState(() {
       _currentImageZoomed = zoomed;
-      return;
-    }
-    setState(() => _currentImageZoomed = zoomed);
+      if (zoomed) _chromeVisible = false;
+      _zoomBadgeVisible = _isDesktop;
+    });
+    _syncSystemChrome();
+    _zoomBadgeTimer?.cancel();
+    _zoomBadgeTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _zoomBadgeVisible = false);
+    });
   }
 
   void _markImageSizeChanged() {
@@ -649,10 +649,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       required Offset outerTopLeft,
       required Size sourceSize,
     }) {
-      final transform = _displayTransforms[index];
-      final fittedSource = transform.quarterTurns.isOdd
-          ? Size(sourceSize.height, sourceSize.width)
-          : sourceSize;
+      final fittedSource = sourceSize;
       final fitted = applyBoxFit(BoxFit.contain, fittedSource, outerSize);
       final outputSize = fitted.destination;
       return Rect.fromLTWH(
@@ -718,18 +715,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       return Size.square(side);
     }
 
-    final transform = _displayTransforms[index];
-    final fittedSource = transform.isOddQuarterTurn
-        ? Size(naturalSize.height, naturalSize.width)
-        : naturalSize;
+    final fittedSource = naturalSize;
     return applyBoxFit(BoxFit.contain, fittedSource, availableSize).destination;
-  }
-
-  Size _imageBoxSizeFor({required int index, required Size displaySize}) {
-    if (_displayTransforms[index].isOddQuarterTurn) {
-      return Size(displaySize.height, displaySize.width);
-    }
-    return displaySize;
   }
 
   void _handleImageTap({
@@ -738,8 +725,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     required Size pageSize,
     required EdgeInsets padding,
   }) {
-    if (!_isDesktop) {
-      Navigator.of(context).maybePop();
+    if (_qualityPanelOpen || !_isDesktop) {
+      _toggleChrome();
       return;
     }
 
@@ -767,10 +754,11 @@ class _ImageViewerPageState extends State<ImageViewerPage>
 
   void _goToIndex(int target) {
     if (!_hasImages) return;
+    setState(() => _qualityPanelOpen = false);
     final next = target < 0
         ? 0
-        : target >= widget.images.length
-        ? widget.images.length - 1
+        : target >= _images.length
+        ? _images.length - 1
         : target;
     if (next == _index) return;
     _controller.animateToPage(
@@ -789,7 +777,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     _animateZoomTo(ctrl, toScale: 1.0, toTx: 0.0, toTy: 0.0);
   }
 
-  void _zoomBy(double factor) {
+  void _zoomBy(double factor, {Offset? focal}) {
     final ctrl = _currentZoomCtrl;
     final viewerContext = _viewerKey.currentContext;
     if (ctrl == null || viewerContext == null) return;
@@ -799,7 +787,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     final current = ctrl.value.clone();
     final currentScale = current.getMaxScaleOnAxis();
     final targetScale = (currentScale * factor).clamp(1.0, 5.0).toDouble();
-    final viewportCenter = size.center(Offset.zero);
+    final viewportCenter = focal ?? size.center(Offset.zero);
     final focalPoint = MatrixUtils.transformPoint(
       Matrix4.inverted(current),
       viewportCenter,
@@ -813,6 +801,10 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     switch (event.logicalKey) {
       case LogicalKeyboardKey.escape:
+        if (_qualityPanelOpen) {
+          setState(() => _qualityPanelOpen = false);
+          return KeyEventResult.handled;
+        }
         Navigator.of(context).maybePop();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowLeft:
@@ -974,7 +966,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     setState(() => _saving = true);
     final l10n = AppLocalizations.of(context)!;
     try {
-      final src = widget.images[_index];
+      final src = _images[_index];
       Uint8List? bytes;
 
       if (isSvgImageSource(src)) {
@@ -1119,7 +1111,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           height: 1,
         );
       }
-      final src = widget.images[_index];
+      final src = _images[_index];
       String? pathToSave;
       File? temp;
       if (isSvgImageSource(src)) {
@@ -1237,7 +1229,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   Future<_CopyPayload?> _loadCopyPayload(
     void Function(String reason) setError,
   ) async {
-    final src = widget.images[_index];
+    final src = _images[_index];
     Uint8List? bytes;
     String suggestedName = '';
     String? sourcePath;
@@ -1443,13 +1435,36 @@ class _ImageViewerPageState extends State<ImageViewerPage>
                 ),
               ),
               if (_hasImages) _buildPagedImageStage(context),
+              if (_zoomBadgeVisible)
+                Positioned(
+                  top: topInset + 14,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: Center(
+                      child: _GlassPanel(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          '${((_currentZoomCtrl?.value.getMaxScaleOnAxis() ?? 1) * 100).round()}%',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               _buildTopBar(
                 context,
                 topInset: topInset,
                 opacity: chromeOpacity,
                 counterLabel: l10n.imageViewerPageCounter(
                   _index + 1,
-                  widget.images.length,
+                  _images.length,
                 ),
               ),
               if (_hasMultipleImages && !compact)
@@ -1483,10 +1498,12 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         physics: _currentImageZoomed
             ? const NeverScrollableScrollPhysics()
             : const PageScrollPhysics(),
-        itemCount: widget.images.length,
+        itemCount: _images.length,
         onPageChanged: (i) {
           setState(() {
             _index = i;
+            _qualityPanelOpen = false;
+            if (widget.draft != null) unawaited(_readSize(i));
             _chromeVisible = true;
             _currentImageZoomed = _isZoomed(_zoomCtrls[i]);
             _resetDragState();
@@ -1499,7 +1516,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
 
   Widget _buildImagePage(BuildContext context, int i) {
     final l10n = AppLocalizations.of(context)!;
-    final src = widget.images[i];
+    final src = _images[i];
     final translateY = (i == _index) ? _dragDy : 0.0;
     final pageScale = (i == _index)
         ? (1.0 - math.min(_dragDy / 800.0, 0.15))
@@ -1522,11 +1539,6 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         var logicalHeight = availableSize.height > 0
             ? availableSize.height
             : pageSize.height;
-        if (_displayTransforms[i].isOddQuarterTurn) {
-          final swapped = logicalWidth;
-          logicalWidth = logicalHeight;
-          logicalHeight = swapped;
-        }
         final provider = _displayProviderFor(
           src,
           logicalWidth: logicalWidth,
@@ -1539,6 +1551,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           configuration: createLocalImageConfiguration(context),
         );
         final image = Image(
+          key: ValueKey((src, _reloadVersions[src] ?? 0)),
           image: provider,
           fit: BoxFit.contain,
           gaplessPlayback: true,
@@ -1561,24 +1574,44 @@ class _ImageViewerPageState extends State<ImageViewerPage>
               ),
             );
           },
-          errorBuilder: (_, __, ___) => Semantics(
-            image: true,
-            label: l10n.imageViewerPageImageLoadFailed,
-            child: Icon(
-              Lucide.ImageOff,
-              color: Colors.white.withValues(alpha: 0.72),
-              size: 64,
-            ),
-          ),
+          errorBuilder: (_, __, ___) {
+            if (_failedImages.add(src)) _markImageSizeChanged();
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: const BoxDecoration(
+                      color: Color(0x14ffffff),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Lucide.ImageOff,
+                      color: Colors.white54,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    l10n.imageViewerPageImageLoadFailed,
+                    style: const TextStyle(color: Colors.white70, fontSize: 15),
+                  ),
+                  const SizedBox(height: 14),
+                  _GlassPillButton(
+                    label: l10n.imageEditorRetry,
+                    onTap: () => _retryImage(src),
+                  ),
+                ],
+              ),
+            );
+          },
         );
         final displaySize = _displaySizeFor(
           index: i,
           src: src,
           availableSize: availableSize,
-        );
-        final imageBoxSize = _imageBoxSizeFor(
-          index: i,
-          displaySize: displaySize,
         );
 
         return Transform.translate(
@@ -1590,67 +1623,80 @@ class _ImageViewerPageState extends State<ImageViewerPage>
               builder: (context, _) {
                 final scale = _zoomCtrls[i].value.getMaxScaleOnAxis();
                 final canPan = scale > 1.01;
-                return InteractiveViewer(
-                  key: i == _index ? _viewerKey : null,
-                  transformationController: _zoomCtrls[i],
-                  minScale: 1.0,
-                  maxScale: 5.0,
-                  panEnabled: canPan,
-                  scaleEnabled: true,
-                  clipBehavior: compact ? Clip.hardEdge : Clip.none,
-                  boundaryMargin: compact
-                      ? EdgeInsets.zero
-                      : canPan
-                      ? const EdgeInsets.all(80)
-                      : EdgeInsets.zero,
-                  child: SizedBox.expand(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTapDown: (details) =>
-                          _lastTapPos = details.localPosition,
-                      onTapCancel: () => _lastTapPos = null,
-                      onDoubleTapDown: (details) =>
-                          _lastDoubleTapPos = details.localPosition,
-                      onTap: () => _handleImageTap(
-                        index: i,
-                        src: src,
-                        pageSize: pageSize,
-                        padding: padding,
-                      ),
-                      onDoubleTap: () {
-                        final focal =
-                            _lastDoubleTapPos ?? pageSize.center(Offset.zero);
-                        _toggleZoomAt(_zoomCtrls[i], focal);
-                        _lastDoubleTapPos = null;
-                        if (!_chromeVisible) {
-                          setState(() => _chromeVisible = true);
-                        }
-                      },
-                      child: Padding(
-                        padding: padding,
-                        child: Center(
-                          child: SizedBox(
-                            key: _imageFrameKeys[i],
-                            width: displaySize.width,
-                            height: displaySize.height,
-                            child: Hero(
-                              tag: 'img:$src',
-                              child: SizedBox.expand(
-                                child: Semantics(
-                                  image: true,
-                                  label: l10n.imageViewerPageImageLabel(
-                                    i + 1,
-                                    widget.images.length,
-                                  ),
-                                  child: Center(
-                                    child: _AnimatedImageDisplayTransform(
-                                      transformKey: ValueKey(
-                                        'image-viewer-display-transform-$i',
-                                      ),
-                                      transform: _displayTransforms[i],
+                return Listener(
+                  onPointerSignal: (event) {
+                    if (_isDesktop && event is PointerScrollEvent) {
+                      GestureBinding.instance.pointerSignalResolver.register(
+                        event,
+                        (_) => _zoomBy(
+                          math.exp(-event.scrollDelta.dy / 400),
+                          focal: event.localPosition,
+                        ),
+                      );
+                    }
+                  },
+                  child: InteractiveViewer(
+                    key: i == _index ? _viewerKey : null,
+                    transformationController: _zoomCtrls[i],
+                    minScale: 1.0,
+                    maxScale: 5.0,
+                    panEnabled: canPan,
+                    scaleEnabled: true,
+                    clipBehavior: compact ? Clip.hardEdge : Clip.none,
+                    boundaryMargin: compact
+                        ? EdgeInsets.zero
+                        : canPan
+                        ? const EdgeInsets.all(80)
+                        : EdgeInsets.zero,
+                    child: SizedBox.expand(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTapDown: (details) =>
+                            _lastTapPos = details.localPosition,
+                        onTapCancel: () => _lastTapPos = null,
+                        onDoubleTapDown: _failedImages.contains(src)
+                            ? null
+                            : (details) =>
+                                  _lastDoubleTapPos = details.localPosition,
+                        onTap: _failedImages.contains(src)
+                            ? null
+                            : () => _handleImageTap(
+                                index: i,
+                                src: src,
+                                pageSize: pageSize,
+                                padding: padding,
+                              ),
+                        onDoubleTap: _failedImages.contains(src)
+                            ? null
+                            : () {
+                                final focal =
+                                    _lastDoubleTapPos ??
+                                    pageSize.center(Offset.zero);
+                                _toggleZoomAt(_zoomCtrls[i], focal);
+                                _lastDoubleTapPos = null;
+                              },
+                        child: Padding(
+                          padding: padding,
+                          child: Center(
+                            child: SizedBox(
+                              key: _imageFrameKeys[i],
+                              width: displaySize.width,
+                              height: displaySize.height,
+                              child: Hero(
+                                tag: widget.draft == null
+                                    ? 'img:$src'
+                                    : ('draft-image', i),
+                                child: SizedBox.expand(
+                                  child: Semantics(
+                                    image: true,
+                                    label: l10n.imageViewerPageImageLabel(
+                                      i + 1,
+                                      _images.length,
+                                    ),
+                                    child: Center(
                                       child: SizedBox(
-                                        width: imageBoxSize.width,
-                                        height: imageBoxSize.height,
+                                        width: displaySize.width,
+                                        height: displaySize.height,
                                         child: isSvgImageSource(src)
                                             ? ColoredBox(
                                                 key: ValueKey(
@@ -1699,20 +1745,45 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
           opacity: opacity.toDouble(),
-          child: Row(
-            children: [
-              _GlassCircleButton(
-                label: l10n.imageViewerPageCloseButton,
-                icon: Lucide.X,
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
-              const Spacer(),
-              if (_hasImages)
-                _GlassLabel(
-                  key: const ValueKey('image-viewer-counter'),
-                  label: counterLabel,
+          child: SizedBox(
+            height: 44,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (_hasMultipleImages)
+                  Text(
+                    counterLabel,
+                    key: const ValueKey('image-viewer-counter'),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .78),
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                Align(
+                  alignment: _isDesktop
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isDesktop && widget.draft != null) ...[
+                        _editButton(),
+                        const SizedBox(width: 10),
+                      ],
+                      _GlassCircleButton(
+                        label: l10n.imageViewerPageCloseButton,
+                        icon: Lucide.X,
+                        size: 40,
+                        onTap: () => Navigator.of(context).maybePop(),
+                      ),
+                    ],
+                  ),
                 ),
-            ],
+                if (!_isDesktop && widget.draft != null)
+                  Align(alignment: Alignment.centerRight, child: _editButton()),
+              ],
+            ),
           ),
         ),
       ),
@@ -1764,6 +1835,218 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     );
   }
 
+  Widget _editButton() => _GlassPillButton(
+    label: AppLocalizations.of(context)!.imageViewerPageEditButton,
+    onTap: _openingEditor || _currentFailed || _qualityBusy.contains(_index)
+        ? null
+        : () async {
+            setState(() => _openingEditor = true);
+            try {
+              final completed = await widget.draft!.onEdit(_index);
+              if (completed && mounted) Navigator.of(context).pop();
+            } finally {
+              if (mounted) setState(() => _openingEditor = false);
+            }
+          },
+  );
+
+  Future<void> _readSize(int index) async {
+    final src = _images[index];
+    try {
+      final size = await File(src).length();
+      if (mounted) setState(() => _fileSizes[src] = size);
+    } catch (_) {}
+  }
+
+  Future<void> _retryImage(String src) async {
+    final provider = _displayProviderCache.remove(src)?.provider;
+    final base = _baseProviderCache.remove(src);
+    final listener = _imageSizeListeners.remove(src);
+    final stream = _imageSizeStreams.remove(src);
+    if (listener != null) stream?.removeListener(listener);
+    _imageNaturalSizes.remove(src);
+    await provider?.evict();
+    await base?.evict();
+    if (mounted) {
+      setState(() {
+        _failedImages.remove(src);
+        _reloadVersions[src] = (_reloadVersions[src] ?? 0) + 1;
+      });
+    }
+  }
+
+  Future<void> _changeQuality(ImageUploadQuality quality, [int? custom]) async {
+    final index = _index;
+    final version = (_qualityVersions[index] ?? 0) + 1;
+    _qualityVersions[index] = version;
+    setState(() {
+      _qualityBusy.add(index);
+      _pendingQuality[index] = quality;
+      if (custom != null) _pendingCustom[index] = custom;
+    });
+    try {
+      final path = await widget.draft!.onQualityChanged(index, quality, custom);
+      if (!mounted || _qualityVersions[index] != version) return;
+      setState(() {
+        final previousSize = _imageNaturalSizes[_images[index]];
+        if (previousSize != null) _imageNaturalSizes[path] = previousSize;
+        _images[index] = path;
+        _zoomCtrls[index].value = Matrix4.identity();
+      });
+      await _readSize(index);
+    } catch (_) {
+      if (mounted && _qualityVersions[index] == version) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.imageEditorProcessFailed,
+          type: NotificationType.error,
+        );
+      }
+    } finally {
+      if (mounted && _qualityVersions[index] == version) {
+        setState(() {
+          _qualityBusy.remove(index);
+          _pendingQuality.remove(index);
+          _pendingCustom.remove(index);
+        });
+      }
+    }
+  }
+
+  String _sizeLabel() {
+    final size = _fileSizes[_images[_index]];
+    if (size == null) return '—';
+    if (size < 1024) return '$size B';
+    if (size < 1024 * 1024) return '${(size / 1024).round()} KB';
+    return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  Widget _filmstrip() => _hasMultipleImages
+      ? SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < _images.length; i++)
+                GestureDetector(
+                  onTap: () => _goToIndex(i),
+                  child: Semantics(
+                    button: true,
+                    selected: i == _index,
+                    label: AppLocalizations.of(
+                      context,
+                    )!.imageViewerPageImageLabel(i + 1, _images.length),
+                    child: AnimatedContainer(
+                      key: ValueKey('image-viewer-thumbnail-$i'),
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      width: i == _index ? 54 : 22,
+                      height: 36,
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Opacity(
+                        opacity: i == _index ? 1 : .55,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(5),
+                          child: _ViewerThumbnail(
+                            key: ValueKey((
+                              _images[i],
+                              _reloadVersions[_images[i]] ?? 0,
+                            )),
+                            provider: SafeResizeImage.display(
+                              _baseProviderFor(_images[i]),
+                              width: 108,
+                              height: 72,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        )
+      : const SizedBox.shrink();
+
+  Widget _qualityPanel() {
+    final draft = widget.draft!, l = AppLocalizations.of(context)!;
+    final selected = _pendingQuality[_index] ?? draft.qualityOf(_index);
+    final custom = _pendingCustom[_index] ?? draft.customQualityOf(_index);
+    final labels = [
+      l.imageSettingsPageQualityOriginal,
+      l.imageSettingsPageQualityHigh,
+      l.imageSettingsPageQualityBalanced,
+      l.imageSettingsPageQualitySaver,
+      l.imageSettingsPageQualityCustom,
+    ];
+    final subtitles = [
+      l.imageSettingsPageQualityOriginalSubtitle,
+      l.imageSettingsPageQualityHighSubtitle,
+      l.imageSettingsPageQualityBalancedSubtitle,
+      l.imageSettingsPageQualitySaverSubtitle,
+      '',
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < labels.length; i++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                  child: _QualityChip(
+                    label: labels[i],
+                    selected: selected.index == i,
+                    onTap: i == 0 && !draft.originalAvailable(_index)
+                        ? null
+                        : () => _changeQuality(
+                            ImageUploadQuality.values[i],
+                            custom,
+                          ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 30,
+          child: selected == ImageUploadQuality.custom
+              ? SizedBox(
+                  width: 260,
+                  child: SfSliderTheme(
+                    data: const SfSliderThemeData(
+                      thumbRadius: 8,
+                      activeTrackHeight: 2,
+                      inactiveTrackHeight: 2,
+                    ),
+                    child: SfSlider(
+                      min: 10.0,
+                      max: 100.0,
+                      stepSize: 5,
+                      value: custom.toDouble(),
+                      activeColor: const Color(0xff9aa8f0),
+                      inactiveColor: Colors.white24,
+                      onChanged: (value) => _changeQuality(
+                        ImageUploadQuality.custom,
+                        (value as double).round(),
+                      ),
+                    ),
+                  ),
+                )
+              : Center(
+                  child: Text(
+                    subtitles[selected.index],
+                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildActionChrome(
     BuildContext context, {
     required bool compact,
@@ -1771,99 +2054,105 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     required double opacity,
   }) {
     if (!_hasImages) return const SizedBox.shrink();
-    final l10n = AppLocalizations.of(context)!;
-    final actions = <Widget>[
-      _GlassCircleButton(
-        label: l10n.imageViewerPageSaveButton,
-        icon: Lucide.Download,
-        loading: _saving,
-        onTap: _saving ? null : _saveCurrent,
+    final l = AppLocalizations.of(context)!;
+    final disabled = _currentFailed || _qualityBusy.contains(_index);
+    Widget save() => _GlassCircleButton(
+      size: 44,
+      label: l.imageViewerPageSaveButton,
+      icon: Lucide.Download,
+      loading: _saving,
+      onTap: disabled || _saving ? null : _saveCurrent,
+    );
+    Widget copy() => _GlassCircleButton(
+      size: 44,
+      label: l.imageViewerPageCopyButton,
+      icon: Lucide.Copy,
+      loading: _copying,
+      onTap: disabled || _copying ? null : _copyCurrent,
+    );
+    Widget share() => _GlassCircleButton(
+      size: 44,
+      label: l.imageViewerPageShareButton,
+      icon: Lucide.Share2,
+      loading: _sharing,
+      onTap: disabled || _sharing ? null : _shareCurrent,
+    );
+    final slot = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 160),
+      child: _qualityPanelOpen ? _qualityPanel() : _filmstrip(),
+    );
+    final size = Tooltip(
+      message: l.imageViewerPageFileSize,
+      child: _GlassPillButton(
+        label: _sizeLabel(),
+        small: true,
+        loading: _qualityBusy.contains(_index),
+        onTap: () => setState(() => _qualityPanelOpen = !_qualityPanelOpen),
       ),
-      if (_isDesktop)
-        _GlassCircleButton(
-          label: l10n.imageViewerPageCopyButton,
-          icon: Lucide.Copy,
-          loading: _copying,
-          onTap: _copying ? null : _copyCurrent,
-        ),
-      _GlassCircleButton(
-        label: l10n.imageViewerPageShareButton,
-        icon: Lucide.Share2,
-        loading: _sharing,
-        onTap: _sharing ? null : _shareCurrent,
-      ),
-      const _GlassDivider(),
-      _GlassCircleButton(
-        label: l10n.imageViewerPageFlipHorizontalButton,
-        icon: Lucide.FlipHorizontal2,
-        onTap: _flipCurrentHorizontally,
-      ),
-      _GlassCircleButton(
-        label: l10n.imageViewerPageFlipVerticalButton,
-        icon: Lucide.FlipVertical2,
-        onTap: _flipCurrentVertically,
-      ),
-      _GlassCircleButton(
-        label: l10n.imageViewerPageRotateLeftButton,
-        icon: Lucide.RotateCcw,
-        onTap: _rotateCurrentLeft,
-      ),
-      _GlassCircleButton(
-        label: l10n.imageViewerPageRotateRightButton,
-        icon: Lucide.RotateCw,
-        onTap: _rotateCurrentRight,
-      ),
-      if (!compact) ...[
-        const _GlassDivider(),
-        _GlassCircleButton(
-          label: l10n.imageViewerPageZoomOutButton,
-          icon: Lucide.ZoomOut,
-          onTap: () => _zoomBy(0.8),
-        ),
-        _GlassCircleButton(
-          label: l10n.imageViewerPageResetZoomButton,
-          icon: Lucide.RotateCcw,
-          onTap: _resetZoom,
-        ),
-        _GlassCircleButton(
-          label: l10n.imageViewerPageZoomInButton,
-          icon: Lucide.ZoomIn,
-          onTap: () => _zoomBy(1.25),
-        ),
-      ],
-    ];
-
+    );
     return Positioned(
-      left: 16,
-      right: 16,
-      bottom: math.max(bottomInset, 12) + (compact ? 10 : 18),
+      left: 22,
+      right: 22,
+      bottom: math.max(bottomInset, 12),
       child: IgnorePointer(
-        ignoring: opacity <= 0.01,
+        ignoring: opacity <= .01,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          opacity: opacity.toDouble(),
-          child: Center(
-            child: _GlassPanel(
-              padding: EdgeInsets.all(compact ? 8 : 10),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: compact
-                    ? const BouncingScrollPhysics()
-                    : const NeverScrollableScrollPhysics(),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions
-                      .expand((child) sync* {
-                        if (child != actions.first) {
-                          yield SizedBox(width: compact ? 8 : 10);
-                        }
-                        yield child;
-                      })
-                      .toList(growable: false),
-                ),
+          opacity: opacity,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (compact && widget.draft != null) ...[
+                size,
+                const SizedBox(height: 8),
+              ],
+              SizedBox(
+                height: compact ? 76 : 62,
+                child: compact
+                    ? Row(
+                        children: [
+                          if (!_qualityPanelOpen) save(),
+                          Expanded(child: Center(child: slot)),
+                          if (!_qualityPanelOpen && _isDesktop) ...[
+                            copy(),
+                            const SizedBox(width: 6),
+                          ],
+                          if (!_qualityPanelOpen) share(),
+                        ],
+                      )
+                    : Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 182,
+                            ),
+                            child: slot,
+                          ),
+                          if (widget.draft != null)
+                            Align(alignment: Alignment.centerLeft, child: size),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: _GlassPanel(
+                              padding: const EdgeInsets.all(6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  save(),
+                                  const SizedBox(width: 8),
+                                  if (_isDesktop) ...[
+                                    copy(),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  share(),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -1876,7 +2165,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     setState(() => _saving = true);
     final l10n = AppLocalizations.of(context)!;
     try {
-      final src = widget.images[_index];
+      final src = _images[_index];
       Uint8List? bytes;
       String ext = '.jpg';
 
@@ -2001,178 +2290,6 @@ class _CopyPayload {
   final String format; // png/jpeg/gif/webp
   final String suggestedName;
   final String? sourcePath;
-}
-
-class _ImageDisplayTransform {
-  const _ImageDisplayTransform({
-    this.flipX = false,
-    this.flipY = false,
-    this.quarterTurns = 0,
-  });
-
-  final bool flipX;
-  final bool flipY;
-  final int quarterTurns;
-
-  bool get isOddQuarterTurn => quarterTurns.isOdd;
-
-  _ImageDisplayTransform copyWith({
-    bool? flipX,
-    bool? flipY,
-    int? quarterTurns,
-  }) {
-    return _ImageDisplayTransform(
-      flipX: flipX ?? this.flipX,
-      flipY: flipY ?? this.flipY,
-      quarterTurns: quarterTurns ?? this.quarterTurns,
-    );
-  }
-
-  Matrix4 toMatrix() {
-    return toPoseNear(0).toMatrix();
-  }
-
-  _ImageDisplayPose toPoseNear(double angle) {
-    final baseAngle = (quarterTurns % 4) * math.pi / 2;
-    final nearestFullTurns = ((angle - baseAngle) / (math.pi * 2)).round();
-    return _ImageDisplayPose(
-      angle: baseAngle + nearestFullTurns * math.pi * 2,
-      scaleX: flipX ? -1.0 : 1.0,
-      scaleY: flipY ? -1.0 : 1.0,
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is _ImageDisplayTransform &&
-        other.flipX == flipX &&
-        other.flipY == flipY &&
-        other.quarterTurns == quarterTurns;
-  }
-
-  @override
-  int get hashCode => Object.hash(flipX, flipY, quarterTurns);
-}
-
-class _ImageDisplayPose {
-  const _ImageDisplayPose({
-    required this.angle,
-    required this.scaleX,
-    required this.scaleY,
-  });
-
-  final double angle;
-  final double scaleX;
-  final double scaleY;
-
-  Matrix4 toMatrix() {
-    return Matrix4.identity()
-      ..rotateZ(angle)
-      ..scaleByDouble(scaleX, scaleY, 1.0, 1.0);
-  }
-}
-
-class _AnimatedImageDisplayTransform extends StatefulWidget {
-  const _AnimatedImageDisplayTransform({
-    required this.transformKey,
-    required this.transform,
-    required this.child,
-  });
-
-  final Key transformKey;
-  final _ImageDisplayTransform transform;
-  final Widget child;
-
-  @override
-  State<_AnimatedImageDisplayTransform> createState() =>
-      _AnimatedImageDisplayTransformState();
-}
-
-class _AnimatedImageDisplayTransformState
-    extends State<_AnimatedImageDisplayTransform>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late Animation<double> _angle;
-  late Animation<double> _scaleX;
-  late Animation<double> _scaleY;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 220),
-      value: 1,
-    );
-    final pose = widget.transform.toPoseNear(0);
-    _setAnimations(pose, pose);
-  }
-
-  @override
-  void didUpdateWidget(covariant _AnimatedImageDisplayTransform oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.transform == widget.transform) return;
-    final current = _currentPose;
-    final target = widget.transform.toPoseNear(current.angle);
-    _setAnimations(current, target);
-    _controller.forward(from: 0);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  _ImageDisplayPose get _currentPose {
-    return _ImageDisplayPose(
-      angle: _angle.value,
-      scaleX: _scaleX.value,
-      scaleY: _scaleY.value,
-    );
-  }
-
-  Animation<double> _animateDouble(double begin, double end) {
-    return Tween<double>(
-      begin: begin,
-      end: end,
-    ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(_controller);
-  }
-
-  void _setAnimations(_ImageDisplayPose begin, _ImageDisplayPose end) {
-    _angle = _animateDouble(begin.angle, end.angle);
-    _scaleX = _animateDouble(begin.scaleX, end.scaleX);
-    _scaleY = _animateDouble(begin.scaleY, end.scaleY);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.maybeOf(context);
-    final reduceMotion =
-        (media?.disableAnimations ?? false) ||
-        (media?.accessibleNavigation ?? false);
-    if (reduceMotion) {
-      return Transform(
-        key: widget.transformKey,
-        alignment: Alignment.center,
-        transform: widget.transform.toPoseNear(_angle.value).toMatrix(),
-        child: widget.child,
-      );
-    }
-
-    return AnimatedBuilder(
-      animation: _controller,
-      child: widget.child,
-      builder: (context, child) {
-        return Transform(
-          key: widget.transformKey,
-          alignment: Alignment.center,
-          transform: _currentPose.toMatrix(),
-          child: child,
-        );
-      },
-    );
-  }
 }
 
 class _GlassCircleButton extends StatefulWidget {
@@ -2317,37 +2434,216 @@ class _GlassPanel extends StatelessWidget {
   }
 }
 
-class _GlassLabel extends StatelessWidget {
-  const _GlassLabel({super.key, required this.label});
-
+class _GlassPillButton extends StatelessWidget {
+  const _GlassPillButton({
+    required this.label,
+    this.onTap,
+    this.small = false,
+    this.loading = false,
+  });
   final String label;
-
+  final VoidCallback? onTap;
+  final bool small, loading;
   @override
-  Widget build(BuildContext context) {
-    return _GlassPanel(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.86),
-          fontSize: 13,
-          fontWeight: AppFontWeights.semibold,
-          letterSpacing: 0,
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    enabled: onTap != null,
+    label: label,
+    child: MouseRegion(
+      cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              height: small ? 30 : 40,
+              padding: EdgeInsets.symmetric(horizontal: small ? 12 : 18),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .16),
+                border: Border.all(color: Colors.white30, width: .7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (loading)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 6),
+                      child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: onTap == null ? Colors.white38 : Colors.white,
+                      fontSize: small ? 13 : 15,
+                      fontWeight: AppFontWeights.semibold,
+                      fontFeatures: const [ui.FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  if (small)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(
+                        Lucide.ChevronDown,
+                        color: Colors.white54,
+                        size: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
-class _GlassDivider extends StatelessWidget {
-  const _GlassDivider();
+class _QualityChip extends StatelessWidget {
+  const _QualityChip({required this.label, required this.selected, this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    enabled: onTap != null,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 30,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: onTap == null
+                ? Colors.white24
+                : selected
+                ? Colors.black
+                : Colors.white70,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// A filmstrip must not pin the full-resolution image streams in memory.
+/// Rasterize one frame at thumbnail size and release the provider listener.
+class _ViewerThumbnail extends StatefulWidget {
+  const _ViewerThumbnail({super.key, required this.provider});
+  final ImageProvider provider;
+  @override
+  State<_ViewerThumbnail> createState() => _ViewerThumbnailState();
+}
+
+class _ViewerThumbnailState extends State<_ViewerThumbnail> {
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  ui.Image? _image;
+  int _generation = 0;
+  bool _failed = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _load();
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 1,
-      height: 24,
-      child: ColoredBox(color: Colors.white.withValues(alpha: 0.16)),
-    );
+  void didUpdateWidget(covariant _ViewerThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.provider != widget.provider) _load();
   }
+
+  void _detach() {
+    if (_listener != null) _stream?.removeListener(_listener!);
+    _listener = null;
+    _stream = null;
+  }
+
+  void _load() {
+    _detach();
+    final generation = ++_generation;
+    _stream = widget.provider.resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener(
+      (info, _) async {
+        _detach();
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder);
+        final source = info.image;
+        final size = applyBoxFit(
+          BoxFit.cover,
+          Size(source.width.toDouble(), source.height.toDouble()),
+          const Size(108, 72),
+        );
+        canvas.drawImageRect(
+          source,
+          Alignment.center.inscribe(
+            size.source,
+            Rect.fromLTWH(
+              0,
+              0,
+              source.width.toDouble(),
+              source.height.toDouble(),
+            ),
+          ),
+          const Rect.fromLTWH(0, 0, 108, 72),
+          Paint()..filterQuality = FilterQuality.low,
+        );
+        final picture = recorder.endRecording();
+        ui.Image? result;
+        try {
+          result = await picture.toImage(108, 72);
+        } finally {
+          picture.dispose();
+          info.dispose();
+        }
+        if (!mounted || generation != _generation) {
+          result.dispose();
+          return;
+        }
+        final previous = _image;
+        setState(() {
+          _image = result;
+          _failed = false;
+        });
+        previous?.dispose();
+      },
+      onError: (_, _) {
+        _detach();
+        if (mounted) setState(() => _failed = true);
+      },
+    );
+    _stream!.addListener(_listener!);
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _detach();
+    _image?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _failed
+      ? const Icon(Lucide.ImageOff, color: Colors.white54, size: 18)
+      : RawImage(image: _image, fit: BoxFit.cover);
 }
