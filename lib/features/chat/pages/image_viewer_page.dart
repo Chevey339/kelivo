@@ -320,7 +320,10 @@ class ImageViewerPage extends StatefulWidget {
             : const Duration(milliseconds: 240),
         pageBuilder: (_, _, _) => this,
         transitionsBuilder: (_, animation, _, child) => FadeTransition(
-          opacity: animation.drive(CurveTween(curve: Curves.easeOutCubic)),
+          // The draft scrim is already partly transparent when a pull ends.
+          opacity: draft != null
+              ? animation
+              : animation.drive(CurveTween(curve: Curves.easeOutCubic)),
           child: child,
         ),
       ),
@@ -359,7 +362,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     with TickerProviderStateMixin {
   late final PageController _controller;
   late int _index;
-  late final AnimationController _restoreCtrl;
+  late final AnimationController _dragOffset;
   late final List<TransformationController> _zoomCtrls;
   late final List<String> _images = List.of(widget.images);
   final Set<String> _failedImages = {};
@@ -383,10 +386,9 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   final Map<String, ImageStreamListener> _imageSizeListeners =
       <String, ImageStreamListener>{};
 
-  double _dragDy = 0.0; // current vertical drag offset
-  double _bgOpacity = 1.0; // background dim opacity (0..1)
   bool _dragActive = false; // only when zoom ~ 1.0
-  double _animFrom = 0.0; // for restore animation
+  Animation<double>? _dismissAnimation;
+  bool _dismissRequested = false;
   Offset? _lastDoubleTapPos; // focal point for double-tap zoom
   Offset? _lastTapPos; // local tap point for desktop image/background split
   bool _saving = false; // saving to gallery state
@@ -442,17 +444,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       (_) => GlobalKey(),
       growable: false,
     );
-    _restoreCtrl =
-        AnimationController(
-          vsync: this,
-          duration: const Duration(milliseconds: 220),
-        )..addListener(() {
-          final t = Curves.easeOutCubic.transform(_restoreCtrl.value);
-          setState(() {
-            _dragDy = _animFrom * (1 - t);
-            _bgOpacity = 1.0 - math.min(_dragDy / 300.0, 0.7);
-          });
-        });
+    _dragOffset = AnimationController.unbounded(vsync: this);
     _zoomCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 230),
@@ -504,7 +496,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     }
     _imageSizeListeners.clear();
     _imageSizeStreams.clear();
-    _restoreCtrl.dispose();
+    _dragOffset.dispose();
     _zoomCtrl.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -801,8 +793,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   }
 
   void _resetDragState() {
-    _dragDy = 0.0;
-    _bgOpacity = 1.0;
+    _dragOffset.value = 0;
     _dragActive = false;
   }
 
@@ -979,36 +970,70 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   }
 
   void _handleVerticalDragStart(DragStartDetails d) {
-    _dragActive = _canDragDismiss();
+    _dragActive = !_dismissRequested && _canDragDismiss();
     if (!_dragActive) return;
-    _restoreCtrl.stop();
+    _dragOffset.stop();
   }
 
   void _handleVerticalDragUpdate(DragUpdateDetails d) {
     if (!_dragActive) return;
-    final dy = d.delta.dy;
-    if (dy <= 0 && _dragDy <= 0) return; // only handle downward
-    setState(() {
-      _dragDy = math.max(0.0, _dragDy + dy);
-      _bgOpacity = 1.0 - math.min(_dragDy / 300.0, 0.7);
-    });
+    _dragOffset.value = math.max(0.0, _dragOffset.value + d.delta.dy);
   }
 
-  void _handleVerticalDragEnd(DragEndDetails d) {
+  Future<void> _handleVerticalDragEnd(DragEndDetails d) async {
     if (!_dragActive) return;
     _dragActive = false;
     final v = d.primaryVelocity ?? 0.0; // positive when swiping down
     const double dismissDistance = 140.0;
     const double dismissVelocity = 900.0;
-    if (_dragDy > dismissDistance || v > dismissVelocity) {
-      Navigator.of(context).maybePop();
+    if (_dragOffset.value > dismissDistance || v > dismissVelocity) {
+      // Chat images already fly back to their source Hero. A draft photo
+      // follows the remaining route transition from the finger's last offset.
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isCurrent) {
+        _restoreDrag();
+        return;
+      }
+      final animation = route.animation;
+      final slideOut =
+          widget.draft != null && !MediaQuery.disableAnimationsOf(context);
+      setState(() {
+        _dismissRequested = true;
+        if (slideOut && animation != null && animation.value > 0) {
+          // A fast swipe may finish during the opening fade. Start at the
+          // release position even when the route has not reached 1 yet.
+          _dismissAnimation = animation.drive(
+            CurveTween(curve: Interval(0, animation.value)),
+          );
+        }
+      });
+      await Navigator.of(context).maybePop();
+      if (mounted && route.isCurrent) {
+        setState(() {
+          _dismissRequested = false;
+          _dismissAnimation = null;
+        });
+        _restoreDrag();
+      }
       return;
     }
-    // animate back
-    _animFrom = _dragDy;
-    _restoreCtrl
-      ..reset()
-      ..forward();
+    _restoreDrag();
+  }
+
+  void _cancelVerticalDrag() {
+    if (!_dragActive) return;
+    _dragActive = false;
+    _restoreDrag();
+  }
+
+  void _restoreDrag() {
+    _dragOffset.animateTo(
+      0,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 190),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _saveCurrent() async {
@@ -1462,7 +1487,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     final compact = size.width < 700;
     final topInset =
         media.padding.top + (_isDesktop && Platform.isMacOS ? 22 : 0);
-    final chromeOpacity = _chromeVisible ? _bgOpacity.clamp(0.0, 1.0) : 0.0;
+    final chromeOpacity = _chromeVisible ? 1.0 : 0.0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -1482,52 +1507,59 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           child: Stack(
             children: [
               Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: _bgOpacity),
+                child: AnimatedBuilder(
+                  animation: _dragOffset,
+                  builder: (_, _) => ColoredBox(
+                    color: Colors.black.withValues(alpha: _dragOpacity),
                   ),
                 ),
               ),
               if (_hasImages) _buildPagedImageStage(context),
-              if (_zoomBadgeVisible)
-                Positioned(
-                  top: topInset + 14,
-                  left: 0,
-                  right: 0,
-                  child: IgnorePointer(
-                    child: Center(
-                      child: _GlassPanel(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          '${((_currentZoomCtrl?.value.getMaxScaleOnAxis() ?? 1) * 100).round()}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
+              _dragChrome(
+                Stack(
+                  children: [
+                    if (_zoomBadgeVisible)
+                      Positioned(
+                        top: topInset + 14,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          child: Center(
+                            child: _GlassPanel(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              child: Text(
+                                '${((_currentZoomCtrl?.value.getMaxScaleOnAxis() ?? 1) * 100).round()}%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
+                    _buildTopBar(
+                      context,
+                      topInset: topInset,
+                      opacity: chromeOpacity,
+                      counterLabel: l10n.imageViewerPageCounter(
+                        _index + 1,
+                        _images.length,
+                      ),
                     ),
-                  ),
+                    if (_hasMultipleImages && !compact)
+                      _buildDesktopPageArrows(context, opacity: chromeOpacity),
+                    _buildActionChrome(
+                      context,
+                      compact: compact,
+                      bottomInset: media.padding.bottom,
+                      opacity: chromeOpacity,
+                    ),
+                  ],
                 ),
-              _buildTopBar(
-                context,
-                topInset: topInset,
-                opacity: chromeOpacity,
-                counterLabel: l10n.imageViewerPageCounter(
-                  _index + 1,
-                  _images.length,
-                ),
-              ),
-              if (_hasMultipleImages && !compact)
-                _buildDesktopPageArrows(context, opacity: chromeOpacity),
-              _buildActionChrome(
-                context,
-                compact: compact,
-                bottomInset: media.padding.bottom,
-                opacity: chromeOpacity,
               ),
             ],
           ),
@@ -1535,6 +1567,19 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       ),
     );
   }
+
+  double get _dragOpacity => 1 - math.min(_dragOffset.value / 300, .7);
+
+  Widget _dragChrome(Widget chrome) => Positioned.fill(
+    child: AnimatedBuilder(
+      animation: _dragOffset,
+      child: chrome,
+      builder: (_, child) => IgnorePointer(
+        ignoring: _dismissRequested || _dragOffset.value > 0,
+        child: Opacity(opacity: _dragOpacity, child: child),
+      ),
+    ),
+  );
 
   Widget _buildPagedImageStage(BuildContext context) {
     return GestureDetector(
@@ -1546,6 +1591,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           ? null
           : _handleVerticalDragUpdate,
       onVerticalDragEnd: _currentImageZoomed ? null : _handleVerticalDragEnd,
+      onVerticalDragCancel: _currentImageZoomed ? null : _cancelVerticalDrag,
       child: PageView.builder(
         key: const ValueKey('image-viewer-page-view'),
         controller: _controller,
@@ -1571,10 +1617,6 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   Widget _buildImagePage(BuildContext context, int i) {
     final l10n = AppLocalizations.of(context)!;
     final src = _images[i];
-    final translateY = (i == _index) ? _dragDy : 0.0;
-    final pageScale = (i == _index)
-        ? (1.0 - math.min(_dragDy / 800.0, 0.15))
-        : 1.0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1681,100 +1723,115 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           availableSize: availableSize,
         );
 
-        return Transform.translate(
-          offset: Offset(0, translateY),
-          child: Transform.scale(
-            scale: pageScale,
-            child: AnimatedBuilder(
-              animation: _zoomCtrls[i],
-              builder: (context, _) {
-                final scale = _zoomCtrls[i].value.getMaxScaleOnAxis();
-                final canPan = scale > 1.01;
-                return Listener(
-                  onPointerSignal: (event) {
-                    if (_isDesktop && event is PointerScrollEvent) {
-                      GestureBinding.instance.pointerSignalResolver.register(
-                        event,
-                        (_) => _zoomBy(
-                          math.exp(-event.scrollDelta.dy / 400),
-                          focal: event.localPosition,
-                        ),
-                      );
-                    }
-                  },
-                  child: InteractiveViewer(
-                    key: i == _index ? _viewerKey : null,
-                    transformationController: _zoomCtrls[i],
-                    minScale: 1.0,
-                    maxScale: 5.0,
-                    panEnabled: canPan,
-                    scaleEnabled: true,
-                    clipBehavior: compact ? Clip.hardEdge : Clip.none,
-                    boundaryMargin: compact
-                        ? EdgeInsets.zero
-                        : canPan
-                        ? const EdgeInsets.all(80)
-                        : EdgeInsets.zero,
-                    child: SizedBox.expand(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onTapDown: (details) =>
-                            _lastTapPos = details.localPosition,
-                        onTapCancel: () => _lastTapPos = null,
-                        onDoubleTapDown: _failedImages.contains(src)
-                            ? null
-                            : (details) =>
-                                  _lastDoubleTapPos = details.localPosition,
-                        onTap: _failedImages.contains(src)
-                            ? null
-                            : () => _handleImageTap(
-                                index: i,
-                                src: src,
-                                pageSize: pageSize,
-                                padding: padding,
-                              ),
-                        onDoubleTap: _failedImages.contains(src)
-                            ? null
-                            : () {
-                                final focal =
-                                    _lastDoubleTapPos ??
-                                    pageSize.center(Offset.zero);
-                                _toggleZoomAt(_zoomCtrls[i], focal);
-                                _lastDoubleTapPos = null;
-                              },
-                        child: Padding(
-                          padding: padding,
-                          child: Center(
-                            child: SizedBox(
-                              key: _imageFrameKeys[i],
-                              width: displaySize.width,
-                              height: displaySize.height,
-                              child: Hero(
-                                createRectTween: ImageViewerPage.flightRect,
-                                tag: widget.heroTags?[i] ?? _imageFrameKeys[i],
-                                child: SizedBox.expand(
-                                  child: Semantics(
-                                    image: true,
-                                    label: l10n.imageViewerPageImageLabel(
-                                      i + 1,
-                                      _images.length,
-                                    ),
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: displaySize.width,
-                                        height: displaySize.height,
-                                        child: isSvgImageSource(src)
-                                            ? ColoredBox(
-                                                key: ValueKey(
-                                                  'image-viewer-svg-surface-$i',
-                                                ),
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.surface,
-                                                child: image,
-                                              )
-                                            : image,
-                                      ),
+        return AnimatedBuilder(
+          animation: _dismissAnimation ?? _dragOffset,
+          builder: (_, child) {
+            final drag = i == _index ? _dragOffset.value : 0.0;
+            final progress = 1 - (_dismissAnimation?.value ?? 1.0);
+            final remaining = math.max(
+              0.0,
+              (pageSize.height + displaySize.height) / 2 - drag,
+            );
+            return Transform.translate(
+              offset: Offset(
+                0,
+                drag + remaining * Curves.easeOutCubic.transform(progress),
+              ),
+              child: Transform.scale(
+                scale: 1 - math.min(drag / 800, .15),
+                child: child,
+              ),
+            );
+          },
+          child: AnimatedBuilder(
+            animation: _zoomCtrls[i],
+            builder: (context, _) {
+              final scale = _zoomCtrls[i].value.getMaxScaleOnAxis();
+              final canPan = scale > 1.01;
+              return Listener(
+                onPointerSignal: (event) {
+                  if (_isDesktop && event is PointerScrollEvent) {
+                    GestureBinding.instance.pointerSignalResolver.register(
+                      event,
+                      (_) => _zoomBy(
+                        math.exp(-event.scrollDelta.dy / 400),
+                        focal: event.localPosition,
+                      ),
+                    );
+                  }
+                },
+                child: InteractiveViewer(
+                  key: i == _index ? _viewerKey : null,
+                  transformationController: _zoomCtrls[i],
+                  minScale: 1.0,
+                  maxScale: 5.0,
+                  panEnabled: canPan,
+                  scaleEnabled: true,
+                  clipBehavior: compact ? Clip.hardEdge : Clip.none,
+                  boundaryMargin: compact
+                      ? EdgeInsets.zero
+                      : canPan
+                      ? const EdgeInsets.all(80)
+                      : EdgeInsets.zero,
+                  child: SizedBox.expand(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTapDown: (details) =>
+                          _lastTapPos = details.localPosition,
+                      onTapCancel: () => _lastTapPos = null,
+                      onDoubleTapDown: _failedImages.contains(src)
+                          ? null
+                          : (details) =>
+                                _lastDoubleTapPos = details.localPosition,
+                      onTap: _failedImages.contains(src)
+                          ? null
+                          : () => _handleImageTap(
+                              index: i,
+                              src: src,
+                              pageSize: pageSize,
+                              padding: padding,
+                            ),
+                      onDoubleTap: _failedImages.contains(src)
+                          ? null
+                          : () {
+                              final focal =
+                                  _lastDoubleTapPos ??
+                                  pageSize.center(Offset.zero);
+                              _toggleZoomAt(_zoomCtrls[i], focal);
+                              _lastDoubleTapPos = null;
+                            },
+                      child: Padding(
+                        padding: padding,
+                        child: Center(
+                          child: SizedBox(
+                            key: _imageFrameKeys[i],
+                            width: displaySize.width,
+                            height: displaySize.height,
+                            child: Hero(
+                              createRectTween: ImageViewerPage.flightRect,
+                              tag: widget.heroTags?[i] ?? _imageFrameKeys[i],
+                              child: SizedBox.expand(
+                                child: Semantics(
+                                  image: true,
+                                  label: l10n.imageViewerPageImageLabel(
+                                    i + 1,
+                                    _images.length,
+                                  ),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: displaySize.width,
+                                      height: displaySize.height,
+                                      child: isSvgImageSource(src)
+                                          ? ColoredBox(
+                                              key: ValueKey(
+                                                'image-viewer-svg-surface-$i',
+                                              ),
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.surface,
+                                              child: image,
+                                            )
+                                          : image,
                                     ),
                                   ),
                                 ),
@@ -1785,9 +1842,9 @@ class _ImageViewerPageState extends State<ImageViewerPage>
                       ),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         );
       },

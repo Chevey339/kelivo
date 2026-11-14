@@ -429,6 +429,68 @@ void main() {
     },
   );
   testWidgets(
+    'draft pull-down returns after a short drag and keeps moving after a dismissal',
+    (tester) async {
+      final (media, text, _, sent) = await open(
+        tester,
+        size: const Size(393, 852),
+      );
+      media.addImages([paths[0], paths[1]]);
+      text.selection = const TextSelection(baseOffset: 2, extentOffset: 5);
+      await tester.pumpAndSettle();
+      final draft = media.snapshotDraft(text.text);
+      Future<void> previewSecondImage() async {
+        await tester.tap(
+          find.byKey(const ValueKey('chat-input-image-preview:1')),
+        );
+        await drain(tester);
+      }
+
+      await previewSecondImage();
+      final photo = find.descendant(
+        of: find.byKey(const ValueKey('image-viewer-page-view')),
+        matching: find.byKey(ValueKey((paths[1], 0))),
+      );
+      final center = tester.getCenter(photo);
+
+      final short = await tester.startGesture(center);
+      await short.moveBy(const Offset(0, 25));
+      await short.moveBy(const Offset(0, 50));
+      await tester.pump();
+      final shortRelease = tester.getCenter(photo).dy;
+      expect(shortRelease, greaterThan(center.dy));
+      await short.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(tester.getCenter(photo).dy, lessThan(shortRelease));
+      await tester.pumpAndSettle();
+      expect(tester.getCenter(photo), center);
+
+      final dismiss = await tester.startGesture(center);
+      await dismiss.moveBy(const Offset(0, 25));
+      await dismiss.moveBy(const Offset(0, 180));
+      await tester.pump();
+      final release = tester.getCenter(photo).dy;
+      expect(release, greaterThan(center.dy + 140));
+      final route = ModalRoute.of(tester.element(photo))!;
+      await dismiss.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(tester.getCenter(photo).dy, greaterThan(release + 1));
+      expect(route.animation!.value, inExclusiveRange(0, 1));
+      await tester.pumpAndSettle();
+      expect(find.byType(ImageViewerPage), findsNothing);
+
+      await previewSecondImage();
+      await tester.flingFrom(center, const Offset(0, 95), 1600);
+      await tester.pumpAndSettle();
+      expect(find.byType(ImageViewerPage), findsNothing);
+      expect(media.snapshotDraft(text.text).sameValue(draft), isTrue);
+      expect(sent.value, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+  testWidgets(
     'edit completion updates pixels and metadata then returns directly to composer',
     (tester) async {
       final (media, text, _, sent) = await open(tester);

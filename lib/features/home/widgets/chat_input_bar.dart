@@ -4045,93 +4045,83 @@ class _ChatInputBarState extends State<ChatInputBar>
     widget.focusNode?.unfocus();
     final target = (widget.mediaController ?? _ownedNativeMedia).capture();
     final settings = context.read<SettingsProvider>();
-    await Navigator.of(context).push<void>(
-      PageRouteBuilder(
-        opaque: false,
-        pageBuilder: (ctx, _, __) => ImageViewerPage(
-          images: images.map((i) => i.path).toList(),
-          initialIndex: initial,
-          draft: ImageViewerDraftMode(
-            onEdit: (i) async {
-              await _imageQualityWork;
-              if (!_sameImageSession(revision, images)) return false;
-              final completed = await _openImageEditor(
-                _images.indexOf(images[i]),
-              );
-              return completed || !_sameImageSession(revision, images);
-            },
-            qualityOf: (i) => images[i].quality ?? settings.imageUploadQuality,
-            customQualityOf: (i) =>
-                images[i].customQuality ?? settings.imageCompressCustomQuality,
-            originalAvailable: (i) =>
-                images[i].sourceIsOriginal && images[i].sourcePath != null,
-            onQualityChanged: (i, quality, custom) async {
-              final image = images[i], version = ++images[i].qualityRevision;
-              setState(() => image.changingQuality = true);
-              final previousWork = _imageQualityWork;
-              final finished = Completer<void>();
-              _imageQualityWork = finished.future;
-              try {
-                await previousWork;
-                if (!_sameImageSession(revision, images) ||
-                    !target.isValid ||
-                    image.qualityRevision != version) {
-                  return image.path;
-                }
-                final source = image.sourcePath ?? image.path;
-                final dir = await target.uploadDirectory();
-                final result = await ImageEditRenderer.export(
-                  sourcePath: source,
-                  document: image.edits,
-                  directory: dir,
-                  config: SettingsProvider.configFor(
-                    quality,
-                    custom: custom ?? settings.imageCompressCustomQuality,
-                    includeTransparent:
-                        settings.imageCompressTransparentEnabled,
-                  ),
-                );
-                if (!_sameImageSession(revision, images) ||
-                    !target.isValid ||
-                    image.qualityRevision != version) {
-                  if (!result.reused &&
-                      !images.any(
-                        (i) =>
-                            i.path == result.path ||
-                            i.sourcePath == result.path,
-                      )) {
-                    await UploadDedupe.deleteIfUnshared(result.path);
-                  }
-                  return image.path;
-                }
-                final previous = _ownedImagePaths(
-                  target,
-                  [image],
-                  keep: {source, result.path},
-                );
-                setState(() {
-                  image.sourcePath ??= source;
-                  if (!result.reused) image.ownedFiles.add(result.path);
-                  image.ownedFiles.removeAll(previous);
-                  image.path = result.path;
-                  image.quality = quality;
-                  image.customQuality = custom;
-                });
-                unawaited(_releaseReplacedImageFiles(target, previous));
-                return result.path;
-              } finally {
-                if (mounted &&
-                    _images.contains(image) &&
-                    version == image.qualityRevision) {
-                  setState(() => image.changingQuality = false);
-                }
-                finished.complete();
+    await ImageViewerPage(
+      images: images.map((i) => i.path).toList(),
+      initialIndex: initial,
+      draft: ImageViewerDraftMode(
+        onEdit: (i) async {
+          await _imageQualityWork;
+          if (!_sameImageSession(revision, images)) return false;
+          final completed = await _openImageEditor(_images.indexOf(images[i]));
+          return completed || !_sameImageSession(revision, images);
+        },
+        qualityOf: (i) => images[i].quality ?? settings.imageUploadQuality,
+        customQualityOf: (i) =>
+            images[i].customQuality ?? settings.imageCompressCustomQuality,
+        originalAvailable: (i) =>
+            images[i].sourceIsOriginal && images[i].sourcePath != null,
+        onQualityChanged: (i, quality, custom) async {
+          final image = images[i], version = ++images[i].qualityRevision;
+          setState(() => image.changingQuality = true);
+          final previousWork = _imageQualityWork;
+          final finished = Completer<void>();
+          _imageQualityWork = finished.future;
+          try {
+            await previousWork;
+            if (!_sameImageSession(revision, images) ||
+                !target.isValid ||
+                image.qualityRevision != version) {
+              return image.path;
+            }
+            final source = image.sourcePath ?? image.path;
+            final dir = await target.uploadDirectory();
+            final result = await ImageEditRenderer.export(
+              sourcePath: source,
+              document: image.edits,
+              directory: dir,
+              config: SettingsProvider.configFor(
+                quality,
+                custom: custom ?? settings.imageCompressCustomQuality,
+                includeTransparent: settings.imageCompressTransparentEnabled,
+              ),
+            );
+            if (!_sameImageSession(revision, images) ||
+                !target.isValid ||
+                image.qualityRevision != version) {
+              if (!result.reused &&
+                  !images.any(
+                    (i) => i.path == result.path || i.sourcePath == result.path,
+                  )) {
+                await UploadDedupe.deleteIfUnshared(result.path);
               }
-            },
-          ),
-        ),
+              return image.path;
+            }
+            final previous = _ownedImagePaths(
+              target,
+              [image],
+              keep: {source, result.path},
+            );
+            setState(() {
+              image.sourcePath ??= source;
+              if (!result.reused) image.ownedFiles.add(result.path);
+              image.ownedFiles.removeAll(previous);
+              image.path = result.path;
+              image.quality = quality;
+              image.customQuality = custom;
+            });
+            unawaited(_releaseReplacedImageFiles(target, previous));
+            return result.path;
+          } finally {
+            if (mounted &&
+                _images.contains(image) &&
+                version == image.qualityRevision) {
+              setState(() => image.changingQuality = false);
+            }
+            finished.complete();
+          }
+        },
       ),
-    );
+    ).open(context);
     if (mounted && revision == _draftReplacementRevision && hadFocus) {
       widget.focusNode?.requestFocus();
     }
