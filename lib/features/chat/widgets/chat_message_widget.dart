@@ -2409,7 +2409,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       source: widget.message.content,
       sourceMap: sourceMap,
       quotes: widget.message.quotes,
-      child: content,
+      child: DefaultTextStyle.merge(
+        textWidthBasis: TextWidthBasis.longestLine,
+        child: content,
+      ),
     );
     if (isDesktop) {
       content = AppSelectionArea(
