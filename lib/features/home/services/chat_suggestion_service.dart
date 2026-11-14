@@ -163,10 +163,14 @@ The suggestions array must contain 0 to 3 distinct, concise strings, each at mos
         {'role': 'user', 'content': prompt},
       ],
       reasoning: reasoning,
-      builtInSearchOnly: true,
+      builtInToolMode: BuiltInToolMode.none,
       skipImageParsing: true,
       allowImagesApiRouting: false,
     );
-    return parseSuggestions(result.text);
+    try {
+      return parseSuggestions(result.text);
+    } on FormatException {
+      return const <String>[];
+    }
   }
 }

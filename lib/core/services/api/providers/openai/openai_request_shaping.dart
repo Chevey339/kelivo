@@ -68,7 +68,7 @@ Object? applyChatCompletionsBuiltInTools(
   if (migratesWebPlugin && body['plugins'] is List) {
     final plugins = (body['plugins'] as List).where((plugin) {
       return plugin is! Map ||
-          (plugin['id'] ?? '').toString().trim().toLowerCase() != 'web';
+          !BuiltInToolsHelper.isOpenRouterWebPlugin(plugin);
     }).toList();
     if (plugins.isEmpty) {
       body.remove('plugins');

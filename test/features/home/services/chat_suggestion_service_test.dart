@@ -1,11 +1,219 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/network/provider_http_exception.dart';
 import 'package:Kelivo/features/home/services/chat_suggestion_service.dart';
 
 void main() {
+  group('ChatSuggestionService.generate', () {
+    const modelId = 'suggestion-model';
+    late HttpServer server;
+
+    setUp(() async {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+    });
+
+    ProviderConfig config() => ProviderConfig(
+      id: 'gateway',
+      enabled: true,
+      name: 'Gateway',
+      apiKey: 'test',
+      baseUrl: 'http://127.0.0.1:${server.port}/v1',
+      providerType: ProviderKind.openai,
+      useResponseApi: true,
+      customHeaders: const [
+        {'name': 'X-Gateway-Route', 'value': 'primary'},
+      ],
+      customBody: const [
+        {'key': 'routing', 'value': '{"region":"local"}'},
+      ],
+      modelOverrides: const {
+        modelId: {
+          'apiModelId': 'upstream-model',
+          'builtInTools': ['search'],
+          'tools': {'codeInterpreter': true},
+          'webSearch': {'include_sources': true},
+          'headers': [
+            {'name': 'X-Model-Route', 'value': 'fast'},
+          ],
+          'body': [
+            {'key': 'routing', 'value': '{"tier":"fast"}'},
+          ],
+        },
+      },
+    );
+
+    Future<List<String>> generate(ProviderConfig provider) =>
+        const ChatSuggestionService().generate(
+          settings: _SuggestionSettings(provider),
+          providerKey: provider.id,
+          modelId: modelId,
+          messages: [_suggestionMessage(0, '问题'), _suggestionMessage(1, '回答')],
+          truncateIndex: -1,
+          locale: 'zh-CN',
+        );
+
+    test('omits built-in tools and preserves gateway overrides', () async {
+      const suggestion = '可以举个例子吗？';
+      final requests = <Map<String, dynamic>>[];
+      late HttpHeaders headers;
+      server.listen((request) async {
+        expect(request.uri.path, '/v1/responses');
+        requests.add(jsonDecode(await utf8.decoder.bind(request).join()));
+        headers = request.headers;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'output_text': jsonEncode({
+              'suggestions': [suggestion],
+            }),
+          }),
+        );
+        await request.response.close();
+      });
+
+      final provider = config();
+      expect(await generate(provider), [suggestion]);
+      final body = requests.single;
+      expect(body.containsKey('tools'), isFalse);
+      expect(body.containsKey('tool_choice'), isFalse);
+      expect(body.containsKey('include'), isFalse);
+      expect(body['model'], 'upstream-model');
+      expect(headers.value('x-gateway-route'), 'primary');
+      expect(headers.value('x-model-route'), 'fast');
+      expect(body['routing'], {'region': 'local', 'tier': 'fast'});
+
+      await ChatApiService.generateMessage(
+        config: provider,
+        modelId: modelId,
+        messages: const [
+          {'role': 'user', 'content': '问题'},
+        ],
+      );
+      final chat = requests.last;
+      expect(
+        (chat['tools'] as List).map((tool) => tool['type']),
+        containsAll(['web_search', 'code_interpreter']),
+      );
+      expect(chat['include'], contains('web_search_call.action.sources'));
+    });
+
+    test('gateway body overrides cannot re-enable suggestion tools', () async {
+      late Map<String, dynamic> body;
+      server.listen((request) async {
+        body = jsonDecode(await utf8.decoder.bind(request).join());
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({'output_text': '{"suggestions":[]}'}),
+        );
+        await request.response.close();
+      });
+      final base = config();
+      final override = base.modelOverrides[modelId] as Map<String, dynamic>;
+      final provider = base.copyWith(
+        id: 'openrouter-gateway',
+        customBody: [
+          ...base.customBody,
+          {'key': 'tools', 'value': '[{"type":"web_search"}]'},
+          {
+            'key': 'plugins',
+            'value': '[{"id":"web"},{"id":"response-healing"}]',
+          },
+        ],
+        modelOverrides: {
+          modelId: {
+            ...override,
+            'body': [
+              ...override['body'] as List,
+              {'key': 'tool_choice', 'value': 'required'},
+              {'key': 'enable_search', 'value': 'true'},
+              {
+                'key': 'include',
+                'value':
+                    '["web_search_call.action.sources","reasoning.encrypted_content"]',
+              },
+            ],
+          },
+        },
+      );
+
+      expect(await generate(provider), isEmpty);
+      expect(body.containsKey('tools'), isFalse);
+      expect(body.containsKey('tool_choice'), isFalse);
+      expect(body.containsKey('enable_search'), isFalse);
+      expect(body['plugins'], [
+        {'id': 'web', 'enabled': false},
+        {'id': 'response-healing'},
+      ]);
+      expect(body['include'], ['reasoning.encrypted_content']);
+      expect(body['routing'], {'region': 'local', 'tier': 'fast'});
+
+      for (final plugins in [
+        [],
+        [
+          {'id': 'web', 'enabled': false, 'max_results': 3},
+        ],
+      ]) {
+        final disabled = provider.copyWith(
+          customBody: [
+            {'key': 'plugins', 'value': jsonEncode(plugins)},
+            {'key': 'enable_search', 'value': 'false'},
+          ],
+          modelOverrides: base.modelOverrides,
+        );
+        expect(await generate(disabled), isEmpty);
+        expect(body['plugins'], plugins);
+        expect(body['enable_search'], false);
+      }
+    });
+
+    test(
+      'skips malformed suggestions and propagates request failures',
+      () async {
+        var modelText = '';
+        var status = HttpStatus.ok;
+        server.listen((request) async {
+          await request.drain<void>();
+          request.response.statusCode = status;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(jsonEncode({'output_text': modelText}));
+          await request.response.close();
+        });
+
+        final provider = config();
+        for (final malformed in [
+          '根据最新报价，价格如下。',
+          '{"suggestions":',
+          '{"suggestions":42}',
+          '',
+        ]) {
+          modelText = malformed;
+          expect(await generate(provider), isEmpty, reason: malformed);
+        }
+        modelText = '{"suggestions":["再举一个例子"]}';
+        expect(await generate(provider), ['再举一个例子']);
+
+        status = HttpStatus.unauthorized;
+        await expectLater(
+          generate(provider),
+          throwsA(
+            isA<ProviderHttpException>().having(
+              (error) => error.statusCode,
+              'statusCode',
+              HttpStatus.unauthorized,
+            ),
+          ),
+        );
+      },
+    );
+  });
+
   group('ChatSuggestionService.parseSuggestions', () {
     test('accepts structured output, trims, deduplicates and limits count', () {
       expect(
@@ -347,6 +555,17 @@ void main() {
       expect(content, contains('message 99'));
     });
   });
+}
+
+class _SuggestionSettings extends Fake implements SettingsProvider {
+  _SuggestionSettings(this.config);
+  final ProviderConfig config;
+
+  @override
+  String get suggestionPrompt => SettingsProvider.defaultSuggestionPrompt;
+
+  @override
+  ProviderConfig getProviderConfig(String key, {String? defaultName}) => config;
 }
 
 ChatMessage _suggestionMessage(int index, String content) {
