@@ -3,6 +3,7 @@
 #include <DispatcherQueue.h>
 #include <shlobj.h>
 #include <windows.graphics.capture.h>
+#include <windows.system.h>
 
 #include <filesystem>
 #include <iostream>
@@ -10,12 +11,7 @@
 WebviewPlatform::WebviewPlatform()
     : rohelper_(std::make_unique<rx::RoHelper>(RO_INIT_SINGLETHREADED)) {
   if (rohelper_->WinRtAvailable()) {
-    DispatcherQueueOptions options{sizeof(DispatcherQueueOptions),
-                                   DQTYPE_THREAD_CURRENT, DQTAT_COM_STA};
-
-    if (FAILED(rohelper_->CreateDispatcherQueueController(
-            options, dispatcher_queue_controller_.put()))) {
-      std::cerr << "Creating DispatcherQueueController failed." << std::endl;
+    if (!EnsureDispatcherQueue()) {
       return;
     }
 
@@ -29,6 +25,51 @@ WebviewPlatform::WebviewPlatform()
     graphics_context_ = std::make_unique<GraphicsContext>(rohelper_.get());
     valid_ = graphics_context_->IsValid();
   }
+}
+
+bool WebviewPlatform::EnsureDispatcherQueue() {
+  // A thread can only have one DispatcherQueue. Borrow an existing queue (for
+  // example one created by another WebView plugin on the platform thread)
+  // without taking ownership or shutting it down.
+  HSTRING class_name;
+  HSTRING_HEADER class_name_header;
+  if (FAILED(rohelper_->GetStringReference(
+          RuntimeClass_Windows_System_DispatcherQueue, &class_name,
+          &class_name_header))) {
+    std::cerr << "Resolving DispatcherQueue runtime class failed."
+              << std::endl;
+    return false;
+  }
+
+  winrt::com_ptr<ABI::Windows::System::IDispatcherQueueStatics> queue_statics;
+  if (FAILED(rohelper_->GetActivationFactory(
+          class_name, __uuidof(ABI::Windows::System::IDispatcherQueueStatics),
+          queue_statics.put_void()))) {
+    std::cerr << "Getting DispatcherQueueStatics activation factory failed."
+              << std::endl;
+    return false;
+  }
+
+  winrt::com_ptr<ABI::Windows::System::IDispatcherQueue> queue;
+  if (FAILED(queue_statics->GetForCurrentThread(queue.put()))) {
+    std::cerr << "Querying DispatcherQueue for current thread failed."
+              << std::endl;
+    return false;
+  }
+
+  if (queue) {
+    return true;
+  }
+
+  DispatcherQueueOptions options{sizeof(DispatcherQueueOptions),
+                                 DQTYPE_THREAD_CURRENT, DQTAT_COM_STA};
+  if (FAILED(rohelper_->CreateDispatcherQueueController(
+          options, dispatcher_queue_controller_.put()))) {
+    std::cerr << "Creating DispatcherQueueController failed." << std::endl;
+    return false;
+  }
+
+  return true;
 }
 
 bool WebviewPlatform::IsGraphicsCaptureSessionSupported() {
