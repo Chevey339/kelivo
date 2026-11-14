@@ -233,7 +233,15 @@ void main() {
       ).copyWith(vertexAI: true, location: 'us-central1', projectId: 'demo');
       expect(
         resolveRequestUrl(c, modelId: 'gemini-test'),
-        'https://aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/publishers/google/models/gemini-test:streamGenerateContent',
+        'https://us-central1-aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/publishers/google/models/gemini-test:streamGenerateContent',
+      );
+      expect(
+        resolveRequestUrl(
+          c.copyWith(location: 'eu'),
+          modelId: 'gemini-test',
+          stream: false,
+        ),
+        'https://aiplatform.eu.rep.googleapis.com/v1/projects/demo/locations/eu/publishers/google/models/gemini-test:generateContent',
       );
       expect(
         resolveRequestUrl(c.copyWith(projectId: ''), modelId: 'gemini-test'),
