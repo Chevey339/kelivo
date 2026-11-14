@@ -250,8 +250,11 @@ class LocalSnapshotProvider extends ChangeNotifier {
   }
 
   Future<void> delete(LocalCopy copy) async {
-    await _catalog.delete(copy);
-    await refresh();
+    if (working) throw StateError('local_snapshot_running');
+    await whileHoldingCopies(() async {
+      await _catalog.delete(copy);
+      await refresh();
+    });
   }
 
   Future<void> setPinned(LocalCopy copy, bool pinned) async {

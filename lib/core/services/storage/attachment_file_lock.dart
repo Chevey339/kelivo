@@ -7,6 +7,39 @@ final class AttachmentFileLock {
   AttachmentFileLock._(this._released);
 
   static Future<void>? _tail;
+  static final _transientOwners =
+      <
+        Object,
+        ({
+          Map<String, Map<String, String>> Function() references,
+          bool Function() active,
+        })
+      >{};
+
+  /// Memory-only chat mutations use this lock too. Read these callbacks only
+  /// after acquiring it so a queued cleanup cannot use an obsolete snapshot.
+  static void registerTransientOwner(
+    Object owner, {
+    required Map<String, Map<String, String>> Function() references,
+    required bool Function() active,
+  }) => _transientOwners[owner] = (references: references, active: active);
+
+  static void unregisterTransientOwner(Object owner) =>
+      _transientOwners.remove(owner);
+
+  static bool get hasActiveTransientGeneration =>
+      _transientOwners.values.any((owner) => owner.active());
+
+  static Map<String, Map<String, String>> get transientReferences {
+    final result = <String, Map<String, String>>{};
+    for (final owner in _transientOwners.values) {
+      for (final entry in owner.references().entries) {
+        result.putIfAbsent(entry.key, () => {}).addAll(entry.value);
+      }
+    }
+    return result;
+  }
+
   final Completer<void> _released;
 
   static Future<AttachmentFileLock> acquire() async {

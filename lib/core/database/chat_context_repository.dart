@@ -3,18 +3,122 @@ part of 'chat_database_repository.dart';
 extension ChatContextRepository on ChatDatabaseRepository {
   Future<ContextMutationState> readContextMutationState(String id) =>
       _db.transaction(() async {
-        final row =
-            await (_db.selectOnly(_db.conversationRows)
-                  ..addColumns([_db.conversationRows.truncateIndex])
-                  ..where(_db.conversationRows.id.equals(id)))
-                .getSingleOrNull();
-        if (row == null) throw StateError('conversation_not_found');
-        // Preserve the existing atomic conversion before issuing approval.
-        if (row.read(_db.conversationRows.truncateIndex)! >= 0) {
-          await readContextOperations(id);
-        }
+        await _convertContextBoundary(id);
         return _contextIndex.read(id);
       });
+
+  Future<void> _convertContextBoundary(String id) async {
+    final row =
+        await (_db.selectOnly(_db.conversationRows)
+              ..addColumns([_db.conversationRows.truncateIndex])
+              ..where(_db.conversationRows.id.equals(id)))
+            .getSingleOrNull();
+    if (row == null) throw StateError('conversation_not_found');
+    // Preserve the existing atomic conversion before reading context records.
+    if (row.read(_db.conversationRows.truncateIndex)! >= 0) {
+      await readContextOperations(id);
+    }
+  }
+
+  /// Select and bound list data on SQLite's worker before crossing to the UI.
+  Future<ContextOperationPage> readContextOperationPage(
+    String id, {
+    required int offset,
+    required int limit,
+  }) => _db.transaction(() async {
+    RangeError.checkNotNegative(offset, 'offset');
+    RangeError.checkValueInInterval(limit, 1, 0x7fffffff, 'limit');
+    await _convertContextBoundary(id);
+    await _contextIndex.ensure(id);
+    final rows = await _db
+        .customSelect(
+          r'''
+WITH state AS MATERIALIZED (
+  SELECT revision,metadata FROM context_operation_state WHERE conversation_id=?
+), metadata AS MATERIALIZED (
+  SELECT CAST(j.key AS INTEGER) AS ordinal, j.value
+  FROM state, json_each(state.metadata) j
+), page AS MATERIALIZED (
+  SELECT ordinal, value,
+    kelivo_timestamp_micros(json_extract(value,'$.createdAt')) AS timestamp
+  FROM metadata ORDER BY timestamp DESC, ordinal DESC LIMIT ? OFFSET ?
+)
+SELECT s.revision, json_extract(p.value,'$.id') AS id,
+  json_extract(p.value,'$.kind') AS kind,
+  json_extract(p.value,'$.createdAt') AS created_at,
+  json_extract(p.value,'$.revoked') AS revoked,
+  COALESCE(json_type(e.payload,'$['||p.ordinal||'].compressionDetails.nativeCompaction')='object',0) AS native,
+  COALESCE(json_extract(e.payload,'$['||p.ordinal||'].compressionDetails.nativeContextImported'),0) AS imported,
+  substr(COALESCE(json_extract(e.payload,'$['||p.ordinal||'].summary'),''),1,240) AS preview,
+  (SELECT json_array_length(metadata) FROM state) AS total,
+  EXISTS(SELECT 1 FROM metadata n
+    WHERE n.ordinal>p.ordinal AND NOT json_extract(n.value,'$.revoked')
+    AND (json_extract(n.value,'$.kind')='start'
+      OR (json_extract(n.value,'$.kind')='clear' AND EXISTS(
+        SELECT 1 FROM json_each(n.value,'$.groups') g
+        WHERE g.value=json_extract(p.value,'$.anchor'))))) AS hidden,
+  EXISTS(SELECT 1 FROM metadata n, json_each(n.value,'$.dependencies') d
+    WHERE NOT json_extract(n.value,'$.revoked')
+    AND json_extract(p.value,'$.kind')='compress'
+    AND d.value=json_extract(p.value,'$.id')) AS superseded
+FROM state s LEFT JOIN page p ON 1
+LEFT JOIN extension_entity_rows e ON e.kind=? AND e.id=?
+ORDER BY p.timestamp DESC, p.ordinal DESC
+''',
+          variables: [
+            Variable<String>(id),
+            Variable<int>(limit),
+            Variable<int>(offset),
+            Variable<String>(ContextOperation.entityKind),
+            Variable<String>(id),
+          ],
+        )
+        .get();
+    final items = rows
+        .where((row) => row.readNullable<String>('id') != null)
+        .toList();
+    return (
+      items: [
+        for (final row in items)
+          ContextOperationSummary(
+            id: row.read<String>('id'),
+            kind: ContextOperationKind.values.byName(row.read<String>('kind')),
+            createdAt: DateTime.parse(row.read<String>('created_at')),
+            revoked: row.read<int>('revoked') != 0,
+            hidden: row.read<int>('hidden') != 0,
+            superseded: row.read<int>('superseded') != 0,
+            isNative: row.read<int>('native') != 0,
+            isImportedNative:
+                row.read<int>('native') != 0 && row.read<int>('imported') != 0,
+            summaryPreview: row.read<int>('native') != 0
+                ? ''
+                : truncateHeadUtf16Safe(row.read<String>('preview'), 240),
+          ),
+      ],
+      hasMore: offset + items.length < rows.first.read<int>('total'),
+      revision: rows.first.read<String>('revision'),
+    );
+  });
+
+  Future<ContextOperation?> readContextOperation(
+    String id,
+    String operationId,
+  ) => _db.transaction(() async {
+    await _convertContextBoundary(id);
+    final row = await _db
+        .customSelect(
+          r'''SELECT j.value AS payload FROM extension_entity_rows e, json_each(e.payload) j
+WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
+          variables: [
+            Variable<String>(ContextOperation.entityKind),
+            Variable<String>(id),
+            Variable<String>(operationId),
+          ],
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    return _decodeContextOperation(row.read<String>('payload'));
+  });
 
   Future<({List<ChatMessage> messages, List<ContextOperation> operations})>
   readContextMutationPreview(String id, {required String expectedState}) =>
@@ -27,27 +131,56 @@ extension ChatContextRepository on ChatDatabaseRepository {
       });
   // Read only selection metadata for the excluded prefix. Large message parts
   // and provider artifacts are hydrated only for history actually being sent.
-  Future<List<ChatMessage>> _contextMetadata(String id) async {
+  Future<List<ContextMessageMetadata>> _contextMetadata(
+    String id, {
+    bool contentInfo = false,
+  }) async {
     await _timelineIndex.ensureConversation(id);
     final rows = await _db
         .customSelect(
-          'SELECT g.group_id,m.id,m.role FROM timeline_group_rows g '
+          '''SELECT g.group_id,m.id,m.role${contentInfo ? """,
+              COALESCE(SUM(CASE WHEN p.kind='text' THEN kelivo_text_length(p.payload) ELSE 0 END),0) AS content_length,
+              COALESCE(MAX(CASE WHEN p.kind IN ('text','image','file') THEN kelivo_has_context_content(p.kind,p.payload) ELSE 0 END),0) AS has_content,
+              EXISTS(SELECT 1 FROM provider_artifact_rows a WHERE a.revision_id=m.id AND a.kind='openai_native_compaction') AS native
+            """ : ''} FROM timeline_group_rows g '''
           'LEFT JOIN timeline_selection_rows s ON s.conversation_id=g.conversation_id AND s.group_id=g.group_id '
           'JOIN message_rows m ON m.id=${MessageTimelineIndex.selectedRevision('g')} '
-          'WHERE g.conversation_id=? ORDER BY g.anchor_order,g.group_id',
+          "${contentInfo ? 'LEFT JOIN message_part_rows p ON p.revision_id=m.id ' : ''}"
+          'WHERE g.conversation_id=? '
+          "${contentInfo ? 'GROUP BY g.group_id ' : ''}"
+          'ORDER BY g.anchor_order,g.group_id',
           variables: [Variable<String>(id)],
         )
         .get();
     return [
       for (final row in rows)
-        ChatMessage(
+        ContextMessageMetadata(
           id: row.read<String>('id'),
           groupId: row.read<String>('group_id'),
           role: row.read<String>('role'),
-          conversationId: id,
+          contentLength: contentInfo ? row.read<int>('content_length') : 0,
+          hasContent: contentInfo && row.read<int>('has_content') != 0,
+          native: contentInfo && row.read<int>('native') != 0,
         ),
     ];
   }
+
+  Future<CompressionHistory> readCompressionHistory(String id) =>
+      _db.transaction(() async {
+        final operations = await readContextOperations(id);
+        return CompressionHistory(
+          messages: await _contextMetadata(id, contentInfo: true),
+          operations: operations,
+        );
+      });
+
+  Future<({List<ChatMessage> messages, List<ContextOperation> operations})>
+  readContextHistory(String id) => _db.transaction(
+    () async => (
+      operations: await readContextOperations(id),
+      messages: await getSelectedContextMessages(id, limit: 0x7fffffff),
+    ),
+  );
 
   Future<
     ({
@@ -62,7 +195,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
     return (
       messages: messages,
       operations: operations,
-      fingerprint: ContextHistory.fingerprint(messages, operations),
+      fingerprint: await _contextSnapshotFingerprint(messages, operations),
     );
   });
 
@@ -95,18 +228,16 @@ extension ChatContextRepository on ChatDatabaseRepository {
       if (target == null) return <ChatMessage>[];
       throughGroup = target.groupId ?? target.id;
       endGroup = throughGroup;
-      final index = metadata.indexWhere(
-        (m) => ContextHistory.group(m) == throughGroup,
-      );
+      final index = metadata.indexWhere((m) => m.groupId == throughGroup);
       if (includeFollowingAssistant &&
           target.role == 'user' &&
           index >= 0 &&
           index + 1 < metadata.length &&
           metadata[index + 1].role == 'assistant') {
-        endGroup = ContextHistory.group(metadata[index + 1]);
+        endGroup = metadata[index + 1].groupId;
       }
     }
-    final projected = ContextHistory.resolve(
+    final projected = ContextHistory.project(
       metadata,
       operations,
       limit: limit,
@@ -115,13 +246,14 @@ extension ChatContextRepository on ChatDatabaseRepository {
     );
     final hydrated = await getMessagesByIds([
       for (final m in projected)
-        if (!ContextOperation.isSummary(m)) m.id,
+        if (!m.isSummary) m.id,
     ]);
-    final byId = {for (final m in hydrated) m.id: m};
-    return [
-      for (final m in projected)
-        ContextOperation.isSummary(m) ? m : byId[m.id]!,
-    ];
+    return ContextHistory.materialize(
+      hydrated,
+      operations,
+      projected,
+      conversationId: id,
+    );
   });
 
   /// Counts the same projection used for sending without loading message bodies.
@@ -129,22 +261,9 @@ extension ChatContextRepository on ChatDatabaseRepository {
     String id, {
     required int limit,
   }) => _db.transaction(() async {
-    final operations = await readContextOperations(id);
+    final operations = (await readContextMutationState(id)).operations;
     final metadata = await _contextMetadata(id);
-    if (limit <= 0) {
-      return (stored: metadata.length, messages: 0, summaries: 0);
-    }
-    final effective = ContextHistory.resolve(
-      metadata,
-      operations,
-      limit: limit,
-    );
-    final summaries = effective.where(ContextOperation.isSummary).length;
-    return (
-      stored: metadata.length,
-      messages: effective.length - summaries,
-      summaries: summaries,
-    );
+    return _contextMessageCounts(metadata, operations, limit);
   });
 
   Future<int> contextBoundaryIndex(
@@ -331,7 +450,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
             operations.add(
               _legacyClearOperation(
                 index,
-                selected.map(ContextHistory.group).toList(),
+                selected.map((m) => m.groupId).toList(),
                 conversation.updatedAt,
               ),
             );
@@ -481,7 +600,7 @@ extension ChatContextRepository on ChatDatabaseRepository {
       final now = DateTime.now();
       final target = Conversation(
         id: id,
-        title: source.title,
+        title: await _nextForkTitle(source.title),
         assistantId: source.assistantId,
         createdAt: now,
         updatedAt: now,
@@ -695,6 +814,10 @@ extension ChatContextRepository on ChatDatabaseRepository {
   }
 }
 
+Future<ContextOperation> _decodeContextOperation(String payload) => Isolate.run(
+  () => ContextOperation.fromJson(jsonDecode(payload) as Map<String, dynamic>),
+);
+
 Future<List<ContextOperation>> _decodeContextOperations(String payload) =>
     Isolate.run(
       () => [
@@ -705,3 +828,25 @@ Future<List<ContextOperation>> _decodeContextOperations(String payload) =>
 
 Future<String> _encodeContextOperations(List<ContextOperation> operations) =>
     Isolate.run(() => jsonEncode(operations.map((op) => op.toJson()).toList()));
+
+Future<String> _contextSnapshotFingerprint(
+  List<ChatMessage> messages,
+  List<ContextOperation> operations,
+) => Isolate.run(() => ContextHistory.fingerprint(messages, operations));
+
+Future<ContextMessageCounts> _contextMessageCounts(
+  List<ContextMessageMetadata> metadata,
+  List<ContextOperationMetadata> operations,
+  int limit,
+) => Isolate.run(() {
+  if (limit <= 0) {
+    return (stored: metadata.length, messages: 0, summaries: 0);
+  }
+  final effective = ContextHistory.project(metadata, operations, limit: limit);
+  final summaries = effective.where((m) => m.isSummary).length;
+  return (
+    stored: metadata.length,
+    messages: effective.length - summaries,
+    summaries: summaries,
+  );
+});

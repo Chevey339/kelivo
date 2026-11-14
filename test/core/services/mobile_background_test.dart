@@ -59,6 +59,49 @@ void main() {
       .toList();
 
   test(
+    'theme colors sync without resetting on settings-only updates',
+    () async {
+      const settings = MobileBackgroundSettings(overlayEnabled: true);
+      const lightPrimary = Color(0xFF6750A4);
+      const darkPrimary = Color(0xFFD0BCFF);
+      await coordinator.configure(
+        settings,
+        l10n,
+        overlayProgressColor: lightPrimary,
+      );
+      expect(
+        (snapshots().last['settings'] as Map)['overlayProgressColor'],
+        lightPrimary.toARGB32(),
+      );
+
+      final count = snapshots().length;
+      await coordinator.configure(
+        settings,
+        l10n,
+        overlayProgressColor: lightPrimary,
+      );
+      expect(snapshots(), hasLength(count));
+
+      await coordinator.configure(
+        settings,
+        l10n,
+        overlayProgressColor: darkPrimary,
+      );
+      expect(snapshots(), hasLength(count + 1));
+      expect(
+        (snapshots().last['settings'] as Map)['overlayProgressColor'],
+        darkPrimary.toARGB32(),
+      );
+
+      await coordinator.configure(settings.copyWith(privacyMode: true), l10n);
+      expect(
+        (snapshots().last['settings'] as Map)['overlayProgressColor'],
+        darkPrimary.toARGB32(),
+      );
+    },
+  );
+
+  test(
     'equal appearance settings do not repeatedly sync native resources',
     () async {
       final settings = MobileBackgroundSettings(

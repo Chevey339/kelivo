@@ -9,7 +9,9 @@ import 'multimodal_input_utils.dart';
   String name,
   Map<String, dynamic>? metadata,
 ) {
-  if (name != 'read_chat_image') return null;
+  // Persisted observations keep the name recorded when they were created.
+  // This only validates their image ownership; it does not expose a tool alias.
+  if (name != 'view_image' && name != 'read_chat_image') return null;
   if (metadata?['chatImage'] case {
     'version': 1,
     'sourceKey': final String key,

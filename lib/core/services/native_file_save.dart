@@ -9,6 +9,17 @@ class NativeFileSave {
   @visibleForTesting
   static bool debugForceAndroidForTest = false;
 
+  /// Saves the encoded image to iOS Photos without requiring library read access.
+  static Future<bool> saveImageToGallery({required String sourcePath}) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
+      throw UnsupportedError('Native photo saving is only supported on iOS.');
+    }
+    return await _channel.invokeMethod<bool>('saveImageToGallery', {
+          'sourcePath': sourcePath,
+        }) ==
+        true;
+  }
+
   /// Lets Android choose a document first, then streams bytes through the
   /// platform channel. This avoids both a second full-size local file and
   /// reopening a SAF descriptor through `/proc/self/fd`, which some ROMs deny.

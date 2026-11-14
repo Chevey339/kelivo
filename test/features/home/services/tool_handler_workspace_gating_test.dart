@@ -12,6 +12,8 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/tools/view_image_tool.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/features/home/services/built_in_tool_names.dart';
@@ -65,6 +67,8 @@ void main() {
       preferences: createBusinessTestPreferences(),
     );
     final settings = SettingsProvider(createBusinessTestPreferences());
+    final chat = ChatService();
+    addTearDown(chat.dispose);
     addTearDown(assistants.dispose);
     addTearDown(mcpProvider.dispose);
     addTearDown(settings.dispose);
@@ -73,6 +77,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          ChangeNotifierProvider<ChatService>.value(value: chat),
           ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
           ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
           ChangeNotifierProvider<McpToolService>.value(value: McpToolService()),
@@ -115,6 +120,36 @@ void main() {
       workspaceContext: context(),
     );
     expect(withCtx.map(nameOf), containsAll(WorkspaceToolsService.toolNames));
+
+    final withHistory = service.buildToolDefinitions(
+      settings,
+      assistant,
+      'openai',
+      'gpt-4.1',
+      false,
+      isToolModel: (_, __) => true,
+      conversationId: 'chat',
+    );
+    final chatImage = withHistory.singleWhere(
+      (tool) => nameOf(tool) == 'view_image',
+    );
+    expect(ViewImageTool.supportsHistory(chatImage), isTrue);
+    expect(ViewImageTool.supportsFiles(chatImage), isFalse);
+    expect(withHistory.map(nameOf), isNot(contains('read_chat_image')));
+
+    final combined = service.buildToolDefinitions(
+      settings,
+      assistant,
+      'openai',
+      'gpt-4.1',
+      false,
+      isToolModel: (_, __) => true,
+      conversationId: 'chat',
+      workspaceContext: context(),
+    );
+    final viewer = combined.singleWhere((tool) => nameOf(tool) == 'view_image');
+    expect(ViewImageTool.supportsHistory(viewer), isTrue);
+    expect(ViewImageTool.supportsFiles(viewer), isTrue);
 
     final textOnly = service.buildToolDefinitions(
       settings,

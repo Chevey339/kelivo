@@ -862,25 +862,50 @@ class DataSync {
       final databasePath = databaseTmp?.path;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
-      await runBackupIsolate<void, _BackupPackArgs>(
-        body: _packAndVerifyInIsolate,
-        payload: _BackupPackArgs(
-          outPath: outPath,
-          manifestPath: manifestPath,
-          settingsPath: settingsPath,
-          databasePath: databasePath,
-          snapshotInfo: snapshotInfo,
-          includeChats: includeChats,
-          includeFiles: includeFiles,
-          appVersion: appVersion,
-          businessEntityRowIds: businessExport.entityRowIds,
-          scope: scope,
-          assetRootPaths: assetRootPaths,
-          publishedDraftFiles: publishedDraftFiles,
+      // File enumeration can fail before the worker knows the byte total.
+      onProgress?.call(
+        const BackupProgress(
+          phase: BackupPhase.packing,
+          processed: 0,
+          cancellable: true,
         ),
-        cancelToken: cancelToken,
-        onProgress: onProgress,
       );
+      final packed =
+          await runBackupIsolate<
+            ({int verifiedBytes, List<String> skippedEntries}),
+            _BackupPackArgs
+          >(
+            body: _packAndVerifyInIsolate,
+            payload: _BackupPackArgs(
+              outPath: outPath,
+              manifestPath: manifestPath,
+              settingsPath: settingsPath,
+              databasePath: databasePath,
+              snapshotInfo: snapshotInfo,
+              includeChats: includeChats,
+              includeFiles: includeFiles,
+              appVersion: appVersion,
+              businessEntityRowIds: businessExport.entityRowIds,
+              scope: scope,
+              assetRootPaths: assetRootPaths,
+              publishedDraftFiles: publishedDraftFiles,
+            ),
+            cancelToken: cancelToken,
+            onProgress: onProgress,
+          );
+      // Completion warnings are data, not a throttled progress update: deliver
+      // them on the caller after the worker result has arrived.
+      if (packed.skippedEntries.isNotEmpty) {
+        onProgress?.call(
+          BackupProgress(
+            phase: BackupPhase.verifying,
+            processed: packed.verifiedBytes,
+            total: packed.verifiedBytes,
+            unit: BackupProgressUnit.bytes,
+            skippedEntries: packed.skippedEntries,
+          ),
+        );
+      }
 
       return (
         file: takePreparedBackupFile(outFile, cancelToken),
@@ -1194,11 +1219,9 @@ class DataSync {
   }
 
   /// Synchronous ZIP packing — runs inside an Isolate.
-  static void _packAndVerifyInIsolate(
-    BackupIsolateContext ctx,
-    _BackupPackArgs args,
-  ) {
-    final expectedEntries = _packZipSync(
+  static ({int verifiedBytes, List<String> skippedEntries})
+  _packAndVerifyInIsolate(BackupIsolateContext ctx, _BackupPackArgs args) {
+    final packed = _packZipSync(
       outPath: args.outPath,
       manifestPath: args.manifestPath,
       settingsPath: args.settingsPath,
@@ -1215,8 +1238,15 @@ class DataSync {
     );
     _verifyPackedBackupSync(
       zipPath: args.outPath,
-      expectedEntries: expectedEntries,
+      expectedEntries: packed.entries,
       ctx: ctx,
+    );
+    return (
+      verifiedBytes: packed.entries.values.fold(
+        0,
+        (sum, entry) => sum + entry.bytes,
+      ),
+      skippedEntries: packed.skippedEntries,
     );
   }
 
@@ -1226,16 +1256,49 @@ class DataSync {
     return file.existsSync() ? file.lengthSync() : 0;
   }
 
-  static List<File> _listFilesSync(String dirPath) {
+  static List<File> _listFilesSync(
+    String dirPath, {
+    required bool excludeSessionTemp,
+    required void Function(String path) onUnreadable,
+    BackupIsolateContext? ctx,
+  }) {
     final dir = Directory(dirPath);
     if (!dir.existsSync()) return const [];
-    return [
-      for (final entity in dir.listSync(recursive: true, followLinks: false))
-        if (entity is File) entity,
-    ];
+    final files = <File>[];
+    final pending = [dir];
+    while (pending.isNotEmpty) {
+      ctx?.throwIfCancelled();
+      final current = pending.removeLast();
+      final isSession =
+          excludeSessionTemp && p.equals(current.parent.path, dir.path);
+      final List<FileSystemEntity> children;
+      try {
+        children = current.listSync(followLinks: false);
+      } on FileSystemException {
+        onUnreadable(current.path);
+        continue;
+      }
+      for (final entity in children) {
+        ctx?.throwIfCancelled();
+        if (entity is File) {
+          files.add(entity);
+        } else if (entity is Directory) {
+          // /tmp is ephemeral scratch bound to sessions/<id>/tmp. Prune it
+          // before listing: guest tools can leave unreadable directories here.
+          // Other directories named tmp can contain persistent user files.
+          if (isSession && p.basename(entity.path) == 'tmp') continue;
+          pending.add(entity);
+        }
+      }
+    }
+    return files;
   }
 
-  static Map<String, _BackupEntryMetadata> _packZipSync({
+  static ({
+    Map<String, _BackupEntryMetadata> entries,
+    List<String> skippedEntries,
+  })
+  _packZipSync({
     required String outPath,
     required String manifestPath,
     required String settingsPath,
@@ -1258,30 +1321,54 @@ class DataSync {
             !_assetRootNames.every(assetRootPaths.containsKey))) {
       throw StateError('backup_asset_roots');
     }
+    final skippedEntries = <String>{};
+    void recordUnreadable(String root, String path) {
+      skippedEntries.add(
+        _zipEntryName(
+          p.join(root, p.relative(path, from: assetRootPaths[root]!)),
+        ),
+      );
+    }
+
     final assetFiles = includeFiles
         ? {
             for (final name in scope.assetRoots)
-              name: _listFilesSync(assetRootPaths[name]!).where((file) {
-                if (!RegExp(
-                  r'^draft-[0-9a-f-]{36}-[0-9]+',
-                ).hasMatch(p.basename(file.path))) {
-                  return true;
-                }
-                final relative = p.relative(
-                  file.path,
-                  from: p.dirname(assetRootPaths[name]!),
-                );
-                final uri =
-                    'kelivo-file:///${p.split(relative).map(Uri.encodeComponent).join('/')}';
-                return publishedDraftFiles.contains(uri);
-              }).toList(),
+              name:
+                  _listFilesSync(
+                    assetRootPaths[name]!,
+                    excludeSessionTemp: name == 'sessions',
+                    onUnreadable: (path) => recordUnreadable(name, path),
+                    ctx: ctx,
+                  ).where((file) {
+                    if (!RegExp(
+                      r'^draft-[0-9a-f-]{36}-[0-9]+',
+                    ).hasMatch(p.basename(file.path))) {
+                      return true;
+                    }
+                    final relative = p.relative(
+                      file.path,
+                      from: p.dirname(assetRootPaths[name]!),
+                    );
+                    final uri =
+                        'kelivo-file:///${p.split(relative).map(Uri.encodeComponent).join('/')}';
+                    return publishedDraftFiles.contains(uri);
+                  }).toList(),
           }
         : const <String, List<File>>{};
     var totalBytes = _fileSizeSync(settingsPath) + _fileSizeSync(databasePath);
-    for (final files in assetFiles.values) {
-      for (final file in files) {
-        totalBytes += file.lengthSync();
-      }
+    final fileSizes = <String, int>{};
+    for (final root in assetFiles.entries) {
+      root.value.removeWhere((file) {
+        try {
+          final size = file.lengthSync();
+          fileSizes[file.path] = size;
+          totalBytes += size;
+          return false;
+        } on FileSystemException {
+          recordUnreadable(root.key, file.path);
+          return true;
+        }
+      });
     }
     final meter = _BackupByteMeter(
       ctx: ctx,
@@ -1319,7 +1406,9 @@ class DataSync {
             name,
             entries,
             collisionKeys,
-            files: assetFiles[name],
+            files: assetFiles[name]!,
+            fileSizes: fileSizes,
+            onUnreadable: (path) => recordUnreadable(name, path),
           );
         }
       }
@@ -1332,6 +1421,7 @@ class DataSync {
         appVersion: appVersion,
         businessEntityRowIds: businessEntityRowIds,
         scope: scope,
+        skippedEntries: skippedEntries.toList(),
       );
       final manifestFile = File(manifestPath)
         ..writeAsStringSync(manifestJson, flush: true);
@@ -1343,7 +1433,7 @@ class DataSync {
         reportProgress: false,
       );
       writer.closeSync();
-      return entries;
+      return (entries: entries, skippedEntries: skippedEntries.toList());
     } finally {
       writer.closeIfNeededSync();
     }
@@ -1429,48 +1519,44 @@ class DataSync {
     Set<String> collisionKeys,
   ) {
     final file = File(filePath);
-    if (!file.existsSync()) {
-      throw FileSystemException('Backup entry does not exist', filePath);
-    }
     final canonicalName = _zipEntryName(entryName);
     final collisionKey = canonicalName.toLowerCase();
-    if (!collisionKeys.add(collisionKey)) {
+    if (collisionKeys.contains(collisionKey)) {
       throw StateError('backup_entry_collision:$canonicalName');
     }
     entries[canonicalName] = writer.addFile(file, canonicalName);
+    collisionKeys.add(collisionKey);
   }
 
-  /// Add all files from [srcDirPath] into the zip under [zipPrefix].
+  /// Add the enumerated files from [srcDirPath] under [zipPrefix].
   static void _addDirectoryToZip(
     _StreamingZipWriter writer,
     String srcDirPath,
     String zipPrefix,
     Map<String, _BackupEntryMetadata> entries,
     Set<String> collisionKeys, {
-    List<File>? files,
+    required List<File> files,
+    required Map<String, int> fileSizes,
+    required void Function(String path) onUnreadable,
   }) {
-    final fileSystemEntries =
-        files ??
-        [
-          for (final entity
-              in Directory(srcDirPath).existsSync()
-                  ? Directory(
-                      srcDirPath,
-                    ).listSync(recursive: true, followLinks: false)
-                  : const <FileSystemEntity>[])
-            if (entity is File) entity,
-        ];
-    for (final ent in fileSystemEntries) {
+    for (final ent in files) {
       final rel = p.relative(ent.path, from: srcDirPath);
       // ZIP entries must use forward slashes regardless of platform
       final relPosix = rel.replaceAll('\\', '/');
-      _addFileToZip(
-        writer,
-        ent.path,
-        '$zipPrefix/$relPosix',
-        entries,
-        collisionKeys,
-      );
+      final before = writer.meter?.processed ?? 0;
+      try {
+        _addFileToZip(
+          writer,
+          ent.path,
+          '$zipPrefix/$relPosix',
+          entries,
+          collisionKeys,
+        );
+      } on _BackupSourceReadException {
+        onUnreadable(ent.path);
+        final read = (writer.meter?.processed ?? 0) - before;
+        writer.meter?.skipUnreadBytes(fileSizes[ent.path]! - read);
+      }
     }
   }
 
@@ -1959,6 +2045,7 @@ class DataSync {
     'secretsIncluded',
     'businessEntityRowIds',
     'scope',
+    'skippedEntries',
     'database',
     'entries',
   };
@@ -2125,6 +2212,32 @@ class DataSync {
     required Map<String, ({int bytes, String sha256})> expectedEntries,
   }) {
     _verifyPackedBackupSync(zipPath: zipPath, expectedEntries: expectedEntries);
+  }
+
+  @visibleForTesting
+  static List<String> debugPackAssetFiles({
+    required File destination,
+    required Directory source,
+    required List<File> files,
+  }) {
+    final skipped = <String>[];
+    final writer = _StreamingZipWriter(destination.path);
+    try {
+      _addDirectoryToZip(
+        writer,
+        source.path,
+        'upload',
+        {},
+        {},
+        files: files,
+        fileSizes: {for (final file in files) file.path: file.lengthSync()},
+        onUnreadable: skipped.add,
+      );
+      writer.closeSync();
+      return skipped;
+    } finally {
+      writer.closeIfNeededSync();
+    }
   }
 
   @visibleForTesting
@@ -2308,6 +2421,7 @@ class DataSync {
     required String appVersion,
     required Map<String, List<String>> businessEntityRowIds,
     required BackupScope scope,
+    required List<String> skippedEntries,
   }) {
     return jsonEncode({
       'format': _backupFormat,
@@ -2321,6 +2435,7 @@ class DataSync {
       'secretsIncluded': true,
       'businessEntityRowIds': businessEntityRowIds,
       'scope': scope.toJson(),
+      if (skippedEntries.isNotEmpty) 'skippedEntries': skippedEntries,
       if (snapshotInfo != null)
         'database': {
           'entry': _databaseEntryName,
@@ -3906,12 +4021,17 @@ class _BackupByteMeter {
 
   final BackupIsolateContext? ctx;
   final BackupPhase phase;
-  final int total;
+  int total;
   var processed = 0;
 
   void add(int bytes, {String? detail}) {
     processed += bytes;
     report(detail: detail);
+  }
+
+  void skipUnreadBytes(int bytes) {
+    total -= bytes.clamp(0, (total - processed).clamp(0, total));
+    report();
   }
 
   void report({String? detail}) {
@@ -3929,9 +4049,63 @@ class _BackupByteMeter {
   }
 }
 
+// Keep source failures distinct from ZIP destination failures (e.g. disk full).
+class _BackupSourceReadException extends FileSystemException {
+  _BackupSourceReadException(FileSystemException error)
+    : super(error.message, error.path, error.osError);
+}
+
+T _readBackupSource<T>(T Function() read) {
+  try {
+    return read();
+  } on FileSystemException catch (error) {
+    throw _BackupSourceReadException(error);
+  }
+}
+
+/// The archive stream has no truncate API. Retain its underlying file so a
+/// failed source read can discard the partial ZIP entry before continuing.
+class _BackupOutputHandle extends AbstractFileHandle {
+  _BackupOutputHandle(String path)
+    : file = File(path).openSync(mode: FileMode.write);
+
+  final RandomAccessFile file;
+  bool _open = true;
+
+  @override
+  bool get isOpen => _open;
+  @override
+  int get length => file.lengthSync();
+  @override
+  int get position => file.positionSync();
+  @override
+  set position(int value) => file.setPositionSync(value);
+  @override
+  int readInto(Uint8List buffer, [int? length]) =>
+      file.readIntoSync(buffer, 0, length);
+  @override
+  void writeFromSync(List<int> buffer, [int start = 0, int? end]) =>
+      file.writeFromSync(buffer, start, end);
+  @override
+  Future<void> close() async {
+    if (!_open) return;
+    _open = false;
+    await file.close();
+  }
+
+  @override
+  void closeSync() {
+    if (!_open) return;
+    _open = false;
+    file.closeSync();
+  }
+}
+
 class _StreamingZipWriter {
   _StreamingZipWriter(String outPath, {this.meter})
-    : _output = OutputFileStream(outPath);
+    : _handle = _BackupOutputHandle(outPath) {
+    _output = OutputFileStream.withFileHandle(_handle);
+  }
 
   final _BackupByteMeter? meter;
 
@@ -3948,7 +4122,10 @@ class _StreamingZipWriter {
   static const int _maxZip32 = 0xffffffff;
   static const int _chunkSize = 1024 * 1024;
 
-  final OutputFileStream _output;
+  final _BackupOutputHandle _handle;
+  late OutputFileStream _output;
+  int _outputStart = 0;
+  int get _position => _outputStart + _output.length;
   final List<_StreamingZipEntry> _entries = <_StreamingZipEntry>[];
   bool _closed = false;
 
@@ -3964,12 +4141,7 @@ class _StreamingZipWriter {
       throw ArgumentError.value(entryName, 'entryName', 'must not be empty');
     }
 
-    final stat = file.statSync();
-    final uncompressedSize = stat.size;
-    // Deflate may grow incompressible input slightly, so reserve ZIP64 before
-    // the 32-bit boundary instead of discovering overflow after streaming.
-    final usesZip64Entry = uncompressedSize > _maxZip32 - (16 * 1024 * 1024);
-
+    final stat = _readBackupSource(file.statSync);
     final modified = stat.modified;
     final modTime = _zipTime(modified);
     final modDate = _zipDate(modified);
@@ -3977,44 +4149,59 @@ class _StreamingZipWriter {
     if (nameBytes.length > 0xffff) {
       throw FileSystemException('ZIP entry name exceeds ZIP32 limit');
     }
-    final localHeaderOffset = _output.length;
-
-    _writeLocalHeader(
-      nameBytes: nameBytes,
-      modTime: modTime,
-      modDate: modDate,
-      usesZip64: usesZip64Entry,
-    );
-
-    final written = _writeDeflatedFile(
-      file,
-      entryName,
-      reportProgress: reportProgress,
-    );
-    _writeDataDescriptor(written, usesZip64: usesZip64Entry);
-
-    _entries.add(
-      _StreamingZipEntry(
+    final localHeaderOffset = _position;
+    // Opening before writing the header handles ordinary permission failures
+    // without ever publishing a partial entry.
+    final input = _readBackupSource(file.openSync);
+    try {
+      final size = _readBackupSource(input.lengthSync);
+      // Deflate can grow incompressible input; reserve ZIP64 before overflow.
+      final usesZip64Entry = size > _maxZip32 - (16 * 1024 * 1024);
+      _writeLocalHeader(
         nameBytes: nameBytes,
         modTime: modTime,
         modDate: modDate,
-        crc32: written.crc32,
-        compressedSize: written.compressedSize,
-        uncompressedSize: written.uncompressedSize,
-        localHeaderOffset: localHeaderOffset,
-        mode: stat.mode,
-      ),
-    );
-    return (bytes: written.uncompressedSize, sha256: written.sha256);
+        usesZip64: usesZip64Entry,
+      );
+      final written = _writeDeflatedFile(
+        input,
+        entryName,
+        reportProgress: reportProgress,
+      );
+      _writeDataDescriptor(written, usesZip64: usesZip64Entry);
+
+      _entries.add(
+        _StreamingZipEntry(
+          nameBytes: nameBytes,
+          modTime: modTime,
+          modDate: modDate,
+          crc32: written.crc32,
+          compressedSize: written.compressedSize,
+          uncompressedSize: written.uncompressedSize,
+          localHeaderOffset: localHeaderOffset,
+          mode: stat.mode,
+        ),
+      );
+      return (bytes: written.uncompressedSize, sha256: written.sha256);
+    } on _BackupSourceReadException {
+      _output.flush();
+      _handle.file.truncateSync(localHeaderOffset);
+      _handle.position = localHeaderOffset;
+      _output = OutputFileStream.withFileHandle(_handle);
+      _outputStart = localHeaderOffset;
+      rethrow;
+    } finally {
+      input.closeSync();
+    }
   }
 
   void closeSync() {
     if (_closed) return;
-    final centralDirectoryOffset = _output.length;
+    final centralDirectoryOffset = _position;
     for (final entry in _entries) {
       _writeCentralDirectoryHeader(entry);
     }
-    final centralDirectorySize = _output.length - centralDirectoryOffset;
+    final centralDirectorySize = _position - centralDirectoryOffset;
     _writeEndOfCentralDirectory(
       centralDirectoryOffset: centralDirectoryOffset,
       centralDirectorySize: centralDirectorySize,
@@ -4025,8 +4212,12 @@ class _StreamingZipWriter {
 
   void closeIfNeededSync() {
     if (!_closed) {
-      _output.closeSync();
-      _closed = true;
+      try {
+        _output.closeSync();
+      } finally {
+        _handle.closeSync();
+        _closed = true;
+      }
     }
   }
 
@@ -4058,7 +4249,7 @@ class _StreamingZipWriter {
   }
 
   _StreamingZipWrittenFile _writeDeflatedFile(
-    File file,
+    RandomAccessFile raf,
     String entryName, {
     required bool reportProgress,
   }) {
@@ -4070,13 +4261,12 @@ class _StreamingZipWriter {
     final digestSink = _DigestOutputSink();
     final hashSink = sha256.startChunkedConversion(digestSink);
 
-    final raf = file.openSync();
     final buffer = Uint8List(_chunkSize);
     var crc32 = 0;
     var uncompressedSize = 0;
     try {
       while (true) {
-        final read = raf.readIntoSync(buffer);
+        final read = _readBackupSource(() => raf.readIntoSync(buffer));
         if (read == 0) break;
         final chunk = Uint8List.sublistView(buffer, 0, read);
         crc32 = getCrc32(chunk, crc32);
@@ -4089,10 +4279,9 @@ class _StreamingZipWriter {
           meter?.ctx?.throwIfCancelled();
         }
       }
+    } finally {
       hashSink.close();
       inputSink.close();
-    } finally {
-      raf.closeSync();
     }
 
     return _StreamingZipWrittenFile(
@@ -4154,7 +4343,7 @@ class _StreamingZipWriter {
     required int centralDirectoryOffset,
     required int centralDirectorySize,
   }) {
-    final zip64EocdOffset = _output.length;
+    final zip64EocdOffset = _position;
     _output.writeUint32(_zip64EndOfCentralDirectorySignature);
     _output.writeUint64(44);
     _output.writeUint16(_versionNeeded);

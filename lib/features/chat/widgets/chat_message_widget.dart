@@ -10,12 +10,18 @@ import 'package:markstream/markstream_core.dart' show SourceSpan;
 import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
 import 'tool_permission_widgets.dart';
 import '../../provider/widgets/oauth_message_recovery.dart';
+import 'response_truncation_notice.dart';
 import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform, visibleForTesting, mapEquals;
+    show
+        defaultTargetPlatform,
+        TargetPlatform,
+        visibleForTesting,
+        mapEquals,
+        ValueListenable;
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import '../../../core/services/haptics.dart';
@@ -25,6 +31,7 @@ import 'dart:io';
 import 'package:open_filex/open_filex.dart';
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
+import 'package:crypto/crypto.dart' show sha256;
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../browser/browser_navigation.dart';
@@ -57,8 +64,11 @@ import '../../../shared/markdown/quote_syntax.dart';
 import '../controllers/quote_editing_controller.dart' show buildQuoteTextSpan;
 import 'quote_chip.dart';
 import 'quote_source_highlight.dart';
+import 'quote_source_anchor.dart';
+import 'quote_interaction_scope.dart';
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/scroll_layout_anchor.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -71,6 +81,7 @@ import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/thinking_sheen.dart';
+import '../../../shared/animations/status_animation.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
@@ -345,9 +356,41 @@ class _AssistantInlineImage extends StatefulWidget {
 }
 
 class _AssistantInlineImageState extends State<_AssistantInlineImage> {
+  late ImageProvider? _provider = _assistantInlineImageProvider(widget.uri);
+  late String _sourceId = sha256.convert(utf8.encode(widget.uri)).toString();
+  PageStorageBucket? _storage;
+  double? _aspect;
   ImageStream? _stream;
   ImageStreamListener? _listener;
-  String? _listenedIdentity;
+  ImageProvider? _listenedProvider;
+
+  Object get _aspectId => ('assistant-inline-image-aspect', _sourceId);
+
+  void _syncAspect({bool sourceChanged = false}) {
+    final storage = PageStorage.maybeOf(context);
+    if (!sourceChanged && identical(storage, _storage)) return;
+    _stopListening();
+    _listenedProvider = null;
+    _storage = storage;
+    _aspect = storage?.readState(context, identifier: _aspectId) as double?;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAspect();
+  }
+
+  @override
+  void didUpdateWidget(_AssistantInlineImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final changed = oldWidget.uri != widget.uri;
+    if (changed) {
+      _provider = _assistantInlineImageProvider(widget.uri);
+      _sourceId = sha256.convert(utf8.encode(widget.uri)).toString();
+    }
+    _syncAspect(sourceChanged: changed);
+  }
 
   @override
   void dispose() {
@@ -361,31 +404,35 @@ class _AssistantInlineImageState extends State<_AssistantInlineImage> {
     }
     _stream = null;
     _listener = null;
-    _listenedIdentity = null;
   }
 
   void _listenForAspect(ImageProvider provider) {
-    final identity = '${widget.imageKey}:${widget.uri.length}';
-    if (_listenedIdentity == identity) return;
+    if (_listenedProvider == provider) return;
     _stopListening();
-    _listenedIdentity = identity;
-    final stream = provider.resolve(ImageConfiguration.empty);
-    late final ImageStreamListener listener;
-    listener = ImageStreamListener((info, _) {
-      final width = info.image.width;
-      final height = info.image.height;
-      if (width > 0 && height > 0) {
-        widget.onAspectResolved?.call(widget.imageKey, width / height);
+    _listenedProvider = provider;
+    _stream = provider.resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener((info, synchronous) {
+      final aspect = info.image.width / info.image.height;
+      info.dispose();
+      _stopListening();
+      if (!mounted || !aspect.isFinite || aspect <= 0) return;
+      _storage?.writeState(context, aspect, identifier: _aspectId);
+      if (_aspect != aspect) {
+        if (synchronous) {
+          _aspect = aspect;
+        } else {
+          preserveScrollLayoutAnchor(context);
+          setState(() => _aspect = aspect);
+        }
       }
-    });
-    _stream = stream;
-    _listener = listener;
-    stream.addListener(listener);
+      widget.onAspectResolved?.call(widget.imageKey, aspect);
+    }, onError: (Object error, StackTrace? stack) => _stopListening());
+    _stream!.addListener(_listener!);
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = _assistantInlineImageProvider(widget.uri);
+    final provider = _provider ??= _assistantInlineImageProvider(widget.uri);
     return GestureDetector(
       key: ValueKey('assistant-inline-image:${widget.imageKey}'),
       onTap: widget.group.isEmpty
@@ -405,23 +452,27 @@ class _AssistantInlineImageState extends State<_AssistantInlineImage> {
           final cacheWidth = displayWidth.isFinite
               ? math.max(1, (displayWidth * dpr).ceil())
               : null;
+          final resized = provider == null
+              ? null
+              : ResizeImage.resizeIfNeeded(cacheWidth, null, provider);
+          // Share Image's decoded stream; measuring must neither decode a
+          // second full-size copy nor keep animated images playing offscreen.
+          if (resized != null) _listenForAspect(resized);
+          final height = displayWidth.isFinite && _aspect != null
+              ? displayWidth / _aspect!
+              : 36.0;
           final image = provider == null
-              ? const Icon(Icons.broken_image)
+              ? const Icon(Lucide.ImageOff)
               : Image(
-                  image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
+                  image: resized!,
                   width: displayWidth.isFinite ? displayWidth : null,
+                  height: height,
                   fit: BoxFit.contain,
-                  frameBuilder: (context, child, frame, _) {
-                    if (frame != null) {
-                      _listenForAspect(provider);
-                    }
-                    return child;
-                  },
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                  errorBuilder: (_, __, ___) => const Icon(Lucide.ImageOff),
                 );
           return ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: image,
+            child: SizedBox(height: height, child: image),
           );
         },
       ),
@@ -1261,6 +1312,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool showUserAvatar;
   final bool showTokenStats;
   final VoidCallback? onRegenerate;
+  final VoidCallback? onRetryWithoutImages;
   final VoidCallback? onResend;
   final VoidCallback? onCopy;
   final VoidCallback? onTranslate;
@@ -1328,6 +1380,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.showUserAvatar = true,
     this.showTokenStats = true,
     this.onRegenerate,
+    this.onRetryWithoutImages,
     this.onResend,
     this.onCopy,
     this.onTranslate,
@@ -2409,12 +2462,23 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       content = CollapsibleUserText(
         key: ValueKey('user-collapse:${widget.message.id}'),
         collapsedHeight: lineHeight * _collapsedUserTextLines,
-        reveal: highlights.isNotEmpty,
+        reveal:
+            highlights.isNotEmpty ||
+            QuoteInteractionScope.maybeOf(
+                  context,
+                )?.navigationFor(widget.message.id) !=
+                null,
         child: content,
       );
     }
 
-    return content;
+    return QuoteSourceAnchor(
+      message: widget.message,
+      source: visualText,
+      sourceMap: sourceMap,
+      markdown: enableUserMarkdown,
+      child: content,
+    );
   }
 
   /// Attachment previews in [parts] ordinal order (not images-then-files).
@@ -2889,19 +2953,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       child: assistantContent,
     );
 
-    return RepaintBoundary(
-      child: AppSelectionArea(
-        message: widget.message,
-        sourceText: visualContent,
-        sourceMap: sourceMap,
-        key: ValueKey(
-          contentKey.isEmpty
-              ? 'assistant_${widget.message.id}'
-              : 'assistant_${widget.message.id}_$contentKey',
-        ),
-        child: DefaultTextStyle.merge(
-          style: TextStyle(fontSize: baseAssistant, height: 1.5),
-          child: assistantContent,
+    return QuoteSourceAnchor(
+      message: widget.message,
+      source: visualContent,
+      sourceMap: sourceMap,
+      markdown: enableAssistantMarkdown,
+      child: RepaintBoundary(
+        child: AppSelectionArea(
+          message: widget.message,
+          sourceText: visualContent,
+          sourceMap: sourceMap,
+          key: ValueKey(
+            contentKey.isEmpty
+                ? 'assistant_${widget.message.id}'
+                : 'assistant_${widget.message.id}_$contentKey',
+          ),
+          child: DefaultTextStyle.merge(
+            style: TextStyle(fontSize: baseAssistant, height: 1.5),
+            child: assistantContent,
+          ),
         ),
       ),
     );
@@ -3467,6 +3537,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ViewportBlockList(
                   storageId: 'body',
                   itemCount: visibleBlocks.length,
+                  revealIndex: () {
+                    final quote = QuoteInteractionScope.maybeOf(
+                      context,
+                    )?.navigationFor(widget.message.id);
+                    if (quote == null) return null;
+                    return visibleBlocks.indexWhere(
+                      (block) =>
+                          block.isText &&
+                          (block.sourceMap
+                                  ?.displayRanges(
+                                    SourceSpan(quote.start, quote.end),
+                                  )
+                                  .isNotEmpty ??
+                              false),
+                    );
+                  }(),
                   spacing: 8,
                   structureToken: (
                     widget.message.id,
@@ -3753,6 +3839,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             for (final error
                 in widget.message.parts.whereType<ProviderAuthErrorPart>())
               OAuthMessageRecovery(error: error),
+            for (final truncation
+                in widget.message.parts.whereType<ResponseTruncationPart>())
+              ResponseTruncationNotice(
+                truncation: truncation,
+                onRetryWithoutImages: widget.message.isStreaming
+                    ? null
+                    : widget.onRetryWithoutImages,
+              ),
             // Action buttons (hidden while generating)
             AnimatedSwitcher(
               // Completion previously remounted the row at its final height.
@@ -3986,6 +4080,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                   finishUsage?.cacheWriteTokens ??
                                   widget.message.cacheWriteTokens,
                               durationMs: widget.message.durationMs,
+                              firstResponseMs: widget.message.firstResponseMs,
                               firstTokenMs: widget.message.firstTokenMs,
                               totalCompletionTokens:
                                   widget.message.completionTokens,
@@ -4480,7 +4575,7 @@ class _RetryCountdownHint extends StatelessWidget {
 }
 
 // Pulsing 3-dot loading indicator for chat thinking states (shared)
-class LoadingIndicator extends StatefulWidget {
+class LoadingIndicator extends StatelessWidget {
   const LoadingIndicator({
     super.key,
     this.height = 16,
@@ -4494,41 +4589,21 @@ class LoadingIndicator extends StatefulWidget {
   final double spacing;
   final Color? color;
   @override
-  State<LoadingIndicator> createState() => _LoadingIndicatorState();
-}
-
-class _LoadingIndicatorState extends State<LoadingIndicator>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1100),
-      vsync: this,
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final base = widget.color ?? cs.primary;
+    final base = color ?? cs.primary;
 
     return RepaintBoundary(
-      child: CustomPaint(
-        size: Size(widget.dotSize * 3 + widget.spacing * 2, widget.height),
-        painter: _LoadingDotsPainter(
-          animation: _controller,
-          color: base,
-          dotSize: widget.dotSize,
-          spacing: widget.spacing,
+      child: StatusAnimation(
+        duration: const Duration(milliseconds: 1100),
+        builder: (context, progress) => CustomPaint(
+          size: Size(dotSize * 3 + spacing * 2, height),
+          painter: _LoadingDotsPainter(
+            animation: progress,
+            color: base,
+            dotSize: dotSize,
+            spacing: spacing,
+          ),
         ),
       ),
     );
@@ -4543,7 +4618,7 @@ class _LoadingDotsPainter extends CustomPainter {
     required this.spacing,
   }) : super(repaint: animation);
 
-  final Animation<double> animation;
+  final ValueListenable<double> animation;
   final Color color;
   final double dotSize;
   final double spacing;
@@ -6921,28 +6996,17 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     ),
                   )
                 else if (widget.part.loading && !isPendingApproval)
-                  isWorkspace
-                      ? SizedBox(
-                          key: WorkspaceStatusBadge.runningKey,
-                          width: 18,
-                          height: 18,
-                          child: LoadingIndicator(
-                            height: 12,
-                            dotSize: 3,
-                            spacing: 2,
-                            color: fg.accent,
-                          ),
-                        )
-                      : SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              fg.accent,
-                            ),
-                          ),
-                        )
+                  SizedBox(
+                    key: isWorkspace ? WorkspaceStatusBadge.runningKey : null,
+                    width: 18,
+                    height: 18,
+                    child: LoadingIndicator(
+                      height: 12,
+                      dotSize: 3,
+                      spacing: 2,
+                      color: fg.accent,
+                    ),
+                  )
                 else
                   SizedBox(
                     width: 18,

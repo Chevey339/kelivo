@@ -21,6 +21,7 @@ class ViewportBlockList extends StatefulWidget {
     this.spacing = 0,
     this.threshold = 24,
     this.storageId,
+    this.revealIndex,
   });
 
   final int itemCount;
@@ -35,6 +36,9 @@ class ViewportBlockList extends StatefulWidget {
   /// Identifies the measured extents kept in the enclosing [PageStorage].
   /// Without it extents live only as long as this widget's state.
   final Object? storageId;
+
+  /// Keep a navigation target mounted while its exact text geometry is read.
+  final int? revealIndex;
 
   @override
   State<ViewportBlockList> createState() => _ViewportBlockListState();
@@ -360,6 +364,9 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
           _last = math.min(widget.itemCount, 24);
         }
         final indices = <int>{
+          if (widget.revealIndex case final index?
+              when index >= 0 && index < widget.itemCount)
+            index,
           for (final index in _mountedIndices)
             if (index < widget.itemCount &&
                 (widget.keepAlive?.call(index) ?? false))

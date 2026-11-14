@@ -66,6 +66,21 @@ const _voidTags = {
 };
 const discardedHtmlTags = {'script', 'style', 'iframe'};
 
+bool isKnownHtmlTag(String name) =>
+    htmlBlockTags.contains(name) ||
+    htmlInlineTags.contains(name) ||
+    discardedHtmlTags.contains(name);
+
+bool isNativeHtmlTableRow(InlineNode node) =>
+    node is HtmlElementNode &&
+    node.tag == 'tr' &&
+    node.children.every(
+      (child) =>
+          child is HtmlElementNode &&
+              (child.tag == 'td' || child.tag == 'th') ||
+          child is TextNode && child.text.trim().isEmpty,
+    );
+
 final class _Element {
   _Element(this.tag, this.start, this.attributes);
   final String tag;
@@ -75,7 +90,7 @@ final class _Element {
 }
 
 /// Tokenizes a fragment without a browser, retaining only the native HTML subset.
-/// Unknown shells disappear; raw script/style/iframe bodies disappear with them.
+/// Unknown tags stay literal; raw script/style/iframe bodies are discarded.
 List<InlineNode> parseHtmlFragment(
   List<TextNode> fragments, {
   bool block = false,
@@ -87,19 +102,14 @@ List<InlineNode> parseHtmlFragment(
   final stack = <_Element>[_Element('', 0, const {})];
   void close(int end) {
     final element = stack.removeLast();
-    if (htmlBlockTags.contains(element.tag) ||
-        htmlInlineTags.contains(element.tag)) {
-      stack.last.children.add(
-        HtmlElementNode(
-          span: input.span(element.start, end),
-          tag: element.tag,
-          children: element.children,
-          attributes: element.attributes,
-        ),
-      );
-    } else {
-      stack.last.children.addAll(element.children);
-    }
+    stack.last.children.add(
+      HtmlElementNode(
+        span: input.span(element.start, end),
+        tag: element.tag,
+        children: element.children,
+        attributes: element.attributes,
+      ),
+    );
   }
 
   var run = 0;
@@ -124,7 +134,10 @@ List<InlineNode> parseHtmlFragment(
       final marker = comment ? '-->' : '>';
       final end = text.indexOf(marker, i + 2);
       i = end < 0 ? text.length : end + marker.length;
-    } else if (tag!.closing) {
+    } else if (!isKnownHtmlTag(tag!.name)) {
+      stack.last.children.addAll(input.slice(i, tag.end));
+      i = tag.end;
+    } else if (tag.closing) {
       final index = stack.lastIndexWhere((element) => element.tag == tag.name);
       if (index > 0) {
         while (stack.length > index + 1) close(i);

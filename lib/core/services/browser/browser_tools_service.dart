@@ -96,15 +96,19 @@ class BrowserToolsService {
           'A page-load timeout does not pause control: inspect the current page '
           'with snapshot or extract before deciding whether to wait or navigate. '
           'browser_action_timeout_outcome_unknown means a native operation '
-          'timed out and control is paused; ask the user to check the page '
-          'and allow continuation. You can still list_tabs or close an owned tab; '
-          'closing does not resume page actions. Other conversations are unaffected. '
-          'This is not human takeover. '
+          'timed out without a confirmed outcome. Control is not paused. '
+          'Inspect snapshot/extract and the current field value or URL before continuing; '
+          'the command may still complete later. Timeout details report page_responsive '
+          'and may_have_late_effects; stopping loading does not cancel JavaScript. '
+          'If the page remains unresponsive, reload/close that tab or use another tab. '
+          'Read-only timeouts can be retried; a timeout never grants permission to repeat a mutation. '
+          'After an unconfirmed command, that tab rejects further mutations with browser_observation_required until snapshot or extract succeeds. Navigation and closing remain available for recovery. '
           'Never retry a mutation with outcome_unknown without observing first. '
           'Navigation waits default to domcontentloaded, not all images/fonts. '
           'Use wait_until=commit for the first document, load for all resources, or none to return after issuing navigation. '
           'Then wait_for/wait_for_url can observe a specific condition. '
           'Errors include error_code, recoverable, outcome_unknown and next_action. '
+          'When details.action_completed is true, the action succeeded but a later wait failed; do not repeat the completed action. '
           'Screenshots cost image tokens; use action=screenshot with save_to=relative/path.png '
           'to save only in the bound workspace (return_image defaults to false with save_to). '
           'Existing files are never overwritten. Set return_image=true only when the model needs to see the image.',
@@ -237,10 +241,10 @@ class BrowserToolsService {
           'timeout': {
             'type': 'integer',
             'minimum': 100,
-            'maximum': 30000,
+            'maximum': 120000,
             'default': 15000,
             'description':
-                'Milliseconds for each navigation-stage or condition wait (100–30000). Does not change the separate 30-second native command deadline; a page-load timeout does not pause AI control.',
+                'Milliseconds for each navigation-stage or condition wait (100–120000). Native commands use the Operation timeout in browser settings; that setting does not shorten navigation-stage waits. Timeouts do not pause AI control.',
           },
           'script': {
             'type': 'string',
@@ -409,6 +413,8 @@ class BrowserToolsService {
                 'url': tab.url,
                 'title': tab.title,
                 'active': activeId == tab.id,
+                if (browser.requiresAgentObservation(tab.id))
+                  'requires_observation': true,
               },
           ],
         });
@@ -417,7 +423,6 @@ class BrowserToolsService {
         sessionId: conversationId,
         label: action,
         tabId: args['tab_id'] as String?,
-        allowTimeoutClose: action == 'close_tab',
         action: () => _execute(
           conversationId,
           action,
@@ -605,7 +610,26 @@ class BrowserToolsService {
         (args.containsKey('wait_for') ||
             args.containsKey('wait_for_url') ||
             args.containsKey('wait_ms'))) {
-      await _wait(tabId, args, timeout);
+      try {
+        await _wait(tabId, args, timeout);
+      } catch (error) {
+        outputScope?.close();
+        // A screenshot has not run yet. Retrying an observation is also safe.
+        if (const {'screenshot', 'snapshot', 'extract'}.contains(action)) {
+          rethrow;
+        }
+        final failure = BrowserFailure.from(error);
+        throw BrowserFailure(
+          failure.code,
+          'The $action action completed, but its subsequent wait failed: ${failure.message}',
+          failure.recoverable
+              ? 'Inspect the current page before choosing another wait. Do not repeat the completed $action action.'
+              : failure.nextAction,
+          recoverable: failure.recoverable,
+          outcomeUnknown: failure.outcomeUnknown,
+          details: {...?failure.details, 'action_completed': true},
+        );
+      }
     }
     if ((action == 'open' || action == 'new_tab') &&
         args['extract_after'] == true) {
@@ -649,6 +673,7 @@ class BrowserToolsService {
             await browser.evaluateJavascript(
               'JSON.stringify({width:innerWidth,height:innerHeight,device_pixel_ratio:devicePixelRatio})',
               tabId: tabId,
+              readOnly: true,
             ),
           );
           final saved = await McpImageSnapshot.saveBytes(
@@ -702,7 +727,7 @@ class BrowserToolsService {
         }
       }
     }
-    return _result(
+    final result = _result(
       sessionId,
       action,
       {
@@ -737,18 +762,30 @@ class BrowserToolsService {
       images: images,
       preview: preview,
     );
+    // Only acknowledge an observation that actually reaches the model. A
+    // successful DOM read followed by a failed wait returns no page content.
+    if (action == 'snapshot' ||
+        action == 'extract' ||
+        ((action == 'open' || action == 'new_tab') &&
+            args['extract_after'] == true)) {
+      browser.didObserveAgentTab(tabId);
+    }
+    return result;
   }
 
   Future<Map<String, dynamic>> _dom(
     String tabId,
     String action,
-    Map<String, dynamic> args,
-  ) async {
+    Map<String, dynamic> args, {
+    Duration? timeout,
+  }) async {
     final data = _decode(
       await browser.evaluateJavascript(
         BrowserAutomationScript.build(action, args),
         tabId: tabId,
         awaitPromise: true,
+        readOnly: const {'snapshot', 'extract', 'wait'}.contains(action),
+        timeout: timeout,
       ),
     );
     if (data['url'] is String) {
@@ -793,9 +830,24 @@ class BrowserToolsService {
     final delay = args['wait_ms'] as int? ?? 0;
     if (delay > 0) await Future<void>.delayed(Duration(milliseconds: delay));
     final deadline = DateTime.now().add(timeout);
+    TimeoutException expired() => TimeoutException(
+      'browser_wait_timeout: requested page condition did not become ready; inspect the current page before retrying.',
+      timeout,
+    );
     do {
       ToolCallCancellation.current?.throwIfCancelled();
-      final state = await _dom(tabId, 'wait', args);
+      final remaining = deadline.difference(DateTime.now());
+      if (remaining <= Duration.zero) throw expired();
+      final Map<String, dynamic> state;
+      try {
+        state = await _dom(tabId, 'wait', args, timeout: remaining);
+      } on BrowserFailure catch (error) {
+        if (error.code != 'browser_read_timeout' ||
+            DateTime.now().isBefore(deadline)) {
+          rethrow;
+        }
+        throw expired();
+      }
       if (state['ready'] == true &&
           (args['wait_for_url'] == null ||
               (state['url'] as String? ?? '').contains(
@@ -803,13 +855,13 @@ class BrowserToolsService {
               ))) {
         return;
       }
-      if (DateTime.now().isAfter(deadline)) {
-        throw TimeoutException(
-          'browser_wait_timeout: requested page condition did not become ready; inspect the current page before retrying.',
-          timeout,
-        );
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+      final untilDeadline = deadline.difference(DateTime.now());
+      if (untilDeadline <= Duration.zero) throw expired();
+      await Future<void>.delayed(
+        untilDeadline < const Duration(milliseconds: 150)
+            ? untilDeadline
+            : const Duration(milliseconds: 150),
+      );
     } while (true);
   }
 

@@ -1,8 +1,10 @@
+import '../models/attachment_retention.dart';
 import 'compression_repository.dart';
 import 'extension_entity_store.dart';
 import '../models/compression_config.dart';
 import '../models/image_context.dart';
 import '../utils/chat_image_result.dart';
+import '../utils/conversation_fork_title.dart';
 import '../models/quote_ref.dart';
 import 'package:Kelivo/utils/utf16_safe_cut.dart';
 import 'package:Kelivo/features/search/utils/searchable_text.dart';
@@ -34,6 +36,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
 import '../models/context_operation.dart';
+import '../models/context_operation_summary.dart';
 import '../models/compress_context_options.dart';
 import '../models/token_usage.dart';
 import '../models/conversation.dart';
@@ -2754,6 +2757,7 @@ class ChatDatabaseRepository {
             .get();
         return getMessagesByIds(
           rows.reversed.map((r) => r.read<String>('revision_id')).toList(),
+          background: true,
         );
       }),
       resultCount: (rows) => rows.length,
@@ -3301,7 +3305,10 @@ class ChatDatabaseRepository {
     });
   }
 
-  Future<List<ChatMessage>> getMessagesByIds(List<String> ids) async {
+  Future<List<ChatMessage>> getMessagesByIds(
+    List<String> ids, {
+    bool background = false,
+  }) async {
     if (ids.isEmpty) return const <ChatMessage>[];
     return _observer.measure(
       ChatDatabaseOperation.queryMessagesByIds,
@@ -3318,7 +3325,10 @@ class ChatDatabaseRepository {
           final rows = await (_db.select(
             _db.messageRows,
           )..where((t) => t.id.isIn(batch))).get();
-          for (final message in await _messagesFromRowsWithParts(rows)) {
+          for (final message in await _messagesFromRowsWithParts(
+            rows,
+            background: background,
+          )) {
             byId[message.id] = message;
           }
         }
@@ -4001,6 +4011,12 @@ class ChatDatabaseRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         content_hash = excluded.content_hash,
+        extras_json = CASE WHEN asset_rows.path != excluded.path THEN
+          json_set(asset_rows.extras_json, '\$.localPaths',
+            json((SELECT json_group_array(value) FROM (
+              SELECT DISTINCT value FROM json_each(
+                coalesce(json_extract(asset_rows.extras_json, '\$.localPaths'), '[]'))
+              UNION SELECT asset_rows.path)))) ELSE asset_rows.extras_json END,
         path = excluded.path,
         byte_size = excluded.byte_size,
         width = excluded.width,
@@ -4067,6 +4083,12 @@ class ChatDatabaseRepository {
             created_at, last_referenced_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
+        extras_json = CASE WHEN asset_rows.path != excluded.path THEN
+          json_set(asset_rows.extras_json, '\$.localPaths',
+            json((SELECT json_group_array(value) FROM (
+              SELECT DISTINCT value FROM json_each(
+                coalesce(json_extract(asset_rows.extras_json, '\$.localPaths'), '[]'))
+              UNION SELECT asset_rows.path)))) ELSE asset_rows.extras_json END,
             path = excluded.path,
             byte_size = excluded.byte_size,
             width = excluded.width,
@@ -4119,6 +4141,34 @@ class ChatDatabaseRepository {
     );
   }
 
+  Future<int> getAttachmentRetentionDays() async => AttachmentRetention.days(
+    await BusinessRepository(
+      _db,
+    ).getPreference(AttachmentRetention.preferenceKey),
+  );
+
+  /// Shift queued deadlines by the policy change, preserving time already spent
+  /// waiting. Apply the policy atomically before scheduling new candidates.
+  Future<void> applyAttachmentRetention(int days) => _db.transaction(() async {
+    const key = 'asset_gc_retention_days';
+    final row = await (_db.select(
+      _db.chatStorageMetaRows,
+    )..where((row) => row.key.equals(key))).getSingleOrNull();
+    final previous = AttachmentRetention.days(int.tryParse(row?.value ?? ''));
+    if (previous != days) {
+      await _db.customStatement(
+        'UPDATE asset_gc_rows SET not_before = not_before + ?, '
+        'generation = generation + 1;',
+        [Duration(days: days - previous).inMicroseconds],
+      );
+    }
+    await _db
+        .into(_db.chatStorageMetaRows)
+        .insertOnConflictUpdate(
+          ChatStorageMetaRowsCompanion.insert(key: key, value: '$days'),
+        );
+  });
+
   Future<int> scheduleUnreferencedAssetGc({required DateTime notBefore}) async {
     await _db.customStatement(
       '''
@@ -4138,13 +4188,42 @@ class ChatDatabaseRepository {
     return row.read<int>('changed');
   }
 
+  Future<bool> hasActiveGenerations() async =>
+      await _db
+          .customSelect(
+            'SELECT 1 FROM message_rows WHERE is_streaming = 1 LIMIT 1;',
+          )
+          .getSingleOrNull() !=
+      null;
+
+  Future<bool> hasDueAssetGc() async =>
+      await _db
+          .customSelect(
+            'SELECT 1 FROM asset_gc_rows WHERE not_before <= ? LIMIT 1;',
+            variables: [
+              Variable<int>(DateTime.now().toUtc().microsecondsSinceEpoch),
+            ],
+          )
+          .getSingleOrNull() !=
+      null;
+
   Future<List<AssetGcCandidate>> claimAssetGc({
     required DateTime now,
     int limit = 50,
     @visibleForTesting int maxScan = 500,
+    bool generationActive = false,
+    Set<String> protectedPaths = const {},
   }) async {
     if (limit <= 0) return const <AssetGcCandidate>[];
     return _db.transaction(() async {
+      if (generationActive || await hasActiveGenerations()) {
+        return const <AssetGcCandidate>[];
+      }
+      final heldPaths = jsonEncode(protectedPaths.toList());
+      const heldFilter =
+          "AND NOT EXISTS (SELECT 1 FROM json_each(?) held "
+          "WHERE held.value = a.path OR held.value IN "
+          "(SELECT value FROM json_each(a.extras_json, '\$.localPaths')))";
       // Page candidates with keyset pagination, then ask SQLite once per page
       // whether any dirty text references those paths (set-based instr). Never
       // pull the full dirty payload corpus into Dart.
@@ -4164,6 +4243,7 @@ class ChatDatabaseRepository {
             SELECT g.asset_id, a.path, g.not_before FROM asset_gc_rows g
             JOIN asset_rows a ON a.id = g.asset_id
             WHERE g.not_before <= ?
+              $heldFilter
               AND NOT EXISTS (
                 SELECT 1 FROM message_asset_rows r
                 WHERE r.asset_id = g.asset_id
@@ -4173,6 +4253,7 @@ class ChatDatabaseRepository {
           ''',
                 variables: [
                   Variable<int>(now.microsecondsSinceEpoch),
+                  Variable<String>(heldPaths),
                   Variable<int>(pageSize),
                 ],
               )
@@ -4184,6 +4265,7 @@ class ChatDatabaseRepository {
             SELECT g.asset_id, a.path, g.not_before FROM asset_gc_rows g
             JOIN asset_rows a ON a.id = g.asset_id
             WHERE g.not_before <= ?
+              $heldFilter
               AND NOT EXISTS (
                 SELECT 1 FROM message_asset_rows r
                 WHERE r.asset_id = g.asset_id
@@ -4197,6 +4279,7 @@ class ChatDatabaseRepository {
           ''',
                 variables: [
                   Variable<int>(now.microsecondsSinceEpoch),
+                  Variable<String>(heldPaths),
                   Variable<int>(cursorNotBefore),
                   Variable<int>(cursorNotBefore),
                   Variable<String>(cursorAssetId!),
@@ -4254,7 +4337,7 @@ class ChatDatabaseRepository {
       }
       final rows = await _db.customSelect(
         '''
-            SELECT a.id, a.path, a.thumbnail_path, a.byte_size, g.generation
+            SELECT a.id, a.path, a.thumbnail_path, a.byte_size, a.extras_json, g.generation
             FROM asset_gc_rows g JOIN asset_rows a ON a.id = g.asset_id
             WHERE a.id IN (${List.filled(ids.length, '?').join(',')})
             ORDER BY g.not_before, a.id;
@@ -4269,6 +4352,7 @@ class ChatDatabaseRepository {
             thumbnailPath: row.readNullable<String>('thumbnail_path'),
             byteSize: row.read<int>('byte_size'),
             generation: row.read<int>('generation'),
+            additionalPaths: assetLocalPaths(row.read<String>('extras_json')),
           ),
       ];
     });
@@ -4335,6 +4419,13 @@ class ChatDatabaseRepository {
   );
 
   Future<bool> isAssetGcClaimStillValid(AssetGcCandidate candidate) async {
+    if (await hasActiveGenerations()) return false;
+    if ((await _dirtyPartProtectedAssetIds([
+      for (final path in candidate.additionalPaths)
+        (id: candidate.assetId, path: path, notBefore: 0),
+    ])).isNotEmpty) {
+      return false;
+    }
     final pathForm = candidate.path.isEmpty ? ' ' : candidate.path;
     final altForm = _alternateAssetPathForm(pathForm);
     final jsonPathForm = _jsonEscapedPathForm(pathForm);
@@ -4377,6 +4468,7 @@ class ChatDatabaseRepository {
     required int expectedGeneration,
     required String path,
     DateTime? completedAt,
+    List<String> additionalPaths = const [],
   }) async {
     // Dirty-part protection must match either stored form. Never pass '' —
     // instr(x, '') is always true and would stall GC forever.
@@ -4385,6 +4477,15 @@ class ChatDatabaseRepository {
     final jsonPathForm = _jsonEscapedPathForm(pathForm);
     final jsonAltForm = _jsonEscapedPathForm(altForm);
     return _db.transaction(() async {
+      if (await hasActiveGenerations()) return false;
+
+      if ((await _dirtyPartProtectedAssetIds([
+        for (final path in additionalPaths)
+          (id: assetId, path: path, notBefore: 0),
+      ])).isNotEmpty) {
+        return false;
+      }
+
       final claim = await _db
           .customSelect(
             '''
@@ -4731,6 +4832,26 @@ class ChatDatabaseRepository {
     await _replaceMcpServers(conversationId, serverIds ?? const []);
   });
 
+  // Call inside the transaction that inserts the fork so concurrent copies
+  // cannot claim the same suffix. Read titles only, including other assistants.
+  Future<String> _nextForkTitle(String sourceTitle) async {
+    final title = _db.conversationRows.title;
+    final rows = await (_db.selectOnly(
+      _db.conversationRows,
+    )..addColumns([title])).get();
+    return nextConversationForkTitle(
+      sourceTitle,
+      rows.map((row) => row.read(title)!),
+    );
+  }
+
+  /// Saves a newly constructed message-selection fork with an available title.
+  Future<void> putForkConversation(Conversation conversation) =>
+      _writeTransaction(() async {
+        conversation.title = await _nextForkTitle(conversation.title);
+        await putConversation(conversation);
+      });
+
   Future<Conversation?> duplicateConversation(String sourceId) async {
     await genUiStates.flush();
     return _writeTransaction(() async {
@@ -4765,6 +4886,7 @@ class ChatDatabaseRepository {
       );
       final duplicatedAt = DateTime.now();
       final duplicate = source.copyWith(
+        title: await _nextForkTitle(source.title),
         extras: ToolPermissionMode.withoutGrant(source.extras),
         id: targetId,
         createdAt: duplicatedAt,
@@ -4924,7 +5046,6 @@ class ChatDatabaseRepository {
   Future<Conversation?> forkConversationWithVersions({
     required String sourceId,
     required String targetRevisionId,
-    required String title,
     String? assistantId,
     bool preserveVersions = true,
   }) async {
@@ -5042,7 +5163,7 @@ class ChatDatabaseRepository {
             _conversationCompanion(
               Conversation(
                 id: targetId,
-                title: title,
+                title: await _nextForkTitle(source.title),
                 createdAt: now,
                 updatedAt: now,
                 assistantId: assistantId,
@@ -6901,6 +7022,7 @@ class ChatDatabaseRepository {
             reasoningTokens: message.reasoningTokens,
             cacheWriteTokens: message.cacheWriteTokens,
             finishUsage: message.finishUsage,
+            firstResponseMs: message.firstResponseMs,
             firstTokenMs: message.firstTokenMs,
             quotes: message.quotes,
           ),
@@ -8039,45 +8161,63 @@ class ChatDatabaseRepository {
     return (await _messagesFromRowsWithParts([row])).single;
   }
 
-  Future<List<ChatMessage>> _messagesFromRowsWithParts(List<MessageRow> rows) =>
-      _db.transaction(() async {
-        if (rows.isEmpty) return const [];
-        final ids = rows.map((row) => row.id).toSet();
-        final parts =
-            await (_db.select(_db.messagePartRows)
-                  ..where((part) => part.revisionId.isIn(ids))
-                  ..orderBy([(part) => OrderingTerm.asc(part.ordinal)]))
-                .get();
-        final byRevision = <String, List<MessagePartRow>>{};
-        for (final part in parts) {
-          byRevision.putIfAbsent(part.revisionId, () => []).add(part);
-        }
-        final runs =
-            await (_db.select(_db.generationRunRows)
-                  ..where((run) => run.targetRevisionId.isIn(ids))
-                  ..orderBy([
-                    (run) => OrderingTerm.desc(run.createdAt),
-                    (run) => OrderingTerm.desc(run.updatedAt),
-                    (run) => OrderingTerm.desc(run.id),
-                  ]))
-                .get();
-        final generationStates = <String, GenerationRunState>{};
-        for (final run in runs) {
-          generationStates.putIfAbsent(
-            run.targetRevisionId,
-            () => GenerationRunState.fromDatabase(run.state),
-          );
-        }
-        return [
-          for (final row in rows)
-            _messageFromRow(row, authoritativeParts: byRevision[row.id])
-              ..hydrateGenerationState(generationStates[row.id]),
-        ];
-      });
+  Future<List<ChatMessage>> _messagesFromRowsWithParts(
+    List<MessageRow> rows, {
+    bool background = false,
+  }) => _db.transaction(() async {
+    if (rows.isEmpty) return const [];
+    final ids = rows.map((row) => row.id).toSet();
+    final parts =
+        await (_db.select(_db.messagePartRows)
+              ..where((part) => part.revisionId.isIn(ids))
+              ..orderBy([(part) => OrderingTerm.asc(part.ordinal)]))
+            .get();
+    final runs =
+        await (_db.select(_db.generationRunRows)
+              ..where((run) => run.targetRevisionId.isIn(ids))
+              ..orderBy([
+                (run) => OrderingTerm.desc(run.createdAt),
+                (run) => OrderingTerm.desc(run.updatedAt),
+                (run) => OrderingTerm.desc(run.id),
+              ]))
+            .get();
+    return background
+        ? _hydrateMessagesInBackground(rows, parts, runs)
+        : _hydrateMessages(rows, parts, runs);
+  });
+
+  static Future<List<ChatMessage>> _hydrateMessagesInBackground(
+    List<MessageRow> rows,
+    List<MessagePartRow> parts,
+    List<GenerationRunRow> runs,
+  ) => Isolate.run(() => _hydrateMessages(rows, parts, runs));
+
+  static List<ChatMessage> _hydrateMessages(
+    List<MessageRow> rows,
+    List<MessagePartRow> parts,
+    List<GenerationRunRow> runs,
+  ) {
+    final byRevision = <String, List<MessagePartRow>>{};
+    for (final part in parts) {
+      byRevision.putIfAbsent(part.revisionId, () => []).add(part);
+    }
+    final generationStates = <String, GenerationRunState>{};
+    for (final run in runs) {
+      generationStates.putIfAbsent(
+        run.targetRevisionId,
+        () => GenerationRunState.fromDatabase(run.state),
+      );
+    }
+    return [
+      for (final row in rows)
+        _messageFromRow(row, authoritativeParts: byRevision[row.id])
+          ..hydrateGenerationState(generationStates[row.id]),
+    ];
+  }
 
   /// Parts come only from [authoritativeParts] in ordinal order. Missing or
   /// empty parts yield empty content via the derived [ChatMessage.content].
-  ChatMessage _messageFromRow(
+  static ChatMessage _messageFromRow(
     MessageRow row, {
     List<MessagePartRow>? authoritativeParts,
   }) {
@@ -8119,6 +8259,7 @@ class ChatDatabaseRepository {
       completionTokens: row.completionTokens,
       cachedTokens: row.cachedTokens,
       durationMs: row.durationMs,
+      firstResponseMs: _tokenExtraInt(extras, _firstResponseMsExtraKey),
       firstTokenMs: _tokenExtraInt(extras, _firstTokenMsExtraKey),
       reasoningTokens: _tokenExtraInt(extras, _reasoningTokensExtraKey),
       cacheWriteTokens: _tokenExtraInt(extras, _cacheWriteTokensExtraKey),
@@ -8387,7 +8528,7 @@ class ChatDatabaseRepository {
     return _toolPayloads[part] = const <String, dynamic>{};
   }
 
-  MessagePart _hydratePart({
+  static MessagePart _hydratePart({
     required String revisionId,
     required int ordinal,
     required String kind,
@@ -8448,6 +8589,7 @@ class ChatDatabaseRepository {
           reasoningTokens: message.reasoningTokens,
           cacheWriteTokens: message.cacheWriteTokens,
           finishUsage: message.finishUsage,
+          firstResponseMs: message.firstResponseMs,
           firstTokenMs: message.firstTokenMs,
           quotes: message.quotes,
         ),
@@ -8498,7 +8640,7 @@ class ChatDatabaseRepository {
     }
   }
 
-  Map<String, dynamic> _decodeExtrasJson(String raw) {
+  static Map<String, dynamic> _decodeExtrasJson(String raw) {
     return Conversation.decodeExtras(raw);
   }
 
@@ -8506,8 +8648,9 @@ class ChatDatabaseRepository {
   static const _cacheWriteTokensExtraKey = 'tokens.cacheWrite';
   static const _finishUsageExtraKey = 'tokens.finish';
   static const _firstTokenMsExtraKey = 'timing.firstTokenMs';
+  static const _firstResponseMsExtraKey = 'timing.firstResponseMs';
 
-  int? _tokenExtraInt(Map<String, dynamic> extras, String key) {
+  static int? _tokenExtraInt(Map<String, dynamic> extras, String key) {
     final value = extras[key];
     if (value is int) return value;
     if (value is num) return value.toInt();
@@ -8531,6 +8674,7 @@ class ChatDatabaseRepository {
     int? reasoningTokens,
     int? cacheWriteTokens,
     TokenUsage? finishUsage,
+    int? firstResponseMs,
     int? firstTokenMs,
     List<QuoteRef>? quotes,
   }) {
@@ -8543,6 +8687,9 @@ class ChatDatabaseRepository {
     }
     if (finishUsage != null) {
       extras[_finishUsageExtraKey] = finishUsage.toJson();
+    }
+    if (firstResponseMs != null) {
+      extras[_firstResponseMsExtraKey] = firstResponseMs;
     }
     if (firstTokenMs != null) {
       extras[_firstTokenMsExtraKey] = firstTokenMs;
@@ -9301,6 +9448,11 @@ final class ChatStatsAggregate {
   final List<ChatStatsRank> topics;
 }
 
+List<String> assetLocalPaths(String extrasJson) {
+  final value = jsonDecode(extrasJson) as Map;
+  return (value['localPaths'] as List? ?? const []).cast<String>();
+}
+
 final class AssetGcCandidate {
   const AssetGcCandidate({
     required this.assetId,
@@ -9308,7 +9460,9 @@ final class AssetGcCandidate {
     required this.thumbnailPath,
     required this.byteSize,
     required this.generation,
+    this.additionalPaths = const [],
   });
+  final List<String> additionalPaths;
   final String assetId;
   final String path;
   final String? thumbnailPath;

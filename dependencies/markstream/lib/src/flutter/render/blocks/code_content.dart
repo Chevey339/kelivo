@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/ast/nodes.dart';
 import '../../../core/ast/source_span.dart';
@@ -51,21 +52,48 @@ class MarkstreamCodeContent extends StatefulWidget {
   final bool streaming, exporting, wrap, highlight;
   final int? maxLines;
   final LiteralSpanBuilder? literalSpanBuilder;
+
+  /// Wait for syntax already requested by a mounted subtree before measuring
+  /// or capturing it. Each block keeps its plain source visible while pending.
+  static Future<void> waitForHighlighting(BuildContext subtree) async {
+    final pending = <Future<void>>[];
+    void visit(BuildContext context) {
+      if (context is StatefulElement &&
+          context.state is _MarkstreamCodeContentState) {
+        final work =
+            (context.state as _MarkstreamCodeContentState)._highlightWork;
+        if (work != null) pending.add(work);
+      }
+      context.visitChildElements(visit);
+    }
+
+    visit(subtree);
+    await Future.wait(pending);
+  }
+
   @override
   State<MarkstreamCodeContent> createState() => _MarkstreamCodeContentState();
 }
 
 class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
   final _selection = SourceTextSelectionDelegate();
+  final _scroll = ScrollController();
+  final _list = ListController();
   final _chunks = <(int, String)>[];
   String _source = '';
   int _lastChunkStart = 0;
   TextIndex? _literalIndex;
+  late TextSpan _span;
+  List<TextSpan>? _chunkSpans;
+  Object? _highlightRequest;
+  int _generation = 0;
+  Future<void>? _highlightWork;
 
   @override
   void initState() {
     super.initState();
     _update();
+    _updateHighlight();
   }
 
   @override
@@ -73,6 +101,7 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.node != widget.node) _literalIndex = null;
     _update();
+    _updateHighlight();
   }
 
   void _update() {
@@ -105,23 +134,88 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
 
   @override
   void dispose() {
+    _generation++;
+    _scroll.dispose();
+    _list.dispose();
     _selection.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  void _setSpan(TextSpan span) {
+    _span = span.toPlainText(includeSemanticsLabels: false) == _source
+        ? span
+        : TextSpan(text: _source, style: widget.theme.code.text);
+    _chunkSpans = null;
+  }
+
+  void _updateHighlight() {
     final language = widget.node.info
         .trim()
         .split(RegExp(r'\s+'))
         .first
         .toLowerCase();
-    final highlight =
+    final enabled =
         widget.highlight &&
         !(widget.streaming &&
             !widget.exporting &&
             (_source.length > PerformanceLimits.highlightCharacters ||
                 codeLineCount(_source) > PerformanceLimits.highlightLines));
+    final highlighter = enabled ? widget.highlighter : null;
+    final key = (
+      _source,
+      language,
+      widget.theme.code.text,
+      widget.theme.brightness,
+      highlighter,
+    );
+    if (key == _highlightRequest) return;
+    _highlightRequest = key;
+    final generation = ++_generation;
+    _highlightWork = null;
+    _setSpan(TextSpan(text: _source, style: widget.theme.code.text));
+    if (highlighter == null) return;
+    try {
+      final result = highlighter.highlight(
+        _source,
+        language: language,
+        style: widget.theme.code.text,
+        brightness: widget.theme.brightness,
+      );
+      if (result is TextSpan) {
+        _setSpan(result);
+      } else {
+        _highlightWork = result.then<void>(
+          (span) {
+            if (mounted && generation == _generation) {
+              setState(() => _setSpan(span));
+            }
+          },
+          onError: (Object error, StackTrace stack) {
+            // The current plain source stays visible if highlighting fails.
+          },
+        );
+        unawaited(_highlightWork);
+      }
+    } catch (_) {
+      // Syntax decoration must not remove or corrupt readable source text.
+    }
+  }
+
+  bool _prepareRange(TextRange range) {
+    if (_selection.rectForRange(range) != null) {
+      return _selection.prepareRange(range, boundary: context);
+    }
+    if (_list.isAttached && _scroll.hasClients) {
+      final index = _chunks.lastIndexWhere((chunk) => chunk.$1 <= range.start);
+      if (index >= 0) {
+        _list.jumpToItem(index: index, scrollController: _scroll, alignment: 0);
+      }
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final highlights = SourceHighlightScope.of(context);
     final ranges = highlights.isEmpty
         ? const <SourceSpan>[]
@@ -129,7 +223,7 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
             for (final part in widget.node.children)
               TextSegment(text: part.text, sourceSpan: part.span, node: part),
           ]);
-    Widget fragment(String text, int offset) {
+    Widget fragment(String text, int offset, TextSpan span) {
       final literal = widget.literalSpanBuilder;
       if (literal != null) {
         _literalIndex ??= TextIndex.fromSegments([
@@ -142,9 +236,8 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
         source: text,
         offset: offset,
         owner: _selection,
-        language: language,
+        span: span,
         theme: widget.theme,
-        highlighter: highlight ? widget.highlighter : null,
         cullToViewport: !widget.exporting,
         highlightRanges: [
           for (final range in ranges)
@@ -172,18 +265,45 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     final Widget content;
     if (!widget.exporting &&
         codeLineCount(_source) > PerformanceLimits.virtualCodeLines) {
+      // Only layout is chunked. Syntax is parsed once with the complete source
+      // so strings, comments and embedded languages can span chunk boundaries.
+      final spans = _chunkSpans ??= _splitCodeSpan(_span, _chunks);
+      final painter = TextPainter(
+        text: TextSpan(
+          text: 'M',
+          style: DefaultTextStyle.of(
+            context,
+          ).style.merge(widget.theme.code.text),
+        ),
+        textDirection: TextDirection.ltr,
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final lineHeight = painter.height;
+      painter.dispose();
       content = SizedBox(
         key: const ValueKey('markstream-virtualized-code'),
         height: widget.theme.code.virtualizedHeight,
-        child: ListView.builder(
+        child: SuperListView.builder(
           primary: false,
+          controller: _scroll,
+          listController: _list,
+          delayPopulatingCacheArea: false,
+          extentEstimation: (index, _) =>
+              lineHeight *
+              (index == null
+                  ? PerformanceLimits.codeChunkLines
+                  : codeLineCount(_chunks[index].$2)),
           itemCount: _chunks.length,
           itemBuilder: (context, index) {
             // Skip the list's per-row selection keep-alive proxy. The source
             // owner retains only endpoints; keep the Scrollable's registrar
             // here so drag selection can still scroll the code viewport.
             final registrar = SelectionContainer.maybeOf(context);
-            final child = fragment(_chunks[index].$2, _chunks[index].$1);
+            final child = fragment(
+              _chunks[index].$2,
+              _chunks[index].$1,
+              spans[index],
+            );
             return registrar == null
                 ? child
                 : SelectionRegistrarScope(registrar: registrar, child: child);
@@ -191,7 +311,7 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
         ),
       );
     } else {
-      content = fragment(_source, 0);
+      content = fragment(_source, 0, _span);
     }
     final body = Directionality(
       textDirection: TextDirection.ltr,
@@ -235,20 +355,62 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     return MarkstreamSelectionFragment(
       node: widget.node,
       segments: segments,
+      rangeRect: _selection.rectForRange,
+      prepareRange: _prepareRange,
       child: selected,
     );
   }
 }
 
-class _CodeTextFragment extends StatefulWidget {
+/// Split styled text in one pass, inheriting syntax styles across line chunks.
+/// The separating newline is owned by the layout, not either text fragment.
+List<TextSpan> _splitCodeSpan(TextSpan root, List<(int, String)> chunks) {
+  final spans = List.generate(chunks.length, (_) => <InlineSpan>[]);
+  var offset = 0;
+  var index = 0;
+  void visit(TextSpan span, TextStyle? inherited) {
+    final style = inherited?.merge(span.style) ?? span.style;
+    final text = span.text;
+    if (text != null) {
+      final end = offset + text.length;
+      while (index < chunks.length && chunks[index].$1 < end) {
+        final (start, source) = chunks[index];
+        final chunkEnd = start + source.length;
+        final from = math.max(offset, start);
+        final to = math.min(end, chunkEnd);
+        if (from < to) {
+          spans[index].add(
+            TextSpan(
+              text: text.substring(from - offset, to - offset),
+              style: style,
+            ),
+          );
+        }
+        if (end < chunkEnd) break;
+        index++;
+      }
+      offset = end;
+    }
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      if (child is TextSpan) visit(child, style);
+    }
+  }
+
+  visit(root, null);
+  return [
+    for (final children in spans)
+      TextSpan(style: root.style, children: children),
+  ];
+}
+
+class _CodeTextFragment extends StatelessWidget {
   const _CodeTextFragment({
     super.key,
     required this.source,
     required this.offset,
     required this.owner,
-    required this.language,
+    required this.span,
     required this.theme,
-    this.highlighter,
     this.cullToViewport = true,
     this.highlightRanges = const [],
     this.highlightColor = const Color(0x00000000),
@@ -258,117 +420,38 @@ class _CodeTextFragment extends StatefulWidget {
   final bool cullToViewport;
   final List<SourceSpan> highlightRanges;
   final Color highlightColor;
-  final String source, language;
+  final String source;
+  final TextSpan span;
   final int offset;
   final SourceTextSelectionDelegate owner;
   final MarkstreamTheme theme;
-  final CodeHighlighter? highlighter;
   final LiteralSpanBuilder? literalSpanBuilder;
   final List<TextSegment> sourceSegments;
   @override
-  State<_CodeTextFragment> createState() => _CodeTextFragmentState();
-}
-
-class _CodeTextFragmentState extends State<_CodeTextFragment> {
-  late TextSpan _span;
-  Object? _request;
-  int _generation = 0;
-  @override
-  void initState() {
-    super.initState();
-    _updateHighlight();
-  }
-
-  @override
-  void didUpdateWidget(_CodeTextFragment oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _updateHighlight();
-  }
-
-  TextSpan _checked(TextSpan span) =>
-      span.toPlainText(includeSemanticsLabels: false) == widget.source
-      ? span
-      : TextSpan(text: widget.source, style: widget.theme.code.text);
-  void _updateHighlight() {
-    final key = (
-      widget.source,
-      widget.language,
-      widget.theme.code.text,
-      widget.theme.brightness,
-      widget.highlighter,
-    );
-    if (key == _request) return;
-    _request = key;
-    final generation = ++_generation;
-    _span = TextSpan(text: widget.source, style: widget.theme.code.text);
-    final highlighter = widget.highlighter;
-    if (highlighter == null) return;
-    try {
-      final result = highlighter.highlight(
-        widget.source,
-        language: widget.language,
-        style: widget.theme.code.text,
-        brightness: widget.theme.brightness,
-      );
-      if (result is TextSpan) {
-        _span = _checked(result);
-      } else {
-        unawaited(
-          result.then<void>(
-            (span) {
-              if (mounted && generation == _generation)
-                setState(() => _span = _checked(span));
-            },
-            onError: (Object error, StackTrace stack) {
-              // The current plain source is already visible if highlighting fails.
-            },
-          ),
-        );
-      }
-    } catch (_) {
-      // Syntax decoration must not remove or corrupt readable source text.
-    }
-  }
-
-  @override
-  void dispose() {
-    _generation++;
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final inherited = DefaultTextStyle.of(
-      context,
-    ).style.merge(widget.theme.code.text);
+    final inherited = DefaultTextStyle.of(context).style.merge(theme.code.text);
     final body = Padding(
       padding: const EdgeInsets.only(right: 3),
       child: StreamingText(
         streaming: false,
-        cullToViewport: widget.cullToViewport,
+        cullToViewport: cullToViewport,
         text: Text.rich(
           paintTextHighlights(
-            widget.literalSpanBuilder?.call(
-                  context,
-                  _span,
-                  widget.sourceSegments,
-                ) ??
-                _span,
-            widget.highlightRanges,
-            widget.highlightColor,
+            literalSpanBuilder?.call(context, span, sourceSegments) ?? span,
+            highlightRanges,
+            highlightColor,
           ),
-          style: widget.theme.code.text,
-          strutStyle:
-              widget.source.length <= PerformanceLimits.staticNativeCharacters
+          style: theme.code.text,
+          strutStyle: source.length <= PerformanceLimits.staticNativeCharacters
               ? StrutStyle.fromTextStyle(inherited)
               : null,
         ),
       ),
     );
     return SourceTextSelectionFragment(
-      source: widget.source,
-      offset: widget.offset,
-      owner: widget.owner,
+      source: source,
+      offset: offset,
+      owner: owner,
       child: body,
     );
   }

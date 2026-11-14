@@ -228,6 +228,59 @@ void main() {
     expect(BackupActivity.isActive, isFalse);
   });
 
+  testWidgets(
+    'skipped paths remain visible after later phases and return success',
+    (tester) async {
+      BackupTaskResult<int>? result;
+      await _openDialog(tester, (context) async {
+        result = await showBackupProgressDialog<int>(
+          context,
+          title: 'Export backup',
+          task: (handle) async {
+            handle.report(
+              const BackupProgress(
+                phase: BackupPhase.packing,
+                processed: 10,
+                skippedEntries: [
+                  'sessions/chat/outputs/locked.docx',
+                  'upload/locked',
+                ],
+              ),
+            );
+            handle.report(
+              const BackupProgress(
+                phase: BackupPhase.uploading,
+                processed: 20,
+                total: 20,
+              ),
+            );
+            return 42;
+          },
+        );
+      });
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 5));
+      expect(result, isNull);
+      expect(find.text('Backup completed with skipped items'), findsOneWidget);
+      expect(
+        find.text(
+          'Unreadable files or directories skipped: 2. They are not included in this backup.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('sessions/chat/outputs/locked.docx\nupload/locked'),
+        findsOneWidget,
+      );
+      expect(find.text('Operation failed'), findsNothing);
+      expect(find.text('Cancel'), findsNothing);
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(result!.isSuccess, isTrue);
+      expect(result!.value, 42);
+    },
+  );
+
   testWidgets('cancellation closes without a failure state', (tester) async {
     BackupTaskResult<void>? result;
     await _openDialog(tester, (context) async {

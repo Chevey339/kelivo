@@ -28,6 +28,7 @@ class ContextCompressionService extends ChangeNotifier {
   final _skipNextTurn = <String>{};
   void skipNextAutomaticTurn(String id) => _skipNextTurn.add(id);
   bool consumeAutomaticSkip(String id) => _skipNextTurn.remove(id);
+  void clearAutomaticSkip(String id) => _skipNextTurn.remove(id);
   final Map<String, Future<void>> _writes = {};
   final Map<String, Future<void>> _runs = {};
   final Map<String, int> _contextChanges = {};
@@ -100,7 +101,8 @@ class ContextCompressionService extends ChangeNotifier {
     for (final entry in saved.entries) {
       final value = entry.value;
       final phase = CompressionPhase.values.byName(value['phase'] as String);
-      if (phase == CompressionPhase.completed ||
+      if (value['dismissed'] == true ||
+          phase == CompressionPhase.completed ||
           phase == CompressionPhase.cancelled) {
         continue;
       }
@@ -150,9 +152,12 @@ class ContextCompressionService extends ChangeNotifier {
     }
   }
 
-  Future<void> _publish(ContextCompressionTask task) async {
+  Future<void> _publish(
+    ContextCompressionTask task, {
+    bool dismissed = false,
+  }) async {
     if (_disposed || !identical(_tasks[task.conversationId], task)) return;
-    final record = task.toJson();
+    final record = {...task.toJson(), if (dismissed) 'dismissed': true};
     final previous = _writes[task.conversationId] ?? Future<void>.value();
     final write = previous
         .catchError((Object _) {})
@@ -160,7 +165,7 @@ class ContextCompressionService extends ChangeNotifier {
           (_) => chat.saveCompressionTaskRecord(task.conversationId, record),
         );
     _writes[task.conversationId] = write;
-    notifyListeners();
+    if (!dismissed) notifyListeners();
     try {
       await write;
     } finally {
@@ -396,9 +401,6 @@ class ContextCompressionService extends ChangeNotifier {
         materials: chunks,
         previousSummary: previousSummary,
         background: background,
-        continuation:
-            await request.loadContinuation?.call(selection) ??
-            request.continuation,
         check: () => _check(task),
         publish: () => _publish(task),
       );
@@ -665,8 +667,10 @@ class ContextCompressionService extends ChangeNotifier {
             task.sourceFingerprint) {
           throw StateError('context_changed');
         }
-        await _checkBudget(task, snapshot);
+        final withinWindow = await _checkBudget(task, snapshot);
         _check(task);
+        if (!withinWindow) throw StateError('context_budget_exceeded');
+        task.error = null;
         final selection = selectCompressionHistory(
           sourceMessages,
           snapshot.operations,
@@ -758,18 +762,9 @@ class ContextCompressionService extends ChangeNotifier {
   Future<void> dismiss(String id) async {
     final task = _tasks[id];
     if (task == null || task.active) return;
-    final previousPhase = task.phase;
-    task.phase = CompressionPhase.cancelled;
-    try {
-      await _publish(task);
-    } catch (_) {
-      if (identical(_tasks[id], task) &&
-          task.phase == CompressionPhase.cancelled) {
-        task.phase = previousPhase;
-        if (!_disposed) notifyListeners();
-      }
-      rethrow;
-    }
+    // Acknowledging a terminal status does not cancel or undo its result.
+    // Persist before removing it so a failed write leaves the status retryable.
+    await _publish(task, dismissed: true);
     if (identical(_tasks[id], task)) _tasks.remove(id);
     if (!_disposed) notifyListeners();
   }

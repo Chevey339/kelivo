@@ -22,6 +22,7 @@ class TokenDisplayWidget extends StatefulWidget {
     this.reasoningTokens,
     this.cacheWriteTokens,
     this.durationMs,
+    this.firstResponseMs,
     this.firstTokenMs,
     this.totalCompletionTokens,
     this.providerId,
@@ -35,6 +36,7 @@ class TokenDisplayWidget extends StatefulWidget {
   final int? reasoningTokens;
   final int? cacheWriteTokens;
   final int? durationMs;
+  final int? firstResponseMs;
   final int? firstTokenMs;
   final int? totalCompletionTokens;
   final String? providerId;
@@ -70,6 +72,7 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
       (widget.reasoningTokens != null && widget.reasoningTokens! > 0) ||
       (widget.cacheWriteTokens != null && widget.cacheWriteTokens! > 0) ||
       (widget.durationMs != null && widget.durationMs! > 0) ||
+      (widget.firstResponseMs != null && widget.firstResponseMs! >= 0) ||
       (widget.firstTokenMs != null && widget.firstTokenMs! >= 0);
 
   /// Lazily create animation controller on first use (when popup actually opens).
@@ -170,6 +173,7 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
                   reasoningTokens: widget.reasoningTokens,
                   cacheWriteTokens: widget.cacheWriteTokens,
                   durationMs: widget.durationMs,
+                  firstResponseMs: widget.firstResponseMs,
                   firstTokenMs: widget.firstTokenMs,
                   totalCompletionTokens: widget.totalCompletionTokens,
                   providerId: widget.providerId,

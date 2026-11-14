@@ -18,6 +18,7 @@ class TokenDetailPopup extends StatelessWidget {
     this.reasoningTokens,
     this.cacheWriteTokens,
     this.durationMs,
+    this.firstResponseMs,
     this.firstTokenMs,
     this.totalCompletionTokens,
     this.providerId,
@@ -30,6 +31,7 @@ class TokenDetailPopup extends StatelessWidget {
   final int? reasoningTokens;
   final int? cacheWriteTokens;
   final int? durationMs;
+  final int? firstResponseMs;
   final int? firstTokenMs;
 
   /// Output across the whole generation, matching [durationMs], even when
@@ -103,11 +105,23 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
+    if (firstResponseMs != null && firstResponseMs! >= 0) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Activity,
+          text: l10n.tokenDetailFirstResponse(
+            (firstResponseMs! / 1000.0).toStringAsFixed(2),
+          ),
+          cs: cs,
+        ),
+      );
+    }
+
     if (firstTokenMs != null && firstTokenMs! >= 0) {
       rows.add(
         _buildRow(
           icon: Lucide.Timer,
-          text: l10n.tokenDetailFirstToken(
+          text: l10n.tokenDetailFirstOutput(
             (firstTokenMs! / 1000.0).toStringAsFixed(2),
           ),
           cs: cs,

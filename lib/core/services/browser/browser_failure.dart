@@ -83,7 +83,12 @@ class BrowserFailure implements Exception {
         'Wait for the user to allow continuation.',
         recoverable: false,
       ),
-      'browser_action_timeout_outcome_unknown' ||
+      'browser_action_timeout_outcome_unknown' => const BrowserFailure(
+        'browser_action_timeout_outcome_unknown',
+        'The browser command timed out; its outcome is not confirmed.',
+        'Inspect the current page with snapshot or extract before continuing. Do not automatically repeat the command; it may still complete later.',
+        outcomeUnknown: true,
+      ),
       'browser_action_cancelled_outcome_unknown' => BrowserFailure(
         code!,
         'The previous operation did not return a confirmed outcome.',

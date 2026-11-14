@@ -1,3 +1,4 @@
+import '../../../core/services/tools/view_image_tool.dart';
 import '../../../core/models/image_context.dart';
 import '../../chat/utils/image_context_budget_error.dart';
 import '../../chat/utils/image_generation_error.dart';
@@ -9,6 +10,7 @@ import '../../../core/models/model_spec.dart';
 import '../../../core/models/compression_config.dart';
 import '../../../core/services/api/request_history_context.dart';
 import '../../../core/services/api/request_image_context.dart';
+import '../../../core/services/api/response_incomplete_exception.dart';
 import '../../../core/services/api/request_token_estimate.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/context_operation.dart';
@@ -490,8 +492,12 @@ class ChatActions {
       _activeAssistantMessages.messageIds;
 
   @visibleForTesting
-  void debugTrackActiveMessage(ChatMessage message) {
+  void debugTrackActiveMessage(
+    ChatMessage message, {
+    stream_ctrl.StreamingState? state,
+  }) {
     _activeAssistantMessages.put(message);
+    if (state != null) _streamingStates[message.id] = state;
   }
 
   /// Rebuild retry countdown UI from surviving [StreamingState] after the
@@ -594,6 +600,7 @@ class ChatActions {
       cacheWriteTokens: state.totalUsage?.cacheWriteTokens,
       finishUsage: state.usage,
       durationMs: state.durationMs,
+      firstResponseMs: state.firstResponseMs,
       firstTokenMs: state.firstTokenMs,
     );
   }
@@ -917,7 +924,7 @@ class ChatActions {
     StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) {
-    state.recordFirstOutput(chunk);
+    state.recordStreamArrival(chunk);
     return _handleStreamChunk(chunk, state);
   }
 
@@ -1564,6 +1571,7 @@ class ChatActions {
     required Conversation conversation,
     bool assistantAsNewReply = false,
     bool allowImagesApiRouting = true,
+    bool omitImages = false,
     Assistant? assistantOverride,
     ({String providerKey, String modelId})? modelOverride,
     bool preserveFollowingMessages = false,
@@ -1583,6 +1591,7 @@ class ChatActions {
     _generationPreparations.add(preparation);
     try {
       return await _regenerateAtMessageClaimed(
+        omitImages: omitImages,
         expectedContextState: expectedContextState,
         message: message,
         conversation: conversation,
@@ -1615,6 +1624,7 @@ class ChatActions {
     required Conversation conversation,
     bool assistantAsNewReply = false,
     bool allowImagesApiRouting = true,
+    bool omitImages = false,
     Assistant? assistantOverride,
     ({String providerKey, String modelId})? modelOverride,
     bool preserveFollowingMessages = false,
@@ -1849,6 +1859,7 @@ class ChatActions {
         final prepared = await messageGenerationService
             .prepareApiMessagesWithInjections(
               messages: regenerationMessages,
+              omitImages: omitImages,
               versionSelections: regenerationVersionSelections,
               currentConversation: conversation.copyWith(truncateIndex: -1),
               settings: settings,
@@ -2105,6 +2116,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: false,
+        isContinuation: true,
       );
 
       if (!_activeAssistantMessages.isActive(streamingMessage)) {
@@ -2307,11 +2319,13 @@ class ChatActions {
         !_activeAssistantMessages.isActive(ctx.assistantMessage)) {
       return null;
     }
-    if (preferences.mode == AutoCompressionMode.off &&
+    final skipAutomatic = chatService.contextCompression.consumeAutomaticSkip(
+      id,
+    );
+    if ((skipAutomatic || preferences.mode == AutoCompressionMode.off) &&
         !preferences.replaceConsumedTools) {
       return null;
     }
-    if (chatService.contextCompression.consumeAutomaticSkip(id)) return null;
     final user = ctx.apiMessages
         .where(
           (m) =>
@@ -2335,7 +2349,8 @@ class ChatActions {
       explicitType: ctx.config.providerType,
     );
     var disposed = false;
-    var allowed = preferences.mode == AutoCompressionMode.auto;
+    var allowed =
+        !skipAutomatic && preferences.mode == AutoCompressionMode.auto;
     final useNative = preferences.nativeEnabled && allowed;
     final nativeScope =
         '${nativeCompactionScope(ctx.config)}:${spec.apiModelId ?? ctx.modelId}';
@@ -2366,6 +2381,7 @@ class ChatActions {
       );
       if (cancelled()) return;
       allowed =
+          !skipAutomatic &&
           current.mode == AutoCompressionMode.auto &&
           current.nativeEnabled == preferences.nativeEnabled;
       if (!allowed &&
@@ -2388,7 +2404,7 @@ class ChatActions {
         if (anchor != null) _nativeUsage[id] = anchor;
       },
       beforeRequest: (body, project, overflow) async {
-        if (cancelled()) return null;
+        if (skipAutomatic || cancelled()) return null;
         // A custom Responses input replaces the transcript. It has no message
         // ownership to compact or safely project back into this request.
         final input = body['input'];
@@ -2611,7 +2627,9 @@ class ChatActions {
         ctx.onToolCall != null &&
         spec.abilities.contains(ModelAbility.tool) &&
         ctx.toolDefs.any(
-          (tool) => (tool['function'] as Map?)?['name'] != 'read_chat_image',
+          (tool) =>
+              (tool['function'] as Map?)?['name'] != 'view_image' ||
+              ViewImageTool.supportsFiles(tool),
         );
     if (canRead) {
       final reader = ChatContextReader(() async {
@@ -2824,7 +2842,7 @@ class ChatActions {
 
       final sub = listenSequentiallyToStream<StreamChunk>(
         stream: stream,
-        onReceived: state.recordFirstOutput,
+        onReceived: state.recordStreamArrival,
         onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
@@ -3325,6 +3343,16 @@ class ChatActions {
     final oauthFailure =
         e is ProviderOAuthException &&
         e.kind == ProviderOAuthFailure.loginRequired;
+    final truncation =
+        e is ResponseIncompleteException && e.reason == 'max_output_tokens'
+        ? ResponseTruncationPart(
+            inputTokens: e.inputTokens,
+            contextWindow: ModelSpecResolver.instance
+                .spec(state.ctx.config, state.ctx.modelId)
+                .contextWindow,
+            hadImages: (state.ctx.imageContext?.lastRequestImageCount ?? 0) > 0,
+          )
+        : null;
     var errorText = oauthFailure ? '' : e.toString();
     if (e is ImageContextBudgetException && contextProvider.mounted) {
       errorText = formatImageContextBudgetError(
@@ -3365,11 +3393,13 @@ class ChatActions {
         ? ''
         : _transformAssistantContent(state, state.fullContentRaw);
     final errorParts = await _sanitizeAssistantImageParts(
-      assistantPartsForStreamError(
-        parts: _assistantPartsForState(state),
-        partialContent: partialContent,
-        errorText: errorText,
-      ),
+      truncation != null
+          ? [..._assistantPartsForState(state), truncation]
+          : assistantPartsForStreamError(
+              parts: _assistantPartsForState(state),
+              partialContent: partialContent,
+              errorText: errorText,
+            ),
     );
     if (oauthFailure) {
       final providerId =
@@ -3383,11 +3413,31 @@ class ChatActions {
       totalTokens: state.totalTokens,
       isStreaming: false,
     );
+    if (truncation != null && state.usage != null) {
+      unawaited(
+        contextUsage?.recordUsage(
+          conversationId: conversationId,
+          providerKey: state.ctx.providerKey,
+          modelId: state.ctx.modelId,
+          assistantId: state.ctx.assistant?.id,
+          usage: state.usage!,
+          assistantMessage: errorMessage,
+          // Keep the measurement, but a failed or image-free request cannot
+          // calibrate the next full-context request.
+          requestConfiguration: null,
+          requestRevision: state.ctx.contextUsageRevision,
+        ),
+      );
+    }
     try {
       await _finalizeStreamingCheckpoint(
         errorMessage,
         terminalState: GenerationRunState.failed,
-        errorCode: oauthFailure ? 'oauth_login_required' : 'generation_failed',
+        errorCode: oauthFailure
+            ? 'oauth_login_required'
+            : truncation != null
+            ? 'response_output_limit'
+            : 'generation_failed',
       );
       state.terminalPersisted = true;
     } finally {
@@ -3406,7 +3456,7 @@ class ChatActions {
       // handler returns. Re-entering its barrier cancel here would wait on this
       // handler itself and prevent the UI error callback below from firing.
       _conversationStreams.remove(conversationId);
-      if (!oauthFailure) {
+      if (!oauthFailure && truncation == null) {
         if (isContextLengthError(errorText) && onContextOverflow != null) {
           onContextOverflow!(
             errorMessage,

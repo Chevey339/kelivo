@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
@@ -10,11 +13,25 @@ import 'package:Kelivo/shared/markdown/markdown_theme_mapper.dart';
 import 'package:Kelivo/shared/markdown/kelivo_markdown_extensions.dart'
     show markdownCodeOptions;
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
+import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 
 import '../../support/business_test_harness.dart';
 import 'markstream_adapters_test.dart' show host;
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const startupChannel = MethodChannel('app.desktop_startup');
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          startupChannel,
+          (_) async => {'supported': false, 'enabled': false},
+        );
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(startupChannel, null);
+  });
   for (final wallpaper in [false, true]) {
     testWidgets(
       'code block preference leaves generated mono text unchanged: wallpaper=$wallpaper',
@@ -22,6 +39,7 @@ void main() {
         final settings = SettingsProvider(createBusinessTestPreferences());
         addTearDown(settings.dispose);
         await settings.loaded;
+        await settings.setUseLegacyCodeBlockStyle(false);
         await tester.pumpWidget(
           host(
             Builder(
@@ -63,11 +81,154 @@ void main() {
   }
   for (final dark in [false, true]) {
     testWidgets(
+      'legacy code header retains the body wallpaper transparency: dark=$dark',
+      (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await settings.loaded;
+        final boundaryKey = GlobalKey();
+        final samples = <(Color, Color)>[];
+        for (final underlay in [Colors.black, Colors.white]) {
+          await tester.pumpWidget(
+            host(
+              RepaintBoundary(
+                key: boundaryKey,
+                child: ColoredBox(
+                  color: underlay,
+                  child: const MarkdownWithCodeHighlight(
+                    text: '> ```python\n> print("code")\n> ```',
+                  ),
+                ),
+              ),
+              settings: settings,
+              dark: dark,
+              wallpaper: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final header = tester.getRect(
+            find.byKey(const ValueKey('markstream-code-header')),
+          );
+          final body = tester.getRect(find.byType(MarkstreamCodeContent));
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          final image = boundary.toImageSync();
+          try {
+            final pixels = (await tester.runAsync(
+              () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+            ))!;
+            Color pixel(Offset global) {
+              final point = boundary.globalToLocal(global);
+              final offset =
+                  (point.dy.floor() * image.width + point.dx.floor()) * 4;
+              return Color.fromARGB(
+                pixels.getUint8(offset + 3),
+                pixels.getUint8(offset),
+                pixels.getUint8(offset + 1),
+                pixels.getUint8(offset + 2),
+              );
+            }
+
+            final headerFill = pixel(header.center);
+            samples.add((
+              headerFill,
+              pixel(Offset(header.center.dx, body.center.dy)),
+            ));
+            final chrome = tester
+                .widget<MarkstreamCodeBlock>(find.byType(MarkstreamCodeBlock))
+                .theme
+                .code
+                .chrome;
+            double contrast(Color ink) {
+              final a = Color.alphaBlend(ink, headerFill).computeLuminance();
+              final b = headerFill.computeLuminance();
+              return a >= b ? (a + .05) / (b + .05) : (b + .05) / (a + .05);
+            }
+
+            expect(contrast(chrome.label.color!), greaterThanOrEqualTo(4.5));
+            expect(contrast(chrome.actionColor), greaterThanOrEqualTo(3));
+          } finally {
+            image.dispose();
+          }
+          expect(tester.takeException(), isNull);
+        }
+        double change(Color a, Color b) =>
+            ((a.r - b.r).abs() + (a.g - b.g).abs() + (a.b - b.b).abs()) / 3;
+        final headerChange = change(samples[0].$1, samples[1].$1);
+        final bodyChange = change(samples[0].$2, samples[1].$2);
+        expect(bodyChange, greaterThan(.15));
+        expect(
+          headerChange,
+          greaterThanOrEqualTo(bodyChange * .9),
+          reason:
+              'The header must not paint a second heavy fill over the code surface.',
+        );
+      },
+    );
+    testWidgets(
+      'original code geometry and body fill remain with opaque exports: dark=$dark',
+      (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await settings.loaded;
+        expect(settings.useLegacyCodeBlockStyle, isTrue);
+        for (final exporting in [false, true]) {
+          await tester.pumpWidget(
+            host(
+              ExportCaptureScope(
+                enabled: exporting,
+                child: const MarkdownWithCodeHighlight(
+                  text: '```text\nOriginal code block\n```',
+                ),
+              ),
+              settings: settings,
+              dark: dark,
+              wallpaper: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final block = find.byType(MarkstreamCodeBlock);
+          final theme = tester.widget<MarkstreamCodeBlock>(block).theme;
+          final code = theme.code;
+          final scheme = Theme.of(tester.element(block)).colorScheme;
+          final alpha = exporting ? 1.0 : .8;
+          expect(code.text.fontSize, 13);
+          expect(code.text.height, 1.5);
+          expect(code.radius, 16);
+          expect(
+            code.bodyPadding,
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          );
+          expect(
+            tester
+                .getSize(find.byKey(const ValueKey('markstream-code-header')))
+                .height,
+            40,
+          );
+          expect(
+            code.backgroundColor,
+            scheme.surfaceContainer.withValues(alpha: alpha),
+          );
+          expect(
+            code.chrome.background,
+            exporting ? scheme.surfaceContainerHighest : theme.colors.fillHead,
+          );
+          expect(tester.takeException(), isNull);
+        }
+      },
+      variant: TargetPlatformVariant({
+        TargetPlatform.iOS,
+        TargetPlatform.macOS,
+      }),
+    );
+    testWidgets(
       'code block preference updates live without resetting content or other styles: dark=$dark',
       (tester) async {
         final settings = SettingsProvider(createBusinessTestPreferences());
         addTearDown(settings.dispose);
         await settings.loaded;
+        await settings.setUseLegacyCodeBlockStyle(false);
         await settings.setAutoCollapseCodeBlock(false);
         await settings.setAutoCollapseCodeBlockLines(2);
         final code = List.generate(8, (i) => 'final value$i = $i;').join('\n');

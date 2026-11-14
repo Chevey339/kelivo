@@ -225,4 +225,31 @@ void main() {
     );
     expect((await storage.read('x.txt'))['content'], 'AI update');
   });
+
+  test('busy workspace requests fail without delayed storage writes', () async {
+    final saved = await storage.write('state.txt', 'original', null);
+    final started = Completer<void>();
+    final release = Completer<void>();
+    final shell = WorkspaceFileCoordinator.run(root, () async {
+      started.complete();
+      await release.future;
+    });
+    await started.future;
+    try {
+      await Future.wait([
+        expectLater(storage.read('state.txt'), code('storage_busy')),
+        expectLater(
+          storage.write('state.txt', 'late write', saved['version'] as String),
+          code('storage_busy'),
+        ),
+      ]).timeout(const Duration(seconds: 8));
+    } finally {
+      release.complete();
+      await shell;
+    }
+    // Await another acquisition so even a mistakenly queued late write would
+    // have finished before checking that the original data is preserved.
+    await WorkspaceFileCoordinator.run(root, () async {});
+    expect((await storage.read('state.txt'))['content'], 'original');
+  });
 }

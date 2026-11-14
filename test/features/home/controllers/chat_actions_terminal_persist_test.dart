@@ -6,6 +6,9 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/models/provider_oauth.dart';
+import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/services/api/response_incomplete_exception.dart';
 import 'package:Kelivo/core/models/mobile_background_settings.dart';
 import 'package:Kelivo/core/services/mobile_background.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -249,6 +252,7 @@ void main() {
       expect(segments, hasLength(2));
       expect(segments.every((segment) => segment.finishedAt == null), isTrue);
       expect(state.firstTokenMs, isNull);
+      expect(state.firstResponseMs, isNotNull);
       switch (terminal) {
         case 'complete':
           await actions.debugFinishStreaming(state);
@@ -262,6 +266,7 @@ void main() {
             state.ctx.assistantMessage.copyWith(
               parts: state.partsHandler.parts,
             ),
+            state: state,
           );
           await actions.cancelStreamingById(state.conversationId);
       }
@@ -271,6 +276,7 @@ void main() {
       expect(saved.reasoningText, isEmpty);
       expect(saved.reasoningFinishedAt, isNotNull);
       expect(saved.firstTokenMs, isNull);
+      expect(saved.firstResponseMs, state.firstResponseMs);
       expect(
         actions.streamController.streamingContentNotifier.hasNotifier(
           state.messageId,
@@ -396,6 +402,7 @@ void main() {
         expect(saved.finishUsage!.totalTokens, 230);
         expect(saved.finishUsage!.reasoningTokens, 0);
         expect(saved.isStreaming, isFalse);
+        expect(saved.firstResponseMs, firstTokenMs);
         expect(saved.firstTokenMs, firstTokenMs);
         expect(saved.durationMs, inInclusiveRange(30000, 31000));
         expect(state.durationMs, saved.durationMs);
@@ -487,6 +494,132 @@ void main() {
           .providerId,
       'account',
     );
+    expect(service.lastMessage!.isStreaming, false);
+    expect(errors, isEmpty);
+  });
+
+  testWidgets('输出截断保留正文、推理、最终用量及持久恢复入口', (tester) async {
+    final service = _ThrowingFinalizeChatService(failCompletion: false);
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final background = MobileBackgroundCoordinator(
+      platform: TargetPlatform.linux,
+    );
+    addTearDown(background.dispose);
+    addTearDown(settings.dispose);
+    final errors = <String>[];
+    late ChatActions actions;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<ChatService>.value(value: service),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              actions = _actionsFor(
+                context,
+                service,
+                settings,
+                background,
+              ).actions;
+              actions.onStreamError = errors.add;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+    final images = RequestImageContext(
+      settings: const ImageContextSettings(),
+      images: [],
+    );
+    await images.project({
+      'input': [
+        {
+          'role': 'user',
+          'content': [
+            {'type': 'input_image', 'image_url': 'data:image/png;base64,YWJj'},
+          ],
+        },
+      ],
+    });
+    final state = StreamingState(
+      GenerationContext(
+        assistantMessage: ChatMessage(
+          id: 'assistant-1',
+          role: 'assistant',
+          content: '',
+          providerId: 'account',
+          conversationId: 'conversation-1',
+          isStreaming: true,
+        ),
+        apiMessages: const [],
+        imageContext: images,
+        userImagePaths: const [],
+        allowImagesApiRouting: false,
+        providerKey: 'account',
+        modelId: 'test',
+        assistant: null,
+        settings: settings,
+        config: ProviderConfig(
+          id: 'account',
+          enabled: true,
+          name: 'ChatGPT',
+          apiKey: '',
+          baseUrl: '',
+        ),
+        toolDefs: const [],
+        supportsReasoning: false,
+        enableReasoning: false,
+        streamOutput: true,
+      ),
+    );
+    await actions.debugHandleStreamChunk(
+      const ReasoningDelta(id: 'reasoning', text: 'Thinking'),
+      state,
+    );
+    await actions.debugHandleStreamChunk(
+      const TextDelta(id: 'text', text: 'Partial reply'),
+      state,
+    );
+    await actions.debugHandleStreamChunk(
+      const Usage(TokenUsage(promptTokens: 100, completionTokens: 10)),
+      state,
+    );
+    await actions.debugHandleStreamChunk(
+      const Usage(
+        TokenUsage(
+          promptTokens: 1042909,
+          completionTokens: 596,
+          reasoningTokens: 590,
+        ),
+        startsRequest: true,
+      ),
+      state,
+    );
+    await actions.debugHandleStreamError(
+      ResponseIncompleteException(
+        reason: 'max_output_tokens',
+        inputTokens: 1042909,
+      ),
+      state,
+    );
+    expect(state.terminalPersisted, true);
+    expect(service.lastErrorCode, 'response_output_limit');
+    expect(service.terminalStates, [GenerationRunState.failed]);
+    expect(service.lastMessage!.content, 'Partial reply');
+    final saved = service.lastMessage!;
+    final notice = saved.parts.whereType<ResponseTruncationPart>().single;
+    expect(notice.inputTokens, 1042909);
+    expect(notice.hadImages, true);
+    expect(saved.parts.whereType<ReasoningPart>().single.text, 'Thinking');
+    expect(saved.promptTokens, 1043009);
+    expect(saved.finishUsage!.promptTokens, 1042909);
+    expect(saved.finishUsage!.reasoningTokens, 590);
+    expect(MessagePart.fromRow(notice.kind, notice.encodePayload()), notice);
     expect(service.lastMessage!.isStreaming, false);
     expect(errors, isEmpty);
   });

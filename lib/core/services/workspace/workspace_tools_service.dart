@@ -778,210 +778,212 @@ class WorkspaceToolsService {
 
     await Directory(ctx.paths.tmpHostRoot).create(recursive: true);
     final runtimeRunId = const Uuid().v4();
-    final workspaceLock = await WorkspaceFileCoordinator.acquireWorkspace(
-      ctx.paths.workspaceHostRoot,
-      checkCancelled: cancellation?.throwIfCancelled,
-      cancelled: cancellation?.cancelled,
-    );
-    try {
-      final before = await FileSnapshot.snapshot([
-        Directory(ctx.paths.workspaceHostRoot),
-        ctx.sessionDir,
-      ], checkCancelled: cancellation?.throwIfCancelled);
-      final run = registry.start(
-        toolCallId,
-        tool,
-        command: command,
-        conversationId: conversationId ?? ctx.conversationId,
-        runtimeRunId: runtimeRunId,
-      );
-
-      CommandExited? exited;
-      Object? executionError;
-      void Function()? unregisterCancellation;
-      try {
-        cancellation?.throwIfCancelled();
-        await access.permission.authorize(
-          needed: needsApproval,
-          arguments: args,
-        );
-        cancellation?.throwIfCancelled();
-        unregisterCancellation = cancellation?.onCancel(() {
-          unawaited(runtime.cancel(runtimeRunId));
-        });
-        await for (final event in runtime.run(
-          CommandRequest(
-            runId: runtimeRunId,
-            isCancelled: cancellation?.isCancelled,
-            command: command,
-            shell: ctx.runtimeStatus?.shell,
-            cwd: cwd,
-            timeout: Duration(seconds: timeoutSeconds),
-            env: env,
-            mounts: ctx.paths.mounts,
-          ),
-        )) {
-          switch (event) {
-            case CommandStarted():
-              break;
-            case CommandOutput(:final kind, :final bytes):
-              if (kind == OutputStreamKind.stdout) {
-                run.appendStdout(bytes);
-              } else {
-                run.appendStderr(bytes);
-              }
-            case CommandExited():
-              exited = event;
-          }
-        }
-      } catch (e) {
-        executionError = e;
-      } finally {
-        unregisterCancellation?.call();
-        // A failed or cancelled command may still have installed/updated files.
-        // Refresh observers without turning a refresh failure into a tool error.
-        try {
-          await onShellCompleted?.call();
-        } catch (error) {
-          debugPrint('Workspace post-command refresh failed: $error');
-        }
-      }
-
-      final runStatus = executionError != null || exited == null
-          ? ToolRunStatus.failed
-          : exited.cancelled
-          ? ToolRunStatus.cancelled
-          : exited.timedOut
-          ? ToolRunStatus.timedOut
-          : exited.exitCode == 0
-          ? ToolRunStatus.succeeded
-          : ToolRunStatus.failed;
-      run.complete(
-        status: runStatus,
-        exitCode: exited?.exitCode,
-        retainUntilHandoff: true,
-      );
-      try {
-        final stdout = run.stdoutSoFar;
-        final stderr = run.stderrSoFar;
-
-        final after = await FileSnapshot.snapshot([
+    return WorkspaceFileCoordinator.runAll(
+      [
+        ctx.paths.workspaceHostRoot,
+        ctx.sessionDir.path,
+        ctx.paths.resolve(cwd, cwd: cwd).hostPath,
+        for (final mount in ctx.paths.externalMounts)
+          if (!mount.readOnly) mount.host,
+      ],
+      () async {
+        final before = await FileSnapshot.snapshot([
           Directory(ctx.paths.workspaceHostRoot),
           ctx.sessionDir,
-        ]);
-        final changedHost = FileSnapshot.changedSince(before, after);
-        final files = <WorkspaceToolFile>[];
-        for (final hostPath in changedHost.take(_changedFilesCap)) {
-          final modelPath = ctx.paths.toModelPath(hostPath);
+        ], checkCancelled: cancellation?.throwIfCancelled);
+        final run = registry.start(
+          toolCallId,
+          tool,
+          command: command,
+          conversationId: conversationId ?? ctx.conversationId,
+          runtimeRunId: runtimeRunId,
+        );
+
+        CommandExited? exited;
+        Object? executionError;
+        void Function()? unregisterCancellation;
+        try {
+          cancellation?.throwIfCancelled();
+          await access.permission.authorize(
+            needed: needsApproval,
+            arguments: args,
+          );
+          cancellation?.throwIfCancelled();
+          unregisterCancellation = cancellation?.onCancel(() {
+            unawaited(runtime.cancel(runtimeRunId));
+          });
+          await for (final event in runtime.run(
+            CommandRequest(
+              runId: runtimeRunId,
+              isCancelled: cancellation?.isCancelled,
+              command: command,
+              shell: ctx.runtimeStatus?.shell,
+              cwd: cwd,
+              timeout: Duration(seconds: timeoutSeconds),
+              env: env,
+              mounts: ctx.paths.mounts,
+            ),
+          )) {
+            switch (event) {
+              case CommandStarted():
+                break;
+              case CommandOutput(:final kind, :final bytes):
+                if (kind == OutputStreamKind.stdout) {
+                  run.appendStdout(bytes);
+                } else {
+                  run.appendStderr(bytes);
+                }
+              case CommandExited():
+                exited = event;
+            }
+          }
+        } catch (e) {
+          executionError = e;
+        } finally {
+          unregisterCancellation?.call();
+          // A failed or cancelled command may still have installed/updated files.
+          // Refresh observers without turning a refresh failure into a tool error.
           try {
-            final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
-            if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
-            files.add(
-              _fileFor(
-                ctx,
-                resolved,
-                role: before.containsKey(hostPath)
-                    ? WorkspaceFileRole.modified
-                    : WorkspaceFileRole.created,
-              ),
-            );
-          } on PathResolutionException {
-            files.add(
-              WorkspaceToolFile(
-                path: modelPath,
-                role: WorkspaceFileRole.modified,
-              ),
-            );
-          } on FileSystemException {
-            // A file removed again before collection is not a remaining output.
+            await onShellCompleted?.call();
+          } catch (error) {
+            debugPrint('Workspace post-command refresh failed: $error');
           }
         }
-        final filesTruncated =
-            changedHost.length > _changedFilesCap ||
-            before.length >= FileSnapshot.defaultMaxEntries ||
-            after.length >= FileSnapshot.defaultMaxEntries;
 
-        if (executionError != null || exited == null) {
-          return _errorResult(
-            tool: tool,
-            error: 'shell_failed',
-            message:
-                executionError?.toString() ??
-                'Command ended without an exit event',
-            meta: WorkspaceToolMetadata(
-              tool: tool,
-              status: 'error',
-              code: 'shell_failed',
-              command: command,
-              stdoutPreview: stdout,
-              stderrPreview: stderr,
-              files: files,
-              filesTruncated: filesTruncated,
-            ),
-          );
-        }
-
-        final offload = await ToolOutputOffloader.maybeOffload(
-          toolCallId: toolCallId,
-          stdout: stdout,
-          stderr: stderr,
-          outputsDir: ctx.outputsDir,
-        );
-        final payload = _shellPayload(offload.modelText);
-        payload['exit_code'] = exited.exitCode;
-        payload['duration_ms'] = exited.duration.inMilliseconds;
-        payload['timed_out'] = exited.timedOut;
-        payload['cancelled'] = exited.cancelled;
-        payload['interrupted'] = exited.interrupted;
-        if (run.stdoutTruncated || run.stderrTruncated) {
-          payload['truncated'] = true;
-        }
-        if (files.isNotEmpty) {
-          payload['changed_files'] = [for (final file in files) file.path];
-        }
-        if (filesTruncated) payload['changed_files_truncated'] = true;
-        if (offload.offloadHostPath != null) {
-          final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
-          payload['output_file'] = outputFile;
-          payload['truncated'] = true;
-          final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
-          files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
-        }
-
-        final metaStatus = exited.timedOut
-            ? 'timeout'
+        final runStatus = executionError != null || exited == null
+            ? ToolRunStatus.failed
             : exited.cancelled
-            ? 'cancelled'
-            : 'ok';
-        final meta = WorkspaceToolMetadata(
-          tool: tool,
-          status: metaStatus,
-          command: command,
-          exitCode: exited.exitCode,
-          durationMs: exited.duration.inMilliseconds,
-          timedOut: exited.timedOut,
-          cancelled: exited.cancelled,
-          interrupted: exited.interrupted,
-          stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
-          stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
-          files: files,
-          filesTruncated: filesTruncated,
-          truncated: payload['truncated'] == true,
+            ? ToolRunStatus.cancelled
+            : exited.timedOut
+            ? ToolRunStatus.timedOut
+            : exited.exitCode == 0
+            ? ToolRunStatus.succeeded
+            : ToolRunStatus.failed;
+        run.complete(
+          status: runStatus,
+          exitCode: exited?.exitCode,
+          retainUntilHandoff: true,
         );
-        await _markToolsUsed(
-          ctx,
-          conversationId: conversationId,
-          status: metaStatus,
-        );
-        return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
-      } finally {
-        // Model output and metadata now own immutable strings (or the offloaded
-        // file). Only now may the registry evict this completed execution.
-        run.finishHandoff();
-      }
-    } finally {
-      workspaceLock.release();
-    }
+        try {
+          final stdout = run.stdoutSoFar;
+          final stderr = run.stderrSoFar;
+
+          final after = await FileSnapshot.snapshot([
+            Directory(ctx.paths.workspaceHostRoot),
+            ctx.sessionDir,
+          ]);
+          final changedHost = FileSnapshot.changedSince(before, after);
+          final files = <WorkspaceToolFile>[];
+          for (final hostPath in changedHost.take(_changedFilesCap)) {
+            final modelPath = ctx.paths.toModelPath(hostPath);
+            try {
+              final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
+              if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
+              files.add(
+                _fileFor(
+                  ctx,
+                  resolved,
+                  role: before.containsKey(hostPath)
+                      ? WorkspaceFileRole.modified
+                      : WorkspaceFileRole.created,
+                ),
+              );
+            } on PathResolutionException {
+              files.add(
+                WorkspaceToolFile(
+                  path: modelPath,
+                  role: WorkspaceFileRole.modified,
+                ),
+              );
+            } on FileSystemException {
+              // A file removed again before collection is not a remaining output.
+            }
+          }
+          final filesTruncated =
+              changedHost.length > _changedFilesCap ||
+              before.length >= FileSnapshot.defaultMaxEntries ||
+              after.length >= FileSnapshot.defaultMaxEntries;
+
+          if (executionError != null || exited == null) {
+            return _errorResult(
+              tool: tool,
+              error: 'shell_failed',
+              message:
+                  executionError?.toString() ??
+                  'Command ended without an exit event',
+              meta: WorkspaceToolMetadata(
+                tool: tool,
+                status: 'error',
+                code: 'shell_failed',
+                command: command,
+                stdoutPreview: stdout,
+                stderrPreview: stderr,
+                files: files,
+                filesTruncated: filesTruncated,
+              ),
+            );
+          }
+
+          final offload = await ToolOutputOffloader.maybeOffload(
+            toolCallId: toolCallId,
+            stdout: stdout,
+            stderr: stderr,
+            outputsDir: ctx.outputsDir,
+          );
+          final payload = _shellPayload(offload.modelText);
+          payload['exit_code'] = exited.exitCode;
+          payload['duration_ms'] = exited.duration.inMilliseconds;
+          payload['timed_out'] = exited.timedOut;
+          payload['cancelled'] = exited.cancelled;
+          payload['interrupted'] = exited.interrupted;
+          if (run.stdoutTruncated || run.stderrTruncated) {
+            payload['truncated'] = true;
+          }
+          if (files.isNotEmpty) {
+            payload['changed_files'] = [for (final file in files) file.path];
+          }
+          if (filesTruncated) payload['changed_files_truncated'] = true;
+          if (offload.offloadHostPath != null) {
+            final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
+            payload['output_file'] = outputFile;
+            payload['truncated'] = true;
+            final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
+            files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
+          }
+
+          final metaStatus = exited.timedOut
+              ? 'timeout'
+              : exited.cancelled
+              ? 'cancelled'
+              : 'ok';
+          final meta = WorkspaceToolMetadata(
+            tool: tool,
+            status: metaStatus,
+            command: command,
+            exitCode: exited.exitCode,
+            durationMs: exited.duration.inMilliseconds,
+            timedOut: exited.timedOut,
+            cancelled: exited.cancelled,
+            interrupted: exited.interrupted,
+            stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
+            stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
+            files: files,
+            filesTruncated: filesTruncated,
+            truncated: payload['truncated'] == true,
+          );
+          await _markToolsUsed(
+            ctx,
+            conversationId: conversationId,
+            status: metaStatus,
+          );
+          return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
+        } finally {
+          // Model output and metadata now own immutable strings (or the offloaded
+          // file). Only now may the registry evict this completed execution.
+          run.finishHandoff();
+        }
+      },
+    );
   }
 
   Future<String> _snapshotImage(ToolImage image) async {

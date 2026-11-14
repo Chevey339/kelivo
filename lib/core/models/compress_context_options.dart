@@ -2,7 +2,6 @@ import '../utils/token_estimator.dart';
 import 'chat_message.dart';
 import 'context_operation.dart';
 import 'message_part.dart';
-import 'native_compaction.dart';
 
 enum CompressContextLimitMode { start, recent, unlimited, keepRecent }
 
@@ -78,17 +77,31 @@ bool isCompressionUserMessage(ChatMessage message) =>
     (message.content.trim().isNotEmpty ||
         message.parts.any((part) => part is ImagePart || part is FilePart));
 
-typedef CompressionSelection = ({
-  List<ChatMessage> effective,
-  List<ChatMessage> retained,
-  List<ChatMessage> covered,
-  List<ChatMessage> input,
+class CompressionHistory {
+  const CompressionHistory({required this.messages, required this.operations});
+  factory CompressionHistory.fromMessages(
+    List<ChatMessage> messages,
+    List<ContextOperation> operations,
+  ) => CompressionHistory(
+    messages: messages.map(ContextMessageMetadata.fromMessage).toList(),
+    operations: operations,
+  );
+  final List<ContextMessageMetadata> messages;
+  final List<ContextOperation> operations;
+}
+
+typedef ContextSelection<T> = ({
+  List<T> effective,
+  List<T> retained,
+  List<T> covered,
+  List<T> input,
   List<String> dependencies,
   bool needsRegeneration,
   bool missingOriginals,
 });
+typedef CompressionSelection = ContextSelection<ChatMessage>;
+typedef CompressionRangeSelection = ContextSelection<ContextMessageMetadata>;
 
-/// The options preview and the actual task use the same range selection.
 CompressionSelection selectCompressionHistory(
   List<ChatMessage> messages,
   List<ContextOperation> operations,
@@ -96,7 +109,69 @@ CompressionSelection selectCompressionHistory(
   String? protectedMessageId,
   Set<String>? effectiveMessageIds,
 }) {
-  final effective = ContextHistory.resolve(messages, operations)
+  final range = selectCompressionRange(
+    messages.map(ContextMessageMetadata.fromMessage).toList(),
+    operations,
+    options,
+    protectedMessageId: protectedMessageId,
+    effectiveMessageIds: effectiveMessageIds,
+  );
+  final entries = {
+    for (final m in [
+      ...range.effective,
+      ...range.retained,
+      ...range.covered,
+      ...range.input,
+    ])
+      m.id: m,
+  };
+  final hydrated = {
+    for (final m in ContextHistory.materialize(
+      messages,
+      operations,
+      entries.values.toList(),
+    ))
+      m.id: m,
+  };
+  List<ChatMessage> materialize(List<ContextMessageMetadata> entries) => [
+    for (final entry in entries) hydrated[entry.id]!,
+  ];
+  return (
+    effective: materialize(range.effective),
+    retained: materialize(range.retained),
+    covered: materialize(range.covered),
+    input: materialize(range.input),
+    dependencies: range.dependencies,
+    needsRegeneration: range.needsRegeneration,
+    missingOriginals: range.missingOriginals,
+  );
+}
+
+List<ContextMessageMetadata> _keepRecentMetadata(
+  List<ContextMessageMetadata> messages,
+  int keep,
+) {
+  if (keep <= 0) return const [];
+  final indices = [
+    for (var i = 0; i < messages.length; i++)
+      if (messages[i].isUserMessage) i,
+  ];
+  if (indices.isEmpty) return const [];
+  if (indices.length <= keep) {
+    return messages.skipWhile((m) => m.isSummary).toList();
+  }
+  return messages.sublist(indices[indices.length - keep]);
+}
+
+/// The options preview and the actual task use the same range selection.
+CompressionRangeSelection selectCompressionRange(
+  List<ContextMessageMetadata> messages,
+  List<ContextOperation> operations,
+  CompressContextOptions options, {
+  String? protectedMessageId,
+  Set<String>? effectiveMessageIds,
+}) {
+  final effective = ContextHistory.project(messages, operations)
       .where(
         (message) =>
             effectiveMessageIds == null ||
@@ -108,14 +183,14 @@ CompressionSelection selectCompressionHistory(
             CompressContextOptions.defaultKeepUserMessages
       : 0;
   final retained = keep == 0
-      ? <ChatMessage>[]
-      : selectKeepRecentMessages(effective, keep);
+      ? <ContextMessageMetadata>[]
+      : _keepRecentMetadata(effective, keep);
   var prefix = effective.take(effective.length - retained.length).toList();
   if (options.mode == CompressContextLimitMode.start ||
       options.mode == CompressContextLimitMode.recent) {
     // The old character setting now chooses whole messages. Coverage and
     // serialization always receive exactly the same selection.
-    final selected = <ChatMessage>[];
+    final selected = <ContextMessageMetadata>[];
     var length = 0;
     final candidates = options.mode == CompressContextLimitMode.recent
         ? prefix.reversed
@@ -126,7 +201,7 @@ CompressionSelection selectCompressionHistory(
         break;
       }
       selected.add(message);
-      length += message.content.length;
+      length += message.contentLength;
     }
     prefix = options.mode == CompressContextLimitMode.recent
         ? selected.reversed.toList()
@@ -139,16 +214,20 @@ CompressionSelection selectCompressionHistory(
     prefix = prefix.where((m) => allowed.contains(m.id)).toList();
   }
   final dependencies = prefix
-      .where(ContextOperation.isSummary)
+      .where((m) => m.isSummary)
       .map((m) => m.id.substring(ContextOperation.summaryPrefix.length))
       .toList();
+  final byId = {for (final op in operations) op.id: op};
+  final byMessage = {
+    for (final op in operations) op.summaryMessageId: op,
+    for (final op in operations) 'context-note:${op.id}': op,
+  };
   final groups = <String>{
     for (final message in prefix)
-      if (!ContextOperation.isSummary(message)) ContextHistory.group(message),
-    for (final operation in operations)
-      if (dependencies.contains(operation.id)) ...operation.sourceGroups,
+      if (!message.isSummary) message.groupId,
+    for (final id in dependencies) ...?byId[id]?.sourceGroups,
   };
-  final expanded = ContextHistory.compressionInput(
+  final expanded = ContextHistory.compressionProjection(
     messages,
     operations,
     source: options.historySource,
@@ -156,35 +235,24 @@ CompressionSelection selectCompressionHistory(
     includeNative: options.native,
   );
   final input = expanded.where((message) {
-    if (groups.contains(ContextHistory.group(message))) return true;
-    final operation = operations
-        .where(
-          (op) =>
-              message.id == op.summaryMessageId ||
-              message.id == 'context-note:${op.id}',
-        )
-        .firstOrNull;
+    if (groups.contains(message.groupId)) return true;
+    final operation = byMessage[message.id];
     return operation != null && operation.sourceGroups.every(groups.contains);
   }).toList();
+  final prefixIds = prefix.map((m) => m.id).toSet();
   return (
     effective: effective,
-    retained: effective.where((m) => !prefix.contains(m)).toList(),
-    covered: messages
-        .where((m) => groups.contains(ContextHistory.group(m)))
-        .toList(),
+    retained: effective.where((m) => !prefixIds.contains(m.id)).toList(),
+    covered: messages.where((m) => groups.contains(m.groupId)).toList(),
     dependencies: dependencies,
     needsRegeneration:
         !options.native &&
         prefix.isNotEmpty &&
-        prefix.every(ContextOperation.isSummary) &&
+        prefix.every((m) => m.isSummary) &&
         options.historySource == ContextHistorySource.effective &&
         !options.regenerateExisting,
     input: input,
-    missingOriginals:
-        !options.native &&
-        input.any(
-          (message) => NativeCompactionPayload.forMessage(message) != null,
-        ),
+    missingOriginals: !options.native && input.any((message) => message.native),
   );
 }
 

@@ -1,3 +1,4 @@
+import '../models/message_part.dart';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -898,6 +899,41 @@ class AppDatabase extends _$AppDatabase {
           directOnly: true,
           function: (_) =>
               Isolate.current.controlPort == openingIsolatePort ? 1 : 0,
+        );
+        // Range previews receive lengths and presence flags, never text bodies.
+        // Dart's UTF-16 length and trim semantics match in-memory selection.
+        database.createFunction(
+          functionName: 'kelivo_text_length',
+          argumentCount: const AllowedArgumentCount(1),
+          deterministic: true,
+          directOnly: true,
+          function: (args) => (args.single as String).length,
+        );
+        database.createFunction(
+          functionName: 'kelivo_timestamp_micros',
+          argumentCount: const AllowedArgumentCount(1),
+          deterministic: true,
+          directOnly: true,
+          function: (args) =>
+              DateTime.parse(args.single as String).microsecondsSinceEpoch,
+        );
+        database.createFunction(
+          functionName: 'kelivo_has_context_content',
+          argumentCount: const AllowedArgumentCount(2),
+          deterministic: true,
+          directOnly: true,
+          function: (args) {
+            final kind = args[0] as String;
+            final payload = args[1] as String;
+            if (kind == 'text') return payload.trim().isNotEmpty ? 1 : 0;
+            if (kind != 'image' && kind != 'file') return 0;
+            try {
+              MessagePart.fromRow(kind, payload);
+              return 1;
+            } on FormatException {
+              return 0;
+            }
+          },
         );
         database.execute('PRAGMA journal_mode = WAL;');
         database.execute('PRAGMA foreign_keys = ON;');

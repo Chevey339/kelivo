@@ -44,6 +44,35 @@ void main() {
     createdAt: DateTime(2026),
   );
 
+  test('metadata range and counts never decode opaque native payloads', () {
+    final messages = ['A', 'B', 'C', 'D'].map(message).toList();
+    // Deliberately not serializable: projection must only inspect native flags.
+    final native = compact('native', ['A', 'B']).copyWith(
+      compressionDetails: {
+        'nativeCompaction': {'opaque': Object()},
+        'nativeContextImported': true,
+      },
+    );
+    final metadata = messages.map(ContextMessageMetadata.fromMessage).toList();
+    final projected = ContextHistory.project(metadata, [native], limit: 1);
+    expect(projected.map((m) => m.id), [native.summaryMessageId, 'D']);
+    final range = selectCompressionRange(
+      metadata,
+      [native],
+      const CompressContextOptions(
+        mode: CompressContextLimitMode.keepRecent,
+        keepUserMessages: 1,
+        native: true,
+      ),
+    );
+    expect(range.covered.map((m) => m.id), ['A', 'B', 'C']);
+    expect(range.retained.map((m) => m.id), ['D']);
+    final text = selectCompressionRange(metadata, [
+      native,
+    ], const CompressContextOptions(mode: CompressContextLimitMode.unlimited));
+    expect(text.missingOriginals, isTrue);
+  });
+
   for (final includeSummary in [false, true]) {
     test(
       'bounded compression expands only selected summary dependencies: $includeSummary',
@@ -276,16 +305,123 @@ void main() {
     );
   });
 
-  test('regeneration cannot see a summary created after its retained tail', () {
-    final history = ['A', 'B', 'C', 'D'].map(message).toList();
-    final summary = compact('S', ['A'], after: 'C');
+  test(
+    'regeneration reuses summaries before the target throughout the retained tail',
+    () {
+      final history = ['A', 'B', 'C', 'D', 'E'].map(message).toList();
+      final summary = compact('S', ['A', 'B'], after: 'E');
+      for (final target in ['A', 'B']) {
+        expect(
+          text(
+            ContextHistory.resolve(history, [summary], throughGroupId: target),
+          ),
+          target == 'A' ? ['A'] : ['A', 'B'],
+        );
+      }
+      for (final target in ['C', 'D', 'E']) {
+        expect(
+          text(
+            ContextHistory.resolve(history, [summary], throughGroupId: target),
+          ),
+          [
+            'S',
+            ...['C', 'D', 'E'].take(['C', 'D', 'E'].indexOf(target) + 1),
+          ],
+        );
+      }
+      expect(
+        text(
+          ContextHistory.resolve(
+            history,
+            [summary],
+            throughGroupId: 'C',
+            limit: 1,
+          ),
+        ),
+        ['S', 'C'],
+      );
+    },
+  );
+
+  test(
+    'regeneration selects only summaries whose covered ranges precede the target',
+    () {
+      final history = ['A', 'B', 'C', 'D', 'E'].map(message).toList();
+      final first = compact('S1', ['A', 'B'], after: 'E');
+      final second = compact(
+        'S2',
+        ['A', 'B', 'C'],
+        dependencies: ['S1'],
+        after: 'E',
+      );
+      expect(
+        text(
+          ContextHistory.resolve(
+            history,
+            [first, second],
+            throughGroupId: 'C',
+            endGroupId: 'D',
+          ),
+        ),
+        ['S1', 'C', 'D'],
+      );
+      expect(
+        text(
+          ContextHistory.resolve(history, [first, second], throughGroupId: 'D'),
+        ),
+        ['S2', 'D'],
+      );
+      expect(
+        text(
+          ContextHistory.resolve(
+            history,
+            [first, second],
+            throughGroupId: 'D',
+            omitOperations: {'S1'},
+          ),
+        ),
+        ['A', 'B', 'C', 'D'],
+      );
+      expect(
+        text(
+          ContextHistory.resolve(history, [
+            first,
+            compact('independent', ['D'], after: 'E'),
+          ], throughGroupId: 'C'),
+        ),
+        ['S1', 'C'],
+      );
+    },
+  );
+
+  test(
+    'regeneration retains a summary depending on the active fixed start',
+    () {
+      final history = ['A', 'B', 'C', 'D', 'E'].map(message).toList();
+      final operations = ContextHistory.appendOperation([
+        start('B'),
+      ], compact('S', ['B', 'C'], after: 'E'));
+      expect(
+        text(ContextHistory.resolve(history, operations, throughGroupId: 'D')),
+        ['S', 'D'],
+      );
+      expect(
+        text(ContextHistory.resolve(history, operations, throughGroupId: 'C')),
+        ['B', 'C'],
+      );
+    },
+  );
+
+  test('regeneration still applies clears only after their boundary', () {
+    final history = ['A', 'B', 'C'].map(message).toList();
+    final reset = clear('clear', 'B');
     expect(
-      text(ContextHistory.resolve(history, [summary], throughGroupId: 'B')),
+      text(ContextHistory.resolve(history, [reset], throughGroupId: 'B')),
       ['A', 'B'],
     );
     expect(
-      text(ContextHistory.resolve(history, [summary], throughGroupId: 'D')),
-      ['S', 'B', 'C', 'D'],
+      text(ContextHistory.resolve(history, [reset], throughGroupId: 'C')),
+      ['C'],
     );
   });
 

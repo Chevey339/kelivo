@@ -1,4 +1,5 @@
 #include "flutter_window.h"
+#include "desktop_startup.h"
 
 #include <optional>
 #include <chrono>
@@ -82,8 +83,8 @@ std::optional<RECT> DecodeWindowRect(const flutter::EncodableValue* value) {
 
 }  // namespace
 
-FlutterWindow::FlutterWindow(const flutter::DartProject& project)
-    : project_(project) {}
+FlutterWindow::FlutterWindow(const flutter::DartProject& project, bool autostart)
+    : autostart_(autostart), project_(project) {}
 
 FlutterWindow::~FlutterWindow() {
   // WM_QUIT can end the loop without a WM_DESTROY (windowManager.destroy()).
@@ -143,6 +144,39 @@ bool FlutterWindow::OnCreate() {
             result->Success();
           } else {
             result->Error("restore_bounds_failed", "SetWindowPos failed");
+          }
+        } else {
+          result->NotImplemented();
+        }
+      });
+
+  auto startup_channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "app.desktop_startup",
+      &flutter::StandardMethodCodec::GetInstance());
+  startup_channel->SetMethodCallHandler(
+      [](const flutter::MethodCall<flutter::EncodableValue>& call,
+         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == "getState") {
+          bool enabled = false;
+          const auto status = desktop_startup::IsEnabled(&enabled);
+          if (status != ERROR_SUCCESS) {
+            result->Error("startup_read_failed", std::to_string(status));
+          } else {
+            result->Success(flutter::EncodableMap{
+                {flutter::EncodableValue("supported"), flutter::EncodableValue(true)},
+                {flutter::EncodableValue("enabled"), flutter::EncodableValue(enabled)}});
+          }
+        } else if (call.method_name() == "setEnabled") {
+          const auto enabled = call.arguments() ? std::get_if<bool>(call.arguments()) : nullptr;
+          if (!enabled) {
+            result->Error("invalid_arguments", "Expected a boolean");
+            return;
+          }
+          const auto status = desktop_startup::SetEnabled(*enabled);
+          if (status != ERROR_SUCCESS) {
+            result->Error("startup_write_failed", std::to_string(status));
+          } else {
+            result->Success();
           }
         } else {
           result->NotImplemented();
@@ -405,7 +439,7 @@ bool FlutterWindow::OnCreate() {
       });
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
+    if (!autostart_) this->Show();
   });
 
   // Ensure a frame is pending so the window shows.

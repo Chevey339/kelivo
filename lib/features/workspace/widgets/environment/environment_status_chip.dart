@@ -73,12 +73,13 @@ class EnvironmentStatusChip extends StatelessWidget {
       case EnvironmentPhase.downloading:
       case EnvironmentPhase.verifying:
       case EnvironmentPhase.extracting:
-      case EnvironmentPhase.patching:
         final percent = workspaceEnvInstallPercent(state);
         if (percent == null) {
           return l10n.workspaceEnvChipInstallingIndeterminate;
         }
         return l10n.workspaceEnvChipInstalling(percent);
+      case EnvironmentPhase.patching:
+        return l10n.workspaceEnvPhasePatching;
       case EnvironmentPhase.error:
         return l10n.workspaceEnvChipError;
       case EnvironmentPhase.needsRestart:

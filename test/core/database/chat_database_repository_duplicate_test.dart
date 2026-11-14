@@ -122,7 +122,7 @@ void main() {
           ))!.extras['tools.permission_mode'],
           'fullAccess',
         );
-        expect(duplicate.title, 'Topic');
+        expect(duplicate.title, 'Topic (1)');
         expect(duplicate.isPinned, isTrue);
         expect(duplicate.mcpServerIds, const ['mcp-server']);
         expect(duplicate.assistantId, 'assistant');

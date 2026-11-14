@@ -24,12 +24,14 @@ void main() {
     LogicalKeyboardKey key,
     ui.KeyEventType type, {
     bool synthesized = false,
+    PhysicalKeyboardKey? physicalKey,
   }) {
     binding.keyEventManager.handleKeyData(
       ui.KeyData(
         timeStamp: Duration.zero,
         type: type,
-        physical: LogicalKeyboardKey.androidPlane + code,
+        physical:
+            physicalKey?.usbHidUsage ?? LogicalKeyboardKey.androidPlane + code,
         logical: key.keyId,
         character: null,
         synthesized: synthesized,
@@ -37,16 +39,23 @@ void main() {
     );
   }
 
-  Future<void> raw(int code, bool down, {int meta = 0, int device = -1}) async {
+  Future<void> raw(
+    int code,
+    bool down, {
+    int meta = 0,
+    int device = -1,
+    int scanCode = 0,
+    int flags = 0,
+  }) async {
     await binding.keyEventManager.handleRawKeyMessage(<String, dynamic>{
       'type': down ? 'keydown' : 'keyup',
       'keymap': 'android',
       'keyCode': code,
-      'scanCode': 0,
+      'scanCode': scanCode,
       'metaState': meta,
       'deviceId': device,
-      'source': 0,
-      'flags': 0,
+      'source': 0x101,
+      'flags': flags,
       'repeatCount': 0,
     });
   }
@@ -55,6 +64,7 @@ void main() {
     LogicalKeyboardKey key, {
     bool extend = true,
     int device = -1,
+    bool gboard = false,
   }) async {
     final code = <LogicalKeyboardKey, int>{
       LogicalKeyboardKey.arrowUp: 19,
@@ -62,21 +72,74 @@ void main() {
       LogicalKeyboardKey.arrowLeft: 21,
       LogicalKeyboardKey.arrowRight: 22,
     }[key]!;
+    // Captured from Gboard 18.6.3 on Android 11: unlike iFlytek, its
+    // virtual-keyboard packets carry Linux scan codes and soft-key flags.
+    final scanCode = gboard
+        ? <LogicalKeyboardKey, int>{
+            LogicalKeyboardKey.arrowUp: 103,
+            LogicalKeyboardKey.arrowDown: 108,
+            LogicalKeyboardKey.arrowLeft: 105,
+            LogicalKeyboardKey.arrowRight: 106,
+          }[key]!
+        : 0;
+    final physicalKey = gboard
+        ? <LogicalKeyboardKey, PhysicalKeyboardKey>{
+            LogicalKeyboardKey.arrowUp: PhysicalKeyboardKey.arrowUp,
+            LogicalKeyboardKey.arrowDown: PhysicalKeyboardKey.arrowDown,
+            LogicalKeyboardKey.arrowLeft: PhysicalKeyboardKey.arrowLeft,
+            LogicalKeyboardKey.arrowRight: PhysicalKeyboardKey.arrowRight,
+          }[key]
+        : null;
+    final flags = gboard ? 6 : 0;
     if (extend) {
-      data(59, LogicalKeyboardKey.shiftLeft, ui.KeyEventType.down);
+      data(
+        59,
+        LogicalKeyboardKey.shiftLeft,
+        ui.KeyEventType.down,
+        physicalKey: gboard ? PhysicalKeyboardKey.shiftLeft : null,
+      );
       data(
         59,
         LogicalKeyboardKey.shiftLeft,
         ui.KeyEventType.up,
         synthesized: true,
+        physicalKey: gboard ? PhysicalKeyboardKey.shiftLeft : null,
       );
-      await raw(59, true, device: device);
+      await raw(
+        59,
+        true,
+        device: device,
+        scanCode: gboard ? 42 : 0,
+        flags: flags,
+      );
     }
-    data(code, key, ui.KeyEventType.down);
-    await raw(code, true, meta: extend ? 1 : 0, device: device);
-    data(code, key, ui.KeyEventType.up);
-    await raw(code, false, meta: extend ? 1 : 0, device: device);
-    if (extend) await raw(59, false, device: device);
+    data(code, key, ui.KeyEventType.down, physicalKey: physicalKey);
+    await raw(
+      code,
+      true,
+      meta: extend ? 1 : 0,
+      device: device,
+      scanCode: scanCode,
+      flags: flags,
+    );
+    data(code, key, ui.KeyEventType.up, physicalKey: physicalKey);
+    await raw(
+      code,
+      false,
+      meta: extend ? 1 : 0,
+      device: device,
+      scanCode: scanCode,
+      flags: flags,
+    );
+    if (extend) {
+      await raw(
+        59,
+        false,
+        device: device,
+        scanCode: gboard ? 42 : 0,
+        flags: flags,
+      );
+    }
   }
 
   Future<TextEditingController> field(
@@ -155,6 +218,49 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('Gboard Shift arrows with scan codes preserve the range', (
+    tester,
+  ) async {
+    final controller = await field(tester, '👩‍💻中文abc');
+    await arrow(LogicalKeyboardKey.arrowRight, gboard: true);
+    expect(
+      controller.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 5),
+    );
+    await arrow(LogicalKeyboardKey.arrowRight, gboard: true);
+    expect(
+      controller.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 6),
+    );
+    await arrow(LogicalKeyboardKey.arrowLeft, gboard: true);
+    expect(
+      controller.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 5),
+    );
+    final state = tester.state<EditableTextState>(find.byType(EditableText));
+    expect(state.copyEnabled, isTrue);
+    expect(state.cutEnabled, isTrue);
+    await arrow(LogicalKeyboardKey.arrowRight, extend: false, gboard: true);
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(HardwareKeyboard.instance.logicalKeysPressed, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Gboard vertical selection follows wrapped visual lines', (
+    tester,
+  ) async {
+    final controller = await field(tester, 'abcdefghij ' * 12, width: 180);
+    await arrow(LogicalKeyboardKey.arrowDown, gboard: true);
+    expect(controller.selection.baseOffset, 0);
+    expect(
+      controller.selection.extentOffset,
+      inExclusiveRange(0, controller.text.length),
+    );
+    await arrow(LogicalKeyboardKey.arrowUp, gboard: true);
+    expect(controller.selection, const TextSelection.collapsed(offset: 0));
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('ordinary arrows remain ordinary after selection mode ends', (
     tester,
   ) async {
@@ -175,6 +281,8 @@ void main() {
   ) async {
     final controller = await field(tester, 'abcdef');
     await arrow(LogicalKeyboardKey.arrowRight, device: 7);
+    expect(controller.selection.isCollapsed, isTrue);
+    await arrow(LogicalKeyboardKey.arrowRight, device: 7, gboard: true);
     expect(controller.selection.isCollapsed, isTrue);
     await tester.pumpWidget(const SizedBox());
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));

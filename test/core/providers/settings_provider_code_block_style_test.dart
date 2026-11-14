@@ -11,26 +11,27 @@ void main() {
   const key = 'display_use_legacy_code_block_style_v1';
 
   test(
-    'legacy code block defaults off and survives copying and restart',
+    'legacy code block defaults on and explicit choices survive restart',
     () async {
       final harness = await createBusinessTestHarness();
       final settings = SettingsProvider(harness.preferences);
       addTearDown(settings.dispose);
+      expect(settings.useLegacyCodeBlockStyle, isTrue);
       await settings.loaded;
-      expect(settings.useLegacyCodeBlockStyle, isFalse);
+      expect(settings.useLegacyCodeBlockStyle, isTrue);
       expect(settings.useLegacyInlineCodeStyle, isFalse);
       await settings.setUseLegacyInlineCodeStyle(true);
 
       var notifications = 0;
       settings.addListener(() => notifications++);
-      await settings.setUseLegacyCodeBlockStyle(true);
-      await settings.setUseLegacyCodeBlockStyle(true);
+      await settings.setUseLegacyCodeBlockStyle(false);
+      await settings.setUseLegacyCodeBlockStyle(false);
       expect(notifications, 1);
-      expect(harness.preferences.getBool(key), isTrue);
+      expect(harness.preferences.getBool(key), isFalse);
 
       final copied = settings.copyWith();
       addTearDown(copied.dispose);
-      expect(copied.useLegacyCodeBlockStyle, isTrue);
+      expect(copied.useLegacyCodeBlockStyle, isFalse);
       expect(copied.useLegacyInlineCodeStyle, isTrue);
 
       final reloaded = SettingsProvider(
@@ -38,14 +39,14 @@ void main() {
       );
       addTearDown(reloaded.dispose);
       await reloaded.loaded;
-      expect(reloaded.useLegacyCodeBlockStyle, isTrue);
-      await reloaded.setUseLegacyCodeBlockStyle(false);
+      expect(reloaded.useLegacyCodeBlockStyle, isFalse);
+      await reloaded.setUseLegacyCodeBlockStyle(true);
       final restarted = SettingsProvider(
         BusinessPreferences(harness.repository),
       );
       addTearDown(restarted.dispose);
       await restarted.loaded;
-      expect(restarted.useLegacyCodeBlockStyle, isFalse);
+      expect(restarted.useLegacyCodeBlockStyle, isTrue);
       expect(restarted.useLegacyInlineCodeStyle, isTrue);
     },
   );

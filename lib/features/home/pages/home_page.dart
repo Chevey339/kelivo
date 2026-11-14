@@ -153,16 +153,6 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
   }
 }
 
-String _compressContextErrorMessage(AppLocalizations l10n, String error) {
-  return switch (error) {
-    'no_messages' => l10n.compressContextNoMessages,
-    'no_conversation' => l10n.compressContextNoConversation,
-    'no_model' => l10n.compressContextNoModel,
-    'empty_summary' => l10n.compressContextEmptySummary,
-    _ => '${l10n.compressContextFailed}: $error',
-  };
-}
-
 class _HomePageState extends State<HomePage>
     with TickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
   // ============================================================================
@@ -199,6 +189,7 @@ class _HomePageState extends State<HomePage>
   late final QuoteInteractionController _quoteInteractions;
   bool _quoteSyncScheduled = false;
   (String?, int)? _quoteSourceVersion;
+  int _quoteJumpSerial = 0;
 
   void _syncQuoteHighlights() {
     if (_quoteSyncScheduled) return;
@@ -234,10 +225,16 @@ class _HomePageState extends State<HomePage>
 
   Future<bool> _jumpToQuote(QuoteRef quote) async {
     if (!quote.hasSourceRange) return false;
+    final serial = ++_quoteJumpSerial;
+    final previousConversation = _controller.currentConversation?.id;
     final source = (await context.read<ChatService>().loadMessagesByIds([
       quote.messageId,
     ])).firstOrNull;
-    if (!mounted) return false;
+    if (!mounted ||
+        serial != _quoteJumpSerial ||
+        _controller.currentConversation?.id != previousConversation) {
+      return false;
+    }
     final labels = AppLocalizations.of(context)!;
     if (source == null) {
       showAppSnackBar(context, message: labels.quoteSourceMissing);
@@ -246,13 +243,24 @@ class _HomePageState extends State<HomePage>
     if (_controller.currentConversation?.id != source.conversationId) {
       await _controller.switchConversationAnimated(source.conversationId);
     }
-    if (!mounted) return false;
+    bool isCurrent() =>
+        mounted &&
+        serial == _quoteJumpSerial &&
+        _controller.currentConversation?.id == source.conversationId;
+    if (!isCurrent()) return false;
     await _controller.setSelectedVersion(
       source.groupId ?? source.id,
       source.version,
     );
+    if (!isCurrent()) return false;
     await _controller.scrollToMessageId(source.id);
-    if (!mounted) return false;
+    if (!isCurrent()) return false;
+    await _quoteInteractions.scrollToSource(
+      quote,
+      scrollToRect: _controller.scrollToSourceRect,
+      isCurrent: isCurrent,
+    );
+    if (!mounted || !isCurrent()) return false;
     _quoteInteractions.reveal(quote);
     showAppSnackBar(context, message: labels.quoteLocated);
     return true;
@@ -392,6 +400,7 @@ class _HomePageState extends State<HomePage>
         void options() => _showCompressContextOptions(
           targetConversationId: task.conversationId,
           initialOptions: task.options,
+          initialError: task.error,
           reviewPending: false,
         );
         switch (phase) {
@@ -441,7 +450,7 @@ class _HomePageState extends State<HomePage>
                   ? l10n.compressionPreviewOnly
                   : compressionErrorLabel(l10n, task.error!),
               type: NotificationType.warning,
-              actionLabel: l10n.compressAdjust,
+              actionLabel: l10n.contextViewGenerated,
               onAction: () => showCompressionReview(
                 context,
                 chat: chat,
@@ -451,30 +460,21 @@ class _HomePageState extends State<HomePage>
             );
           case CompressionPhase.failed:
           case CompressionPhase.interrupted:
-            final stale = task.error?.contains('context_changed') ?? false;
-            final nothing = task.error?.contains('no_messages') ?? false;
-            final reason = compressionErrorLabel(
+            final action = compressionRecoveryActions(
               l10n,
-              task.error ?? l10n.contextTaskInterrupted,
-            ).split('\n').first;
+              error: task.error,
+              native: task.options.native,
+              onRetry: retry,
+              onAdjust: options,
+            ).first;
             showAppSnackBar(
               context,
-              message: stale
-                  ? l10n.compressStaleSnack
-                  : nothing
-                  ? l10n.compressNothingNew
-                  : l10n.compressFailedSnack(
-                      reason.length > 160
-                          ? '${reason.substring(0, 160)}…'
-                          : reason,
-                    ),
+              message: task.error == null
+                  ? compressionStatusLabel(l10n, task)
+                  : compressionErrorLabel(l10n, task.error!),
               type: NotificationType.warning,
-              actionLabel: nothing
-                  ? l10n.compressAdjust
-                  : stale
-                  ? l10n.compressRegenerate
-                  : l10n.compressTaskRetry,
-              onAction: nothing ? options : retry,
+              actionLabel: action.label,
+              onAction: action.onTap,
             );
           default:
             break;
@@ -1206,6 +1206,8 @@ class _HomePageState extends State<HomePage>
         onAdjust: () => _showCompressContextOptions(
           targetConversationId: task.conversationId,
           initialOptions: task.options,
+          initialError: task.error,
+          reviewPending: false,
         ),
       ),
       contextOperations: contextOperations,
@@ -1282,6 +1284,8 @@ class _HomePageState extends State<HomePage>
       },
       onRegenerateMessage: (message) =>
           _controller.regenerateAtMessage(message),
+      onRetryWithoutImages: (message) =>
+          _controller.regenerateAtMessage(message, omitImages: true),
       onSetContextStart: (message) async {
         try {
           await chat.setConversationContextStart(
@@ -1988,6 +1992,7 @@ class _HomePageState extends State<HomePage>
       onAdjust: (task) => _showCompressContextOptions(
         targetConversationId: id,
         initialOptions: task.options,
+        initialError: task.error,
         reviewPending: false,
       ),
       onOpenConversation: _controller.switchConversationAnimated,
@@ -1997,6 +2002,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _showCompressContextOptions({
     String? targetConversationId,
     CompressContextOptions? initialOptions,
+    String? initialError,
     bool reviewPending = true,
   }) async {
     final chat = context.read<ChatService>();
@@ -2013,6 +2019,7 @@ class _HomePageState extends State<HomePage>
         onRecompress: () => _showCompressContextOptions(
           targetConversationId: conversation.id,
           initialOptions: pending.options,
+          initialError: pending.error,
           reviewPending: false,
         ),
       );
@@ -2024,28 +2031,39 @@ class _HomePageState extends State<HomePage>
     final messageWindow = assistant?.limitContextMessages == true
         ? assistant!.contextMessageSize
         : null;
-    final snapshot = await chat.loadContextSnapshot(conversation.id);
-    if (!mounted) return;
-    final estimator = chat.contextCompression.estimateCandidate;
+    Future<ConversationContextHistory>? previewHistory;
+    var previewRevision = -1;
     final options = await showCompressContextOptions(
       context: context,
       builder: (sheet) => CompressContextOptionsDialog(
         sheet: sheet,
         conversationId: conversation.id,
-        previewRequest: (options, config) => _controller
-            .previewCompressionRequest(conversation.id, options, config),
-        messages: snapshot.messages,
-        operations: snapshot.operations,
+        loadHistory: () => chat.loadCompressionHistory(conversation.id),
+        historyRevision: chat.compressionHistoryRevisionListenable(
+          conversation.id,
+        ),
+        previewRequest: (options, config) {
+          final revision = chat.compressionHistoryRevision(conversation.id);
+          if (previewHistory == null || previewRevision != revision) {
+            previewRevision = revision;
+            previewHistory = chat.loadContextHistory(conversation.id);
+          }
+          final history = previewHistory!;
+          return _controller
+              .previewCompressionRequest(
+                conversation.id,
+                options,
+                config,
+                history: history,
+              )
+              .catchError((Object error, StackTrace stack) {
+                if (identical(previewHistory, history)) previewHistory = null;
+                Error.throwWithStackTrace(error, stack);
+              });
+        },
         messageWindow: messageWindow,
         initialOptions: initialOptions,
-        prepareInput: (messages, include) => chat.messagesForCompression(
-          messages,
-          includeAttachmentsAndTools: include,
-          quoteMarker: AppLocalizations.of(context)!.selectionQuoteMarker,
-        ),
-        estimateContext: estimator == null
-            ? null
-            : (history) => estimator(conversation.id, history),
+        initialError: initialError,
       ),
     );
     if (options == null || !mounted) return;
@@ -2054,13 +2072,21 @@ class _HomePageState extends State<HomePage>
       targetConversationId: conversation.id,
     );
     if (error != null && mounted) {
+      final l10n = AppLocalizations.of(context)!;
+      final target = compressionRecoveryTarget(error, native: options.native);
       showAppSnackBar(
         context,
-        message: _compressContextErrorMessage(
-          AppLocalizations.of(context)!,
-          error,
-        ),
+        message: compressionErrorLabel(l10n, error),
         type: NotificationType.warning,
+        actionLabel: target?.label(l10n) ?? l10n.ttsServicesDialogErrorTitle,
+        onAction: () => target == null
+            ? showCompressionErrorDetails(context, error)
+            : _showCompressContextOptions(
+                targetConversationId: conversation.id,
+                initialOptions: options,
+                initialError: error,
+                reviewPending: false,
+              ),
       );
     }
   }

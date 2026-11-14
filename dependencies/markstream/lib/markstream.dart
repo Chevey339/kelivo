@@ -5,6 +5,7 @@ export 'markstream_core.dart';
 export 'src/flutter/selection/selectable_span_adapter.dart';
 export 'src/flutter/selection/selectable_rich_text.dart';
 export 'src/flutter/selection/stable_selection_container.dart';
+export 'src/flutter/selection/text_range_rect.dart' show textRangeRect;
 export 'src/flutter/render/inline_code_capsule.dart';
 export 'src/flutter/render/optical_baseline.dart';
 export 'src/flutter/selection/code_selection.dart';

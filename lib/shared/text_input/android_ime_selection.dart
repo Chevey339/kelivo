@@ -45,9 +45,10 @@ class AndroidImeSelection {
       return KeyEventResult.ignored;
     }
     final data = raw.data;
+    // Virtual IMEs can supply real scan codes (Gboard does). Device identity,
+    // rather than a zero scan code, distinguishes them from physical keyboards.
     if (data is! RawKeyEventDataAndroid ||
         data.deviceId != -1 ||
-        data.scanCode != 0 ||
         !data.isShiftPressed ||
         data.isControlPressed ||
         data.isAltPressed ||

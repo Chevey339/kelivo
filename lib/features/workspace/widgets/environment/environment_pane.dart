@@ -750,7 +750,11 @@ class _StatusCard extends StatelessWidget {
             else if (state.phase == EnvironmentPhase.error)
               _ErrorBody(state: state, busy: busy, onRetry: onRetry)
             else if (state.phase == EnvironmentPhase.needsRestart)
-              const _RestartBanner()
+              _RestartBanner(
+                repairInterrupted:
+                    state.errorMessage == 'patch_interrupted' ||
+                    state.errorMessage == 'patch_timeout',
+              )
             else ...[
               const IosRowDivider(),
               EnvironmentMetricRow(
@@ -957,7 +961,9 @@ class _InstallingBody extends StatelessWidget {
               color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
-          if (state.phase == EnvironmentPhase.downloading &&
+          if ((state.phase == EnvironmentPhase.downloading ||
+                  (state.phase == EnvironmentPhase.patching &&
+                      defaultTargetPlatform == TargetPlatform.iOS)) &&
               onCancel != null) ...[
             const SizedBox(height: 12),
             KeyedSubtree(
@@ -1027,7 +1033,9 @@ class _ErrorBody extends StatelessWidget {
 }
 
 class _RestartBanner extends StatelessWidget {
-  const _RestartBanner();
+  const _RestartBanner({this.repairInterrupted = false});
+
+  final bool repairInterrupted;
 
   @override
   Widget build(BuildContext context) {
@@ -1049,7 +1057,9 @@ class _RestartBanner extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  l10n.workspaceEnvRestartDoneBanner,
+                  repairInterrupted
+                      ? l10n.workspaceEnvRepairRestartBanner
+                      : l10n.workspaceEnvRestartDoneBanner,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: AppFontWeights.medium,

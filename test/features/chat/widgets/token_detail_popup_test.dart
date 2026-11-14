@@ -64,6 +64,7 @@ const _fullStats = TokenDisplayWidget(
   reasoningTokens: 500,
   cacheWriteTokens: 100,
   durationMs: 5000,
+  firstResponseMs: 500,
   firstTokenMs: 1250,
   providerId: 'openai',
   modelId: 'priced-model',
@@ -448,31 +449,34 @@ void main() {
     );
   }
 
-  testWidgets('shows first-token latency and speed for the whole generation', (
-    tester,
-  ) async {
-    final settings = SettingsProvider(createBusinessTestPreferences());
-    addTearDown(settings.dispose);
-    await tester.pumpWidget(
-      _harness(
-        settings: settings,
-        child: const TokenDetailPopup(
-          completionTokens: 30,
-          reasoningTokens: 20,
-          totalCompletionTokens: 50,
-          durationMs: 5000,
-          firstTokenMs: 1250,
+  testWidgets(
+    'shows distinct response and output latencies and generation speed',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      addTearDown(settings.dispose);
+      await tester.pumpWidget(
+        _harness(
+          settings: settings,
+          child: const TokenDetailPopup(
+            completionTokens: 30,
+            reasoningTokens: 20,
+            totalCompletionTokens: 50,
+            durationMs: 5000,
+            firstResponseMs: 500,
+            firstTokenMs: 1250,
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(find.text('1.25s (first token)'), findsOneWidget);
-    expect(find.text('10.0 tok/s'), findsOneWidget);
-    expect(find.text('5.0s'), findsOneWidget);
-    expect(find.text('30 tokens'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.text('0.50s (first response)'), findsOneWidget);
+      expect(find.text('1.25s (first output)'), findsOneWidget);
+      expect(find.text('10.0 tok/s'), findsOneWidget);
+      expect(find.text('5.0s'), findsOneWidget);
+      expect(find.text('30 tokens'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('omits unknown latency and speed without positive duration', (
     tester,
@@ -487,13 +491,14 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.textContaining('(first token)'), findsNothing);
+    expect(find.textContaining('(first response)'), findsNothing);
+    expect(find.textContaining('(first output)'), findsNothing);
     expect(find.textContaining('tok/s'), findsNothing);
     expect(find.text('30 tokens'), findsOneWidget);
   });
 
   testWidgets(
-    'tap or hover opens the popup even with only a zero-ms first token',
+    'tap or hover opens the popup with only a zero-ms first response',
     (tester) async {
       final settings = SettingsProvider(createBusinessTestPreferences());
       addTearDown(settings.dispose);
@@ -501,7 +506,7 @@ void main() {
         _harness(
           settings: settings,
           child: const Center(
-            child: TokenDisplayWidget(totalTokens: 0, firstTokenMs: 0),
+            child: TokenDisplayWidget(totalTokens: 0, firstResponseMs: 0),
           ),
         ),
       );
@@ -518,7 +523,8 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expect(find.text('0.00s (first token)'), findsOneWidget);
+      expect(find.text('0.00s (first response)'), findsOneWidget);
+      expect(find.textContaining('(first output)'), findsNothing);
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant({TargetPlatform.iOS, TargetPlatform.macOS}),

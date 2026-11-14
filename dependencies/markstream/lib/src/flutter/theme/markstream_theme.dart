@@ -726,11 +726,13 @@ final class MarkstreamTheme extends _ThemeTokens {
 
   /// Defaults match Kelivo's Markdown geometry. Apps supply font families,
   /// platform-adjusted weights and an optional base style here.
+  /// [blockBackgroundColor] overrides the shared fill for painted blocks.
   factory MarkstreamTheme.fromColorScheme(
     ColorScheme colors, {
     TextStyle? bodyStyle,
     MarkstreamBackdrop backdrop = MarkstreamBackdrop.plain,
     double maskStrength = 1,
+    Color? blockBackgroundColor,
     String codeFontFamily = 'monospace',
     bool desktop = false,
     FontWeight Function(FontWeight) fontWeightResolver = _identityFontWeight,
@@ -776,18 +778,20 @@ final class MarkstreamTheme extends _ThemeTokens {
         backdrop == MarkstreamBackdrop.frostedBubble ||
         backdrop == MarkstreamBackdrop.solidBubble;
     final lowMask = 1 - maskStrength.clamp(0.0, 1.0);
-    final fillBlock = switch (backdrop) {
-      MarkstreamBackdrop.plain => opaque,
-      MarkstreamBackdrop.wallpaper => surface.withValues(
-        alpha: (dark ? .74 : .80) + .10 * lowMask,
-      ),
-      MarkstreamBackdrop.frostedBubble => surface.withValues(
-        alpha: dark ? .36 : .42,
-      ),
-      MarkstreamBackdrop.solidBubble => tint.withValues(
-        alpha: dark ? .05 : .035,
-      ),
-    };
+    final fillBlock =
+        blockBackgroundColor ??
+        switch (backdrop) {
+          MarkstreamBackdrop.plain => opaque,
+          MarkstreamBackdrop.wallpaper => surface.withValues(
+            alpha: (dark ? .74 : .80) + .10 * lowMask,
+          ),
+          MarkstreamBackdrop.frostedBubble => surface.withValues(
+            alpha: dark ? .36 : .42,
+          ),
+          MarkstreamBackdrop.solidBubble => tint.withValues(
+            alpha: dark ? .05 : .035,
+          ),
+        };
     final palette = MarkstreamColors(
       ink: on,
       ink2: on.withValues(alpha: dark ? .70 : .72),

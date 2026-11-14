@@ -29,6 +29,8 @@ void main() {
     SandboxPathResolver.debugSetDirs(docsDir: root.path, supportDir: root.path);
     service = ChatService();
     await service.init();
+    await service.runAssetReferenceMaintenance();
+    await service.runAssetMaintenance();
   });
   tearDown(() async {
     await service.close();
@@ -155,7 +157,6 @@ void main() {
       final fork = await service.forkConversationAtRevision(
         sourceConversationId: conversation.id,
         sourceRevisionId: message.id,
-        title: 'Copy',
         preserveVersions: preserveVersions,
       );
       await service.deleteConversation(conversation.id);
@@ -239,6 +240,12 @@ void main() {
         } finally {
           db.close();
         }
+        final next = await service.createConversation(title: 'Next');
+        final pending = await service.addMessage(
+          conversationId: next.id,
+          role: 'assistant',
+          isStreaming: true,
+        );
         if (cached) {
           expect(await McpImageSnapshot.reuseLocalFile(saved.uri), isNotNull);
         } else {
@@ -250,7 +257,6 @@ void main() {
         // The tool has a result, but the next message checkpoint has not landed.
         await service.runAssetMaintenance();
         expect(await file.exists(), isTrue);
-        final next = await service.createConversation(title: 'Next');
         final message = await service.addMessage(
           conversationId: next.id,
           role: 'assistant',
@@ -262,6 +268,7 @@ void main() {
           ),
           hasLength(1),
         );
+        await service.deleteMessage(pending.id);
         await service.deleteConversation(next.id);
         await service.runAssetMaintenance(
           now: DateTime.now().toUtc().add(const Duration(days: 8)),

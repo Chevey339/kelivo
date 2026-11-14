@@ -10,6 +10,7 @@ class BrowserSettings {
     this.restoreTabs = true,
     this.saveHistory = true,
     this.agentEnabled = true,
+    this.operationTimeoutSeconds = 30,
     this.surfaceStyle = BrowserSurfaceStyle.solid,
   });
 
@@ -23,6 +24,8 @@ class BrowserSettings {
   final bool restoreTabs;
   final bool saveHistory;
   final bool agentEnabled;
+  static const operationTimeoutOptions = [30, 60, 90, 120];
+  final int operationTimeoutSeconds;
   final BrowserSurfaceStyle surfaceStyle;
 
   BrowserSettings copyWith({
@@ -32,6 +35,7 @@ class BrowserSettings {
     bool? restoreTabs,
     bool? saveHistory,
     bool? agentEnabled,
+    int? operationTimeoutSeconds,
     BrowserSurfaceStyle? surfaceStyle,
   }) => BrowserSettings(
     searchEngine: searchEngine ?? this.searchEngine,
@@ -40,6 +44,8 @@ class BrowserSettings {
     restoreTabs: restoreTabs ?? this.restoreTabs,
     saveHistory: saveHistory ?? this.saveHistory,
     agentEnabled: agentEnabled ?? this.agentEnabled,
+    operationTimeoutSeconds:
+        operationTimeoutSeconds ?? this.operationTimeoutSeconds,
     surfaceStyle: surfaceStyle ?? this.surfaceStyle,
   );
 
@@ -50,6 +56,7 @@ class BrowserSettings {
     'restoreTabs': restoreTabs,
     'saveHistory': saveHistory,
     'agentEnabled': agentEnabled,
+    'operationTimeoutSeconds': operationTimeoutSeconds,
     'surfaceStyle': surfaceStyle.name,
   };
 
@@ -71,6 +78,11 @@ class BrowserSettings {
     restoreTabs: json['restoreTabs'] != false,
     saveHistory: json['saveHistory'] != false,
     agentEnabled: json['agentEnabled'] != false,
+    operationTimeoutSeconds:
+        json['operationTimeoutSeconds'] is int &&
+            operationTimeoutOptions.contains(json['operationTimeoutSeconds'])
+        ? json['operationTimeoutSeconds'] as int
+        : 30,
     surfaceStyle: BrowserSurfaceStyle.values.firstWhere(
       (value) => value.name == json['surfaceStyle'],
       orElse: () => BrowserSurfaceStyle.solid,

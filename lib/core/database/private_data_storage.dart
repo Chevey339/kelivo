@@ -28,6 +28,113 @@ abstract final class PrivateDataStorage {
   static const noticeName = '.kelivo_storage_notice';
   static const sourceManifestName = '.kelivo_private_source.json';
 
+  /// The original iOS database can be explicitly discarded once private
+  /// storage is active. Listing only checks metadata, never reads the old DB.
+  static Future<bool> canDeleteRetainedDatabase({
+    required Directory source,
+    required Directory target,
+  }) async {
+    try {
+      await _requireRetainedDatabase(source: source, target: target);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> deleteRetainedDatabase({
+    required Directory source,
+    required Directory target,
+    RestoreDurability? durability,
+  }) async {
+    await _requireRetainedDatabase(source: source, target: target);
+    final io = durability ?? RestorePlatformDurability();
+    // Match activation's lock order. An old process using Documents must not
+    // lose its live database, and private activation/recovery must stay idle.
+    final parentLease = await RestoreBusinessLease.acquire(
+      appDataDirectory: target.parent,
+      durability: io,
+    );
+    RestoreBusinessLease? sourceLease;
+    try {
+      sourceLease = await RestoreBusinessLease.acquire(
+        appDataDirectory: source,
+        durability: io,
+      );
+      await _requireRetainedDatabase(source: source, target: target);
+      // Keep the main file visible until every sidecar has been removed, so a
+      // failed deletion remains listed and can be retried.
+      for (final suffix in DatabaseFamilyPreserver.suffixes.reversed) {
+        final file = File(p.join(source.path, 'kelivo.db$suffix'));
+        final type = await FileSystemEntity.type(file.path, followLinks: false);
+        if (type == FileSystemEntityType.notFound) continue;
+        if (type != FileSystemEntityType.file) {
+          throw StateError('private_storage_retained_file_type');
+        }
+        await file.delete();
+      }
+      await io.syncDirectory(source, fullBarrier: true);
+    } finally {
+      await sourceLease?.close();
+      await parentLease.close();
+    }
+  }
+
+  static Future<void> _requireRetainedDatabase({
+    required Directory source,
+    required Directory target,
+  }) async {
+    for (final directory in [source, target]) {
+      if (await FileSystemEntity.type(directory.path, followLinks: false) !=
+          FileSystemEntityType.directory) {
+        throw StateError('private_storage_path_type');
+      }
+    }
+    final sourcePath = await source.resolveSymbolicLinks();
+    final targetPath = await target.resolveSymbolicLinks();
+    if (p.equals(sourcePath, targetPath) ||
+        p.isWithin(sourcePath, targetPath) ||
+        p.isWithin(targetPath, sourcePath)) {
+      throw StateError('private_storage_overlapping_directories');
+    }
+    final record = await _readRecord(
+      File(p.join(target.parent.path, recordName)),
+    );
+    final ready = await _readRecord(File(p.join(target.path, readyName)));
+    if (record['id'] != ready['id']) {
+      throw StateError('private_storage_identity_mismatch');
+    }
+    for (final path in [
+      p.join(target.parent.path, recoveryName),
+      p.join(target.path, RestoreWorkspaceLock.snapshotRecoveryMarkerName),
+      p.join(target.path, DatabaseFamilyPreserver.pendingName),
+      p.join(source.path, DatabaseFamilyPreserver.pendingName),
+    ]) {
+      if (await FileSystemEntity.type(path, followLinks: false) !=
+          FileSystemEntityType.notFound) {
+        throw StateError('private_storage_recovery_pending');
+      }
+    }
+    for (final directory in [source, target]) {
+      final database = File(p.join(directory.path, 'kelivo.db'));
+      if (await FileSystemEntity.type(database.path, followLinks: false) !=
+              FileSystemEntityType.file ||
+          await database.length() == 0) {
+        throw StateError('private_storage_database_missing');
+      }
+    }
+    for (final suffix in DatabaseFamilyPreserver.suffixes) {
+      final type = await FileSystemEntity.type(
+        p.join(source.path, 'kelivo.db$suffix'),
+        followLinks: false,
+      );
+      if (type != FileSystemEntityType.file &&
+          type != FileSystemEntityType.notFound) {
+        throw StateError('private_storage_retained_file_type');
+      }
+    }
+  }
+
   static Future<void> prepare({
     required Directory source,
     required Directory target,

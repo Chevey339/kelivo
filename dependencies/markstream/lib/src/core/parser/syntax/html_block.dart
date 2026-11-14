@@ -32,7 +32,8 @@ HtmlBlockStart? matchHtmlBlock(String source, int start, int end) {
     return const HtmlBlockStart(rootTag: 'html', fullDocument: true);
   if (htmlBlockTags.contains(tag.name) || discardedHtmlTags.contains(tag.name))
     return HtmlBlockStart(rootTag: tag.name);
-  if (source.substring(tag.end, end).trim().isEmpty)
+  if (htmlInlineTags.contains(tag.name) &&
+      source.substring(tag.end, end).trim().isEmpty)
     return const HtmlBlockStart(interrupts: false);
   return null;
 }
@@ -88,6 +89,9 @@ final class HtmlBlockTracker {
         continue;
       }
       i = tag.end;
+      // Literal unknown tags cannot open or close native HTML containers.
+      // The full-document root (html) is tracked separately from that subset.
+      if (!isKnownHtmlTag(tag.name) && tag.name != start.rootTag) continue;
       if (tag.closing) {
         final index = _tags.lastIndexOf(tag.name);
         if (index >= 0) _tags.removeRange(index, _tags.length);

@@ -1,28 +1,35 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
-import 'package:highlight/highlight.dart' show Node, highlight;
+import 'package:re_highlight/re_highlight.dart';
+import 'package:re_highlight/languages/all.dart';
 import 'package:markstream/markstream.dart';
 import 'package:Kelivo/shared/cache/byte_lru_cache.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 // Cache syntax trees, not styled spans, so changing the theme does not reparse.
-final _nodes = ByteLruCache<String, List<Node>>(
+final _nodes = ByteLruCache<String, DataNode>(
   maxBytes: 8 << 20,
   sizeOf: (key, nodes) {
     var bytes = key.length * 2;
-    final pending = [...nodes];
+    final pending = <dynamic>[nodes];
     while (pending.isNotEmpty) {
       final node = pending.removeLast();
-      bytes +=
-          64 +
-          (node.value?.length ?? 0) * 2 +
-          (node.className?.length ?? 0) * 2;
-      pending.addAll(node.children ?? const []);
+      if (node is String) {
+        bytes += 32 + node.length * 2;
+      } else if (node is DataNode) {
+        bytes += 64 + (node.scope?.length ?? 0) * 2;
+        pending.addAll(node.children);
+      }
     }
     return bytes;
   },
 );
+final _pending = <String, Future<DataNode>>{};
+final _parser = Highlight()..registerLanguages(builtinAllLanguages);
 @visibleForTesting
 int debugHighlightParseCount = 0;
 @visibleForTesting
@@ -41,7 +48,7 @@ class KelivoCodeHighlighter implements CodeHighlighter {
       ? const KelivoCodeHighlighter(wallpaper: true)
       : const KelivoCodeHighlighter();
   @override
-  TextSpan highlight(
+  FutureOr<TextSpan> highlight(
     String source, {
     required String language,
     required TextStyle style,
@@ -56,30 +63,23 @@ class KelivoCodeHighlighter implements CodeHighlighter {
         ? (wallpaper ? _wallpaperDarkMuted : _plainDarkMuted)
         : (wallpaper ? _wallpaperLightMuted : _plainLightMuted);
     TextStyle? syntaxStyle(String? name) {
-      final raw = theme[name]?.merge(mutedStyles[name]) ?? mutedStyles[name];
+      // Modern grammars use scopes such as title.function and variable.language.
+      final scope = theme.containsKey(name) ? name : name?.split('.').first;
+      final raw = theme[scope]?.merge(mutedStyles[scope]) ?? mutedStyles[scope];
       final weight = raw?.fontWeight;
       if (weight == null) return raw;
       final normalized = AppFontWeights.normalize(weight);
       return normalized == weight ? raw : raw!.copyWith(fontWeight: normalized);
     }
 
-    try {
-      var nodes = _nodes.get(key);
-      if (nodes == null) {
-        debugHighlightParseCount++;
-        nodes = _parse(source, languageId);
-        _nodes.put(key, nodes);
-      }
-      List<TextSpan> convert(List<Node> nodes) => [
-        for (final node in nodes)
-          TextSpan(
-            text: node.value,
-            children: node.value == null && node.children != null
-                ? convert(node.children!)
-                : null,
-            style: syntaxStyle(node.className),
-          ),
-      ];
+    List<TextSpan> convert(DataNode node) => [
+      for (final child in node.children)
+        if (child is String)
+          TextSpan(text: child)
+        else if (child is DataNode)
+          TextSpan(style: syntaxStyle(child.scope), children: convert(child)),
+    ];
+    TextSpan styled(DataNode nodes) {
       final span = TextSpan(
         style: style.copyWith(backgroundColor: const Color(0x00000000)),
         children: convert(nodes),
@@ -87,6 +87,17 @@ class KelivoCodeHighlighter implements CodeHighlighter {
       return span.toPlainText() == source
           ? span
           : TextSpan(text: source, style: style);
+    }
+
+    try {
+      final nodes = _parseCached(source, languageId, key);
+      return nodes is DataNode
+          ? styled(nodes)
+          : nodes.then(
+              styled,
+              onError: (Object error, StackTrace stack) =>
+                  TextSpan(text: source, style: style),
+            );
     } catch (_) {
       return TextSpan(text: source, style: style);
     }
@@ -116,9 +127,51 @@ const _wallpaperDarkMuted = <String, TextStyle>{
   'meta': TextStyle(color: Color(0xffbdc5d0)),
 };
 
-// Keep this separate from the interface method of the same name.
-List<Node> _parse(String source, String language) =>
-    highlight.parse(source, language: language).nodes ?? const [];
+FutureOr<DataNode> _parseCached(String source, String language, String key) {
+  final cached = _nodes.get(key);
+  if (cached != null) return cached;
+  final pending = _pending[key];
+  if (pending != null) return pending;
+  debugHighlightParseCount++;
+  if (source.length <= PerformanceLimits.highlightCharacters &&
+      '\n'.allMatches(source).length < PerformanceLimits.highlightLines) {
+    final result = _parseCode((source, language));
+    _nodes.put(key, result);
+    return result;
+  }
+  // Parse the complete block off the UI isolate so embedded languages and
+  // multiline tokens retain their context without blocking scrolling.
+  return _pending[key] = compute(_parseCode, (source, language))
+      .then((result) {
+        _nodes.put(key, result);
+        return result;
+      })
+      .whenComplete(() {
+        _pending.remove(key);
+      });
+}
+
+DataNode _parseCode((String, String) input) {
+  final (source, language) = input;
+  if (_parser.getLanguage(language) == null) {
+    return DataNode(children: [source]);
+  }
+  final tree = _SyntaxTree();
+  _parser.highlight(code: source, language: language).render(tree);
+  return tree.root!;
+}
+
+// Retain only the token tree, not HighlightResult's compiled grammar/state.
+// This tree is also safe to transfer from the parsing isolate.
+class _SyntaxTree implements HighlightRenderer {
+  DataNode? root;
+  @override
+  void openNode(DataNode node) => root ??= node;
+  @override
+  void addText(String text) {}
+  @override
+  void closeNode(DataNode node) {}
+}
 
 String? normalizeCodeLanguage(String? lang) {
   if (lang == null || lang.trim().isEmpty) return null;

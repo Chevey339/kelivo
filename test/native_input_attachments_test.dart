@@ -331,11 +331,11 @@ void main() {
                 });
               case _Api.gemini:
                 final files = all
-                    .where((p) => p.containsKey('inline_data'))
-                    .map((p) => p['inline_data'] as Map)
+                    .where((p) => p.containsKey('inlineData'))
+                    .map((p) => p['inlineData'] as Map)
                     .toList();
                 expect(
-                  files.map((p) => p['mime_type']),
+                  files.map((p) => p['mimeType']),
                   unorderedEquals([
                     'application/pdf',
                     'audio/m4a',
@@ -406,6 +406,35 @@ void main() {
       expect(parts.single['input_audio'], {'data': encoded, 'format': 'wav'});
     },
   );
+
+  test('Gemini remote attachments use camelCase file fields', () async {
+    const uri = 'https://generativelanguage.googleapis.com/v1beta/files/report';
+    final parts =
+        await NativeInputAttachments(
+          config: _config(_Api.gemini, 'https://example.test', ['pdf']),
+          spec: ModelSpec(
+            id: 'gemini-2.5-flash',
+            displayName: 'Gemini',
+            input: const [Modality.pdf],
+          ),
+          protocol: NativeInputProtocol.gemini,
+        ).build({
+          'role': 'user',
+          'content': '',
+          multimodalInternalDocumentPathsKey: [
+            encodeInternalDocumentRef((
+              uri: uri,
+              name: 'report.pdf',
+              mime: 'application/pdf',
+            )),
+          ],
+        });
+    expect(parts, [
+      {
+        'fileData': {'fileUri': uri, 'mimeType': 'application/pdf'},
+      },
+    ]);
+  });
 
   test('disabled modalities do not read files or emit native parts', () async {
     final native = NativeInputAttachments(

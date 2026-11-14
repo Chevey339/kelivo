@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../features/mcp/widgets/mcp_server_avatar.dart';
+import '../features/mcp/widgets/mcp_tool_connection_status.dart';
 import '../features/mcp/utils/mcp_tool_groups.dart';
 import 'package:provider/provider.dart';
 
@@ -13,6 +14,7 @@ import '../core/models/conversation.dart';
 import '../core/models/conversation_mcp_settings.dart';
 import '../core/services/chat/chat_service.dart';
 import '../features/chat/utils/ensure_conversation.dart';
+import '../features/chat/widgets/image_recall_control.dart';
 import '../features/home/services/local_tool_labels.dart';
 import '../features/home/services/local_tool_toggle.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -312,6 +314,23 @@ class _ToolsContent extends StatelessWidget {
           ),
         );
       }
+      rows.add(
+        (context) => ImageRecallControl(
+          assistantId: assistantId,
+          conversationId: conversationId,
+          builder: (enabled, onChanged) => _RowItem(
+            key: const ValueKey('desktop-tools-view-image'),
+            leading: Icon(
+              Lucide.Image,
+              size: 16,
+              color: enabled ? cs.primary : cs.onSurface,
+            ),
+            label: l10n.workspaceToolTitleViewImage,
+            selected: enabled,
+            onTap: onChanged == null ? null : () => onChanged(!enabled),
+          ),
+        ),
+      );
     }
 
     if (groups.isNotEmpty || (supportsModelTools && conversationScoped)) {
@@ -365,6 +384,9 @@ class _ToolsContent extends StatelessWidget {
               size: 16,
               radius: 7,
               showBackground: false,
+              status: mcp.statusFor(s.id) == McpStatus.connected
+                  ? null
+                  : mcp.statusFor(s.id),
             ),
             detail:
                 '${s.tools.where((t) => t.enabled).length}/${s.tools.length}',
@@ -382,6 +404,11 @@ class _ToolsContent extends StatelessWidget {
             },
           ),
         );
+        if (mcp.statusFor(s.id) != McpStatus.connected) {
+          rows.add(
+            (context) => McpToolConnectionStatus(serverId: s.id, desktop: true),
+          );
+        }
       }
     }
 
@@ -443,7 +470,7 @@ class _RowItem extends StatefulWidget {
   final String? detail;
   final String label;
   final bool? selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   State<_RowItem> createState() => _RowItemState();
@@ -463,12 +490,16 @@ class _RowItemState extends State<_RowItem> {
     final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10);
     return Semantics(
       button: true,
+      enabled: widget.onTap != null,
       toggled: widget.selected,
       child: MouseRegion(
-        cursor: SystemMouseCursors.click,
+        cursor: widget.onTap == null
+            ? MouseCursor.defer
+            : SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: FocusableActionDetector(
+          enabled: widget.onTap != null,
           onShowFocusHighlight: (value) => setState(() => _focused = value),
           shortcuts: const {
             SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
@@ -477,7 +508,7 @@ class _RowItemState extends State<_RowItem> {
           actions: {
             ActivateIntent: CallbackAction<ActivateIntent>(
               onInvoke: (_) {
-                widget.onTap();
+                widget.onTap?.call();
                 return null;
               },
             ),

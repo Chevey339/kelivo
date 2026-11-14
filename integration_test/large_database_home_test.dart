@@ -71,7 +71,7 @@ SELECT conversation_id,id,0,'text',CASE WHEN message_order<98000 THEN ? ELSE 'Vi
       SchedulerBinding.instance.addTimingsCallback(collect);
       ChatService? service;
       try {
-        await app.main();
+        await app.main(const []);
         MessageListView? view;
         for (var i = 0; i < 300; i++) {
           await tester.pump(const Duration(milliseconds: 100));

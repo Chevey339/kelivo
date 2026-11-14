@@ -1,3 +1,5 @@
+import '../../../support/compression_options_pump.dart';
+import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +18,7 @@ import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
+import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -97,8 +100,8 @@ void main() {
                   context: context,
                   builder: (sheet) => CompressContextOptionsDialog(
                     sheet: sheet,
-                    messages: const [],
-                    operations: const [],
+                    loadHistory: () async =>
+                        CompressionHistory.fromMessages(const [], const []),
                   ),
                 ),
               ),
@@ -108,10 +111,10 @@ void main() {
       ),
     );
     await tester.tap(find.text('Open compression'));
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     await tester.ensureVisible(find.text(l10n.compressionMore));
     await tester.tap(find.text(l10n.compressionMore));
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
   }
 
   Finder recipeDialog() => find.ancestor(
@@ -128,7 +131,7 @@ void main() {
   Future<void> openRecipe(WidgetTester tester) async {
     await tester.ensureVisible(find.text(l10n.compressionSaveRecipeAction));
     await tester.tap(find.text(l10n.compressionSaveRecipeAction));
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     expect(recipeDialog(), findsOneWidget);
     expect(tester.takeException(), isNull);
   }
@@ -141,7 +144,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 20));
     }
     expect(done(), isTrue);
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     expect(tester.takeException(), isNull);
   }
 
@@ -173,7 +176,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 80));
         expect(tester.takeException(), isNull);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         expect(recipeDialog(), findsNothing);
         expect(find.byType(CompressContextOptionsDialog), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -186,6 +189,20 @@ void main() {
 
     check('recipe saves once and can be reopened on $platform', (tester) async {
       await prepare(tester, platform);
+      Finder numberField(String label) => find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) => widget is IosFormTextField && widget.label == label,
+        ),
+        matching: find.byType(TextField),
+      );
+      final target = numberField(l10n.compressionLength);
+      final output = numberField(l10n.compressionOutputBudget);
+      await tester.ensureVisible(target);
+      await tester.enterText(target, '512');
+      await tester.ensureVisible(output);
+      await tester.enterText(output, '8192');
+      await tester.pump();
+      expect(tester.widget<TextField>(target).controller!.text, '512');
       for (final bindModel in [false, true]) {
         await openRecipe(tester);
         final actions = find.descendant(
@@ -218,6 +235,8 @@ void main() {
         );
         expect(recipe.settings.providerId, bindModel ? 'provider' : isNull);
         expect(recipe.settings.modelId, bindModel ? 'model' : isNull);
+        expect(recipe.settings.summaryTokens, 512);
+        expect(recipe.settings.maxOutputTokens, 8192);
         expect(recipe.template.id, 'general');
         expect(recipes, hasLength(bindModel ? 2 : 1));
       }
@@ -263,11 +282,11 @@ void main() {
   ) async {
     await prepare(tester, TargetPlatform.iOS);
     tester.view.physicalSize = const Size(320, 640);
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     await openRecipe(tester);
     await tester.enterText(nameField(), 'Keyboard recipe');
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-    await tester.pumpAndSettle();
+    await settleCompressionOptions(tester);
     expect(tester.takeException(), isNull);
     expect(recipeButton(l10n.multiKeyPageSave).hitTestable(), findsOneWidget);
     await tester.tap(recipeButton(l10n.multiKeyPageSave));

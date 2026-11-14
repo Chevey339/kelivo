@@ -37,8 +37,8 @@ import 'google_vertex.dart';
 
 /// Builds the Gemini tools array, handling Gemini 3+ coexistence vs 2.x mutual exclusion.
 ///
-/// Gemini 3+: built-in tools can coexist with function_declarations (MCP).
-/// Gemini 2.x and below: code_execution is exclusive; search/url_context exclude MCP.
+/// Gemini 3+: built-in tools can coexist with functionDeclarations (MCP).
+/// Gemini 2.x and below: codeExecution is exclusive; search/urlContext exclude MCP.
 List<Map<String, dynamic>> _buildGeminiToolsArray({
   required Set<String> builtIns,
   required bool allowCoexistence,
@@ -47,27 +47,27 @@ List<Map<String, dynamic>> _buildGeminiToolsArray({
   final toolsArr = <Map<String, dynamic>>[];
   if (allowCoexistence) {
     if (builtIns.contains(BuiltInToolNames.codeExecution)) {
-      toolsArr.add({'code_execution': {}});
+      toolsArr.add({'codeExecution': {}});
     }
     if (builtIns.contains(BuiltInToolNames.search)) {
-      toolsArr.add({'google_search': {}});
+      toolsArr.add({'googleSearch': {}});
     }
     if (builtIns.contains(BuiltInToolNames.urlContext)) {
-      toolsArr.add({'url_context': {}});
+      toolsArr.add({'urlContext': {}});
     }
     if (geminiTools != null) {
       toolsArr.addAll(geminiTools);
     }
   } else {
     if (builtIns.contains(BuiltInToolNames.codeExecution)) {
-      toolsArr.add({'code_execution': {}});
+      toolsArr.add({'codeExecution': {}});
     } else if (builtIns.contains(BuiltInToolNames.search) ||
         builtIns.contains(BuiltInToolNames.urlContext)) {
       if (builtIns.contains(BuiltInToolNames.search)) {
-        toolsArr.add({'google_search': {}});
+        toolsArr.add({'googleSearch': {}});
       }
       if (builtIns.contains(BuiltInToolNames.urlContext)) {
-        toolsArr.add({'url_context': {}});
+        toolsArr.add({'urlContext': {}});
       }
     } else if (geminiTools != null) {
       toolsArr.addAll(geminiTools);
@@ -285,9 +285,7 @@ const Set<String> _geminiBlockedFinishReasons = {
   'IMAGE_SAFETY',
 };
 
-/// Surfaces candidate-level content filtering (`finishReason: SAFETY` etc.)
-/// as a stream error so truncated output is not persisted as a normal finish.
-void _throwIfGeminiCandidateBlocked(String data) {
+void _throwIfGeminiStreamCandidateFailed(String data) {
   if (!data.contains('finishReason')) return;
   Object? decoded;
   try {
@@ -300,15 +298,24 @@ void _throwIfGeminiCandidateBlocked(String data) {
   if (candidates is! List) return;
   for (final cand in candidates) {
     if (cand is! Map) continue;
-    final reason = (cand['finishReason'] ?? '').toString().trim();
-    if (!_geminiBlockedFinishReasons.contains(reason)) continue;
-    final message = (cand['finishMessage'] ?? '').toString().trim();
-    throw HttpException(
-      message.isEmpty
-          ? 'Response blocked ($reason)'
-          : 'Response blocked ($reason): $message',
-    );
+    _throwIfGeminiCandidateFailed(cand);
   }
+}
+
+/// Surfaces candidate-level filtering and malformed function calls as errors
+/// instead of persisting an empty or truncated reply as a normal finish.
+void _throwIfGeminiCandidateFailed(Map candidate) {
+  final reason = (candidate['finishReason'] ?? '').toString().trim();
+  final String summary;
+  if (reason == 'MALFORMED_FUNCTION_CALL') {
+    summary = 'Gemini function call failed ($reason)';
+  } else if (_geminiBlockedFinishReasons.contains(reason)) {
+    summary = 'Response blocked ($reason)';
+  } else {
+    return;
+  }
+  final message = (candidate['finishMessage'] ?? '').toString().trim();
+  throw HttpException(message.isEmpty ? summary : '$summary: $message');
 }
 
 Stream<StreamChunk> sendGoogleStream(
@@ -467,7 +474,7 @@ Stream<StreamChunk> sendGoogleStream(
               if (idx > 0) {
                 final b64 = ref.src.substring(idx + 7);
                 parts.add({
-                  'inline_data': {'mime_type': mime, 'data': b64},
+                  'inlineData': {'mimeType': mime, 'data': b64},
                 });
               } else {
                 parts.add({'text': ref.src});
@@ -477,7 +484,7 @@ Stream<StreamChunk> sendGoogleStream(
               final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
               if (b64 == null) continue;
               parts.add({
-                'inline_data': {'mime_type': mime, 'data': b64},
+                'inlineData': {'mimeType': mime, 'data': b64},
               });
             } else {
               parts.add({'text': '(image) ${ref.src}'});
@@ -506,7 +513,7 @@ Stream<StreamChunk> sendGoogleStream(
                 if (idx > 0) {
                   final b64 = p.substring(idx + 7);
                   parts.add({
-                    'inline_data': {'mime_type': mime, 'data': b64},
+                    'inlineData': {'mimeType': mime, 'data': b64},
                   });
                 }
               } else if (!(p.startsWith('http://') ||
@@ -515,7 +522,7 @@ Stream<StreamChunk> sendGoogleStream(
                 final b64 = await tryEncodeBase64File(p, withPrefix: false);
                 if (b64 == null) continue;
                 parts.add({
-                  'inline_data': {'mime_type': mime, 'data': b64},
+                  'inlineData': {'mimeType': mime, 'data': b64},
                 });
               } else {
                 parts.add({'text': '(image) $p'});
@@ -525,19 +532,19 @@ Stream<StreamChunk> sendGoogleStream(
         } else {
           if (raw.isNotEmpty) parts.add({'text': raw});
         }
-        // YouTube URL ingestion as file_data parts (Gemini official API)
+        // YouTube URL ingestion as fileData parts (Gemini official API)
         // Only inject on the last user message of this request.
         if (role == 'user' && isLast && enableYoutube) {
           final urls = extractYouTubeUrls(raw);
           for (final u in urls) {
-            // Vertex AI requires mime_type for file_data
+            // Vertex AI requires mimeType for fileData
             if (isVertex) {
               parts.add({
-                'file_data': {'file_uri': u, 'mime_type': 'video/*'},
+                'fileData': {'fileUri': u, 'mimeType': 'video/*'},
               });
             } else {
               parts.add({
-                'file_data': {'file_uri': u},
+                'fileData': {'fileUri': u},
               });
             }
           }
@@ -577,7 +584,7 @@ Stream<StreamChunk> sendGoogleStream(
       }
       if (decls.isNotEmpty) {
         geminiTools = [
-          {'function_declarations': decls},
+          {'functionDeclarations': decls},
         ];
       }
     }
@@ -691,6 +698,7 @@ Stream<StreamChunk> sendGoogleStream(
         final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
         if (candidates.isEmpty) return;
         final cand = (candidates.first as Map).cast<String, dynamic>();
+        _throwIfGeminiCandidateFailed(cand);
         finishReason = cand['finishReason']?.toString();
         final parts = (cand['content']?['parts'] as List?) ?? const <dynamic>[];
         final functionCallParts = parts
@@ -931,7 +939,7 @@ Stream<StreamChunk> sendGoogleStream(
             if (idx > 0) {
               final b64 = ref.src.substring(idx + 7);
               parts.add({
-                'inline_data': {'mime_type': mime, 'data': b64},
+                'inlineData': {'mimeType': mime, 'data': b64},
               });
             } else {
               // If malformed data URL, include as plain text fallback
@@ -942,7 +950,7 @@ Stream<StreamChunk> sendGoogleStream(
             final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
             if (b64 == null) continue;
             parts.add({
-              'inline_data': {'mime_type': mime, 'data': b64},
+              'inlineData': {'mimeType': mime, 'data': b64},
             });
           } else {
             // Remote URL: Gemini official API doesn't fetch http(s) here; keep short reference
@@ -972,7 +980,7 @@ Stream<StreamChunk> sendGoogleStream(
               if (idx > 0) {
                 final b64 = p.substring(idx + 7);
                 parts.add({
-                  'inline_data': {'mime_type': mime, 'data': b64},
+                  'inlineData': {'mimeType': mime, 'data': b64},
                 });
               }
             } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
@@ -980,7 +988,7 @@ Stream<StreamChunk> sendGoogleStream(
               final b64 = await tryEncodeBase64File(p, withPrefix: false);
               if (b64 == null) continue;
               parts.add({
-                'inline_data': {'mime_type': mime, 'data': b64},
+                'inlineData': {'mimeType': mime, 'data': b64},
               });
             } else {
               // http url fallback reference text
@@ -992,19 +1000,19 @@ Stream<StreamChunk> sendGoogleStream(
         // No images, use simple text content
         if (raw.isNotEmpty) parts.add({'text': raw});
       }
-      // YouTube URL ingestion as file_data parts (Gemini official API)
+      // YouTube URL ingestion as fileData parts (Gemini official API)
       // Only inject on the last user message of this request.
       if (role == 'user' && isLast && enableYoutube) {
         final urls = extractYouTubeUrls(raw);
         for (final u in urls) {
-          // Vertex AI requires mime_type for file_data
+          // Vertex AI requires mimeType for fileData
           if (isVertex) {
             parts.add({
-              'file_data': {'file_uri': u, 'mime_type': 'video/*'},
+              'fileData': {'fileUri': u, 'mimeType': 'video/*'},
             });
           } else {
             parts.add({
-              'file_data': {'file_uri': u},
+              'fileData': {'fileUri': u},
             });
           }
         }
@@ -1053,7 +1061,7 @@ Stream<StreamChunk> sendGoogleStream(
     }
     if (decls.isNotEmpty) {
       geminiTools = [
-        {'function_declarations': decls},
+        {'functionDeclarations': decls},
       ];
     }
   }
@@ -1207,11 +1215,11 @@ Stream<StreamChunk> sendGoogleStream(
         final data = event.data;
         if (data.isEmpty) continue;
         // Gemini can deliver {"error":{code,message,status}}, a prompt-level
-        // block, or a candidate-level content-filter finish in-band on a 2xx
+        // block, or a candidate-level failure in-band on a 2xx
         // stream; raise before the malformed-chunk guard below can swallow it.
         throwIfInBandStreamError(data);
         _throwIfGeminiPromptBlocked(data);
-        _throwIfGeminiCandidateBlocked(data);
+        _throwIfGeminiStreamCandidateFailed(data);
         final decoded = decoder.accept(event);
         for (final remote in decoder.takePendingRemoteImages()) {
           try {

@@ -433,7 +433,14 @@ void main() {
         ),
       );
       await pumpUntil(
-        () => find.byType(ContextOperationContent).evaluate().isNotEmpty,
+        () =>
+            find.byType(ContextOperationContent).evaluate().isNotEmpty &&
+            tester
+                    .widget<ContextOperationContent>(
+                      find.byType(ContextOperationContent),
+                    )
+                    .onContinueNewChat !=
+                null,
       );
       await tester.pumpAndSettle();
       expect(find.byType(ContextOperationContent), findsOneWidget);

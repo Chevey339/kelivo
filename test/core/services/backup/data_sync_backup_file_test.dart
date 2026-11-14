@@ -3724,6 +3724,262 @@ void main() {
       },
     );
 
+    for (final unreadable in [false, true]) {
+      test(
+        'excludes session scratch before traversal (unreadable=$unreadable)',
+        () async {
+          final retained = {
+            'sessions/conv1/attachments/input.docx': 'input document',
+            'sessions/conv1/outputs/report.docx': 'output document',
+            'sessions/conv1/.attachment-index.json': '{}',
+            'sessions/conv1/notes.txt': 'session notes',
+            'sessions/conv1/outputs/tmp/keep.txt': 'output named tmp',
+            'sessions/conv1/attachments/tmp/keep.txt': 'attachment named tmp',
+            'sessions/tmp/outputs/keep.txt': 'session named tmp',
+            'workspaces/ws1/files/tmp/keep.txt': 'workspace file',
+            'skills/demo/tmp/keep.txt': 'skill file',
+          };
+          final scratch = {
+            'sessions/conv1/tmp/readable.txt': 'scratch file',
+            'sessions/conv1/tmp/docx_x/word/_rels/document.xml.rels':
+                'temporary document relationships',
+          };
+          for (final entry in {...retained, ...scratch}.entries) {
+            final file = File(p.join(root.path, entry.key));
+            await file.parent.create(recursive: true);
+            await file.writeAsString(entry.value);
+          }
+          final locked = Directory(
+            p.join(root.path, 'sessions/conv1/tmp/docx_x/word/_rels'),
+          );
+          if (unreadable) {
+            addTearDown(() async {
+              await Process.run('chmod', ['700', locked.path]);
+            });
+            expect(
+              (await Process.run('chmod', ['000', locked.path])).exitCode,
+              0,
+            );
+            try {
+              locked.listSync();
+              markTestSkipped('Requires an unprivileged process');
+              return;
+            } on FileSystemException catch (error) {
+              expect(error.osError?.errorCode, 13);
+            }
+          }
+
+          final backup =
+              await DataSync(
+                businessRepository: businessRepository,
+                chatService: ChatService(),
+              ).prepareBackupFile(
+                const WebDavConfig(
+                  scope: BackupScope(excluded: {BackupCategory.chats}),
+                ),
+              );
+          addTearDown(() => DataSync.cleanupTemporaryBackupFile(backup));
+          final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+          try {
+            final manifest =
+                jsonDecode(
+                      utf8.decode(
+                        archive.findFile('manifest.json')!.readBytes()!,
+                      ),
+                    )
+                    as Map<String, dynamic>;
+            final entries = manifest['entries'] as Map;
+            for (final entry in retained.entries) {
+              expect(
+                utf8.decode(archive.findFile(entry.key)!.readBytes()!),
+                entry.value,
+                reason: entry.key,
+              );
+              expect(entries, contains(entry.key));
+            }
+            for (final name in scratch.keys) {
+              expect(archive.findFile(name), isNull, reason: name);
+              expect(entries, isNot(contains(name)));
+            }
+            if (unreadable) {
+              expect(locked.statSync().mode & 0x1ff, 0);
+            }
+          } finally {
+            archive.clearSync();
+          }
+        },
+        skip: unreadable && Platform.isWindows,
+      );
+    }
+
+    for (final lockDirectory in [false, true]) {
+      test(
+        'skips unreadable assets and preserves readable siblings (directory=$lockDirectory)',
+        () async {
+          final output = File(
+            p.join(root.path, 'sessions/conv1/outputs/report.docx'),
+          );
+          await output.parent.create(recursive: true);
+          await output.writeAsString('unreadable document');
+          final locked = lockDirectory ? output.parent : output;
+          addTearDown(() async {
+            await Process.run('chmod', ['700', locked.path]);
+          });
+          expect(
+            (await Process.run('chmod', ['000', locked.path])).exitCode,
+            0,
+          );
+          try {
+            if (lockDirectory) {
+              output.parent.listSync();
+            } else {
+              output.readAsBytesSync();
+            }
+            markTestSkipped('Requires an unprivileged process');
+            return;
+          } on FileSystemException catch (error) {
+            expect(error.osError?.errorCode, 13);
+          }
+          final readable = File(
+            p.join(root.path, 'sessions/conv1/attachments/input.txt'),
+          );
+          await readable.parent.create(recursive: true);
+          await readable.writeAsString('readable attachment');
+          final events = <BackupProgress>[];
+          final backup =
+              await DataSync(
+                businessRepository: businessRepository,
+                chatService: ChatService(),
+              ).prepareBackupFile(
+                const WebDavConfig(
+                  scope: BackupScope(excluded: {BackupCategory.chats}),
+                ),
+                onProgress: events.add,
+              );
+          addTearDown(() => DataSync.cleanupTemporaryBackupFile(backup));
+          final skippedPath = p.relative(locked.path, from: root.path);
+          final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+          try {
+            expect(archive.findFile('settings.json'), isNotNull);
+            expect(
+              archive.findFile('sessions/conv1/outputs/report.docx'),
+              isNull,
+            );
+            expect(
+              utf8.decode(
+                archive
+                    .findFile('sessions/conv1/attachments/input.txt')!
+                    .readBytes()!,
+              ),
+              'readable attachment',
+            );
+            final manifest =
+                jsonDecode(
+                      utf8.decode(
+                        archive.findFile('manifest.json')!.readBytes()!,
+                      ),
+                    )
+                    as Map;
+            expect(manifest['skippedEntries'], [skippedPath]);
+            expect(
+              (manifest['entries'] as Map).keys,
+              isNot(contains('sessions/conv1/outputs/report.docx')),
+            );
+            expect(events.expand((event) => event.skippedEntries), [
+              skippedPath,
+            ]);
+            final packed = events.lastWhere(
+              (event) => event.phase == BackupPhase.packing,
+            );
+            expect(packed.processed, packed.total);
+            expect(locked.statSync().mode & 0x1ff, 0);
+          } finally {
+            archive.clearSync();
+          }
+        },
+        skip: Platform.isWindows,
+      );
+    }
+
+    test(
+      'backup with skipped assets can overwrite restore chats and readable files',
+      () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: root);
+        final locked = File(p.join(root.path, 'upload', 'locked.txt'));
+        await locked.parent.create(recursive: true);
+        await locked.writeAsString('unreadable attachment');
+        addTearDown(() async {
+          if (await locked.exists()) {
+            await Process.run('chmod', ['600', locked.path]);
+          }
+        });
+        expect((await Process.run('chmod', ['000', locked.path])).exitCode, 0);
+        try {
+          locked.readAsBytesSync();
+          markTestSkipped('Requires an unprivileged process');
+          return;
+        } on FileSystemException catch (error) {
+          expect(error.osError?.errorCode, 13);
+        }
+        final readable = File(p.join(root.path, 'upload', 'readable.txt'));
+        await readable.writeAsString('backed up attachment');
+        final chat = ChatService();
+        await chat.init();
+        late File backup;
+        try {
+          await chat.restoreConversation(
+            Conversation(id: 'skipped-assets-chat', title: 'Kept conversation'),
+            [
+              ChatMessage(
+                id: 'skipped-assets-message',
+                conversationId: 'skipped-assets-chat',
+                role: 'user',
+                content: 'Kept message',
+              ),
+            ],
+          );
+          final events = <BackupProgress>[];
+          backup = await DataSync(
+            businessRepository: businessRepository,
+            chatService: chat,
+          ).prepareBackupFile(const WebDavConfig(), onProgress: events.add);
+          expect(events.expand((event) => event.skippedEntries), [
+            'upload/locked.txt',
+          ]);
+        } finally {
+          await chat.close();
+        }
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backup));
+        // Restore into the same installation after source permissions recover.
+        expect((await Process.run('chmod', ['600', locked.path])).exitCode, 0);
+        await readable.writeAsString('changed after backup');
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(backup, const WebDavConfig());
+
+        final terminal = await _recoverAcrossColdRestart(
+          appDataDirectory: root,
+        );
+        expect(terminal?.state, RestoreReceiptState.committed);
+        expect(await readable.readAsString(), 'backed up attachment');
+        expect(await locked.exists(), isFalse);
+        final restored = ChatDatabaseRepository.open(
+          file: File(p.join(root.path, AppDatabase.databaseFileName)),
+        );
+        try {
+          expect(
+            (await restored.getConversation('skipped-assets-chat'))?.title,
+            'Kept conversation',
+          );
+          expect(await restored.getMessageCount('skipped-assets-chat'), 1);
+        } finally {
+          await restored.close();
+        }
+      },
+      skip: Platform.isWindows,
+    );
+
     test(
       'restore recreates skills, workspaces, and sessions after startup',
       () async {

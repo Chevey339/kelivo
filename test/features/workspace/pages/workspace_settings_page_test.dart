@@ -99,8 +99,8 @@ void main() {
       )!;
       expect(find.text(l10n.workspaceEnvTitle), findsOneWidget);
       expect(find.text(l10n.workspaceEnvEngineLocalShell), findsOneWidget);
-      expect(find.text(l10n.workspaceEnvPhaseReady), findsOneWidget);
-      expect(find.text(l10n.workspaceEnvPhaseNotInstalled), findsNothing);
+      expect(find.text(l10n.workspaceEnvPhaseReady), findsNothing);
+      expect(find.text(l10n.workspaceEnvPhaseNotInstalled), findsOneWidget);
       expect(find.byKey(WorkspacesPane.createKey), findsOneWidget);
     });
   });
@@ -181,6 +181,18 @@ void main() {
             .icon,
         Lucide.Package,
       );
+      for (final entry in {
+        EnvironmentPhase.patching: l10n.workspaceEnvPhasePatching,
+        EnvironmentPhase.error: l10n.workspaceEnvPhaseError,
+        EnvironmentPhase.needsRestart: l10n.workspaceEnvPhaseNeedsRestart,
+      }.entries) {
+        await tester.runAsync(
+          () => env.setState(env.state.copyWith(phase: entry.key)),
+        );
+        await tester.pump();
+        expect(find.text(entry.value), findsOneWidget);
+        expect(find.text(l10n.workspaceEnvPhaseReady), findsNothing);
+      }
     });
   });
 }

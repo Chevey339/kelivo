@@ -1,3 +1,4 @@
+import '../../../support/compression_options_pump.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -89,6 +90,7 @@ void main() {
             keepRecentUserTurns: 2,
             templateId: 'code',
             summaryTokens: 8192,
+            requestTimeoutMinutes: 7,
           ),
         );
       });
@@ -122,16 +124,16 @@ void main() {
                       builder: (sheet) => CompressContextOptionsDialog(
                         sheet: sheet,
                         conversationId: conversationId,
-                        messages: [
-                          for (var i = 0; i < 10; i++)
-                            ChatMessage(
-                              id: 'u$i',
-                              role: 'user',
-                              content: 'Turn $i',
-                              conversationId: conversationId,
-                            ),
-                        ],
-                        operations: const [],
+                        loadHistory: () async =>
+                            CompressionHistory.fromMessages([
+                              for (var i = 0; i < 10; i++)
+                                ChatMessage(
+                                  id: 'u$i',
+                                  role: 'user',
+                                  content: 'Turn $i',
+                                  conversationId: conversationId,
+                                ),
+                            ], const []),
                       ),
                     );
                   },
@@ -143,11 +145,11 @@ void main() {
       );
       Future<void> open() async {
         await tester.tap(find.text('Open'));
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)),
         );
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
       }
 
       await open();
@@ -162,10 +164,12 @@ void main() {
         matching: find.byType(TextField),
       );
       Future<void> flip() async {
+        FocusManager.instance.primaryFocus?.unfocus();
+        await settleCompressionOptions(tester);
         await tester.ensureVisible(toggle);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
         await tester.tap(toggle);
-        await tester.pumpAndSettle();
+        await settleCompressionOptions(tester);
       }
 
       expect(tester.widget<IosSwitch>(toggle).value, isFalse);
@@ -182,13 +186,29 @@ void main() {
       await tester.enterText(keep(), '3');
       await tester.ensureVisible(find.text(l10n.compressionMore));
       await tester.tap(find.text(l10n.compressionMore));
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       final trigger = find.descendant(
         of: find.widgetWithText(IosFormTextField, l10n.compressionTrigger),
         matching: find.byType(TextField),
       );
       await tester.ensureVisible(trigger);
       await tester.enterText(trigger, '50');
+      final timeout = find.descendant(
+        of: find.widgetWithText(
+          IosFormTextField,
+          l10n.compressionRequestTimeout,
+        ),
+        matching: find.byType(TextField),
+      );
+      expect(tester.widget<TextField>(timeout).controller!.text, '7');
+      expect(find.text(l10n.compressionAdvancedOptions), findsNothing);
+      await tester.ensureVisible(timeout);
+      await tester.enterText(timeout, '0');
+      await tester.tap(find.text(l10n.multiKeyPageSave));
+      await settleCompressionOptions(tester);
+      expect(find.text(l10n.compressionInvalidSettings), findsOneWidget);
+      await tester.ensureVisible(timeout);
+      await tester.enterText(timeout, '10.5');
       await tester.tap(find.text(l10n.multiKeyPageSave));
       for (var i = 0; i < 100 && trigger.evaluate().isNotEmpty; i++) {
         await tester.runAsync(
@@ -196,16 +216,16 @@ void main() {
         );
         await tester.pump();
       }
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       expect(find.text(l10n.compressionInvalidSettings), findsNothing);
       expect(trigger, findsNothing);
       final scope = find.byWidgetPredicate(
         (w) => w is DesktopSelectDropdown<CompressContextLimitMode>,
       );
       await tester.ensureVisible(scope);
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       await tester.tap(scope);
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       expect(find.text(l10n.compressionScopeKeepHint), findsNothing);
       expect(find.text(l10n.compressionNativeScopeHint), findsWidgets);
       expect(
@@ -213,7 +233,7 @@ void main() {
         findsNothing,
       );
       await tester.tap(find.text(l10n.compressContextUnlimited).last);
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       await tester.tap(find.text(l10n.compressContextStartButton));
       for (var i = 0; i < 100 && result == null; i++) {
         await tester.runAsync(
@@ -221,7 +241,7 @@ void main() {
         );
         await tester.pump();
       }
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       expect(result!.native, isTrue);
       expect(result!.mode, CompressContextLimitMode.unlimited);
       expect(settings.nativeCompression.enabled, isTrue);
@@ -236,6 +256,7 @@ void main() {
         expect(config.nativeEnabled, isTrue);
         expect(config.nativeKeepRecentUserTurns, 3);
         expect(config.nativeTriggerInputRatio, .5);
+        expect(config.requestTimeout, const Duration(minutes: 10, seconds: 30));
         expect(config.triggerInputRatio, .8);
         expect(config.targetInputRatio, .6);
         expect(config.keepRecentUserTurns, 2);
@@ -256,11 +277,36 @@ void main() {
       expect(find.text(l10n.compressionManage), findsOneWidget);
       await tester.ensureVisible(find.text(l10n.compressionMore));
       await tester.tap(find.text(l10n.compressionMore));
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       expect(tester.widget<TextField>(trigger).controller!.text, '80');
+      expect(tester.widget<TextField>(timeout).controller!.text, '10.5');
+      expect(find.text(l10n.compressionAdvancedOptions), findsOneWidget);
+      await tester.ensureVisible(timeout);
+      await tester.enterText(timeout, '');
+      await tester.tap(find.text(l10n.multiKeyPageSave));
+      await tester.runAsync(() async {
+        for (var i = 0; i < 100; i++) {
+          final values = await chat.compressionOverrides(conversationId);
+          if (values.containsKey('requestTimeoutMinutes') &&
+              values['requestTimeoutMinutes'] == null) {
+            return;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        fail('cleared timeout was not saved');
+      });
+      await settleCompressionOptions(tester);
+      await tester.runAsync(() async {
+        final config = await chat.compressionConfig(
+          conversationId,
+          settings.compressionDefaults,
+        );
+        expect(config.requestTimeout, isNull);
+        expect(settings.compressionDefaults.requestTimeoutMinutes, 7);
+      });
       expect(tester.takeException(), isNull);
       await tester.tap(find.text(l10n.homePageCancel));
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       conversationId = 'other';
       (chat as _NativeOptionsChat).temporary = true;
       await open();
@@ -272,7 +318,7 @@ void main() {
       );
       await tester.ensureVisible(newChat);
       await tester.tap(newChat);
-      await tester.pumpAndSettle();
+      await settleCompressionOptions(tester);
       expect(
         find.text(l10n.compressionNativeTemporaryCopyHint),
         findsOneWidget,

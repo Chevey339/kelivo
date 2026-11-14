@@ -1253,6 +1253,36 @@ void main() {
     },
   );
 
+  test(
+    'a late stop acknowledgement cannot settle a replacement navigation',
+    () async {
+      const old = 'https://pending.example';
+      const next = 'https://next.example';
+      final tab = await service.createTab(url: old);
+      await service.evaluateJavascript('1', tabId: tab.id);
+      final native = platform.views.single;
+      await native.start(old);
+      final stopGate = native.document.stopLoadingGate = Completer<void>();
+      final stopping = service.stop(tabId: tab.id);
+      await Future<void>.delayed(Duration.zero);
+      await service.navigate(next, tabId: tab.id);
+      await native.start(next);
+      var loaded = false;
+      final loading = service
+          .waitForLoad(tabId: tab.id)
+          .then((_) => loaded = true);
+      stopGate.complete();
+      await stopping;
+      await Future<void>.delayed(Duration.zero);
+      expect(loaded, isFalse);
+      expect(service.requireTab(tab.id).isLoading, isTrue);
+      expect(service.requireTab(tab.id).error, isNull);
+      await native.stop(next);
+      await loading;
+      expect(service.requireTab(tab.id).url, next);
+    },
+  );
+
   test('changing UA also invalidates the cached download header', () async {
     final engine = await _createEngine(
       tab: const BrowserTab(id: 'ua-download'),
@@ -2238,6 +2268,7 @@ class _Document {
   int focusClears = 0;
   int mediaPauses = 0;
   Completer<void>? clearFocusGate;
+  Completer<void>? stopLoadingGate;
   Completer<CallAsyncJavaScriptResult?>? faviconResult;
   int faviconReads = 0;
   String? faviconSource;
@@ -2457,7 +2488,7 @@ class _Controller extends PlatformInAppWebViewController {
   }
 
   @override
-  Future<void> stopLoading() async {}
+  Future<void> stopLoading() async => document.stopLoadingGate?.future;
   @override
   void dispose({bool isKeepAlive = false}) => disposed = true;
   @override

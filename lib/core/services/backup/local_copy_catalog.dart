@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:path/path.dart' as p;
 
+import '../../../utils/app_directories.dart';
+import '../../database/private_data_storage.dart';
 import 'recovery_file_discovery.dart';
 import 'local_snapshot_schedule.dart';
 
@@ -36,7 +38,8 @@ final class LocalCopy {
     this.pinned = false,
     this.appVersion,
     this.discovered = false,
-  });
+    bool? canDelete,
+  }) : canDelete = canDelete ?? !discovered;
 
   final LocalCopyKind kind;
 
@@ -59,8 +62,11 @@ final class LocalCopy {
   final bool pinned;
   final String? appVersion;
 
-  /// Found outside the managed store. It is never pruned, pinned or deleted.
+  /// Found outside the managed store. It is never pruned or pinned.
   final bool discovered;
+
+  /// A listing hint; deletion rechecks ownership and current storage state.
+  final bool canDelete;
 
   /// Whether the copy is already a backup archive, or has to be converted
   /// into one before it can be exported or restored.
@@ -172,6 +178,9 @@ final class LocalCopyCatalog {
         ),
       );
     }
+    final retained = await AppDirectories.documentsDirectoryFor(
+      appDataDirectory,
+    );
     for (final file in await RecoveryFileDiscovery.databases(
       appDataDirectory,
       includeActiveDatabase: includeActiveDatabase,
@@ -198,6 +207,14 @@ final class LocalCopyCatalog {
           createdAt: stat.modified,
           bytes: stat.size,
           discovered: true,
+          canDelete:
+              !includeActiveDatabase &&
+              retained != null &&
+              p.equals(file.path, p.join(retained.path, 'kelivo.db')) &&
+              await PrivateDataStorage.canDeleteRetainedDatabase(
+                source: retained,
+                target: appDataDirectory,
+              ),
         ),
       );
     }
@@ -222,8 +239,23 @@ final class LocalCopyCatalog {
     return total;
   }
 
-  Future<void> delete(LocalCopy copy) {
-    if (copy.discovered) throw StateError('recovered_copy_preserved');
+  Future<void> delete(LocalCopy copy) async {
+    if (copy.discovered) {
+      final retained = await AppDirectories.documentsDirectoryFor(
+        appDataDirectory,
+      );
+      if (includeActiveDatabase ||
+          retained == null ||
+          copy.kind != LocalCopyKind.displaced ||
+          !p.equals(copy.file.path, p.join(retained.path, 'kelivo.db'))) {
+        throw StateError('recovered_copy_preserved');
+      }
+      await PrivateDataStorage.deleteRetainedDatabase(
+        source: retained,
+        target: appDataDirectory,
+      );
+      return;
+    }
     return switch (copy.kind) {
       LocalCopyKind.snapshot => store.delete(copy.id),
       LocalCopyKind.displaced =>

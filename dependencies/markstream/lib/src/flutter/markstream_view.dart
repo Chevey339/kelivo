@@ -203,11 +203,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       if (_binding case final binding?) binding.controller.detach(binding);
       _binding = controller == null
           ? null
-          : DocumentSelectionBinding(
-              _document,
-              controller,
-              () => context.findRenderObject() as RenderBox?,
-            );
+          : DocumentSelectionBinding(_document, controller, context);
       if (_binding case final binding?) controller!.attach(binding);
     }
     _binding?.document = _document;

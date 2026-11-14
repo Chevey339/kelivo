@@ -5,9 +5,11 @@ import 'package:Kelivo/core/models/request_budget.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/services/api/request_history_context.dart';
 import 'package:Kelivo/core/services/api/tool_result_content.dart';
+import 'package:Kelivo/core/services/tools/view_image_tool.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_api.dart';
 import 'package:Kelivo/core/services/api/native_input_attachments.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -38,6 +40,129 @@ void main() {
       },
     ],
   };
+
+  test(
+    'native retained pixels suppress only the matching local image lookup',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'native_inline_image_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final bytes = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      );
+      final file = File('${directory.path}/image.png');
+      await file.writeAsBytes(bytes);
+      final local = ChatContextImage(
+        identity: const ContextImageIdentity('user', 'part:0'),
+        uri: file.path,
+        source: ContextImageSource.user,
+        label: 'image',
+      );
+      final tools = [ViewImageTool.withHistory()];
+      RequestImageContext context(List<ChatContextImage> images) =>
+          RequestImageContext(
+            settings: const ImageContextSettings(),
+            images: images,
+            latestUserId: 'user',
+          );
+      final first = await context([local]).project({
+        ...bodyFor([local.reference]),
+        'tools': tools,
+      });
+      expect(first, isNot(contains('tools')));
+      final retained = <String, dynamic>{
+        ...first,
+        'tools': tools,
+        'input': [
+          {...first['input'][0] as Map, nativeCompactionWireKey: true},
+        ],
+      };
+      final original = jsonEncode(retained);
+      final replayContext = context([local]);
+      final replay = await replayContext.project(retained);
+      expect(replay, isNot(contains('tools')));
+      expect(replayContext.lastRequestImageCount, 1);
+      expect(replay['input'], first['input']);
+      expect(jsonEncode(retained), original);
+
+      // Equal file sizes do not prove that another historical image is visible.
+      final otherFile = File('${directory.path}/other.png');
+      await otherFile.writeAsBytes([
+        ...bytes.take(bytes.length - 1),
+        bytes.last ^ 1,
+      ]);
+      final other = ChatContextImage(
+        identity: const ContextImageIdentity('older-user', 'part:0'),
+        uri: otherFile.path,
+        source: ContextImageSource.user,
+        label: 'different content',
+      );
+      final missingHistory = await context([other, local]).project(retained);
+      expect(missingHistory['tools'], tools);
+      expect(missingHistory['input'], first['input']);
+    },
+  );
+
+  test(
+    'image-free retry omits pinned, native and tool images without loading pixels',
+    () async {
+      final originalImage = image(0, source: ContextImageSource.user);
+      final context = RequestImageContext(
+        settings: ImageContextSettings(
+          automatic: false,
+          pinned: {originalImage.key},
+        ),
+        images: [originalImage],
+        latestUserId: originalImage.identity.messageId,
+        omitImages: true,
+        loader: (_) async => fail('An image-free retry must not load pixels'),
+      );
+      final body = bodyFor([
+        originalImage.reference,
+        pixels,
+        'https://example.com/image.png',
+      ]);
+      body['input'] = <Map<String, dynamic>>[
+        ...(body['input'] as List).cast<Map<String, dynamic>>(),
+        {
+          nativeCompactionWireKey: true,
+          'role': 'user',
+          'content': [
+            {'type': 'input_image', 'file_id': 'file-1'},
+          ],
+        },
+        {
+          'type': 'function_call_output',
+          'call_id': 'tool-1',
+          'output': [
+            {'type': 'input_image', 'image_url': originalImage.reference},
+          ],
+        },
+      ];
+      body['tools'] = [
+        {'type': 'function', 'name': 'view_image'},
+      ];
+      final original = jsonEncode(body);
+      final projected = await context.project(body);
+      expect(jsonEncode(projected), isNot(contains('input_image')));
+      expect(jsonEncode(projected), isNot(contains('base64')));
+      expect(projected.containsKey('tools'), false);
+      expect(context.hasRecallableImages, false);
+      expect(context.lastRequestImageCount, 0);
+      expect(jsonEncode(body), original);
+      // A fresh image introduced by a subsequent tool is also omitted.
+      final followUp = await context.project(bodyFor([pixels]));
+      expect(jsonEncode(followUp), isNot(contains('input_image')));
+      // Ordinary retries retain the image; the option never changes saved data.
+      final normal = RequestImageContext(
+        settings: const ImageContextSettings(),
+        images: [],
+      );
+      expect(await normal.project(bodyFor([pixels])), bodyFor([pixels]));
+      expect(normal.lastRequestImageCount, 1);
+    },
+  );
 
   test(
     'all image limits report measured values and allow the exact boundary',
@@ -370,7 +495,7 @@ void main() {
         ToolCallPart(
           jsonEncode({
             'id': 'read',
-            'name': 'read_chat_image',
+            'name': 'view_image',
             'content': result.content,
             'metadata': result.metadata,
           }),
@@ -548,7 +673,7 @@ void main() {
       final restored = request.readImage(request.images.single.handle);
       await request.run(() async* {
         final result = await ToolResultContent.read(
-          'read_chat_image',
+          'view_image',
           restored.content,
           metadata: restored.metadata,
           toolCallId: 'read',
@@ -843,7 +968,7 @@ void main() {
       final restored = request.readImage(original.handle);
       await request.run(() async* {
         final result = await ToolResultContent.read(
-          'read_chat_image',
+          'view_image',
           restored.content,
           metadata: restored.metadata,
           toolCallId: 'read-1',

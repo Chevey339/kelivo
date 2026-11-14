@@ -226,7 +226,8 @@ void main() {
     await tester.pumpWidget(
       host(
         MarkstreamView(
-          source: '<ol start="7"><li>First</li><li><b>Second</b></li><li>Third</li></ol>',
+          source:
+              '<ol start="7"><li>First</li><li><b>Second</b></li><li>Third</li></ol>',
           selectionController: controller,
         ),
         selectable: true,
@@ -238,21 +239,121 @@ void main() {
     expect(controller.selectedMarkdown, contains('<b>econd</b>'));
     expect(controller.selectedMarkdown, contains('<li>Thi</li>'));
   });
-  testWidgets(
-    'unknown shells retain text and active HTML cannot render or open',
-    (tester) async {
+  testWidgets('unknown tags stay literal and active HTML cannot render or open', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const MarkstreamView(
+          source:
+              '<div><custom>Keep</custom><script>SECRET</script><style>SECRET</style><iframe>SECRET</iframe><p>After</p></div>',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final visible = paragraphs().map((p) => p.text.toPlainText()).join();
+    expect(visible, contains('<custom>Keep</custom>'));
+    expect(visible, contains('After'));
+    expect(visible, isNot(contains('SECRET')));
+  });
+
+  testWidgets('unknown tags stay visible and selectable through streaming', (
+    tester,
+  ) async {
+    final controller = MarkstreamSelectionController();
+    addTearDown(controller.dispose);
+    for (final source in ['<hell', '<hello>', '<hello> **Bold**']) {
       await tester.pumpWidget(
         host(
-          const MarkstreamView(
-            source: '<div><custom>Keep</custom><script>SECRET</script><style>SECRET</style><iframe>SECRET</iframe><p>After</p></div>',
+          MarkstreamView(
+            source: source,
+            streaming: true,
+            selectionController: controller,
           ),
+          selectable: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        paragraph('<hell').text.toPlainText(),
+        source.replaceAll('**', ''),
+      );
+    }
+    expect(spanStyle('Bold').fontWeight, FontWeight.w700);
+    await tester.pumpWidget(
+      host(
+        MarkstreamView(
+          source: '<hello> **Bold**',
+          selectionController: controller,
+        ),
+        selectable: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    selectAll(tester);
+    await tester.pumpAndSettle();
+    expect(controller.selectedPlainText, '<hello> Bold');
+    expect(controller.selectedMarkdown, r'\<hello\> **Bold**');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('lists and tables retain literal tags in display and selection', (
+    tester,
+  ) async {
+    for (final (source, plain, tables) in [
+      ('<ul><hello><li>Item</li></hello></ul>', '<hello>\n- Item\n</hello>', 0),
+      ('<ul><hello/></ul>', '<hello/>', 0),
+      (
+        '<ol start="3"><li>A</li><hello/><li>B</li></ol>',
+        '3. A\n<hello/>\n4. B',
+        0,
+      ),
+      (
+        '<table><caption>Title</caption><tr><td>Cell</td></tr></table>',
+        '<caption>Title</caption>\n\nCell',
+        1,
+      ),
+      (
+        '<table><tr><td>A</td></tr><hello/><tr><td>B</td></tr></table>',
+        'A\n\n<hello/>\n\nB',
+        2,
+      ),
+      (
+        '<table><tbody><hello/><tr><td>A</td></tr></tbody></table>',
+        '<hello/>\n\nA',
+        1,
+      ),
+      (
+        '<table><tr><hello/><td>A</td><td>B</td></tr></table>',
+        '<hello/>\n\nA\n\nB',
+        0,
+      ),
+    ]) {
+      final controller = MarkstreamSelectionController();
+      await tester.pumpWidget(
+        host(
+          MarkstreamView(source: source, selectionController: controller),
+          selectable: true,
         ),
       );
       await tester.pumpAndSettle();
       final visible = paragraphs().map((p) => p.text.toPlainText()).join();
-      expect(visible, contains('Keep'));
-      expect(visible, contains('After'));
-      expect(visible, isNot(contains('SECRET')));
-    },
-  );
+      for (final match in RegExp(r'<[^>]+>').allMatches(plain)) {
+        expect(visible, contains(match[0]), reason: source);
+      }
+      expect(find.byType(MarkstreamTableBlock), findsNWidgets(tables));
+      selectAll(tester);
+      await tester.pumpAndSettle();
+      expect(controller.selectedPlainText, plain, reason: source);
+      final copied = toPlainText(
+        const MarkdownParser().parse(controller.selectedMarkdown),
+      );
+      for (final match in RegExp(r'<[^>]+>').allMatches(plain)) {
+        expect(copied, contains(match[0]), reason: source);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+    }
+  });
 }

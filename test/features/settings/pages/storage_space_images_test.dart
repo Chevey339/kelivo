@@ -163,8 +163,8 @@ void main() {
         expect(find.text('已选 1 项'), findsOneWidget);
         await tester.tap(find.text('删除'));
         await tester.pumpAndSettle();
-        expect(find.textContaining('正在使用的头像与背景会保留'), findsOneWidget);
-        await tester.tap(find.widgetWithText(TextButton, '删除'));
+        expect(find.textContaining('仍在使用的文件会保留'), findsOneWidget);
+        await tester.tap(find.widgetWithText(IosTileButton, '删除').last);
         await _until(
           tester,
           () => find.text('已删除 1 个项目').evaluate().isNotEmpty,
@@ -187,12 +187,15 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('删除'));
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(TextButton, '删除'));
+        await tester.tap(find.widgetWithText(IosTileButton, '删除').last);
         await _until(tester, () => find.text('共 0 项').evaluate().isNotEmpty);
         expect(find.text('工具图片'), findsOneWidget);
         expect(find.text('头像与背景'), findsOneWidget);
         AppSnackBarManager().dismissAll();
         await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        tester.view.physicalSize = Size(desktop ? 1200 : 400, 320);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());

@@ -7,10 +7,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/ast/nodes.dart';
+import '../../../core/ast/source_span.dart';
 import '../../../core/serialize/to_markdown.dart';
 import '../../../core/serialize/to_plain_text.dart';
 import '../../extensions/registry.dart';
 import '../../selection/table_selection.dart';
+import '../../selection/selection_controller.dart';
 import '../../theme/markstream_theme.dart';
 import '../block_list.dart';
 import '../chrome.dart';
@@ -44,6 +46,7 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
   final _boundary = GlobalKey();
   final _scroll = ScrollController();
   int _visibleRows = PerformanceLimits.initialTableRows;
+  int _revealedRows = 0;
   bool _capturing = false;
   @override
   void didUpdateWidget(MarkstreamTableBlock oldWidget) {
@@ -51,8 +54,24 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
     if (widget.node.span.start != oldWidget.node.span.start ||
         !widget.source.startsWith(oldWidget.source)) {
       _visibleRows = PerformanceLimits.initialTableRows;
+      _revealedRows = 0;
       if (_scroll.hasClients) _scroll.jumpTo(0);
     }
+  }
+
+  bool _prepareRange(SourceSpan range) {
+    final rows = widget.node.children;
+    final index = rows.indexWhere((row) => row.span.contains(range.start));
+    final count = math.max(
+      _revealedRows,
+      widget.streaming ? PerformanceLimits.streamingTableRows : _visibleRows,
+    );
+    if (index < count) return true;
+    setState(() {
+      _revealedRows = index + 1;
+      _visibleRows = math.max(_visibleRows, index + 1);
+    });
+    return false;
   }
 
   @override
@@ -162,9 +181,12 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
         ? rows.length
         : math.min(
             rows.length,
-            widget.streaming
-                ? PerformanceLimits.streamingTableRows
-                : _visibleRows,
+            math.max(
+              _revealedRows,
+              widget.streaming
+                  ? PerformanceLimits.streamingTableRows
+                  : _visibleRows,
+            ),
           );
     final content = LayoutBuilder(
       builder: (context, constraints) {
@@ -371,10 +393,10 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                         MarkstreamActionKind.collapse,
                         widget.labels.collapse,
                         () async {
-                          setState(
-                            () => _visibleRows =
-                                PerformanceLimits.initialTableRows,
-                          );
+                          setState(() {
+                            _visibleRows = PerformanceLimits.initialTableRows;
+                            _revealedRows = 0;
+                          });
                         },
                       ),
                     if (count < rows.length)
@@ -425,9 +447,13 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
         );
       },
     );
-    return SelectionContainer.maybeOf(context) == null
-        ? content
-        : SelectionContainer(delegate: _selection, child: content);
+    return SourceRangePreparer(
+      span: widget.node.span,
+      prepare: _prepareRange,
+      child: SelectionContainer.maybeOf(context) == null
+          ? content
+          : SelectionContainer(delegate: _selection, child: content),
+    );
   }
 }
 

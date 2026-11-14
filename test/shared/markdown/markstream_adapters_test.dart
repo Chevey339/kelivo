@@ -252,17 +252,17 @@ void main() {
   });
   test(
     'highlight trees survive aliases and themes, and errors retain source',
-    () {
+    () async {
       debugResetHighlightNodeCache();
       const highlighter = KelivoCodeHighlighter();
       const source = 'const value = 42;';
-      final light = highlighter.highlight(
+      final light = await highlighter.highlight(
         source,
         language: 'js',
         style: const TextStyle(fontSize: 13),
         brightness: Brightness.light,
       );
-      final dark = highlighter.highlight(
+      final dark = await highlighter.highlight(
         source,
         language: 'javascript',
         style: const TextStyle(fontSize: 13),
@@ -272,24 +272,22 @@ void main() {
       expect(dark.toPlainText(), source);
       expect(debugHighlightParseCount, 1);
       expect(
-        highlighter
-            .highlight(
-              source,
-              language: 'unknown-language',
-              style: const TextStyle(),
-              brightness: Brightness.dark,
-            )
-            .toPlainText(),
+        (await highlighter.highlight(
+          source,
+          language: 'unknown-language',
+          style: const TextStyle(),
+          brightness: Brightness.dark,
+        )).toPlainText(),
         source,
       );
     },
   );
-  test('SVG reuses styled XML syntax trees', () {
+  test('SVG reuses styled XML syntax trees', () async {
     debugResetHighlightNodeCache();
     const highlighter = KelivoCodeHighlighter();
     const code = '<svg><rect /></svg>';
     for (final language in ['svg', 'xml']) {
-      final span = highlighter.highlight(
+      final span = await highlighter.highlight(
         code,
         language: language,
         style: const TextStyle(),
@@ -300,51 +298,57 @@ void main() {
     }
     expect(debugHighlightParseCount, 1);
   });
-  test('cached syntax resolves platform weights without changing source', () {
-    debugResetHighlightNodeCache();
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    const source = '**strong** and *italic*';
-    for (final platform in [
-      TargetPlatform.android,
-      TargetPlatform.iOS,
-      TargetPlatform.macOS,
-    ]) {
-      debugDefaultTargetPlatformOverride = platform;
-      for (final brightness in Brightness.values) {
-        for (final wallpaper in [false, true]) {
-          final span = KelivoCodeHighlighter(wallpaper: wallpaper).highlight(
-            source,
-            language: 'markdown',
-            style: TextStyle(fontWeight: AppFontWeights.semibold),
-            brightness: brightness,
-          );
-          final pending = [...?span.children];
-          final weights = <FontWeight>[];
-          var italic = false;
-          while (pending.isNotEmpty) {
-            final node = pending.removeLast();
-            if (node.style?.fontWeight case final weight?) weights.add(weight);
-            italic |= node.style?.fontStyle == FontStyle.italic;
-            if (node is TextSpan) pending.addAll(node.children ?? const []);
+  test(
+    'cached syntax resolves platform weights without changing source',
+    () async {
+      debugResetHighlightNodeCache();
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      const source = '**strong** and *italic*';
+      for (final platform in [
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+        TargetPlatform.macOS,
+      ]) {
+        debugDefaultTargetPlatformOverride = platform;
+        for (final brightness in Brightness.values) {
+          for (final wallpaper in [false, true]) {
+            final span = await KelivoCodeHighlighter(wallpaper: wallpaper)
+                .highlight(
+                  source,
+                  language: 'markdown',
+                  style: TextStyle(fontWeight: AppFontWeights.semibold),
+                  brightness: brightness,
+                );
+            final pending = [...?span.children];
+            final weights = <FontWeight>[];
+            var italic = false;
+            while (pending.isNotEmpty) {
+              final node = pending.removeLast();
+              if (node.style?.fontWeight case final weight?) {
+                weights.add(weight);
+              }
+              italic |= node.style?.fontStyle == FontStyle.italic;
+              if (node is TextSpan) pending.addAll(node.children ?? const []);
+            }
+            expect(span.toPlainText(), source);
+            expect(weights, isNotEmpty);
+            expect(
+              weights,
+              everyElement(
+                platform == TargetPlatform.android
+                    ? FontWeight.w500
+                    : FontWeight.w700,
+              ),
+            );
+            expect(italic, isTrue);
+            // The caller's style is already normalized; do not reduce it again.
+            expect(span.style!.fontWeight, AppFontWeights.semibold);
           }
-          expect(span.toPlainText(), source);
-          expect(weights, isNotEmpty);
-          expect(
-            weights,
-            everyElement(
-              platform == TargetPlatform.android
-                  ? FontWeight.w500
-                  : FontWeight.w700,
-            ),
-          );
-          expect(italic, isTrue);
-          // The caller's style is already normalized; do not reduce it again.
-          expect(span.style!.fontWeight, AppFontWeights.semibold);
         }
       }
-    }
-    expect(debugHighlightParseCount, 1);
-  });
+      expect(debugHighlightParseCount, 1);
+    },
+  );
   test('math normalization repairs visuals and preserves color arguments', () {
     expect(normalizeMathTex(r'\# + #'), r'\# + \#');
     expect(

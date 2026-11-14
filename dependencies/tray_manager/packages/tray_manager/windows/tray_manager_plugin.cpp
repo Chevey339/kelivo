@@ -85,7 +85,7 @@ class TrayManagerPlugin : public flutter::Plugin {
   int window_proc_id = -1;
 
   void TrayManagerPlugin::_CreateMenu(HMENU menu, flutter::EncodableMap args);
-  void TrayManagerPlugin::_ApplyIcon();
+  bool _ApplyIcon();
 
   // Called for top-level WindowProc delegation.
   std::optional<LRESULT> TrayManagerPlugin::HandleWindowProc(HWND hwnd,
@@ -286,23 +286,28 @@ void TrayManagerPlugin::SetIcon(
 
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
-  if (nid.hIcon != nullptr) {
-    DestroyIcon(nid.hIcon);
-  }
-
-  nid.hIcon = static_cast<HICON>(
+  const HICON icon = static_cast<HICON>(
       LoadImage(nullptr, (LPCWSTR)(converter.from_bytes(iconPath).c_str()),
                 IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),
                 GetSystemMetrics(SM_CYSMICON), LR_LOADFROMFILE));
+  if (icon == nullptr) {
+    result->Error("tray_icon_load_failed", "Could not load the tray icon");
+    return;
+  }
+  if (nid.hIcon != nullptr) DestroyIcon(nid.hIcon);
+  nid.hIcon = icon;
 
-  _ApplyIcon();
+  if (!_ApplyIcon()) {
+    result->Error("tray_icon_create_failed", "The Windows notification area is unavailable");
+    return;
+  }
 
   result->Success(flutter::EncodableValue(true));
 }
 
-void TrayManagerPlugin::_ApplyIcon() {
+bool TrayManagerPlugin::_ApplyIcon() {
   if (tray_icon_setted) {
-    Shell_NotifyIcon(NIM_MODIFY, &nid);
+    if (!Shell_NotifyIcon(NIM_MODIFY, &nid)) return false;
   } else {
     HICON hIconBackup = nid.hIcon;
     WCHAR szTipBackup[128];
@@ -319,7 +324,7 @@ void TrayManagerPlugin::_ApplyIcon() {
     if (nid.szTip[0] != '\0') {
       nid.uFlags |= NIF_TIP;
     }
-    Shell_NotifyIcon(NIM_ADD, &nid);
+    if (!Shell_NotifyIcon(NIM_ADD, &nid)) return false;
   }
 
   niif.cbSize = sizeof(NOTIFYICONIDENTIFIER);
@@ -328,6 +333,7 @@ void TrayManagerPlugin::_ApplyIcon() {
   niif.guidItem = GUID_NULL;
 
   tray_icon_setted = true;
+  return true;
 }
 
 void TrayManagerPlugin::SetToolTip(

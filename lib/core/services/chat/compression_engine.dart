@@ -19,7 +19,6 @@ class CompressionEngine {
     required List<String> materials,
     required String previousSummary,
     required String background,
-    String continuation = '',
     required void Function() check,
     required Future<void> Function() publish,
   }) async {
@@ -28,7 +27,6 @@ class CompressionEngine {
       materials: materials,
       previousSummary: previousSummary,
       background: background,
-      continuation: continuation,
     );
     task.totalParts = await Isolate.run(planner.estimateRequests);
     check();

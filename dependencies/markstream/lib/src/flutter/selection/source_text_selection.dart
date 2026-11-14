@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 
 import 'code_selection.dart';
 import 'stable_selection_container.dart';
+import 'text_range_rect.dart';
 
 // Logical offsets include source that is outside the virtualized viewport.
 // Each mounted fragment reports its source offset; copying a range slices the
@@ -160,6 +161,52 @@ class SourceTextSelectionDelegate extends StableSelectionDelegate
   List<Rect> get boundingBoxes => [Offset.zero & size];
   final _fragments = <_SourceTextSelectionFragmentState>{};
   final _anchorFragments = <_SourceTextSelectionFragmentState>{};
+
+  /// Virtual code fragments retain their original offsets even after scrolling.
+  Rect? rectForRange(TextRange range) {
+    for (final fragment in _fragments) {
+      final start = fragment.widget.offset;
+      final end = start + fragment.widget.source.length;
+      if (range.start < start || range.start >= end) continue;
+      final root = fragment.context.findRenderObject();
+      if (root == null || root.getTransformTo(null).determinant() == 0)
+        continue;
+      return textRangeRect(
+        root,
+        TextRange(
+          start: range.start - start,
+          end: (range.end - start).clamp(0, end - start),
+        ),
+      );
+    }
+    return null;
+  }
+
+  /// Reveal code inside its own vertical/horizontal scrollables. Returns false
+  /// while a scroll needs another layout; leaves the outer chat list alone.
+  bool prepareRange(TextRange range, {required BuildContext boundary}) {
+    for (final fragment in _fragments) {
+      final start = fragment.widget.offset;
+      if (range.start < start ||
+          range.start >= start + fragment.widget.source.length)
+        continue;
+      final root = fragment.context.findRenderObject();
+      if (root == null) continue;
+      final local = TextRange(
+        start: range.start - start,
+        end: (range.end - start).clamp(0, fragment.widget.source.length),
+      );
+      final rect = textRangeRect(root, local);
+      if (rect == null) return false;
+      return revealRectInScrollables(
+        rect,
+        context: fragment.context,
+        boundary: boundary,
+      );
+    }
+    return false;
+  }
+
   bool _all = false;
   int? _startBoundary, _endBoundary;
   @override

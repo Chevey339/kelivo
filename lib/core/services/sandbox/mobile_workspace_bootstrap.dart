@@ -85,6 +85,8 @@ Future<MobileWorkspaceStack> _android(EnvironmentProvider env) async {
 
 Future<MobileWorkspaceStack> _ios(EnvironmentProvider env) async {
   final channel = WorkspaceChannel();
+  final manager = IosRootfsManager(channel: channel, env: env);
+  await manager.recoverInterruptedInstall();
   final runtime = IosIshRuntime(channel: channel);
   final guest = _MirrorGuestRunner(runtime, env);
   final mirrors = MirrorService(
@@ -101,7 +103,7 @@ Future<MobileWorkspaceStack> _ios(EnvironmentProvider env) async {
       alpine: true,
       mirrors: mirrors,
     ),
-    manager: IosRootfsManager(channel: channel, env: env),
+    manager: manager,
     mirrors: mirrors,
     channel: channel,
   );

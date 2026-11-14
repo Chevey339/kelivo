@@ -202,6 +202,9 @@ class ChatInputSection extends StatelessWidget {
       workspaceBound = _isWorkspaceBound(context);
     }
 
+    final tools = supportsModelTools
+        ? _toolsState(context, a, workspaceBound)
+        : (active: false, connectionIssue: false);
     final bar = ChatInputBar(
       chatModelProviderKey: pk,
       chatModelId: mid,
@@ -254,8 +257,8 @@ class ChatInputSection extends StatelessWidget {
       onCancelQueuedInput: onCancelQueuedInput,
       onExpandedChanged: onExpandedChanged,
       showToolsButton: supportsModelTools,
-      toolsActive:
-          supportsModelTools && _isToolsActive(context, a, workspaceBound),
+      toolsActive: tools.active,
+      toolsConnectionIssue: tools.connectionIssue,
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
@@ -415,10 +418,12 @@ class ChatInputSection extends StatelessWidget {
     );
   }
 
-  bool _isToolsActive(BuildContext context, Assistant? a, bool workspaceBound) {
-    if (workspaceBound) return true;
-    if ((a?.localToolIds ?? const <String>[]).isNotEmpty) return true;
-    final connected = context.watch<McpProvider>().connectedServers;
+  ({bool active, bool connectionIssue}) _toolsState(
+    BuildContext context,
+    Assistant? a,
+    bool workspaceBound,
+  ) {
+    final mcp = context.watch<McpProvider>();
     final selected = a?.allowConversationMcp == true && conversationId != null
         ? context.select<ChatService, List<String>>(
             (chat) => ConversationMcpSettings.effectiveServerIds(
@@ -427,8 +432,23 @@ class ChatInputSection extends StatelessWidget {
             ),
           )
         : a?.mcpServerIds ?? const <String>[];
-    if (selected.isEmpty || connected.isEmpty) return false;
-    return connected.any((s) => selected.contains(s.id));
+    final servers = mcp.servers.where(
+      (s) => s.enabled && selected.contains(s.id),
+    );
+    return (
+      active:
+          workspaceBound ||
+          (a?.localToolIds.isNotEmpty ?? false) ||
+          servers.isNotEmpty,
+      connectionIssue: servers.any(
+        (s) => switch (mcp.statusFor(s.id)) {
+          McpStatus.idle ||
+          McpStatus.error ||
+          McpStatus.needsAuthorization => true,
+          _ => false,
+        },
+      ),
+    );
   }
 
   bool _hasQuickPhrases(BuildContext context, Assistant? a) {

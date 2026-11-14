@@ -16,6 +16,10 @@ import 'html_tag.dart';
     if (!text.startsWith('<!--', start)) return null;
     final close = text.indexOf('-->', start + 4);
     if (close >= 0) end = close + 3;
+  } else if (!isKnownHtmlTag(tag.name)) {
+    // Consume only the literal tag, leaving its contents and following Markdown
+    // to the inline parser. Attribute syntax must remain literal as well.
+    return (end: tag.end, nodes: input.slice(start, tag.end));
   } else if (tag.closing) {
     end = tag.end;
   } else {

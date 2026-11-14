@@ -126,6 +126,7 @@ CommandExited _exitFrom(Map<String, Object?> event) {
     timedOut: _eventFlag(event['timedOut']),
     cancelled: _eventFlag(event['cancelled']),
     interrupted: _eventFlag(event['interrupted']),
+    terminationConfirmed: _eventFlag(event['terminationConfirmed']),
     duration: Duration(milliseconds: _eventInt(event['durationMs']) ?? 0),
   );
 }

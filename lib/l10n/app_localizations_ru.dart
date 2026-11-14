@@ -2152,6 +2152,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupProgressErrorCopied => 'Ошибка скопирована';
 
   @override
+  String get backupProgressSkippedTitle =>
+      'Резервная копия создана с пропущенными элементами';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return 'Пропущено нечитаемых файлов или каталогов: $count. Они не включены в эту резервную копию.';
+  }
+
+  @override
   String get backupProgressPreparing => 'Подготовка';
 
   @override
@@ -2496,35 +2505,38 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressContextDesc =>
-      'Создать сводку, которую можно просмотреть и отменить';
+      'Сожмите раннюю часть чата в сводку. Оригиналы останутся в чате, и вы сможете отменить это в любой момент.';
 
   @override
-  String get clearContextDesc => 'Отметить границу контекста';
+  String get clearContextDesc =>
+      'Начните заново с этого места: ранние сообщения останутся в чате, но не будут отправляться модели.';
 
   @override
   String get contextManagement => 'Управление контекстом';
 
   @override
-  String get compressContextFailed => 'Не удалось сжать контекст';
+  String get compressContextFailed => 'Сжатие не завершилось';
 
   @override
-  String get compressContextNoMessages => 'Нет сообщений для сжатия';
+  String get compressContextNoMessages => 'В этом чате нечего сжимать.';
 
   @override
-  String get compressContextNoConversation => 'Нет чата для сжатия';
+  String get compressContextNoConversation => 'Нет беседы для сжатия.';
 
   @override
-  String get compressContextNoModel => 'Модель сжатия не настроена';
+  String get compressContextNoModel =>
+      'Модель для сжатия не выбрана. Выберите быструю в настройках.';
 
   @override
-  String get compressContextEmptySummary => 'Сжатие вернуло пустую сводку';
+  String get compressContextEmptySummary =>
+      'Модель не создала сводку. Попробуйте другую модель или измените параметры и повторите попытку.';
 
   @override
   String get compressContextOptionsTitle => 'Сжать контекст';
 
   @override
   String get compressContextOptionsDesc =>
-      'Создайте в этом чате редактируемую и обратимую сводку. Исходные сообщения сохраняются.';
+      'Превратите ранние сообщения в сводку — именно её модель увидит в следующий раз. Оригинальный чат сохраняется; сводку можно изменить или отменить.';
 
   @override
   String get compressContextKeepStart => 'Ранняя история';
@@ -2555,11 +2567,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressContextKeepRecentMessages => 'Сохранять недавние ходы';
 
   @override
-  String get compressContextKeepCountLabel => 'Недавние сообщения пользователя';
+  String get compressContextKeepCountLabel =>
+      'Сколько последних сообщений пользователя сохранить';
 
   @override
   String get compressContextKeepAllMessages =>
-      'Это число охватывает все сообщения — нечего сжимать';
+      'Это количество последних сообщений уже охватывает весь чат, поэтому сжимать нечего.';
 
   @override
   String compressContextEstimatePreview(
@@ -2569,7 +2582,7 @@ class AppLocalizationsRu extends AppLocalizations {
     int maxTokens,
     int totalTokens,
   ) {
-    return 'Суммировать $summarized символов, сохранить $kept символов дословно → примерно $minTokens–$maxTokens токенов (исходно примерно $totalTokens токенов)';
+    return 'Будет суммировано $summarized символов, сохранено без изменений $kept. После сжатия примерно $minTokens–$maxTokens токенов (исходно примерно $totalTokens).';
   }
 
   @override
@@ -3449,7 +3462,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextUsageStateExactCalibrated =>
-      'Точно (разбивка масштабирована по оценке)';
+      'Итог точный; разбивка оценена пропорционально';
 
   @override
   String get contextUsageStateEstimated => 'Оценка';
@@ -3461,29 +3474,30 @@ class AppLocalizationsRu extends AppLocalizations {
   String get contextUsageStateComputing => 'Вычисление…';
 
   @override
-  String get contextUsageStateFailed => 'Ошибка вычисления';
+  String get contextUsageStateFailed =>
+      'Не удалось рассчитать использование. Попробуйте ещё раз.';
 
   @override
   String get contextUsageStateFailedWithPrevious =>
-      'Ошибка обновления · предыдущий результат устарел';
+      'Не удалось обновить. Показан предыдущий результат, который может быть устаревшим.';
 
   @override
-  String get contextUsageUnavailable => 'Использование недоступно';
+  String get contextUsageUnavailable => 'Использование сейчас недоступно.';
 
   @override
   String contextUsagePartialSummary(String tokens) {
-    return 'Оценка $tokens + неизвестное сжатие';
+    return 'Оценено $tokens, плюс неизвестное использование на стороне сервера';
   }
 
   @override
-  String get contextUsageBucketNativeCompaction => 'Нативное сжатие';
+  String get contextUsageBucketNativeCompaction => 'Сжатие на стороне сервера';
 
   @override
   String get contextUsageUnknownTokens => 'Неизвестно';
 
   @override
   String contextUsageLastRequestInput(String tokens) {
-    return 'Вход последнего запроса (измерено): $tokens';
+    return 'Последний фактически отправленный модели объём: $tokens';
   }
 
   @override
@@ -3537,7 +3551,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get contextUsageNoWindow => 'Нет контекстного окна';
+  String get contextUsageNoWindow => 'Лимит контекста ещё не задан.';
 
   @override
   String get contextUsageSetWindow => 'Задать контекстное окно';
@@ -3858,15 +3872,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get defaultModelPageCompressModelSubtitle =>
-      'Используется для сжатия контекста чата; предпочтительны быстрые модели';
+      'Модель, используемая для сжатия длинных чатов в сводку. Обычно достаточно быстрой модели.';
 
   @override
   String get defaultModelPageCompressPromptHint =>
-      'Введите шаблон промпта для сжатия контекста';
+      'Введите промпт, используемый при сжатии.';
 
   @override
   String defaultModelPageCompressVars(String contentVar, String localeVar) {
-    return 'Переменные: чат: $contentVar, язык: $localeVar';
+    return 'Переменные: беседа $contentVar, язык $localeVar';
   }
 
   @override
@@ -7662,7 +7676,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String logViewerRequestsCount(int count) {
-    return '$count запросов';
+    return 'Загружено запросов: $count';
   }
 
   @override
@@ -8969,8 +8983,13 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '$value с (первый токен)';
+  String tokenDetailFirstResponse(String value) {
+    return '$value с (первый ответ)';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '$value с (первый вывод)';
   }
 
   @override
@@ -9954,6 +9973,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get toolSchemaSettingsGroupSearch => 'Поиск';
 
   @override
+  String get toolSchemaSettingsGroupImages => 'Изображения';
+
+  @override
   String get toolSchemaSettingsGroupMemory => 'Память';
 
   @override
@@ -10389,7 +10411,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get workspaceToolTitleReadFile => 'Прочитать файл';
 
   @override
-  String get workspaceToolTitleViewImage => 'Просмотреть изображение';
+  String get workspaceToolTitleViewImage => 'Просмотр изображения';
 
   @override
   String get workspaceToolTitleWriteFile => 'Записать файл';
@@ -10622,6 +10644,18 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get workspaceEnvErrorPatchFailed =>
       'Не удалось завершить настройку песочницы.';
+
+  @override
+  String get workspaceEnvErrorRepairInterrupted =>
+      'Исправление песочницы было прервано. Существующая песочница сохранена. Повторите попытку, чтобы завершить исправление.';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout =>
+      'Время ожидания исправления песочницы истекло. Проверьте подключение к сети и повторите попытку. Существующая песочница сохранена.';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      'Не удалось подтвердить, что исправление песочницы остановилось в пределах отведённого времени. Полностью закройте и снова откройте Kelivo, прежде чем повторять попытку. Существующая песочница сохранена.';
 
   @override
   String get workspaceEnvErrorCancelled => 'Установка отменена.';
@@ -11566,18 +11600,18 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get storageSpaceCategorySessionFilesHint =>
-      'Вложения и результаты по каждому чату.';
+      'Вложения и результаты сеансов рабочей области. Обычные загрузки чата перечислены в разделах «Изображения» и «Файлы».';
 
   @override
   String get storageSpaceManageSkills => 'Управление навыками';
 
   @override
   String get storageSessionFilesCleanOrphans =>
-      'Очистить файлы чатов без чатов';
+      'Очистить пустые и осиротевшие папки';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return 'Удаляет папки сеансов, у которых больше нет чата. Можно освободить: $size.';
+    return 'Удалить пустые папки чатов и папки без чатов или оставшихся ссылок. Осиротевшие файлы занимают $size.';
   }
 
   @override
@@ -15064,14 +15098,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get chatInputBarQueuedPausedReason =>
-      'Сжатие не завершено; отправка приостановлена';
+      'Сжатие ещё выполняется, поэтому это не отправится автоматически.';
 
   @override
   String get contextChanged =>
-      'История изменилась. Откройте это действие снова, чтобы проверить его текущий охват.';
+      'Чат изменился. Откройте это снова и подтвердите диапазон, прежде чем продолжить.';
 
   @override
-  String get contextOperationSuperseded => 'Включено в более позднюю сводку';
+  String get contextOperationSuperseded => 'Заменено более поздней сводкой';
 
   @override
   String get compressIncludeAttachments =>
@@ -15084,11 +15118,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressOverSnack =>
-      'Сводка превысит лимит контекста и не была применена.';
+      'Сводка всё ещё слишком длинная и превысит лимит, поэтому она не была использована. Сожмите ещё раз или переключитесь на модель с большим контекстом.';
 
   @override
   String get contextSummaryHint =>
-      'Это сводка, используемая в последующих запросах. Сохранение изменений не перезаписывает существующие ответы. Вложения дают только доступный текст; изображения не интерпретируются повторно.';
+      'Это сводка, которую модель увидит в следующий раз. Сохранение изменяет только сводку, а не существующие ответы. Вложения дают только уже извлечённый текст; изображения повторно не распознаются.';
 
   @override
   String get compressAdvanced => 'Дополнительно';
@@ -15098,7 +15132,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextBudgetExceeded =>
-      'Оценочный контекст превышает лимит этой модели. Сократите сводку, сожмите снова или выберите модель с большим контекстом.';
+      'С этой сводкой следующее сообщение превысит лимит модели. Сократите сводку, сожмите ещё раз или переключитесь на модель с большим контекстом.';
 
   @override
   String get contextManualSupplement =>
@@ -15111,11 +15145,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get contextSourceLabel => 'Источник сводки';
 
   @override
-  String get contextImpactSourceTitle => 'Изменить сжатые оригиналы?';
+  String get contextImpactSourceTitle =>
+      'Изменить исходный текст, уже включённый в сводку?';
 
   @override
   String get chatInputBarQueuedCompressionFailed =>
-      'Сжатие не удалось; отправка приостановлена';
+      'Сжатие не удалось, поэтому это сообщение не отправится автоматически.';
 
   @override
   String contextTokenInfo(int before, int after) {
@@ -15136,7 +15171,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressNothingNew =>
-      'С момента последней сводки нет нового содержимого для сжатия';
+      'С прошлого раза нет нового содержимого для сжатия.';
 
   @override
   String get browserActionScreenshot => 'Сделать снимок экрана';
@@ -15169,7 +15204,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String contextImpactSaveConfirm(int count) {
-    return 'Сохранить и отменить $count узлов';
+    return 'Сохранить и отменить следующие связанные операции: $count';
   }
 
   @override
@@ -15186,7 +15221,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get contextTaskApplying => 'Применение сводки';
+  String get contextTaskApplying => 'Используется эта сводка';
 
   @override
   String get storageSpaceImagesHint =>
@@ -15200,11 +15235,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get worldBookMoveEntries => 'Переместить в…';
 
   @override
-  String get compressReread => 'Повторно читать сжатые оригиналы';
+  String get compressReread => 'Вернуться к просмотру сжатых оригиналов';
 
   @override
   String get chatInputBarQueuedPausedHold =>
-      'Ввод приостановлен; отмените очередь, чтобы редактировать или отправить';
+      'Отправка приостановлена. Отмените очередь, чтобы изменить или отправить сейчас.';
 
   @override
   String get contextSummaryTitle => 'Сводка контекста';
@@ -15217,21 +15252,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressTaskAbandon => 'Отменить';
 
   @override
-  String get browserAgentTimedOut => 'Время операции истекло; ИИ приостановлен';
+  String get compressCancelledSnack => 'Отменено. Контекст не изменён.';
 
   @override
-  String get compressCancelledSnack =>
-      'Сжатие отменено. Текущий контекст не изменён.';
+  String get contextImpactClearTitle => 'Отменить предыдущую очистку?';
 
   @override
-  String get contextImpactClearTitle => 'Отменить более раннюю очистку?';
+  String get compressTaskWaitingApproval => 'Ждём вашего одобрения инструмента';
 
   @override
-  String get compressTaskWaitingApproval =>
-      'Ожидание подтверждения инструмента';
-
-  @override
-  String get contextTaskFailed => 'Сжатие не удалось';
+  String get contextTaskFailed => 'Сжатие не завершилось';
 
   @override
   String get wsDeniedSkillsReadonly =>
@@ -15246,14 +15276,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressStaleSnack =>
-      'История чата изменилась; сводка не применена.';
+      'Чат изменился до завершения сжатия, поэтому результат не использован. Сожмите снова, если всё ещё нужно.';
 
   @override
   String get worldBookCopyEntries => 'Копировать в…';
 
   @override
   String get contextEditEmpty =>
-      'Сводка не может быть пустой. Чтобы исключить всю предыдущую историю, используйте «Очистить контекст».';
+      'Сводка не может быть пустой. Чтобы не включать ранний чат, используйте «Очистить контекст».';
 
   @override
   String get toolApprovalDenyWithReason => 'Отклонить с причиной…';
@@ -15268,7 +15298,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get storageSpaceImageTypeLabel => 'Тип';
 
   @override
-  String get contextImpactUndoTitle => 'Отменить более раннее сжатие?';
+  String get contextImpactUndoTitle => 'Отменить предыдущее сжатие?';
 
   @override
   String get contextOriginalMessages => 'Просмотреть исходные сообщения';
@@ -15289,7 +15319,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressTaskAdjustRetry => 'Изменить параметры и повторить';
 
   @override
-  String get contextDetailLegacy => 'Преобразовано из устаревшей очистки';
+  String get contextDetailLegacy => 'Перенесено из старой очистки';
 
   @override
   String get contextDetailCurrent => 'Текущий контекст';
@@ -15311,20 +15341,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String contextDetailParts(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count сегмента',
-      many: '$count сегментов',
-      few: '$count сегмента',
-      one: '$count сегмент',
-    );
-    return '$_temp0';
+    return 'Автоматически разделено на $count частей';
   }
 
   @override
   String get contextEditPending =>
-      'Сохранено; применится после текущего ответа';
+      'Сохранено. Будет использовано после завершения текущего ответа.';
 
   @override
   String get contextTaskRetry => 'Повторить сжатие';
@@ -15360,10 +15382,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get branchInheritNote =>
-      'Наследуются только узлы контекста, активные до этой точки';
+      'Новая ветка переносит только сводки и оригиналы, действовавшие до этой точки.';
 
   @override
-  String get contextTaskInterrupted => 'Сжатие прервано; ввод сохранён';
+  String get contextTaskInterrupted =>
+      'Сжатие прервано. Введённый текст сохранён.';
 
   @override
   String get storageSpaceImageTypeAll => 'Все';
@@ -15416,7 +15439,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressDiscardedSnack =>
-      'Контекст очищен; текущее сжатие отменено.';
+      'Контекст очищен. Текущее сжатие отменено и не использовано.';
 
   @override
   String get browserActionSelect => 'Выбрать вариант';
@@ -15425,7 +15448,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get toolPermissionTitle => 'Разрешения';
 
   @override
-  String get contextDetailNext => 'Следующий запрос';
+  String get contextDetailNext => 'Следующая отправка';
 
   @override
   String get contextTaskCancel => 'Отменить сжатие';
@@ -15435,7 +15458,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get chatInputBarQueuedCompressionCancelled =>
-      'Сжатие отменено; отправка остаётся приостановленной';
+      'Сжатие отменено, поэтому это сообщение не отправится автоматически.';
 
   @override
   String get toolPermissionResetSnack =>
@@ -15449,10 +15472,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextTaskPaused =>
-      'Отправка приостановлена — отмените очередь, чтобы редактировать';
+      'Отправка приостановлена. Отмените очередь, чтобы продолжить редактирование.';
 
   @override
-  String get contextTaskReview => 'Проверьте сводку перед применением';
+  String get contextTaskReview =>
+      'Просмотрите сводку, прежде чем использовать её.';
 
   @override
   String compressApproxTokens(String value) {
@@ -15464,7 +15488,8 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сначала замените или удалите этот аватар, фон или значок в соответствующих настройках, затем удаляйте.';
 
   @override
-  String get compressRereadLastLayer => 'Развернуть последний слой';
+  String get compressRereadLastLayer =>
+      'Показать оригиналы до последнего сжатия';
 
   @override
   String get contextRestoreOperation => 'Восстановить операцию';
@@ -15474,7 +15499,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Перечитать все оригинальные сообщения в этом сегменте';
 
   @override
-  String get contextImpactEditTitle => 'Сохранить более раннюю сводку?';
+  String get contextImpactEditTitle => 'Сохранить эту раннюю сводку?';
 
   @override
   String get contextOpenNewChat => 'Открыть новый чат';
@@ -15485,7 +15510,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextEditUnknownPreview =>
-      'Использование недоступно; оно будет проверено повторно перед сохранением.';
+      'Сейчас нельзя оценить расход. Он будет проверен ещё раз перед сохранением.';
 
   @override
   String get contextTaskWait =>
@@ -15497,11 +15522,11 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get wsContextChanged => 'Контекст чата изменился. Запрос устарел.';
+  String get wsContextChanged => 'Чат изменился, поэтому запрос отменён.';
 
   @override
   String contextChangeImpact(int count) {
-    return 'Это изменение также отменит затронутые операции контекста: $count. Оригинальные сообщения сохраняются. Продолжить?';
+    return 'Это также отменит следующие связанные сжатия или очистки: $count. Исходный чат сохранится. Продолжить?';
   }
 
   @override
@@ -15514,23 +15539,24 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextSummaryNotSmaller =>
-      'Сводка не короче исходного текста. Проверьте её перед применением.';
+      'Сводка не короче оригинала. Просмотрите её, прежде чем решить, использовать ли.';
 
   @override
   String get storageSpaceImageTypeTool => 'Изображения инструментов';
 
   @override
-  String get contextPreviousHistory => 'Перечитать последний слой сжатия';
+  String get contextPreviousHistory =>
+      'Перечитать оригиналы до последнего сжатия';
 
   @override
-  String get contextDetailRead => 'Фактическое чтение';
+  String get contextDetailRead => 'Что будет фактически прочитано';
 
   @override
   String get contextViewGenerated => 'Просмотреть созданную сводку';
 
   @override
   String get contextImpactDeleteDescription =>
-      'Удалить оригиналы и отменить связанные сводки, чтобы удалённое содержимое больше не отправлялось. Остальные сообщения и независимые узлы не изменяются.';
+      'При удалении этих оригиналов также будут отменены связанные сводки и последующие сжатия, зависящие от них, чтобы удалённое содержимое больше не отправлялось. Остальные сообщения не затронуты.';
 
   @override
   String get storageSpaceImageTypeAvatar => 'Аватары и фоны';
@@ -15539,7 +15565,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get contextDetailAfterUndo => 'После отмены';
 
   @override
-  String get contextOperationUndo => 'Отменить эту операцию с контекстом';
+  String get contextOperationUndo => 'Отменить эту операцию';
 
   @override
   String contextHistoryWindowNote(int count) {
@@ -15548,7 +15574,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextOverLimitWarning =>
-      'После отмены можно превысить лимит контекста. Отмена и повторное сжатие всё равно доступны; лимит проверяется снова при отправке.';
+      'После отмены содержимое может превысить лимит модели. Отменить всё равно можно — мы проверим ещё раз перед отправкой. При необходимости сожмите снова.';
 
   @override
   String get storageSpaceImageTypeChat => 'Изображения чата';
@@ -15565,14 +15591,15 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get contextOperationHidden => 'Отделено последующей очисткой';
+  String get contextOperationHidden =>
+      'Позже уже была очистка, поэтому это больше не действует.';
 
   @override
   String get contextUndoClearTooltip => 'Отменить эту очистку';
 
   @override
   String compressKeepDescription(int count) {
-    return 'Сохранить последние сообщения пользователя ($count) с ответами и инструментами. Более ранняя история заменяется сводкой; сообщения только с вложениями тоже считаются.';
+    return 'Сохранить последние сообщения пользователя ($count) вместе с ответами и действиями инструментов. Более ранняя история заменяется сводкой. Сообщения только с вложениями считаются по одному.';
   }
 
   @override
@@ -15580,7 +15607,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String contextEditPreview(String value) {
-    return 'После сохранения примерно $value токенов. Редактирование не меняет активный контекст.';
+    return 'Около $value токенов после сохранения. Редактирование не меняет сразу то, что используется сейчас.';
   }
 
   @override
@@ -15596,27 +15623,27 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get contextDetailReplaced => 'Заменённый диапазон';
+  String get contextDetailReplaced => 'Заменено сводкой';
 
   @override
   String get displaySettingsPageAutoScrollEnabledLabel => 'Вкл.';
 
   @override
-  String get contextChangeTitle => 'Проверить затронутый контекст';
+  String get contextChangeTitle => 'Подтвердите, на что повлияет это изменение';
 
   @override
   String get contextDetailTitle => 'Сводка';
 
   @override
   String get compressModelGlobal =>
-      'Глобальная настройка · фиксируется при запуске';
+      'Использует модель из настроек и не меняет её в середине сеанса.';
 
   @override
   String get wsDeniedMountReadonly => 'Только для чтения. Запись невозможна.';
 
   @override
   String get compressRereadDesc =>
-      'Восстанавливает сведения, потерянные при нескольких сжатиях. Увеличивает расход в этот раз';
+      'Если чат сжимался несколько раз, это позволит заглянуть в оригиналы, чтобы меньше деталей потерялось. В этот раз будет использовано больше токенов.';
 
   @override
   String get toolApprovalSwitchToFullAccess => 'Переключить на полный доступ';
@@ -15625,20 +15652,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressUsageInput => 'Вход сводки';
 
   @override
-  String get contextDetailSummaryLabel =>
-      'Сводка, используемая в последующих запросах';
+  String get contextDetailSummaryLabel => 'Сводка, которую модель увидит далее';
 
   @override
-  String get contextImpactDeleteTitle => 'Удалить сжатые оригиналы?';
+  String get contextImpactDeleteTitle => 'Удалить уже сжатые оригиналы?';
 
   @override
-  String get compressAdvancedOff => 'Перечитывание оригиналов выкл.';
+  String get compressAdvancedOff => 'Просмотр оригиналов: выкл.';
 
   @override
-  String get contextOperationActive => 'Сейчас применено';
+  String get contextOperationActive => 'Сейчас используется';
 
   @override
-  String get compressAdvancedOn => 'Перечитывание оригиналов вкл.';
+  String get compressAdvancedOn => 'Просмотр оригиналов: вкл.';
 
   @override
   String get contextTaskMerging => 'Объединение сводок';
@@ -15653,21 +15679,21 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextClearDetails =>
-      'Предыдущая история чата исключается из будущих запросов. Системные инструкции, память и определения инструментов по-прежнему действуют.';
+      'С этого момента ранний чат не будет отправляться модели. Системные инструкции ассистента, память и инструменты по-прежнему действуют.';
 
   @override
   String get compressCopyResult => 'Копировать результат';
 
   @override
-  String get contextDetailInUse => 'Используется напрямую';
+  String get contextDetailInUse => 'Сейчас используется';
 
   @override
   String get contextImpactDescription =>
-      'Связанные сводки будут отменены вместе. Исходные сообщения и независимые узлы сохраняются; модель автоматически не вызывается.';
+      'Связанные сводки будут отменены вместе. Исходный чат сохранится, модель не будет вызвана. Другие несвязанные сводки останутся как есть.';
 
   @override
   String get compressIncludeAttachmentsDesc =>
-      'Включить доступный текст вложений и полные записи инструментов в исходном порядке. Изображения не анализируются повторно.';
+      'Включает уже извлечённый текст вложений и полные записи инструментов в исходном порядке. Изображения повторно не распознаются.';
 
   @override
   String worldBookEntriesMoved(int count) {
@@ -15684,17 +15710,17 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextImpactSourceDescription =>
-      'Изменить оригиналы и отменить их сводки и зависимые узлы вместе. Остальные сообщения и независимые узлы сохраняются; модель не вызывается.';
+      'Это изменит исходный текст и отменит сводки, которые его использовали, а также последующие сжатия, зависящие от этих сводок. Другие сообщения не затронуты, модель не будет вызвана.';
 
   @override
   String get contextEditTitle => 'Редактировать сводку';
 
   @override
-  String get compressUsageNext => 'Следующий запрос';
+  String get compressUsageNext => 'После применения, при следующей отправке';
 
   @override
   String get contextSummaryEmpty =>
-      'Сводка не может быть пустой. Используйте «Очистить контекст», чтобы исключить историю.';
+      'Сводка не может быть пустой. Чтобы не включать предыдущий чат, используйте «Очистить контекст».';
 
   @override
   String get toolApprovalDenied => 'Отклонено';
@@ -15704,20 +15730,20 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String compressIncludeManual(int count) {
-    return 'Включить ручные правки · $count';
+    return 'Включает $count ваших ручных дополнений';
   }
 
   @override
   String contextBudgetInfo(int used, String limit) {
-    return 'Оценка следующего запроса (включая резерв вывода): $used / $limit токенов';
+    return 'Следующая отправка займёт примерно $used / $limit токенов, включая место для ответа.';
   }
 
   @override
-  String get contextTaskDismiss => 'Скрыть статус';
+  String get contextTaskDismiss => 'Закрыть';
 
   @override
   String contextUndoBudgetInfo(int used) {
-    return 'После отмены: примерно $used токенов, включая резерв вывода';
+    return 'После отмены: примерно $used токенов, включая место для ответа';
   }
 
   @override
@@ -15727,7 +15753,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get worldBookSelectionDone => 'Готово';
 
   @override
-  String get contextDividerFailed => 'Сжатие не удалось';
+  String get contextDividerFailed => 'Сжатие не завершено';
 
   @override
   String get toolPermissionUnboundHint =>
@@ -15735,7 +15761,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get contextChangeWaiting =>
-      'Изменение вступит в силу после завершения текущего ответа и работы инструментов.';
+      'Это изменение вступит в силу после завершения текущего ответа и работы инструментов.';
 
   @override
   String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
@@ -15756,7 +15782,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String contextImpactConfirm(int count) {
-    return 'Отменить $count узлов';
+    return 'Также отменить следующие $count связанных операций';
   }
 
   @override
@@ -15786,7 +15812,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get browserErrActionTimeout =>
-      'Время операции истекло; результат неизвестен. Проверьте страницу, прежде чем разрешить ИИ продолжить.';
+      'Время операции истекло; результат неизвестен. Ассистент может проверить страницу перед продолжением.';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -16183,7 +16209,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get imageContextAllowRecallDescription =>
-      'Позволяет модели при необходимости получать изображения из этого чата. Отключение не влияет на автоматическое управление изображениями.';
+      'Разрешить view_image при необходимости извлекать исторические изображения из этого чата. Отключение не влияет на изображения, отправленные напрямую с сообщениями, автоматическое управление изображениями или доступ к файлам рабочей области.';
 
   @override
   String get imageContextTitle => 'Контекст изображений';
@@ -16265,42 +16291,45 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось сохранить изменения. Попробуйте ещё раз.';
 
   @override
-  String get contextOperationsTitle => 'Операции с контекстом';
+  String get contextOperationsTitle => 'Сжатие и очистка истории';
+
+  @override
+  String get contextOperationsLoadMore => 'Показать ещё';
 
   @override
   String get contextOperationsDescription =>
-      'Управление задачами сжатия, сводками и границами контекста';
+      'Просматривайте сжатия и очистки, при необходимости отменяйте их.';
 
   @override
-  String get contextOperationsEmpty => 'Операций с контекстом пока нет.';
+  String get contextOperationsEmpty => 'Пока нет сжатий или очисток.';
 
   @override
   String contextOperationsStored(int count) {
-    return 'Сохранённая история: сообщений — $count';
+    return 'Сохранённый чат: сообщений — $count';
   }
 
   @override
   String contextOperationsEffective(int summaries, int messages) {
-    return 'История для следующего запроса: сводок — $summaries + исходных сообщений — $messages';
+    return 'Следующая отправка включит сводок: $summaries, исходных сообщений: $messages.';
   }
 
   @override
   String get contextOperationsScope =>
-      'Применяется текущий лимит истории. Системные промпты, память, инструменты и неотправленный ввод добавляются к этому контексту. Откройте запись, чтобы просмотреть сводку, исходный диапазон или отменить её.';
+      'Учитывается текущий лимит длины истории. Системные инструкции, память, инструменты и неотправленный ввод также добавляются в контекст. Откройте запись, чтобы просмотреть сводку, исходный диапазон или отменить её.';
 
   @override
   String get contextOperationsLoadFailed =>
-      'Не удалось загрузить обзор контекста. Повторите попытку.';
+      'Не удалось загрузить эти записи. Попробуйте ещё раз.';
 
   @override
   String get compressNewConversation => 'Сжать в новый чат';
 
   @override
   String get compressNewConversationDescription =>
-      'Создать новый чат со сводкой и сохранёнными сообщениями. Исходный чат останется без изменений. Выключите, чтобы сжимать на месте.';
+      'Если включено, создаётся новый чат со сводкой и сохранёнными сообщениями, а исходный чат остаётся без изменений. Если выключено, сжатие выполняется в этом чате.';
 
   @override
-  String get contextViewBoundary => 'Перейти к границе';
+  String get contextViewBoundary => 'Перейти к месту очистки контекста';
 
   @override
   String get contextFixedStart => 'Фиксированное начало контекста';
@@ -16392,7 +16421,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionMore => 'Дополнительные настройки';
 
   @override
-  String get compressionFocus => 'Акцент для этого запуска';
+  String get compressionFocus => 'На чём сделать акцент в этот раз';
 
   @override
   String get compressionFocusHint =>
@@ -16411,7 +16440,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionGlobalDescription =>
-      'Влияет на чаты, следующие глобальным настройкам по умолчанию. Переопределения в чатах остаются без изменений.';
+      'Влияет только на чаты, использующие глобальные настройки по умолчанию. Чаты с собственными настройками не изменяются.';
 
   @override
   String get compressionAutoTitle => 'Автоматическое сжатие';
@@ -16427,17 +16456,17 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionNearLimit =>
-      'Контекст близок к расчётной ёмкости. Можно продолжать чат или сжать вручную.';
+      'Этот чат близок к пределу, который может удержать модель. Можно продолжать отправлять сообщения или сначала сжать.';
 
   @override
   String get compressionKeepTurns => 'Сохранять последние';
 
   @override
   String get compressionKeepHint =>
-      'Раунд включает сообщение пользователя, ответы на него и инструменты.';
+      'Один ход — это одно сообщение пользователя плюс следующие за ним ответы и действия инструментов.';
 
   @override
-  String get compressionLength => 'Лимит сводки (токены)';
+  String get compressionLength => 'Длина сводки (токены)';
 
   @override
   String get compressionTrigger => 'Начинать при';
@@ -16446,30 +16475,30 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionTarget => 'Сжимать до';
 
   @override
-  String get compressionWindow => 'Окно планирования';
+  String get compressionWindow => 'Ёмкость модели сводки';
 
   @override
-  String get compressionRequests => 'Максимум вызовов';
+  String get compressionRequests => 'Максимум запросов';
 
   @override
   String get compressionReference =>
-      'Учитывать активные мировые книги и память';
+      'Учитывать книги мира и историческую память';
 
   @override
   String get compressionReferenceHint =>
-      'Справочные данные поясняют имена и правила; они не доказывают, что события произошли или известны персонажам.';
+      'Мировые книги сопоставляются только с историей, которая сжимается, с использованием снимков памяти того времени. Это нужно только для объяснения имён и правил — это не означает, что те события произошли или что персонаж уже о них знает.';
 
   @override
   String get compressionToolReferences =>
-      'Заменять прочитанные результаты инструментов ссылками';
+      'Оставлять только ссылки на уже прочитанные результаты инструментов';
 
   @override
   String get compressionToolReferencesHint =>
-      'Только при доступе к инструментам. Сохраняет последние непрочитанные результаты и позволяет точно перечитать их только для чтения.';
+      'Применяется только при доступных инструментах. Последние непрочитанные результаты сохраняются полностью. Уже прочитанные результаты сохраняются как ссылки — их можно просмотреть, но нельзя редактировать.';
 
   @override
   String get compressionSummaryScan =>
-      'Учитывать сводки при сопоставлении ключевых слов мировой книги';
+      'Также сопоставлять ключевые слова мировых книг со сводкой';
 
   @override
   String get compressionChatModel => 'Следовать текущей модели чата';
@@ -16482,15 +16511,15 @@ class AppLocalizationsRu extends AppLocalizations {
       'Предпросмотр запроса · без вызова модели';
 
   @override
-  String get compressionTry => 'Пробная сводка · расходует токены модели';
+  String get compressionTry => 'Попробовать сводку · расходует токены модели';
 
   @override
   String get compressionPreviewOnly =>
-      'Только кандидат. Проверьте и примените, когда будете готовы.';
+      'Это создаёт только предварительный просмотр. Используйте его после проверки.';
 
   @override
   String get compressionTemplateChanged =>
-      'Этот шаблон применяется к будущим сводкам. Существующие сводки не изменяются; перечитайте оригиналы, чтобы восстановить недостающие детали.';
+      'Новый шаблон применяется только к будущим сводкам. Уже созданные сводки остаются как есть. Чтобы восстановить детали, пересоздайте их из оригиналов.';
 
   @override
   String compressionRange(int count, int turns) {
@@ -16499,7 +16528,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String compressionCalls(int count) {
-    return 'Вызовов модели: $count';
+    return 'Запросов к модели: $count';
   }
 
   @override
@@ -16512,32 +16541,32 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String compressionUsageUnknown(int count) {
-    return 'Для $count попыток расход не возвращён; эти вызовы нельзя считать бесплатными.';
+    return 'Для $count запросов не вернулись данные об использовании. Это не значит, что они были бесплатными.';
   }
 
   @override
   String get compressionBudgetError =>
-      'Запланированная работа превышает лимит вызовов. Увеличьте лимит или выберите модель сводки с большим окном. Частичная сводка не применена.';
+      'Для этого потребуется больше запросов к модели, чем позволяет текущий лимит, поэтому контекст не изменён. Увеличьте «Максимум запросов» или переключитесь на модель с большим контекстом.';
 
   @override
   String get compressionIncomplete =>
-      'Сводка была усечена или отклонена и не применена. Измените лимит вывода или модель.';
+      'Сводка была обрезана или отклонена, контекст не изменён. Увеличьте лимит вывода или попробуйте другую модель.';
 
   @override
   String get compressionReferenceTooLarge =>
-      'Шаблон, справочные данные или рабочая сводка исчерпывают бюджет модели сводки. Уменьшите объём справочных данных или выберите модель с большим окном.';
+      'Справочные материалы уже занимают всю ёмкость этой модели, и для сводки не остаётся места. Используйте меньше справочных материалов или переключитесь на модель с большим контекстом.';
 
   @override
   String get compressionReferenceChanged =>
-      'Используемые справочные данные изменились. Проверьте кандидата или создайте заново.';
+      'Используемый справочный фон изменился. Проверьте эту сводку или создайте новую.';
 
   @override
   String get compressionTargetNotReached =>
-      'Кандидат не уменьшил полный запрос ниже порога автоматического запуска. Исходный контекст сохранён.';
+      'Даже после сжатия использование всё ещё будет выше порога автоматического запуска, поэтому исходный контекст сохранён. Сократите сводку или увеличьте «Запускать при».';
 
   @override
   String get compressionTemplateMissing =>
-      'Выбранный шаблон недоступен. Выберите другой шаблон.';
+      'Выбранный шаблон недоступен. Пожалуйста, выберите другой.';
 
   @override
   String get compressionTemplates => 'Шаблоны';
@@ -16571,34 +16600,35 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionLanguageLegacy =>
-      'Сохранить исходное языковое поведение шаблона';
+      'Сохранить языковую настройку исходного шаблона';
 
   @override
   String get compressionLanguageHint =>
-      'Название или код языка, либо conversation / legacy';
+      'Введите название или код языка. Также можно указать conversation (следовать за чатом) или legacy (сохранить исходный шаблон).';
 
   @override
   String get compressionVariables =>
-      'Поддерживаемые переменные; история добавляется автоматически, если не указана:';
+      'Можно использовать эти переменные. Если в промпте нет истории, она будет добавлена автоматически:';
 
   @override
   String get compressionDeleteTemplate =>
-      'Выбрать замену и удалить этот шаблон? Принятые сводки и снимки рецептов останутся доступными.';
+      'Выбрать замену и удалить этот шаблон? Уже используемые сводки и копии, сохранённые в рецептах, останутся.';
 
   @override
   String compressionTemplateReferences(int count) {
-    return 'Используется в переопределениях чатов: $count.';
+    return 'Используется как переопределение для отдельных чатов: $count.';
   }
 
   @override
   String get compressionSaveRecipe => 'Сохранить эти настройки как рецепт';
 
   @override
-  String get compressionBindModel => 'Привязать выбранную модель для сводки';
+  String get compressionBindModel =>
+      'Также сохранить выбранную сейчас модель для сводок';
 
   @override
   String get compressionRecipeHint =>
-      'Рецепты не включают автоматическое сжатие. Импорт только добавляет в библиотеку без применения.';
+      'Сохранение или импорт рецепта не включает автоматическое сжатие и не применяет его к текущему чату. Рецепт только добавляется в библиотеку.';
 
   @override
   String get compressionImport => 'Импорт JSON';
@@ -16614,11 +16644,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionInvalidSettings =>
-      'Проверьте значения: целевой объём должен быть ниже порога, а лимиты вызовов и токенов — положительными.';
+      'Проверьте значения: «Сжимать до» должно быть меньше «Запускать при», а лимиты запросов и токенов должны быть больше 0.';
 
   @override
   String get compressionOverflowAction =>
-      'Сжать один раз и повторить неудачный ответ';
+      'Сжать один раз, затем повторить неудачный ответ';
 
   @override
   String compressionPlannedCalls(int count, int limit) {
@@ -16631,7 +16661,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String compressionRecipeReferences(int count) {
-    return 'Рецептов с независимыми снимками шаблона: $count.';
+    return 'Рецептов, сохраняющих собственную копию шаблона на тот момент: $count.';
   }
 
   @override
@@ -16719,11 +16749,29 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionCallUnit => 'вызовов';
 
   @override
+  String get compressionRequestTimeout => 'Тайм-аут запроса сжатия';
+
+  @override
+  String get compressionMinuteUnit => 'мин';
+
+  @override
+  String get compressionRequestTimeoutDefault => 'По умолчанию';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      'Введите число минут больше 0. Оставьте пустым, чтобы сохранить текущее значение по умолчанию (5 минут для серверного сжатия). При сжатии по частям каждая часть и объединение учитываются отдельно.';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return 'Сжатие остановлено после $minutes мин, контекст не изменён. Попробуйте снова или увеличьте тайм-аут.';
+  }
+
+  @override
   String get compressionAdvancedOptions => 'Детали сжатия';
 
   @override
   String get compressionAdvancedHint =>
-      'Ссылки, повторное чтение исходной истории и лимиты запросов';
+      'Справочные материалы, повторное обращение к оригиналам и лимит запросов';
 
   @override
   String get compressionAutomaticWindow => 'Авто';
@@ -16733,15 +16781,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionAutoNotifyHint =>
-      'Уведомление при приближении к порогу; когда сжимать, решаете вы.';
+      'Вы получите уведомление, когда использование приблизится к лимиту, а когда сжимать — решаете вы.';
 
   @override
   String get compressionAutoOnHint =>
-      'При достижении порога старая история суммируется. Возможен дополнительный расход модели.';
+      'Когда использование достигает заданного процента, ранняя история автоматически сворачивается в сводку. Это дополнительно расходует токены модели.';
 
   @override
   String get compressionBudgetHint =>
-      'Проценты рассчитываются от доступного бюджета ввода.';
+      'Эти проценты рассчитываются от доступной ёмкости ввода.';
 
   @override
   String get compressionPreviewAction => 'Локальный предпросмотр';
@@ -16754,23 +16802,23 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionScopeKeepHint =>
-      'Недавние ходы сохраняются дословно, более ранняя история суммируется; это число ходов также используется автоматическим сжатием.';
+      'Последние ходы сохраняются как есть, более ранняя история сворачивается в сводку. Автоматическое сжатие использует то же число ходов.';
 
   @override
   String get compressionScopeAllHint =>
-      'Суммируется вся история текущего контекста, включая недавние ходы. Исходные сообщения остаются доступны.';
+      'Свернуть в сводку всю историю, которая сейчас в контексте, не сохраняя отдельно недавние оригиналы. Исходные сообщения по-прежнему можно просмотреть.';
 
   @override
   String get compressionScopeStartHint =>
-      'Выбираются более ранние целые сообщения в пределах лимита символов; остальные сообщения сохраняют исходный текст.';
+      'В пределах лимита символов сжимаются более ранние полные сообщения. Невыбранные сообщения остаются исходным текстом.';
 
   @override
   String get compressionScopeRecentHint =>
-      'Выбираются недавние целые сообщения в пределах лимита символов; остальные сообщения сохраняют исходный текст.';
+      'В пределах лимита символов сжимаются более поздние полные сообщения. Невыбранные сообщения остаются исходным текстом.';
 
   @override
   String get compressionAutoKeepHint =>
-      'Автоматическое сжатие всегда сохраняет последние реплики независимо от ручного диапазона. Это число реплик общее с ручным сжатием.';
+      'Автоматическое сжатие всегда сохраняет недавние оригиналы независимо от диапазона, выбранного для ручного запуска. Число ходов общее с ручным сжатием.';
 
   @override
   String get requestBudgetTitle => 'Лимиты изображений и запросов';
@@ -16865,50 +16913,50 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get compressionNativeTitle => 'Использовать нативное сжатие OpenAI';
+  String get compressionNativeTitle => 'Использовать серверное сжатие OpenAI';
 
   @override
   String get compressionNativeHint =>
-      'Использует текущую модель чата с Responses. Автоматическое сжатие в этом чате также использует нативное сжатие, если включено. Поддержку определяет ваш сервис.';
+      'Используется текущая модель чата, сжатие выполняется на сервере. Если в этом чате включено автоматическое сжатие, оно тоже будет использовать этот способ. Ваш провайдер должен поддерживать Responses API OpenAI.';
 
   @override
   String get compressionNativeScopeHint =>
-      'Оставить последние реплики без изменений и сжать более раннюю историю. Нативное автоматическое сжатие также использует это число; число реплик для текстовой сводки не меняется.';
+      'Последние ходы сохраняются как есть, более ранняя история отправляется на серверное сжатие. Автоматическое серверное сжатие использует то же число; число ходов для текстовых сводок не меняется.';
 
   @override
-  String get compressionNativeLabel => 'Нативное сжатие';
+  String get compressionNativeLabel => 'Серверное сжатие';
 
   @override
   String get compressionNativeDescription =>
-      'Нативный контекст, возвращённый сервисом, сохранён локально для последующих запросов. Его нельзя прочитать или изменить как текст. Исходные сообщения остаются доступны, и это сжатие можно отменить.';
+      'Результат сжатия с сервера сохранён локально и будет использоваться при следующей отправке. Его нельзя просмотреть или изменить как текст. Исходные сообщения сохранены, и это сжатие можно отменить.';
 
   @override
   String get compressionNativeIncomplete =>
-      'Сервис не вернул полный результат нативного сжатия. Исходный контекст не изменён.';
+      'Сервер не вернул полный результат сжатия. Исходный контекст не изменён.';
 
   @override
   String get compressionNativeScopeChanged =>
-      'Этот нативный контекст принадлежит другому подключению или аккаунту. Продолжите с исходным подключением либо отмените сжатие или создайте текстовое резюме в чате, содержащем оригиналы.';
+      'Этот серверный результат относится к другому подключению или аккаунту. Вернитесь к исходному подключению, чтобы продолжить, или отмените это сжатие в чате, где ещё есть оригиналы, и создайте текстовую сводку.';
 
   @override
   String get compressionNativeTokenHint =>
-      'Расход токенов для непрозрачного нативного контекста определяется сервисом.';
+      'Использование токенов для серверного сжатия определяется сервером.';
 
   @override
   String get compressionNativeCopyHint =>
-      'Новый чат сохраняет только полный результат нативного сжатия и сохранённые последние реплики. Оригиналы остаются в исходном чате, и их нельзя восстановить отменой здесь.';
+      'Новый чат сохранит только полный серверный результат и оставленные вами недавние ходы. Оригиналы остаются в исходном чате, и отмена здесь их не восстановит.';
 
   @override
   String get compressionNativeInputOverride =>
-      'Пользовательское поле input заменит данные нативного сжатия. Удалите переопределение input в настройках провайдера, модели или ассистента, прежде чем продолжить.';
+      'Пользовательский параметр input в настройках модели или ассистента перезапишет результат серверной обработки. Удалите этот параметр, чтобы продолжить.';
 
   @override
   String get compressionNativeAllHint =>
-      'Отправить всю текущую историю на нативное сжатие без отдельного сохранения последних реплик. Исходные сообщения остаются доступны.';
+      'Отправить всю текущую историю на серверную обработку, не сохраняя отдельно недавние оригиналы. Исходные сообщения по-прежнему можно просмотреть.';
 
   @override
   String get compressionNativeAutoHint =>
-      'При достижении порога выполнить нативное сжатие текущей моделью чата и продолжить отправку. При неудаче исходный контекст сохраняется, переход на текстовую сводку не выполняется.';
+      'Когда использование достигнет заданного процента, текущая модель чата выполнит серверную обработку, после чего отправка продолжится. При сбое исходный контекст сохраняется, и приложение не переключится на текстовое резюме.';
 
   @override
   String get languageDisplayRussian => 'Русский';
@@ -16956,26 +17004,27 @@ class AppLocalizationsRu extends AppLocalizations {
   String get themePaletteCustom => 'Пользовательская';
 
   @override
-  String get compressionNativeImported => 'Нативный контекст загружен';
+  String get compressionNativeImported =>
+      'Результат серверной обработки загружен';
 
   @override
   String get compressionNativeImportedDescription =>
-      'Этот чат начинается с полного результата нативного сжатия и сохранённых последних реплик. Результат нельзя просмотреть или отредактировать как текст. Более ранние оригиналы остаются в исходном чате, поэтому их нельзя восстановить отменой здесь.';
+      'Этот чат начинается с результата серверной обработки и последних реплик. Результат нельзя просмотреть или изменить как текст. Более ранние оригиналы остаются в исходном чате, и их нельзя восстановить отменой здесь.';
 
   @override
   String get compressionNativeOpenSource => 'Открыть исходный чат';
 
   @override
   String get compressionNativeOriginalsUnavailable =>
-      'В этом чате нет оригиналов для загруженного нативного контекста. Продолжите с нативным сжатием или вернитесь в исходный чат, чтобы просмотреть оригиналы или создать текстовое резюме.';
+      'В этом чате нет оригиналов для загруженного результата серверной обработки. Вы можете продолжить использовать серверную обработку или вернуться в исходный чат, чтобы просмотреть оригиналы или создать текстовое резюме.';
 
   @override
   String get compressionNativeTemporaryCopyHint =>
-      'Новый временный чат сохраняет только полный результат нативного сжатия и сохранённые последние ходы. При выходе из исходного временного чата он и не перенесённые оригиналы удаляются; восстановить их здесь невозможно.';
+      'Новый временный чат сохранит только полный результат серверной обработки и последние реплики. Когда вы покинете исходный временный чат, он и все неперенесённые оригиналы будут удалены и не смогут быть восстановлены здесь.';
 
   @override
   String get compressionNativeSourceUnavailable =>
-      'Этот чат сохраняет полный результат нативного сжатия и сохранённые последние ходы. Исходный чат больше недоступен. Оригиналы, не скопированные сюда, восстановить невозможно, а нативный результат нельзя просмотреть или отредактировать как текст.';
+      'В этом чате сохранены полный результат серверной обработки и оставленные последние реплики. Исходный чат больше недоступен. Оригиналы, не скопированные сюда, нельзя восстановить, а результат нельзя просмотреть или изменить как текст.';
 
   @override
   String get modelDetailSheetImageGenerationModel => 'Модель изображений';
@@ -17030,4 +17079,110 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellSave => 'Сохранить';
+
+  @override
+  String get desktopAutostartTitle => 'Запускать при входе';
+
+  @override
+  String get desktopAutostartDescription =>
+      'Запускать Kelivo при входе в систему на этом компьютере.';
+
+  @override
+  String get desktopAutostartHiddenTitle => 'Скрывать в трей при автозапуске';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      'Требуется автозапуск и значок в трее. При ручном запуске Kelivo окно всё равно отображается.';
+
+  @override
+  String get desktopAutostartUnsupported =>
+      'Автозапуск требует macOS 13 или новее.';
+
+  @override
+  String get desktopAutostartError =>
+      'Не удалось применить настройку автозапуска. Проверьте Kelivo в настройках автозагрузки или элементов входа системы и повторите попытку.';
+
+  @override
+  String get compressionOutputBudget => 'Общий лимит вывода (токены)';
+
+  @override
+  String get compressionOutputBudgetHint =>
+      'Включает рассуждение и само резюме. Оставьте пустым, чтобы использовать длину резюме. Если рассуждение включено, этот лимит можно увеличить, не удлиняя резюме. Собственный лимит вывода модели по-прежнему действует.';
+
+  @override
+  String get responseOutputLimitReached =>
+      'Ответ обрезан: лимит вывода включает рассуждение. Увеличьте лимит вывода или уменьшите рассуждение, затем повторите попытку.';
+
+  @override
+  String responseContextLimitReached(int inputTokens, int contextWindow) {
+    return 'Ответ обрезан: этот запрос использовал $inputTokens входных токенов, что близко к лимиту контекста в $contextWindow токенов. Сократите контекст, затем повторите попытку.';
+  }
+
+  @override
+  String get responseRetryWithoutImages =>
+      'Повторить без изображений (сохранить оригиналы)';
+
+  @override
+  String get browserOperationTimeout => 'Тайм-аут операции';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      'Максимальное время ожидания команды браузера. После тайм-аута ассистент может проверить состояние страницы.';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds с';
+  }
+
+  @override
+  String get browserErrObservationRequired =>
+      'Проверьте страницу перед продолжением: результат предыдущей операции не подтверждён.';
+
+  @override
+  String get storageAttachmentRetention => 'Автоочистка вложений';
+
+  @override
+  String get storageAttachmentRetentionDays => 'Дней до очистки';
+
+  @override
+  String get storageAttachmentRetentionImmediately => 'Очистить сразу';
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      'После удаления сообщений или чатов автоматически удаляйте неиспользуемые изображения и файлы.';
+
+  @override
+  String get storageAttachmentUnused => 'Не используется';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return 'Ожидает очистки · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return 'Чаты: $names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => 'Очистить неиспользуемые';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      'Файлы, которые ещё используются, будут сохранены.';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return 'Удалить сейчас неиспользуемых файлов: $count? Файлы, которые всё ещё используются, будут сохранены.';
+  }
+
+  @override
+  String get storageAttachmentRetentionDelayed => 'Очистить позже';
+
+  @override
+  String get storageAttachmentRetentionInvalidDays =>
+      'Введите от 1 до 3650 дней.';
+
+  @override
+  String get storageAttachmentDetailsTitle => 'Информация о файле';
 }

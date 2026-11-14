@@ -138,6 +138,7 @@ class MessageListView extends StatefulWidget {
     this.removingSlotIds = const <String>{},
     this.onVersionChange,
     this.onRegenerateMessage,
+    this.onRetryWithoutImages,
     this.onSetContextStart,
     this.onResendMessage,
     this.onTranslateMessage,
@@ -240,6 +241,7 @@ class MessageListView extends StatefulWidget {
   // Callbacks
   final OnVersionChange? onVersionChange;
   final OnRegenerateMessage? onRegenerateMessage;
+  final OnRegenerateMessage? onRetryWithoutImages;
   final ValueChanged<ChatMessage>? onSetContextStart;
   final OnResendMessage? onResendMessage;
   final OnTranslateMessage? onTranslateMessage;
@@ -469,7 +471,10 @@ class _MessageListViewState extends State<MessageListView> {
     final previous = timelineImageAspects[imageKey];
     if (previous != null && (previous - aspectRatio).abs() < 0.001) return;
     timelineImageAspects[imageKey] = aspectRatio;
-    _invalidateToolExtentForMessage(messageId);
+    // The mounted image's relayout updates the list's measured extent. Only
+    // discard our estimate here: preserving distance from the end would fight
+    // the image's reading anchor when other images load below it in this frame.
+    _extentEstimateCache.remove(messageId);
   }
 
   void _invalidateToolExtentForMessage(String messageId) {
@@ -1679,6 +1684,7 @@ class _MessageListViewState extends State<MessageListView> {
         old.completionTokens != current.completionTokens ||
         old.cachedTokens != current.cachedTokens ||
         old.durationMs != current.durationMs ||
+        old.firstResponseMs != current.firstResponseMs ||
         old.firstTokenMs != current.firstTokenMs ||
         _partsIdentityChanged(old.parts, current.parts);
   }
@@ -2601,6 +2607,9 @@ class _MessageListViewState extends State<MessageListView> {
       onRegenerate: message.role == 'assistant'
           ? () => widget.onRegenerateMessage?.call(message)
           : null,
+      onRetryWithoutImages: widget.onRetryWithoutImages == null
+          ? null
+          : () => widget.onRetryWithoutImages!(message),
       onResend: message.role == 'user'
           ? () => widget.onResendMessage?.call(message)
           : null,

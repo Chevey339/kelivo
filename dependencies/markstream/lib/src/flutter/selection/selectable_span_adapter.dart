@@ -1,5 +1,6 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'text_range_rect.dart';
 
 /// Joins a non-text inline widget to its surrounding selection, reporting the
 /// source represented by the widget as one atomic selection unit.
@@ -18,7 +19,8 @@ class SelectableSpanAdapter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final registrar = SelectionContainer.maybeOf(context);
-    if (registrar == null) return child;
+    if (registrar == null)
+      return TextRangeAtom(length: selectedText.length, child: child);
     return MouseRegion(
       cursor: mouseCursor,
       child: _SelectableSource(

@@ -90,19 +90,22 @@ void main() {
     },
   );
 
-  test('paint retains semantics overrides and replaces an existing background paint', () {
-    final original = TextSpan(
-      text: 'word',
-      semanticsLabel: 'spoken',
-      style: TextStyle(background: Paint()..color = Colors.blue),
-    );
-    final marked = paintTextHighlights(original, const [
-      SourceSpan(1, 2),
-    ], _color);
-    expect(marked.toPlainText(), 'spoken');
-    expect(marked.toPlainText(includeSemanticsLabels: false), 'word');
-    expect(marked.style!.background!.color.toARGB32(), _color.toARGB32());
-  });
+  test(
+    'paint retains semantics overrides and replaces an existing background paint',
+    () {
+      final original = TextSpan(
+        text: 'word',
+        semanticsLabel: 'spoken',
+        style: TextStyle(background: Paint()..color = Colors.blue),
+      );
+      final marked = paintTextHighlights(original, const [
+        SourceSpan(1, 2),
+      ], _color);
+      expect(marked.toPlainText(), 'spoken');
+      expect(marked.toPlainText(includeSemanticsLabels: false), 'word');
+      expect(marked.style!.background!.color.toARGB32(), _color.toARGB32());
+    },
+  );
 
   test(
     'custom mixed spans highlight atomically and retain placeholder text',
@@ -115,11 +118,11 @@ void main() {
         ],
       );
       final highlights = SourceHighlights(const [SourceSpan(8, 9)], _color);
-      final marked = highlights.customInline(
-        source,
-        const SourceSpan(0, 9),
-        const [TextSegment(text: 'AatomicB', sourceSpan: SourceSpan(0, 9))],
-      ) as TextSpan;
+      final marked =
+          highlights.customInline(source, const SourceSpan(0, 9), const [
+                TextSegment(text: 'AatomicB', sourceSpan: SourceSpan(0, 9)),
+              ])
+              as TextSpan;
       expect(marked.toPlainText(), source.toPlainText());
       expect(marked.style!.background!.color.toARGB32(), _color.toARGB32());
       final atom = marked.children!.whereType<WidgetSpan>().single;
@@ -350,7 +353,7 @@ void main() {
     final scroll = tester.state<ScrollableState>(
       find
           .descendant(
-            of: find.byType(ListView),
+            of: find.byKey(const ValueKey('markstream-virtualized-code')),
             matching: find.byType(Scrollable),
           )
           .first,

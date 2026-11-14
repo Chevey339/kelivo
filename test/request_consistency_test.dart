@@ -377,8 +377,7 @@ void main() {
                           'input_image',
                           'image',
                         ].contains(part['type']) ||
-                        part['inlineData'] != null ||
-                        part['inline_data'] != null,
+                        part['inlineData'] != null,
                   )
                   .length,
           ];

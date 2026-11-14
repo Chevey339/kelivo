@@ -2117,6 +2117,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupProgressErrorCopied => 'Error copied';
 
   @override
+  String get backupProgressSkippedTitle =>
+      'Backup completed with skipped items';
+
+  @override
+  String backupProgressSkippedMessage(int count) {
+    return 'Unreadable files or directories skipped: $count. They are not included in this backup.';
+  }
+
+  @override
   String get backupProgressPreparing => 'Preparing';
 
   @override
@@ -2457,36 +2466,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContext => 'Compress Context';
 
   @override
-  String get compressContextDesc => 'Create a summary you can review and undo';
+  String get compressContextDesc =>
+      'Turn earlier chat into a summary. Originals stay in the chat and you can undo anytime.';
 
   @override
-  String get clearContextDesc => 'Mark a context boundary';
+  String get clearContextDesc =>
+      'Start fresh from here: earlier messages stay in the chat but won’t be sent to the model.';
 
   @override
   String get contextManagement => 'Context Management';
 
   @override
-  String get compressContextFailed => 'Failed to compress context';
+  String get compressContextFailed => 'Compression didn’t finish';
 
   @override
-  String get compressContextNoMessages => 'No messages to compress';
+  String get compressContextNoMessages =>
+      'There’s nothing in this chat to compress.';
 
   @override
-  String get compressContextNoConversation => 'No conversation to compress';
+  String get compressContextNoConversation =>
+      'There’s no conversation to compress.';
 
   @override
-  String get compressContextNoModel => 'No compression model configured';
+  String get compressContextNoModel =>
+      'No model is set for compression. Choose a fast one in Settings.';
 
   @override
   String get compressContextEmptySummary =>
-      'Compression returned an empty summary';
+      'The model didn’t produce a summary. Try a different model, or change the options and try again.';
 
   @override
   String get compressContextOptionsTitle => 'Compress Context';
 
   @override
   String get compressContextOptionsDesc =>
-      'Create an editable, reversible summary in this chat. Original messages are kept.';
+      'Turn earlier messages into a summary, which is what the model will see next time. The original chat is kept; you can edit or undo the summary.';
 
   @override
   String get compressContextKeepStart => 'Earlier history';
@@ -2516,11 +2530,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContextKeepRecentMessages => 'Keep recent turns';
 
   @override
-  String get compressContextKeepCountLabel => 'Recent user messages';
+  String get compressContextKeepCountLabel => 'Recent user messages to keep';
 
   @override
   String get compressContextKeepAllMessages =>
-      'Keeping that many covers all messages — nothing to compress';
+      'That many recent messages already covers the whole chat, so there’s nothing left to compress.';
 
   @override
   String compressContextEstimatePreview(
@@ -2530,7 +2544,7 @@ class AppLocalizationsEn extends AppLocalizations {
     int maxTokens,
     int totalTokens,
   ) {
-    return 'Summarize $summarized chars, keep $kept chars verbatim → about $minTokens–$maxTokens tokens (original about $totalTokens tokens)';
+    return 'Will summarize $summarized characters and keep $kept as-is. About $minTokens–$maxTokens tokens after compression (original about $totalTokens).';
   }
 
   @override
@@ -3398,11 +3412,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextUsageTitle => 'Context window';
 
   @override
-  String get contextUsageStateExact => 'Exact (from last response)';
+  String get contextUsageStateExact => 'Exact (from the last reply)';
 
   @override
   String get contextUsageStateExactCalibrated =>
-      'Exact (breakdown scaled from estimate)';
+      'Total is exact; the breakdown is estimated in proportion';
 
   @override
   String get contextUsageStateEstimated => 'Estimated';
@@ -3414,29 +3428,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextUsageStateComputing => 'Computing…';
 
   @override
-  String get contextUsageStateFailed => 'Calculation failed';
+  String get contextUsageStateFailed =>
+      'Couldn’t calculate usage. Please try again.';
 
   @override
   String get contextUsageStateFailedWithPrevious =>
-      'Update failed · previous result is stale';
+      'Couldn’t refresh. Showing the previous result, which may be out of date.';
 
   @override
-  String get contextUsageUnavailable => 'Usage unavailable';
+  String get contextUsageUnavailable => 'Usage isn’t available right now.';
 
   @override
   String contextUsagePartialSummary(String tokens) {
-    return 'Estimated $tokens + unknown compaction';
+    return 'Estimated $tokens, plus unknown server-side usage';
   }
 
   @override
-  String get contextUsageBucketNativeCompaction => 'Native compaction';
+  String get contextUsageBucketNativeCompaction => 'Server-side compression';
 
   @override
   String get contextUsageUnknownTokens => 'Unknown';
 
   @override
   String contextUsageLastRequestInput(String tokens) {
-    return 'Last request input (measured): $tokens';
+    return 'Last amount actually sent to the model: $tokens';
   }
 
   @override
@@ -3490,7 +3505,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get contextUsageNoWindow => 'No context window';
+  String get contextUsageNoWindow => 'No context limit is set yet.';
 
   @override
   String get contextUsageSetWindow => 'Set context window';
@@ -3807,15 +3822,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageCompressModelSubtitle =>
-      'Used for compressing conversation context; prefer fast models';
+      'The model used to summarize long chats. A fast model is usually enough.';
 
   @override
   String get defaultModelPageCompressPromptHint =>
-      'Enter prompt template for context compression';
+      'Enter the prompt used when compressing.';
 
   @override
   String defaultModelPageCompressVars(String contentVar, String localeVar) {
-    return 'Variables: conversation: $contentVar, language: $localeVar';
+    return 'Variables: conversation $contentVar, language $localeVar';
   }
 
   @override
@@ -7551,7 +7566,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String logViewerRequestsCount(int count) {
-    return '$count requests';
+    return '$count loaded requests';
   }
 
   @override
@@ -8840,8 +8855,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String tokenDetailFirstToken(String value) {
-    return '${value}s (first token)';
+  String tokenDetailFirstResponse(String value) {
+    return '${value}s (first response)';
+  }
+
+  @override
+  String tokenDetailFirstOutput(String value) {
+    return '${value}s (first output)';
   }
 
   @override
@@ -9800,6 +9820,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolSchemaSettingsGroupSearch => 'Search';
 
   @override
+  String get toolSchemaSettingsGroupImages => 'Images';
+
+  @override
   String get toolSchemaSettingsGroupMemory => 'Memory';
 
   @override
@@ -10463,6 +10486,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workspaceEnvErrorPatchFailed =>
       'Could not finish setting up the sandbox.';
+
+  @override
+  String get workspaceEnvErrorRepairInterrupted =>
+      'Sandbox repair was interrupted. The existing sandbox has been kept. Retry to finish the repair.';
+
+  @override
+  String get workspaceEnvErrorRepairTimeout =>
+      'Sandbox repair timed out. Check your network connection and retry. The existing sandbox has been kept.';
+
+  @override
+  String get workspaceEnvRepairRestartBanner =>
+      'Could not confirm that sandbox repair stopped within the time limit. Fully close and reopen Kelivo before retrying. The existing sandbox has been kept.';
 
   @override
   String get workspaceEnvErrorCancelled => 'Installation was cancelled.';
@@ -11401,18 +11436,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceCategorySessionFilesHint =>
-      'Per-conversation attachments and outputs.';
+      'Workspace conversation attachments and outputs. Ordinary chat uploads are listed in Images and Files.';
 
   @override
   String get storageSpaceManageSkills => 'Manage skills';
 
   @override
   String get storageSessionFilesCleanOrphans =>
-      'Clean orphaned conversation files';
+      'Clean empty and orphaned folders';
 
   @override
   String storageSessionFilesCleanOrphansHint(String size) {
-    return 'Deletes session folders that no longer have a conversation. Reclaimable: $size.';
+    return 'Remove empty conversation folders and folders with no conversation or remaining references. Orphaned files occupy $size.';
   }
 
   @override
@@ -14820,14 +14855,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputBarQueuedPausedReason =>
-      'Compression did not finish; sending stays paused';
+      'Compression is still running, so this won’t send automatically.';
 
   @override
   String get contextChanged =>
-      'History changed. Reopen this action to review its current scope.';
+      'The chat has changed. Open this again and confirm the range before continuing.';
 
   @override
-  String get contextOperationSuperseded => 'Included in a later summary';
+  String get contextOperationSuperseded => 'Replaced by a later summary';
 
   @override
   String get compressIncludeAttachments => 'Attachment text & tool results';
@@ -14839,11 +14874,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressOverSnack =>
-      'The summary would exceed the context limit and was not applied.';
+      'The summary is still too long and would exceed the limit, so it wasn’t used. Compress again, or switch to a model with a larger context.';
 
   @override
   String get contextSummaryHint =>
-      'This is the summary used in subsequent requests. Saving changes does not rewrite existing replies. Attachments contribute only available text; images are not reinterpreted.';
+      'This is the summary the model will see next. Saving changes only the summary, not existing replies. Attachments contribute only text already extracted; images are not re-read.';
 
   @override
   String get compressAdvanced => 'Advanced';
@@ -14853,7 +14888,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextBudgetExceeded =>
-      'The estimated context exceeds this model’s limit. Shorten the summary, compress again, or choose a model with a larger context.';
+      'With this summary, the next message would exceed the model’s limit. Shorten the summary, compress again, or switch to a model with a larger context.';
 
   @override
   String get contextManualSupplement =>
@@ -14866,11 +14901,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextSourceLabel => 'Summary input';
 
   @override
-  String get contextImpactSourceTitle => 'Change compressed originals?';
+  String get contextImpactSourceTitle =>
+      'Change original text that’s already in a summary?';
 
   @override
   String get chatInputBarQueuedCompressionFailed =>
-      'Compression failed; sending stays paused';
+      'Compression failed, so this message won’t send automatically.';
 
   @override
   String contextTokenInfo(int before, int after) {
@@ -14890,8 +14926,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolPermissionRequestApproval => 'Ask for approval';
 
   @override
-  String get compressNothingNew =>
-      'Nothing new to compress since the last summary';
+  String get compressNothingNew => 'Nothing new to compress since last time.';
 
   @override
   String get browserActionScreenshot => 'Capture screenshot';
@@ -14924,7 +14959,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String contextImpactSaveConfirm(int count) {
-    return 'Save and undo $count nodes';
+    return 'Save, and undo the next $count related operations';
   }
 
   @override
@@ -14941,7 +14976,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get contextTaskApplying => 'Applying summary';
+  String get contextTaskApplying => 'Using this summary';
 
   @override
   String get storageSpaceImagesHint =>
@@ -14955,11 +14990,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worldBookMoveEntries => 'Move to…';
 
   @override
-  String get compressReread => 'Re-read compressed originals';
+  String get compressReread => 'Look back at the compressed originals';
 
   @override
   String get chatInputBarQueuedPausedHold =>
-      'Input remains paused; cancel the queue to edit or send';
+      'Sending is paused. Cancel the queue to edit or send now.';
 
   @override
   String get contextSummaryTitle => 'Context summary';
@@ -14971,20 +15006,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressTaskAbandon => 'Dismiss';
 
   @override
-  String get browserAgentTimedOut => 'Operation timed out; AI paused';
+  String get compressCancelledSnack => 'Cancelled. The context is unchanged.';
 
   @override
-  String get compressCancelledSnack =>
-      'Compression cancelled. Current context is unchanged.';
+  String get contextImpactClearTitle => 'Undo the earlier clear?';
 
   @override
-  String get contextImpactClearTitle => 'Undo earlier clear?';
+  String get compressTaskWaitingApproval => 'Waiting for you to approve a tool';
 
   @override
-  String get compressTaskWaitingApproval => 'Waiting for tool approval';
-
-  @override
-  String get contextTaskFailed => 'Compression failed';
+  String get contextTaskFailed => 'Compression didn’t finish';
 
   @override
   String get wsDeniedSkillsReadonly => 'Skills folder is read-only.';
@@ -14998,14 +15029,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressStaleSnack =>
-      'Chat history changed; the summary was not applied.';
+      'The chat changed before compression finished, so this result wasn’t used. Compress again if you still want to.';
 
   @override
   String get worldBookCopyEntries => 'Copy to…';
 
   @override
   String get contextEditEmpty =>
-      'Summary cannot be empty. Use Clear context to exclude all earlier history.';
+      'The summary can’t be empty. To leave earlier chat out, use Clear context.';
 
   @override
   String get toolApprovalDenyWithReason => 'Deny with reason…';
@@ -15020,7 +15051,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceImageTypeLabel => 'Type';
 
   @override
-  String get contextImpactUndoTitle => 'Undo earlier compression?';
+  String get contextImpactUndoTitle => 'Undo the earlier compression?';
 
   @override
   String get contextOriginalMessages => 'View original messages';
@@ -15041,7 +15072,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressTaskAdjustRetry => 'Adjust options and retry';
 
   @override
-  String get contextDetailLegacy => 'Converted from legacy clear';
+  String get contextDetailLegacy => 'Carried over from an older clear';
 
   @override
   String get contextDetailCurrent => 'Current context';
@@ -15063,11 +15094,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String contextDetailParts(int count) {
-    return '$count segments';
+    return 'Automatically split into $count parts';
   }
 
   @override
-  String get contextEditPending => 'Saved; applies after the current reply';
+  String get contextEditPending =>
+      'Saved. It will be used after the current reply finishes.';
 
   @override
   String get contextTaskRetry => 'Retry compression';
@@ -15102,11 +15134,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get branchInheritNote =>
-      'Only inherits context nodes active before this point';
+      'The new branch only carries summaries and originals that were still in effect before this point.';
 
   @override
   String get contextTaskInterrupted =>
-      'Compression interrupted; input is preserved';
+      'Compression was interrupted. What you typed is still there.';
 
   @override
   String get storageSpaceImageTypeAll => 'All';
@@ -15140,7 +15172,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressDiscardedSnack =>
-      'Context cleared; the running compression was discarded.';
+      'Context cleared. The compression in progress was cancelled and not used.';
 
   @override
   String get browserActionSelect => 'Select option';
@@ -15149,7 +15181,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolPermissionTitle => 'Permissions';
 
   @override
-  String get contextDetailNext => 'Next request';
+  String get contextDetailNext => 'Next send';
 
   @override
   String get contextTaskCancel => 'Cancel compression';
@@ -15159,7 +15191,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputBarQueuedCompressionCancelled =>
-      'Compression cancelled; sending stays paused';
+      'Compression was cancelled, so this message won’t send automatically.';
 
   @override
   String get toolPermissionResetSnack =>
@@ -15172,10 +15204,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextDetailContinueNewChat => 'Continue in new chat';
 
   @override
-  String get contextTaskPaused => 'Sending paused — cancel the queue to edit';
+  String get contextTaskPaused =>
+      'Sending is paused. Cancel the queue to keep editing.';
 
   @override
-  String get contextTaskReview => 'Review the summary before applying';
+  String get contextTaskReview => 'Please review the summary before using it.';
 
   @override
   String compressApproxTokens(String value) {
@@ -15187,7 +15220,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Change or remove this avatar, background, or icon in its settings before deleting it.';
 
   @override
-  String get compressRereadLastLayer => 'Expand last layer';
+  String get compressRereadLastLayer =>
+      'View the originals from before the last compression';
 
   @override
   String get contextRestoreOperation => 'Restore operation';
@@ -15197,7 +15231,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Re-read all original messages in this segment';
 
   @override
-  String get contextImpactEditTitle => 'Save earlier summary?';
+  String get contextImpactEditTitle => 'Save this earlier summary?';
 
   @override
   String get contextOpenNewChat => 'Open new chat';
@@ -15207,7 +15241,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextEditUnknownPreview =>
-      'Usage is unavailable; it will be checked again before saving.';
+      'Usage can’t be estimated right now. It will be checked again before saving.';
 
   @override
   String get contextTaskWait =>
@@ -15220,11 +15254,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wsContextChanged =>
-      'Conversation context changed. Request expired.';
+      'The conversation changed, so this request was cancelled.';
 
   @override
   String contextChangeImpact(int count) {
-    return 'This change will also undo $count affected context operations. Original messages are kept. Continue?';
+    return 'This will also undo the next $count related compressions or clears. The original chat is kept. Continue?';
   }
 
   @override
@@ -15237,23 +15271,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextSummaryNotSmaller =>
-      'The summary is not shorter than its input. Review it before applying.';
+      'The summary isn’t shorter than the original. Review it before deciding to use it.';
 
   @override
   String get storageSpaceImageTypeTool => 'Tool images';
 
   @override
-  String get contextPreviousHistory => 'Re-read the last compression layer';
+  String get contextPreviousHistory =>
+      'Re-read the originals from before the last compression';
 
   @override
-  String get contextDetailRead => 'Read';
+  String get contextDetailRead => 'What will actually be read';
 
   @override
   String get contextViewGenerated => 'View generated summary';
 
   @override
   String get contextImpactDeleteDescription =>
-      'Delete the originals and undo related summaries so removed content is not sent again. Other messages and independent nodes are unchanged.';
+      'Deleting these originals will also undo related summaries and later compressions that depend on them, so deleted content isn’t sent again. Other messages are unaffected.';
 
   @override
   String get storageSpaceImageTypeAvatar => 'Avatars & backgrounds';
@@ -15262,7 +15297,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextDetailAfterUndo => 'After undo';
 
   @override
-  String get contextOperationUndo => 'Undo this context operation';
+  String get contextOperationUndo => 'Undo this operation';
 
   @override
   String contextHistoryWindowNote(int count) {
@@ -15271,7 +15306,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextOverLimitWarning =>
-      'Undo may exceed the context limit. You can still undo and recompress; sending checks the limit again.';
+      'After undoing, the content may exceed the model’s limit. You can still undo — we’ll check again before sending. Compress again if needed.';
 
   @override
   String get storageSpaceImageTypeChat => 'Chat images';
@@ -15288,14 +15323,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get contextOperationHidden => 'Excluded by a later clear';
+  String get contextOperationHidden =>
+      'A later clear already took effect, so this no longer applies.';
 
   @override
   String get contextUndoClearTooltip => 'Undo this clear';
 
   @override
   String compressKeepDescription(int count) {
-    return 'Keep the latest $count user messages with their replies and tools. Earlier history is summarized; attachment-only messages also count.';
+    return 'Keep the latest $count user messages, with their replies and tool activity. Earlier history is replaced by a summary. Attachment-only messages count as one each.';
   }
 
   @override
@@ -15303,7 +15339,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String contextEditPreview(String value) {
-    return 'Approx. $value tokens after saving. Editing does not change active context.';
+    return 'About $value tokens after saving. Editing doesn’t immediately change what’s currently in use.';
   }
 
   @override
@@ -15319,26 +15355,27 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get contextDetailReplaced => 'Replaced';
+  String get contextDetailReplaced => 'Replaced by the summary';
 
   @override
   String get displaySettingsPageAutoScrollEnabledLabel => 'On';
 
   @override
-  String get contextChangeTitle => 'Review affected context';
+  String get contextChangeTitle => 'Confirm what this change will affect';
 
   @override
   String get contextDetailTitle => 'Summary';
 
   @override
-  String get compressModelGlobal => 'Global setting · fixed when started';
+  String get compressModelGlobal =>
+      'Uses the model from Settings, and won’t change it mid-session.';
 
   @override
   String get wsDeniedMountReadonly => 'Read-only mount. Can’t write.';
 
   @override
   String get compressRereadDesc =>
-      'Recover details lost across summaries. Uses more tokens.';
+      'If the chat has been compressed more than once, this looks back at the originals so fewer details are lost. Uses more tokens this time.';
 
   @override
   String get toolApprovalSwitchToFullAccess => 'Switch to full access';
@@ -15347,19 +15384,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressUsageInput => 'Summary input';
 
   @override
-  String get contextDetailSummaryLabel => 'Summary used in later requests';
+  String get contextDetailSummaryLabel => 'The summary the model will see next';
 
   @override
-  String get contextImpactDeleteTitle => 'Delete compressed originals?';
+  String get contextImpactDeleteTitle =>
+      'Delete originals that were already compressed?';
 
   @override
-  String get compressAdvancedOff => 'Re-read originals off';
+  String get compressAdvancedOff => 'Look back at originals: off';
 
   @override
-  String get contextOperationActive => 'Currently applied';
+  String get contextOperationActive => 'Currently in use';
 
   @override
-  String get compressAdvancedOn => 'Re-read originals on';
+  String get compressAdvancedOn => 'Look back at originals: on';
 
   @override
   String get contextTaskMerging => 'Merging summaries';
@@ -15374,21 +15412,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextClearDetails =>
-      'Earlier chat history is excluded from future requests. System instructions, memory and tool definitions still apply.';
+      'Earlier chat won’t be sent to the model from here on. The assistant’s system instructions, memory, and tools still apply.';
 
   @override
   String get compressCopyResult => 'Copy result';
 
   @override
-  String get contextDetailInUse => 'In use';
+  String get contextDetailInUse => 'Currently in use';
 
   @override
   String get contextImpactDescription =>
-      'Related summaries will be undone together. Original messages and independent nodes are kept; no model is called automatically.';
+      'Related summaries will be undone together. The original chat is kept, and the model won’t be called. Other unrelated summaries stay as they are.';
 
   @override
   String get compressIncludeAttachmentsDesc =>
-      'Include available attachment text and complete tool records in their original order. Images are not reinterpreted.';
+      'Includes already extracted attachment text and complete tool records, in their original order. Images are not re-read.';
 
   @override
   String worldBookEntriesMoved(int count) {
@@ -15403,17 +15441,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextImpactSourceDescription =>
-      'Change the originals and undo their summaries and dependent nodes together. Other messages and independent nodes are kept; no model is called.';
+      'This will change the original text, and undo summaries that used it, along with later compressions that depend on those summaries. Other messages are unaffected, and the model won’t be called.';
 
   @override
   String get contextEditTitle => 'Edit summary';
 
   @override
-  String get compressUsageNext => 'Next request';
+  String get compressUsageNext => 'After applying, next send';
 
   @override
   String get contextSummaryEmpty =>
-      'The summary cannot be empty. Use Clear context to exclude history.';
+      'The summary can’t be empty. To leave earlier chat out, use Clear context.';
 
   @override
   String get toolApprovalDenied => 'Denied';
@@ -15423,20 +15461,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String compressIncludeManual(int count) {
-    return 'Include manual edits · $count';
+    return 'Includes $count manual addition(s) of yours';
   }
 
   @override
   String contextBudgetInfo(int used, String limit) {
-    return 'Estimated next request (including output reserve): $used / $limit tokens';
+    return 'Next send is about $used / $limit tokens, including room for a reply.';
   }
 
   @override
-  String get contextTaskDismiss => 'Dismiss status';
+  String get contextTaskDismiss => 'Dismiss';
 
   @override
   String contextUndoBudgetInfo(int used) {
-    return 'After undo: approximately $used tokens including output reserve';
+    return 'After undo: about $used tokens, including room for a reply';
   }
 
   @override
@@ -15446,7 +15484,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worldBookSelectionDone => 'Done';
 
   @override
-  String get contextDividerFailed => 'Compression failed';
+  String get contextDividerFailed => 'Compression didn’t finish';
 
   @override
   String get toolPermissionUnboundHint =>
@@ -15454,7 +15492,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextChangeWaiting =>
-      'Waiting for the current reply and tools to finish before applying this change.';
+      'This change will take effect after the current reply and tools finish.';
 
   @override
   String storageSpaceDeletedUploadsPartial(int deleted, int kept) {
@@ -15475,7 +15513,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String contextImpactConfirm(int count) {
-    return 'Undo $count nodes';
+    return 'Also undo the next $count related operations';
   }
 
   @override
@@ -15491,7 +15529,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolPermissionEnabledSnack => 'Full access enabled for this chat';
 
   @override
-  String get contextDetailSuperseded => 'Superseded by a later summary';
+  String get contextDetailSuperseded => 'Replaced by a later summary';
 
   @override
   String get contextTaskQueued => 'Queued — waiting for compression';
@@ -15504,7 +15542,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserErrActionTimeout =>
-      'Operation timed out; outcome unknown. Check the page before allowing AI to continue.';
+      'Operation timed out; outcome unknown. AI can inspect the page before continuing.';
 
   @override
   String get toolPermissionRequestApprovalDesc =>
@@ -15897,7 +15935,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imageContextAllowRecallDescription =>
-      'Let the model retrieve images from this conversation when needed. Turning this off does not change automatic image management.';
+      'Let view_image retrieve historical images from this conversation when needed. Turning this off does not affect images sent directly with messages, automatic image management, or workspace file access.';
 
   @override
   String get imageContextTitle => 'Image context';
@@ -15977,42 +16015,45 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not save your changes. Try again.';
 
   @override
-  String get contextOperationsTitle => 'Context operations';
+  String get contextOperationsTitle => 'Compression and clear history';
+
+  @override
+  String get contextOperationsLoadMore => 'Show more';
 
   @override
   String get contextOperationsDescription =>
-      'Manage compression tasks, summaries and context boundaries';
+      'Review compressions and clears, and undo them if needed.';
 
   @override
-  String get contextOperationsEmpty => 'No context operations yet.';
+  String get contextOperationsEmpty => 'No compressions or clears yet.';
 
   @override
   String contextOperationsStored(int count) {
-    return 'Saved history: $count messages';
+    return 'Saved chat: $count messages';
   }
 
   @override
   String contextOperationsEffective(int summaries, int messages) {
-    return 'History for the next request: $summaries summaries + $messages original messages';
+    return 'The next send will include $summaries summaries and $messages original messages.';
   }
 
   @override
   String get contextOperationsScope =>
-      'Uses the current history limit. System prompts, memory, tools and unsent input add to this context. Open a record to view its summary, original range or undo it.';
+      'This uses the current history-length limit. System instructions, memory, tools, and unsent input are also added to the context. Open a record to view its summary, original range, or undo it.';
 
   @override
   String get contextOperationsLoadFailed =>
-      'Could not load the context overview. Please retry.';
+      'Couldn’t load these records. Please try again.';
 
   @override
   String get compressNewConversation => 'Compress into a new chat';
 
   @override
   String get compressNewConversationDescription =>
-      'Create a new chat with the summary and retained messages. Keep the original chat unchanged. Turn off to compress in place.';
+      'When on, creates a new chat with the summary and kept messages, and leaves the original chat unchanged. When off, compresses in this chat.';
 
   @override
-  String get contextViewBoundary => 'Jump to boundary';
+  String get contextViewBoundary => 'Jump to where the context was cleared';
 
   @override
   String get contextFixedStart => 'Fixed context start';
@@ -16103,7 +16144,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressionMore => 'More settings';
 
   @override
-  String get compressionFocus => 'Focus for this run';
+  String get compressionFocus => 'What to keep in focus this time';
 
   @override
   String get compressionFocusHint =>
@@ -16120,7 +16161,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionGlobalDescription =>
-      'Affects conversations that follow global defaults. Conversation overrides stay unchanged.';
+      'Only affects conversations that follow the global defaults. Conversations with their own settings are unchanged.';
 
   @override
   String get compressionAutoTitle => 'Automatic compression';
@@ -16136,17 +16177,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionNearLimit =>
-      'Context is near its estimated capacity. You can keep chatting or compress manually.';
+      'This chat is close to what the model can hold. You can keep sending, or compress first.';
 
   @override
   String get compressionKeepTurns => 'Keep recent';
 
   @override
   String get compressionKeepHint =>
-      'A turn includes a user message, its replies and tools.';
+      'A turn is one user message plus the replies and tool activity that follow it.';
 
   @override
-  String get compressionLength => 'Summary limit (tokens)';
+  String get compressionLength => 'Summary length (tokens)';
 
   @override
   String get compressionTrigger => 'Start at';
@@ -16155,28 +16196,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressionTarget => 'Compress to';
 
   @override
-  String get compressionWindow => 'Planning window';
+  String get compressionWindow => 'Summary model capacity';
 
   @override
-  String get compressionRequests => 'Maximum calls';
+  String get compressionRequests => 'Maximum requests';
 
   @override
-  String get compressionReference => 'Reference active world books and memory';
+  String get compressionReference =>
+      'Reference world books and historical memory';
 
   @override
   String get compressionReferenceHint =>
-      'Reference explains names and rules; it is not evidence that events happened or characters know them.';
+      'World books are matched only against the history being compressed, using memory snapshots from that time. This is only to explain names and rules — it doesn’t mean those events happened, or that a character already knows them.';
 
   @override
-  String get compressionToolReferences => 'Reference consumed tool results';
+  String get compressionToolReferences =>
+      'Keep only references to tool results already read';
 
   @override
   String get compressionToolReferencesHint =>
-      'Only with tool access. Keeps the latest unread results and allows exact, read-only recall.';
+      'Only applies when tools are available. The latest unread results are kept in full. Results already read are kept as references — you can look them up, but not edit them.';
 
   @override
   String get compressionSummaryScan =>
-      'Include summaries in world book keyword matching';
+      'Also match world-book keywords against the summary';
 
   @override
   String get compressionChatModel => 'Follow the current chat model';
@@ -16188,15 +16231,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressionLocalPreview => 'Preview request · no model call';
 
   @override
-  String get compressionTry => 'Try summary · uses model tokens';
+  String get compressionTry => 'Try a summary · uses model tokens';
 
   @override
   String get compressionPreviewOnly =>
-      'Candidate only. Review and apply when ready.';
+      'This only creates a preview. Use it after you’ve reviewed it.';
 
   @override
   String get compressionTemplateChanged =>
-      'This template applies to future summaries. Existing summaries are unchanged; re-read originals to rebuild missing details.';
+      'The new template applies to future summaries only. Existing summaries stay as they are. To fill in details, regenerate from the originals.';
 
   @override
   String compressionRange(int count, int turns) {
@@ -16205,7 +16248,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String compressionCalls(int count) {
-    return '$count model calls';
+    return '$count model request(s)';
   }
 
   @override
@@ -16218,32 +16261,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String compressionUsageUnknown(int count) {
-    return 'Usage not returned for $count attempts; these calls are not counted as free.';
+    return '$count request(s) didn’t return usage data. That doesn’t mean they were free.';
   }
 
   @override
   String get compressionBudgetError =>
-      'The planned work exceeds the call limit. Increase the limit or select a larger summary model. No partial summary was applied.';
+      'This would take more model requests than the current limit allows, so the context is unchanged. Raise Maximum requests, or switch to a model with a larger context.';
 
   @override
   String get compressionIncomplete =>
-      'The summary was truncated or refused and was not applied. Adjust the output limit or model.';
+      'The summary was cut off or refused, and the context is unchanged. Raise the output limit, or try a different model.';
 
   @override
   String get compressionReferenceTooLarge =>
-      'The template, reference or working summary fills the summary model budget. Reduce references or choose a larger model.';
+      'Reference material already fills this model’s capacity, leaving no room for the summary. Use fewer references, or switch to a model with a larger context.';
 
   @override
   String get compressionReferenceChanged =>
-      'Referenced background changed. Review the candidate or regenerate.';
+      'The referenced background has changed. Review this summary, or generate a new one.';
 
   @override
   String get compressionTargetNotReached =>
-      'The candidate did not reduce the full request below the automatic trigger. Original context was kept.';
+      'Even after compression, usage would still be above the automatic starting point, so the original context was kept. Shorten the summary, or raise Start at.';
 
   @override
   String get compressionTemplateMissing =>
-      'The selected template is unavailable. Select another template.';
+      'The selected template isn’t available. Please choose another.';
 
   @override
   String get compressionTemplates => 'Templates';
@@ -16277,34 +16320,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionLanguageLegacy =>
-      'Keep original template language behavior';
+      'Keep the original template’s language setting';
 
   @override
   String get compressionLanguageHint =>
-      'Language code, or conversation / legacy';
+      'Enter a language name or code. You can also use conversation (follow the chat) or legacy (keep the original template).';
 
   @override
   String get compressionVariables =>
-      'Supported variables; history is appended automatically if omitted:';
+      'You can use these variables. If the prompt doesn’t include the history, it will be appended automatically:';
 
   @override
   String get compressionDeleteTemplate =>
-      'Choose a replacement and delete this template? Accepted summaries and recipe snapshots remain readable.';
+      'Choose a replacement and delete this template? Summaries already in use, and copies saved in recipes, are kept.';
 
   @override
   String compressionTemplateReferences(int count) {
-    return 'Used by $count conversation overrides.';
+    return 'Used as a per-conversation override in $count chat(s).';
   }
 
   @override
   String get compressionSaveRecipe => 'Save these settings as a recipe';
 
   @override
-  String get compressionBindModel => 'Include the selected summary model';
+  String get compressionBindModel =>
+      'Also save the summary model currently selected';
 
   @override
   String get compressionRecipeHint =>
-      'Recipes do not enable automatic compression. Import adds to the library without applying.';
+      'Saving or importing a recipe doesn’t turn on automatic compression, and doesn’t apply it to the current chat. It only adds the recipe to your library.';
 
   @override
   String get compressionImport => 'Import JSON';
@@ -16320,11 +16364,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionInvalidSettings =>
-      'Check the values: target must be below trigger, and call and token limits must be positive.';
+      'Check these values: Compress to must be lower than Start at, and request and token limits must be greater than 0.';
 
   @override
   String get compressionOverflowAction =>
-      'Compress once, then retry the failed response';
+      'Compress once, then retry the reply that failed';
 
   @override
   String compressionPlannedCalls(int count, int limit) {
@@ -16337,7 +16381,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String compressionRecipeReferences(int count) {
-    return '$count recipes keep independent template snapshots.';
+    return '$count recipe(s) keep their own copy of the template from that time.';
   }
 
   @override
@@ -16425,11 +16469,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressionCallUnit => 'calls';
 
   @override
+  String get compressionRequestTimeout => 'Compression request timeout';
+
+  @override
+  String get compressionMinuteUnit => 'min';
+
+  @override
+  String get compressionRequestTimeoutDefault => 'Default';
+
+  @override
+  String get compressionRequestTimeoutHint =>
+      'Enter a number of minutes greater than 0. Leave blank to keep the current default (5 minutes for server-side compression). When summarizing in parts, each part and the merge is timed separately.';
+
+  @override
+  String compressionRequestTimedOut(num minutes) {
+    return 'Compression stopped after $minutes minutes and the context is unchanged. Try again, or allow a longer timeout.';
+  }
+
+  @override
   String get compressionAdvancedOptions => 'Compression details';
 
   @override
   String get compressionAdvancedHint =>
-      'References, original-history rereading and request limits';
+      'References, whether to look back at originals, and the request limit';
 
   @override
   String get compressionAutomaticWindow => 'Auto';
@@ -16439,15 +16501,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionAutoNotifyHint =>
-      'Notify near the threshold; you decide when to compress.';
+      'You’ll be notified when usage is close to the limit, and you decide when to compress.';
 
   @override
   String get compressionAutoOnHint =>
-      'Summarize older history at the threshold. Extra model usage applies.';
+      'When usage reaches the set percentage, earlier history is summarized automatically. This uses additional model tokens.';
 
   @override
   String get compressionBudgetHint =>
-      'Percentages use the available input budget.';
+      'These percentages are based on the input capacity still available.';
 
   @override
   String get compressionPreviewAction => 'Local preview';
@@ -16460,23 +16522,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionScopeKeepHint =>
-      'Keep recent turns verbatim and summarize older history. This turn count is also used by automatic compression.';
+      'Keep the most recent turns as-is, and summarize earlier history. Automatic compression uses this same turn count.';
 
   @override
   String get compressionScopeAllHint =>
-      'Summarize all history in the current context, including recent turns. Original messages stay available.';
+      'Summarize all history currently in context, without keeping a separate recent original. The original messages can still be viewed.';
 
   @override
   String get compressionScopeStartHint =>
-      'Select earlier whole messages within the character budget. Other messages keep their original text.';
+      'Within the character limit, compress earlier complete messages. Messages not selected stay as original text.';
 
   @override
   String get compressionScopeRecentHint =>
-      'Select recent whole messages within the character budget. Other messages keep their original text.';
+      'Within the character limit, compress more recent complete messages. Messages not selected stay as original text.';
 
   @override
   String get compressionAutoKeepHint =>
-      'Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression.';
+      'Automatic compression always keeps recent originals, regardless of the range you pick for a manual run. The turn count is shared with manual compression.';
 
   @override
   String get requestBudgetTitle => 'Image & request budgets';
@@ -16571,50 +16633,50 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get compressionNativeTitle => 'Use OpenAI native compaction';
+  String get compressionNativeTitle => 'Use OpenAI server-side compression';
 
   @override
   String get compressionNativeHint =>
-      'Uses the current chat model with Responses. Automatic compression in this chat also uses native compaction when enabled. Your service decides whether it is supported.';
+      'Uses the current chat model, and compression happens on the server. If automatic compression is on in this chat, it will use this method too. Your provider needs to support OpenAI’s Responses API.';
 
   @override
   String get compressionNativeScopeHint =>
-      'Keep recent turns unchanged and compact earlier history. Native automatic compression uses this count too; the text-summary count stays unchanged.';
+      'Keep the most recent turns as-is, and send earlier history to server-side compression. Automatic server-side compression uses this same count; the text-summary count is unchanged.';
 
   @override
-  String get compressionNativeLabel => 'Native compaction';
+  String get compressionNativeLabel => 'Server-side compression';
 
   @override
   String get compressionNativeDescription =>
-      'The native context returned by the service is saved locally for subsequent requests. It cannot be read or edited as text. Original messages remain available and this compaction can be undone.';
+      'The server’s compressed result is saved locally and will be used on the next send. It can’t be viewed or edited as text. Original messages are kept, and you can undo this compression.';
 
   @override
   String get compressionNativeIncomplete =>
-      'The service did not return a complete native compaction result. The original context is unchanged.';
+      'The server didn’t return a complete compressed result. The original context is unchanged.';
 
   @override
   String get compressionNativeScopeChanged =>
-      'This native context belongs to another connection or account. Continue with the original connection, or undo the compaction or create a text summary in the chat that contains the originals.';
+      'This server-side result belongs to another connection or account. Switch back to the original connection to continue, or undo this compression in the chat that still has the originals and create a text summary.';
 
   @override
   String get compressionNativeTokenHint =>
-      'Token usage for opaque native context is determined by the service.';
+      'Token usage for server-side compression is reported by the server.';
 
   @override
   String get compressionNativeCopyHint =>
-      'The new chat keeps only the complete native compaction result and retained recent turns. Originals stay in the source chat and cannot be restored by undoing here.';
+      'The new chat only keeps the complete server-side result and the recent turns you kept. Originals stay in the original chat and can’t be restored by undoing here.';
 
   @override
   String get compressionNativeInputOverride =>
-      'The custom input field would replace native compression data. Remove the input override in the provider, model, or assistant settings before continuing.';
+      'A custom input parameter in the model or assistant settings would overwrite the server-side result. Remove that parameter before continuing.';
 
   @override
   String get compressionNativeAllHint =>
-      'Send all current history to native compaction without keeping a separate recent tail. Original messages remain available.';
+      'Send all current history to server-side compression, without keeping a separate recent original. Original messages can still be viewed.';
 
   @override
   String get compressionNativeAutoHint =>
-      'At the threshold, compact natively with the current chat model, then continue sending. A failed attempt keeps the original context and does not switch to text summarization.';
+      'When usage reaches the set percentage, the current chat model runs server-side compression, then sending continues. If it fails, the original context is kept and it won’t fall back to a text summary.';
 
   @override
   String get languageDisplayRussian => 'Russian';
@@ -16662,26 +16724,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themePaletteCustom => 'Custom';
 
   @override
-  String get compressionNativeImported => 'Native context loaded';
+  String get compressionNativeImported => 'Server-side compression loaded';
 
   @override
   String get compressionNativeImportedDescription =>
-      'This chat starts with the complete native compaction result and retained recent turns. The result cannot be read or edited as text. Earlier originals remain in the source chat, so they cannot be restored by undoing here.';
+      'This chat starts with the server-side compressed result and the most recent turns. The result can’t be viewed or edited as text. Earlier originals remain in the original chat and can’t be restored by undoing here.';
 
   @override
-  String get compressionNativeOpenSource => 'Open source chat';
+  String get compressionNativeOpenSource => 'Open original chat';
 
   @override
   String get compressionNativeOriginalsUnavailable =>
-      'This chat has no originals for the imported native context. Continue with native compaction, or return to the source chat to view or summarize the originals.';
+      'This chat has no originals for the loaded server-side result. You can keep using server-side compression, or go back to the original chat to view the originals or create a text summary.';
 
   @override
   String get compressionNativeTemporaryCopyHint =>
-      'The new temporary chat keeps only the complete native compaction result and retained recent turns. Leaving the source temporary chat deletes it and the originals not carried over; they cannot be restored here.';
+      'The new temporary chat only keeps the complete server-side result and recent turns. When you leave the original temporary chat, it and any originals not carried over are deleted and can’t be restored here.';
 
   @override
   String get compressionNativeSourceUnavailable =>
-      'This chat keeps the complete native compaction result and retained recent turns. The source chat is no longer available. Originals not copied here cannot be restored, and the native result cannot be read or edited as text.';
+      'This chat has the complete server-side result and the recent turns you kept. The original chat is no longer available. Originals not copied here can’t be restored, and the result can’t be viewed or edited as text.';
 
   @override
   String get modelDetailSheetImageGenerationModel => 'Image model';
@@ -16735,4 +16797,109 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvNativeShellSave => 'Save';
+
+  @override
+  String get desktopAutostartTitle => 'Launch at startup';
+
+  @override
+  String get desktopAutostartDescription =>
+      'Start Kelivo when you sign in to this computer.';
+
+  @override
+  String get desktopAutostartHiddenTitle => 'Hide to tray on automatic startup';
+
+  @override
+  String get desktopAutostartHiddenDescription =>
+      'Requires launch at startup and the tray icon. Opening Kelivo manually still shows the window.';
+
+  @override
+  String get desktopAutostartUnsupported =>
+      'Launch at startup requires macOS 13 or later.';
+
+  @override
+  String get desktopAutostartError =>
+      'Could not apply the startup setting. Check this app in your system startup or login-item settings and try again.';
+
+  @override
+  String get compressionOutputBudget => 'Total output limit (tokens)';
+
+  @override
+  String get compressionOutputBudgetHint =>
+      'Includes thinking and the summary itself. Leave blank to use the summary length. If thinking is on, you can raise this limit without making the summary longer. The model’s own output limit still applies.';
+
+  @override
+  String get responseOutputLimitReached =>
+      'Response truncated: the output limit includes reasoning. Increase the output limit or reduce reasoning before retrying.';
+
+  @override
+  String responseContextLimitReached(int inputTokens, int contextWindow) {
+    return 'Response truncated: this request used $inputTokens input tokens, close to the $contextWindow-token context limit. Shorten the context before retrying.';
+  }
+
+  @override
+  String get responseRetryWithoutImages =>
+      'Retry without images (keep originals)';
+
+  @override
+  String get browserOperationTimeout => 'Operation timeout';
+
+  @override
+  String get browserOperationTimeoutDescription =>
+      'Maximum wait for a browser command. The assistant can check the page after a timeout.';
+
+  @override
+  String browserOperationTimeoutSeconds(int seconds) {
+    return '$seconds seconds';
+  }
+
+  @override
+  String get browserErrObservationRequired =>
+      'Inspect the page before continuing; the previous operation is unconfirmed.';
+
+  @override
+  String get storageAttachmentRetention => 'Auto-clean attachments';
+
+  @override
+  String get storageAttachmentRetentionDays => 'Days before cleanup';
+
+  @override
+  String get storageAttachmentRetentionImmediately => 'Clean immediately';
+
+  @override
+  String get storageAttachmentRetentionHint =>
+      'After you delete messages or chats, automatically remove images and files that are no longer used.';
+
+  @override
+  String get storageAttachmentUnused => 'Unused';
+
+  @override
+  String storageAttachmentPending(String date) {
+    return 'Waiting for cleanup · $date';
+  }
+
+  @override
+  String storageAttachmentConversations(String names) {
+    return 'Chats: $names';
+  }
+
+  @override
+  String get storageAttachmentCleanUnused => 'Clean unused';
+
+  @override
+  String get storageAttachmentProtectedHint =>
+      'Files still in use will be kept.';
+
+  @override
+  String storageAttachmentDeleteConfirm(int count) {
+    return 'Delete $count unused files now? Files that are still in use will be kept.';
+  }
+
+  @override
+  String get storageAttachmentRetentionDelayed => 'Clean later';
+
+  @override
+  String get storageAttachmentRetentionInvalidDays => 'Enter 1–3650 days.';
+
+  @override
+  String get storageAttachmentDetailsTitle => 'File info';
 }

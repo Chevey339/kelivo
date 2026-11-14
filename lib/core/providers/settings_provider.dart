@@ -1,3 +1,4 @@
+import '../models/attachment_retention.dart';
 import '../models/native_compaction.dart';
 import '../../l10n/app_language.dart';
 import '../models/compression_config.dart';
@@ -55,6 +56,7 @@ import '../../theme/chat_bubble_style.dart';
 import '../models/tool_schema_override.dart';
 import '../services/app_exit_flush.dart';
 import '../services/linux_window_service.dart';
+import '../../desktop/desktop_startup_service.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -1107,6 +1109,9 @@ class SettingsProvider extends ChangeNotifier {
     _logElideLargePayloads = prefs.getBool(_logElideLargePayloadsKey) ?? true;
     RequestLogger.elideLargePayloads = _logElideLargePayloads;
     _logAutoDeleteDays = prefs.getInt(_logAutoDeleteDaysKey) ?? 0;
+    _attachmentRetentionDays = AttachmentRetention.days(
+      prefs.getInt(AttachmentRetention.preferenceKey),
+    );
     _logMaxSizeMB = prefs.getInt(_logMaxSizeMBKey) ?? 50;
     _appLaunchCount = prefs.getInt(_appLaunchCountKey) ?? 0;
     // Run log cleanup based on current settings
@@ -1177,7 +1182,7 @@ class SettingsProvider extends ChangeNotifier {
     _useLegacyInlineCodeStyle =
         prefs.getBool(_displayUseLegacyInlineCodeStyleKey) ?? false;
     _useLegacyCodeBlockStyle =
-        prefs.getBool(_displayUseLegacyCodeBlockStyleKey) ?? false;
+        prefs.getBool(_displayUseLegacyCodeBlockStyleKey) ?? true;
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
@@ -1222,6 +1227,9 @@ class SettingsProvider extends ChangeNotifier {
     _linuxHideTitleBar =
         LinuxWindowService.isSupported &&
         (localPreferences.getBool(LinuxWindowService.hideTitleBarKey) ?? false);
+
+    _desktopAutostartHidden = await DesktopStartupService.readHidden();
+    await refreshDesktopStartup(notify: false);
 
     // Desktop: tray settings (default enabled on desktop platforms)
     final trayPref = prefs.getBool(_displayDesktopShowTrayKey);
@@ -5244,8 +5252,8 @@ Requirements:
     await _preferences.setBool(_displayUseLegacyInlineCodeStyleKey, value);
   }
 
-  // Display: opt in to the previous fenced code block appearance.
-  bool _useLegacyCodeBlockStyle = false;
+  // Display: retain the original fenced code block appearance by default.
+  bool _useLegacyCodeBlockStyle = true;
   bool get useLegacyCodeBlockStyle => _useLegacyCodeBlockStyle;
   Future<void> setUseLegacyCodeBlockStyle(bool value) async {
     if (_useLegacyCodeBlockStyle == value) return;
@@ -5479,11 +5487,70 @@ Requirements:
     notifyListeners();
   }
 
+  int _desktopStartupRevision = 0;
+  bool _desktopAutostartEnabled = false;
+  bool get desktopAutostartEnabled => _desktopAutostartEnabled;
+  bool _desktopAutostartSupported = true;
+  bool get desktopAutostartSupported => _desktopAutostartSupported;
+  bool _desktopAutostartBusy = false;
+  bool get desktopAutostartBusy => _desktopAutostartBusy;
+  bool _desktopAutostartFailed = false;
+  bool get desktopAutostartFailed => _desktopAutostartFailed;
+  bool _desktopAutostartHidden = false;
+  bool get desktopAutostartHidden => _desktopAutostartHidden;
+
+  Future<void> refreshDesktopStartup({bool notify = true}) async {
+    if (!DesktopStartupService.isDesktop || _desktopAutostartBusy) return;
+    final revision = ++_desktopStartupRevision;
+    try {
+      final state = await DesktopStartupService.readState();
+      if (revision != _desktopStartupRevision) return;
+      _desktopAutostartEnabled = state.enabled;
+      _desktopAutostartSupported = state.supported;
+      _desktopAutostartFailed = false;
+    } catch (_) {
+      if (revision != _desktopStartupRevision) return;
+      _desktopAutostartFailed = true;
+    }
+    if (notify) notifyListeners();
+  }
+
+  Future<void> setDesktopAutostartEnabled(bool enabled) async {
+    if (_desktopAutostartBusy || !_desktopAutostartSupported) return;
+    _desktopStartupRevision++;
+    _desktopAutostartBusy = true;
+    notifyListeners();
+    try {
+      await DesktopStartupService.setEnabled(enabled);
+      final state = await DesktopStartupService.readState();
+      _desktopAutostartEnabled = state.enabled;
+      _desktopAutostartFailed = false;
+      if (state.enabled != enabled) {
+        throw StateError('Startup registration requires system approval');
+      }
+    } finally {
+      _desktopAutostartBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setDesktopAutostartHidden(bool hidden) async {
+    if (_desktopAutostartBusy) return;
+    final next = hidden && _desktopShowTray && _desktopAutostartEnabled;
+    await DesktopStartupService.setHidden(next);
+    _desktopAutostartHidden = next;
+    notifyListeners();
+  }
+
   // Desktop-only: show system tray icon
   bool _desktopShowTray = false;
   bool get desktopShowTray => _desktopShowTray;
   Future<void> setDesktopShowTray(bool v) async {
     if (_desktopShowTray == v) return;
+    if (!v && _desktopAutostartHidden) {
+      await DesktopStartupService.setHidden(false);
+      _desktopAutostartHidden = false;
+    }
     _desktopShowTray = v;
     if (!_desktopShowTray && _desktopMinimizeToTrayOnClose) {
       _desktopMinimizeToTrayOnClose = false;
@@ -5702,6 +5769,15 @@ Requirements:
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_logElideLargePayloadsKey, v);
+  }
+
+  int _attachmentRetentionDays = AttachmentRetention.defaultDays;
+  int get attachmentRetentionDays => _attachmentRetentionDays;
+  Future<void> setAttachmentRetentionDays(int days) async {
+    final value = AttachmentRetention.days(days);
+    await _preferences.setInt(AttachmentRetention.preferenceKey, value);
+    _attachmentRetentionDays = value;
+    notifyListeners();
   }
 
   // Log settings: auto-delete (days)
@@ -5972,6 +6048,7 @@ Requirements:
     copy._logSaveOutput = _logSaveOutput;
     copy._logElideLargePayloads = _logElideLargePayloads;
     copy._logAutoDeleteDays = _logAutoDeleteDays;
+    copy._attachmentRetentionDays = _attachmentRetentionDays;
     copy._logMaxSizeMB = _logMaxSizeMB;
     copy._appLaunchCount = _appLaunchCount;
     copy._newChatOnLaunch = _newChatOnLaunch;
@@ -5999,6 +6076,10 @@ Requirements:
     copy._collapseLongUserMessageChars = _collapseLongUserMessageChars;
     copy._desktopAutoSwitchTopics = _desktopAutoSwitchTopics;
     copy._linuxHideTitleBar = _linuxHideTitleBar;
+    copy._desktopAutostartEnabled = _desktopAutostartEnabled;
+    copy._desktopAutostartSupported = _desktopAutostartSupported;
+    copy._desktopAutostartHidden = _desktopAutostartHidden;
+    copy._desktopAutostartFailed = _desktopAutostartFailed;
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;
@@ -6318,7 +6399,7 @@ class ProviderConfig {
   final KeyManagementConfig? keyManagement;
   // AIhubmix promo header opt-in
   final bool? aihubmixAppCodeEnabled;
-  // OpenAI-compatible provider account balance query.
+  // Provider account balance query, independent of the chat API format.
   final bool? balanceEnabled;
   final String? balanceApiPath;
   final String? balanceResultPath;

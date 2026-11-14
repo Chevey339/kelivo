@@ -63,6 +63,99 @@ void main() {
   });
 
   for (final stream in [false, true]) {
+    test('Gemini uses camelCase wire fields (stream=$stream)', () async {
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final tools = (body['tools'] as List).cast<Map>();
+        expect(tools.map((tool) => tool.keys.single), [
+          'codeExecution',
+          'googleSearch',
+          'urlContext',
+          'functionDeclarations',
+        ]);
+        expect(body['toolConfig'], {
+          'functionCallingConfig': {'mode': 'VALIDATED'},
+          'includeServerSideToolInvocations': true,
+        });
+        final declaration = (tools.last['functionDeclarations'] as List).single;
+        expect(declaration['name'], 'search_web');
+        expect(declaration['parameters'], {
+          'type': 'object',
+          'properties': {
+            'search_query': {'type': 'string'},
+          },
+          'required': ['search_query'],
+        });
+        final parts = (body['contents'][0]['parts'] as List).cast<Map>();
+        expect(parts.singleWhere((part) => part['inlineData'] != null), {
+          'inlineData': {'mimeType': 'image/png', 'data': 'AQIDBA=='},
+        });
+        expect(parts.singleWhere((part) => part['fileData'] != null), {
+          'fileData': {'fileUri': 'https://www.youtube.com/watch?v=test123'},
+        });
+        final response = jsonEncode({
+          'candidates': [
+            {
+              'content': {
+                'parts': [
+                  {'text': 'done'},
+                ],
+              },
+              'finishReason': 'STOP',
+            },
+          ],
+        });
+        return http.Response(stream ? 'data: $response\n\n' : response, 200);
+      });
+      addTearDown(client.close);
+      await sendGoogleGeminiStream(
+        client,
+        ProviderConfig(
+          id: 'GeminiWireFieldsTest',
+          name: 'Gemini',
+          enabled: true,
+          apiKey: 'test-key',
+          baseUrl: 'https://example.test/v1beta',
+          providerType: ProviderKind.google,
+          modelOverrides: const {
+            'gemini-3.8-flash': {
+              'builtInTools': [
+                'search',
+                'code_execution',
+                'url_context',
+                'youtube',
+              ],
+              'input': ['text', 'image'],
+            },
+          },
+        ),
+        'gemini-3.8-flash',
+        const [
+          {
+            'role': 'user',
+            'content': 'https://www.youtube.com/watch?v=test123',
+          },
+        ],
+        userImagePaths: const ['data:image/png;base64,AQIDBA=='],
+        tools: const [
+          {
+            'type': 'function',
+            'function': {
+              'name': 'search_web',
+              'parameters': {
+                'type': 'object',
+                'properties': {
+                  'search_query': {'type': 'string'},
+                },
+                'required': ['search_query'],
+              },
+            },
+          },
+        ],
+        stream: stream,
+      ).toList();
+    });
+
     test(
       'Gemini sanitizes built-in schemas across tool rounds (stream=$stream)',
       () async {
@@ -134,8 +227,12 @@ void main() {
         expect(calls, 1);
         expect(requests, hasLength(2));
         for (final request in requests) {
+          expect(request['toolConfig'], {
+            'functionCallingConfig': {'mode': 'AUTO'},
+          });
+          expect((request['tools'][0] as Map).keys, ['functionDeclarations']);
           final declarations =
-              request['tools'][0]['function_declarations'] as List;
+              request['tools'][0]['functionDeclarations'] as List;
           expect(declarations, hasLength(tools.length));
           for (final tool in tools) {
             final function = tool['function'] as Map;

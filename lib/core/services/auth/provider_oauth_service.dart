@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
@@ -547,8 +548,15 @@ class ProviderOAuthService extends ChangeNotifier {
     http.Client client,
     ProviderConfig config, {
     CodexTurnState? codexTurnState,
+    CancelToken? cancelToken,
   }) => config.isOAuth
-      ? _ProviderOAuthHttpClient(client, config, this, codexTurnState)
+      ? _ProviderOAuthHttpClient(
+          client,
+          config,
+          this,
+          codexTurnState,
+          cancelToken,
+        )
       : client;
 }
 
@@ -780,16 +788,20 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     this.config,
     this.service,
     CodexTurnState? codexTurnState,
+    this._cancelToken,
   ) : _sessionId = config.oauthCredentials?.sessionId,
       _codexTurnState = codexTurnState ?? CodexTurnState();
   final http.Client inner;
   ProviderConfig config;
   final ProviderOAuthService service;
+  final CancelToken? _cancelToken;
   final String? _sessionId;
   final CodexTurnState _codexTurnState;
   final String _claudeConversationId = const Uuid().v4();
 
   void _checkSession() {
+    final cancellation = _cancelToken?.cancelError;
+    if (cancellation != null) throw cancellation;
     if (config.oauthCredentials?.sessionId != _sessionId) {
       throw ProviderOAuthException(
         ProviderOAuthFailure.cancelled,
@@ -799,11 +811,24 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     service._requireCurrentSession(config);
   }
 
+  Future<void> _resolve({bool force = false}) async {
+    _checkSession();
+    final pending = service.resolve(config, force: force);
+    final cancellation = _cancelToken;
+    // Refresh is shared with other requests. Stop only this caller's wait;
+    // token rotation must still finish and be persisted for the other callers.
+    config = await (cancellation == null
+        ? pending
+        : Future.any<ProviderConfig>([
+            pending,
+            cancellation.whenCancel.then((error) => throw error),
+          ]));
+    _checkSession();
+  }
+
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    _checkSession();
-    config = await service.resolve(config);
-    _checkSession();
+    await _resolve();
     final base = Uri.parse(config.oauthProvider!.baseUrl);
     if (request.url.origin != base.origin ||
         !request.url.path.startsWith('${base.path}/') ||
@@ -945,7 +970,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
             statusCode: 401,
           );
         }
-        config = await service.resolve(config, force: true);
+        await _resolve(force: true);
         refreshed = true;
         continue;
       }

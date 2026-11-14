@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/ast/nodes.dart';
 import '../../core/text_index/text_index.dart';
-import '../../core/html/html_fragment.dart' show htmlBlockTags;
+import '../../core/html/html_fragment.dart'
+    show htmlBlockTags, isNativeHtmlTableRow;
 import '../../core/serialize/to_plain_text.dart';
 import '../extensions/registry.dart';
 import '../selection/document_selection.dart';

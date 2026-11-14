@@ -100,15 +100,6 @@ class ProviderBalanceService {
   const ProviderBalanceService._();
 
   static Future<String> fetchBalance(ProviderConfig config) async {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    if (kind != ProviderKind.openai) {
-      throw const ProviderBalanceException(
-        'Balance is only supported for OpenAI-compatible providers',
-      );
-    }
     if (config.balanceEnabled != true) {
       throw const ProviderBalanceException('Balance query is disabled');
     }

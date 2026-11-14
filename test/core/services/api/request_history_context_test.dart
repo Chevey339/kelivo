@@ -397,7 +397,9 @@ void main() {
               stream: streaming,
             ),
           }.toList();
-          if (protocol == 'responses' && streaming) {
+          // Both Responses transports expose partial output/usage and then
+          // fail the turn, so a truncated response never becomes a success.
+          if (protocol == 'responses') {
             await expectLater(
               chunksFuture,
               throwsA(

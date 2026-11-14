@@ -141,10 +141,13 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Estimated 0 + unknown compaction'), findsOneWidget);
-    expect(find.text('Native compaction'), findsOneWidget);
+    expect(
+      find.text('Estimated 0, plus unknown server-side usage'),
+      findsOneWidget,
+    );
+    expect(find.text('Server-side compression'), findsOneWidget);
     expect(find.text('Unknown'), findsOneWidget);
-    expect(find.text('Usage unavailable'), findsNothing);
+    expect(find.text('Usage isn’t available right now.'), findsNothing);
     expect(find.text('Free space'), findsNothing);
   });
 
@@ -171,13 +174,18 @@ void main() {
         expect(find.text('Stale, updating…'), findsNothing);
         if (hasPrevious) {
           expect(
-            find.text('Update failed · previous result is stale'),
+            find.text(
+              'Couldn’t refresh. Showing the previous result, which may be out of date.',
+            ),
             findsOneWidget,
           );
           expect(find.text('110 / 1k (11%)'), findsOneWidget);
         } else {
-          expect(find.text('Calculation failed'), findsOneWidget);
-          expect(find.text('Usage unavailable'), findsOneWidget);
+          expect(
+            find.text('Couldn’t calculate usage. Please try again.'),
+            findsOneWidget,
+          );
+          expect(find.text('Usage isn’t available right now.'), findsOneWidget);
           expect(find.text('0 / 1k (0%)'), findsNothing);
           expect(
             find.byKey(const ValueKey('context-usage-stacked-bar')),
@@ -441,7 +449,7 @@ void main() {
     expect(find.text('Used'), findsOneWidget);
     expect(find.text('250'), findsOneWidget);
     expect(find.text('25.0%'), findsOneWidget);
-    expect(find.text('Exact (from last response)'), findsOneWidget);
+    expect(find.text('Exact (from the last reply)'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('context-usage-bucket-used')),
       findsOneWidget,
@@ -474,7 +482,10 @@ void main() {
       ),
     );
 
-    expect(find.text('Exact (breakdown scaled from estimate)'), findsOneWidget);
+    expect(
+      find.text('Total is exact; the breakdown is estimated in proportion'),
+      findsOneWidget,
+    );
     expect(find.text('System prompt'), findsOneWidget);
     expect(find.text('Messages'), findsOneWidget);
     expect(find.text('Draft'), findsOneWidget);

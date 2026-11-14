@@ -78,8 +78,7 @@ class IosFormTextField extends StatelessWidget {
   bool get _useInlineLabel => inlineLabel ?? (maxLines == 1);
 
   TextAlign _defaultTextAlign() {
-    final kt = keyboardType;
-    if (kt == TextInputType.number || kt == TextInputType.numberWithOptions()) {
+    if (keyboardType?.index == TextInputType.number.index) {
       return TextAlign.end;
     }
     return TextAlign.start;

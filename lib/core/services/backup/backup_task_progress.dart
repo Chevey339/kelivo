@@ -31,6 +31,7 @@ final class BackupProgress {
     this.unit = BackupProgressUnit.none,
     this.cancellable = true,
     this.detail,
+    this.skippedEntries = const [],
   });
 
   final BackupPhase phase;
@@ -39,6 +40,10 @@ final class BackupProgress {
   final BackupProgressUnit unit;
   final bool cancellable;
   final String? detail;
+
+  /// Relative asset paths omitted because their source could not be read.
+  /// A directory counts once, including its unlisted descendants.
+  final List<String> skippedEntries;
 
   double? get fraction => (total != null && total! > 0)
       ? (processed / total!).clamp(0.0, 1.0)

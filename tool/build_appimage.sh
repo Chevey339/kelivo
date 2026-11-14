@@ -56,6 +56,10 @@ export NO_STRIP=1
 export ARCH="$arch"
 export VERSION="$version"
 
+# GTK input methods are loaded dynamically, so an ELF dependency scan alone
+# cannot discover them. Install them and their AppRun hook before linuxdeploy.
+bash "$repo_root/tool/bundle_appimage_gtk.sh" "$app_dir"
+
 # This scans every ELF in the AppDir, including Flutter plugins and native
 # assets. The plugin also bundles GStreamer's dynamically loaded codecs and
 # gst-plugin-scanner, and installs the AppRun hook that selects those copies.

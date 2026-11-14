@@ -306,6 +306,7 @@ Stream<StreamChunk> sendOpenAIStream(
       final obj = jsonDecode(txt);
       // Responses API non-stream
       if (config.useResponseApi == true) {
+        final incomplete = throwIfInBandStreamError(txt, deferIncomplete: true);
         for (final chunk
             in ResponsesStreamDecoder(sourceId: 'finish').decodeSearchResults(
               obj['response'] is Map ? obj['response'] as Map : obj as Map,
@@ -380,6 +381,15 @@ Stream<StreamChunk> sendOpenAIStream(
         );
         final ids = StreamChunkIds('finish');
         yield* emitImages(images, ids: ids);
+        if (incomplete != null) {
+          yield* emitDelta(
+            ids: ids,
+            content: outText,
+            reasoning: reasoningText,
+            usage: usage,
+          );
+          throw incomplete;
+        }
         final outputItems = <Map<String, dynamic>>[
           if (rawOutput is List)
             for (final item in rawOutput.whereType<Map>())
@@ -509,6 +519,8 @@ Stream<StreamChunk> sendOpenAIStream(
       return;
     } on ImageContextBudgetException {
       rethrow;
+    } on HttpException {
+      rethrow;
     } catch (e) {
       throw HttpException('Invalid JSON: $e');
     }
@@ -562,9 +574,12 @@ Stream<StreamChunk> sendOpenAIStream(
     recoverAdjacentJsonDataRecords: config.useResponseApi != true,
   )) {
     final data = event.data;
-    if (data.isNotEmpty && data != '[DONE]') {
-      throwIfInBandStreamError(data);
-    }
+    final incomplete = data.isNotEmpty && data != '[DONE]'
+        ? throwIfInBandStreamError(
+            data,
+            deferIncomplete: config.useResponseApi == true,
+          )
+        : null;
     try {
       if (config.useResponseApi == true) {
         final decoder = responsesDecoder!;
@@ -572,6 +587,7 @@ Stream<StreamChunk> sendOpenAIStream(
         for (final chunk in decoded.chunks) {
           yield chunk;
         }
+        if (incomplete != null) throw incomplete;
         if (!decoded.completed) continue;
         for (final chunk in decoder.onClosed()) {
           yield chunk;

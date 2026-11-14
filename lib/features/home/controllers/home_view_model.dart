@@ -276,6 +276,8 @@ class HomeViewModel extends ChangeNotifier {
       _compressionStates[task.conversationId] = state;
       if (task.phase == CompressionPhase.completed &&
           task.resultConversationId == null) {
+        queueChanged =
+            _pausedQueuedInputs.remove(task.conversationId) || queueChanged;
         unawaited(_drainQueuedInputIfReady(task.conversationId));
       } else if ((task.phase == CompressionPhase.review || !task.active) &&
           _queuedInputs.containsKey(task.conversationId)) {
@@ -740,6 +742,7 @@ class HomeViewModel extends ChangeNotifier {
     ChatMessage message, {
     bool assistantAsNewReply = false,
     bool allowImagesApiRouting = true,
+    bool omitImages = false,
     String? expectedContextState,
   }) async {
     final conversation = _chatService
@@ -760,6 +763,7 @@ class HomeViewModel extends ChangeNotifier {
 
     final result = await _chatActions.regenerateAtMessage(
       expectedContextState: expectedContextState,
+      omitImages: omitImages,
       message: message,
       conversation: conversation,
       assistantOverride: assistant,
@@ -1361,13 +1365,11 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
-    final title = getTitleForLocale(_contextProvider);
     final sourceConversation = currentConversation;
     if (sourceConversation == null) return;
     final newConvo = await _chatService.forkConversationAtRevision(
       sourceConversationId: sourceConversation.id,
       sourceRevisionId: message.id,
-      title: title,
       preserveVersions: _contextProvider
           .read<SettingsProvider>()
           .forkKeepMessageVersions,
@@ -1473,6 +1475,12 @@ class HomeViewModel extends ChangeNotifier {
       assistant,
       conversation: conversation,
     );
+    final preferences =
+        configOverride ??
+        await _chatService.compressionConfig(
+          conversationId,
+          settings.compressionDefaults,
+        );
     if (options.native) {
       // A tool loop owns its original connection even if the user selects
       // another model while that turn is still running.
@@ -1503,7 +1511,7 @@ class HomeViewModel extends ChangeNotifier {
         automatic: automatic,
         ownsContinuation: ownsContinuation,
         acceptCandidate: acceptCandidate,
-        config: configOverride ?? const CompressionConfig(),
+        config: preferences,
         model: '$provider / $model',
         quoteMarker: quoteMarker,
         beforeMessageId: beforeMessageId,
@@ -1524,16 +1532,11 @@ class HomeViewModel extends ChangeNotifier {
             conversationId: conversationId,
             extraHeaders: _generationController.buildCustomHeaders(assistant),
             isCancelled: cancelled,
+            requestTimeout: preferences.requestTimeout,
           );
         },
       );
     }
-    final preferences =
-        configOverride ??
-        await _chatService.compressionConfig(
-          conversationId,
-          settings.compressionDefaults,
-        );
     final model = resolveCompressContextModel(
       compressProvider: preferences.providerId,
       compressModelId: preferences.modelId,
@@ -1587,29 +1590,13 @@ class HomeViewModel extends ChangeNotifier {
               chatModel.modelId == null
           ? null
           : (selection) async =>
-                (await _messageGenerationService.previewContextAssembly(
+                _messageGenerationService.compressionReferenceText(
                   promptTime: referenceTime,
                   conversationId: conversationId,
-                  providerKey: chatModel.providerKey!,
                   modelId: chatModel.modelId!,
                   assistantId: conversation.assistantId,
-                  messagesOverride: selection.effective,
-                )).referenceText,
-      loadContinuation: (selection) async {
-        final recent = selection.retained.reversed
-            .take(2)
-            .toList()
-            .reversed
-            .toList();
-        final text = await _chatService.messagesForCompression(
-          recent,
-          quoteMarker: quoteMarker,
-        );
-        return buildConversationTextForCompression(
-          text,
-          quoteMarker: quoteMarker,
-        );
-      },
+                  messages: selection.input,
+                ),
       generate: (prompt, requestId, maxTokens, onUsage) =>
           ChatApiService.generateMessage(
             conversationId: conversationId,
@@ -1620,6 +1607,7 @@ class HomeViewModel extends ChangeNotifier {
             textOnly: true,
             maxTokens: maxTokens,
             retryOverride: const AutoRetryOptions.defaults(),
+            requestTimeout: preferences.requestTimeout,
             onUsage: (update) => onUsage(update.usage),
             messages: [
               {'role': 'user', 'content': prompt},
@@ -1696,19 +1684,16 @@ class HomeViewModel extends ChangeNotifier {
   Future<CompressionRequestPreview> previewCompressionRequest(
     String conversationId,
     CompressContextOptions options,
-    CompressionConfig config,
-  ) async {
+    CompressionConfig config, {
+    required Future<ConversationContextHistory> history,
+  }) async {
+    final snapshot = await history;
     final request = await buildCompressionRequest(
       conversationId,
       options: options,
       configOverride: config,
     );
-    final snapshot = await _chatService.loadContextSnapshot(conversationId);
-    final selection = selectCompressionHistory(
-      snapshot.messages,
-      snapshot.operations,
-      options,
-    );
+    final selection = await _selectPreviewHistory(snapshot, options);
     if (selection.missingOriginals) {
       throw StateError('native_compaction_originals_unavailable');
     }
@@ -1717,25 +1702,19 @@ class HomeViewModel extends ChangeNotifier {
       includeAttachmentsAndTools: options.includeAttachmentsAndTools,
       quoteMarker: request.quoteMarker,
     );
-    final materials = buildCompressRequestContents(
-      messages.where((m) => !ContextOperation.isSummary(m)).toList(),
-      options,
-      quoteMarker: request.quoteMarker,
-    );
-    final previous = messages
-        .where(ContextOperation.isSummary)
-        .map((m) => m.content)
-        .join('\n\n');
     final background = await request.loadReference?.call(selection) ?? '';
-    final continuation = await request.loadContinuation?.call(selection) ?? '';
     final planner = CompressionPlanner(
       request: request,
-      materials: materials,
-      previousSummary: previous,
+      materials: [],
+      previousSummary: '',
       background: background,
-      continuation: continuation,
     );
-    return Isolate.run(planner.preview);
+    return _previewCompressionMaterials(
+      planner,
+      messages,
+      options,
+      request.quoteMarker,
+    );
   }
 
   /// Update current conversation reference.
@@ -2273,3 +2252,30 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 }
+
+Future<CompressionSelection> _selectPreviewHistory(
+  ConversationContextHistory history,
+  CompressContextOptions options,
+) => Isolate.run(
+  () => selectCompressionHistory(history.messages, history.operations, options),
+);
+
+Future<CompressionRequestPreview> _previewCompressionMaterials(
+  CompressionPlanner planner,
+  List<ChatMessage> messages,
+  CompressContextOptions options,
+  String Function(int) quoteMarker,
+) => Isolate.run(() {
+  planner.materials.addAll(
+    buildCompressRequestContents(
+      messages.where((m) => !ContextOperation.isSummary(m)).toList(),
+      options,
+      quoteMarker: quoteMarker,
+    ),
+  );
+  planner.previousSummary = messages
+      .where(ContextOperation.isSummary)
+      .map((m) => m.content)
+      .join('\n\n');
+  return planner.preview();
+});

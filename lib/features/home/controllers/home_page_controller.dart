@@ -947,6 +947,10 @@ class HomePageController extends ChangeNotifier {
     };
     _viewModel.onError = (error) {
       final l10n = AppLocalizations.of(_context)!;
+      final compressionFailure =
+          error != 'compression_near_limit' &&
+          (error.contains('compression_') ||
+              error.contains('native_compaction_'));
       showAppSnackBar(
         _context,
         message: error == 'compression_near_limit'
@@ -955,6 +959,12 @@ class HomePageController extends ChangeNotifier {
         type: error == 'compression_near_limit'
             ? NotificationType.info
             : NotificationType.error,
+        actionLabel: compressionFailure
+            ? l10n.ttsServicesDialogErrorTitle
+            : null,
+        onAction: compressionFailure
+            ? () => showCompressionErrorDetails(_context, error)
+            : null,
       );
     };
     _viewModel.onWarning = (warning) {
@@ -1727,6 +1737,7 @@ class HomePageController extends ChangeNotifier {
     ChatMessage message, {
     bool assistantAsNewReply = false,
     bool? allowImagesApiRouting,
+    bool omitImages = false,
   }) async {
     if (currentConversation == null) return;
     final deletingTail = _context
@@ -1776,6 +1787,7 @@ class HomePageController extends ChangeNotifier {
 
     final success = await _viewModel.regenerateAtMessage(
       message,
+      omitImages: omitImages,
       assistantAsNewReply: assistantAsNewReply,
       expectedContextState: approved,
       allowImagesApiRouting:
@@ -2053,8 +2065,14 @@ class HomePageController extends ChangeNotifier {
   Future<CompressionRequestPreview> previewCompressionRequest(
     String id,
     CompressContextOptions options,
-    CompressionConfig config,
-  ) => _viewModel.previewCompressionRequest(id, options, config);
+    CompressionConfig config, {
+    required Future<ConversationContextHistory> history,
+  }) => _viewModel.previewCompressionRequest(
+    id,
+    options,
+    config,
+    history: history,
+  );
 
   Future<String?> compressContext({
     required CompressContextOptions options,
@@ -3817,6 +3835,9 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> jumpToPreviousQuestion() =>
       _jumpToAdjacentMessage(previous: true);
+
+  void scrollToSourceRect(Rect rect) =>
+      _scrollCtrl.scrollToSourceRect(rect, bottomInset: inputBarHeight);
 
   Future<void> jumpToNextQuestion() => _jumpToAdjacentMessage(previous: false);
 

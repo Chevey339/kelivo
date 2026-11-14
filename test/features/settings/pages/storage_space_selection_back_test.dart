@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -104,7 +105,7 @@ void main() {
       addTearDown(() {
         if (!gate.isCompleted) gate.complete();
       });
-      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.tap(find.widgetWithText(IosTileButton, 'Delete').last);
       await tester.pumpAndSettle();
       expect(paths.waitingForDocuments, isTrue);
       await tester.binding.handlePopRoute();

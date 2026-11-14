@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/database/chat_database_observer.dart';
+import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/models/image_context.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -15,10 +17,15 @@ import 'package:Kelivo/utils/mcp_structured_image.dart';
 void main() {
   late Directory dir;
   late ChatDatabaseRepository repo;
+  late ChatDatabaseObserver observer;
   final conversation = Conversation(id: 'chat', title: 'Keep my title');
   setUp(() async {
     dir = await Directory.systemTemp.createTemp('context_nodes_');
-    repo = ChatDatabaseRepository.open(file: File('${dir.path}/chat.sqlite'));
+    observer = ChatDatabaseObserver();
+    repo = ChatDatabaseRepository.open(
+      file: File('${dir.path}/chat.sqlite'),
+      observer: observer,
+    );
     await repo.ensureReady();
     for (final id in ['u1', 'a1', 'u2', 'a2', 'u3', 'a3']) {
       await repo.appendLinearMessageToConversation(
@@ -36,6 +43,244 @@ void main() {
     await repo.close();
     await dir.delete(recursive: true);
   });
+
+  for (final count in [0, 1, 3, 4, 13, 25]) {
+    test(
+      'operation history pages $count records without hydrating details',
+      () async {
+        final operations = [
+          for (var i = 0; i < count; i++)
+            ContextOperation(
+              id: 'operation-$i',
+              kind: ContextOperationKind.compress,
+              anchorGroupId: 'u1',
+              appliedAfterGroupId: 'a3',
+              sourceGroups: const ['u1'],
+              dependencies: const [],
+              createdAt: DateTime.utc(2026, 1, 1, 0, i),
+              revoked: true,
+              summary: '${'a' * 239}😀${'body' * 25000}',
+              originalSummary: 'original',
+              compressionDetails: i == count - 1
+                  ? {
+                      'nativeCompaction': {'opaque': 'payload' * 25000},
+                      'nativeContextImported': true,
+                    }
+                  : const {},
+            ),
+        ];
+        await repo.restoreContextOperations(
+          'chat',
+          operations,
+          expectedFingerprint: (await repo.readContextSnapshot(
+            'chat',
+          )).fingerprint,
+        );
+        observer.reset();
+        final ids = <String>[];
+        var page = await repo.readContextOperationPage(
+          'chat',
+          offset: 0,
+          limit: 3,
+        );
+        expect(page.items.length, count < 3 ? count : 3);
+        while (true) {
+          for (final item in page.items) {
+            expect(item.summaryPreview.length, lessThanOrEqualTo(240));
+            expect(item.summaryPreview, item.isNative ? '' : 'a' * 239);
+          }
+          ids.addAll(page.items.map((item) => item.id));
+          expect(page.hasMore, ids.length < count);
+          if (!page.hasMore) break;
+          page = await repo.readContextOperationPage(
+            'chat',
+            offset: ids.length,
+            limit: 10,
+          );
+          expect(page.items.length, lessThanOrEqualTo(10));
+        }
+        expect(ids, operations.reversed.map((operation) => operation.id));
+        expect(
+          observer.snapshot().operations.containsKey(
+            ChatDatabaseOperation.queryMessagesByIds,
+          ),
+          isFalse,
+        );
+        expect(
+          (await repo.readContextOperationPage(
+            'chat',
+            offset: count,
+            limit: 10,
+          )).items,
+          isEmpty,
+        );
+        expect(await repo.readContextOperation('chat', 'missing'), isNull);
+        if (operations.isNotEmpty) {
+          final detail = await repo.readContextOperation(
+            'chat',
+            operations.last.id,
+          );
+          expect(detail!.toJson(), operations.last.toJson());
+        }
+      },
+    );
+  }
+
+  test(
+    'paged status matches full history, with stable timestamp ordering',
+    () async {
+      ContextOperation operation(
+        String id,
+        ContextOperationKind kind, {
+        List<String> dependencies = const [],
+        bool revoked = false,
+        DateTime? createdAt,
+      }) => ContextOperation(
+        id: id,
+        kind: kind,
+        anchorGroupId: 'u1',
+        appliedAfterGroupId: 'a3',
+        sourceGroups: const ['u1'],
+        dependencies: dependencies,
+        createdAt: createdAt ?? DateTime.utc(2026),
+        revoked: revoked,
+      );
+      final operations = [
+        operation(
+          'summary',
+          ContextOperationKind.compress,
+          createdAt: DateTime.utc(2027),
+        ),
+        operation(
+          'replacement',
+          ContextOperationKind.compress,
+          dependencies: ['summary'],
+        ),
+        operation('clear', ContextOperationKind.clear),
+        operation('pin', ContextOperationKind.start),
+        operation('revoked-clear', ContextOperationKind.clear, revoked: true),
+        operation(
+          'latest',
+          ContextOperationKind.compress,
+          createdAt: DateTime.utc(2028).toLocal(),
+        ),
+      ];
+      await repo.restoreContextOperations(
+        'chat',
+        operations,
+        expectedFingerprint: (await repo.readContextSnapshot(
+          'chat',
+        )).fingerprint,
+      );
+      final statuses = ContextHistory.operationStatuses(operations);
+      final ids = <String>[];
+      for (var i = 0; i < operations.length; i++) {
+        final item = (await repo.readContextOperationPage(
+          'chat',
+          offset: i,
+          limit: 1,
+        )).items.single;
+        ids.add(item.id);
+        expect((
+          hidden: item.hidden,
+          superseded: item.superseded,
+        ), statuses[item.id]);
+      }
+      expect(ids, [
+        'latest',
+        'summary',
+        'revoked-clear',
+        'pin',
+        'clear',
+        'replacement',
+      ]);
+    },
+  );
+
+  test(
+    'range metadata preserves Unicode and attachment selection without loading bodies',
+    () async {
+      final additions = [
+        ChatMessage(
+          id: 'unicode',
+          role: 'user',
+          conversationId: 'chat',
+          parts: const [TextPart('😀'), TextPart('文')],
+        ),
+        ChatMessage(
+          id: 'blank',
+          role: 'user',
+          conversationId: 'chat',
+          content: '\u2003\n',
+        ),
+        ChatMessage(
+          id: 'image',
+          role: 'user',
+          conversationId: 'chat',
+          parts: const [ImagePart(uri: 'https://example.com/image.png')],
+        ),
+        ChatMessage(
+          id: 'broken',
+          role: 'user',
+          conversationId: 'chat',
+          parts: const [
+            MalformedPart(
+              rawKind: 'file',
+              rawPayload: '{}',
+              parseError: 'missing_uri',
+            ),
+          ],
+        ),
+      ];
+      for (final message in additions) {
+        await repo.appendLinearMessageToConversation(
+          conversation: conversation,
+          message: message,
+        );
+      }
+      observer.reset();
+      final metadata = await repo.readCompressionHistory('chat');
+      final counts = await repo.getContextMessageCounts('chat', limit: 100);
+      expect(
+        observer.snapshot().operations.containsKey(
+          ChatDatabaseOperation.queryMessagesByIds,
+        ),
+        isFalse,
+      );
+      expect(
+        observer.snapshot().operations.containsKey(
+          ChatDatabaseOperation.queryMessageRange,
+        ),
+        isFalse,
+      );
+      expect(counts, (stored: 10, messages: 10, summaries: 0));
+      final byId = {for (final m in metadata.messages) m.id: m};
+      expect(byId['unicode']!.contentLength, 3);
+      expect(byId['blank']!.isUserMessage, isFalse);
+      expect(byId['image']!.isUserMessage, isTrue);
+      expect(byId['broken']!.isUserMessage, isFalse);
+      final history = await repo.readContextHistory('chat');
+      for (final mode in CompressContextLimitMode.values) {
+        final options = CompressContextOptions(
+          mode: mode,
+          maxChars: 14,
+          keepUserMessages: 2,
+        );
+        final range = selectCompressionRange(
+          metadata.messages,
+          metadata.operations,
+          options,
+        );
+        final full = selectCompressionHistory(
+          history.messages,
+          history.operations,
+          options,
+        );
+        expect(range.covered.map((m) => m.id), full.covered.map((m) => m.id));
+        expect(range.retained.map((m) => m.id), full.retained.map((m) => m.id));
+      }
+    },
+  );
 
   test(
     'fixed start persists, moves atomically and counts the full pinned range',
@@ -111,7 +356,6 @@ void main() {
       final fork = (await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a2',
-        title: 'Before pin',
       ))!;
       expect(
         ContextHistory.fixedStart(await repo.readContextOperations(fork.id)),
@@ -266,7 +510,6 @@ void main() {
       final fork = (await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a1',
-        title: 'fork',
       ))!;
       final forkMessages = (await repo.readContextSnapshot(fork.id)).messages;
       final forkSettings = await repo.readImageContextSettings(fork.id);
@@ -421,9 +664,9 @@ void main() {
   });
 
   test(
-    'historical regeneration uses original history and keeps following assistant',
+    'historical regeneration reuses earlier summaries and keeps following assistant',
     () async {
-      await compact('S1', ['u1', 'a1']);
+      final summary = await compact('S1', ['u1', 'a1']);
       final selected = await repo.appendMessageVersion(
         messageId: 'u3',
         content: 'selected version',
@@ -436,8 +679,7 @@ void main() {
         includeFollowingAssistant: true,
       );
       expect(result.map((m) => m.id), [
-        'u1',
-        'a1',
+        summary.summaryMessageId,
         'u2',
         'a2',
         selected!.message.id,
@@ -806,13 +1048,11 @@ void main() {
       final old = await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'u2',
-        title: 'old',
       );
       expect(await repo.readContextOperations(old!.id), isEmpty);
       final current = await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a3',
-        title: 'current',
         preserveVersions: false,
       );
       expect((await repo.readContextOperations(current!.id)).length, 1);
@@ -834,7 +1074,6 @@ void main() {
       final fork = (await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a3',
-        title: 'Fork',
         preserveVersions: false,
       ))!;
       expect(

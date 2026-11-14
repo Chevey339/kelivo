@@ -18,7 +18,7 @@ import '../logging/flutter_logger.dart';
 import '../network/request_logger.dart';
 import '../sandbox/rootfs_disk_usage.dart';
 import '../workspace/workspace_session_sync.dart';
-import 'storage_image_usage.dart';
+import 'storage_attachment_usage.dart';
 import 'attachment_file_lock.dart';
 
 enum StorageUsageCategoryKey {
@@ -95,6 +95,8 @@ class StorageFileEntry {
   final DateTime modifiedAt;
   final StorageImageKind? imageKind;
   final bool isInUse;
+  final Map<String, String> conversations;
+  final DateTime? pendingDeletionAt;
   const StorageFileEntry({
     required this.path,
     required this.name,
@@ -102,6 +104,8 @@ class StorageFileEntry {
     required this.modifiedAt,
     this.imageKind,
     this.isInUse = false,
+    this.conversations = const {},
+    this.pendingDeletionAt,
   });
 }
 
@@ -767,11 +771,17 @@ abstract final class StorageUsageService {
 
   static Future<List<StorageFileEntry>> listUploadEntries({
     required bool images,
+    Map<String, Map<String, String>> additionalReferences = const {},
+    bool generationActive = false,
   }) async {
     final dir = await AppDirectories.getUploadDirectory();
     final imagesDir = await AppDirectories.getImagesDirectory();
     final avatarsDir = await AppDirectories.getAvatarsDirectory();
-    final usage = await StorageImageUsage.load(includeMessages: images);
+    final usage = (await StorageAttachmentUsage.load())
+      ..includeConversations(
+        additionalReferences,
+        generationActive: generationActive,
+      );
     final out = <StorageFileEntry>[];
     Future<void> addFromDir(Directory d) async {
       if (!await d.exists()) return;
@@ -803,6 +813,8 @@ abstract final class StorageUsageService {
               name: name,
               bytes: bytes,
               modifiedAt: modifiedAt,
+              conversations: usage.conversationsFor(ent.path),
+              pendingDeletionAt: usage.pendingDeletionFor(ent.path),
               imageKind: images
                   ? usage.kindFor(ent.path, realPath: realPath)
                   : null,
@@ -827,65 +839,34 @@ abstract final class StorageUsageService {
   static Future<int> deleteUploadFiles(
     Iterable<String> paths, {
     required bool images,
+    Set<String> protectedPaths = const {},
+    bool generationActive = false,
   }) => AttachmentFileLock.synchronized(
-    () => _deleteUploadFiles(paths, images: images),
+    () => _deleteUploadFiles(
+      paths,
+      images: images,
+      protectedPaths: protectedPaths,
+      generationActive: generationActive,
+    ),
   );
 
   static Future<int> _deleteUploadFiles(
     Iterable<String> paths, {
     required bool images,
+    required Set<String> protectedPaths,
+    required bool generationActive,
   }) async {
-    final dir = await AppDirectories.getUploadDirectory();
-    final imagesDir = await AppDirectories.getImagesDirectory();
-    final avatarsDir = await AppDirectories.getAvatarsDirectory();
-    final roots = <String>[
-      p.normalize(dir.absolute.path),
-      p.normalize(imagesDir.absolute.path),
-      p.normalize(avatarsDir.absolute.path),
-    ];
-    final realRoots = await Future.wait(
-      roots.map((root) async {
-        try {
-          return await Directory(root).resolveSymbolicLinks();
-        } catch (_) {
-          return root;
-        }
-      }),
+    final removedPaths = await StorageAttachmentUsage.deleteUnusedFiles(
+      paths.where((path) => _isImageExt(path) == images),
+      protectedPaths: protectedPaths,
+      generationActive: generationActive,
     );
-    // Re-read references after confirmation; the list shown by the UI may be
-    // stale after an assistant/user/provider changed its appearance.
-    final usage = await StorageImageUsage.load(includeMessages: false);
-    final removedPaths = <String>{};
-    for (final raw in paths) {
-      try {
-        final abs = p.normalize(File(raw).absolute.path);
-        if (_isImageExt(abs) != images) continue;
-        final allowed = roots.any((root) => p.isWithin(root, abs));
-        if (!allowed) continue;
-        // A symlinked child directory must not let storage cleanup escape the
-        // app's upload roots. Only regular files are eligible for deletion.
-        final parent = await File(abs).parent.resolveSymbolicLinks();
-        if (!realRoots.any(
-          (root) => p.equals(root, parent) || p.isWithin(root, parent),
-        )) {
-          continue;
-        }
-        if (await FileSystemEntity.type(abs, followLinks: false) !=
-            FileSystemEntityType.file) {
-          continue;
-        }
-        if (usage.isInUse(abs) ||
-            usage.isInUse(await File(abs).resolveSymbolicLinks())) {
-          continue;
-        }
-        await File(abs).delete();
-        removedPaths.add(abs);
-      } catch (_) {}
-    }
     if (removedPaths.isNotEmpty) {
       await deleteSessionAttachmentCopies(
         removedPaths,
         sessionsDirectory: await AppDirectories.getSessionsDirectory(),
+        protectedPaths: protectedPaths,
+        generationActive: generationActive,
       );
     }
     return removedPaths.length;
@@ -903,29 +884,20 @@ abstract final class StorageUsageService {
 
   static Future<StorageUsageStats> clearOrphanSessionFiles({
     Set<String>? conversationIds,
+    Set<String> protectedPaths = const {},
     Future<Directory> Function()? sessionsDirectory,
   }) async {
-    final ids = conversationIds ?? await _readConversationIdsFromDatabase();
-    final sessions =
-        await (sessionsDirectory ?? AppDirectories.getSessionsDirectory)();
-    final stats = await _orphanSessionStats(
-      sessions: sessions,
-      conversationIds: ids,
+    final cleared = await AttachmentFileLock.synchronized(
+      () async => StorageAttachmentUsage.cleanSessions(
+        includeOrphans: true,
+        sessionsDirectory: sessionsDirectory == null
+            ? null
+            : await sessionsDirectory(),
+        conversationIds: conversationIds,
+        protectedPaths: protectedPaths,
+      ),
     );
-    if (!await sessions.exists()) return stats;
-    try {
-      await for (final ent in sessions.list(
-        recursive: false,
-        followLinks: false,
-      )) {
-        if (ent is! Directory) continue;
-        if (ids.contains(p.basename(ent.path))) continue;
-        try {
-          await ent.delete(recursive: true);
-        } catch (_) {}
-      }
-    } catch (_) {}
-    return stats;
+    return StorageUsageStats(fileCount: cleared.files, bytes: cleared.bytes);
   }
 
   static Future<StorageUsageStats> _orphanSessionStats({

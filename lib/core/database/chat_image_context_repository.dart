@@ -12,7 +12,7 @@ extension ChatImageContextRepository on ChatDatabaseRepository {
         : metadata.indexWhere((m) => m.id == throughMessageId);
     if (cutoff < 0) return <ChatMessage>[];
     final allowed = metadata.take(cutoff + 1).map((m) => m.id).toSet();
-    final selected = ContextHistory.resolve(
+    final selected = ContextHistory.project(
       metadata,
       operations.where((op) => !op.isCompression).toList(),
     ).where((m) => allowed.contains(m.id)).toList();
@@ -37,7 +37,7 @@ extension ChatImageContextRepository on ChatDatabaseRepository {
         while (parts.length <= ordinal) {
           parts.add(const TextPart(''));
         }
-        parts[ordinal] = _hydratePart(
+        parts[ordinal] = ChatDatabaseRepository._hydratePart(
           revisionId: revision,
           ordinal: ordinal,
           kind: row.read<String>('kind'),
@@ -47,7 +47,13 @@ extension ChatImageContextRepository on ChatDatabaseRepository {
     }
     return [
       for (final message in selected)
-        message.copyWith(parts: byId[message.id] ?? []),
+        ChatMessage(
+          id: message.id,
+          groupId: message.groupId,
+          role: message.role,
+          conversationId: id,
+          parts: byId[message.id] ?? [],
+        ),
     ];
   });
 

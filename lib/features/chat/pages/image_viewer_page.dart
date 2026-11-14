@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
+import '../../../core/services/native_file_save.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/safe_resize_image.dart';
@@ -1024,11 +1025,36 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       }
 
       final name = 'kelivo-${DateTime.now().millisecondsSinceEpoch}';
-      final result = await ImageGallerySaverPlus.saveImage(
-        bytes,
-        quality: 100,
-        name: name,
-      );
+      final dynamic result;
+      if (_formatFromMagicBytes(bytes) == 'gif') {
+        // saveImage re-encodes as JPEG on Android and iOS, losing animation.
+        final temp = await getTemporaryDirectory();
+        final directory = await temp.createTemp('kelivo-image-save-');
+        try {
+          final file = File(p.join(directory.path, '$name.gif'));
+          await file.writeAsBytes(bytes);
+          if (defaultTargetPlatform == TargetPlatform.iOS) {
+            result = {
+              'isSuccess': await NativeFileSave.saveImageToGallery(
+                sourcePath: file.path,
+              ),
+            };
+          } else {
+            result = await ImageGallerySaverPlus.saveFile(
+              file.path,
+              name: name,
+            );
+          }
+        } finally {
+          await directory.delete(recursive: true);
+        }
+      } else {
+        result = await ImageGallerySaverPlus.saveImage(
+          bytes,
+          quality: 100,
+          name: name,
+        );
+      }
       bool success = false;
       if (result is Map) {
         final isSuccess =

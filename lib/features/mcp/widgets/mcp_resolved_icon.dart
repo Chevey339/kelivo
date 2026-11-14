@@ -47,6 +47,7 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.icon?.type != widget.icon?.type ||
         oldWidget.icon?.value != widget.icon?.value ||
+        oldWidget.icon?.monochrome != widget.icon?.monochrome ||
         !listEquals(oldWidget.sources, widget.sources)) {
       _failedPaths.clear();
       _resolve();
@@ -58,14 +59,11 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
     final sources = [...widget.sources];
     _cached = null;
     if (icon?.type == McpIconType.url) sources.insert(0, icon!.value);
-    if (icon?.type == McpIconType.lobehub &&
-        RegExp(r'^[a-z0-9][a-z0-9-]*$').hasMatch(icon!.value.toLowerCase())) {
-      final name = icon.value.toLowerCase();
-      sources.insertAll(0, [
-        if (!name.endsWith('-color') && !name.endsWith('-text'))
-          BrandAssets.lobehubIconUrl('$name-color'),
-        BrandAssets.lobehubIconUrl(name),
-      ]);
+    if (icon?.type == McpIconType.lobehub) {
+      sources.insertAll(
+        0,
+        BrandAssets.lobehubIconUrls(icon!.value, monochrome: icon.monochrome),
+      );
     }
     if (icon?.type == McpIconType.emoji && icon!.value.isNotEmpty ||
         icon?.type == McpIconType.asset &&
@@ -147,6 +145,7 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
       }
     }
     return FutureBuilder<String?>(
+      key: ValueKey(_path),
       future: _path,
       builder: (context, snapshot) {
         final path = snapshot.data ?? _cached;
@@ -159,7 +158,15 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
                 theme: SvgTheme(
                   currentColor: widget.color.withValues(alpha: 1),
                 ),
-                colorFilter: _imageTint == null
+                colorFilter:
+                    icon?.type == McpIconType.lobehub && icon!.monochrome
+                    ? ColorFilter.mode(
+                        Theme.of(context).colorScheme.onSurface.withValues(
+                          alpha: widget.color.a,
+                        ),
+                        BlendMode.srcIn,
+                      )
+                    : _imageTint == null
                     ? null
                     : ColorFilter.mode(_imageTint!, BlendMode.modulate),
                 clipBehavior: Clip.none,

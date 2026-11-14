@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/workspace/pages/workspaces_page.dart';
@@ -99,9 +98,6 @@ class _EnvironmentNavRow extends StatelessWidget {
     final env = context.watch<EnvironmentProvider>();
     final runtime = context.watch<WorkspaceRuntimeProvider>();
     final status = runtime.lastStatus;
-    final phase = status?.ready == true
-        ? EnvironmentPhase.ready
-        : env.state.phase;
     final label = workspaceEnvEngineLabel(
       l10n: l10n,
       state: env.state,
@@ -112,32 +108,11 @@ class _EnvironmentNavRow extends StatelessWidget {
         IosNavRow(
           icon: workspaceEnvEngineIcon(state: env.state, status: status),
           label: label,
-          subtitle: _phaseLabel(l10n, phase),
+          subtitle: workspaceEnvPhaseLabel(l10n, env.state.phase),
           labelWeight: AppFontWeights.medium,
           onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
         ),
       ],
     );
-  }
-}
-
-String _phaseLabel(AppLocalizations l10n, EnvironmentPhase phase) {
-  switch (phase) {
-    case EnvironmentPhase.notInstalled:
-      return l10n.workspaceEnvPhaseNotInstalled;
-    case EnvironmentPhase.downloading:
-      return l10n.workspaceEnvPhaseDownloading;
-    case EnvironmentPhase.verifying:
-      return l10n.workspaceEnvPhaseVerifying;
-    case EnvironmentPhase.extracting:
-      return l10n.workspaceEnvPhaseExtracting;
-    case EnvironmentPhase.patching:
-      return l10n.workspaceEnvPhasePatching;
-    case EnvironmentPhase.ready:
-      return l10n.workspaceEnvPhaseReady;
-    case EnvironmentPhase.error:
-      return l10n.workspaceEnvPhaseError;
-    case EnvironmentPhase.needsRestart:
-      return l10n.workspaceEnvPhaseNeedsRestart;
   }
 }

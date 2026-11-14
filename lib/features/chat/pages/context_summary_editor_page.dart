@@ -7,6 +7,7 @@ import '../../../shared/text_input/message_editing_controller.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/long_message_editor.dart';
 import '../../../theme/app_semantic_colors.dart';
+import '../widgets/compression_error_notice.dart';
 import '../widgets/context_dialog.dart';
 
 class ContextSummaryEditorPage extends StatefulWidget {
@@ -71,7 +72,9 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
       final saved = await widget.onSave(_editor.text);
       if (mounted && saved) Navigator.of(context).pop(true);
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        setState(() => _error = error.toString());
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -111,6 +114,7 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
+                flex: 3,
                 child: LongMessageEditor(
                   controller: _editor,
                   autofocus: true,
@@ -143,23 +147,27 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                _error ??
-                    (empty
-                        ? l10n.contextEditEmpty
-                        : _budget == null
-                        ? l10n.contextSummaryHint
-                        : l10n.contextEditPreview(
-                            contextTokenValue(_budget!.usedTokens),
-                          )),
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.4,
-                  color: empty || _error != null
-                      ? cs.error
-                      : cs.onSurfaceVariant,
+              if (_error case final error?)
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: CompressionErrorNotice(error: error),
+                  ),
+                )
+              else
+                Text(
+                  empty
+                      ? l10n.contextEditEmpty
+                      : _budget == null
+                      ? l10n.contextSummaryHint
+                      : l10n.contextEditPreview(
+                          contextTokenValue(_budget!.usedTokens),
+                        ),
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: empty ? cs.error : cs.onSurfaceVariant,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

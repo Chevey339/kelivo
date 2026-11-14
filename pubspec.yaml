@@ -88,6 +88,7 @@ dependencies:
     path: ./dependencies/mcp_client
   flutter_highlight: ^0.7.0
   highlight: ^0.7.0
+  re_highlight: ^0.0.3
   re_editor:
     path: ./dependencies/re_editor
   syncfusion_flutter_core: ^31.2.5

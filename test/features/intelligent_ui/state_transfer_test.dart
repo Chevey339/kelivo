@@ -356,7 +356,6 @@ void main() {
       final copied = (await repo.forkConversationWithVersions(
         sourceId: 'source',
         targetRevisionId: 'cut',
-        title: 'Fork',
       ))!;
       expect(copied.messageIds, hasLength(3));
       final copiedRows = await rows(copied.id);
@@ -390,12 +389,10 @@ void main() {
           'versions' => repo.forkConversationWithVersions(
             sourceId: 'source',
             targetRevisionId: 'r',
-            title: 'Fork',
           ),
           'service' => chat.forkConversationAtRevision(
             sourceConversationId: 'source',
             sourceRevisionId: 'r',
-            title: 'Fork',
           ),
           'messages' => chat.forkConversationFromMessages(
             title: 'Fork',
@@ -487,7 +484,6 @@ void main() {
             : await chat.forkConversationAtRevision(
                 sourceConversationId: 'source',
                 sourceRevisionId: 'selected',
-                title: 'Fork',
               );
         final copied = (await rows(fork.id)).single;
         expect(jsonDecode(copied.stateJson)['inputs'], {'value': 9});
@@ -745,7 +741,6 @@ void main() {
               ? chat.forkConversationAtRevision(
                   sourceConversationId: sourceId,
                   sourceRevisionId: original.id,
-                  title: 'Fork',
                 )
               : chat.forkConversationFromMessages(
                   title: 'Fork',
@@ -838,7 +833,6 @@ void main() {
             ? chat.forkConversationAtRevision(
                 sourceConversationId: source.id,
                 sourceRevisionId: original.id,
-                title: 'Fork',
                 preserveVersions: path == 'versions',
               )
             : chat.forkConversationFromMessages(

@@ -246,6 +246,58 @@ void main() {
       await tester.pump();
       expect(find.text(l10n.workspaceEnvPhasePatching), findsWidgets);
       expect(find.byKey(EnvironmentPane.installKey), findsNothing);
+      expect(find.byKey(EnvironmentPane.cancelKey), findsNothing);
+    });
+  });
+
+  testWidgets('iOS repair can be cancelled and an interrupted repair retried', (
+    tester,
+  ) async {
+    await withPlatform(TargetPlatform.iOS, () async {
+      final harness = await createHarness(
+        tester,
+        engine: 'ish',
+        state: const EnvironmentState(phase: EnvironmentPhase.patching),
+      );
+      final l10n = await pumpPane(tester, harness);
+      expect(find.byKey(EnvironmentPane.cancelKey), findsOneWidget);
+      await tester.tap(find.byKey(EnvironmentPane.cancelKey));
+      await tester.pump();
+      expect(harness.manager.cancelCalls, 1);
+      await tester.runAsync(
+        () => harness.env.setState(
+          const EnvironmentState(
+            phase: EnvironmentPhase.error,
+            errorMessage: 'patch_interrupted',
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.text(l10n.workspaceEnvErrorRepairInterrupted),
+        findsOneWidget,
+      );
+      expect(find.byKey(EnvironmentPane.cancelKey), findsNothing);
+      expect(find.byKey(EnvironmentPane.retryKey), findsOneWidget);
+    });
+  });
+
+  testWidgets('unresponsive repair explains why a restart is required', (
+    tester,
+  ) async {
+    await withPlatform(TargetPlatform.iOS, () async {
+      final harness = await createHarness(
+        tester,
+        engine: 'ish',
+        state: const EnvironmentState(
+          phase: EnvironmentPhase.needsRestart,
+          errorMessage: 'patch_timeout',
+        ),
+      );
+      final l10n = await pumpPane(tester, harness);
+      expect(find.text(l10n.workspaceEnvRepairRestartBanner), findsOneWidget);
+      expect(find.text(l10n.workspaceEnvRestartDoneBanner), findsNothing);
+      expect(find.byKey(EnvironmentPane.retryKey), findsNothing);
     });
   });
 

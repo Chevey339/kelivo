@@ -52,6 +52,31 @@ void main() {
       12.5,
     );
   });
+  test('explicit block fills propagate through shared block surfaces', () {
+    for (final scheme in [light, dark]) {
+      final theme = MarkstreamTheme.fromColorScheme(
+        scheme,
+        backdrop: MarkstreamBackdrop.wallpaper,
+        blockBackgroundColor: scheme.surface,
+      );
+      expect(theme.colors.fillBlock, scheme.surface);
+      expect(theme.code.backgroundColor, scheme.surface);
+      expect(theme.table.bodyBackgroundColor, scheme.surface);
+      expect(theme.details.backgroundColor, scheme.surface);
+      expect(theme.inlineCode.backgroundColor.a, 1);
+      expect(theme.blockContentTheme.colors.fillBlock, scheme.surface);
+      expect(theme.copyWith(), theme);
+      expect(
+        theme,
+        isNot(
+          MarkstreamTheme.fromColorScheme(
+            scheme,
+            backdrop: MarkstreamBackdrop.wallpaper,
+          ),
+        ),
+      );
+    }
+  });
   test(
     'app font families and platform-adjusted weights propagate to all text',
     () {

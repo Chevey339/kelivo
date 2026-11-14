@@ -1455,6 +1455,11 @@ void main() {
           () => !controller.chatController.isConversationLoading(convo.id),
           'recovered streaming to finish',
         );
+        final continued = (await service.loadMessages(
+          convo.id,
+        )).singleWhere((message) => message.id == reply.id);
+        expect(continued.firstResponseMs, isNull);
+        expect(continued.firstTokenMs, isNull);
         final requestMessages = (streamRequests.single['messages'] as List)
             .cast<Map>();
         final result = requestMessages.singleWhere((m) => m['role'] == 'tool');
@@ -2065,6 +2070,112 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   });
+
+  for (final newConversation in [false, true]) {
+    testWidgets(
+      'reviewed compression resumes only the original conversation queue: fork=$newConversation',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          final conversation = await openConversation(controller);
+          await service.addMessage(
+            conversationId: conversation.id,
+            role: 'user',
+            content: 'history ' * 100,
+          );
+          final hold = Completer<String>();
+          service.contextCompression.estimateCandidate =
+              (_, _, {bool? fixedContextStart}) async =>
+                  (usedTokens: 100, contextWindow: 4000);
+          await service.contextCompression.start(
+            conversation.id,
+            CompressionRequest(
+              options: CompressContextOptions(
+                mode: CompressContextLimitMode.unlimited,
+                previewOnly: true,
+                newConversation: newConversation,
+              ),
+              model: 'test',
+              generate: (_, _, _, _) async =>
+                  TextGenerationResult(parts: [TextPart(await hold.future)]),
+              quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
+            ),
+          );
+          expect(
+            await controller.sendMessage(
+              ChatInputData(text: 'send after approval'),
+            ),
+            ChatInputSubmissionResult.queued,
+          );
+          hold.complete('summary');
+          await waitFor(
+            () => controller.currentQueuedInputPaused,
+            'review pauses queued input',
+          );
+          final task = service.contextCompression.taskFor(conversation.id)!;
+          expect(task.phase, CompressionPhase.review);
+          if (!newConversation) {
+            service.contextCompression.estimateCandidate =
+                (_, _, {bool? fixedContextStart}) async =>
+                    (usedTokens: 5000, contextWindow: 4000);
+            await expectLater(
+              service.contextCompression.applyReviewed(
+                conversation.id,
+                task.summary,
+              ),
+              throwsStateError,
+            );
+            expect(task.phase, CompressionPhase.review);
+            expect(controller.currentQueuedInputPaused, isTrue);
+            expect(streamRequestCount, 0);
+            service.contextCompression.estimateCandidate =
+                (_, _, {bool? fixedContextStart}) async =>
+                    (usedTokens: 100, contextWindow: 4000);
+          }
+          await service.contextCompression.applyReviewed(
+            conversation.id,
+            'approved summary',
+          );
+          expect(task.phase, CompressionPhase.completed);
+          if (newConversation) {
+            expect(task.resultConversationId, isNotNull);
+            expect(controller.currentQueuedInputPaused, isTrue);
+            expect(
+              controller.currentQueuedInput!.input.text,
+              'send after approval',
+            );
+            expect(streamRequestCount, 0);
+          } else {
+            await waitFor(
+              () =>
+                  streamRequestCount == 1 &&
+                  !controller.chatController.isConversationLoading(
+                    conversation.id,
+                  ),
+              'reviewed queue sends once',
+            );
+            expect(controller.currentQueuedInput, isNull);
+            expect(controller.currentQueuedInputPaused, isFalse);
+            expect(
+              jsonEncode(streamRequests.single),
+              contains('approved summary'),
+            );
+            expect(
+              jsonEncode(streamRequests.single),
+              contains('send after approval'),
+            );
+            expect(
+              (await service.loadMessages(
+                conversation.id,
+              )).where((message) => message.content == 'send after approval'),
+              hasLength(1),
+            );
+          }
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'failed compression pauses queued input until existing cancellation restores it',
@@ -4856,6 +4967,96 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'undo skips compression for one turn while consumed tools stay replaceable',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        await settings.disableTitleGeneration();
+        await settings.disableSuggestionGeneration();
+        await settings.setCurrentModel('SiliconFlow', 'gpt-4.1');
+        await assistantProvider.updateAssistant(
+          assistantProvider.currentAssistant!.copyWith(
+            maxTokens: 512,
+            localToolIds: [AskUserToolNames.askUser],
+          ),
+        );
+        await settings.setCompressionDefaults(
+          const CompressionConfig(
+            mode: AutoCompressionMode.auto,
+            keepRecentUserTurns: 1,
+            summaryTokens: 512,
+            planningWindow: 5000,
+            includeReference: false,
+            replaceConsumedTools: true,
+          ),
+        );
+        final conversation = await openConversation(controller);
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'OLD_FACTS ${'history ' * 6000}',
+        );
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          parts: [
+            ToolCallPart(
+              jsonEncode({
+                'id': 'consumed-call',
+                'name': 'read_file',
+                'arguments': {'path': 'history.txt'},
+                'content': 'TOOL_PAYLOAD ' * 500,
+              }),
+            ),
+            const AssistantRoundEndPart(),
+            const TextPart('Already used the result'),
+            const AssistantRoundEndPart(),
+          ],
+        );
+        service.contextCompression.skipNextAutomaticTurn(conversation.id);
+        var summaryCalls = 0;
+        final sent = <Map<String, dynamic>>[];
+        apiOverride = (request, body) async {
+          if (jsonEncode(body).contains('Target length:')) {
+            summaryCalls++;
+            await compressionReply(request, summary: true);
+          } else {
+            sent.add(body);
+            await compressionReply(request);
+          }
+        };
+        await controller.sendMessage(ChatInputData(text: 'FIRST_QUESTION'));
+        await waitFor(
+          () =>
+              sent.isNotEmpty &&
+              !controller.chatController.isConversationLoading(conversation.id),
+          'skipped turn finishes',
+        );
+        expect(summaryCalls, 0);
+        expect(sent, hasLength(1));
+        final first = jsonEncode(sent.single);
+        expect(first, contains('OLD_FACTS'));
+        expect(first, contains('Previously consumed result:'));
+        expect(first, contains('read_chat_context'));
+        expect(first, isNot(contains('TOOL_PAYLOAD')));
+        await controller.sendMessage(ChatInputData(text: 'SECOND_QUESTION'));
+        await waitFor(
+          () =>
+              sent.length == 2 &&
+              !controller.chatController.isConversationLoading(conversation.id),
+          'next turn compresses',
+        );
+        expect(summaryCalls, 1);
+        expect(jsonEncode(sent.last), contains('COMPACT_HANDOFF'));
+        expect(jsonEncode(sent.last), isNot(contains('OLD_FACTS')));
+      });
+      AppSnackBarManager().dismissAll();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('stop during compression settings read never sends a request', (
     tester,

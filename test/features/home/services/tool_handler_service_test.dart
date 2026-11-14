@@ -72,7 +72,7 @@ void main() {
       await tester.runAsync(
         () => context.run(() async* {
           final before = ClientToolResult.fromHandler(
-            await handler('read_chat_image', {}),
+            await handler('view_image', {}),
           );
           expect(before.content, contains('"images"'));
           await chat.setImageContextSettings(
@@ -84,10 +84,10 @@ void main() {
             {'image_id': context.images.single.handle},
           ]) {
             final result = ClientToolResult.fromHandler(
-              await handler('read_chat_image', args),
+              await handler('view_image', args),
             );
             expect(result.content, contains('disabled'));
-            expect(result.content, isNot(contains('read_chat_image')));
+            expect(result.content, isNot(contains('view_image')));
             expect(result.metadata, isNull);
           }
           yield 0;

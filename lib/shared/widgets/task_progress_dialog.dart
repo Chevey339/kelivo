@@ -11,7 +11,7 @@ import 'animated_progress_bar.dart';
 import 'ios_tile_button.dart';
 import 'throttled_progress_label.dart';
 
-enum TaskProgressOutcome { running, success, failure }
+enum TaskProgressOutcome { running, success, warning, failure }
 
 class TaskProgressDialogCard extends StatelessWidget {
   const TaskProgressDialogCard({
@@ -29,6 +29,7 @@ class TaskProgressDialogCard extends StatelessWidget {
     this.onBackground,
     this.backgroundLabel,
     this.errorMessage,
+    this.warningMessage,
     this.onCopyError,
     this.copyErrorLabel = 'Copy error',
     this.outcome = TaskProgressOutcome.running,
@@ -50,6 +51,7 @@ class TaskProgressDialogCard extends StatelessWidget {
   final VoidCallback? onBackground;
   final String? backgroundLabel;
   final String? errorMessage;
+  final String? warningMessage;
   final VoidCallback? onCopyError;
   final String copyErrorLabel;
   final TaskProgressOutcome outcome;
@@ -61,20 +63,28 @@ class TaskProgressDialogCard extends StatelessWidget {
         outcome == TaskProgressOutcome.running &&
         cancellable &&
         onCancel != null;
-    final showAck = outcome == TaskProgressOutcome.failure;
-    final showError = showAck && errorMessage != null;
+    final warning = outcome == TaskProgressOutcome.warning;
+    final showAck = outcome == TaskProgressOutcome.failure || warning;
+    final message = warning ? warningMessage : errorMessage;
+    final showError = showAck && message != null;
+    final messageColor = warning ? context.appColors.warning : cs.error;
+    final messageBackground = warning
+        ? context.appColors.warningContainer
+        : cs.errorContainer;
     final showBackground =
         outcome == TaskProgressOutcome.running &&
         onBackground != null &&
         backgroundLabel != null;
     final resolvedFraction = switch (outcome) {
       TaskProgressOutcome.success => 1.0,
+      TaskProgressOutcome.warning => 1.0,
       TaskProgressOutcome.failure => fraction,
       TaskProgressOutcome.running => fraction,
     };
     final leadingIcon = switch (outcome) {
       TaskProgressOutcome.success => Lucide.Check,
       TaskProgressOutcome.failure => Lucide.TriangleAlert,
+      TaskProgressOutcome.warning => Lucide.TriangleAlert,
       TaskProgressOutcome.running => phaseIcon,
     };
 
@@ -104,6 +114,7 @@ class TaskProgressDialogCard extends StatelessWidget {
                     color: switch (outcome) {
                       TaskProgressOutcome.success => context.appColors.success,
                       TaskProgressOutcome.failure => cs.error,
+                      TaskProgressOutcome.warning => context.appColors.warning,
                       TaskProgressOutcome.running => cs.onSurface,
                     },
                   ),
@@ -145,7 +156,9 @@ class TaskProgressDialogCard extends StatelessWidget {
                               text: phaseLabel,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: showAck ? cs.error : cs.onSurfaceVariant,
+                                color: showAck
+                                    ? messageColor
+                                    : cs.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -195,14 +208,14 @@ class TaskProgressDialogCard extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: cs.errorContainer.withValues(alpha: 0.3),
+                              color: messageBackground.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: cs.error.withValues(alpha: 0.2),
+                                color: messageColor.withValues(alpha: 0.2),
                               ),
                             ),
                             child: SelectableText(
-                              errorMessage!,
+                              message,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: cs.onSurface,

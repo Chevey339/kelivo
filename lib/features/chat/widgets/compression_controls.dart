@@ -290,11 +290,13 @@ class CompressionNumberRow extends StatefulWidget {
     required this.onChanged,
     this.hint,
     this.unit,
+    this.allowDecimal = false,
   });
   final String label;
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final String? hint, unit;
+  final bool allowDecimal;
 
   @override
   State<CompressionNumberRow> createState() => _CompressionNumberRowState();
@@ -324,7 +326,9 @@ class _CompressionNumberRowState extends State<CompressionNumberRow> {
         controller: widget.controller,
         focusNode: _focusNode,
         hintText: widget.hint,
-        keyboardType: TextInputType.number,
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: widget.allowDecimal,
+        ),
         fieldWidth: 120,
         textAlign: TextAlign.end,
         compact: true,

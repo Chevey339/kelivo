@@ -234,8 +234,8 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('open-context-usage-popover')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Context operations'));
-    await tester.tap(find.text('Context operations'));
+    await tester.ensureVisible(find.text('Compression and clear history'));
+    await tester.tap(find.text('Compression and clear history'));
     await tester.pumpAndSettle();
     expect(opened, isTrue);
     expect(find.byKey(contextUsagePopoverKey), findsNothing);
@@ -260,13 +260,13 @@ void main() {
       expect(
         find.text(
           hasPrevious
-              ? 'Update failed · previous result is stale'
-              : 'Calculation failed',
+              ? 'Couldn’t refresh. Showing the previous result, which may be out of date.'
+              : 'Couldn’t calculate usage. Please try again.',
         ),
         findsOneWidget,
       );
       if (!hasPrevious) {
-        expect(find.text('Usage unavailable'), findsOneWidget);
+        expect(find.text('Usage isn’t available right now.'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('context-usage-bucket-freeSpace')),
           findsNothing,

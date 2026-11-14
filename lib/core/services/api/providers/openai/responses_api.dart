@@ -336,7 +336,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       final respCalls2 = <int, Map<String, String>>{};
       if (!stream) {
         final raw = await decodeUtf8Stream(resp2.stream);
-        throwIfInBandStreamError(raw);
+        final incomplete = throwIfInBandStreamError(raw, deferIncomplete: true);
         final obj = jsonDecode(raw) as Map;
         finishReason = responsesFinishReason(obj);
         for (final chunk
@@ -394,6 +394,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           reasoning: responsesReasoningText(output),
           usage: usage,
         );
+        if (incomplete != null) throw incomplete;
       } else {
         final s2 = rethrowFollowUpStreamErrors(
           resp2.stream.transform(utf8.decoder),
@@ -402,7 +403,11 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           initialUsage: usage,
           sourceId: 'round-${round++}',
         );
-        yield* decodeSseEvents(parseSseEventStrings(s2), followUpDecoder);
+        yield* decodeSseEvents(
+          parseSseEventStrings(s2),
+          followUpDecoder,
+          deferIncomplete: true,
+        );
         finishReason = followUpDecoder.finishReason;
         usage = followUpDecoder.usage ?? usage;
         chars += followUpDecoder.approxCompletionChars;

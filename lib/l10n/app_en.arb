@@ -943,6 +943,19 @@
   },
   "backupProgressCopyError": "Copy error",
   "backupProgressErrorCopied": "Error copied",
+  "backupProgressSkippedTitle": "Backup completed with skipped items",
+  "@backupProgressSkippedTitle": {
+    "description": "Completion heading in the backup progress dialog when unreadable asset files or directories were skipped; the archive was created successfully but does not include those items."
+  },
+  "backupProgressSkippedMessage": "Unreadable files or directories skipped: {count}. They are not included in this backup.",
+  "@backupProgressSkippedMessage": {
+    "description": "Warning above the skipped path list in the backup completion dialog. {count} is the number of unreadable files or directories omitted; an unreadable directory counts once including all its descendants.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupProgressPreparing": "Preparing",
   "backupProgressSnapshotting": "Creating database snapshot",
   "backupProgressPacking": "Packing",
@@ -1088,16 +1101,16 @@
   "bottomToolsSheetUpload": "Upload",
   "bottomToolsSheetClearContext": "Clear Context",
   "compressContext": "Compress Context",
-  "compressContextDesc": "Create a summary you can review and undo",
-  "clearContextDesc": "Mark a context boundary",
+  "compressContextDesc": "Turn earlier chat into a summary. Originals stay in the chat and you can undo anytime.",
+  "clearContextDesc": "Start fresh from here: earlier messages stay in the chat but won’t be sent to the model.",
   "contextManagement": "Context Management",
-  "compressContextFailed": "Failed to compress context",
-  "compressContextNoMessages": "No messages to compress",
-  "compressContextNoConversation": "No conversation to compress",
-  "compressContextNoModel": "No compression model configured",
-  "compressContextEmptySummary": "Compression returned an empty summary",
+  "compressContextFailed": "Compression didn’t finish",
+  "compressContextNoMessages": "There’s nothing in this chat to compress.",
+  "compressContextNoConversation": "There’s no conversation to compress.",
+  "compressContextNoModel": "No model is set for compression. Choose a fast one in Settings.",
+  "compressContextEmptySummary": "The model didn’t produce a summary. Try a different model, or change the options and try again.",
   "compressContextOptionsTitle": "Compress Context",
-  "compressContextOptionsDesc": "Create an editable, reversible summary in this chat. Original messages are kept.",
+  "compressContextOptionsDesc": "Turn earlier messages into a summary, which is what the model will see next time. The original chat is kept; you can edit or undo the summary.",
   "compressContextKeepStart": "Earlier history",
   "compressContextKeepRecent": "Recent history",
   "compressContextUnlimited": "All active history",
@@ -1107,9 +1120,9 @@
   "compressContextModelLabel": "Model",
   "compressContextModelUnset": "Select a model",
   "compressContextKeepRecentMessages": "Keep recent turns",
-  "compressContextKeepCountLabel": "Recent user messages",
-  "compressContextKeepAllMessages": "Keeping that many covers all messages — nothing to compress",
-  "compressContextEstimatePreview": "Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)",
+  "compressContextKeepCountLabel": "Recent user messages to keep",
+  "compressContextKeepAllMessages": "That many recent messages already covers the whole chat, so there’s nothing left to compress.",
+  "compressContextEstimatePreview": "Will summarize {summarized} characters and keep {kept} as-is. About {minTokens}–{maxTokens} tokens after compression (original about {totalTokens}).",
   "@compressContextEstimatePreview": {
     "description": "Keep-recent compression preview: summarized/kept char counts and the estimated result token band",
     "placeholders": {
@@ -1596,34 +1609,38 @@
   "chatInputBarExpand": "Expand",
   "chatInputBarCollapse": "Collapse",
   "contextUsageTitle": "Context window",
-  "contextUsageStateExact": "Exact (from last response)",
-  "contextUsageStateExactCalibrated": "Exact (breakdown scaled from estimate)",
+  "contextUsageStateExact": "Exact (from the last reply)",
+  "contextUsageStateExactCalibrated": "Total is exact; the breakdown is estimated in proportion",
   "contextUsageStateEstimated": "Estimated",
   "contextUsageStateStale": "Stale, updating…",
   "contextUsageStateComputing": "Computing…",
-  "contextUsageStateFailed": "Calculation failed",
-  "contextUsageStateFailedWithPrevious": "Update failed · previous result is stale",
-  "contextUsageUnavailable": "Usage unavailable",
-  "contextUsagePartialSummary": "Estimated {tokens} + unknown compaction",
+  "contextUsageStateFailed": "Couldn’t calculate usage. Please try again.",
+  "contextUsageStateFailedWithPrevious": "Couldn’t refresh. Showing the previous result, which may be out of date.",
+  "contextUsageUnavailable": "Usage isn’t available right now.",
+  "contextUsagePartialSummary": "Estimated {tokens}, plus unknown server-side usage",
   "@contextUsagePartialSummary": {
     "description": "Summary in the context usage panel and input-bar tooltip when OpenAI native compaction is present. Only readable content has been estimated; the encrypted compaction block's input token count is unknown. tokens is the already-formatted subtotal, such as 42k, not the full context total.",
     "placeholders": {
-      "tokens": { "type": "String" }
+      "tokens": {
+        "type": "String"
+      }
     }
   },
-  "contextUsageBucketNativeCompaction": "Native compaction",
+  "contextUsageBucketNativeCompaction": "Server-side compression",
   "@contextUsageBucketNativeCompaction": {
-    "description": "Category row in the context usage breakdown for opaque OpenAI native compaction state. Its token value is shown as unknown, separately from estimated readable messages and other categories."
+    "description": "Context-usage breakdown label for the opaque server-side compaction data."
   },
   "contextUsageUnknownTokens": "Unknown",
   "@contextUsageUnknownTokens": {
     "description": "Token value in the context usage panel for encrypted native compaction content that cannot be counted locally; unknown must not be interpreted as zero."
   },
-  "contextUsageLastRequestInput": "Last request input (measured): {tokens}",
+  "contextUsageLastRequestInput": "Last amount actually sent to the model: {tokens}",
   "@contextUsageLastRequestInput": {
     "description": "Separate line below the native-compaction context usage breakdown showing input tokens reported by the last matching model request, not the current estimated window or the compaction operation's output usage. tokens is an already-formatted token count such as 42k.",
     "placeholders": {
-      "tokens": { "type": "String" }
+      "tokens": {
+        "type": "String"
+      }
     }
   },
   "contextUsageStateNone": "No data yet",
@@ -1656,7 +1673,7 @@
       }
     }
   },
-  "contextUsageNoWindow": "No context window",
+  "contextUsageNoWindow": "No context limit is set yet.",
   "contextUsageSetWindow": "Set context window",
   "contextUsageRefresh": "Refresh",
   "mcpPageBackTooltip": "Back",
@@ -1823,9 +1840,9 @@
     "description": "Hint listing template variables for the suggestions prompt; {contentVar} and {localeVar} are literal tokens like {content}."
   },
   "defaultModelPageCompressModelTitle": "Compress Model",
-  "defaultModelPageCompressModelSubtitle": "Used for compressing conversation context; prefer fast models",
-  "defaultModelPageCompressPromptHint": "Enter prompt template for context compression",
-  "defaultModelPageCompressVars": "Variables: conversation: {contentVar}, language: {localeVar}",
+  "defaultModelPageCompressModelSubtitle": "The model used to summarize long chats. A fast model is usually enough.",
+  "defaultModelPageCompressPromptHint": "Enter the prompt used when compressing.",
+  "defaultModelPageCompressVars": "Variables: conversation {contentVar}, language {localeVar}",
   "@defaultModelPageCompressVars": {
     "placeholders": {
       "contentVar": {
@@ -3414,14 +3431,14 @@
   "logViewerCurrentLog": "Current Log",
   "logViewerExport": "Export",
   "logViewerOpenFolder": "Open Logs Folder",
-  "logViewerRequestsCount": "{count} requests",
+  "logViewerRequestsCount": "{count} loaded requests",
   "@logViewerRequestsCount": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     },
-    "description": "Header count label showing how many requests are in the log; {count} is the integer total."
+    "description": "Summary in the request log viewer. The count is the number of request instances loaded so far, not a total for the entire file; it increases as earlier pages load."
   },
   "logViewerFieldId": "ID",
   "logViewerFieldMethod": "Method",
@@ -4084,14 +4101,23 @@
     },
     "description": "Row in the token detail popup showing total generation duration in seconds; {value} is the formatted number."
   },
-  "tokenDetailFirstToken": "{value}s (first token)",
-  "@tokenDetailFirstToken": {
+  "tokenDetailFirstResponse": "{value}s (first response)",
+  "@tokenDetailFirstResponse": {
     "placeholders": {
       "value": {
         "type": "String"
       }
     },
-    "description": "Row in the token detail popup showing time to first token in seconds; {value} is the formatted number."
+    "description": "Row in the token detail popup showing seconds from request preparation to the first client-received reasoning-start event or non-empty output, whichever arrives first. This is response activity, not the server's hidden reasoning-token time. {value} is the formatted duration in seconds."
+  },
+  "tokenDetailFirstOutput": "{value}s (first output)",
+  "@tokenDetailFirstOutput": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    },
+    "description": "Row in the token detail popup showing seconds from request preparation to the first non-empty content received, such as a public reasoning summary, answer text, tool input, image or file. A reasoning-start event alone does not count. {value} is the formatted duration in seconds."
   },
   "tokenDetailTotalTokens": "{count} tokens",
   "@tokenDetailTotalTokens": {
@@ -4606,6 +4632,7 @@
   },
   "toolSchemaSettingsPageTitle": "Tool Descriptions",
   "toolSchemaSettingsGroupSearch": "Search",
+  "toolSchemaSettingsGroupImages": "Images",
   "toolSchemaSettingsGroupMemory": "Memory",
   "toolSchemaSettingsGroupLocal": "Device tools",
   "toolSchemaSettingsModified": "Modified",
@@ -5015,6 +5042,9 @@
   "workspaceEnvCleanupIncomplete": "The sandbox is ready, but some old files could not be removed. They still take up storage space.",
   "workspaceEnvErrorResetFailed": "Could not finish resetting the sandbox. Please try again.",
   "workspaceEnvErrorPatchFailed": "Could not finish setting up the sandbox.",
+  "workspaceEnvErrorRepairInterrupted": "Sandbox repair was interrupted. The existing sandbox has been kept. Retry to finish the repair.",
+  "workspaceEnvErrorRepairTimeout": "Sandbox repair timed out. Check your network connection and retry. The existing sandbox has been kept.",
+  "workspaceEnvRepairRestartBanner": "Could not confirm that sandbox repair stopped within the time limit. Fully close and reopen Kelivo before retrying. The existing sandbox has been kept.",
   "workspaceEnvErrorCancelled": "Installation was cancelled.",
   "workspaceEnvErrorGeneric": "Something went wrong installing the sandbox.",
   "workspaceEnvChipInstall": "Install sandbox",
@@ -5545,17 +5575,17 @@
   "storageSpaceCategorySkills": "Skills",
   "storageSpaceCategorySkillsHint": "Installed skill files.",
   "storageSpaceCategorySessionFiles": "Conversation files",
-  "storageSpaceCategorySessionFilesHint": "Per-conversation attachments and outputs.",
+  "storageSpaceCategorySessionFilesHint": "Workspace conversation attachments and outputs. Ordinary chat uploads are listed in Images and Files.",
   "storageSpaceManageSkills": "Manage skills",
-  "storageSessionFilesCleanOrphans": "Clean orphaned conversation files",
-  "storageSessionFilesCleanOrphansHint": "Deletes session folders that no longer have a conversation. Reclaimable: {size}.",
+  "storageSessionFilesCleanOrphans": "Clean empty and orphaned folders",
+  "storageSessionFilesCleanOrphansHint": "Remove empty conversation folders and folders with no conversation or remaining references. Orphaned files occupy {size}.",
   "@storageSessionFilesCleanOrphansHint": {
     "placeholders": {
       "size": {
         "type": "String"
       }
     },
-    "description": "Confirmation message for cleaning orphaned session files; {size} is the reclaimable space."
+    "description": "Confirmation for cleaning empty and orphaned conversation directories. size is the measured disk use of orphan directories before final reference protection checks."
   },
   "workspaceDesktopFolderPath": "Folder path",
   "workspaceDesktopFolderMissing": "Choose an existing folder or enter its absolute path.",
@@ -7143,16 +7173,16 @@
   "displaySettingsShowGenUiHeaderSubtitle": "Hide for a cleaner message. Source and actions remain in the menu below the UI.",
   "genuiClearFilter": "Clear filter",
   "genuiClearSelection": "Clear selection",
-  "chatInputBarQueuedPausedReason": "Compression did not finish; sending stays paused",
-  "contextChanged": "History changed. Reopen this action to review its current scope.",
-  "contextOperationSuperseded": "Included in a later summary",
+  "chatInputBarQueuedPausedReason": "Compression is still running, so this won’t send automatically.",
+  "contextChanged": "The chat has changed. Open this again and confirm the range before continuing.",
+  "contextOperationSuperseded": "Replaced by a later summary",
   "compressIncludeAttachments": "Attachment text & tool results",
   "contextEditCharacters": "{count} characters",
-  "compressOverSnack": "The summary would exceed the context limit and was not applied.",
-  "contextSummaryHint": "This is the summary used in subsequent requests. Saving changes does not rewrite existing replies. Attachments contribute only available text; images are not reinterpreted.",
+  "compressOverSnack": "The summary is still too long and would exceed the limit, so it wasn’t used. Compress again, or switch to a model with a larger context.",
+  "contextSummaryHint": "This is the summary the model will see next. Saving changes only the summary, not existing replies. Attachments contribute only text already extracted; images are not re-read.",
   "compressAdvanced": "Advanced",
   "compressTaskWaiting": "Waiting for the current reply",
-  "contextBudgetExceeded": "The estimated context exceeds this model’s limit. Shorten the summary, compress again, or choose a model with a larger context.",
+  "contextBudgetExceeded": "With this summary, the next message would exceed the model’s limit. Shorten the summary, compress again, or switch to a model with a larger context.",
   "@compressApproxTokens": {
     "placeholders": {
       "value": {
@@ -7175,13 +7205,13 @@
   },
   "contextDetailEdited": "Manually edited",
   "contextSourceLabel": "Summary input",
-  "contextImpactSourceTitle": "Change compressed originals?",
-  "chatInputBarQueuedCompressionFailed": "Compression failed; sending stays paused",
+  "contextImpactSourceTitle": "Change original text that’s already in a summary?",
+  "chatInputBarQueuedCompressionFailed": "Compression failed, so this message won’t send automatically.",
   "contextTokenInfo": "Summary input ≈ {before} tokens → summary ≈ {after} tokens",
   "worldBookTransferFailed": "Could not save the entries. Please try again.",
   "contextDetailKeptCount": "Latest {count} user messages, replies and tools",
   "toolPermissionRequestApproval": "Ask for approval",
-  "compressNothingNew": "Nothing new to compress since the last summary",
+  "compressNothingNew": "Nothing new to compress since last time.",
   "browserActionScreenshot": "Capture screenshot",
   "displaySettingsPageIosNativeSelectionMenuSubtitle": "Applies to input and messages. Turn off if menus feel slow.",
   "contextUndoneSnack": "Undone · {from} → {to}",
@@ -7201,15 +7231,15 @@
   },
   "compressTaskRetry": "Retry",
   "wsDeniedPathOutside": "Target is outside the authorized area. Denied.",
-  "contextImpactSaveConfirm": "Save and undo {count} nodes",
+  "contextImpactSaveConfirm": "Save, and undo the next {count} related operations",
   "contextRestore": "Restore",
   "compressUsageOriginal": "was {value}",
   "toolApprovalPendingKind": "Awaiting approval · {kind}",
-  "contextTaskApplying": "Applying summary",
+  "contextTaskApplying": "Using this summary",
   "storageSpaceImagesHint": "Deleting images affects chat history and tool results. Avatars and backgrounds in use are protected.",
   "displaySettingsPageIosNativeSelectionMenuTitle": "iOS 26+ native selection menu",
   "worldBookMoveEntries": "Move to…",
-  "compressReread": "Re-read compressed originals",
+  "compressReread": "Look back at the compressed originals",
   "@contextImpactConfirm": {
     "placeholders": {
       "count": {
@@ -7218,7 +7248,7 @@
     },
     "description": "Confirm button in the context impact dialog to undo {count} nodes."
   },
-  "chatInputBarQueuedPausedHold": "Input remains paused; cancel the queue to edit or send",
+  "chatInputBarQueuedPausedHold": "Sending is paused. Cancel the queue to edit or send now.",
   "contextSummaryTitle": "Context summary",
   "contextKeepInvalid": "Enter a positive number of user messages.",
   "@contextInputModeInfo": {
@@ -7233,9 +7263,8 @@
     "description": "Detail line describing the summary input mode and its source; {mode} and {source} are filled in."
   },
   "compressTaskAbandon": "Dismiss",
-  "browserAgentTimedOut": "Operation timed out; AI paused",
-  "compressCancelledSnack": "Compression cancelled. Current context is unchanged.",
-  "contextImpactClearTitle": "Undo earlier clear?",
+  "compressCancelledSnack": "Cancelled. The context is unchanged.",
+  "contextImpactClearTitle": "Undo the earlier clear?",
   "@contextBudgetInfo": {
     "placeholders": {
       "used": {
@@ -7247,12 +7276,12 @@
     },
     "description": "Shows estimated tokens for the next request including output reserve, as {used} of {limit} tokens."
   },
-  "compressTaskWaitingApproval": "Waiting for tool approval",
-  "contextTaskFailed": "Compression failed",
+  "compressTaskWaitingApproval": "Waiting for you to approve a tool",
+  "contextTaskFailed": "Compression didn’t finish",
   "wsDeniedSkillsReadonly": "Skills folder is read-only.",
   "compressTaskMerging": "Merging summaries",
   "toolPermissionFullAccessDesc": "Lets this conversation access files on this device, run commands, and use enabled online tools without asking each time.",
-  "compressStaleSnack": "Chat history changed; the summary was not applied.",
+  "compressStaleSnack": "The chat changed before compression finished, so this result wasn’t used. Compress again if you still want to.",
   "@contextDetailKeptCount": {
     "placeholders": {
       "count": {
@@ -7273,12 +7302,12 @@
     "description": "Label comparing token counts before and after summarization, with {before} and {after} as integer token counts."
   },
   "worldBookCopyEntries": "Copy to…",
-  "contextEditEmpty": "Summary cannot be empty. Use Clear context to exclude all earlier history.",
+  "contextEditEmpty": "The summary can’t be empty. To leave earlier chat out, use Clear context.",
   "toolApprovalDenyWithReason": "Deny with reason…",
   "toolApprovalRequestedPath": "Requested path",
   "toolApprovalScopeOnce": "Applies to this call only",
   "storageSpaceImageTypeLabel": "Type",
-  "contextImpactUndoTitle": "Undo earlier compression?",
+  "contextImpactUndoTitle": "Undo the earlier compression?",
   "contextOriginalMessages": "View original messages",
   "storageSpaceDeleteImagesConfirmMessage": "Delete {count} images? Related chat images, tool screenshots, and conversation copies will no longer be available. Avatars and backgrounds in use will be kept.",
   "chatInputBarQueuedAfterCompress": "Sends after compression",
@@ -7292,7 +7321,7 @@
     "description": "Compact label showing the original token usage value, formatted as 'was {value}'."
   },
   "compressTaskAdjustRetry": "Adjust options and retry",
-  "contextDetailLegacy": "Converted from legacy clear",
+  "contextDetailLegacy": "Carried over from an older clear",
   "contextDetailCurrent": "Current context",
   "toolPermissionUndo": "Undo",
   "contextDetailViewOriginals": "View originals",
@@ -7307,8 +7336,8 @@
     "description": "Info text noting only {count} selected characters were read while the summary replaces the entire selected history range."
   },
   "contextCompressMarker": "Context compressed",
-  "contextDetailParts": "{count} segments",
-  "contextEditPending": "Saved; applies after the current reply",
+  "contextDetailParts": "Automatically split into {count} parts",
+  "contextEditPending": "Saved. It will be used after the current reply finishes.",
   "contextTaskRetry": "Retry compression",
   "contextUndoCompressTooltip": "Undo this compression",
   "@compressKeepDescription": {
@@ -7342,8 +7371,8 @@
     },
     "description": "Note explaining that preserved history is still limited by the chat's maximum sending window of {count} messages."
   },
-  "branchInheritNote": "Only inherits context nodes active before this point",
-  "contextTaskInterrupted": "Compression interrupted; input is preserved",
+  "branchInheritNote": "The new branch only carries summaries and originals that were still in effect before this point.",
+  "contextTaskInterrupted": "Compression was interrupted. What you typed is still there.",
   "storageSpaceImageTypeAll": "All",
   "contextRangeInfo": "Replaces {count} messages; keeps {keep} recent user messages and their replies.",
   "@compressFailedSnack": {
@@ -7358,7 +7387,7 @@
   "contextDetailKept": "Kept",
   "worldBookEntriesCopied": "{count, plural, =1{Copied 1 entry} other{Copied {count} entries}}",
   "toolPermissionSaveFailed": "Couldn’t save. Permission unchanged.",
-  "compressDiscardedSnack": "Context cleared; the running compression was discarded.",
+  "compressDiscardedSnack": "Context cleared. The compression in progress was cancelled and not used.",
   "browserActionSelect": "Select option",
   "@worldBookEntriesCopied": {
     "placeholders": {
@@ -7369,7 +7398,7 @@
     "description": "Snackbar confirming copied world book entries; pluralized on {count}."
   },
   "toolPermissionTitle": "Permissions",
-  "contextDetailNext": "Next request",
+  "contextDetailNext": "Next send",
   "contextTaskCancel": "Cancel compression",
   "@contextTaskProgress": {
     "placeholders": {
@@ -7383,7 +7412,7 @@
     "description": "Progress label during context compression showing completed and total segments, with {done} and {total} as integer placeholders."
   },
   "toolPermissionFullAccess": "Full access",
-  "chatInputBarQueuedCompressionCancelled": "Compression cancelled; sending stays paused",
+  "chatInputBarQueuedCompressionCancelled": "Compression was cancelled, so this message won’t send automatically.",
   "toolPermissionResetSnack": "Workspace changed · permission reset to Ask for approval",
   "@contextRangeInfo": {
     "placeholders": {
@@ -7398,8 +7427,8 @@
   },
   "contextImpactUndoOne": "Undo",
   "contextDetailContinueNewChat": "Continue in new chat",
-  "contextTaskPaused": "Sending paused — cancel the queue to edit",
-  "contextTaskReview": "Review the summary before applying",
+  "contextTaskPaused": "Sending is paused. Cancel the queue to keep editing.",
+  "contextTaskReview": "Please review the summary before using it.",
   "compressApproxTokens": "Approx. {value} tokens",
   "@contextImpactUsage": {
     "placeholders": {
@@ -7413,13 +7442,13 @@
     "description": "Shows approximate token change from {from} to {to} in the context impact dialog."
   },
   "storageSpaceImageInUseHint": "Change or remove this avatar, background, or icon in its settings before deleting it.",
-  "compressRereadLastLayer": "Expand last layer",
+  "compressRereadLastLayer": "View the originals from before the last compression",
   "contextRestoreOperation": "Restore operation",
   "contextOriginalHistory": "Re-read all original messages in this segment",
-  "contextImpactEditTitle": "Save earlier summary?",
+  "contextImpactEditTitle": "Save this earlier summary?",
   "contextOpenNewChat": "Open new chat",
   "wsPathChanged": "Target changed while awaiting approval.",
-  "contextEditUnknownPreview": "Usage is unavailable; it will be checked again before saving.",
+  "contextEditUnknownPreview": "Usage can’t be estimated right now. It will be checked again before saving.",
   "contextTaskWait": "Waiting for the current reply and tools to finish",
   "@storageSpaceDeleteImagesConfirmMessage": {
     "placeholders": {
@@ -7430,8 +7459,8 @@
     "description": "Confirmation dialog text asking to delete {count} images, warning related chat images, tool screenshots, and copies become unavailable while in-use avatars and backgrounds are kept."
   },
   "compressTaskElapsed": "Part {i}/{n} · {seconds}s elapsed",
-  "wsContextChanged": "Conversation context changed. Request expired.",
-  "contextChangeImpact": "This change will also undo {count} affected context operations. Original messages are kept. Continue?",
+  "wsContextChanged": "The conversation changed, so this request was cancelled.",
+  "contextChangeImpact": "This will also undo the next {count} related compressions or clears. The original chat is kept. Continue?",
   "@compressTaskElapsed": {
     "placeholders": {
       "i": {
@@ -7464,22 +7493,22 @@
     "description": "Hint under the summary editor showing approximate tokens after saving ({value}) and that editing does not affect active context."
   },
   "contextTaskProgress": "Compressing {done}/{total} segments",
-  "contextSummaryNotSmaller": "The summary is not shorter than its input. Review it before applying.",
+  "contextSummaryNotSmaller": "The summary isn’t shorter than the original. Review it before deciding to use it.",
   "storageSpaceImageTypeTool": "Tool images",
-  "contextPreviousHistory": "Re-read the last compression layer",
-  "contextDetailRead": "Read",
+  "contextPreviousHistory": "Re-read the originals from before the last compression",
+  "contextDetailRead": "What will actually be read",
   "contextViewGenerated": "View generated summary",
-  "contextImpactDeleteDescription": "Delete the originals and undo related summaries so removed content is not sent again. Other messages and independent nodes are unchanged.",
+  "contextImpactDeleteDescription": "Deleting these originals will also undo related summaries and later compressions that depend on them, so deleted content isn’t sent again. Other messages are unaffected.",
   "storageSpaceImageTypeAvatar": "Avatars & backgrounds",
   "contextDetailAfterUndo": "After undo",
-  "contextOperationUndo": "Undo this context operation",
+  "contextOperationUndo": "Undo this operation",
   "contextHistoryWindowNote": "Recent history is still limited by the chat’s {count}-message sending window.",
-  "contextOverLimitWarning": "Undo may exceed the context limit. You can still undo and recompress; sending checks the limit again.",
+  "contextOverLimitWarning": "After undoing, the content may exceed the model’s limit. You can still undo — we’ll check again before sending. Compress again if needed.",
   "storageSpaceImageTypeChat": "Chat images",
   "worldBookSelectEntries": "Select entries",
   "compressUsageSummary": "Est. summary",
   "contextDetailRange": "Messages {from}–{to} · {count} user messages",
-  "contextOperationHidden": "Excluded by a later clear",
+  "contextOperationHidden": "A later clear already took effect, so this no longer applies.",
   "contextUndoClearTooltip": "Undo this clear",
   "@compressSuccessSnack": {
     "placeholders": {
@@ -7492,13 +7521,13 @@
     },
     "description": "Snackbar reporting successful compression, showing token budget before and after ({from} → {to})."
   },
-  "compressKeepDescription": "Keep the latest {count} user messages with their replies and tools. Earlier history is summarized; attachment-only messages also count.",
+  "compressKeepDescription": "Keep the latest {count} user messages, with their replies and tool activity. Earlier history is replaced by a summary. Attachment-only messages count as one each.",
   "contextOperationUndone": "Undone",
-  "contextEditPreview": "Approx. {value} tokens after saving. Editing does not change active context.",
+  "contextEditPreview": "About {value} tokens after saving. Editing doesn’t immediately change what’s currently in use.",
   "contextDetailExcluded": "Excluded history",
   "worldBookNoMoveTargets": "Create another world book to move entries into it.",
   "worldBookSelectedEntries": "{count} selected",
-  "contextDetailReplaced": "Replaced",
+  "contextDetailReplaced": "Replaced by the summary",
   "displaySettingsPageAutoScrollEnabledLabel": "On",
   "@contextDetailParts": {
     "placeholders": {
@@ -7508,37 +7537,37 @@
     },
     "description": "Detail row showing how many segments the input was automatically split into; {count} is the segment count."
   },
-  "contextChangeTitle": "Review affected context",
+  "contextChangeTitle": "Confirm what this change will affect",
   "contextDetailTitle": "Summary",
-  "compressModelGlobal": "Global setting · fixed when started",
+  "compressModelGlobal": "Uses the model from Settings, and won’t change it mid-session.",
   "wsDeniedMountReadonly": "Read-only mount. Can’t write.",
-  "compressRereadDesc": "Recover details lost across summaries. Uses more tokens.",
+  "compressRereadDesc": "If the chat has been compressed more than once, this looks back at the originals so fewer details are lost. Uses more tokens this time.",
   "toolApprovalSwitchToFullAccess": "Switch to full access",
   "compressUsageInput": "Summary input",
-  "contextDetailSummaryLabel": "Summary used in later requests",
-  "contextImpactDeleteTitle": "Delete compressed originals?",
-  "compressAdvancedOff": "Re-read originals off",
-  "contextOperationActive": "Currently applied",
-  "compressAdvancedOn": "Re-read originals on",
+  "contextDetailSummaryLabel": "The summary the model will see next",
+  "contextImpactDeleteTitle": "Delete originals that were already compressed?",
+  "compressAdvancedOff": "Look back at originals: off",
+  "contextOperationActive": "Currently in use",
+  "compressAdvancedOn": "Look back at originals: on",
   "contextTaskMerging": "Merging summaries",
   "contextSampledInfo": "Only the selected {count} characters were read; the summary replaces the entire selected history range.",
   "contextDividerRunning": "Compressing context",
-  "contextClearDetails": "Earlier chat history is excluded from future requests. System instructions, memory and tool definitions still apply.",
+  "contextClearDetails": "Earlier chat won’t be sent to the model from here on. The assistant’s system instructions, memory, and tools still apply.",
   "compressCopyResult": "Copy result",
-  "contextDetailInUse": "In use",
-  "contextImpactDescription": "Related summaries will be undone together. Original messages and independent nodes are kept; no model is called automatically.",
-  "compressIncludeAttachmentsDesc": "Include available attachment text and complete tool records in their original order. Images are not reinterpreted.",
+  "contextDetailInUse": "Currently in use",
+  "contextImpactDescription": "Related summaries will be undone together. The original chat is kept, and the model won’t be called. Other unrelated summaries stay as they are.",
+  "compressIncludeAttachmentsDesc": "Includes already extracted attachment text and complete tool records, in their original order. Images are not re-read.",
   "worldBookEntriesMoved": "{count, plural, =1{Moved 1 entry} other{Moved {count} entries}}",
-  "contextImpactSourceDescription": "Change the originals and undo their summaries and dependent nodes together. Other messages and independent nodes are kept; no model is called.",
+  "contextImpactSourceDescription": "This will change the original text, and undo summaries that used it, along with later compressions that depend on those summaries. Other messages are unaffected, and the model won’t be called.",
   "contextEditTitle": "Edit summary",
-  "compressUsageNext": "Next request",
-  "contextSummaryEmpty": "The summary cannot be empty. Use Clear context to exclude history.",
+  "compressUsageNext": "After applying, next send",
+  "contextSummaryEmpty": "The summary can’t be empty. To leave earlier chat out, use Clear context.",
   "toolApprovalDenied": "Denied",
   "contextDetailModel": "Model · time",
-  "compressIncludeManual": "Include manual edits · {count}",
-  "contextBudgetInfo": "Estimated next request (including output reserve): {used} / {limit} tokens",
-  "contextTaskDismiss": "Dismiss status",
-  "contextUndoBudgetInfo": "After undo: approximately {used} tokens including output reserve",
+  "compressIncludeManual": "Includes {count} manual addition(s) of yours",
+  "contextBudgetInfo": "Next send is about {used} / {limit} tokens, including room for a reply.",
+  "contextTaskDismiss": "Dismiss",
+  "contextUndoBudgetInfo": "After undo: about {used} tokens, including room for a reply",
   "storageSpaceImageInUse": "In use",
   "worldBookSelectionDone": "Done",
   "@contextChangeImpact": {
@@ -7549,9 +7578,9 @@
     },
     "description": "Confirmation text warning an edit will also undo {count} affected context operations while keeping originals."
   },
-  "contextDividerFailed": "Compression failed",
+  "contextDividerFailed": "Compression didn’t finish",
   "toolPermissionUnboundHint": "No workspace bound: this does not turn on file or shell tools.",
-  "contextChangeWaiting": "Waiting for the current reply and tools to finish before applying this change.",
+  "contextChangeWaiting": "This change will take effect after the current reply and tools finish.",
   "@contextEditCharacters": {
     "placeholders": {
       "count": {
@@ -7580,7 +7609,7 @@
     "description": "Snackbar message reporting how many world book entries were moved, with plural handling for {count}."
   },
   "contextImpactUsage": "Approx. {from} → {to} tokens",
-  "contextImpactConfirm": "Undo {count} nodes",
+  "contextImpactConfirm": "Also undo the next {count} related operations",
   "contextDividerEdited": "edited",
   "compressAdjust": "Adjust",
   "compressRegenerate": "Recompress",
@@ -7607,11 +7636,11 @@
     "description": "Primary confirm button in the context impact dialog that saves the edit and undoes {count} affected nodes."
   },
   "toolPermissionEnabledSnack": "Full access enabled for this chat",
-  "contextDetailSuperseded": "Superseded by a later summary",
+  "contextDetailSuperseded": "Replaced by a later summary",
   "contextTaskQueued": "Queued — waiting for compression",
   "contextNewConversation": "Create a new chat with the summary",
   "contextUnknownLimit": "unknown limit",
-  "browserErrActionTimeout": "Operation timed out; outcome unknown. Check the page before allowing AI to continue.",
+  "browserErrActionTimeout": "Operation timed out; outcome unknown. AI can inspect the page before continuing.",
   "toolPermissionRequestApprovalDesc": "Kelivo will ask before accessing files outside the workspace, running desktop commands, or using other tools that need approval.",
   "contextLimitedInputHint": "Only the selected character window is read. The rest of the replaced history is not included in the summary; original messages remain available.",
   "contextTaskCancelled": "Compression cancelled",
@@ -7854,7 +7883,7 @@
   },
   "recoveryCopiesNeedUpdate": "Some copies were made by a newer version of Kelivo. Update Kelivo before restoring them. These copies have been kept.",
   "imageContextAllowRecall": "Allow the model to recall images",
-  "imageContextAllowRecallDescription": "Let the model retrieve images from this conversation when needed. Turning this off does not change automatic image management.",
+  "imageContextAllowRecallDescription": "Let view_image retrieve historical images from this conversation when needed. Turning this off does not affect images sent directly with messages, automatic image management, or workspace file access.",
   "imageContextTitle": "Image context",
   "imageContextAutomatic": "Manage history images automatically",
   "imageContextDescription": "Manage the images included in this turn. Originals stay in your chat.",
@@ -7896,15 +7925,19 @@
     },
     "description": "Status line showing how many images are included in this turn; {included} of {total}."
   },
-  "contextOperationsTitle": "Context operations",
-  "contextOperationsDescription": "Manage compression tasks, summaries and context boundaries",
-  "contextOperationsEmpty": "No context operations yet.",
-  "contextOperationsStored": "Saved history: {count} messages",
-  "contextOperationsEffective": "History for the next request: {summaries} summaries + {messages} original messages",
-  "contextOperationsScope": "Uses the current history limit. System prompts, memory, tools and unsent input add to this context. Open a record to view its summary, original range or undo it.",
-  "contextOperationsLoadFailed": "Could not load the context overview. Please retry.",
+  "contextOperationsTitle": "Compression and clear history",
+  "contextOperationsLoadMore": "Show more",
+  "@contextOperationsLoadMore": {
+    "description": "Button below the context operation history list. Loads and appends the next ten older records; initially only the three most recent records are shown. Hidden when all records are loaded. No placeholders."
+  },
+  "contextOperationsDescription": "Review compressions and clears, and undo them if needed.",
+  "contextOperationsEmpty": "No compressions or clears yet.",
+  "contextOperationsStored": "Saved chat: {count} messages",
+  "contextOperationsEffective": "The next send will include {summaries} summaries and {messages} original messages.",
+  "contextOperationsScope": "This uses the current history-length limit. System instructions, memory, tools, and unsent input are also added to the context. Open a record to view its summary, original range, or undo it.",
+  "contextOperationsLoadFailed": "Couldn’t load these records. Please try again.",
   "compressNewConversation": "Compress into a new chat",
-  "compressNewConversationDescription": "Create a new chat with the summary and retained messages. Keep the original chat unchanged. Turn off to compress in place.",
+  "compressNewConversationDescription": "When on, creates a new chat with the summary and kept messages, and leaves the original chat unchanged. When off, compresses in this chat.",
   "@contextOperationsStored": {
     "placeholders": {
       "count": {
@@ -7924,7 +7957,7 @@
     },
     "description": "Overview line describing the history sent in the next request: {summaries} summaries plus {messages} original messages."
   },
-  "contextViewBoundary": "Jump to boundary",
+  "contextViewBoundary": "Jump to where the context was cleared",
   "contextFixedStart": "Fixed context start",
   "contextSetFixedStart": "Start context here",
   "contextCancelFixedStart": "Cancel fixed context start",
@@ -7966,46 +7999,46 @@
   "compressionRoleplay": "Roleplay",
   "compressionOriginalPrompt": "My original prompt",
   "compressionMore": "More settings",
-  "compressionFocus": "Focus for this run",
+  "compressionFocus": "What to keep in focus this time",
   "compressionFocusHint": "Optional: key decisions, progress or character details",
   "compressionForConversation": "For this conversation",
   "compressionFollowGlobal": "Follow global defaults",
   "compressionSetGlobal": "Set as global defaults",
-  "compressionGlobalDescription": "Affects conversations that follow global defaults. Conversation overrides stay unchanged.",
+  "compressionGlobalDescription": "Only affects conversations that follow the global defaults. Conversations with their own settings are unchanged.",
   "compressionAutoTitle": "Automatic compression",
   "compressionAutoOff": "Off",
   "compressionAutoNotify": "Notify only",
   "compressionAutoOn": "Automatic",
-  "compressionNearLimit": "Context is near its estimated capacity. You can keep chatting or compress manually.",
+  "compressionNearLimit": "This chat is close to what the model can hold. You can keep sending, or compress first.",
   "compressionKeepTurns": "Keep recent",
-  "compressionKeepHint": "A turn includes a user message, its replies and tools.",
-  "compressionLength": "Summary limit (tokens)",
+  "compressionKeepHint": "A turn is one user message plus the replies and tool activity that follow it.",
+  "compressionLength": "Summary length (tokens)",
   "compressionTrigger": "Start at",
   "compressionTarget": "Compress to",
-  "compressionWindow": "Planning window",
-  "compressionRequests": "Maximum calls",
-  "compressionReference": "Reference active world books and memory",
-  "compressionReferenceHint": "Reference explains names and rules; it is not evidence that events happened or characters know them.",
-  "compressionToolReferences": "Reference consumed tool results",
-  "compressionToolReferencesHint": "Only with tool access. Keeps the latest unread results and allows exact, read-only recall.",
-  "compressionSummaryScan": "Include summaries in world book keyword matching",
+  "compressionWindow": "Summary model capacity",
+  "compressionRequests": "Maximum requests",
+  "compressionReference": "Reference world books and historical memory",
+  "compressionReferenceHint": "World books are matched only against the history being compressed, using memory snapshots from that time. This is only to explain names and rules — it doesn’t mean those events happened, or that a character already knows them.",
+  "compressionToolReferences": "Keep only references to tool results already read",
+  "compressionToolReferencesHint": "Only applies when tools are available. The latest unread results are kept in full. Results already read are kept as references — you can look them up, but not edit them.",
+  "compressionSummaryScan": "Also match world-book keywords against the summary",
   "compressionChatModel": "Follow the current chat model",
   "compressionManageTemplates": "Manage templates & recipes",
   "compressionLocalPreview": "Preview request · no model call",
-  "compressionTry": "Try summary · uses model tokens",
-  "compressionPreviewOnly": "Candidate only. Review and apply when ready.",
-  "compressionTemplateChanged": "This template applies to future summaries. Existing summaries are unchanged; re-read originals to rebuild missing details.",
+  "compressionTry": "Try a summary · uses model tokens",
+  "compressionPreviewOnly": "This only creates a preview. Use it after you’ve reviewed it.",
+  "compressionTemplateChanged": "The new template applies to future summaries only. Existing summaries stay as they are. To fill in details, regenerate from the originals.",
   "compressionRange": "Summarize {count} messages · keep {turns} user turns verbatim",
-  "compressionCalls": "{count} model calls",
+  "compressionCalls": "{count} model request(s)",
   "compressionActualUsage": "Summary model usage",
   "compressionUsageValues": "Input {input} · output {output} tokens",
-  "compressionUsageUnknown": "Usage not returned for {count} attempts; these calls are not counted as free.",
-  "compressionBudgetError": "The planned work exceeds the call limit. Increase the limit or select a larger summary model. No partial summary was applied.",
-  "compressionIncomplete": "The summary was truncated or refused and was not applied. Adjust the output limit or model.",
-  "compressionReferenceTooLarge": "The template, reference or working summary fills the summary model budget. Reduce references or choose a larger model.",
-  "compressionReferenceChanged": "Referenced background changed. Review the candidate or regenerate.",
-  "compressionTargetNotReached": "The candidate did not reduce the full request below the automatic trigger. Original context was kept.",
-  "compressionTemplateMissing": "The selected template is unavailable. Select another template.",
+  "compressionUsageUnknown": "{count} request(s) didn’t return usage data. That doesn’t mean they were free.",
+  "compressionBudgetError": "This would take more model requests than the current limit allows, so the context is unchanged. Raise Maximum requests, or switch to a model with a larger context.",
+  "compressionIncomplete": "The summary was cut off or refused, and the context is unchanged. Raise the output limit, or try a different model.",
+  "compressionReferenceTooLarge": "Reference material already fills this model’s capacity, leaving no room for the summary. Use fewer references, or switch to a model with a larger context.",
+  "compressionReferenceChanged": "The referenced background has changed. Review this summary, or generate a new one.",
+  "compressionTargetNotReached": "Even after compression, usage would still be above the automatic starting point, so the original context was kept. Shorten the summary, or raise Start at.",
+  "compressionTemplateMissing": "The selected template isn’t available. Please choose another.",
   "compressionTemplates": "Templates",
   "compressionRecipes": "Recipes",
   "compressionNewTemplate": "New template",
@@ -8016,20 +8049,20 @@
   "compressionPrompt": "Summary instructions",
   "compressionLanguage": "Output language",
   "compressionLanguageConversation": "Follow the conversation",
-  "compressionLanguageLegacy": "Keep original template language behavior",
-  "compressionLanguageHint": "Language code, or conversation / legacy",
-  "compressionVariables": "Supported variables; history is appended automatically if omitted:",
-  "compressionDeleteTemplate": "Choose a replacement and delete this template? Accepted summaries and recipe snapshots remain readable.",
-  "compressionTemplateReferences": "Used by {count} conversation overrides.",
+  "compressionLanguageLegacy": "Keep the original template’s language setting",
+  "compressionLanguageHint": "Enter a language name or code. You can also use conversation (follow the chat) or legacy (keep the original template).",
+  "compressionVariables": "You can use these variables. If the prompt doesn’t include the history, it will be appended automatically:",
+  "compressionDeleteTemplate": "Choose a replacement and delete this template? Summaries already in use, and copies saved in recipes, are kept.",
+  "compressionTemplateReferences": "Used as a per-conversation override in {count} chat(s).",
   "compressionSaveRecipe": "Save these settings as a recipe",
-  "compressionBindModel": "Include the selected summary model",
-  "compressionRecipeHint": "Recipes do not enable automatic compression. Import adds to the library without applying.",
+  "compressionBindModel": "Also save the summary model currently selected",
+  "compressionRecipeHint": "Saving or importing a recipe doesn’t turn on automatic compression, and doesn’t apply it to the current chat. It only adds the recipe to your library.",
   "compressionImport": "Import JSON",
   "compressionExport": "Export JSON",
   "compressionCopyJson": "Copy JSON",
   "compressionApplyRecipe": "Apply recipe",
-  "compressionInvalidSettings": "Check the values: target must be below trigger, and call and token limits must be positive.",
-  "compressionOverflowAction": "Compress once, then retry the failed response",
+  "compressionInvalidSettings": "Check these values: Compress to must be lower than Start at, and request and token limits must be greater than 0.",
+  "compressionOverflowAction": "Compress once, then retry the reply that failed",
   "@compressionRange": {
     "placeholders": {
       "count": {
@@ -8089,7 +8122,7 @@
     "description": "Status line in the compression options dialog showing estimated request count and the per-run limit, including retries."
   },
   "compressionGlobalTemplateReference": "Also used as the global default.",
-  "compressionRecipeReferences": "{count} recipes keep independent template snapshots.",
+  "compressionRecipeReferences": "{count} recipe(s) keep their own copy of the template from that time.",
   "compressionReplacementTemplate": "Replacement template",
   "@compressionRecipeReferences": {
     "placeholders": {
@@ -8131,21 +8164,46 @@
   "compressionRecipeCreateHint": "Save a recipe from More settings to reuse a configuration.",
   "compressionTurnUnit": "turns",
   "compressionCallUnit": "calls",
+  "compressionRequestTimeout": "Compression request timeout",
+  "@compressionRequestTimeout": {
+    "description": "Timeout field for each compression request, in minutes. Also labels the recovery action that opens this field."
+  },
+  "compressionMinuteUnit": "min",
+  "@compressionMinuteUnit": {
+    "description": "Minute unit suffix beside the compression request timeout numeric input. Keep it short to fit a narrow field suffix."
+  },
+  "compressionRequestTimeoutDefault": "Default",
+  "@compressionRequestTimeoutDefault": {
+    "description": "Placeholder for an empty compression request timeout input. Empty preserves the current behavior of each mode, including the native compression default of five minutes."
+  },
+  "compressionRequestTimeoutHint": "Enter a number of minutes greater than 0. Leave blank to keep the current default (5 minutes for server-side compression). When summarizing in parts, each part and the merge is timed separately.",
+  "@compressionRequestTimeoutHint": {
+    "description": "Help text below the compression request timeout input in More settings. The value may contain decimals and limits total wait per model invocation, not idle time or the whole multi-request task."
+  },
+  "compressionRequestTimedOut": "Compression stopped after {minutes} minutes and the context is unchanged. Try again, or allow a longer timeout.",
+  "@compressionRequestTimedOut": {
+    "description": "Compression task failure shown when the total deadline cancels a model request, distinct from user cancellation. minutes is the elapsed request limit in minutes, possibly fractional. Users can increase the timeout in More settings and retry.",
+    "placeholders": {
+      "minutes": {
+        "type": "num"
+      }
+    }
+  },
   "compressionAdvancedOptions": "Compression details",
-  "compressionAdvancedHint": "References, original-history rereading and request limits",
+  "compressionAdvancedHint": "References, whether to look back at originals, and the request limit",
   "compressionAutomaticWindow": "Auto",
   "compressionAutoOffHint": "Compress manually whenever you need.",
-  "compressionAutoNotifyHint": "Notify near the threshold; you decide when to compress.",
-  "compressionAutoOnHint": "Summarize older history at the threshold. Extra model usage applies.",
-  "compressionBudgetHint": "Percentages use the available input budget.",
+  "compressionAutoNotifyHint": "You’ll be notified when usage is close to the limit, and you decide when to compress.",
+  "compressionAutoOnHint": "When usage reaches the set percentage, earlier history is summarized automatically. This uses additional model tokens.",
+  "compressionBudgetHint": "These percentages are based on the input capacity still available.",
   "compressionPreviewAction": "Local preview",
   "compressionSaveRecipeAction": "Save recipe",
   "compressionManualRange": "Scope for this compression",
-  "compressionScopeKeepHint": "Keep recent turns verbatim and summarize older history. This turn count is also used by automatic compression.",
-  "compressionScopeAllHint": "Summarize all history in the current context, including recent turns. Original messages stay available.",
-  "compressionScopeStartHint": "Select earlier whole messages within the character budget. Other messages keep their original text.",
-  "compressionScopeRecentHint": "Select recent whole messages within the character budget. Other messages keep their original text.",
-  "compressionAutoKeepHint": "Automatic compression always keeps recent turns, regardless of the manual scope. This turn count is shared with manual compression.",
+  "compressionScopeKeepHint": "Keep the most recent turns as-is, and summarize earlier history. Automatic compression uses this same turn count.",
+  "compressionScopeAllHint": "Summarize all history currently in context, without keeping a separate recent original. The original messages can still be viewed.",
+  "compressionScopeStartHint": "Within the character limit, compress earlier complete messages. Messages not selected stay as original text.",
+  "compressionScopeRecentHint": "Within the character limit, compress more recent complete messages. Messages not selected stay as original text.",
+  "compressionAutoKeepHint": "Automatic compression always keeps recent originals, regardless of the range you pick for a manual run. The turn count is shared with manual compression.",
   "requestBudgetTitle": "Image & request budgets",
   "requestBudgetInherited": "Inherited",
   "requestBudgetCustom": "Custom",
@@ -8244,18 +8302,18 @@
     },
     "description": "Prefix used in budget errors when the actual size is a lower bound, rendering as 'at least {value}'."
   },
-  "compressionNativeTitle": "Use OpenAI native compaction",
-  "compressionNativeHint": "Uses the current chat model with Responses. Automatic compression in this chat also uses native compaction when enabled. Your service decides whether it is supported.",
-  "compressionNativeScopeHint": "Keep recent turns unchanged and compact earlier history. Native automatic compression uses this count too; the text-summary count stays unchanged.",
-  "compressionNativeLabel": "Native compaction",
-  "compressionNativeDescription": "The native context returned by the service is saved locally for subsequent requests. It cannot be read or edited as text. Original messages remain available and this compaction can be undone.",
-  "compressionNativeIncomplete": "The service did not return a complete native compaction result. The original context is unchanged.",
-  "compressionNativeScopeChanged": "This native context belongs to another connection or account. Continue with the original connection, or undo the compaction or create a text summary in the chat that contains the originals.",
-  "compressionNativeTokenHint": "Token usage for opaque native context is determined by the service.",
-  "compressionNativeCopyHint": "The new chat keeps only the complete native compaction result and retained recent turns. Originals stay in the source chat and cannot be restored by undoing here.",
-  "compressionNativeInputOverride": "The custom input field would replace native compression data. Remove the input override in the provider, model, or assistant settings before continuing.",
-  "compressionNativeAllHint": "Send all current history to native compaction without keeping a separate recent tail. Original messages remain available.",
-  "compressionNativeAutoHint": "At the threshold, compact natively with the current chat model, then continue sending. A failed attempt keeps the original context and does not switch to text summarization.",
+  "compressionNativeTitle": "Use OpenAI server-side compression",
+  "compressionNativeHint": "Uses the current chat model, and compression happens on the server. If automatic compression is on in this chat, it will use this method too. Your provider needs to support OpenAI’s Responses API.",
+  "compressionNativeScopeHint": "Keep the most recent turns as-is, and send earlier history to server-side compression. Automatic server-side compression uses this same count; the text-summary count is unchanged.",
+  "compressionNativeLabel": "Server-side compression",
+  "compressionNativeDescription": "The server’s compressed result is saved locally and will be used on the next send. It can’t be viewed or edited as text. Original messages are kept, and you can undo this compression.",
+  "compressionNativeIncomplete": "The server didn’t return a complete compressed result. The original context is unchanged.",
+  "compressionNativeScopeChanged": "This server-side result belongs to another connection or account. Switch back to the original connection to continue, or undo this compression in the chat that still has the originals and create a text summary.",
+  "compressionNativeTokenHint": "Token usage for server-side compression is reported by the server.",
+  "compressionNativeCopyHint": "The new chat only keeps the complete server-side result and the recent turns you kept. Originals stay in the original chat and can’t be restored by undoing here.",
+  "compressionNativeInputOverride": "A custom input parameter in the model or assistant settings would overwrite the server-side result. Remove that parameter before continuing.",
+  "compressionNativeAllHint": "Send all current history to server-side compression, without keeping a separate recent original. Original messages can still be viewed.",
+  "compressionNativeAutoHint": "When usage reaches the set percentage, the current chat model runs server-side compression, then sending continues. If it fails, the original context is kept and it won’t fall back to a text summary.",
   "languageDisplayRussian": "Russian",
   "@languageDisplayRussian": {
     "description": "Language name for the Russian translation target; the app-language selector uses its native name Русский."
@@ -10436,7 +10494,7 @@
     "description": "Descriptive subtitle for the compress-context action, noting the summary can be reviewed and undone."
   },
   "@clearContextDesc": {
-    "description": "Descriptive subtitle for the clear-context action, noting it marks a context boundary."
+    "description": "Subtitle for clearing context: earlier chat remains stored but is no longer sent to the model."
   },
   "@contextManagement": {
     "description": "Label/tooltip for the context management entry that opens context actions like compress or clear."
@@ -10451,10 +10509,10 @@
     "description": "Error shown when compression is attempted without an active conversation."
   },
   "@compressContextNoModel": {
-    "description": "Error message shown when context compression is attempted but no compression model is configured; mapped from a 'no_model' error code in the home page."
+    "description": "Compression error when no model is selected. Directs the user to select a compression model."
   },
   "@compressContextEmptySummary": {
-    "description": "Error message shown when the compression model returns an empty summary; mapped from an 'empty_summary' error code in the home page."
+    "description": "Compression failure when the model returned no summary text; suggests changing the model or options, not filling in a blank summary editor."
   },
   "@compressContextOptionsTitle": {
     "description": "Title of the dialog for configuring context compression in a chat."
@@ -10481,7 +10539,7 @@
     "description": "Primary confirm button in the compression options dialog that begins compression."
   },
   "@compressContextModelLabel": {
-    "description": "Section title labeling the model selector used for compression."
+    "description": "Compression model section heading and recovery action that opens the model selection section."
   },
   "@compressContextModelUnset": {
     "description": "Placeholder label shown in the model selector when no compression model has been chosen."
@@ -16429,6 +16487,9 @@
   "@toolSchemaSettingsGroupSearch": {
     "description": "Group heading for search-related built-in tools in the tool schema settings."
   },
+  "@toolSchemaSettingsGroupImages": {
+    "description": "Group heading in the mobile and desktop tool descriptions settings for the unified view_image tool, which can inspect conversation images or permitted workspace image files."
+  },
   "@toolSchemaSettingsGroupMemory": {
     "description": "Group heading for memory-related built-in tools in the tool schema settings."
   },
@@ -16802,7 +16863,7 @@
     "description": "Title for the read_file tool card."
   },
   "@workspaceToolTitleViewImage": {
-    "description": "Title for the view_image tool card."
+    "description": "Title for the view_image tool card and the image viewing entry in mobile and desktop chat tool menus."
   },
   "@workspaceToolTitleWriteFile": {
     "description": "Title for the write_file tool card."
@@ -16944,6 +17005,15 @@
   },
   "@workspaceEnvErrorPatchFailed": {
     "description": "Error message for 'patch_failed', stating sandbox setup could not be finished."
+  },
+  "@workspaceEnvErrorRepairInterrupted": {
+    "description": "Error shown in the iOS workspace environment details after an interrupted or cancelled sandbox repair, including recovery on app startup. Explains that the existing filesystem was retained and the user can retry the in-place repair. No placeholders."
+  },
+  "@workspaceEnvErrorRepairTimeout": {
+    "description": "Error shown in the iOS workspace environment details when sandbox repair exceeds its time limit and the command has stopped. Explains that the existing filesystem was retained and suggests checking the network before retrying the in-place repair. No placeholders."
+  },
+  "@workspaceEnvRepairRestartBanner": {
+    "description": "Banner in iOS workspace environment details when a cancelled or timed-out repair command has not confirmed it stopped. Requires a full app restart before retrying so package transactions cannot overlap, and reassures that the existing filesystem was retained. No placeholders."
   },
   "@workspaceEnvErrorCancelled": {
     "description": "Message for the 'cancelled' code and cancelled dependency installs, stating installation was cancelled."
@@ -17690,13 +17760,13 @@
     "description": "Storage usage category label for per-conversation files; also passed into the clear-done message."
   },
   "@storageSpaceCategorySessionFilesHint": {
-    "description": "Description of the conversation files category: attachments and outputs per conversation."
+    "description": "Storage Conversation files category help. Distinguishes workspace session copies and outputs from original uploads shown in Images/Files."
   },
   "@storageSpaceManageSkills": {
     "description": "Button label opening the skills management screen, used in the skills popover and storage page."
   },
   "@storageSessionFilesCleanOrphans": {
-    "description": "Button label to delete session folders that no longer have an associated conversation."
+    "description": "Storage Conversation files action. Removes empty roots including metadata-only folders and unreferenced orphan directories; other conversation references are protected."
   },
   "@workspaceDesktopFolderPath": {
     "description": "Text field label for the folder path when creating a desktop workspace."
@@ -20471,7 +20541,7 @@
     "description": "Action label to restore a previous context budget, shown in an undo snackbar action."
   },
   "@contextTaskApplying": {
-    "description": "Compression status text shown while the generated summary is being applied to the conversation."
+    "description": "Task status while the generated summary is being applied to the conversation."
   },
   "@storageSpaceImagesHint": {
     "description": "Hint on the storage page warning that deleting images affects chat images and tool results, while in-use avatars and backgrounds are protected."
@@ -20496,9 +20566,6 @@
   },
   "@compressTaskAbandon": {
     "description": "Destructive action label to dismiss/abandon a compression task."
-  },
-  "@browserAgentTimedOut": {
-    "description": "Browser agent status chip label shown when an operation timed out and the AI was paused."
   },
   "@compressCancelledSnack": {
     "description": "Snackbar confirming compression was cancelled and the current context is unchanged."
@@ -20651,7 +20718,7 @@
     "description": "Status hint that sending is paused and the queue must be cancelled to edit."
   },
   "@contextTaskReview": {
-    "description": "Status prompting the user to review the generated summary before applying it."
+    "description": "Task status indicating that a generated summary needs the user to review and accept it before it is applied."
   },
   "@storageSpaceImageInUseHint": {
     "description": "Tooltip explaining an image can't be deleted while used as an avatar, background, or icon."
@@ -20870,7 +20937,7 @@
     "description": "Fallback text shown when the context token limit is unknown."
   },
   "@browserErrActionTimeout": {
-    "description": "Error message when a browser action timed out with unknown outcome; asks the user to check the page before letting the AI continue."
+    "description": "Browser tool error summary for a timed-out command with an unconfirmed outcome. Browser control remains available for the assistant to inspect the page; this does not request manual permission to resume."
   },
   "@toolPermissionRequestApprovalDesc": {
     "description": "Description of the approval-required permission mode: tools accessing files outside the workspace or running desktop commands ask before executing."
@@ -21158,10 +21225,10 @@
     "description": "Message on the restore failure screen warning some copies come from a newer Kelivo version and require an app update; copies kept."
   },
   "@imageContextAllowRecall": {
-    "description": "Setting card label in the image context panel; toggles whether the model may recall historical images."
+    "description": "Label for the conversation image recall switch in the image context panel and mobile/desktop chat tool menus. Controls the historical-image capability of view_image."
   },
   "@imageContextAllowRecallDescription": {
-    "description": "Description under the recall setting; explains the model can retrieve conversation images on demand, independent of automatic management."
+    "description": "Description under the conversation image recall switch. Explains that view_image can retrieve historical chat images; disabling this does not disable direct vision on message attachments, automatic image management, or separately controlled workspace file access. Keep the tool name view_image unchanged."
   },
   "@imageContextTitle": {
     "description": "Title/label for the image context feature, used in the context usage popover and context management sheet."
@@ -21224,10 +21291,10 @@
     "description": "Error message shown when saving image inclusion changes fails."
   },
   "@contextOperationsTitle": {
-    "description": "Title of the context operations entry/panel; opens the log of compression tasks, summaries and context boundaries."
+    "description": "Title of the panel listing compression and context-clearing records, including tasks that need attention."
   },
   "@contextOperationsDescription": {
-    "description": "Subtitle under the context operations entry describing what it manages: compression tasks, summaries and context boundaries."
+    "description": "Subtitle of the compression and clear history entry; users can inspect records and undo operations."
   },
   "@contextOperationsEmpty": {
     "description": "Empty-state text in the context operations panel when no operations have been recorded."
@@ -21245,7 +21312,7 @@
     "description": "Helper text explaining that a new chat gets the summary and retained messages while the original stays unchanged; off means compress in place."
   },
   "@contextViewBoundary": {
-    "description": "Action sheet item that jumps the chat view to the context boundary position."
+    "description": "Action that jumps to the position of a context operation in the chat timeline."
   },
   "@contextFixedStart": {
     "description": "Label for a context operation that marks a fixed context start point."
@@ -21356,25 +21423,25 @@
     "description": "Hint text explaining that a turn includes a user message plus its replies and tool content."
   },
   "@compressionLength": {
-    "description": "Number-field label for the summary output token limit."
+    "description": "Compression summary settings: target maximum length of visible summary text in tokens, separate from the total generation limit including reasoning."
   },
   "@compressionTrigger": {
-    "description": "Number-field label for the context-usage percentage that starts automatic compression."
+    "description": "Percentage field in automatic compression settings: input usage at which compression starts."
   },
   "@compressionTarget": {
-    "description": "Number-field label for the target context percentage after compression."
+    "description": "Percentage field in automatic compression settings: desired input usage after compression."
   },
   "@compressionWindow": {
-    "description": "Number-field label for the planning window used in automatic compression."
+    "description": "Optional input-capacity override for the summary model in compression details, measured in tokens."
   },
   "@compressionRequests": {
-    "description": "Number-field label for the maximum number of model calls allowed."
+    "description": "Maximum number of model requests allowed for one compression task, including retries. Also labels the recovery action that opens this field."
   },
   "@compressionReference": {
-    "description": "Switch label for including active world books and memory as reference during summarization."
+    "description": "Compression option to include world books evaluated on the selected history and memory snapshots frozen in that history, rather than current live memory or retained messages."
   },
   "@compressionReferenceHint": {
-    "description": "Hint clarifying that reference material explains names/rules but is not evidence events occurred or characters know them."
+    "description": "Compression reference help: restrict dynamic reference sources to the selected historical range, and distinguish explanatory background from events or character knowledge. No placeholders."
   },
   "@compressionToolReferences": {
     "description": "Switch label for replacing already-consumed tool results with references."
@@ -21407,7 +21474,7 @@
     "description": "Detail-row label for the summary model's actual token usage."
   },
   "@compressionBudgetError": {
-    "description": "Error message when planned work exceeds the call limit, advising a higher limit or larger model; no partial summary applied."
+    "description": "Compression failure when the estimated or actual request count exceeds the configured maximum. Refers to the setting named compressionRequests and confirms no result was applied."
   },
   "@compressionIncomplete": {
     "description": "Error message when the summary was truncated or refused and not applied, advising adjusting output limit or model."
@@ -21419,7 +21486,7 @@
     "description": "Error message when referenced background changed, advising reviewing the candidate or regenerating."
   },
   "@compressionTargetNotReached": {
-    "description": "Error message when the candidate did not reduce the request below the auto trigger, so original context was kept."
+    "description": "Review notice when automatic compression did not reduce the full request below its trigger ratio. The original context remains active; suggests shortening the summary or adjusting compressionTrigger."
   },
   "@compressionTemplateMissing": {
     "description": "Error message when the selected template is unavailable, advising choosing another."
@@ -21665,7 +21732,7 @@
     "description": "Status in the image context panel when an image's size is only an estimate and will be checked at send time."
   },
   "@compressionNativeTitle": {
-    "description": "Switch label in the compression options dialog to enable OpenAI native compaction."
+    "description": "Toggle label for OpenAI server-side compaction using the current chat model and Responses API."
   },
   "@compressionNativeHint": {
     "description": "Hint under the native compaction switch explaining it uses the current chat model with Responses and that server support is required."
@@ -21674,7 +21741,7 @@
     "description": "Hint for the keep-recent scope when native compaction is selected, noting the turn count also applies to native automatic compression."
   },
   "@compressionNativeLabel": {
-    "description": "Label for a native compaction operation shown in the context divider and operation actions."
+    "description": "Short label for a server-side compaction result; this is opaque data, not an editable text summary."
   },
   "@compressionNativeDescription": {
     "description": "Description in the context operation view explaining that opaque native context is stored locally for later requests, cannot be viewed as text, and can be undone."
@@ -21700,27 +21767,27 @@
   "@compressionNativeAutoHint": {
     "description": "Hint for automatic compression with native mode: compact at the threshold with the current model; failures keep the original context without falling back to text summarization."
   },
-  "compressionNativeImported": "Native context loaded",
+  "compressionNativeImported": "Server-side compression loaded",
   "@compressionNativeImported": {
     "description": "Title for an imported native compaction at the start of a new chat, shown in the timeline, context operation list and details. It is opaque context carried over from another chat, not a locally undoable compression. No placeholders."
   },
-  "compressionNativeImportedDescription": "This chat starts with the complete native compaction result and retained recent turns. The result cannot be read or edited as text. Earlier originals remain in the source chat, so they cannot be restored by undoing here.",
+  "compressionNativeImportedDescription": "This chat starts with the server-side compressed result and the most recent turns. The result can’t be viewed or edited as text. Earlier originals remain in the original chat and can’t be restored by undoing here.",
   "@compressionNativeImportedDescription": {
     "description": "Description in imported native context details. Explains which data this chat owns, that the provider result is opaque, and that earlier originals must be viewed or restored in the source chat rather than through local undo. No placeholders."
   },
-  "compressionNativeOpenSource": "Open source chat",
+  "compressionNativeOpenSource": "Open original chat",
   "@compressionNativeOpenSource": {
     "description": "Action in imported native context details to open the source conversation containing the earlier originals. Source means the originating chat, not source code. No placeholders."
   },
-  "compressionNativeOriginalsUnavailable": "This chat has no originals for the imported native context. Continue with native compaction, or return to the source chat to view or summarize the originals.",
+  "compressionNativeOriginalsUnavailable": "This chat has no originals for the loaded server-side result. You can keep using server-side compression, or go back to the original chat to view the originals or create a text summary.",
   "@compressionNativeOriginalsUnavailable": {
     "description": "Message when undo or text-summary regeneration would require originals absent from an imported native context. Also shown in compression options when the selected range includes such context. Directs users to native compaction or the source chat. No placeholders."
   },
-  "compressionNativeTemporaryCopyHint": "The new temporary chat keeps only the complete native compaction result and retained recent turns. Leaving the source temporary chat deletes it and the originals not carried over; they cannot be restored here.",
+  "compressionNativeTemporaryCopyHint": "The new temporary chat only keeps the complete server-side result and recent turns. When you leave the original temporary chat, it and any originals not carried over are deleted and can’t be restored here.",
   "@compressionNativeTemporaryCopyHint": {
     "description": "Warning in the compression dialog when native compaction creates a new temporary chat. The app discards the source temporary chat when switching away, so originals outside the retained tail are deleted and cannot be restored from the new chat. No placeholders."
   },
-  "compressionNativeSourceUnavailable": "This chat keeps the complete native compaction result and retained recent turns. The source chat is no longer available. Originals not copied here cannot be restored, and the native result cannot be read or edited as text.",
+  "compressionNativeSourceUnavailable": "This chat has the complete server-side result and the recent turns you kept. The original chat is no longer available. Originals not copied here can’t be restored, and the result can’t be viewed or edited as text.",
   "@compressionNativeSourceUnavailable": {
     "description": "Description in imported native context details when the source conversation has been deleted or discarded. Explains that this chat still owns the complete opaque result and retained tail, but cannot restore absent originals. No placeholders."
   },
@@ -21787,5 +21854,145 @@
   "workspaceEnvNativeShellSave": "Save",
   "@workspaceEnvNativeShellSave": {
     "description": "Button in the desktop default shell dialog; validates and saves the executable path or automatic detection setting."
+  },
+  "desktopAutostartTitle": "Launch at startup",
+  "@desktopAutostartTitle": {
+    "description": "Desktop display settings, tray section: switch to register Kelivo to start when the user logs in to this device. Disabled by default."
+  },
+  "desktopAutostartDescription": "Start Kelivo when you sign in to this computer.",
+  "@desktopAutostartDescription": {
+    "description": "Tooltip for the desktop launch-at-startup switch. This is a device-local operating system setting."
+  },
+  "desktopAutostartHiddenTitle": "Hide to tray on automatic startup",
+  "@desktopAutostartHiddenTitle": {
+    "description": "Desktop display settings, tray section: switch to keep the main window hidden only when the system starts Kelivo at login."
+  },
+  "desktopAutostartHiddenDescription": "Requires launch at startup and the tray icon. Opening Kelivo manually still shows the window.",
+  "@desktopAutostartHiddenDescription": {
+    "description": "Tooltip for hiding the desktop window on automatic startup. Explains prerequisites and that manual launches remain visible."
+  },
+  "desktopAutostartUnsupported": "Launch at startup requires macOS 13 or later.",
+  "@desktopAutostartUnsupported": {
+    "description": "Desktop startup switch tooltip when the current macOS version does not support the system login-item API."
+  },
+  "desktopAutostartError": "Could not apply the startup setting. Check this app in your system startup or login-item settings and try again.",
+  "@desktopAutostartError": {
+    "description": "Desktop startup setting failure tooltip and error notification, including when system approval is required. No placeholders."
+  },
+  "compressionOutputBudget": "Total output limit (tokens)",
+  "compressionOutputBudgetHint": "Includes thinking and the summary itself. Leave blank to use the summary length. If thinking is on, you can raise this limit without making the summary longer. The model’s own output limit still applies.",
+  "@compressionOutputBudget": {
+    "description": "Total output token limit for summary generation, including reasoning and summary text. Also labels the recovery action that opens this field."
+  },
+  "@compressionOutputBudgetHint": {
+    "description": "Help below the compression total output limit field: reasoning consumes the same budget, an independent higher limit does not increase the desired summary length, blank follows the summary target, and model output limits still apply. No placeholders."
+  },
+  "responseOutputLimitReached": "Response truncated: the output limit includes reasoning. Increase the output limit or reduce reasoning before retrying.",
+  "@responseOutputLimitReached": {
+    "description": "Persistent notice below an assistant reply stopped by max_output_tokens when the latest request is not known to be near the context window limit. Explains that reasoning also consumes the output allowance."
+  },
+  "responseContextLimitReached": "Response truncated: this request used {inputTokens} input tokens, close to the {contextWindow}-token context limit. Shorten the context before retrying.",
+  "@responseContextLimitReached": {
+    "description": "Persistent notice below a truncated assistant reply when the final HTTP response input usage is at least 95 percent of the configured context window. Does not attribute the limit to images. inputTokens is that single request input usage; contextWindow is the model context capacity.",
+    "placeholders": {
+      "inputTokens": {
+        "type": "int"
+      },
+      "contextWindow": {
+        "type": "int"
+      }
+    }
+  },
+  "responseRetryWithoutImages": "Retry without images (keep originals)",
+  "@responseRetryWithoutImages": {
+    "description": "Action below a truncated assistant reply whose final request contained images. Regenerates once with all image inputs omitted for that generation, including tool follow-ups, without deleting attachments or changing saved settings."
+  },
+  "browserOperationTimeout": "Operation timeout",
+  "browserOperationTimeoutDescription": "Maximum wait for a browser command. The assistant can check the page after a timeout.",
+  "browserOperationTimeoutSeconds": "{seconds} seconds",
+  "@browserOperationTimeout": {
+    "description": "Browser settings row and picker title for the maximum wait for an individual native browser command."
+  },
+  "@browserOperationTimeoutDescription": {
+    "description": "Explanatory text in the browser operation-timeout picker. Describes the command deadline and that the assistant can inspect the page after a timeout."
+  },
+  "@browserOperationTimeoutSeconds": {
+    "description": "Selected value and picker option in browser operation-timeout settings. The integer seconds placeholder is the maximum command wait in seconds.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "browserErrObservationRequired": "Inspect the page before continuing; the previous operation is unconfirmed.",
+  "@browserErrObservationRequired": {
+    "description": "Browser tool error summary when a page-changing command was not sent because an earlier command timed out. The assistant must successfully read a snapshot or extract before further changes; no manual resume permission is needed."
+  },
+  "storageAttachmentRetention": "Auto-clean attachments",
+  "@storageAttachmentRetention": {
+    "description": "Settings button in the upper-right corner of the Storage Space overview, and its dialog title. Configures automatic deletion of unused chat images and files."
+  },
+  "storageAttachmentRetentionDays": "Days before cleanup",
+  "@storageAttachmentRetentionDays": {
+    "description": "Number field shown only when delayed automatic cleanup is selected. Enter a positive number of days to keep unused attachments before deleting them."
+  },
+  "storageAttachmentRetentionImmediately": "Clean immediately",
+  "@storageAttachmentRetentionImmediately": {
+    "description": "First option in the automatic attachment cleanup dialog. Selects zero-day retention without requiring the user to type zero."
+  },
+  "storageAttachmentRetentionHint": "After you delete messages or chats, automatically remove images and files that are no longer used.",
+  "@storageAttachmentRetentionHint": {
+    "description": "Short introduction in the automatic attachment cleanup dialog. Explains the purpose in everyday language before the immediate/later choice."
+  },
+  "storageAttachmentUnused": "Unused",
+  "@storageAttachmentUnused": {
+    "description": "Attachment badge when no conversation, draft or appearance reference remains and no automatic recycling deadline is recorded. Manual deletion is available."
+  },
+  "storageAttachmentPending": "Waiting for cleanup · {date}",
+  "@storageAttachmentPending": {
+    "description": "Attachment status showing the earliest scheduled cleanup date. date is a localized calendar date; cleanup may wait for the next maintenance run.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAttachmentConversations": "Chats: {names}",
+  "@storageAttachmentConversations": {
+    "description": "Compact label below an attachment preview and in its information dialog. names lists every chat or branch using this file.",
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAttachmentCleanUnused": "Clean unused",
+  "@storageAttachmentCleanUnused": {
+    "description": "Action in the Images/Files list. Opens a confirmation to delete files that are no longer used; active files remain protected."
+  },
+  "storageAttachmentProtectedHint": "Files still in use will be kept.",
+  "@storageAttachmentProtectedHint": {
+    "description": "Brief explanation in the Images/Files list and automatic cleanup dialog, also used as the in-use badge tooltip. Avoid technical reference-count terminology."
+  },
+  "storageAttachmentDeleteConfirm": "Delete {count} unused files now? Files that are still in use will be kept.",
+  "@storageAttachmentDeleteConfirm": {
+    "description": "Confirmation for manual storage attachment cleanup. count is the selected number; references are checked again before deletion.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageAttachmentRetentionDelayed": "Clean later",
+  "@storageAttachmentRetentionDelayed": {
+    "description": "Second option in the automatic attachment cleanup dialog. Reveals a field for the number of days to wait before deleting unused attachments."
+  },
+  "storageAttachmentRetentionInvalidDays": "Enter 1–3650 days.",
+  "@storageAttachmentRetentionInvalidDays": {
+    "description": "Inline error below the delayed attachment cleanup number field. Only shown when the value is empty, zero, or above the maximum. Immediate cleanup has its own option."
+  },
+  "storageAttachmentDetailsTitle": "File info",
+  "@storageAttachmentDetailsTitle": {
+    "description": "Title of the information dialog opened by tapping an attachment status label. Shows its chats or cleanup status; this is not the automatic-cleanup settings dialog."
   }
 }

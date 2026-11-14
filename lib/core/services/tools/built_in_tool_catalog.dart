@@ -4,8 +4,9 @@ import '../../services/search/search_tool_service.dart';
 import '../../services/search/web_fetch_tool_service.dart';
 import '../../../features/home/services/local_tools_service.dart';
 import '../workspace/workspace_tools_service.dart';
+import 'view_image_tool.dart';
 
-enum BuiltInToolGroup { search, memory, local, workspace }
+enum BuiltInToolGroup { search, images, memory, local, workspace }
 
 class BuiltInToolCatalogEntry {
   const BuiltInToolCatalogEntry({
@@ -47,6 +48,15 @@ abstract final class BuiltInToolCatalog {
         defaultDefinition: WebFetchToolService.getToolDefinition(),
         group: BuiltInToolGroup.search,
       ),
+      BuiltInToolCatalogEntry(
+        name: ViewImageTool.name,
+        defaultDefinition: ViewImageTool.withHistory(
+          WorkspaceToolsService.definitions().singleWhere(
+            (definition) => _toolName(definition) == ViewImageTool.name,
+          ),
+        ),
+        group: BuiltInToolGroup.images,
+      ),
     ];
 
     final memoryDefs = legacyMemoryMode
@@ -75,6 +85,7 @@ abstract final class BuiltInToolCatalog {
       );
     }
     for (final definition in WorkspaceToolsService.definitions()) {
+      if (_toolName(definition) == ViewImageTool.name) continue;
       out.add(
         BuiltInToolCatalogEntry(
           name: _toolName(definition)!,

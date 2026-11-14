@@ -22,11 +22,14 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 import 'tools_sheet_row.dart';
+import 'image_recall_control.dart';
 import '../../mcp/widgets/mcp_server_avatar.dart';
+import '../../mcp/widgets/mcp_tool_connection_status.dart';
 import '../../mcp/utils/mcp_tool_groups.dart';
 
 /// Everything the model can call in this chat: device-local tools, connected
@@ -182,6 +185,7 @@ class _ChatToolsSheetState extends State<ChatToolsSheet> {
                           SliverToBoxAdapter(
                             child: _LocalToolsGroup(
                               assistantId: widget.assistantId,
+                              conversationId: widget.conversationId,
                               expanded: _expanded.contains(_ToolsGroupId.local),
                               onToggle: () => _toggleGroup(_ToolsGroupId.local),
                             ),
@@ -223,7 +227,7 @@ class _ChatToolsSheetState extends State<ChatToolsSheet> {
 ///
 /// The header borrows the tile's own geometry so the sheet reads as three
 /// columns and nothing else: the disclosure chevron sits in the tiles' 20px
-/// icon column, the title on their label baseline, and the folded summary ends
+/// icon column, the title on their label baseline, and the summary ends
 /// on the same right edge as every switch and chevron below it.
 class _ToolsGroup extends StatelessWidget {
   const _ToolsGroup({
@@ -304,9 +308,7 @@ class _ToolsGroup extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (!expanded &&
-                        summaryText != null &&
-                        summaryText.isNotEmpty)
+                    if (summaryText != null && summaryText.isNotEmpty)
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 160),
                         child: Text(
@@ -351,11 +353,13 @@ class _ToolsGroup extends StatelessWidget {
 class _LocalToolsGroup extends StatelessWidget {
   const _LocalToolsGroup({
     required this.assistantId,
+    required this.conversationId,
     required this.expanded,
     required this.onToggle,
   });
 
   final String assistantId;
+  final String? conversationId;
   final bool expanded;
   final VoidCallback onToggle;
 
@@ -382,42 +386,60 @@ class _LocalToolsGroup extends StatelessWidget {
     final enabled = assistant.localToolIds.toSet();
     final enabledCount = ids.where(enabled.contains).length;
 
-    return _ToolsGroup(
-      key: ChatToolsSheet.localGroupKey,
-      isFirst: true,
-      title: l10n.assistantEditPageLocalToolsTab,
-      summary: '$enabledCount/${ids.length}',
-      expanded: expanded,
-      onToggle: onToggle,
-      children: [
-        for (final id in ids)
-          ToolsSheetRow(
-            key: ChatToolsSheet.localToolKey(id),
-            icon: localToolIcon(id),
-            label: localToolTitle(l10n, id),
-            selected: enabled.contains(id),
-            onTap: () => unawaited(
-              setLocalToolEnabled(
-                context,
-                assistant: assistant,
-                toolId: id,
-                value: !enabled.contains(id),
-              ),
-            ),
-            trailing: IosSwitch(
-              value: enabled.contains(id),
-              semanticLabel: localToolTitle(l10n, id),
-              onChanged: (value) => unawaited(
+    return ImageRecallControl(
+      assistantId: assistantId,
+      conversationId: conversationId,
+      builder: (imageEnabled, onImageChanged) => _ToolsGroup(
+        key: ChatToolsSheet.localGroupKey,
+        isFirst: true,
+        title: l10n.assistantEditPageLocalToolsTab,
+        summary: '${enabledCount + (imageEnabled ? 1 : 0)}/${ids.length + 1}',
+        expanded: expanded,
+        onToggle: onToggle,
+        children: [
+          for (final id in ids)
+            ToolsSheetRow(
+              key: ChatToolsSheet.localToolKey(id),
+              icon: localToolIcon(id),
+              label: localToolTitle(l10n, id),
+              selected: enabled.contains(id),
+              onTap: () => unawaited(
                 setLocalToolEnabled(
                   context,
                   assistant: assistant,
                   toolId: id,
-                  value: value,
+                  value: !enabled.contains(id),
+                ),
+              ),
+              trailing: IosSwitch(
+                value: enabled.contains(id),
+                semanticLabel: localToolTitle(l10n, id),
+                onChanged: (value) => unawaited(
+                  setLocalToolEnabled(
+                    context,
+                    assistant: assistant,
+                    toolId: id,
+                    value: value,
+                  ),
                 ),
               ),
             ),
+          ToolsSheetRow(
+            key: const ValueKey('chat-tools-view-image'),
+            icon: Lucide.Image,
+            label: l10n.workspaceToolTitleViewImage,
+            selected: imageEnabled,
+            onTap: onImageChanged == null
+                ? null
+                : () => onImageChanged(!imageEnabled),
+            trailing: IosSwitch(
+              value: imageEnabled,
+              semanticLabel: l10n.workspaceToolTitleViewImage,
+              onChanged: onImageChanged,
+            ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -514,28 +536,58 @@ class _McpGroup extends StatelessWidget {
         ),
         if (expanded && conversationScoped)
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                ToolsSheetRow(
-                  key: const ValueKey('chat-tools-mcp-inherit'),
-                  icon: Lucide.RotateCcw,
-                  label: l10n.mcpInheritAssistant,
-                  subtitle: inherited
-                      ? l10n.mcpSelectionInherited
-                      : l10n.mcpSelectionCustom,
-                  selected: inherited,
-                  onTap: () => unawaited(setIds(null)),
-                ),
-                const SizedBox(height: 8),
-                ToolsSheetRow(
-                  key: const ValueKey('chat-tools-mcp-clear'),
-                  icon: Lucide.CircleX,
-                  label: l10n.mcpAssistantSheetClearAll,
-                  selected: !inherited && selected.isEmpty,
-                  onTap: () => unawaited(setIds(const [])),
-                ),
-                const SizedBox(height: 8),
-              ],
+            child: Padding(
+              // Align this secondary line with the section and server labels.
+              padding: const EdgeInsets.only(left: 42, right: 6),
+              child: OverflowBar(
+                alignment: MainAxisAlignment.spaceBetween,
+                spacing: 8,
+                overflowAlignment: OverflowBarAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        inherited
+                            ? l10n.mcpSelectionInherited
+                            : l10n.mcpSelectionCustom,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    children: [
+                      if (!inherited)
+                        IosTextButton(
+                          key: const ValueKey('chat-tools-mcp-inherit'),
+                          label: l10n.mcpInheritAssistant,
+                          fontSize: 12,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          onPressed: () => unawaited(setIds(null)),
+                        ),
+                      IosTextButton(
+                        key: const ValueKey('chat-tools-mcp-clear'),
+                        label: l10n.mcpAssistantSheetClearAll,
+                        fontSize: 12,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        onPressed: !inherited && selected.isEmpty
+                            ? null
+                            : () => unawaited(setIds(const [])),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         if (expanded)
@@ -563,27 +615,36 @@ class _McpGroup extends StatelessWidget {
                 padding: EdgeInsets.only(
                   top: index == 0 || rows[index - 1].server == null ? 0 : 8,
                 ),
-                child: ToolsSheetRow(
-                  key: ChatToolsSheet.mcpServerKey(server.id),
-                  leading: McpServerAvatar(
-                    server: server,
-                    size: 20,
-                    radius: 7,
-                    showBackground: false,
-                  ),
-                  label: server.name,
-                  selected: selected.contains(server.id),
-                  detail:
-                      '${server.tools.where((tool) => tool.enabled).length}/${server.tools.length}',
-                  onTap: () => unawaited(
-                    setSelected(server.id, !selected.contains(server.id)),
-                  ),
-                  trailing: IosSwitch(
-                    value: selected.contains(server.id),
-                    semanticLabel: server.name,
-                    onChanged: (value) =>
-                        unawaited(setSelected(server.id, value)),
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ToolsSheetRow(
+                      key: ChatToolsSheet.mcpServerKey(server.id),
+                      leading: McpServerAvatar(
+                        server: server,
+                        size: 20,
+                        radius: 7,
+                        showBackground: false,
+                        status: mcp.statusFor(server.id) == McpStatus.connected
+                            ? null
+                            : mcp.statusFor(server.id),
+                      ),
+                      label: server.name,
+                      selected: selected.contains(server.id),
+                      detail:
+                          '${server.tools.where((tool) => tool.enabled).length}/${server.tools.length}',
+                      onTap: () => unawaited(
+                        setSelected(server.id, !selected.contains(server.id)),
+                      ),
+                      trailing: IosSwitch(
+                        value: selected.contains(server.id),
+                        semanticLabel: server.name,
+                        onChanged: (value) =>
+                            unawaited(setSelected(server.id, value)),
+                      ),
+                    ),
+                    McpToolConnectionStatus(serverId: server.id),
+                  ],
                 ),
               );
             },
@@ -615,7 +676,7 @@ class _WorkspaceGroup extends StatelessWidget {
       key: ChatToolsSheet.workspaceGroupKey,
       title: l10n.workspacesTitle,
       // Only read while folded, where the section's own first row is hidden.
-      summary: _boundName(context),
+      summary: expanded ? null : _boundName(context),
       expanded: expanded,
       onToggle: onToggle,
       children: [
