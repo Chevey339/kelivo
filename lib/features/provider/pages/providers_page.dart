@@ -514,6 +514,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
     _p('MaruCode', 'MaruCode', enabled: false, models: 0),
     _p('砂糖酒馆', '砂糖酒馆', enabled: false, models: 0),
     _p('Vercel AI Gateway', 'Vercel', enabled: false, models: 0),
+    _p('Atlas Cloud', 'Atlas Cloud', enabled: true, models: 0),
     _p('Tensdaq', 'Tensdaq', enabled: false, models: 0),
     _p(l10n.providersPageAliyunName, 'Aliyun', enabled: false, models: 0),
     _p(l10n.providersPageZhipuName, 'Zhipu AI', enabled: false, models: 0),

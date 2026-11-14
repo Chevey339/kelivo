@@ -212,6 +212,7 @@ void main() {
         'MaruCode',
         '砂糖酒馆',
         'Vercel',
+        'Atlas Cloud',
       ];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({

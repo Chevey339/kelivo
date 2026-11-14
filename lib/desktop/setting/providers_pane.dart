@@ -327,6 +327,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'MaruCode', key: 'MaruCode'),
       (name: '砂糖酒馆', key: '砂糖酒馆'),
       (name: 'Vercel AI Gateway', key: 'Vercel'),
+      (name: 'Atlas Cloud', key: 'Atlas Cloud'),
       (name: 'Tensdaq', key: 'Tensdaq'),
       (name: l10n.providersPageAliyunName, key: 'Aliyun'),
       (name: l10n.providersPageZhipuName, key: 'Zhipu AI'),
