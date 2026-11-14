@@ -294,12 +294,62 @@ class ImageViewerPage extends StatefulWidget {
     this.initialIndex = 0,
     this.draft,
     this.imageProviders = const <String, ImageProvider>{},
-  });
+    this.heroTags,
+    this.initialPreview,
+  }) : assert(heroTags == null || heroTags.length == images.length);
 
   final List<String> images; // local paths, http urls, or data urls
   final int initialIndex;
   final ImageViewerDraftMode? draft;
   final Map<String, ImageProvider> imageProviders;
+  final List<Object>? heroTags;
+
+  /// The already visible thumbnail supplies both the first frame and its aspect ratio.
+  final ({ImageProvider provider, Size size})? initialPreview;
+
+  Future<void> open(BuildContext context) {
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    return Navigator.of(context).push<void>(
+      PageRouteBuilder<void>(
+        opaque: false,
+        transitionDuration: reducedMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        reverseTransitionDuration: reducedMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 240),
+        pageBuilder: (_, _, _) => this,
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
+          opacity: animation.drive(CurveTween(curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  static RectTween flightRect(Rect? begin, Rect? end) =>
+      RectTween(begin: begin, end: end);
+
+  static Widget thumbnailFlight(
+    BuildContext flightContext,
+    Animation<double> animation,
+    HeroFlightDirection direction,
+    BuildContext fromContext,
+    BuildContext toContext,
+  ) {
+    final thumbnail = direction == HeroFlightDirection.push
+        ? fromContext
+        : toContext;
+    final hero = thumbnail.widget as Hero;
+    return AnimatedBuilder(
+      animation: animation,
+      child: hero.child,
+      builder: (_, child) => ClipRRect(
+        borderRadius: BorderRadius.circular(10 * (1 - animation.value)),
+        child: child,
+      ),
+    );
+  }
 
   @override
   State<ImageViewerPage> createState() => _ImageViewerPageState();
@@ -377,6 +427,10 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       0,
       _images.isEmpty ? 0 : _images.length - 1,
     );
+    final preview = widget.initialPreview;
+    if (_hasImages && preview != null) {
+      _imageNaturalSizes[_images[_index]] = preview.size;
+    }
     _controller = PageController(initialPage: _index);
     _zoomCtrls = List<TransformationController>.generate(_images.length, (_) {
       final ctrl = TransformationController();
@@ -1550,13 +1604,26 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           provider,
           configuration: createLocalImageConfiguration(context),
         );
+        final preview = i == widget.initialIndex ? widget.initialPreview : null;
         final image = Image(
           key: ValueKey((src, _reloadVersions[src] ?? 0)),
           image: provider,
           fit: BoxFit.contain,
           gaplessPlayback: true,
+          frameBuilder: preview == null
+              ? null
+              : (_, child, frame, _) => frame == null
+                    ? Image(
+                        image: preview.provider,
+                        fit: BoxFit.contain,
+                        excludeFromSemantics: true,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      )
+                    : child,
           loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
+            if (loadingProgress == null || preview != null) {
+              return child;
+            }
             return Center(
               child: SizedBox(
                 width: 34,
@@ -1683,9 +1750,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
                               width: displaySize.width,
                               height: displaySize.height,
                               child: Hero(
-                                tag: widget.draft == null
-                                    ? 'img:$src'
-                                    : ('draft-image', i),
+                                createRectTween: ImageViewerPage.flightRect,
+                                tag: widget.heroTags?[i] ?? _imageFrameKeys[i],
                                 child: SizedBox.expand(
                                   child: Semantics(
                                     image: true,

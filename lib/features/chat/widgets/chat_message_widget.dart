@@ -241,10 +241,7 @@ Uint8List? _decodeDataUriBytes(String path) {
   return bytes;
 }
 
-/// Shared image widget for tool thumbnails and message attachment previews.
-///
-/// Decodes through [SafeResizeImage] at the display area × device pixel ratio so
-/// 17K tool outputs are not materialized at full resolution.
+/// Builds a tool thumbnail without decoding large tool outputs at full resolution.
 Widget _buildResolvedImage(
   BuildContext context,
   String rawPath, {
@@ -252,49 +249,35 @@ Widget _buildResolvedImage(
   double? height,
   double? maxLogicalWidth,
   BoxFit fit = BoxFit.contain,
-  Widget Function()? placeholder,
 }) {
   final cs = Theme.of(context).colorScheme;
-  Widget errorWidget() =>
-      placeholder?.call() ??
-      Container(
-        width: width ?? (height != null ? height * 0.67 : 120),
-        height: height ?? 180,
-        color: cs.surfaceContainerHighest,
-        alignment: Alignment.center,
-        child: Icon(
-          Lucide.ImageOff,
-          size: 24,
-          color: cs.onSurface.withValues(alpha: 0.5),
-        ),
-      );
-
-  final path = rawPath.trim();
-  if (path.isEmpty) return errorWidget();
-
-  final provider = _toolImageProvider(path);
-  if (provider == null) return errorWidget();
+  Widget errorWidget() => Container(
+    width: width ?? (height != null ? height * 0.67 : 120),
+    height: height ?? 180,
+    color: cs.surfaceContainerHighest,
+    alignment: Alignment.center,
+    child: Icon(
+      Lucide.ImageOff,
+      size: 24,
+      color: cs.onSurface.withValues(alpha: 0.5),
+    ),
+  );
 
   final logicalHeight = height ?? width ?? kToolImageCardHeight;
   final logicalWidth =
       maxLogicalWidth ??
       width ??
       (height != null ? height * 2 : kToolImageTimelineMaxWidth);
-  final decode = toolImageDecodePixels(
+  final provider = _previewImageProvider(
+    rawPath,
     logicalWidth: logicalWidth,
     logicalHeight: logicalHeight,
     devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    fit: fit,
   );
+  if (provider == null) return errorWidget();
   Widget image = Image(
-    image: SafeResizeImage.display(
-      provider,
-      width: decode.width,
-      height: decode.height,
-      fit: fit == BoxFit.cover ? SafeResizeFit.cover : SafeResizeFit.contain,
-      allowUpscaling: false,
-      maxEdge: kToolImageMaxDecodeEdge,
-      maxPixels: kToolImageMaxDecodePixels,
-    ),
+    image: provider,
     width: width,
     height: height,
     fit: fit,
@@ -308,6 +291,47 @@ Widget _buildResolvedImage(
     );
   }
   return image;
+}
+
+ImageProvider? _previewImageProvider(
+  String path, {
+  required double logicalWidth,
+  required double logicalHeight,
+  required double devicePixelRatio,
+  required BoxFit fit,
+}) {
+  final source = path.trim();
+  if (source.isEmpty) return null;
+  final base = _toolImageProvider(source);
+  if (base == null) return null;
+  final decode = toolImageDecodePixels(
+    logicalWidth: logicalWidth,
+    logicalHeight: logicalHeight,
+    devicePixelRatio: devicePixelRatio,
+  );
+  return SafeResizeImage.display(
+    base,
+    width: decode.width,
+    height: decode.height,
+    fit: fit == BoxFit.cover ? SafeResizeFit.cover : SafeResizeFit.contain,
+    allowUpscaling: false,
+    maxEdge: kToolImageMaxDecodeEdge,
+    maxPixels: kToolImageMaxDecodePixels,
+  );
+}
+
+Size? _cachedPreviewSize(BuildContext context, ImageProvider provider) {
+  // Only read the thumbnail's already-decoded frame. A pending or broken
+  // thumbnail can still open immediately with the ordinary viewer fade.
+  final stream = provider.resolve(createLocalImageConfiguration(context));
+  Size? size;
+  final listener = ImageStreamListener((info, _) {
+    size = Size(info.image.width.toDouble(), info.image.height.toDouble());
+    info.dispose();
+  }, onError: (_, _) {});
+  stream.addListener(listener);
+  stream.removeListener(listener);
+  return size;
 }
 
 ImageProvider<Object>? _toolImageProvider(String path) {
@@ -437,14 +461,13 @@ class _AssistantInlineImageState extends State<_AssistantInlineImage> {
       key: ValueKey('assistant-inline-image:${widget.imageKey}'),
       onTap: widget.group.isEmpty
           ? null
-          : () => _openAssistantImageViewer(
-              context,
+          : () => ImageViewerPage(
               images: widget.group,
               initialIndex: widget.initialIndex.clamp(
                 0,
                 widget.group.length - 1,
               ),
-            ),
+            ).open(context),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final displayWidth = constraints.maxWidth;
@@ -478,39 +501,6 @@ class _AssistantInlineImageState extends State<_AssistantInlineImage> {
       ),
     );
   }
-}
-
-void _openAssistantImageViewer(
-  BuildContext context, {
-  required List<String> images,
-  required int initialIndex,
-}) {
-  Navigator.of(context).push(
-    PageRouteBuilder<void>(
-      opaque: false,
-      pageBuilder: (_, __, ___) =>
-          ImageViewerPage(images: images, initialIndex: initialIndex),
-      transitionDuration: const Duration(milliseconds: 360),
-      reverseTransitionDuration: const Duration(milliseconds: 280),
-      transitionsBuilder: (context, anim, sec, child) {
-        final curved = CurvedAnimation(
-          parent: anim,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.02),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
-        );
-      },
-    ),
-  );
 }
 
 IconData _toolIconFor(String name, [Map<String, dynamic> args = const {}]) {
@@ -778,33 +768,8 @@ Widget _buildToolImageFromPath(
   );
 }
 
-void _showToolFullImage(BuildContext context, String path) {
-  Navigator.of(context).push(
-    PageRouteBuilder<void>(
-      opaque: false,
-      pageBuilder: (_, __, ___) => ImageViewerPage(images: [path]),
-      transitionDuration: const Duration(milliseconds: 360),
-      reverseTransitionDuration: const Duration(milliseconds: 280),
-      transitionsBuilder: (context, anim, sec, child) {
-        final curved = CurvedAnimation(
-          parent: anim,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.02),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
-        );
-      },
-    ),
-  );
-}
+void _showToolFullImage(BuildContext context, String path) =>
+    unawaited(ImageViewerPage(images: [path]).open(context));
 
 void _showBrowserStepDetail(
   BuildContext context,
@@ -2512,14 +2477,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       child: Icon(Lucide.ImageOff, color: cs.onSurface.withValues(alpha: 0.45)),
     );
 
-    final viewablePaths = <String>[
-      for (final entry in attachmentEntries)
-        if (entry.part is ImagePart)
-          if (!(entry.part as ImagePart).unavailable &&
-              (entry.part as ImagePart).uri.trim().isNotEmpty)
-            _resolveAttachmentImageUri((entry.part as ImagePart).uri),
-    ];
-
+    final viewablePaths = <String>[];
+    final heroTags = <Object>[];
     final items = <Widget>[];
     for (final entry in attachmentEntries) {
       final part = entry.part;
@@ -2584,7 +2543,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       if (part is ImagePart) {
         final path = part.uri.trim();
         final fixed = path.isEmpty ? '' : _resolveAttachmentImageUri(path);
-        final viewIndex = viewablePaths.indexOf(fixed);
+        final viewIndex = viewablePaths.length;
+        final heroTag = (this, partIndex);
+        final available = !part.unavailable && fixed.isNotEmpty;
+        if (available) {
+          viewablePaths.add(fixed);
+          heroTags.add(heroTag);
+        }
+        final provider = available
+            ? _previewImageProvider(
+                fixed,
+                logicalWidth: 112,
+                logicalHeight: 112,
+                devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+                fit: BoxFit.cover,
+              )
+            : null;
         items.add(
           IosCardPress(
             key: ValueKey(
@@ -2594,55 +2568,39 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             pressedScale: 0.985,
             borderRadius: BorderRadius.circular(10),
             padding: EdgeInsets.zero,
-            onTap: part.unavailable || viewIndex < 0
+            onTap: !available
                 ? null
                 : () {
-                    Navigator.of(context).push(
-                      PageRouteBuilder(
-                        pageBuilder: (_, __, ___) => ImageViewerPage(
-                          images: viewablePaths,
-                          initialIndex: viewIndex,
-                        ),
-                        transitionDuration: const Duration(milliseconds: 360),
-                        reverseTransitionDuration: const Duration(
-                          milliseconds: 280,
-                        ),
-                        transitionsBuilder: (context, anim, sec, child) {
-                          final curved = CurvedAnimation(
-                            parent: anim,
-                            curve: Curves.easeOutCubic,
-                            reverseCurve: Curves.easeInCubic,
-                          );
-                          return FadeTransition(
-                            opacity: curved,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0, 0.02),
-                                end: Offset.zero,
-                              ).animate(curved),
-                              child: child,
-                            ),
-                          );
-                        },
-                      ),
-                    );
+                    final size = provider == null
+                        ? null
+                        : _cachedPreviewSize(context, provider);
+                    ImageViewerPage(
+                      images: viewablePaths,
+                      initialIndex: viewIndex,
+                      heroTags: size == null ? null : heroTags,
+                      initialPreview: size == null
+                          ? null
+                          : (provider: provider!, size: size),
+                    ).open(context);
                   },
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Hero(
-                tag:
-                    'img:${fixed.isNotEmpty ? fixed : 'unavailable-$partIndex'}',
-                child: part.unavailable || fixed.isEmpty
-                    ? unavailableImagePlaceholder()
-                    : _buildResolvedImage(
-                        context,
-                        fixed,
+              child: provider == null
+                  ? unavailableImagePlaceholder()
+                  : Hero(
+                      tag: heroTag,
+                      createRectTween: ImageViewerPage.flightRect,
+                      flightShuttleBuilder: ImageViewerPage.thumbnailFlight,
+                      child: Image(
+                        image: provider,
                         width: 112,
                         height: 112,
                         fit: BoxFit.cover,
-                        placeholder: unavailableImagePlaceholder,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, _, _) =>
+                            unavailableImagePlaceholder(),
                       ),
-              ),
+                    ),
             ),
           ),
         );
@@ -7233,7 +7191,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                   itemBuilder: (ctx, i) {
                     final path = _imagePaths[i];
                     return GestureDetector(
-                      onTap: () => _showFullImage(context, path),
+                      onTap: () => _showToolFullImage(context, path),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: _buildImageFromPath(
@@ -7264,36 +7222,6 @@ class _ToolCallItemState extends State<_ToolCallItem> {
       return;
     }
     _showToolDetail(context, widget.part);
-  }
-
-  /// Show full-size image using ImageViewerPage for save/share/copy support.
-  /// [path] can be a local file path or HTTP URL.
-  void _showFullImage(BuildContext context, String path) {
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: false,
-        pageBuilder: (_, __, ___) => ImageViewerPage(images: [path]),
-        transitionDuration: const Duration(milliseconds: 360),
-        reverseTransitionDuration: const Duration(milliseconds: 280),
-        transitionsBuilder: (context, anim, sec, child) {
-          final curved = CurvedAnimation(
-            parent: anim,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.02),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
-      ),
-    );
   }
 }
 
