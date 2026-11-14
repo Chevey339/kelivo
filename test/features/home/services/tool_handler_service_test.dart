@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:Kelivo/core/models/conversation_mcp_settings.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +21,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Kelivo/core/services/search/search_tool_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
+import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/services/tool_handler_service.dart';
 
@@ -414,6 +419,202 @@ void main() {
       );
     });
   });
+
+  testWidgets(
+    'unknown tool hints respect declarations and same-name MCP routes',
+    (tester) async {
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      final mcpProvider = _RecordingMcpProvider([]);
+      final toolSvc = McpToolService();
+      addTearDown(assistants.dispose);
+      addTearDown(settings.dispose);
+      addTearDown(mcpProvider.dispose);
+      addTearDown(toolSvc.dispose);
+      await settings.loaded;
+      await assistants.loaded;
+      final id = await assistants.addAssistant(name: 'Test');
+      final assistant = assistants
+          .getById(id)!
+          .copyWith(
+            localToolIds: [LocalToolNames.askUser],
+            mcpServerIds: ['srv-id'],
+          );
+      await assistants.updateAssistant(assistant);
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+            ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
+            ChangeNotifierProvider<McpToolService>.value(value: toolSvc),
+          ],
+          child: const SizedBox.shrink(),
+        ),
+      );
+      final service = ToolHandlerService(
+        contextProvider: tester.element(find.byType(SizedBox)),
+      );
+      const bare = 'ask_user_input';
+      final handler = service.buildToolCallHandler(settings, assistant)!;
+      final generation = ToolCallCancellation(
+        isCancelled: () => false,
+        cancelled: Completer<void>().future,
+      );
+      await tester.runAsync(
+        () => generation.runStream(() async* {
+          Future<Map<String, dynamic>> errorFor(String name) async {
+            final result = ClientToolResult.fromHandler(
+              await handler(name, {}),
+            );
+            final error = jsonDecode(result.content) as Map<String, dynamic>;
+            expect(error['type'], 'tool_error');
+            expect(error['tool'], name);
+            expect(error['error'], 'unknown_tool');
+            expect(result.metadata, isNull);
+            return error;
+          }
+
+          final ask = LocalToolsService.definitionFor(LocalToolNames.askUser);
+          const full = LocalToolNames.askUser;
+          const responses = {'type': 'function', 'name': full};
+          const claude = {
+            'name': full,
+            'input_schema': {'type': 'object'},
+          };
+          const gemini = {
+            'functionDeclarations': [
+              {'name': full},
+            ],
+          };
+          for (final (tool, claudeOAuth, expectedName) in [
+            (ask, false, full),
+            (responses, false, full),
+            (claude, false, full),
+            (claude, true, '_$full'),
+            (gemini, false, full),
+          ]) {
+            await RequestImageContext.encodeBody({
+              'tools': [tool],
+            }, claudeOAuth: claudeOAuth);
+            expect(
+              (await errorFor(bare))['instruction'],
+              contains('`$expectedName`'),
+            );
+          }
+          for (final (tool, choice) in [
+            (ask, 'none'),
+            (
+              ask,
+              {
+                'type': 'function',
+                'function': {'name': 'lookup'},
+              },
+            ),
+            (
+              responses,
+              {
+                'type': 'allowed_tools',
+                'mode': 'auto',
+                'tools': [
+                  {'type': 'function', 'name': 'lookup'},
+                ],
+              },
+            ),
+            (claude, {'type': 'tool', 'name': 'lookup'}),
+          ]) {
+            await RequestImageContext.encodeBody({
+              'tools': [tool],
+              'tool_choice': choice,
+            });
+            expect(await errorFor(bare), isNot(contains('instruction')));
+          }
+          for (final (allowed, shouldHint) in [
+            (['lookup'], false),
+            ([full], true),
+          ]) {
+            await RequestImageContext.encodeBody({
+              'tools': [gemini],
+              'toolConfig': {
+                'functionCallingConfig': {
+                  'mode': 'ANY',
+                  'allowedFunctionNames': allowed,
+                },
+              },
+            });
+            expect(
+              (await errorFor(bare)).containsKey('instruction'),
+              shouldHint,
+            );
+          }
+          for (final name in [
+            'missing_tool',
+            'builtin_search',
+            'read_chat_image',
+          ]) {
+            expect(await errorFor(name), isNot(contains('instruction')));
+          }
+          final disabled = ClientToolResult.fromHandler(
+            await handler(LocalToolNames.calculate, {}),
+          );
+          expect(jsonDecode(disabled.content)['error'], 'tool_disabled');
+          expect(disabled.content, isNot(contains('MCP')));
+          await RequestImageContext.encodeBody({
+            'tools': [
+              {'googleSearch': <String, dynamic>{}},
+            ],
+          });
+          expect(await errorFor(bare), isNot(contains('instruction')));
+          expect(mcpProvider.calls, isEmpty);
+
+          mcpProvider._servers.add(
+            McpServerConfig(
+              id: 'srv-id',
+              enabled: true,
+              name: 'Test MCP',
+              transport: McpTransportType.http,
+              tools: [McpToolConfig(enabled: true, name: bare)],
+            ),
+          );
+          final routes = service.captureMcpToolRoutes(assistant);
+          final definitions = service.buildToolDefinitions(
+            settings,
+            assistant,
+            'openai',
+            'gpt',
+            false,
+            isToolModel: (_, _) => true,
+            mcpRouteSnapshot: routes,
+          );
+          expect(
+            definitions.map((tool) => tool['function']['name']),
+            containsAll([bare, LocalToolNames.askUser]),
+          );
+          await RequestImageContext.encodeBody({'tools': definitions});
+          final mcpHandler = service.buildToolCallHandler(
+            settings,
+            assistant,
+            mcpRouteSnapshot: routes,
+          )!;
+          final result = ClientToolResult.fromHandler(
+            await mcpHandler(bare, {}),
+          );
+          expect(result.content, 'srv-id:$bare');
+          expect(mcpProvider.calls, [(serverId: 'srv-id', toolName: bare)]);
+
+          mcpProvider._servers.clear();
+          final revoked = ClientToolResult.fromHandler(
+            await mcpHandler(bare, {}),
+          );
+          expect(revoked.metadata?['toolPermissionError'], 'tool_disabled');
+          expect(jsonDecode(revoked.content), isNot(contains('instruction')));
+          expect(mcpProvider.calls, hasLength(1));
+        }).drain<void>(),
+      );
+    },
+  );
 
   group('ToolHandlerService MCP approval identity', () {
     for (final (full, customMcp) in [

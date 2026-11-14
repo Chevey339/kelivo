@@ -1,6 +1,7 @@
 import '../../models/carried_original.dart';
 import '../../models/native_compaction.dart';
 import 'request_history_context.dart';
+import 'request_tool_declarations.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -1526,15 +1527,18 @@ class RequestImageContext {
     return result;
   }
 
-  static Future<String> encodeBody(Map<String, dynamic> body) async {
+  static Future<String> encodeBody(
+    Map<String, dynamic> body, {
+    bool claudeOAuth = false,
+  }) async {
     final context = current;
     final history = RequestHistoryContext.current;
     final prepared = history == null ? body : await history.prepare(body);
-    return jsonEncode(
-      context == null
-          ? RequestHistoryContext.stripSources(_projectTools(prepared, null))
-          : await context.project(prepared),
-    );
+    final request = context == null
+        ? RequestHistoryContext.stripSources(_projectTools(prepared, null))
+        : await context.project(prepared);
+    RequestToolDeclarations.current?.record(request, claudeOAuth: claudeOAuth);
+    return jsonEncode(request);
   }
 
   Map<String, dynamic> previewMessage(Map<String, dynamic> message) {

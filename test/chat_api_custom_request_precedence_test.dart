@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/request_tool_declarations.dart';
+import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'support/collect_generation.dart';
 
 ProviderConfig _config(ProviderKind kind, String baseUrl, String modelId) =>
@@ -142,6 +144,71 @@ void main() {
           'provider': true,
           'model': true,
         });
+      },
+    );
+  }
+
+  for (final overrideTools in [false, true]) {
+    test(
+      'tool callback sees the request declarations (override: $overrideTools)',
+      () async {
+        const kind = ProviderKind.openai;
+        const model = 'openai-model';
+        const fullName = LocalToolNames.askUser;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        final sentNames = <List<String>>[];
+        server.listen((request) async {
+          final body =
+              jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+          sentNames.add([
+            for (final tool in body['tools'] as List)
+              tool['function']['name'] as String,
+          ]);
+          final response = _responseFor(kind);
+          if (sentNames.length == 1) {
+            response['choices'][0] = {
+              'finish_reason': 'tool_calls',
+              'message': {
+                'role': 'assistant',
+                'tool_calls': [
+                  {
+                    'id': 'call-1',
+                    'type': 'function',
+                    'function': {'name': 'ask_user_input', 'arguments': '{}'},
+                  },
+                ],
+              },
+            };
+          }
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(jsonEncode(response));
+          await request.response.close();
+        });
+
+        final seen = <String?>[];
+        await ChatApiService.sendMessageStream(
+          config: _config(
+            kind,
+            'http://${server.address.address}:${server.port}',
+            model,
+          ),
+          modelId: model,
+          messages: const [
+            {'role': 'user', 'content': 'Ask a question'},
+          ],
+          tools: [LocalToolsService.definitionFor(fullName)],
+          extraBody: overrideTools ? {'tools': <Map<String, dynamic>>[]} : null,
+          onToolCall: (name, args, {toolCallId}) async {
+            expect(name, 'ask_user_input');
+            seen.add(RequestToolDeclarations.current?.advertisedName(fullName));
+            return 'unknown_tool';
+          },
+          stream: false,
+        ).drain<void>();
+        final expected = overrideTools ? <String>[] : [fullName];
+        expect(sentNames, [expected, expected]);
+        expect(seen, [overrideTools ? null : fullName]);
       },
     );
   }

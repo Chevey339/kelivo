@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'request_tool_declarations.dart';
+
 /// The generation owning a tool call, including work after the HTTP response.
 class ToolCallCancellation {
   ToolCallCancellation({required this.isCancelled, required this.cancelled}) {
@@ -46,17 +48,25 @@ class ToolCallCancellation {
   /// I/O before or after the tool handler itself (for example image replay).
   Stream<T> runStream<T>(Stream<T> Function() action) {
     return Stream<T>.multi((controller) {
+      late Zone requestZone;
       final subscription = runZoned(
-        () => action().listen(
-          controller.addSync,
-          onError: controller.addErrorSync,
-          onDone: controller.closeSync,
-        ),
-        zoneValues: {_key: this},
+        () {
+          requestZone = Zone.current;
+          return action().listen(
+            controller.addSync,
+            onError: controller.addErrorSync,
+            onDone: controller.closeSync,
+          );
+        },
+        zoneValues: {
+          _key: this,
+          RequestToolDeclarations: RequestToolDeclarations(),
+        },
       );
-      controller.onPause = subscription.pause;
-      controller.onResume = subscription.resume;
-      controller.onCancel = subscription.cancel;
+      // A tool often executes after the consumer resumes from its start event.
+      controller.onPause = () => requestZone.run(subscription.pause);
+      controller.onResume = () => requestZone.run(subscription.resume);
+      controller.onCancel = () => requestZone.run(subscription.cancel);
     });
   }
 

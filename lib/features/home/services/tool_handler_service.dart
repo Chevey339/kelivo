@@ -1,4 +1,5 @@
 import '../../../core/services/api/request_image_context.dart';
+import '../../../core/services/api/request_tool_declarations.dart';
 import 'package:Kelivo/core/services/conversation_tool_permissions.dart';
 import 'package:Kelivo/core/models/tool_permission_mode.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -540,6 +541,8 @@ class ToolHandlerService {
     }
 
     final workspaceTools = workspaceContext == null ? null : _workspaceTools();
+    final askUserEnabled =
+        assistant?.localToolIds.contains(LocalToolNames.askUser) ?? false;
 
     return (name, args, {toolCallId}) async {
       final permission = permissionFor(name, toolCallId);
@@ -714,9 +717,7 @@ class ToolHandlerService {
             return localResult;
           }
 
-          if (name == LocalToolNames.askUser &&
-              assistant != null &&
-              assistant.localToolIds.contains(LocalToolNames.askUser)) {
+          if (name == LocalToolNames.askUser && askUserEnabled) {
             if (askUserService == null) {
               return _toolError(
                 error: 'ask_user_unavailable',
@@ -742,7 +743,26 @@ class ToolHandlerService {
             }
           }
 
-          return await approveAndExecuteMcp(name, args, permission);
+          if (BuiltInToolNames.functions.contains(name)) {
+            throw const ToolPermissionException(
+              'tool_disabled',
+              'This built-in tool is unavailable for this request.',
+            );
+          }
+
+          final retryName = name == 'ask_user_input' && askUserEnabled
+              ? RequestToolDeclarations.current?.advertisedName(
+                  LocalToolNames.askUser,
+                )
+              : null;
+          return _toolError(
+            error: 'unknown_tool',
+            message: 'Unknown tool name.',
+            tool: name,
+            instruction: retryName == null
+                ? null
+                : 'Retry using the full tool name `$retryName`.',
+          );
         } on ToolPermissionException catch (e) {
           permission.byFullAccess = false;
           return ClientToolResult(
