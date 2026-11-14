@@ -11,7 +11,8 @@ enum AsrServiceKind {
   qwenAudio('qwen_audio'),
   volcengine('volcengine'),
   mimo('mimo'),
-  step('step');
+  step('step'),
+  deepseek('deepseek');
 
   const AsrServiceKind(this.id);
 
@@ -45,6 +46,8 @@ enum AsrServiceKind {
         return AsrServiceKind.mimo;
       case 'step':
         return AsrServiceKind.step;
+      case 'deepseek':
+        return AsrServiceKind.deepseek;
       default:
         throw FormatException('Unsupported ASR service kind: $value');
     }
@@ -185,6 +188,15 @@ abstract class AsrServiceOptions {
           enableItn: _bool(json['enableItn'], true),
           enableTimestamp: _bool(json['enableTimestamp'], false),
           hotwords: _stringList(json['hotwords']),
+        );
+      case AsrServiceKind.deepseek:
+        return DeepSeekAsrOptions(
+          id: id,
+          name: _string(json['name'], 'DeepSeek'),
+          apiKey: _string(json['apiKey']),
+          baseUrl: _string(json['baseUrl'], DeepSeekAsrOptions.defaultBaseUrl),
+          sampleRate: _positiveInt(json['sampleRate'], 16000),
+          segmentDurationSec: _nonNegativeInt(json['segmentDurationSec'], 30),
         );
     }
   }
@@ -602,6 +614,61 @@ class MimoAsrOptions extends AsrServiceOptions {
     'baseUrl': baseUrl,
     'model': model,
     'language': language,
+    'sampleRate': sampleRate,
+    'segmentDurationSec': segmentDurationSec,
+  };
+}
+
+/// DeepSeek speech recognition (`POST {baseUrl}/tools/asr`).
+///
+/// Accepts a single 16-bit PCM WAV or Ogg Opus upload per request — at most
+/// 8 MiB and 120 s — and detects the language from the audio, so there is no
+/// model or language parameter. Segmented uploads stay well inside those caps.
+class DeepSeekAsrOptions extends AsrServiceOptions {
+  DeepSeekAsrOptions({
+    super.id,
+    super.name = 'DeepSeek',
+    this.apiKey = '',
+    this.baseUrl = defaultBaseUrl,
+    this.sampleRate = 16000,
+    this.segmentDurationSec = 30,
+  }) : super(kind: AsrServiceKind.deepseek);
+
+  static const String defaultBaseUrl = 'https://api.deepseek.com/v1';
+
+  /// The service rejects audio longer than 120 s per request.
+  static const int maximumSegmentDurationSec = 120;
+
+  final String apiKey;
+  final String baseUrl;
+  final int sampleRate;
+  final int segmentDurationSec;
+
+  @override
+  bool get isConfigured =>
+      apiKey.trim().isNotEmpty && baseUrl.trim().isNotEmpty;
+
+  DeepSeekAsrOptions copyWith({
+    String? id,
+    String? name,
+    String? apiKey,
+    String? baseUrl,
+    int? sampleRate,
+    int? segmentDurationSec,
+  }) => DeepSeekAsrOptions(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    apiKey: apiKey ?? this.apiKey,
+    baseUrl: baseUrl ?? this.baseUrl,
+    sampleRate: sampleRate ?? this.sampleRate,
+    segmentDurationSec: segmentDurationSec ?? this.segmentDurationSec,
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {
+    ...baseJson(),
+    'apiKey': apiKey,
+    'baseUrl': baseUrl,
     'sampleRate': sampleRate,
     'segmentDurationSec': segmentDurationSec,
   };

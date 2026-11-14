@@ -5989,6 +5989,10 @@ class AppLocalizationsTr extends AppLocalizations {
       'Step Audio segmentli bulut transkripsiyonu';
 
   @override
+  String get asrServicesDeepSeekSubtitle =>
+      'DeepSeek ile segmentli bulut dökümü';
+
+  @override
   String get asrServicesAddTitle => 'Konuşma Tanıma Ekle';
 
   @override

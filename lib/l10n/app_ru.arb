@@ -1779,6 +1779,7 @@
   "asrServicesMimoSubtitle": "Сегментированная облачная транскрипция",
   "asrServicesStepTitle": "Step",
   "asrServicesStepSubtitle": "Сегментированная транскрипция Step Audio",
+  "asrServicesDeepSeekSubtitle": "Сегментированная расшифровка через DeepSeek",
   "asrServicesAddTitle": "Добавить распознавание речи",
   "asrServicesEditTitle": "Изменить распознавание речи",
   "asrServicesSelectedLabel": "Выбрано",

@@ -1122,7 +1122,8 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                               : _defaultBaseUrl(_kind),
                         ),
                         if (_kind != NetworkTtsKind.xai &&
-                            _kind != NetworkTtsKind.azure)
+                            _kind != NetworkTtsKind.azure &&
+                            _kind != NetworkTtsKind.deepseek)
                           _TtsEditorTextField(
                             label: l10n.ttsServicesFieldModelLabel,
                             controller: _modelCtl,
@@ -1612,6 +1613,15 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           baseUrl: base,
           model: model,
           voice: voice,
+        );
+      case NetworkTtsKind.deepseek:
+        return DeepSeekTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          voiceId: voice,
         );
       case NetworkTtsKind.xai:
         return XaiTtsOptions(
@@ -2237,6 +2247,7 @@ const List<NetworkTtsKind> _networkTtsKinds = [
   NetworkTtsKind.qwen,
   NetworkTtsKind.qwenAudio,
   NetworkTtsKind.groq,
+  NetworkTtsKind.deepseek,
   NetworkTtsKind.xai,
   NetworkTtsKind.elevenlabs,
   NetworkTtsKind.mimo,
@@ -2252,6 +2263,7 @@ String _apiKeyOf(TtsServiceOptions? option) {
   if (option is QwenTtsOptions) return option.apiKey;
   if (option is QwenAudioTtsOptions) return option.apiKey;
   if (option is GroqTtsOptions) return option.apiKey;
+  if (option is DeepSeekTtsOptions) return option.apiKey;
   if (option is XaiTtsOptions) return option.apiKey;
   if (option is ElevenLabsTtsOptions) return option.apiKey;
   if (option is MimoTtsOptions) return option.apiKey;
@@ -2268,6 +2280,7 @@ String _baseUrlOf(TtsServiceOptions? option) {
   if (option is QwenTtsOptions) return option.baseUrl;
   if (option is QwenAudioTtsOptions) return option.workspaceId;
   if (option is GroqTtsOptions) return option.baseUrl;
+  if (option is DeepSeekTtsOptions) return option.baseUrl;
   if (option is XaiTtsOptions) return option.baseUrl;
   if (option is ElevenLabsTtsOptions) return option.baseUrl;
   if (option is MimoTtsOptions) return option.baseUrl;
@@ -2298,6 +2311,7 @@ String _voiceOf(TtsServiceOptions? option) {
   if (option is QwenTtsOptions) return option.voice;
   if (option is QwenAudioTtsOptions) return option.voice;
   if (option is GroqTtsOptions) return option.voice;
+  if (option is DeepSeekTtsOptions) return option.voiceId;
   if (option is XaiTtsOptions) return option.voiceId;
   if (option is ElevenLabsTtsOptions) return option.voiceId;
   if (option is MimoTtsOptions) return option.voice;
@@ -2320,6 +2334,8 @@ String _defaultBaseUrl(NetworkTtsKind k) {
       return 'https://dashscope.aliyuncs.com/api/v1';
     case NetworkTtsKind.groq:
       return 'https://api.groq.com/openai/v1';
+    case NetworkTtsKind.deepseek:
+      return DeepSeekTtsOptions.defaultBaseUrl;
     case NetworkTtsKind.xai:
       return 'https://api.x.ai/v1';
     case NetworkTtsKind.elevenlabs:
@@ -2349,6 +2365,8 @@ String _defaultModel(NetworkTtsKind k) {
       return 'qwen3-tts-flash';
     case NetworkTtsKind.groq:
       return 'canopylabs/orpheus-v1-english';
+    case NetworkTtsKind.deepseek:
+      return '';
     case NetworkTtsKind.xai:
       return '';
     case NetworkTtsKind.elevenlabs:
@@ -2378,6 +2396,8 @@ String _defaultVoice(NetworkTtsKind k) {
       return 'Cherry';
     case NetworkTtsKind.groq:
       return 'austin';
+    case NetworkTtsKind.deepseek:
+      return DeepSeekTtsOptions.defaultVoiceId;
     case NetworkTtsKind.xai:
       return 'eve';
     case NetworkTtsKind.elevenlabs:
@@ -2407,6 +2427,8 @@ String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.groq:
       return l10n.ttsServicesFieldVoiceLabel;
+    case NetworkTtsKind.deepseek:
+      return l10n.ttsServicesFieldVoiceIdLabel;
     case NetworkTtsKind.xai:
       return l10n.ttsServicesFieldVoiceIdLabel;
     case NetworkTtsKind.elevenlabs:

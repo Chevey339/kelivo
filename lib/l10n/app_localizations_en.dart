@@ -5937,6 +5937,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get asrServicesStepSubtitle => 'Step Audio segmented transcription';
 
   @override
+  String get asrServicesDeepSeekSubtitle =>
+      'Segmented transcription via DeepSeek ASR';
+
+  @override
   String get asrServicesAddTitle => 'Add Speech Recognition';
 
   @override

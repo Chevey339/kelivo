@@ -525,6 +525,7 @@ String? _kindBrandAsset(AsrServiceKind kind) {
     AsrServiceKind.volcengine => 'Doubao',
     AsrServiceKind.mimo => 'MiMo',
     AsrServiceKind.step => 'Step',
+    AsrServiceKind.deepseek => 'DeepSeek',
     AsrServiceKind.sherpaOnnx || AsrServiceKind.system => '',
   };
   return hint.isEmpty ? null : BrandAssets.assetForName(hint);
@@ -1035,6 +1036,24 @@ class _AsrEditorState extends State<_AsrEditor> {
           ),
         );
         return;
+      case AsrServiceKind.deepseek:
+        final initial = widget.initial is DeepSeekAsrOptions
+            ? widget.initial as DeepSeekAsrOptions
+            : null;
+        widget.onSubmit(
+          DeepSeekAsrOptions(
+            id: id,
+            name: name,
+            apiKey: _apiKeyController.text.trim(),
+            baseUrl: _valueOrDefault(
+              _endpointController.text,
+              _defaultEndpoint(_kind),
+            ),
+            sampleRate: initial?.sampleRate ?? 16000,
+            segmentDurationSec: initial?.segmentDurationSec ?? 30,
+          ),
+        );
+        return;
     }
   }
 
@@ -1169,7 +1188,7 @@ class _AsrEditorState extends State<_AsrEditor> {
           hint: _defaultResourceId(_kind),
           desktop: widget.desktop,
         )
-      else
+      else if (_kind != AsrServiceKind.deepseek)
         _EditorField(
           label: l10n.asrServicesModelLabel,
           controller: _modelController,
@@ -1178,8 +1197,9 @@ class _AsrEditorState extends State<_AsrEditor> {
               : _defaultModel(_kind),
           desktop: widget.desktop,
         ),
-      if (_kind != AsrServiceKind.qwenAudio ||
-          _qwenMode == QwenAudioAsrMode.transcription)
+      if (_kind != AsrServiceKind.deepseek &&
+          (_kind != AsrServiceKind.qwenAudio ||
+              _qwenMode == QwenAudioAsrMode.transcription))
         _EditorField(
           label: l10n.asrServicesLanguageLabel,
           controller: _languageController,
@@ -1307,6 +1327,7 @@ class _AsrEditorState extends State<_AsrEditor> {
                       AsrServiceKind.volcengine,
                       AsrServiceKind.mimo,
                       AsrServiceKind.step,
+                      AsrServiceKind.deepseek,
                     ],
                     labelFor: (kind) => _kindTitle(l10n, kind),
                     onSelected: _selectKind,
@@ -1428,6 +1449,7 @@ class _ProviderChoiceGrid extends StatelessWidget {
               AsrServiceKind.volcengine,
               AsrServiceKind.mimo,
               AsrServiceKind.step,
+              AsrServiceKind.deepseek,
             ])
               _ProviderChoice(
                 kind: kind,
@@ -2188,6 +2210,8 @@ IconData _kindIcon(AsrServiceKind kind) {
       return Lucide.AudioWaveform;
     case AsrServiceKind.step:
       return Lucide.AudioWaveform;
+    case AsrServiceKind.deepseek:
+      return Lucide.AudioWaveform;
   }
 }
 
@@ -2265,6 +2289,10 @@ bool _isDefaultServiceName(AsrServiceKind kind, String name) {
       '阶跃星辰',
       '階躍星辰',
     }.contains(name),
+    AsrServiceKind.deepseek => const {
+      'DeepSeek ASR',
+      'DeepSeek',
+    }.contains(name),
   };
 }
 
@@ -2292,6 +2320,8 @@ String _kindTitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesMimoTitle;
     case AsrServiceKind.step:
       return l10n.asrServicesStepTitle;
+    case AsrServiceKind.deepseek:
+      return 'DeepSeek';
   }
 }
 
@@ -2319,6 +2349,8 @@ String _kindSubtitle(AppLocalizations l10n, AsrServiceKind kind) {
       return l10n.asrServicesMimoSubtitle;
     case AsrServiceKind.step:
       return l10n.asrServicesStepSubtitle;
+    case AsrServiceKind.deepseek:
+      return l10n.asrServicesDeepSeekSubtitle;
   }
 }
 
@@ -2400,6 +2432,8 @@ String _defaultEndpoint(AsrServiceKind kind) {
       return 'https://api.xiaomimimo.com/v1';
     case AsrServiceKind.step:
       return 'https://api.stepfun.com';
+    case AsrServiceKind.deepseek:
+      return DeepSeekAsrOptions.defaultBaseUrl;
     case AsrServiceKind.sherpaOnnx:
     case AsrServiceKind.system:
       return '';
@@ -2424,6 +2458,8 @@ String _defaultModel(AsrServiceKind kind) {
       return 'mimo-v2.5-asr';
     case AsrServiceKind.step:
       return 'stepaudio-2.5-asr';
+    case AsrServiceKind.deepseek:
+      return '';
     case AsrServiceKind.sherpaOnnx:
     case AsrServiceKind.system:
       return '';

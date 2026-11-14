@@ -1472,6 +1472,114 @@ void main() {
       throwsFormatException,
     );
   });
+
+  group('DeepSeek', () {
+    test('deserializes provider defaults and round-trips', () {
+      final options = TtsServiceOptions.fromJson({
+        'kind': 'deepseek',
+        'enabled': true,
+        'name': 'DeepSeek',
+        'apiKey': 'ds-key',
+      });
+
+      expect(options, isA<DeepSeekTtsOptions>());
+      final deepSeek = options as DeepSeekTtsOptions;
+      expect(deepSeek.baseUrl, 'https://api.deepseek.com/v1');
+      expect(deepSeek.voiceId, 'stella');
+      expect(deepSeek.apiKey, 'ds-key');
+
+      final restored = TtsServiceOptions.fromJson(deepSeek.toJson());
+      expect(restored, isA<DeepSeekTtsOptions>());
+      expect((restored as DeepSeekTtsOptions).voiceId, 'stella');
+      expect(restored.id, deepSeek.id);
+    });
+
+    test('synthesizes speech and restores streamed WAV lengths', () async {
+      late HttpRequest captured;
+      late Map<String, dynamic> requestBody;
+      final pcm = <int>[1, 2, 3, 4, 5, 6, 7, 8];
+      final streamed = _buildWav(<(String, List<int>)>[
+        ('fmt ', _pcmFormat(24000)),
+        ('data', pcm),
+      ]);
+      // DeepSeek streams the audio before the total size is known, so both the
+      // RIFF and data lengths carry placeholder values.
+      final placeholder = _replaceWavUint32(
+        _replaceWavUint32(streamed, 4, 0xffffffff),
+        _riffChunkOffset(streamed, 'data') + 4,
+        0xffffffff,
+      );
+      final server = await _bindServer((request) async {
+        captured = request;
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.add(placeholder);
+        await request.response.close();
+      });
+      addTearDown(() async => server.close(force: true));
+
+      final result = await NetworkTtsService.synthesize(
+        options: DeepSeekTtsOptions(
+          enabled: true,
+          name: 'DeepSeek',
+          apiKey: 'ds-key',
+          baseUrl: _baseUrl(server),
+          voiceId: 'tide',
+        ),
+        text: '你好',
+      );
+
+      expect(captured.uri.path, '/api/v1/tools/tts');
+      expect(
+        captured.headers.value(HttpHeaders.authorizationHeader),
+        'Bearer ds-key',
+      );
+      expect(requestBody['text'], '你好');
+      expect(requestBody['voice_id'], 'tide');
+      expect(requestBody['format'], 'wav');
+      expect(requestBody['filter_markdown'], isTrue);
+      expect(result.mime, 'audio/wav');
+      expect(
+        ByteData.sublistView(result.bytes).getUint32(4, Endian.little),
+        result.bytes.length - 8,
+      );
+      expect(_riffChunkData(result.bytes, 'data'), pcm);
+    });
+
+    test('surfaces error responses with the service message', () async {
+      final server = await _bindServer((request) async {
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.badRequest;
+        request.response.write(
+          '{"error":{"message":"text must not be empty"}}',
+        );
+        await request.response.close();
+      });
+      addTearDown(() async => server.close(force: true));
+
+      expect(
+        () => NetworkTtsService.synthesize(
+          options: DeepSeekTtsOptions(
+            enabled: true,
+            name: 'DeepSeek',
+            apiKey: 'ds-key',
+            baseUrl: _baseUrl(server),
+            voiceId: 'stella',
+          ),
+          text: 'hello',
+        ),
+        throwsA(
+          isA<Exception>().having(
+            (error) => error.toString(),
+            'message',
+            contains('text must not be empty'),
+          ),
+        ),
+      );
+    });
+  });
 }
 
 Future<HttpServer> _bindServer(

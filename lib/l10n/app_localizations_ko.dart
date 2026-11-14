@@ -5779,6 +5779,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get asrServicesStepSubtitle => 'Step Audio 분할 클라우드 전사';
 
   @override
+  String get asrServicesDeepSeekSubtitle => 'DeepSeek 분할 클라우드 전사';
+
+  @override
   String get asrServicesAddTitle => '음성 인식 추가';
 
   @override

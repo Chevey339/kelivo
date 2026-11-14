@@ -2735,6 +2735,7 @@
   "asrServicesMimoSubtitle": "Segmented cloud transcription",
   "asrServicesStepTitle": "Step",
   "asrServicesStepSubtitle": "Step Audio segmented transcription",
+  "asrServicesDeepSeekSubtitle": "Segmented transcription via DeepSeek ASR",
   "asrServicesAddTitle": "Add Speech Recognition",
   "asrServicesEditTitle": "Edit Speech Recognition",
   "asrServicesSelectedLabel": "Selected",
@@ -13362,6 +13363,9 @@
   },
   "@asrServicesStepSubtitle": {
     "description": "Subtitle describing the Step ASR service as Step Audio segmented cloud transcription."
+  },
+  "@asrServicesDeepSeekSubtitle": {
+    "description": "Subtitle describing the DeepSeek ASR service as segmented cloud transcription with automatic language detection."
   },
   "@asrServicesAddTitle": {
     "description": "Dialog/app bar title shown when creating a new speech recognition service configuration."
