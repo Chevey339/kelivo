@@ -15,6 +15,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/features/chat/widgets/compress_context_options_dialog.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import '../../../support/business_test_harness.dart';
@@ -61,6 +62,7 @@ void main() {
       late AssistantProvider assistants;
       late ChatService chat;
       late String conversationId;
+      var previewAttempts = 0;
       await tester.runAsync(() async {
         final harness = await createBusinessTestHarness();
         settings = SettingsProvider(harness.preferences);
@@ -124,6 +126,12 @@ void main() {
                       builder: (sheet) => CompressContextOptionsDialog(
                         sheet: sheet,
                         conversationId: conversationId,
+                        previewCarried: (_, _) async {
+                          if (++previewAttempts == 1) {
+                            throw StateError('preview unavailable');
+                          }
+                          return const CarrySelection();
+                        },
                         loadHistory: () async =>
                             CompressionHistory.fromMessages([
                               for (var i = 0; i < 10; i++)
@@ -173,6 +181,31 @@ void main() {
       }
 
       expect(tester.widget<IosSwitch>(toggle).value, isFalse);
+      final carryToggle = find.byWidgetPredicate(
+        (w) => w is IosSwitch && w.semanticLabel == l10n.compressionCarryTitle,
+      );
+      await tester.ensureVisible(carryToggle);
+      await tester.tap(carryToggle);
+      await settleCompressionOptions(tester);
+      expect(
+        tester
+            .widget<FormSheetActions>(find.byType(FormSheetActions))
+            .onConfirm,
+        isNull,
+      );
+      final retry = find.text(l10n.retry);
+      await tester.ensureVisible(retry);
+      await tester.tap(retry);
+      await settleCompressionOptions(tester);
+      expect(
+        tester
+            .widget<FormSheetActions>(find.byType(FormSheetActions))
+            .onConfirm,
+        isNotNull,
+      );
+      await tester.ensureVisible(carryToggle);
+      await tester.tap(carryToggle);
+      await settleCompressionOptions(tester);
       await flip();
       expect(find.text(l10n.compressionManage), findsNothing);
       expect(find.text(l10n.compressionMore), findsOneWidget);

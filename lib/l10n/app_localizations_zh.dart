@@ -16027,6 +16027,112 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => '文件信息';
+
+  @override
+  String get compressionCarryTitle => '原样带上你之前说的话';
+
+  @override
+  String get compressionCarryHint => '收进摘要的那部分里，你发过的消息会原文一起发给模型，不只留下摘要里的转述。';
+
+  @override
+  String get compressionCarryCountLabel => '带上最近';
+
+  @override
+  String get compressionCarryUnit => '条';
+
+  @override
+  String get compressionCarryAll => '能带的都带上';
+
+  @override
+  String get compressionCarryAllHint => '不限条数，从最新的往前带，直到快装满；最早那条太长时只带开头和结尾。';
+
+  @override
+  String get compressionCarryEarlier => '连之前已经收成摘要的话也拿回来';
+
+  @override
+  String get compressionCarryEarlierHint => '之前压缩过的部分里你发过的消息，也可以挑进来。';
+
+  @override
+  String compressionCarryPreview(int count, String tokens) {
+    return '将带上 $count 条 · 约 $tokens tokens';
+  }
+
+  @override
+  String get compressionCarryNone => '收进摘要的部分里没有你发的消息。';
+
+  @override
+  String compressionCarryNotFit(int count) {
+    return '还有 $count 条较早的放不下，这次不带。';
+  }
+
+  @override
+  String compressionCarryMoreRows(int count) {
+    return '还有 $count 条';
+  }
+
+  @override
+  String get compressionCarryOverBudget =>
+      '这些原话大约会超出当前模型容量。可以少带几条，或换一个上下文更大的模型。';
+
+  @override
+  String compressionCarryFitAction(int count) {
+    return '改成 $count 条';
+  }
+
+  @override
+  String get compressionCarryTruncated => '太长，只带开头和结尾';
+
+  @override
+  String get compressionCarryAutoToo => '自动压缩也会这样带。';
+
+  @override
+  String get compressionCarryNewChatText => '图片和文件不会带到新聊天，只带文字。';
+
+  @override
+  String get compressionCarryServerKeeps => '这个服务压缩时会自己带上你之前说的话。';
+
+  @override
+  String get contextDetailCarried => '原样带上的话';
+
+  @override
+  String contextDetailCarriedCount(int count) {
+    return '$count 条你之前说的话';
+  }
+
+  @override
+  String get contextDetailServerKept => '服务端带上的话';
+
+  @override
+  String get contextCarriedEditHint => '只改这里发给模型的文字，聊天记录里的原消息不变。';
+
+  @override
+  String get contextCarriedEmpty => '不能为空。不想再带这句，可以选“不再带上”。';
+
+  @override
+  String get contextCarriedRemove => '不再带上';
+
+  @override
+  String get contextCarriedRemoveConfirm => '这条之后不再发给模型。聊天记录里的原消息不受影响。';
+
+  @override
+  String get contextCarriedSourceDeleted => '原消息已删除，只保留这里的文字';
+
+  @override
+  String get compressionCarryReply => '也带上当时的回复';
+
+  @override
+  String compressionCarryReplyTokens(String tokens) {
+    return '+约 $tokens';
+  }
+
+  @override
+  String get compressionCarryReplyInKept => '回复已经在保留的原文里';
+
+  @override
+  String get contextCarriedReplyLabel => '当时的回复';
+
+  @override
+  String get contextCarriedRemoveReply => '不带回复';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -32052,6 +32158,112 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageAttachmentDetailsTitle => '文件信息';
+
+  @override
+  String get compressionCarryTitle => '原样带上你之前说的话';
+
+  @override
+  String get compressionCarryHint => '收进摘要的那部分里，你发过的消息会原文一起发给模型，不只留下摘要里的转述。';
+
+  @override
+  String get compressionCarryCountLabel => '带上最近';
+
+  @override
+  String get compressionCarryUnit => '条';
+
+  @override
+  String get compressionCarryAll => '能带的都带上';
+
+  @override
+  String get compressionCarryAllHint => '不限条数，从最新的往前带，直到快装满；最早那条太长时只带开头和结尾。';
+
+  @override
+  String get compressionCarryEarlier => '连之前已经收成摘要的话也拿回来';
+
+  @override
+  String get compressionCarryEarlierHint => '之前压缩过的部分里你发过的消息，也可以挑进来。';
+
+  @override
+  String compressionCarryPreview(int count, String tokens) {
+    return '将带上 $count 条 · 约 $tokens tokens';
+  }
+
+  @override
+  String get compressionCarryNone => '收进摘要的部分里没有你发的消息。';
+
+  @override
+  String compressionCarryNotFit(int count) {
+    return '还有 $count 条较早的放不下，这次不带。';
+  }
+
+  @override
+  String compressionCarryMoreRows(int count) {
+    return '还有 $count 条';
+  }
+
+  @override
+  String get compressionCarryOverBudget =>
+      '这些原话大约会超出当前模型容量。可以少带几条，或换一个上下文更大的模型。';
+
+  @override
+  String compressionCarryFitAction(int count) {
+    return '改成 $count 条';
+  }
+
+  @override
+  String get compressionCarryTruncated => '太长，只带开头和结尾';
+
+  @override
+  String get compressionCarryAutoToo => '自动压缩也会这样带。';
+
+  @override
+  String get compressionCarryNewChatText => '图片和文件不会带到新聊天，只带文字。';
+
+  @override
+  String get compressionCarryServerKeeps => '这个服务压缩时会自己带上你之前说的话。';
+
+  @override
+  String get contextDetailCarried => '原样带上的话';
+
+  @override
+  String contextDetailCarriedCount(int count) {
+    return '$count 条你之前说的话';
+  }
+
+  @override
+  String get contextDetailServerKept => '服务端带上的话';
+
+  @override
+  String get contextCarriedEditHint => '只改这里发给模型的文字，聊天记录里的原消息不变。';
+
+  @override
+  String get contextCarriedEmpty => '不能为空。不想再带这句，可以选“不再带上”。';
+
+  @override
+  String get contextCarriedRemove => '不再带上';
+
+  @override
+  String get contextCarriedRemoveConfirm => '这条之后不再发给模型。聊天记录里的原消息不受影响。';
+
+  @override
+  String get contextCarriedSourceDeleted => '原消息已删除，只保留这里的文字';
+
+  @override
+  String get compressionCarryReply => '也带上当时的回复';
+
+  @override
+  String compressionCarryReplyTokens(String tokens) {
+    return '+约 $tokens';
+  }
+
+  @override
+  String get compressionCarryReplyInKept => '回复已经在保留的原文里';
+
+  @override
+  String get contextCarriedReplyLabel => '当时的回复';
+
+  @override
+  String get contextCarriedRemoveReply => '不带回复';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -48084,4 +48296,110 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageAttachmentDetailsTitle => '檔案資訊';
+
+  @override
+  String get compressionCarryTitle => '原樣帶上你之前說的話';
+
+  @override
+  String get compressionCarryHint => '收進摘要的那部分裡，你發過的訊息會原文一起發給模型，不只留下摘要裡的轉述。';
+
+  @override
+  String get compressionCarryCountLabel => '帶上最近';
+
+  @override
+  String get compressionCarryUnit => '則';
+
+  @override
+  String get compressionCarryAll => '能帶的都帶上';
+
+  @override
+  String get compressionCarryAllHint => '不限則數，從最新的往前帶，直到快裝滿；最早那則太長時只帶開頭和結尾。';
+
+  @override
+  String get compressionCarryEarlier => '連之前已經收成摘要的話也拿回來';
+
+  @override
+  String get compressionCarryEarlierHint => '之前壓縮過的部分裡你發過的訊息，也可以挑進來。';
+
+  @override
+  String compressionCarryPreview(int count, String tokens) {
+    return '將帶上 $count 則 · 約 $tokens tokens';
+  }
+
+  @override
+  String get compressionCarryNone => '收進摘要的部分裡沒有你發的訊息。';
+
+  @override
+  String compressionCarryNotFit(int count) {
+    return '還有 $count 則較早的放不下，這次不帶。';
+  }
+
+  @override
+  String compressionCarryMoreRows(int count) {
+    return '還有 $count 則';
+  }
+
+  @override
+  String get compressionCarryOverBudget =>
+      '這些原話大約會超出目前模型容量。可以少帶幾則，或換一個上下文更大的模型。';
+
+  @override
+  String compressionCarryFitAction(int count) {
+    return '改成 $count 則';
+  }
+
+  @override
+  String get compressionCarryTruncated => '太長，只帶開頭和結尾';
+
+  @override
+  String get compressionCarryAutoToo => '自動壓縮也會這樣帶。';
+
+  @override
+  String get compressionCarryNewChatText => '圖片和檔案不會帶到新聊天，只帶文字。';
+
+  @override
+  String get compressionCarryServerKeeps => '這個服務壓縮時會自己帶上你之前說的話。';
+
+  @override
+  String get contextDetailCarried => '原樣帶上的話';
+
+  @override
+  String contextDetailCarriedCount(int count) {
+    return '$count 則你之前說的話';
+  }
+
+  @override
+  String get contextDetailServerKept => '服務端帶上的話';
+
+  @override
+  String get contextCarriedEditHint => '只改這裡發給模型的文字，聊天記錄裡的原訊息不變。';
+
+  @override
+  String get contextCarriedEmpty => '不能為空。不想再帶這句，可以選「不再帶上」。';
+
+  @override
+  String get contextCarriedRemove => '不再帶上';
+
+  @override
+  String get contextCarriedRemoveConfirm => '這則之後不再發給模型。聊天記錄裡的原訊息不受影響。';
+
+  @override
+  String get contextCarriedSourceDeleted => '原訊息已刪除，只保留這裡的文字';
+
+  @override
+  String get compressionCarryReply => '也帶上當時的回覆';
+
+  @override
+  String compressionCarryReplyTokens(String tokens) {
+    return '+約 $tokens';
+  }
+
+  @override
+  String get compressionCarryReplyInKept => '回覆已經在保留的原文裡';
+
+  @override
+  String get contextCarriedReplyLabel => '當時的回覆';
+
+  @override
+  String get contextCarriedRemoveReply => '不帶回覆';
 }

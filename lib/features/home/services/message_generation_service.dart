@@ -1,6 +1,7 @@
 import '../../../core/services/tools/view_image_tool.dart';
 import '../../../core/models/native_compaction.dart';
 import '../../../core/models/compression_config.dart';
+import '../../../core/models/carried_original.dart';
 import '../../../core/services/api/native_compaction_context.dart';
 import '../../../core/services/api/providers/zhipu_layout_parsing.dart';
 import '../../../core/models/context_operation.dart';
@@ -242,7 +243,12 @@ class MessageGenerationService {
     if (assistant != null && assistant.regexRules.isNotEmpty) {
       for (int i = 0; i < apiMessages.length; i++) {
         final role = (apiMessages[i]['role'] ?? '').toString();
-        if (role != 'assistant') continue;
+        if (role != 'assistant' ||
+            isCarriedMessageId(
+              apiMessages[i][imageContextOwnerKey]?.toString() ?? '',
+            )) {
+          continue;
+        }
         final raw = (apiMessages[i]['content'] ?? '').toString();
         if (raw.isEmpty) continue;
         apiMessages[i]['content'] = applyAssistantRegexes(
@@ -613,7 +619,9 @@ class MessageGenerationService {
     final original = await chatService.imageContextHistory(
       conversationId,
       throughMessageId: messages
-          .where((m) => !ContextOperation.isSummary(m))
+          .where(
+            (m) => !ContextOperation.isSummary(m) && !isCarriedMessageId(m.id),
+          )
           .lastOrNull
           ?.id,
     );

@@ -1,4 +1,5 @@
 import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/models/carried_original.dart';
 import 'dart:convert';
 import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -472,6 +473,16 @@ void main() {
             {'role': 'system', 'content': 'CURRENT_RULES'},
             {
               'role': 'user',
+              'content': 'EDITED_COPY',
+              imageContextOwnerKey: '${carriedPrefix}op:old-user',
+            },
+            {
+              'role': 'assistant',
+              'content': 'FROZEN_REPLY',
+              imageContextOwnerKey: '${carriedReplyPrefix}op:old-user',
+            },
+            {
+              'role': 'user',
               'content': 'HISTORY_SUMMARY',
               imageContextOwnerKey: 'context-summary:summary',
             },
@@ -562,6 +573,12 @@ void main() {
           expect(requests, hasLength(2));
           expect(toolsRun, 1);
           final last = jsonEncode(requests.last);
+          expect('EDITED_COPY'.allMatches(last), hasLength(1));
+          expect('FROZEN_REPLY'.allMatches(last), hasLength(1));
+          expect(
+            last.indexOf('FROZEN_REPLY'),
+            lessThan(last.indexOf('HISTORY_SUMMARY')),
+          );
           expect(last, contains('HISTORY_SUMMARY'));
           expect(last, contains('CURRENT_QUESTION'));
           expect(last, contains('CURRENT_RULES'));

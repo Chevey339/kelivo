@@ -1,3 +1,4 @@
+import '../../../core/models/carried_original.dart';
 import '../../../core/models/native_compaction.dart';
 import '../../../core/services/api/request_image_context.dart';
 import '../../../l10n/app_localizations.dart';
@@ -407,6 +408,35 @@ class MessageBuilderService {
 
     final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
+      if (isCarriedMessageId(m.id)) {
+        final media = mediaRefsFromParts(m);
+        final message = <String, dynamic>{
+          'role': m.role,
+          'content': m.content,
+          '_contextSummary': true,
+          imageContextOwnerKey: m.id,
+          if (m.providerArtifactSnapshot[carriedArtifactKind]
+              case final frozen?)
+            carriedWireKey: jsonDecode(frozen),
+          if (media.isNotEmpty) internalMediaPathsKey: media,
+          if (m.providerArtifactSnapshot[carriedImageHandlesKey]
+              case final handles?)
+            carriedImageHandlesKey: jsonDecode(handles),
+          if (m.providerArtifactSnapshot.containsKey(
+            carriedTextOnlyArtifactKind,
+          )) ...{
+            carriedTextOnlyKey: true,
+            multimodalInternalLiteralTextKey: m.content,
+          },
+        };
+        ContextSegmentTags.replaceWithSingle(
+          message,
+          source: ContextSource.chatHistory,
+          length: m.content.length,
+        );
+        out.add(message);
+        continue;
+      }
       final native = NativeCompactionPayload.forMessage(m);
       if (native != null) {
         out.add({
@@ -415,6 +445,9 @@ class MessageBuilderService {
           '_contextSummary': true,
           imageContextOwnerKey: m.id,
           nativeCompactionMessageKey: native.toJson(),
+          if (m.providerArtifactSnapshot[nativeUserSourcesKey]
+              case final sources?)
+            nativeUserSourcesKey: jsonDecode(sources),
         });
         continue;
       }

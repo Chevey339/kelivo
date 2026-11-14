@@ -14,6 +14,7 @@ typedef CompressionSegment = ({String prompt, int nextIndex, int nextOffset});
 class CompressionPlanner {
   CompressionPlanner({
     required CompressionRequest request,
+    int? summaryTokens,
     required this.materials,
     required this.previousSummary,
     required this.background,
@@ -21,13 +22,19 @@ class CompressionPlanner {
        focus = request.options.focus,
        locale = request.locale,
        outputTokens = math.min(
-         request.config.maxOutputTokens ?? request.config.summaryTokens,
+         request.config.maxOutputTokens ??
+             summaryTokens ??
+             request.config.summaryTokens,
          request.maxOutputTokens ??
              request.config.maxOutputTokens ??
+             summaryTokens ??
              request.config.summaryTokens,
        ),
        maxRequestAttempts = request.config.maxRequestAttempts {
-    targetTokens = math.min(request.config.summaryTokens, outputTokens);
+    targetTokens = math.min(
+      summaryTokens ?? request.config.summaryTokens,
+      outputTokens,
+    );
     final window =
         request.contextWindowTokens ??
         CompressContextOptions.defaultContextWindowTokens;

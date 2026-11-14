@@ -17185,4 +17185,124 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => 'Информация о файле';
+
+  @override
+  String get compressionCarryTitle =>
+      'Также отправлять ваши прежние сообщения как есть';
+
+  @override
+  String get compressionCarryHint =>
+      'Из той части, которая становится сводкой, ваши собственные сообщения отправляются модели в том виде, как вы их написали, а не только в пересказе сводки.';
+
+  @override
+  String get compressionCarryCountLabel => 'Отправлять последние';
+
+  @override
+  String get compressionCarryUnit => 'сообщений';
+
+  @override
+  String get compressionCarryAll => 'Сколько поместится';
+
+  @override
+  String get compressionCarryAllHint =>
+      'Без фиксированного числа. Начинается с самых новых и идёт назад, пока не заполнится почти всё; если самое старое слишком длинное, отправляются только его начало и конец.';
+
+  @override
+  String get compressionCarryEarlier =>
+      'Также возвращать сообщения из прежних сводок';
+
+  @override
+  String get compressionCarryEarlierHint =>
+      'Ваши сообщения из частей, сжатых ранее, тоже можно включить.';
+
+  @override
+  String compressionCarryPreview(int count, String tokens) {
+    return 'Будет отправлено $count · около $tokens токенов';
+  }
+
+  @override
+  String get compressionCarryNone =>
+      'В части, которая сворачивается в сводку, нет ваших сообщений.';
+
+  @override
+  String compressionCarryNotFit(int count) {
+    return '$count более старых сообщений не помещаются и не будут отправлены в этот раз.';
+  }
+
+  @override
+  String compressionCarryMoreRows(int count) {
+    return 'ещё $count';
+  }
+
+  @override
+  String get compressionCarryOverBudget =>
+      'Эти сообщения, вероятно, превысят вместимость текущей модели. Отправьте меньше или переключитесь на модель с большим контекстом.';
+
+  @override
+  String compressionCarryFitAction(int count) {
+    return 'Изменить на $count';
+  }
+
+  @override
+  String get compressionCarryTruncated =>
+      'Слишком длинное; отправляются только начало и конец';
+
+  @override
+  String get compressionCarryAutoToo => 'Автоматическое сжатие сделает так же.';
+
+  @override
+  String get compressionCarryNewChatText =>
+      'Изображения и файлы не переносятся в новый чат; переносится только текст.';
+
+  @override
+  String get compressionCarryServerKeeps =>
+      'Этот сервис при сжатии сам сохраняет ваши прежние сообщения.';
+
+  @override
+  String get contextDetailCarried => 'Отправлено как есть';
+
+  @override
+  String contextDetailCarriedCount(int count) {
+    return '$count ваших прежних сообщений';
+  }
+
+  @override
+  String get contextDetailServerKept => 'Сохранено сервисом';
+
+  @override
+  String get contextCarriedEditHint =>
+      'Это меняет только текст, отправляемый модели. Исходное сообщение в чате остаётся прежним.';
+
+  @override
+  String get contextCarriedEmpty =>
+      'Это не может быть пустым. Чтобы перестать отправлять, выберите «Не отправлять».';
+
+  @override
+  String get contextCarriedRemove => 'Не отправлять';
+
+  @override
+  String get contextCarriedRemoveConfirm =>
+      'Это больше не будет отправляться модели. Исходное сообщение в чате не затрагивается.';
+
+  @override
+  String get contextCarriedSourceDeleted =>
+      'Исходное сообщение удалено; остался только этот текст';
+
+  @override
+  String get compressionCarryReply => 'Также включить ответ';
+
+  @override
+  String compressionCarryReplyTokens(String tokens) {
+    return '+около $tokens';
+  }
+
+  @override
+  String get compressionCarryReplyInKept =>
+      'Ответ уже есть в сохранённых репликах';
+
+  @override
+  String get contextCarriedReplyLabel => 'Ответ';
+
+  @override
+  String get contextCarriedRemoveReply => 'Не отправлять ответ';
 }

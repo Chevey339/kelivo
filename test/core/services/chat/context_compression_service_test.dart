@@ -1,7 +1,14 @@
+import 'package:Kelivo/core/services/api/providers/openai/native_compaction.dart';
+import 'package:Kelivo/core/services/api/request_history_context.dart';
+import 'package:Kelivo/core/models/carried_original.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/services/api/request_timeout.dart';
 import 'package:Kelivo/features/chat/widgets/context_compression_status.dart';
+import 'package:Kelivo/features/home/services/message_builder_service.dart';
+import 'package:Kelivo/core/models/assistant.dart';
+import 'package:flutter/widgets.dart';
+import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/l10n/app_localizations_zh.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -25,6 +32,11 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/quote_ref.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/chat/context_compression_service.dart';
+
+class _TestContext implements BuildContext {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _Paths extends PathProviderPlatform {
   _Paths(this.path);
@@ -103,6 +115,455 @@ void main() {
     );
   }
 
+  test('carried preflight rejects before making a summary request', () async {
+    var calls = 0;
+    await compression.start(
+      id,
+      request(
+        (_, _) async {
+          calls++;
+          return 'summary';
+        },
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.keepRecent,
+          keepUserMessages: 6,
+          carry: CarrySetting(mode: CarryMode.count, count: 2),
+        ),
+      ),
+    );
+    await until(
+      () => compression.taskFor(id)!.phase == CompressionPhase.failed,
+    );
+    expect(calls, 0);
+    expect(
+      compression.taskFor(id)!.error,
+      contains('compression_carry_over_budget'),
+    );
+  });
+
+  test(
+    'persisted carried copies edit, remove and undo without changing source',
+    () async {
+      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
+          (usedTokens: 100, contextWindow: 20000);
+      final originals = (await chat.loadContextSnapshot(id)).messages;
+      final selected = originals[2];
+      await compression.start(
+        id,
+        request(
+          (_, _) async => 'summary',
+          options: CompressContextOptions(
+            mode: CompressContextLimitMode.keepRecent,
+            keepUserMessages: 6,
+            carry: const CarrySetting(mode: CarryMode.count, count: 1),
+            carryReplies: [selected.id],
+          ),
+        ),
+      );
+      await until(
+        () => compression.taskFor(id)!.phase == CompressionPhase.completed,
+      );
+      var op = (await chat.loadContextOperations(id, refresh: true)).single;
+      expect(op.carried!.items.single.sourceMessageId, selected.id);
+      expect(op.carried!.items.single.reply!.text, originals[3].content);
+      final projected = await chat.loadSelectedContextMessages(id, limit: 100);
+      expect(projected.take(3).map((m) => m.content), [
+        selected.content,
+        originals[3].content,
+        op.contextText,
+      ]);
+      final builder = MessageBuilderService(
+        chatService: chat,
+        chatRepository: repo,
+        contextProvider: _TestContext(),
+      );
+      final conversation = chat.getConversation(id)!;
+      final assembled = builder.buildApiMessages(
+        messages: projected,
+        versionSelections: {},
+        currentConversation: conversation,
+      );
+      const assistant = Assistant(
+        id: 'a',
+        name: 'a',
+        limitContextMessages: true,
+        contextMessageSize: 2,
+        messageTemplate: 'TEMPLATE {{ message }}',
+      );
+      builder.applyContextLimit(assembled, assistant);
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      addTearDown(settings.dispose);
+      await settings.loaded;
+      await builder.processUserMessagesForApi(
+        assembled,
+        settings,
+        assistant,
+        conversation: conversation,
+        sourceMessages: projected,
+      );
+      expect(assembled.take(3).map((m) => m['content']), [
+        selected.content,
+        originals[3].content,
+        op.contextText,
+      ]);
+      expect(
+        await repo.getMessagePrompts([projected[0].id, projected[1].id]),
+        isEmpty,
+      );
+      final edited = op.carried!.withItems([
+        op.carried!.items.single.copyWith(editedText: 'edited original'),
+      ]);
+      await chat.changeContextOperation(
+        id,
+        op.id,
+        carried: edited,
+        includeDependents: false,
+        expectedState: ContextHistory.operationsFingerprint([op]),
+      );
+      expect(compression.consumeAutomaticSkip(id), false);
+      expect(
+        (await chat.loadMessagesByIds([selected.id])).single.content,
+        selected.content,
+      );
+      expect(
+        (await chat.loadSelectedContextMessages(id, limit: 100)).first.content,
+        'edited original',
+      );
+      op = (await chat.loadContextOperations(id, refresh: true)).single;
+      await chat.changeContextOperation(
+        id,
+        op.id,
+        carried: op.carried!.withItems([]),
+        includeDependents: false,
+        expectedState: ContextHistory.operationsFingerprint([op]),
+      );
+      expect(
+        (await chat.loadSelectedContextMessages(id, limit: 100)).first.content,
+        op.contextText,
+      );
+      op = (await chat.loadContextOperations(id, refresh: true)).single;
+      await chat.changeContextOperation(
+        id,
+        op.id,
+        includeDependents: false,
+        expectedState: ContextHistory.operationsFingerprint([op]),
+      );
+      expect(
+        (await chat.loadSelectedContextMessages(
+          id,
+          limit: 100,
+        )).map((m) => m.content),
+        originals.map((m) => m.content),
+      );
+    },
+  );
+
+  test(
+    'automatic carry drops oldest and reserves at least 128 for summary',
+    () async {
+      final original = (await chat.loadContextSnapshot(id)).messages;
+      final one = countCarriedTokens(
+        carriedFromMessage(original[2]),
+        ProviderKind.openai,
+      );
+      var output = 0;
+      final task = await compression.runAtSafePoint(
+        id,
+        CompressionRequest(
+          options: const CompressContextOptions(
+            mode: CompressContextLimitMode.keepRecent,
+            keepUserMessages: 6,
+            carry: CarrySetting(mode: CarryMode.count, count: 2),
+          ),
+          automatic: true,
+          beforeMessageId: original[14].id,
+          model: 'test',
+          quoteMarker: (_) => '',
+          carryBudgetTokens: one,
+          generate: (_, _, max, _) async {
+            output = max;
+            return const TextGenerationResult(parts: [TextPart('summary')]);
+          },
+        ),
+      );
+      expect(task.phase, CompressionPhase.completed);
+      expect(task.candidate!.carried!.items, hasLength(1));
+      expect(task.candidate!.carried!.notFit, 1);
+      expect(output, 128);
+      expect(task.candidate!.carried!.items.single.reply, isNull);
+    },
+  );
+
+  test(
+    'preview checks actual reply bodies and shares one budget for all pages',
+    () async {
+      final source = (await chat.loadContextSnapshot(id)).messages;
+      await chat.updateMessage(
+        source[1].id,
+        content: '<think>private only</think>',
+      );
+      for (var i = 0; i < 52; i++) {
+        await chat.addMessage(
+          conversationId: id,
+          role: 'user',
+          content: 'extra $i',
+        );
+      }
+      var estimates = 0;
+      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async {
+        estimates++;
+        return (usedTokens: 100, contextWindow: 20000);
+      };
+      final r = request(
+        (_, _) async => 'summary',
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.unlimited,
+          carry: CarrySetting(mode: CarryMode.all),
+        ),
+      );
+      final preview = await compression.previewCarried(id, r);
+      expect(preview.items.length, 60);
+      expect(preview.rows.last.availableReply, isNull);
+      expect(estimates, 1);
+      final expected = await compression.previewCarried(
+        id,
+        r,
+        snapshot: await chat.loadContextSnapshot(id),
+      );
+      expect(
+        preview.items.map((i) => i.toJson()),
+        expected.items.map((i) => i.toJson()),
+      );
+    },
+  );
+  test(
+    'file carry takes only extracted document text and original message',
+    () async {
+      final m = await chat.addMessage(
+        conversationId: id,
+        role: 'user',
+        parts: [
+          const TextPart('my words'),
+          const FilePart(uri: '/file.txt', name: 'file.txt'),
+        ],
+      );
+      const block =
+          '## user sent a file: file.txt\n<content>\n```\nexact file\n```\n</content>';
+      await repo.putMessagePrompt(
+        revisionId: m.id,
+        conversationId: id,
+        payload: 'TEMPLATE\n$block\n\ntransformed words and time',
+        carriesMemorySnapshot: false,
+      );
+      final texts = await chat.carriedUserTexts(
+        [m],
+        includeAttachments: true,
+        quoteMarker: (_) => '',
+      );
+      expect(texts[m.id], '$block\n\nmy words');
+    },
+  );
+
+  test('paged preview matches execution including optional replies', () async {
+    compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
+        (usedTokens: 100, contextWindow: 20000);
+    final original = await chat.loadContextSnapshot(id);
+    for (final mode in [CarryMode.count, CarryMode.all]) {
+      final r = request(
+        (_, _) async => 'summary',
+        options: CompressContextOptions(
+          mode: CompressContextLimitMode.keepRecent,
+          keepUserMessages: 6,
+          carry: CarrySetting(mode: mode, count: 2),
+          carryReplies: [original.messages[2].id],
+        ),
+      );
+      final preview = await compression.previewCarried(id, r);
+      final execution = await compression.previewCarried(
+        id,
+        r,
+        snapshot: original,
+      );
+      expect(
+        preview.items.map((i) => i.toJson()),
+        execution.items.map((i) => i.toJson()),
+      );
+      expect(preview.totalTokens, execution.totalTokens);
+      expect(
+        preview.rows.first.availableReply?.text,
+        original.messages[3].content,
+      );
+    }
+  });
+
+  test(
+    'Codex unset freezes actual wire outside payload and remains editable',
+    () async {
+      final original = await chat.loadContextSnapshot(id);
+      Future<Map<String, dynamic>> prepare(
+        CompressionSelection selection,
+      ) async => {
+        'input': [
+          for (final m in selection.input)
+            {'role': m.role, 'content': m.content, historySourceKey: m.id},
+        ],
+      };
+      final r = CompressionRequest(
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.keepRecent,
+          keepUserMessages: 6,
+          native: true,
+        ),
+        codex: true,
+        model: 'test',
+        quoteMarker: (_) => '',
+        prepareNative: prepare,
+        compactNative: (selection, _) async => NativeCompactionResult(
+          payload: NativeCompactionPayload(
+            protocol: NativeCompactionProtocol.codex,
+            scope: 'fixture',
+            modelId: 'test',
+            output: [
+              {'type': 'compaction', 'encrypted_content': 'state'},
+            ],
+          ),
+          retained: await retainCodexUsers(
+            (await prepare(selection))['input'] as List,
+          ),
+        ),
+      );
+      final preview = await compression.previewCarried(id, r);
+      await compression.start(id, r);
+      await until(
+        () => compression.taskFor(id)!.phase == CompressionPhase.completed,
+      );
+      final op = (await chat.loadContextOperations(id, refresh: true)).single;
+      expect(op.nativePayload!.output, hasLength(1));
+      expect(op.carried!.origin, 'auto');
+      expect(op.carried!.setting.mode, CarryMode.unset);
+      expect(
+        op.carried!.items.map((i) => i.wire),
+        preview.items.map((i) => i.wire),
+      );
+      expect(op.carried!.items.map((i) => i.sourceMessageId), [
+        original.messages[0].id,
+        original.messages[2].id,
+      ]);
+      await chat.changeContextOperation(
+        id,
+        op.id,
+        includeDependents: false,
+        expectedState: ContextHistory.operationsFingerprint([op]),
+        carried: op.carried!.withItems([
+          op.carried!.items.last.copyWith(editedText: 'edited native user'),
+        ]),
+      );
+      final replay = await chat.loadSelectedContextMessages(id, limit: 100);
+      expect(replay.first.content, 'edited native user');
+      expect(
+        jsonDecode(
+          replay.first.providerArtifactSnapshot[carriedArtifactKind]!,
+        )['content'],
+        'edited native user',
+      );
+      expect(op.nativePayload!.output.single['encrypted_content'], 'state');
+    },
+  );
+
+  test(
+    'continuing past another carried summary copies its list without synthetic raw rows',
+    () async {
+      var snapshot = await chat.loadContextSnapshot(id);
+      final first = snapshot.messages.first;
+      final second = snapshot.messages[2];
+      for (final pair in [
+        (first, snapshot.messages[1]),
+        (second, snapshot.messages[3]),
+      ]) {
+        final op =
+            ContextOperation(
+              id: 'op-${pair.$1.id}',
+              kind: ContextOperationKind.compress,
+              anchorGroupId: pair.$2.id,
+              appliedAfterGroupId: snapshot.messages.last.id,
+              sourceGroups: [pair.$1.id, pair.$2.id],
+              dependencies: [],
+              createdAt: DateTime.now(),
+              summary: 'summary ${pair.$1.id}',
+              originalSummary: 'summary ${pair.$1.id}',
+              compressionDetails: const {'envelope': 'history-v1'},
+            ).withCarried(
+              CarriedOriginals(
+                setting: const CarrySetting(mode: CarryMode.count),
+                items: [carriedFromMessage(pair.$1)],
+              ),
+            );
+        await chat.appendContextOperation(
+          id,
+          op,
+          expectedFingerprint: snapshot.fingerprint,
+        );
+        snapshot = await chat.loadContextSnapshot(id);
+      }
+      final created = await chat.continueFromContextSummary(
+        id,
+        snapshot.operations.first.id,
+      );
+      final copied = await chat.loadContextSnapshot(created.id);
+      expect(copied.messages.any((m) => isCarriedMessageId(m.id)), false);
+      expect(copied.operations, hasLength(2));
+      expect(
+        copied.operations.every((op) => op.carried?.items.length == 1),
+        true,
+      );
+      final effective = await chat.loadSelectedContextMessages(
+        created.id,
+        limit: 100,
+      );
+      expect(
+        effective.where((m) => isCarriedMessageId(m.id)).map((m) => m.content),
+        [first.content, second.content],
+      );
+      expect(
+        effective.where(ContextOperation.isSummary).last.content,
+        snapshot.operations.last.contextText,
+      );
+    },
+  );
+
+  test(
+    'automatic live validation can drop carried copies without a second summary request',
+    () async {
+      final original = await chat.loadContextSnapshot(id);
+      var calls = 0;
+      final task = await compression.runAtSafePoint(
+        id,
+        CompressionRequest(
+          options: const CompressContextOptions(
+            mode: CompressContextLimitMode.keepRecent,
+            keepUserMessages: 6,
+            carry: CarrySetting(mode: CarryMode.count, count: 2),
+          ),
+          automatic: true,
+          beforeMessageId: original.messages[14].id,
+          model: 'test',
+          quoteMarker: (_) => '',
+          carryBudgetTokens: 10000,
+          generate: (_, _, _, _) async {
+            calls++;
+            return const TextGenerationResult(parts: [TextPart('summary')]);
+          },
+          acceptCandidate: (candidate) async =>
+              candidate.carried!.items.isEmpty,
+        ),
+      );
+      expect(task.phase, CompressionPhase.completed);
+      expect(task.candidate!.carried!.items, isEmpty);
+      expect(task.candidate!.carried!.notFit, 2);
+      expect(calls, 1);
+    },
+  );
+
   Future<void> rejectCancellationWrites() => database.customStatement('''
     CREATE TRIGGER reject_cancel BEFORE UPDATE ON extension_entity_rows
     WHEN NEW.kind = 'contextCompressionTask'
@@ -142,7 +603,8 @@ void main() {
     ),
     model: 'private-provider/private-model',
     quoteMarker: AppLocalizationsEn().selectionQuoteMarker,
-    compactNative: compact,
+    compactNative: (selection, id) async =>
+        NativeCompactionResult(payload: await compact(selection, id)),
   );
 
   for (final native in [false, true]) {
@@ -213,7 +675,9 @@ void main() {
                 ? null
                 : (_, _) async {
                     if (fails) throw StateError('model failed');
-                    return nativePayload('completed');
+                    return NativeCompactionResult(
+                      payload: nativePayload('completed'),
+                    );
                   },
           );
           await compression.start(id, request);
@@ -908,7 +1372,7 @@ void main() {
               loadReference: (_) async => reference,
               compactNative: (_, _) async {
                 if (!changeAtCommit) reference = 'changed rules';
-                return nativePayload('stale');
+                return NativeCompactionResult(payload: nativePayload('stale'));
               },
               acceptCandidate: (_) async {
                 if (changeAtCommit) reference = 'changed rules';

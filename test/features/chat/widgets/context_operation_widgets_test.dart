@@ -839,7 +839,11 @@ void main() {
       await settleCompressionOptions(tester);
       final start = find.byType(FormSheetActions);
       expect(tester.widget<FormSheetActions>(start).onConfirm, isNull);
-      expect(find.byType(IosSwitch), findsNWidgets(2));
+      expect(find.byType(IosSwitch), findsNWidgets(3));
+      expect(
+        find.text(AppLocalizationsEn().compressionCarryTitle),
+        findsOneWidget,
+      );
       expect(
         tester.widget<IosSwitch>(find.byType(IosSwitch).first).value,
         isFalse,

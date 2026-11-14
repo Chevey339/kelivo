@@ -1,3 +1,4 @@
+import '../../../core/models/carried_original.dart';
 import '../../../core/services/tools/view_image_tool.dart';
 import '../../../core/models/image_context.dart';
 import '../../chat/utils/image_context_budget_error.dart';
@@ -2331,6 +2332,7 @@ class ChatActions {
           (m) =>
               m['role'] == 'user' &&
               m[imageContextOwnerKey] is String &&
+              !isCarriedMessageId(m[imageContextOwnerKey] as String) &&
               !(m[imageContextOwnerKey] as String).startsWith(
                 ContextOperation.summaryPrefix,
               ),
@@ -2469,6 +2471,9 @@ class ChatActions {
         final options = CompressContextOptions(
           mode: CompressContextLimitMode.keepRecent,
           native: useNative,
+          carry: useNative
+              ? preferences.nativeCarryOriginals
+              : preferences.carryOriginals,
           keepUserMessages: useNative
               ? preferences.nativeKeepRecentUserTurns
               : preferences.keepRecentUserTurns,
@@ -2502,7 +2507,11 @@ class ChatActions {
                 .where(
                   (message) =>
                       allowedMessageIds.contains(message.id) ||
-                      message.id == candidate.summaryMessageId,
+                      message.id == candidate.summaryMessageId ||
+                      message.id.startsWith('$carriedPrefix${candidate.id}:') ||
+                      message.id.startsWith(
+                        '$carriedReplyPrefix${candidate.id}:',
+                      ),
                 )
                 .toList();
         Future<List<Map<String, dynamic>>> rebuild(
@@ -2522,7 +2531,8 @@ class ChatActions {
         List<Map<String, dynamic>>? replacement;
         try {
           var runtimeConfig = preferences;
-          if (budget != null && !useNative) {
+          int? carryBudgetTokens;
+          if (budget != null) {
             final empty = ContextOperation(
               id: 'planning',
               kind: ContextOperationKind.compress,
@@ -2541,16 +2551,21 @@ class ChatActions {
             );
             final space =
                 (budget.input * preferences.targetInputRatio).floor() - fixed;
-            if (space < 128) {
+            if (space < 128 && !useNative) {
               if (!notified) {
                 notified = true;
                 viewModel.onError?.call('compression_reference_too_large');
               }
               return null;
             }
-            runtimeConfig = preferences.withOverrides({
-              'summaryTokens': space.clamp(128, preferences.summaryTokens),
-            });
+            carryBudgetTokens = useNative
+                ? space.clamp(0, 64000)
+                : (space - 128).clamp(0, space);
+            if (!useNative) {
+              runtimeConfig = preferences.withOverrides({
+                'summaryTokens': space.clamp(128, preferences.summaryTokens),
+              });
+            }
           }
           final request = await viewModel.buildCompressionRequest(
             id,
@@ -2559,6 +2574,7 @@ class ChatActions {
             beforeMessageId: userId,
             effectiveMessageIds: Set.unmodifiable(allowedMessageIds),
             configOverride: runtimeConfig,
+            carryBudgetTokens: carryBudgetTokens,
             nativeModel: useNative
                 ? (
                     providerKey: ctx.providerKey,
@@ -2600,6 +2616,12 @@ class ChatActions {
           }
           ctx.imageContext?.compressedOwners.addAll(excluded);
           allowedMessageIds.add(task.candidate!.summaryMessageId);
+          for (final item
+              in task.candidate!.carried?.items ?? <CarriedOriginal>[]) {
+            allowedMessageIds.add(
+              '$carriedPrefix${task.id}:${item.sourceMessageId}',
+            );
+          }
           // Publish activation for the accepted projection at the real request
           // boundary. Candidate/reference previews above remain read-only.
           try {

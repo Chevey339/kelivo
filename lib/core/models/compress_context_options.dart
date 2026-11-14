@@ -1,3 +1,5 @@
+import 'carried_original.dart';
+export 'carried_selection.dart';
 import '../utils/token_estimator.dart';
 import 'chat_message.dart';
 import 'context_operation.dart';
@@ -18,6 +20,10 @@ class CompressContextOptions {
     this.focus = '',
     this.previewOnly = false,
     this.native = false,
+    this.carry,
+    this.carryFromSummaries = false,
+    this.carryExcluded = const [],
+    this.carryReplies = const [],
   });
 
   static const int defaultMaxChars = 6000;
@@ -37,6 +43,10 @@ class CompressContextOptions {
   final String focus;
   final bool previewOnly;
   final bool native;
+  final CarrySetting? carry;
+  final bool carryFromSummaries;
+  final List<String> carryExcluded;
+  final List<String> carryReplies;
 
   Map<String, dynamic> toJson() => {
     'mode': mode.name,
@@ -50,30 +60,46 @@ class CompressContextOptions {
     'focus': focus,
     'previewOnly': previewOnly,
     'native': native,
+    'carry': carry?.toJson(),
+    'carryFromSummaries': carryFromSummaries,
+    'carryExcluded': carryExcluded,
+    'carryReplies': carryReplies,
   };
 
-  factory CompressContextOptions.fromJson(Map<String, dynamic> json) =>
-      CompressContextOptions(
-        mode: CompressContextLimitMode.values.byName(json['mode'] as String),
-        maxChars: json['maxChars'] as int?,
-        keepUserMessages: json['keep'] as int?,
-        historySource: ContextHistorySource.values.byName(
-          json['source'] as String,
-        ),
-        includeEditedSummaries: json['includeEdited'] as bool,
-        includeAttachmentsAndTools: json['includeAttachmentsAndTools'] != false,
-        regenerateExisting: json['regenerateExisting'] == true,
-        newConversation: json['newConversation'] as bool,
-        focus: json['focus'] as String? ?? '',
-        previewOnly: json['previewOnly'] == true,
-        native: json['native'] == true,
-      );
+  factory CompressContextOptions.fromJson(
+    Map<String, dynamic> json,
+  ) => CompressContextOptions(
+    mode: CompressContextLimitMode.values.byName(json['mode'] as String),
+    maxChars: json['maxChars'] as int?,
+    keepUserMessages: json['keep'] as int?,
+    historySource: ContextHistorySource.values.byName(json['source'] as String),
+    includeEditedSummaries: json['includeEdited'] as bool,
+    includeAttachmentsAndTools: json['includeAttachmentsAndTools'] != false,
+    regenerateExisting: json['regenerateExisting'] == true,
+    newConversation: json['newConversation'] as bool,
+    focus: json['focus'] as String? ?? '',
+    previewOnly: json['previewOnly'] == true,
+    native: json['native'] == true,
+    carry: json['carry'] is Map ? CarrySetting.fromJson(json['carry']) : null,
+    carryFromSummaries: json['carryFromSummaries'] == true,
+    carryExcluded:
+        (json['carryExcluded'] is List
+                ? json['carryExcluded'] as List
+                : const [])
+            .whereType<String>()
+            .toList(),
+    carryReplies:
+        (json['carryReplies'] is List ? json['carryReplies'] as List : const [])
+            .whereType<String>()
+            .toList(),
+  );
 }
 
 bool isCompressionUserMessage(ChatMessage message) =>
     message.role == 'user' &&
     !ContextOperation.isSummary(message) &&
     !message.id.startsWith('context-note:') &&
+    !isCarriedMessageId(message.id) &&
     (message.content.trim().isNotEmpty ||
         message.parts.any((part) => part is ImagePart || part is FilePart));
 
@@ -130,6 +156,7 @@ CompressionSelection selectCompressionHistory(
       messages,
       operations,
       entries.values.toList(),
+      deduplicate: false,
     ))
       m.id: m,
   };
@@ -171,13 +198,14 @@ CompressionRangeSelection selectCompressionRange(
   String? protectedMessageId,
   Set<String>? effectiveMessageIds,
 }) {
-  final effective = ContextHistory.project(messages, operations)
+  final projected = ContextHistory.project(messages, operations)
       .where(
         (message) =>
             effectiveMessageIds == null ||
             effectiveMessageIds.contains(message.id),
       )
       .toList();
+  final effective = projected.where((m) => !isCarriedMessageId(m.id)).toList();
   final keep = options.mode == CompressContextLimitMode.keepRecent
       ? options.keepUserMessages ??
             CompressContextOptions.defaultKeepUserMessages
@@ -224,7 +252,8 @@ CompressionRangeSelection selectCompressionRange(
   };
   final groups = <String>{
     for (final message in prefix)
-      if (!message.isSummary) message.groupId,
+      if (!message.isSummary && !isCarriedMessageId(message.id))
+        message.groupId,
     for (final id in dependencies) ...?byId[id]?.sourceGroups,
   };
   final expanded = ContextHistory.compressionProjection(
@@ -235,14 +264,27 @@ CompressionRangeSelection selectCompressionRange(
     includeNative: options.native,
   );
   final input = expanded.where((message) {
+    if (isCarriedMessageId(message.id)) {
+      final operation = byMessage[message.groupId];
+      return operation != null && operation.sourceGroups.every(groups.contains);
+    }
     if (groups.contains(message.groupId)) return true;
     final operation = byMessage[message.id];
     return operation != null && operation.sourceGroups.every(groups.contains);
   }).toList();
   final prefixIds = prefix.map((m) => m.id).toSet();
+  for (final m in projected.where((m) => isCarriedMessageId(m.id))) {
+    if (dependencies.any(
+      (id) =>
+          m.id.startsWith('$carriedPrefix$id:') ||
+          m.id.startsWith('$carriedReplyPrefix$id:'),
+    )) {
+      prefixIds.add(m.id);
+    }
+  }
   return (
-    effective: effective,
-    retained: effective.where((m) => !prefixIds.contains(m.id)).toList(),
+    effective: projected,
+    retained: projected.where((m) => !prefixIds.contains(m.id)).toList(),
     covered: messages.where((m) => groups.contains(m.groupId)).toList(),
     dependencies: dependencies,
     needsRegeneration:
@@ -319,7 +361,11 @@ List<ChatMessage> selectKeepRecentMessages(
   }
   if (userIndices.isEmpty) return const <ChatMessage>[];
   if (userIndices.length <= keepUserMessages) {
-    return messages.skipWhile(ContextOperation.isSummary).toList();
+    return messages
+        .skipWhile(
+          (m) => ContextOperation.isSummary(m) || isCarriedMessageId(m.id),
+        )
+        .toList();
   }
   return messages.sublist(userIndices[userIndices.length - keepUserMessages]);
 }

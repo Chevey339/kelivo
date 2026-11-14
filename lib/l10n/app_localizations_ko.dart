@@ -16385,4 +16385,116 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => '파일 정보';
+
+  @override
+  String get compressionCarryTitle => '이전에 보낸 메시지도 원문 그대로 함께 보내기';
+
+  @override
+  String get compressionCarryHint =>
+      '요약되는 부분에 포함된 내 메시지는 요약으로 전달되는 내용뿐 아니라, 작성한 원문 그대로도 모델에 함께 전송됩니다.';
+
+  @override
+  String get compressionCarryCountLabel => '최근 메시지 보내기';
+
+  @override
+  String get compressionCarryUnit => '개';
+
+  @override
+  String get compressionCarryAll => '들어가는 만큼';
+
+  @override
+  String get compressionCarryAllHint =>
+      '개수 제한 없이 최신 메시지부터 거슬러 올라가 거의 가득 찰 때까지 보냅니다. 가장 오래된 메시지가 너무 길면 시작과 끝 부분만 보냅니다.';
+
+  @override
+  String get compressionCarryEarlier => '이전 요약에 포함된 메시지도 다시 가져오기';
+
+  @override
+  String get compressionCarryEarlierHint =>
+      '이전에 압축된 부분에 포함된 내 메시지도 함께 포함할 수 있습니다.';
+
+  @override
+  String compressionCarryPreview(int count, String tokens) {
+    return '$count개 전송 · 약 $tokens 토큰';
+  }
+
+  @override
+  String get compressionCarryNone => '요약되는 부분에 내가 보낸 메시지가 없습니다.';
+
+  @override
+  String compressionCarryNotFit(int count) {
+    return '오래된 메시지 $count개는 공간이 부족해 이번에는 전송되지 않습니다.';
+  }
+
+  @override
+  String compressionCarryMoreRows(int count) {
+    return '$count개 더';
+  }
+
+  @override
+  String get compressionCarryOverBudget =>
+      '이 메시지들은 현재 모델의 용량을 초과할 가능성이 높습니다. 개수를 줄이거나 컨텍스트가 더 큰 모델로 전환하세요.';
+
+  @override
+  String compressionCarryFitAction(int count) {
+    return '$count개로 변경';
+  }
+
+  @override
+  String get compressionCarryTruncated => '너무 길어 시작과 끝 부분만 전송됩니다';
+
+  @override
+  String get compressionCarryAutoToo => '자동 압축도 동일하게 처리됩니다.';
+
+  @override
+  String get compressionCarryNewChatText =>
+      '이미지와 파일은 새 대화로 전달되지 않으며 텍스트만 전달됩니다.';
+
+  @override
+  String get compressionCarryServerKeeps => '이 서비스는 압축 시 이전 메시지를 자체적으로 유지합니다.';
+
+  @override
+  String get contextDetailCarried => '원문 그대로 전송된 메시지';
+
+  @override
+  String contextDetailCarriedCount(int count) {
+    return '이전에 보낸 메시지 $count개';
+  }
+
+  @override
+  String get contextDetailServerKept => '서비스에서 유지한 메시지';
+
+  @override
+  String get contextCarriedEditHint =>
+      '여기서는 모델에 전송되는 텍스트만 변경됩니다. 대화의 원본 메시지는 그대로 유지됩니다.';
+
+  @override
+  String get contextCarriedEmpty => '비워 둘 수 없습니다. 전송을 중단하려면 \"전송 중단\"을 선택하세요.';
+
+  @override
+  String get contextCarriedRemove => '전송 중단';
+
+  @override
+  String get contextCarriedRemoveConfirm =>
+      '이 메시지는 더 이상 모델에 전송되지 않습니다. 대화의 원본 메시지는 영향을 받지 않습니다.';
+
+  @override
+  String get contextCarriedSourceDeleted => '원본이 삭제되어 이 텍스트만 남아 있습니다';
+
+  @override
+  String get compressionCarryReply => '당시 답변도 함께 포함';
+
+  @override
+  String compressionCarryReplyTokens(String tokens) {
+    return '+약 $tokens';
+  }
+
+  @override
+  String get compressionCarryReplyInKept => '답변이 이미 유지된 턴에 포함되어 있습니다';
+
+  @override
+  String get contextCarriedReplyLabel => '당시 답변';
+
+  @override
+  String get contextCarriedRemoveReply => '답변 전송 안 함';
 }

@@ -47,7 +47,7 @@ export 'generation/tool_loop_runner.dart';
 export 'stream/stream_chunk_emit.dart';
 
 class ChatApiService {
-  static Future<NativeCompactionPayload> compactHistory({
+  static Future<NativeCompactionResult> compactHistory({
     required ProviderConfig config,
     required String modelId,
     required List<Map<String, dynamic>> messages,
@@ -58,6 +58,7 @@ class ChatApiService {
     Map<String, String>? extraHeaders,
     bool Function()? isCancelled,
     Duration? requestTimeout,
+    NativeUserRetention retention = NativeUserRetention.auto,
   }) async {
     final token = CancelToken();
     _activeCancelTokens.remove(requestId)?.cancel('replaced');
@@ -100,11 +101,12 @@ class ChatApiService {
         cancelToken: token,
       );
       final authenticatedClient = client;
-      Future<NativeCompactionPayload> sendCompact() => requestNativeCompaction(
+      Future<NativeCompactionResult> sendCompact() => requestNativeCompaction(
         authenticatedClient,
         config,
         modelId,
         projected,
+        retention: retention,
         extraHeaders: providerSessionHeaders(
           config,
           conversationId: conversationId,

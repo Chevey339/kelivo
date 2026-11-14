@@ -1,3 +1,4 @@
+import '../models/carried_original.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -24,7 +25,9 @@ Map<String, String> internalImageReferences(Map<String, dynamic> message) {
 const String multimodalInternalLiteralTextKey = '_kelivo_literal_text';
 String? internalLiteralText(Map<String, dynamic> message) {
   final value = message[multimodalInternalLiteralTextKey];
-  return value is String && value.isNotEmpty && value.length <= 4096
+  return value is String &&
+          value.isNotEmpty &&
+          (value.length <= 4096 || message[carriedTextOnlyKey] == true)
       ? value
       : null;
 }

@@ -246,7 +246,12 @@ WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
     );
     final hydrated = await getMessagesByIds([
       for (final m in projected)
-        if (!m.isSummary) m.id,
+        if (!m.isSummary && !isCarriedMessageId(m.id)) m.id,
+      for (final op in operations.where(
+        (op) => projected.any((m) => m.id == op.summaryMessageId),
+      ))
+        for (final item in op.carried?.items ?? <CarriedOriginal>[])
+          item.sourceMessageId,
     ]);
     return ContextHistory.materialize(
       hydrated,
@@ -540,6 +545,7 @@ WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
     String conversationId,
     String operationId, {
     String? summary,
+    CarriedOriginals? carried,
     required bool includeDependents,
     required String expectedState,
   }) => _db.transaction(() async {
@@ -549,7 +555,8 @@ WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
     }
     final target = operations.firstWhere((op) => op.id == operationId);
     if (target.revoked) throw StateError('context_changed');
-    if (target.isImportedNative) {
+    if (carried != null) validateCarriedChange(operations, target, carried);
+    if (target.isImportedNative && (summary != null || carried == null)) {
       throw StateError('native_compaction_originals_unavailable');
     }
     if (summary != null &&
@@ -565,7 +572,9 @@ WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
     }
     final next = [
       for (final op in operations)
-        if (op.id == operationId && summary != null)
+        if (op.id == operationId && carried != null)
+          op.withCarried(carried)
+        else if (op.id == operationId && summary != null)
           op.copyWith(summary: summary)
         else if (affected.contains(op.id))
           op.copyWith(revoked: true)
@@ -584,6 +593,7 @@ WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
     Future<void> Function()? validateBeforeCommit,
     void Function()? checkBeforeCommit,
   }) async {
+    retained = retained.where((m) => !isCarriedMessageId(m.id)).toList();
     // Copy the newest accepted UI state before entering the shared writer.
     // Nested message writes and their publications must use this same owner.
     await genUiStates.flush();
@@ -654,7 +664,9 @@ WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
           );
           final background = ChatMessage(
             role: 'user',
-            content: retained[i].content,
+            content: retainedOperation.carried == null
+                ? retained[i].content
+                : retainedOperation.summary,
             conversationId: id,
             modelId: retainedOperation.model,
           );
@@ -664,7 +676,7 @@ WHERE e.kind=? AND e.id=? AND json_extract(j.value,'$.id')=? LIMIT 1''',
           await _replaceMessageParts(background);
           final keep = countUserMessages(retained.skip(i + 1).toList());
           targetOperations.add(
-            retainedOperation.isNative
+            retainedOperation.isNative || retainedOperation.carried != null
                 ? retainedOperation.copiedTo(
                     background,
                     sourceConversationId: sourceId,
@@ -846,7 +858,9 @@ Future<ContextMessageCounts> _contextMessageCounts(
   final summaries = effective.where((m) => m.isSummary).length;
   return (
     stored: metadata.length,
-    messages: effective.length - summaries,
+    messages: effective
+        .where((m) => !m.isSummary && !isCarriedMessageId(m.id))
+        .length,
     summaries: summaries,
   );
 });

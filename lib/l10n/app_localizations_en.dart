@@ -16902,4 +16902,125 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => 'File info';
+
+  @override
+  String get compressionCarryTitle =>
+      'Also send your earlier messages as written';
+
+  @override
+  String get compressionCarryHint =>
+      'From the part that becomes a summary, your own messages are sent to the model as you wrote them, not just as the summary retells them.';
+
+  @override
+  String get compressionCarryCountLabel => 'Send the latest';
+
+  @override
+  String get compressionCarryUnit => 'messages';
+
+  @override
+  String get compressionCarryAll => 'As many as fit';
+
+  @override
+  String get compressionCarryAllHint =>
+      'No set number. Starts from the newest and goes back until it’s nearly full; if the oldest one is too long, only its start and end are sent.';
+
+  @override
+  String get compressionCarryEarlier =>
+      'Also bring back messages from earlier summaries';
+
+  @override
+  String get compressionCarryEarlierHint =>
+      'Your messages from parts compressed earlier can be included too.';
+
+  @override
+  String compressionCarryPreview(int count, String tokens) {
+    return 'Will send $count · about $tokens tokens';
+  }
+
+  @override
+  String get compressionCarryNone =>
+      'The part being summarized has no messages from you.';
+
+  @override
+  String compressionCarryNotFit(int count) {
+    return '$count older messages don’t fit and won’t be sent this time.';
+  }
+
+  @override
+  String compressionCarryMoreRows(int count) {
+    return '$count more';
+  }
+
+  @override
+  String get compressionCarryOverBudget =>
+      'These messages would likely be more than the current model can take. Send fewer, or switch to a model with a larger context.';
+
+  @override
+  String compressionCarryFitAction(int count) {
+    return 'Change to $count';
+  }
+
+  @override
+  String get compressionCarryTruncated =>
+      'Too long; only the start and end are sent';
+
+  @override
+  String get compressionCarryAutoToo =>
+      'Automatic compression will do the same.';
+
+  @override
+  String get compressionCarryNewChatText =>
+      'Images and files aren’t carried to the new chat; only the text is.';
+
+  @override
+  String get compressionCarryServerKeeps =>
+      'This service keeps your earlier messages on its own when compressing.';
+
+  @override
+  String get contextDetailCarried => 'Sent as written';
+
+  @override
+  String contextDetailCarriedCount(int count) {
+    return '$count of your earlier messages';
+  }
+
+  @override
+  String get contextDetailServerKept => 'Kept by the service';
+
+  @override
+  String get contextCarriedEditHint =>
+      'This only changes the text sent to the model. The original message in the chat stays the same.';
+
+  @override
+  String get contextCarriedEmpty =>
+      'This can’t be empty. To stop sending it, choose “Stop sending”.';
+
+  @override
+  String get contextCarriedRemove => 'Stop sending';
+
+  @override
+  String get contextCarriedRemoveConfirm =>
+      'This won’t be sent to the model anymore. The original message in the chat isn’t affected.';
+
+  @override
+  String get contextCarriedSourceDeleted =>
+      'The original was deleted; only this text remains';
+
+  @override
+  String get compressionCarryReply => 'Include the reply too';
+
+  @override
+  String compressionCarryReplyTokens(String tokens) {
+    return '+about $tokens';
+  }
+
+  @override
+  String get compressionCarryReplyInKept =>
+      'The reply is already in the kept turns';
+
+  @override
+  String get contextCarriedReplyLabel => 'The reply';
+
+  @override
+  String get contextCarriedRemoveReply => 'Don’t send the reply';
 }

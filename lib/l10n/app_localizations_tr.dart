@@ -16998,4 +16998,123 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => 'Dosya bilgisi';
+
+  @override
+  String get compressionCarryTitle =>
+      'Önceki mesajlarınızı da yazdığınız gibi gönder';
+
+  @override
+  String get compressionCarryHint =>
+      'Özete dönüşen kısımdaki kendi mesajlarınız, özetin aktardığı şekliyle değil, yazdığınız gibi modele gönderilir.';
+
+  @override
+  String get compressionCarryCountLabel => 'En son şunları gönder:';
+
+  @override
+  String get compressionCarryUnit => 'mesaj';
+
+  @override
+  String get compressionCarryAll => 'Sığabildiği kadar';
+
+  @override
+  String get compressionCarryAllHint =>
+      'Sabit sayı yok. En yeniden başlayıp neredeyse dolana kadar geriye gider; en eski mesaj çok uzunsa yalnızca başı ve sonu gönderilir.';
+
+  @override
+  String get compressionCarryEarlier =>
+      'Daha önceki özetlerdeki mesajları da geri getir';
+
+  @override
+  String get compressionCarryEarlierHint =>
+      'Daha önce sıkıştırılan kısımlardaki mesajlarınız da dahil edilebilir.';
+
+  @override
+  String compressionCarryPreview(int count, String tokens) {
+    return '$count mesaj gönderilecek · yaklaşık $tokens token';
+  }
+
+  @override
+  String get compressionCarryNone => 'Özetlenen kısımda size ait mesaj yok.';
+
+  @override
+  String compressionCarryNotFit(int count) {
+    return '$count eski mesaj sığmıyor ve bu sefer gönderilmeyecek.';
+  }
+
+  @override
+  String compressionCarryMoreRows(int count) {
+    return '$count tane daha';
+  }
+
+  @override
+  String get compressionCarryOverBudget =>
+      'Bu mesajlar büyük ihtimalle mevcut modelin kapasitesini aşar. Daha az gönderin veya daha büyük bağlamı olan bir modele geçin.';
+
+  @override
+  String compressionCarryFitAction(int count) {
+    return '$count olarak değiştir';
+  }
+
+  @override
+  String get compressionCarryTruncated =>
+      'Çok uzun; yalnızca başı ve sonu gönderilir';
+
+  @override
+  String get compressionCarryAutoToo =>
+      'Otomatik sıkıştırma da aynısını yapar.';
+
+  @override
+  String get compressionCarryNewChatText =>
+      'Görseller ve dosyalar yeni sohbete taşınmaz; yalnızca metin taşınır.';
+
+  @override
+  String get compressionCarryServerKeeps =>
+      'Bu hizmet, sıkıştırırken önceki mesajlarınızı kendisi saklar.';
+
+  @override
+  String get contextDetailCarried => 'Yazdığınız gibi gönderildi';
+
+  @override
+  String contextDetailCarriedCount(int count) {
+    return 'Önceki $count mesajınız';
+  }
+
+  @override
+  String get contextDetailServerKept => 'Hizmet tarafından saklandı';
+
+  @override
+  String get contextCarriedEditHint =>
+      'Bu yalnızca modele gönderilen metni değiştirir. Sohbetteki orijinal mesaj aynı kalır.';
+
+  @override
+  String get contextCarriedEmpty =>
+      'Bu boş olamaz. Göndermeyi durdurmak için “Göndermeyi durdur”u seçin.';
+
+  @override
+  String get contextCarriedRemove => 'Göndermeyi durdur';
+
+  @override
+  String get contextCarriedRemoveConfirm =>
+      'Bu artık modele gönderilmeyecek. Sohbetteki orijinal mesaj etkilenmez.';
+
+  @override
+  String get contextCarriedSourceDeleted =>
+      'Orijinal silindi; yalnızca bu metin kaldı';
+
+  @override
+  String get compressionCarryReply => 'Yanıtı da dahil et';
+
+  @override
+  String compressionCarryReplyTokens(String tokens) {
+    return '+yaklaşık $tokens';
+  }
+
+  @override
+  String get compressionCarryReplyInKept => 'Yanıt zaten saklanan turlarda';
+
+  @override
+  String get contextCarriedReplyLabel => 'Yanıt';
+
+  @override
+  String get contextCarriedRemoveReply => 'Yanıtı gönderme';
 }

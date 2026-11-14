@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/request_budget.dart';
+import 'package:Kelivo/core/models/carried_original.dart';
+import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/image_context.dart';
@@ -41,6 +43,164 @@ void main() {
     ],
   };
 
+  test(
+    'a subsequent carry uses the original handle after editing Markdown',
+    () async {
+      final original = ChatContextImage(
+        identity: const ContextImageIdentity('old', 'part:1'),
+        uri: pixels,
+        source: ContextImageSource.user,
+        label: 'original',
+      );
+      final markdown = ChatContextImage(
+        identity: const ContextImageIdentity('old', 'markdown:original'),
+        uri: 'https://example.test/original.png',
+        source: ContextImageSource.user,
+        label: 'markdown',
+      );
+      final images = RequestImageContext(
+        settings: const ImageContextSettings(automatic: false),
+        images: [original, markdown],
+        latestUserId: 'current',
+      );
+      final frozen = <String, dynamic>{
+        'role': 'user',
+        'content': 'edited ![new](https://example.test/new.png)',
+        imageContextOwnerKey: '${carriedPrefix}first:old',
+        carriedTextOnlyKey: true,
+        carriedImageHandlesKey: [original.handle, markdown.handle],
+      };
+      await images.prepareMessages(
+        [frozen],
+        [],
+        parseMarkdownImages: true,
+        allowRemoteImages: true,
+      );
+      expect(
+        parseInternalMediaRefs(
+          frozen[multimodalInternalMediaPathsKey],
+        ).map((r) => r.uri),
+        [original.reference, markdown.reference],
+      );
+      final history = RequestHistoryContext(
+        currentUserId: 'current',
+        targetMessageId: 'answer',
+        isCancelled: () => false,
+        beforeRequest: (_, _, _) async => null,
+      )..format = HistoryWireFormat.responses;
+      final projected = history.projectCandidate(
+        {
+          'input': [
+            {
+              ...(bodyFor([original.reference, markdown.reference])['input']
+                          as List)
+                      .single
+                  as Map,
+              historySourceKey: '${carriedPrefix}first:old',
+            },
+            {'role': 'user', 'content': 'current', historySourceKey: 'current'},
+          ],
+        },
+        [
+          {...frozen, imageContextOwnerKey: '${carriedPrefix}second:old'},
+        ],
+      );
+      images.compressedOwners.add('old');
+      final next = await images.project(projected);
+      final parts = (next['input'] as List).first['content'] as List;
+      expect(
+        parts
+            .where((p) => p['type'] == 'input_image')
+            .map((p) => p['image_url']),
+        [pixels, markdown.uri],
+      );
+      expect(parts.first['text'], frozen['content']);
+    },
+  );
+  test(
+    'automatic carry retains the chosen user image through both projections',
+    () async {
+      final original = image(1, source: ContextImageSource.user);
+      final omitted = image(2, source: ContextImageSource.user);
+      final images = RequestImageContext(
+        settings: const ImageContextSettings(automatic: false),
+        images: [original, omitted],
+      );
+      final history = RequestHistoryContext(
+        currentUserId: 'current',
+        targetMessageId: 'answer',
+        isCancelled: () => false,
+        beforeRequest: (_, _, _) async => null,
+      )..format = HistoryWireFormat.google;
+      final replacement = [
+        <String, dynamic>{
+          'role': 'user',
+          'content': 'edited',
+          imageContextOwnerKey: '${carriedPrefix}op:m1',
+          carriedImageHandlesKey: [original.handle],
+        },
+        <String, dynamic>{
+          'role': 'user',
+          'content': 'summary',
+          imageContextOwnerKey: 'context-summary:op',
+        },
+      ];
+      final body = history.projectCandidate({
+        'contents': [
+          {
+            'role': 'user',
+            historySourceKey: 'm1',
+            'parts': [
+              {'text': 'old'},
+              {
+                'inlineData': {
+                  'mimeType': 'image/png',
+                  'data': 'kelivo-image-ref:${original.handle}',
+                },
+              },
+              {
+                'inlineData': {
+                  'mimeType': 'application/pdf',
+                  'data': 'document bytes',
+                },
+              },
+              {
+                'fileData': {
+                  'mimeType': 'audio/mpeg',
+                  'fileUri': 'https://example.test/audio',
+                },
+              },
+              {
+                'inlineData': {
+                  'mimeType': 'image/png',
+                  'data': 'kelivo-image-ref:${omitted.handle}',
+                },
+              },
+            ],
+          },
+          {
+            'role': 'user',
+            historySourceKey: 'current',
+            'parts': [
+              {'text': 'next'},
+            ],
+          },
+        ],
+      }, replacement);
+      final preview = await images.project(body, excludedOwners: {'m1', 'm2'});
+      images.compressedOwners.addAll(['m1', 'm2']);
+      final sent = await images.project(body);
+      expect(sent, preview);
+      final parts = (sent['contents'] as List).first['parts'];
+      expect(parts, [
+        {'text': 'edited'},
+        {
+          'inlineData': {'mimeType': 'image/png', 'data': 'YWJj'},
+        },
+      ]);
+      expect(jsonEncode(sent), isNot(contains('_kelivo_')));
+    },
+  );
   test(
     'native retained pixels suppress only the matching local image lookup',
     () async {

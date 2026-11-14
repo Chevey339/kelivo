@@ -17,8 +17,12 @@ class ContextSummaryEditorPage extends StatefulWidget {
     required this.onSave,
     this.estimate,
     this.budget,
+    this.hint,
+    this.emptyHint,
+    this.title,
   });
   final String summary;
+  final String? hint, emptyHint, title;
   final Future<bool> Function(String) onSave;
   final Future<CompressionBudget?> Function(String)? estimate;
   final CompressionBudget? budget;
@@ -95,7 +99,7 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
           onPressed: _saving ? null : () => Navigator.of(context).pop(false),
         ),
         title: Text(
-          l10n.contextEditTitle,
+          widget.title ?? l10n.contextEditTitle,
           style: const TextStyle(fontSize: 17),
         ),
         centerTitle: true,
@@ -113,6 +117,14 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.hint != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    widget.hint!,
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                ),
               Expanded(
                 flex: 3,
                 child: LongMessageEditor(
@@ -156,7 +168,7 @@ class _ContextSummaryEditorPageState extends State<ContextSummaryEditorPage> {
               else
                 Text(
                   empty
-                      ? l10n.contextEditEmpty
+                      ? widget.emptyHint ?? l10n.contextEditEmpty
                       : _budget == null
                       ? l10n.contextSummaryHint
                       : l10n.contextEditPreview(

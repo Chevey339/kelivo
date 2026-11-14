@@ -5,9 +5,23 @@ import 'token_usage.dart';
 
 const nativeCompactionArtifactKind = 'openai_native_compaction';
 const nativeCompactionMessageKey = '_kelivo_native_compaction';
+const nativeUserSourcesKey = '_kelivo_native_user_sources';
 const nativeCompactionWireKey = '_kelivo_native_compaction_item';
 
 enum NativeCompactionProtocol { compact, codex }
+
+enum NativeUserRetention { auto, none }
+
+typedef RetainedNativeUser = ({String sourceKey, Map<String, dynamic> wire});
+
+class NativeCompactionResult {
+  const NativeCompactionResult({
+    required this.payload,
+    this.retained = const [],
+  });
+  final NativeCompactionPayload payload;
+  final List<RetainedNativeUser> retained;
+}
 
 /// Remembers manual native choices; each chat owns its automatic policy.
 class NativeCompressionPreferences {

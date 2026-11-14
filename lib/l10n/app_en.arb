@@ -21994,5 +21994,169 @@
   "storageAttachmentDetailsTitle": "File info",
   "@storageAttachmentDetailsTitle": {
     "description": "Title of the information dialog opened by tapping an attachment status label. Shows its chats or cleanup status; this is not the automatic-cleanup settings dialog."
+  },
+  "compressionCarryTitle": "Also send your earlier messages as written",
+  "@compressionCarryTitle": {
+    "description": "Compression options panel: Also send your earlier messages as written Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryHint": "From the part that becomes a summary, your own messages are sent to the model as you wrote them, not just as the summary retells them.",
+  "@compressionCarryHint": {
+    "description": "Compression options panel: From the part that becomes a summary, your own messages are sent to the model as you wrote them, not just as the summary retells them. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryCountLabel": "Send the latest",
+  "@compressionCarryCountLabel": {
+    "description": "Compression options panel: Send the latest Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryUnit": "messages",
+  "@compressionCarryUnit": {
+    "description": "Compression options panel: messages Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryAll": "As many as fit",
+  "@compressionCarryAll": {
+    "description": "Compression options panel: As many as fit Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryAllHint": "No set number. Starts from the newest and goes back until it’s nearly full; if the oldest one is too long, only its start and end are sent.",
+  "@compressionCarryAllHint": {
+    "description": "Compression options panel: No set number. Starts from the newest and goes back until it’s nearly full; if the oldest one is too long, only its start and end are sent. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryEarlier": "Also bring back messages from earlier summaries",
+  "@compressionCarryEarlier": {
+    "description": "Compression options panel: Also bring back messages from earlier summaries Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryEarlierHint": "Your messages from parts compressed earlier can be included too.",
+  "@compressionCarryEarlierHint": {
+    "description": "Compression options panel: Your messages from parts compressed earlier can be included too. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryPreview": "Will send {count} · about {tokens} tokens",
+  "@compressionCarryPreview": {
+    "description": "Compression options panel: Will send {count} · about {tokens} tokens Refers to original user messages additionally sent with a summary; replies are optional text-only copies.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of user messages"
+      },
+      "tokens": {
+        "type": "String",
+        "description": "Formatted approximate token count"
+      }
+    }
+  },
+  "compressionCarryNone": "The part being summarized has no messages from you.",
+  "@compressionCarryNone": {
+    "description": "Compression options panel: The part being summarized has no messages from you. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryNotFit": "{count} older messages don’t fit and won’t be sent this time.",
+  "@compressionCarryNotFit": {
+    "description": "Compression options panel: {count} older messages don’t fit and won’t be sent this time. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of user messages"
+      }
+    }
+  },
+  "compressionCarryMoreRows": "{count} more",
+  "@compressionCarryMoreRows": {
+    "description": "Compression options panel: {count} more Refers to original user messages additionally sent with a summary; replies are optional text-only copies.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of user messages"
+      }
+    }
+  },
+  "compressionCarryOverBudget": "These messages would likely be more than the current model can take. Send fewer, or switch to a model with a larger context.",
+  "@compressionCarryOverBudget": {
+    "description": "Compression options panel: These messages would likely be more than the current model can take. Send fewer, or switch to a model with a larger context. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryFitAction": "Change to {count}",
+  "@compressionCarryFitAction": {
+    "description": "Compression options panel: Change to {count} Refers to original user messages additionally sent with a summary; replies are optional text-only copies.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of user messages"
+      }
+    }
+  },
+  "compressionCarryTruncated": "Too long; only the start and end are sent",
+  "@compressionCarryTruncated": {
+    "description": "Compression options panel: Too long; only the start and end are sent Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryAutoToo": "Automatic compression will do the same.",
+  "@compressionCarryAutoToo": {
+    "description": "Compression options panel: Automatic compression will do the same. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryNewChatText": "Images and files aren’t carried to the new chat; only the text is.",
+  "@compressionCarryNewChatText": {
+    "description": "Compression options panel: Images and files aren’t carried to the new chat; only the text is. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryServerKeeps": "This service keeps your earlier messages on its own when compressing.",
+  "@compressionCarryServerKeeps": {
+    "description": "Compression options panel: This service keeps your earlier messages on its own when compressing. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextDetailCarried": "Sent as written",
+  "@contextDetailCarried": {
+    "description": "Context operation details and carried message editor: Sent as written Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextDetailCarriedCount": "{count} of your earlier messages",
+  "@contextDetailCarriedCount": {
+    "description": "Context operation details and carried message editor: {count} of your earlier messages Refers to original user messages additionally sent with a summary; replies are optional text-only copies.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of user messages"
+      }
+    }
+  },
+  "contextDetailServerKept": "Kept by the service",
+  "@contextDetailServerKept": {
+    "description": "Context operation details and carried message editor: Kept by the service Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextCarriedEditHint": "This only changes the text sent to the model. The original message in the chat stays the same.",
+  "@contextCarriedEditHint": {
+    "description": "Context operation details and carried message editor: This only changes the text sent to the model. The original message in the chat stays the same. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextCarriedEmpty": "This can’t be empty. To stop sending it, choose “Stop sending”.",
+  "@contextCarriedEmpty": {
+    "description": "Context operation details and carried message editor: This can’t be empty. To stop sending it, choose “Stop sending”. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextCarriedRemove": "Stop sending",
+  "@contextCarriedRemove": {
+    "description": "Context operation details and carried message editor: Stop sending Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextCarriedRemoveConfirm": "This won’t be sent to the model anymore. The original message in the chat isn’t affected.",
+  "@contextCarriedRemoveConfirm": {
+    "description": "Context operation details and carried message editor: This won’t be sent to the model anymore. The original message in the chat isn’t affected. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextCarriedSourceDeleted": "The original was deleted; only this text remains",
+  "@contextCarriedSourceDeleted": {
+    "description": "Context operation details and carried message editor: The original was deleted; only this text remains Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryReply": "Include the reply too",
+  "@compressionCarryReply": {
+    "description": "Compression options panel: Include the reply too Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "compressionCarryReplyTokens": "+about {tokens}",
+  "@compressionCarryReplyTokens": {
+    "description": "Compression options panel: +about {tokens} Refers to original user messages additionally sent with a summary; replies are optional text-only copies.",
+    "placeholders": {
+      "tokens": {
+        "type": "String",
+        "description": "Formatted approximate token count"
+      }
+    }
+  },
+  "compressionCarryReplyInKept": "The reply is already in the kept turns",
+  "@compressionCarryReplyInKept": {
+    "description": "Compression options panel: The reply is already in the kept turns Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextCarriedReplyLabel": "The reply",
+  "@contextCarriedReplyLabel": {
+    "description": "Context operation details and carried message editor: The reply Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
+  },
+  "contextCarriedRemoveReply": "Don’t send the reply",
+  "@contextCarriedRemoveReply": {
+    "description": "Context operation details and carried message editor: Don’t send the reply Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
   }
 }

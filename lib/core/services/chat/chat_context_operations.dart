@@ -27,6 +27,58 @@ extension ChatContextOperations on ChatService {
     await _repo.saveCompressionTask(id, record);
   }
 
+  Future<Map<String, String>> legacyCarryPrompts(Iterable<String> ids) async =>
+      {
+        for (final prompt in (await _repo.getMessagePrompts(ids)).entries)
+          prompt.key: prompt.value.payload,
+      };
+
+  Future<Map<String, String>> carriedUserTexts(
+    List<ChatMessage> messages, {
+    required bool includeAttachments,
+    required String Function(int) quoteMarker,
+  }) async {
+    final texts = {
+      for (final message in messages)
+        if (message.role == 'user' && message.quotes.isNotEmpty)
+          message.id: message.quotedContent(quoteMarker),
+    };
+    if (!includeAttachments) return texts;
+    final prompts = await _repo.getMessagePrompts(
+      messages
+          .where((m) => m.role == 'user' && m.parts.any((p) => p is FilePart))
+          .map((m) => m.id),
+    );
+    for (final message in messages) {
+      final prompt = prompts[message.id];
+      if (prompt == null) continue;
+      final stored = prompt.carriesMemorySnapshot
+          ? MemoryBlockBuilder.splitInjectedPrefix(prompt.payload)?.rest ?? ''
+          : prompt.payload;
+      final blocks = <String>[];
+      var offset = 0;
+      for (final file in message.parts.whereType<FilePart>()) {
+        final start = stored.indexOf(
+          '## user sent a file: ${file.name}\n<content>\n```\n',
+          offset,
+        );
+        if (start < 0) continue;
+        const endMarker = '\n```\n</content>';
+        final end = stored.indexOf(endMarker, start);
+        if (end < 0) continue;
+        offset = end + endMarker.length;
+        blocks.add(stored.substring(start, offset));
+      }
+      if (blocks.isNotEmpty) {
+        texts[message.id] = [
+          ...blocks,
+          message.quotedContent(quoteMarker),
+        ].join('\n\n');
+      }
+    }
+    return texts;
+  }
+
   Future<List<ChatMessage>> messagesForCompression(
     List<ChatMessage> messages, {
     bool includeAttachmentsAndTools = true,
@@ -247,7 +299,12 @@ extension ChatContextOperations on ChatService {
         includeFollowingAssistant: includeFollowingAssistant,
       );
       await _cacheMessageArtifacts(
-        messages.where((m) => !ContextOperation.isSummary(m)).toList(),
+        messages
+            .where(
+              (m) =>
+                  !ContextOperation.isSummary(m) && !isCarriedMessageId(m.id),
+            )
+            .toList(),
       );
       return messages;
     }
@@ -360,7 +417,9 @@ extension ChatContextOperations on ChatService {
           final summaries = effective.where((m) => m.isSummary).length;
           counts = (
             stored: history.messages.length,
-            messages: effective.length - summaries,
+            messages: effective
+                .where((m) => !m.isSummary && !isCarriedMessageId(m.id))
+                .length,
             summaries: summaries,
           );
         }
@@ -393,6 +452,7 @@ extension ChatContextOperations on ChatService {
     String id,
     String operationId, {
     String? summary,
+    CarriedOriginals? carried,
     required bool includeDependents,
     required String expectedState,
   }) => contextCompression.runContextChange(id, () async {
@@ -402,7 +462,10 @@ extension ChatContextOperations on ChatService {
       if (ContextHistory.operationsFingerprint(operations) != expectedState) {
         throw StateError('context_changed');
       }
-      if (operations.any((op) => op.id == operationId && op.isImportedNative)) {
+      final target = operations.firstWhere((op) => op.id == operationId);
+      if (carried != null) validateCarriedChange(operations, target, carried);
+      if ((summary != null || carried == null) &&
+          operations.any((op) => op.id == operationId && op.isImportedNative)) {
         throw StateError('native_compaction_originals_unavailable');
       }
       final affected = ContextHistory.affectedOperations(
@@ -421,7 +484,9 @@ extension ChatContextOperations on ChatService {
       }
       _contextOperations[id] = [
         for (final op in operations)
-          if (op.id == operationId && summary != null)
+          if (op.id == operationId && carried != null)
+            op.withCarried(carried)
+          else if (op.id == operationId && summary != null)
             op.copyWith(summary: summary)
           else if (affected.contains(op.id))
             op.copyWith(revoked: true)
@@ -433,12 +498,15 @@ extension ChatContextOperations on ChatService {
         id,
         operationId,
         summary: summary,
+        carried: carried,
         includeDependents: includeDependents,
         expectedState: expectedState,
       );
     }
     await loadContextOperations(id, refresh: true);
-    if (summary == null) contextCompression.skipNextAutomaticTurn(id);
+    if (summary == null && carried == null) {
+      contextCompression.skipNextAutomaticTurn(id);
+    }
     _notifyContextChanged(id);
   });
 
@@ -475,6 +543,7 @@ extension ChatContextOperations on ChatService {
     Future<void> Function()? validateBeforeCommit,
     void Function()? checkBeforeCommit,
   }) async {
+    retained = retained.where((m) => !isCarriedMessageId(m.id)).toList();
     if (_temporaryConversationIds.contains(id)) {
       await validateBeforeCommit?.call();
       checkBeforeCommit?.call();
@@ -490,7 +559,18 @@ extension ChatContextOperations on ChatService {
           conversationId: id,
           modelId: operation.model,
         ),
-        ...retained,
+        for (final message in retained)
+          ContextOperation.isSummary(message) &&
+                  snapshot.operations.any(
+                    (op) =>
+                        op.summaryMessageId == message.id && op.carried != null,
+                  )
+              ? message.copyWith(
+                  content: snapshot.operations
+                      .firstWhere((op) => op.summaryMessageId == message.id)
+                      .summary,
+                )
+              : message,
       ];
       return _forkSelectedMessages(
         title: source.title,
@@ -518,7 +598,7 @@ extension ChatContextOperations on ChatService {
             final keep = countUserMessages(
               sourceMessages.skip(index + 1).toList(),
             );
-            return index == 0 || original.isNative
+            return index == 0 || original.isNative || original.carried != null
                 ? original.copiedTo(
                     target.messages[index],
                     sourceConversationId: id,

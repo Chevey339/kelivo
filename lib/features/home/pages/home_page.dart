@@ -2042,6 +2042,13 @@ class _HomePageState extends State<HomePage>
         historyRevision: chat.compressionHistoryRevisionListenable(
           conversation.id,
         ),
+        previewCarried: (options, config) async {
+          return _controller.previewCarriedMessages(
+            conversation.id,
+            options,
+            config,
+          );
+        },
         previewRequest: (options, config) {
           final revision = chat.compressionHistoryRevision(conversation.id);
           if (previewHistory == null || previewRevision != revision) {

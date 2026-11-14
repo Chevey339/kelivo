@@ -202,10 +202,13 @@ void main() {
       expect(body, isNot(contains('stream')));
       expect(body, isNot(contains('tools')));
       expect(sent.body, isNot(contains(historySourceKey)));
-      expect(result.output, output);
-      expect(result.usage!.promptTokens, 900);
+      expect(([
+        ...result.retained.map((r) => r.wire),
+        ...result.payload.output,
+      ]), output);
+      expect(result.payload.usage!.promptTokens, 900);
       final restored = NativeCompactionPayload.fromJson(
-        jsonDecode(jsonEncode(result.toJson())) as Map<String, dynamic>,
+        jsonDecode(jsonEncode(result.payload.toJson())) as Map<String, dynamic>,
       );
       expect(restored.output, output);
       final replay = await buildOpenAIResponsesBody(
@@ -229,7 +232,10 @@ void main() {
           RequestHistoryContext.stripSources(projected)['input'] as List;
       expect(input.take(output.length).toList(), output);
       expect(input.last, containsPair('content', 'recent unchanged'));
-      expect(result.output, output);
+      expect(([
+        ...result.retained.map((r) => r.wire),
+        ...result.payload.output,
+      ]), output);
     },
   );
 
@@ -484,11 +490,26 @@ void main() {
       expect((body['input'] as List).last, {'type': 'compaction_trigger'});
       expect(body['stream'], isTrue);
       expect(body['store'], isFalse);
-      expect(result.output.last, compaction);
-      expect(result.output.first, {'role': 'user', 'content': 'earlier'});
+      expect(
+        ([
+          ...result.retained.map((r) => r.wire),
+          ...result.payload.output,
+        ]).last,
+        compaction,
+      );
+      expect(
+        ([
+          ...result.retained.map((r) => r.wire),
+          ...result.payload.output,
+        ]).first,
+        {'role': 'user', 'content': 'earlier'},
+      );
       final continuation = <String, dynamic>{
         'model': 'custom-codex-model',
-        'input': result.output,
+        'input': ([
+          ...result.retained.map((r) => r.wire),
+          ...result.payload.output,
+        ]),
       };
       applyCodexRequest(continuation, {}, 'opaque-test-token');
       expect((continuation['input'] as List).last, compaction);
@@ -537,11 +558,40 @@ void main() {
         'custom-codex-model',
         projected,
       );
-      expect(result.output, hasLength(2));
-      expect(jsonEncode(result.output.first), contains('REAL_USER_HISTORY'));
-      expect(jsonEncode(result.output), isNot(contains('INJECTED_REFERENCE')));
-      expect(jsonEncode(result.output), isNot(contains(historySourceKey)));
-      expect(result.output.last, compaction);
+      expect(([
+        ...result.retained.map((r) => r.wire),
+        ...result.payload.output,
+      ]), hasLength(2));
+      expect(
+        jsonEncode(
+          ([
+            ...result.retained.map((r) => r.wire),
+            ...result.payload.output,
+          ]).first,
+        ),
+        contains('REAL_USER_HISTORY'),
+      );
+      expect(
+        jsonEncode(([
+          ...result.retained.map((r) => r.wire),
+          ...result.payload.output,
+        ])),
+        isNot(contains('INJECTED_REFERENCE')),
+      );
+      expect(
+        jsonEncode(([
+          ...result.retained.map((r) => r.wire),
+          ...result.payload.output,
+        ])),
+        isNot(contains(historySourceKey)),
+      );
+      expect(
+        ([
+          ...result.retained.map((r) => r.wire),
+          ...result.payload.output,
+        ]).last,
+        compaction,
+      );
     },
   );
 

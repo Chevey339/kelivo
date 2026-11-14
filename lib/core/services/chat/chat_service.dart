@@ -1,3 +1,4 @@
+import '../../models/carried_original.dart';
 import '../../../shared/markdown/markdown_image_sources.dart';
 import '../api/request_image_context.dart';
 import '../../../features/chat/utils/thinking_tag_parser.dart';

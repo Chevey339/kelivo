@@ -1,3 +1,6 @@
+import '../../../core/models/carried_original.dart';
+import '../../../core/models/provider_oauth.dart';
+import 'carried_options_section.dart';
 import '../../../core/models/native_compaction.dart';
 import 'dart:convert';
 import 'dart:isolate';
@@ -50,6 +53,7 @@ class CompressContextOptionsDialog extends StatefulWidget {
     this.conversationId,
     this.sheet = false,
     this.previewRequest,
+    this.previewCarried,
     this.initialError,
   });
   final Future<CompressionHistory> Function() loadHistory;
@@ -64,6 +68,11 @@ class CompressContextOptionsDialog extends StatefulWidget {
     CompressionConfig,
   )?
   previewRequest;
+  final Future<CarrySelection> Function(
+    CompressContextOptions,
+    CompressionConfig,
+  )?
+  previewCarried;
   @override
   State<CompressContextOptionsDialog> createState() =>
       _CompressContextOptionsDialogState();
@@ -71,6 +80,14 @@ class CompressContextOptionsDialog extends StatefulWidget {
 
 class _CompressContextOptionsDialogState
     extends State<CompressContextOptionsDialog> {
+  Object? _carryError;
+  CarrySelection _carryPreview = const CarrySelection();
+  bool _carryLoading = false;
+  bool _carryCountValid = true;
+  String? _carryKey;
+  bool _carryEarlier = false;
+  final _carryExcluded = <String>{};
+  final _carryReplies = <String>{};
   late CompressionConfig _config;
   Map<String, dynamic> _overrides = {};
   List<CompressionTemplate> _templates = builtInCompressionTemplates;
@@ -189,6 +206,7 @@ class _CompressContextOptionsDialogState
 
   void _historyChanged() {
     setState(() {
+      _carryKey = null;
       _history = null;
       _loadedHistory = null;
       _rangeKey = null;
@@ -268,6 +286,7 @@ class _CompressContextOptionsDialogState
 
   void _setNative(bool value) => setState(() {
     if (value == _native) return;
+    _carryCountValid = true;
     if (value) {
       _textMode = _mode;
       _textKeep = _keep.text;
@@ -410,6 +429,11 @@ class _CompressContextOptionsDialogState
   }) => CompressContextOptions(
     mode: _mode,
     native: _native,
+    carry: _native ? _config.nativeCarryOriginals : _config.carryOriginals,
+    carryFromSummaries:
+        _carryEarlier && (_selection?.dependencies.isNotEmpty ?? false),
+    carryExcluded: _carryExcluded.toList(),
+    carryReplies: _carryReplies.toList(),
     maxChars:
         _mode == CompressContextLimitMode.start ||
             _mode == CompressContextLimitMode.recent
@@ -427,6 +451,136 @@ class _CompressContextOptionsDialogState
         regenerate || (!_native && _source != ContextHistorySource.effective),
     previewOnly: trial,
   );
+  void _ensureCarryPreview(bool codex) {
+    final setting = _native
+        ? _config.nativeCarryOriginals
+        : _config.carryOriginals;
+    final enabled =
+        setting.mode == CarryMode.count ||
+        setting.mode == CarryMode.all ||
+        (_native && codex && setting.mode == CarryMode.unset);
+    if (!enabled || (_native && !codex)) {
+      _carryPreview = const CarrySelection();
+      _carryLoading = false;
+      _carryKey = null;
+      _carryError = null;
+      _carryCountValid = true;
+      return;
+    }
+    final callback = widget.previewCarried;
+    if (callback == null || _selection == null) return;
+    final options = _options();
+    final config = _config.withOverrides({
+      'summaryTokens':
+          int.tryParse(_length.text)?.clamp(128, 65536) ??
+          _config.summaryTokens,
+    });
+    final key = jsonEncode([
+      options.toJson(),
+      config.toJson(),
+      _rangeGeneration,
+    ]);
+    if (_carryKey == key) return;
+    _carryKey = key;
+    _carryError = null;
+    _carryPreview = const CarrySelection();
+    _carryLoading = true;
+    Future(() => callback(options, config)).then(
+      (preview) {
+        if (mounted && _carryKey == key) {
+          setState(() {
+            _carryPreview = preview;
+            _carryLoading = false;
+          });
+        }
+      },
+      onError: (Object error) {
+        if (mounted && _carryKey == key) {
+          setState(() {
+            _carryLoading = false;
+            _carryError = error;
+          });
+        }
+      },
+    );
+  }
+
+  Widget _carrySection(bool codex) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: SectionCard(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_carryError != null) ...[
+          CompressionErrorNotice(error: _carryError.toString()),
+          IosTextButton(
+            label: AppLocalizations.of(context)!.retry,
+            onPressed: () => setState(() => _carryKey = null),
+          ),
+        ],
+        CarriedOptionsSection(
+          key: ValueKey(_native),
+          setting: _native
+              ? _config.nativeCarryOriginals
+              : _config.carryOriginals,
+          codex: _native && codex,
+          serverKeeps: _native && !codex,
+          preview: _carryPreview,
+          loading: _carryLoading,
+          hasSummaries: _selection?.dependencies.isNotEmpty ?? false,
+          earlier: _carryEarlier,
+          newConversation: _newConversation,
+          automatic: _config.mode == AutoCompressionMode.auto,
+          replies: _carryReplies,
+          onValidity: (valid) => setState(() => _carryCountValid = valid),
+          onSetting: (value) {
+            _carryCountValid = true;
+            _change({
+              (_native ? 'nativeCarryOriginals' : 'carryOriginals'): value
+                  .toJson(),
+            });
+          },
+          onEarlier: (value) {
+            _explicitCarry(codex);
+            setState(() => _carryEarlier = value);
+          },
+          onExcluded: (id, excluded) {
+            _explicitCarry(codex);
+            setState(() {
+              if (excluded) {
+                _carryExcluded.add(id);
+                _carryReplies.remove(id);
+              } else {
+                _carryExcluded.remove(id);
+              }
+            });
+          },
+          onReply: (id, included) {
+            _explicitCarry(codex);
+            setState(() {
+              if (included) {
+                _carryReplies.add(id);
+              } else {
+                _carryReplies.remove(id);
+              }
+            });
+          },
+        ),
+      ],
+    ),
+  );
+
+  void _explicitCarry(bool codex) {
+    if (_native &&
+        codex &&
+        _config.nativeCarryOriginals.mode == CarryMode.unset) {
+      _change({
+        'nativeCarryOriginals': const CarrySetting(
+          mode: CarryMode.all,
+        ).toJson(),
+      });
+    }
+  }
+
   void _change(Map<String, dynamic> changes) => setState(() {
     _config = _config.withOverrides(changes);
     _overrides.addAll(changes);
@@ -458,6 +612,7 @@ class _CompressContextOptionsDialogState
         : _values().withOverrides({'nativeEnabled': false});
     const nativeKeys = {
       'nativeEnabled',
+      'nativeCarryOriginals',
       'nativeKeepRecentUserTurns',
       'nativeTriggerInputRatio',
       'mode',
@@ -469,7 +624,7 @@ class _CompressContextOptionsDialogState
       for (final e in values.toJson().entries)
         if ((!_native || nativeKeys.contains(e.key)) &&
             (e.key == 'nativeEnabled' ||
-                original[e.key] != e.value ||
+                jsonEncode(original[e.key]) != jsonEncode(e.value) ||
                 _overrides.containsKey(e.key)))
           e.key: e.value,
     };
@@ -503,7 +658,13 @@ class _CompressContextOptionsDialogState
   }
 
   Future<void> _submit({bool trial = false, bool regenerate = false}) async {
-    if (_saving) return;
+    if (_saving ||
+        _carryLoading ||
+        _carryError != null ||
+        !_carryCountValid ||
+        _carryPreview.overBudget) {
+      return;
+    }
     setState(() => _saving = true);
     try {
       await _saveSettings();
@@ -944,6 +1105,8 @@ class _CompressContextOptionsDialogState
     final provider = resolved.providerKey == null
         ? null
         : settings.getProviderConfig(resolved.providerKey!);
+    final codex = provider?.oauthProvider == OAuthProvider.chatgpt;
+    _ensureCarryPreview(codex);
     final selectedTemplate = _templates
         .where((t) => t.id == _config.templateId)
         .firstOrNull;
@@ -1117,6 +1280,7 @@ class _CompressContextOptionsDialogState
                     CompressionRecoveryTarget.range,
                     _rangeSettings(selection),
                   ),
+                  _carrySection(codex),
                   if (_native && _newConversation)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -1536,7 +1700,13 @@ class _CompressContextOptionsDialogState
                 : l10n.compressContextStartButton,
             onCancel: () => Navigator.pop(context),
             busy: _saving,
-            onConfirm: _saving
+            onConfirm:
+                _saving ||
+                    (!_advanced &&
+                        (_carryLoading ||
+                            _carryError != null ||
+                            !_carryCountValid ||
+                            _carryPreview.overBudget))
                 ? null
                 : _advanced
                 ? () async {

@@ -1,3 +1,4 @@
+import '../models/carried_original.dart';
 import '../models/attachment_retention.dart';
 import 'compression_repository.dart';
 import 'extension_entity_store.dart';

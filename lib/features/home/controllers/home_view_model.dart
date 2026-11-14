@@ -1,3 +1,8 @@
+import '../../../core/models/native_compaction.dart';
+import '../../../core/models/provider_oauth.dart';
+import '../../../core/models/carried_original.dart';
+import '../../../core/services/api/providers/openai/responses_request.dart';
+import '../../../core/services/api/request_history_context.dart';
 import '../../../core/services/api/native_compaction_context.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import '../../../core/models/message_part.dart';
@@ -1458,6 +1463,7 @@ class HomeViewModel extends ChangeNotifier {
     bool Function()? isCancelled,
     Future<bool> Function(ContextOperation)? acceptCandidate,
     CompressionConfig? configOverride,
+    int? carryBudgetTokens,
     ({String providerKey, String modelId, ProviderConfig config})? nativeModel,
   }) async {
     final conversation = _chatService.getConversation(conversationId);
@@ -1508,6 +1514,22 @@ class HomeViewModel extends ChangeNotifier {
           nativeCompactionScope(settings.getProviderConfig(provider)) != scope;
       return CompressionRequest(
         options: options,
+        codex: config.oauthProvider == OAuthProvider.chatgpt,
+        carryBudgetTokens: carryBudgetTokens,
+        prepareNative: (selection) async {
+          final prepared = await prepare(selection);
+          final body = await buildOpenAIResponsesBody(
+            nativeResponsesConfig(config),
+            model,
+            RequestHistoryContext.identify(prepared.apiMessages),
+            tools: [...prepared.tools, ...prepared.mcpTools],
+          );
+          return await prepared.imageContext?.project(
+                body,
+                preserveSources: true,
+              ) ??
+              body;
+        },
         automatic: automatic,
         ownsContinuation: ownsContinuation,
         acceptCandidate: acceptCandidate,
@@ -1533,6 +1555,11 @@ class HomeViewModel extends ChangeNotifier {
             extraHeaders: _generationController.buildCustomHeaders(assistant),
             isCancelled: cancelled,
             requestTimeout: preferences.requestTimeout,
+            retention:
+                (options.carry ?? preferences.nativeCarryOriginals).mode ==
+                    CarryMode.unset
+                ? NativeUserRetention.auto
+                : NativeUserRetention.none,
           );
         },
       );
@@ -1571,6 +1598,15 @@ class HomeViewModel extends ChangeNotifier {
     final spec = ModelSpecResolver.instance.spec(config, modelId);
     return CompressionRequest(
       options: options,
+      carryBudgetTokens: carryBudgetTokens,
+      carryProviderKind: chatModel.providerKey == null
+          ? ProviderKind.openai
+          : ProviderConfig.classify(
+              chatModel.providerKey!,
+              explicitType: settings
+                  .getProviderConfig(chatModel.providerKey!)
+                  .providerType,
+            ),
       model: '$provider / $modelId',
       quoteMarker: quoteMarker,
       config: preferences,

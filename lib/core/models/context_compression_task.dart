@@ -1,3 +1,4 @@
+import '../providers/settings_provider.dart';
 import 'compress_context_options.dart';
 import 'context_operation.dart';
 import 'compression_config.dart';
@@ -55,13 +56,22 @@ class CompressionRequest {
     this.automatic = false,
     this.ownsContinuation = false,
     this.acceptCandidate,
+    this.codex = false,
+    this.carryProviderKind = ProviderKind.openai,
+    this.carryBudgetTokens,
+    this.prepareNative,
   }) : assert((generate == null) != (compactNative == null));
   final CompressContextOptions options;
   final String model;
   final String Function(int) quoteMarker;
   final int? contextWindowTokens;
   final CompressionGenerate? generate;
-  final Future<NativeCompactionPayload> Function(
+  final bool codex;
+  final ProviderKind carryProviderKind;
+  final int? carryBudgetTokens;
+  final Future<Map<String, dynamic>> Function(CompressionSelection)?
+  prepareNative;
+  final Future<NativeCompactionResult> Function(
     CompressionSelection selection,
     String requestId,
   )?

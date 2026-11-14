@@ -1,9 +1,9 @@
+import '../../../../models/carried_original.dart';
 import '../../../../models/native_compaction.dart';
 import '../../native_compaction_context.dart';
 import '../../request_history_context.dart';
 import '../../request_image_context.dart';
 import 'dart:async';
-import 'dart:convert';
 
 import '../../../../models/model_spec.dart';
 import '../../../../providers/model_provider.dart';
@@ -73,19 +73,29 @@ Future<Map<String, dynamic>> buildOpenAIResponsesBody(
     final m = messages[i];
     final sourceStart = input.length;
     try {
+      if (m[carriedWireKey] case final Map wire) {
+        input.add({...Map<String, dynamic>.from(wire), carriedWireKey: true});
+        continue;
+      }
       if (m[nativeCompactionMessageKey] case final Map payload) {
         validateNativeCompactionScope([m], config);
         final native = NativeCompactionPayload.fromJson(
           Map<String, dynamic>.from(payload),
         );
-        input.addAll(
-          (jsonDecode(jsonEncode(native.output)) as List).map(
-            (item) => {
-              ...Map<String, dynamic>.from(item as Map),
+        input.addAll([
+          for (final (index, item) in native.output.indexed)
+            {
+              ...item,
               nativeCompactionWireKey: true,
+              if ((m[nativeUserSourcesKey] as Map?)?[index.toString()]
+                  case final String source)
+                historySourceKey: source
+              else if (native.protocol == NativeCompactionProtocol.codex &&
+                  item['role'] == 'user' &&
+                  m[historySourceKey] is String)
+                historySourceKey: 'legacy-native:${m[historySourceKey]}:$index',
             },
-          ),
-        );
+        ]);
         continue;
       }
       final originalContent = m['content'];

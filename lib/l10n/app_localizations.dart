@@ -29717,6 +29717,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'File info'**
   String get storageAttachmentDetailsTitle;
+
+  /// Compression options panel: Also send your earlier messages as written Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Also send your earlier messages as written'**
+  String get compressionCarryTitle;
+
+  /// Compression options panel: From the part that becomes a summary, your own messages are sent to the model as you wrote them, not just as the summary retells them. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'From the part that becomes a summary, your own messages are sent to the model as you wrote them, not just as the summary retells them.'**
+  String get compressionCarryHint;
+
+  /// Compression options panel: Send the latest Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the latest'**
+  String get compressionCarryCountLabel;
+
+  /// Compression options panel: messages Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'messages'**
+  String get compressionCarryUnit;
+
+  /// Compression options panel: As many as fit Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'As many as fit'**
+  String get compressionCarryAll;
+
+  /// Compression options panel: No set number. Starts from the newest and goes back until it’s nearly full; if the oldest one is too long, only its start and end are sent. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'No set number. Starts from the newest and goes back until it’s nearly full; if the oldest one is too long, only its start and end are sent.'**
+  String get compressionCarryAllHint;
+
+  /// Compression options panel: Also bring back messages from earlier summaries Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Also bring back messages from earlier summaries'**
+  String get compressionCarryEarlier;
+
+  /// Compression options panel: Your messages from parts compressed earlier can be included too. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Your messages from parts compressed earlier can be included too.'**
+  String get compressionCarryEarlierHint;
+
+  /// Compression options panel: Will send {count} · about {tokens} tokens Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Will send {count} · about {tokens} tokens'**
+  String compressionCarryPreview(int count, String tokens);
+
+  /// Compression options panel: The part being summarized has no messages from you. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'The part being summarized has no messages from you.'**
+  String get compressionCarryNone;
+
+  /// Compression options panel: {count} older messages don’t fit and won’t be sent this time. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} older messages don’t fit and won’t be sent this time.'**
+  String compressionCarryNotFit(int count);
+
+  /// Compression options panel: {count} more Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} more'**
+  String compressionCarryMoreRows(int count);
+
+  /// Compression options panel: These messages would likely be more than the current model can take. Send fewer, or switch to a model with a larger context. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'These messages would likely be more than the current model can take. Send fewer, or switch to a model with a larger context.'**
+  String get compressionCarryOverBudget;
+
+  /// Compression options panel: Change to {count} Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Change to {count}'**
+  String compressionCarryFitAction(int count);
+
+  /// Compression options panel: Too long; only the start and end are sent Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Too long; only the start and end are sent'**
+  String get compressionCarryTruncated;
+
+  /// Compression options panel: Automatic compression will do the same. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic compression will do the same.'**
+  String get compressionCarryAutoToo;
+
+  /// Compression options panel: Images and files aren’t carried to the new chat; only the text is. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Images and files aren’t carried to the new chat; only the text is.'**
+  String get compressionCarryNewChatText;
+
+  /// Compression options panel: This service keeps your earlier messages on its own when compressing. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'This service keeps your earlier messages on its own when compressing.'**
+  String get compressionCarryServerKeeps;
+
+  /// Context operation details and carried message editor: Sent as written Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent as written'**
+  String get contextDetailCarried;
+
+  /// Context operation details and carried message editor: {count} of your earlier messages Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of your earlier messages'**
+  String contextDetailCarriedCount(int count);
+
+  /// Context operation details and carried message editor: Kept by the service Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept by the service'**
+  String get contextDetailServerKept;
+
+  /// Context operation details and carried message editor: This only changes the text sent to the model. The original message in the chat stays the same. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'This only changes the text sent to the model. The original message in the chat stays the same.'**
+  String get contextCarriedEditHint;
+
+  /// Context operation details and carried message editor: This can’t be empty. To stop sending it, choose “Stop sending”. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'This can’t be empty. To stop sending it, choose “Stop sending”.'**
+  String get contextCarriedEmpty;
+
+  /// Context operation details and carried message editor: Stop sending Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop sending'**
+  String get contextCarriedRemove;
+
+  /// Context operation details and carried message editor: This won’t be sent to the model anymore. The original message in the chat isn’t affected. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'This won’t be sent to the model anymore. The original message in the chat isn’t affected.'**
+  String get contextCarriedRemoveConfirm;
+
+  /// Context operation details and carried message editor: The original was deleted; only this text remains Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'The original was deleted; only this text remains'**
+  String get contextCarriedSourceDeleted;
+
+  /// Compression options panel: Include the reply too Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Include the reply too'**
+  String get compressionCarryReply;
+
+  /// Compression options panel: +about {tokens} Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'+about {tokens}'**
+  String compressionCarryReplyTokens(String tokens);
+
+  /// Compression options panel: The reply is already in the kept turns Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'The reply is already in the kept turns'**
+  String get compressionCarryReplyInKept;
+
+  /// Context operation details and carried message editor: The reply Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'The reply'**
+  String get contextCarriedReplyLabel;
+
+  /// Context operation details and carried message editor: Don’t send the reply Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t send the reply'**
+  String get contextCarriedRemoveReply;
 }
 
 class _AppLocalizationsDelegate

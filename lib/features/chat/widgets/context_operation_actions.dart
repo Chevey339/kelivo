@@ -1,3 +1,4 @@
+import '../../../core/models/carried_original.dart';
 import 'dart:async';
 import 'dart:isolate';
 import 'package:flutter/material.dart';
@@ -145,12 +146,13 @@ Future<bool> changeContextOperationWithConfirmation(
   required String conversationId,
   required ContextOperation operation,
   String? summary,
+  CarriedOriginals? carried,
 }) async {
   final before = await chat.loadContextSnapshot(conversationId);
   final operations = before.operations;
   if (!context.mounted) return false;
   final current = operations.where((op) => op.id == operation.id).firstOrNull;
-  if (current?.isImportedNative == true) {
+  if (current?.isImportedNative == true && carried == null) {
     showAppSnackBar(
       context,
       message: AppLocalizations.of(
@@ -162,7 +164,9 @@ Future<bool> changeContextOperationWithConfirmation(
   }
   if (current == null ||
       current.revoked ||
-      current.summary != operation.summary) {
+      current.summary != operation.summary ||
+      current.carried?.toJson().toString() !=
+          operation.carried?.toJson().toString()) {
     showAppSnackBar(
       context,
       message: AppLocalizations.of(context)!.contextChanged,
@@ -176,7 +180,9 @@ Future<bool> changeContextOperationWithConfirmation(
   );
   final projected = [
     for (final op in operations)
-      if (op.id == operation.id && summary != null)
+      if (op.id == operation.id && carried != null)
+        op.withCarried(carried)
+      else if (op.id == operation.id && summary != null)
         op.copyWith(summary: summary)
       else if (affected.contains(op.id))
         op.copyWith(revoked: true)
@@ -207,7 +213,7 @@ Future<bool> changeContextOperationWithConfirmation(
     }
   }
   if (!context.mounted) return false;
-  if (summary != null &&
+  if ((summary != null || carried != null) &&
       budgets.last?.contextWindow != null &&
       budgets.last!.usedTokens > budgets.last!.contextWindow!) {
     showAppSnackBar(
@@ -223,13 +229,14 @@ Future<bool> changeContextOperationWithConfirmation(
     conversationId,
     operation.id,
     summary: summary,
+    carried: carried,
     includeDependents: true,
     expectedState: ContextHistory.operationsFingerprint(operations),
   );
   Future<bool> finish() async {
     try {
       await change;
-      if (summary == null) {
+      if (summary == null && carried == null) {
         final after = await chat.loadContextSnapshot(conversationId);
         final budget = await _estimate(
           chat,
@@ -304,6 +311,7 @@ Future<void> showContextOperationDetails(
   Future<void> Function(String conversationId)? onOpenConversation,
 }) async {
   var open = true;
+  var carriedOperation = operation;
   Future<
     ({
       ConversationContextHistory history,
@@ -390,6 +398,14 @@ Future<void> showContextOperationDetails(
           final statuses = ContextHistory.operationStatuses(
             snapshot?.operations ?? const [],
           );
+          final copiedSourceId =
+              operation.compressionDetails['carriedSourceConversationId']
+                  as String? ??
+              operation.nativeSourceConversationId;
+          final canOpenCarriedSource = copiedSourceId == null
+              ? onViewOriginal != null
+              : onOpenConversation != null &&
+                    chat.getConversation(copiedSourceId) != null;
           final status = statuses[operation.id];
           final hidden = status?.hidden ?? false;
           final superseded = status?.superseded ?? false;
@@ -412,13 +428,59 @@ Future<void> showContextOperationDetails(
                   ? l10n.contextDetailSuperseded
                   : '',
               onClose: () => Navigator.of(detailContext).pop(),
+              carriedSourceIds: {
+                for (final m in snapshot?.messages ?? <ChatMessage>[]) m.id,
+              },
+              onSaveCarried:
+                  operation.revoked ||
+                      superseded ||
+                      hidden ||
+                      snapshot == null ||
+                      operation.carried == null
+                  ? null
+                  : (value) async {
+                      final saved =
+                          await changeContextOperationWithConfirmation(
+                            context,
+                            chat: chat,
+                            conversationId: conversationId,
+                            operation: carriedOperation,
+                            carried: value,
+                          );
+                      if (saved) {
+                        carriedOperation = carriedOperation.withCarried(value);
+                      }
+                      return saved;
+                    },
+              estimateCarried: snapshot == null
+                  ? null
+                  : (value) =>
+                        _estimate(chat, conversationId, snapshot.messages, [
+                          for (final op in snapshot.operations)
+                            op.id == operation.id ? op.withCarried(value) : op,
+                        ]),
+              onCarriedSource: !canOpenCarriedSource
+                  ? null
+                  : (messageId) {
+                      final sourceConversation =
+                          operation
+                                  .compressionDetails['carriedSourceConversationId']
+                              as String? ??
+                          operation.nativeSourceConversationId;
+                      Navigator.of(detailContext).pop();
+                      if (sourceConversation != null) {
+                        onOpenConversation?.call(sourceConversation);
+                      } else {
+                        onViewOriginal?.call(messageId);
+                      }
+                    },
               onSave: operation.revoked || operation.isNative
                   ? null
                   : (summary) => changeContextOperationWithConfirmation(
                       context,
                       chat: chat,
                       conversationId: conversationId,
-                      operation: operation,
+                      operation: carriedOperation,
                       summary: summary,
                     ),
               onUndo: !operation.canUndo
@@ -427,7 +489,7 @@ Future<void> showContextOperationDetails(
                       context,
                       chat: chat,
                       conversationId: conversationId,
-                      operation: operation,
+                      operation: carriedOperation,
                     ),
               estimateSummary: (summary) async {
                 final detail = await details;
@@ -439,7 +501,7 @@ Future<void> showContextOperationDetails(
                   [
                     for (final op in detail.history.operations)
                       if (op.id == operation.id)
-                        op.copyWith(summary: summary)
+                        carriedOperation.copyWith(summary: summary)
                       else if (detail.affected.contains(op.id))
                         op.copyWith(revoked: true)
                       else

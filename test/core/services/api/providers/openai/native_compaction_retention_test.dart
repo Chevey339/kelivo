@@ -23,7 +23,7 @@ Map<String, dynamic> _userWithTokens(int tokens) {
   final item = <String, dynamic>{
     'role': 'user',
     'content': 'start end',
-    historySourceKey: 'user',
+    historySourceKey: 'user-$tokens',
   };
   final words = tokens - _tokens(item);
   item['content'] = 'start ${'word ' * words}end';
@@ -74,7 +74,17 @@ void main() {
       );
     });
     addTearDown(client.close);
-    final result = await requestNativeCompaction(client, config, model, body);
+    final response = await requestNativeCompaction(client, config, model, body);
+    expect(response.payload.output, [compaction]);
+    final result = NativeCompactionPayload(
+      protocol: response.payload.protocol,
+      scope: response.payload.scope,
+      modelId: response.payload.modelId,
+      output: [
+        ...response.retained.map((r) => r.wire),
+        ...response.payload.output,
+      ],
+    );
     expect(jsonEncode(body), original);
     expect(result.output.last, compaction);
     expect(

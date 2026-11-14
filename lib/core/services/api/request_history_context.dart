@@ -1,3 +1,4 @@
+import '../../models/carried_original.dart';
 import '../../models/native_compaction.dart';
 import 'dart:async';
 import 'request_image_context.dart';
@@ -146,9 +147,13 @@ class RequestHistoryContext {
     final original = (body[_listKey] as List).cast<Map>();
     final groups = <String, List<Map<String, dynamic>>>{};
     final suffix = <Map<String, dynamic>>[];
+    final originalUsers = <String, Map>{};
     for (final item in original) {
       final source = item[historySourceKey];
       if (source is String) {
+        if (item['role'] == 'user' && !source.startsWith('context-summary:')) {
+          originalUsers[carriedSourceId(source)] = item;
+        }
         groups
             .putIfAbsent(source, () => [])
             .add(Map<String, dynamic>.from(item));
@@ -177,18 +182,84 @@ class RequestHistoryContext {
         );
         if (owner == null || emitted.add(owner)) {
           next.addAll([
-            for (final item in native.output)
+            for (final (index, item) in native.output.indexed)
               {
                 ...item,
                 nativeCompactionWireKey: true,
-                if (owner != null) historySourceKey: owner,
+                if ((message[nativeUserSourcesKey] as Map?)?[index.toString()]
+                    case final String source)
+                  historySourceKey: source
+                else if (owner != null)
+                  historySourceKey: owner,
               },
           ]);
         }
+      } else if (owner != null && isCarriedMessageId(owner)) {
+        if (!emitted.add(owner)) continue;
+        final wire = message[carriedWireKey];
+        if (format == HistoryWireFormat.responses && wire is Map) {
+          next.add({
+            ...Map<String, dynamic>.from(wire),
+            carriedWireKey: true,
+            historySourceKey: owner,
+          });
+          continue;
+        }
+        final carried = _textMessage(message)..[historySourceKey] = owner;
+        final handles =
+            (message[carriedImageHandlesKey] as List?)
+                ?.whereType<String>()
+                .toSet() ??
+            <String>{};
+        // Take only the media already prepared for this provider. User prompts,
+        // tool output and reasoning from the original turn are never replayed.
+        if (owner.startsWith(carriedPrefix) && handles.isNotEmpty) {
+          final field = format == HistoryWireFormat.google
+              ? 'parts'
+              : 'content';
+          final parts = originalUsers[carriedSourceId(owner)]?[field];
+          if (parts is List) {
+            final media = parts.whereType<Map>().where((part) {
+              final url = RequestImageContext.userImageUrl(part);
+              if (url == null) return false;
+              final handle = RequestImageContext.referenceHandle(url);
+              return handle == null ||
+                  handles.contains(handle) ||
+                  RequestImageContext.current?.matchesCarriedImage(
+                        handle,
+                        handles,
+                        carriedSourceId(owner),
+                      ) ==
+                      true;
+            });
+            if (media.isNotEmpty) {
+              carried[carriedImageHandlesKey] = [
+                for (final part in media)
+                  if (RequestImageContext.referenceHandle(
+                        RequestImageContext.userImageUrl(part)!,
+                      )
+                      case final handle?)
+                    handle,
+              ];
+              final content = carried[field];
+              carried[field] = [
+                if (content is List)
+                  ...content
+                else
+                  {'type': 'text', 'text': content},
+                ...media,
+              ];
+            }
+          }
+        }
+        next.add(carried);
       } else if (owner != null && groups.containsKey(owner)) {
         if (emitted.add(owner)) next.addAll(groups[owner]!);
       } else if (owner == null || owner.startsWith('context-summary:')) {
-        next.add(_textMessage(message));
+        next.add({
+          ..._textMessage(message),
+          if (owner != null) historySourceKey: owner,
+        });
       } else {
         throw StateError('compression_protocol_source_missing');
       }
@@ -450,7 +521,10 @@ class RequestHistoryContext {
             (() {
               final item = Map<String, dynamic>.from(raw)
                 ..remove(historySourceKey)
-                ..remove(nativeCompactionWireKey);
+                ..remove(nativeCompactionWireKey)
+                ..remove(carriedWireKey)
+                ..remove(carriedTextOnlyKey)
+                ..remove(carriedImageHandlesKey);
               if (raw[nativeCompactionWireKey] == true) return item;
               for (final field in ['content', 'parts']) {
                 if (item[field] is List) {

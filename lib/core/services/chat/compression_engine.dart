@@ -21,9 +21,11 @@ class CompressionEngine {
     required String background,
     required void Function() check,
     required Future<void> Function() publish,
+    int? summaryTokens,
   }) async {
     final planner = CompressionPlanner(
       request: request,
+      summaryTokens: summaryTokens,
       materials: materials,
       previousSummary: previousSummary,
       background: background,

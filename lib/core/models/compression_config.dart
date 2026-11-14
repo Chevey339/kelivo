@@ -1,3 +1,4 @@
+import 'carried_original.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
@@ -12,6 +13,8 @@ class CompressionConfig {
   const CompressionConfig({
     this.mode = AutoCompressionMode.off,
     this.nativeEnabled = false,
+    this.carryOriginals = const CarrySetting(),
+    this.nativeCarryOriginals = const CarrySetting(),
     this.nativeKeepRecentUserTurns = 6,
     this.nativeTriggerInputRatio = .8,
     this.templateId = 'general',
@@ -33,6 +36,8 @@ class CompressionConfig {
   static const conversationKind = 'conversationCompression';
   final AutoCompressionMode mode;
   final bool nativeEnabled;
+  final CarrySetting carryOriginals;
+  final CarrySetting nativeCarryOriginals;
   final int nativeKeepRecentUserTurns;
   final double nativeTriggerInputRatio;
   final String templateId;
@@ -66,6 +71,8 @@ class CompressionConfig {
   Map<String, dynamic> toJson({bool includeMode = true}) => {
     if (includeMode) 'mode': mode.name,
     'nativeEnabled': nativeEnabled,
+    'carryOriginals': carryOriginals.toJson(),
+    'nativeCarryOriginals': nativeCarryOriginals.toJson(),
     'nativeKeepRecentUserTurns': nativeKeepRecentUserTurns,
     'nativeTriggerInputRatio': nativeTriggerInputRatio,
     'templateId': templateId,
@@ -88,6 +95,8 @@ class CompressionConfig {
     final config = CompressionConfig(
       mode: AutoCompressionMode.values.byName(json['mode'] as String? ?? 'off'),
       nativeEnabled: json['nativeEnabled'] == true,
+      carryOriginals: CarrySetting.fromJson(json['carryOriginals']),
+      nativeCarryOriginals: CarrySetting.fromJson(json['nativeCarryOriginals']),
       nativeKeepRecentUserTurns: json['nativeKeepRecentUserTurns'] as int? ?? 6,
       nativeTriggerInputRatio: (json['nativeTriggerInputRatio'] as num? ?? .8)
           .toDouble(),

@@ -2062,6 +2062,19 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<CarrySelection> previewCarriedMessages(
+    String id,
+    CompressContextOptions options,
+    CompressionConfig config,
+  ) async {
+    final request = await _viewModel.buildCompressionRequest(
+      id,
+      options: options,
+      configOverride: config,
+    );
+    return _chatService.contextCompression.previewCarried(id, request);
+  }
+
   Future<CompressionRequestPreview> previewCompressionRequest(
     String id,
     CompressContextOptions options,

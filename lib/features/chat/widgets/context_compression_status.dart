@@ -96,6 +96,9 @@ String compressionErrorLabel(AppLocalizations l10n, String error) {
   if (error.contains('compression_template_missing')) {
     return l10n.compressionTemplateMissing;
   }
+  if (error.contains('compression_carry_over_budget')) {
+    return l10n.compressionCarryOverBudget;
+  }
   if (error.contains('context_budget_exceeded')) return l10n.compressOverSnack;
   if (error.contains('summary_not_smaller')) {
     return l10n.contextSummaryNotSmaller;

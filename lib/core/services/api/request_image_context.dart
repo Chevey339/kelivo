@@ -1,3 +1,4 @@
+import '../../models/carried_original.dart';
 import '../../models/native_compaction.dart';
 import 'request_history_context.dart';
 import 'dart:async';
@@ -38,6 +39,7 @@ bool isUserInputMessage(
   final owner = message[imageContextOwnerKey];
   return owner is String &&
       owner.isNotEmpty &&
+      !isCarriedMessageId(owner) &&
       !owner.startsWith(ContextOperation.summaryPrefix);
 }
 
@@ -301,7 +303,9 @@ class RequestImageContext {
       final order = {
         for (final image in items) image.key: image.partOrdinal ?? 0,
       };
-      if (message.content.contains('![')) {
+      if (message.content.contains('![') &&
+          message.providerArtifactSnapshot[carriedTextOnlyArtifactKind] !=
+              'true') {
         final parsed = await parseTextAndImages(
           message.content,
           literalText: message.role == 'user'
@@ -445,6 +449,31 @@ class RequestImageContext {
       final source = message['role'] == 'user'
           ? ContextImageSource.user
           : ContextImageSource.assistant;
+      if (owner.startsWith(carriedPrefix)) {
+        // Recover the frozen occurrences from the original history. Edits change
+        // only the text, so a new Markdown link can never authorize new pixels.
+        final handles =
+            (message[carriedImageHandlesKey] as List?)?.whereType<String>() ??
+            const <String>[];
+        final sourceId = carriedSourceId(owner);
+        final refs = <Map<String, dynamic>>[];
+        for (final handle in handles) {
+          final image = _byHandle[handle];
+          if (image == null ||
+              image.identity.messageId != sourceId ||
+              image.source != ContextImageSource.user ||
+              _isUnavailable(image) ||
+              (!parseMarkdownImages &&
+                  image.identity.slot.startsWith('markdown:')) ||
+              (!allowRemoteImages && isRemoteHttpUrl(image.uri))) {
+            continue;
+          }
+          activeHandles.add(handle);
+          refs.add({'uri': image.reference, 'mime': image.mediaType});
+        }
+        message[multimodalInternalMediaPathsKey] = refs;
+        continue;
+      }
       final raw = message['content'];
       if (raw is String && parseMarkdownImages) {
         final parsed = await parseTextAndImages(
@@ -811,6 +840,59 @@ class RequestImageContext {
     );
   }
 
+  /// Match a deferred occurrence from an earlier carried turn to the frozen
+  /// handles of its original user. Only user images may cross compression.
+  bool matchesCarriedImage(
+    String handle,
+    Set<String> originals,
+    String sourceId,
+  ) {
+    final img = _byHandle[handle];
+    if (img == null ||
+        img.source != ContextImageSource.user ||
+        carriedSourceId(img.identity.messageId) != sourceId) {
+      return false;
+    }
+    return originals.contains(
+      ContextImageIdentity(
+        sourceId,
+        img.identity.slot,
+        img.identity.imageIndex,
+      ).handle,
+    );
+  }
+
+  static String? userImageUrl(Map part) {
+    if (part['type'] == 'input_image') {
+      return (part['image_url'] ?? '').toString();
+    }
+    if (part['type'] == 'image_url' && part['image_url'] is Map) {
+      return (part['image_url']['url'] ?? '').toString();
+    }
+    final source = part['source'];
+    if (part['type'] == 'image' && source is Map) {
+      if (source['url'] case final String url) return url;
+      if (source['data'] case final String data) {
+        return 'data:${source['media_type']};base64,$data';
+      }
+    }
+    final data =
+        part['inlineData'] ??
+        part['inline_data'] ??
+        part['fileData'] ??
+        part['file_data'];
+    if (data is Map) {
+      final mime = data['mimeType'] ?? data['mime_type'];
+      if (mime is String && mime.startsWith('image/')) {
+        return (data['fileUri'] ??
+                data['file_uri'] ??
+                'data:$mime;base64,${data['data']}')
+            .toString();
+      }
+    }
+    return null;
+  }
+
   static String? referenceHandle(String value) {
     final marker = value.indexOf(_referencePrefix);
     if (marker < 0 || !(value.startsWith('data:') || marker == 0)) return null;
@@ -839,44 +921,8 @@ class RequestImageContext {
   ) {
     if (value is! Map) return value;
     final part = Map<String, dynamic>.from(value);
-    final source = part['source'];
-    final inline = part['inlineData'] ?? part['inline_data'];
-    if (part['type'] == 'image_url' && part['image_url'] is Map) {
-      return image(part, (part['image_url']['url'] ?? '').toString());
-    }
-    if (part['type'] == 'input_image') {
-      return image(part, (part['image_url'] ?? '').toString());
-    }
-    if (part['type'] == 'image' &&
-        source is Map &&
-        source['type'] == 'base64') {
-      return image(
-        part,
-        'data:${source['media_type']};base64,${source['data']}',
-      );
-    }
-    if (part['type'] == 'image' && source is Map) {
-      return image(part, (source['url'] ?? '').toString());
-    }
-    final file = part['fileData'] ?? part['file_data'];
-    if (file is Map &&
-        (file['mimeType'] ?? file['mime_type'] ?? '').toString().startsWith(
-          'image/',
-        )) {
-      return image(
-        part,
-        (file['fileUri'] ?? file['file_uri'] ?? '').toString(),
-      );
-    }
-    if (inline is Map &&
-        (inline['mimeType'] ?? inline['mime_type'] ?? '').toString().startsWith(
-          'image/',
-        )) {
-      return image(
-        part,
-        'data:${inline['mimeType'] ?? inline['mime_type']};base64,${inline['data']}',
-      );
-    }
+    final url = userImageUrl(part);
+    if (url != null) return image(part, url);
     if (part['type'] == 'tool_result') {
       part['content'] = _mapContent(part['content'], image);
     }
@@ -900,7 +946,8 @@ class RequestImageContext {
               final message = Map<String, dynamic>.from(value)
                 ..remove(imageContextOwnerKey)
                 ..remove(multimodalInternalImageReferencesKey);
-              if (message[nativeCompactionWireKey] == true &&
+              if ((message[nativeCompactionWireKey] == true ||
+                      message[carriedWireKey] == true) &&
                   !mapNativeImages) {
                 if (nativeImage != null) {
                   dynamic observe(Map<String, dynamic> part, String url) {
@@ -1035,11 +1082,21 @@ class RequestImageContext {
       }
       return part;
     }, nativeImage: addExternal);
+    final carriedHandles = {
+      for (final field in ['input', 'messages', 'contents'])
+        for (final item in (body[field] as List? ?? const []).whereType<Map>())
+          if (item[historySourceKey] is String &&
+              (item[historySourceKey] as String).startsWith(carriedPrefix))
+            ...(item[carriedImageHandlesKey] as List? ?? const [])
+                .whereType<String>(),
+    };
     final omittedByCount = {
       ...await historyOmissions(),
       for (final image in images)
-        if (compressedOwners.contains(image.identity.messageId) ||
-            excludedOwners.contains(image.identity.messageId))
+        if ((compressedOwners.contains(image.identity.messageId) ||
+                excludedOwners.contains(image.identity.messageId)) &&
+            !(image.source == ContextImageSource.user &&
+                carriedHandles.contains(image.handle)))
           image.key,
     };
     final positions = <String, int>{};

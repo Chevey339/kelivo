@@ -788,12 +788,12 @@ void main() {
         model,
         prepared,
       );
-      final compactedBefore = jsonEncode(compacted.toJson());
+      final compactedBefore = jsonEncode(compacted.payload.toJson());
       await sendOpenAIStream(client, resolved, model, [
         {
           'role': 'user',
           'content': '',
-          nativeCompactionMessageKey: compacted.toJson(),
+          nativeCompactionMessageKey: compacted.payload.toJson(),
         },
         {'role': 'user', 'content': 'next'},
       ]).toList();
@@ -833,7 +833,7 @@ void main() {
       );
       expect(jsonEncode(prepared), preparedBefore);
       expect(jsonEncode(history), historyBefore);
-      expect(jsonEncode(compacted.toJson()), compactedBefore);
+      expect(jsonEncode(compacted.payload.toJson()), compactedBefore);
     },
   );
 
