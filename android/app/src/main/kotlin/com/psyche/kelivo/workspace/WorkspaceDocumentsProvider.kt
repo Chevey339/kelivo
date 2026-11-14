@@ -21,8 +21,14 @@ import com.psyche.kelivo.R
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 
-/** Read-only workspace files in the Android system document picker. */
+/** Workspace files in the Android system document picker. */
 class WorkspaceDocumentsProvider : DocumentsProvider() {
     private lateinit var appData: File
     private lateinit var store: WorkspaceDocumentsStore
@@ -43,7 +49,8 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
                 Root.COLUMN_DOCUMENT_ID to WorkspaceDocumentPaths.ROOT,
                 Root.COLUMN_TITLE to "Kelivo",
                 Root.COLUMN_ICON to R.mipmap.ic_launcher,
-                Root.COLUMN_FLAGS to (Root.FLAG_LOCAL_ONLY or Root.FLAG_SUPPORTS_IS_CHILD),
+                Root.COLUMN_FLAGS to (Root.FLAG_LOCAL_ONLY or Root.FLAG_SUPPORTS_IS_CHILD or
+                    Root.FLAG_SUPPORTS_CREATE),
                 Root.COLUMN_MIME_TYPES to "*/*",
             ))
         }
@@ -101,12 +108,78 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
         }
     }
 
+    override fun createDocument(parentDocumentId: String, mimeType: String, displayName: String): String {
+        val (root, parentRelative, parent) = resolve(parentDocumentId)
+        if (!parent.isDirectory) throw FileNotFoundException("Not a directory")
+        val name = displayName.trim()
+        if (!WorkspaceDocumentPaths.validFileName(name)) throw IllegalArgumentException("Invalid document name")
+        var target = File(parent, name)
+        var counter = 2
+        while (target.exists()) {
+            val dot = name.lastIndexOf('.')
+            val candidate = if (dot <= 0) "$name ($counter)"
+                else "${name.substring(0, dot)} ($counter)${name.substring(dot)}"
+            target = File(parent, candidate)
+            counter++
+        }
+        val created = if (mimeType == Document.MIME_TYPE_DIR) {
+            target.mkdir()
+        } else {
+            target.createNewFile()
+        }
+        if (!created) throw IOException("Unable to create document")
+        val relative = if (parentRelative.isEmpty()) target.name else "$parentRelative/${target.name}"
+        requireNotNull(context).contentResolver.notifyChange(
+            DocumentsContract.buildChildDocumentsUri(authority, parentDocumentId), null,
+        )
+        return WorkspaceDocumentPaths.documentId(root.id, relative)
+    }
+
+    override fun renameDocument(documentId: String, displayName: String): String? {
+        val (root, relative, source) = resolve(documentId)
+        if (relative.isEmpty()) throw FileNotFoundException("Cannot rename a workspace")
+        val name = displayName.trim()
+        if (!WorkspaceDocumentPaths.validFileName(name)) throw IllegalArgumentException("Invalid document name")
+        if (name == source.name) return null
+        val parent = source.parentFile ?: throw FileNotFoundException("No parent directory")
+        val target = File(parent, name)
+        if (target.exists()) throw FileAlreadyExistsException(target)
+        if (!source.renameTo(target)) throw IOException("Unable to rename document")
+        val parentId = WorkspaceDocumentPaths.documentId(root.id, relative.substringBeforeLast('/', ""))
+        val targetRelative = if (relative.contains('/')) {
+            "${relative.substringBeforeLast('/')}/$name"
+        } else {
+            name
+        }
+        val resolver = requireNotNull(context).contentResolver
+        resolver.notifyChange(DocumentsContract.buildChildDocumentsUri(authority, parentId), null)
+        resolver.notifyChange(DocumentsContract.buildDocumentUri(authority, documentId), null)
+        return WorkspaceDocumentPaths.documentId(root.id, targetRelative)
+    }
+
+    override fun deleteDocument(documentId: String) {
+        val (root, relative, file) = resolve(documentId)
+        if (relative.isEmpty()) throw FileNotFoundException("Cannot delete a workspace")
+        deleteTree(file.toPath())
+        val parentId = WorkspaceDocumentPaths.documentId(root.id, relative.substringBeforeLast('/', ""))
+        val resolver = requireNotNull(context).contentResolver
+        resolver.notifyChange(DocumentsContract.buildChildDocumentsUri(authority, parentId), null)
+        resolver.notifyChange(DocumentsContract.buildDocumentUri(authority, documentId), null)
+    }
+
     override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
-        if (mode != "r") throw FileNotFoundException("Workspace documents are read-only")
         signal?.throwIfCanceled()
         val (root, relative, file) = resolve(documentId)
         if (relative.isEmpty() || !file.isFile) throw FileNotFoundException("Not a file")
-        val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        val truncate = mode == "w" || mode == "wt" || mode == "rwt"
+        val flags = when (mode) {
+            "r" -> ParcelFileDescriptor.MODE_READ_ONLY
+            "w", "wt" -> ParcelFileDescriptor.MODE_WRITE_ONLY
+            "wa" -> ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_APPEND
+            "rw", "rwt" -> ParcelFileDescriptor.MODE_READ_WRITE
+            else -> throw FileNotFoundException("Unsupported mode")
+        }
+        val descriptor = ParcelFileDescriptor.open(file, flags)
         try {
             // Validate the opened descriptor as well, in case a running command
             // changed a symlink between path validation and open().
@@ -114,6 +187,9 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
             if (!WorkspaceDocumentPaths.isWithin(root.directory, File(openedPath))) {
                 throw FileNotFoundException("Path outside workspace")
             }
+            // Truncate only after the descriptor is known to be inside the
+            // workspace, so a swapped symlink cannot erase an outside file.
+            if (truncate) Os.ftruncate(descriptor.fileDescriptor, 0)
             signal?.throwIfCanceled()
             return descriptor
         } catch (error: Exception) {
@@ -148,14 +224,34 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
     }
 
     private fun MatrixCursor.addDocument(root: WorkspaceDocumentRoot, relative: String, file: File) {
+        val isDirectory = relative.isEmpty() || file.isDirectory
+        var flags = if (isDirectory) Document.FLAG_DIR_SUPPORTS_CREATE else Document.FLAG_SUPPORTS_WRITE
+        if (relative.isNotEmpty()) flags = flags or Document.FLAG_SUPPORTS_DELETE or Document.FLAG_SUPPORTS_RENAME
         addValues(mapOf(
             Document.COLUMN_DOCUMENT_ID to WorkspaceDocumentPaths.documentId(root.id, relative),
             Document.COLUMN_DISPLAY_NAME to if (relative.isEmpty()) root.name else relative.substringAfterLast('/'),
-            Document.COLUMN_MIME_TYPE to if (relative.isEmpty()) Document.MIME_TYPE_DIR else mimeType(file),
-            Document.COLUMN_FLAGS to 0,
+            Document.COLUMN_MIME_TYPE to if (isDirectory) Document.MIME_TYPE_DIR else mimeType(file),
+            Document.COLUMN_FLAGS to flags,
             Document.COLUMN_SIZE to if (file.isFile) file.length() else null,
             Document.COLUMN_LAST_MODIFIED to file.lastModified().takeIf { it > 0 },
         ))
+    }
+
+    /** Delete without following symlinks, so a link inside the workspace cannot
+     * erase files outside it. */
+    private fun deleteTree(path: Path) {
+        Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
+            override fun visitFile(file: Path, attributes: BasicFileAttributes): FileVisitResult {
+                Files.delete(file)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun postVisitDirectory(dir: Path, error: IOException?): FileVisitResult {
+                if (error != null) throw error
+                Files.delete(dir)
+                return FileVisitResult.CONTINUE
+            }
+        })
     }
 
     private fun mimeType(file: File): String {

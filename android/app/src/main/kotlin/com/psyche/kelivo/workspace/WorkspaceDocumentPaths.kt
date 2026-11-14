@@ -49,4 +49,7 @@ internal object WorkspaceDocumentPaths {
 
     fun isWithin(parent: File, child: File): Boolean =
         child.path.startsWith(parent.path + File.separator)
+
+    fun validFileName(name: String): Boolean = name.isNotEmpty() && name != "." && name != ".." &&
+        name.none { it == '/' || it == '\\' || it == '\u0000' }
 }
