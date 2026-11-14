@@ -43,6 +43,7 @@ import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
+import 'package:Kelivo/core/services/workspace/workspace_file_coordinator.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 const _withoutAssets = WebDavConfig(
@@ -1207,17 +1208,40 @@ void main() {
         final local = File(
           '${root.path}/sessions/fixture-conversation/outputs/report.txt',
         );
-        await local.parent.create(recursive: true);
-        await local.writeAsString('local output');
+        await WorkspaceFileCoordinator.run(local.path, () async {
+          await local.parent.create(recursive: true);
+          await local.writeAsString('local output');
+        });
         final sync = DataSync(
           businessRepository: businessRepository,
           chatService: chat,
         );
-        await sync.restoreFromLocalFile(
-          fixture,
-          const WebDavConfig(),
-          mode: RestoreMode.merge,
-        );
+        final sessions = Directory('${root.path}/sessions');
+        late Future<void> restoring;
+        // Hold a workspace writer while the database assigns the imported ID.
+        // The corresponding session output must not appear until it releases.
+        await WorkspaceFileCoordinator.run(sessions.path, () async {
+          restoring = sync.restoreFromLocalFile(
+            fixture,
+            const WebDavConfig(),
+            mode: RestoreMode.merge,
+          );
+          final deadline = Stopwatch()..start();
+          while (sync.lastMergeReport == null) {
+            if (deadline.elapsed > const Duration(seconds: 10)) {
+              fail('Chat merge did not publish its conversation mapping');
+            }
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+          final imported = sync
+              .lastMergeReport!
+              .remappedConversationIds['fixture-conversation']!;
+          final importedFile = File(
+            p.join(sessions.path, imported, 'outputs', 'report.txt'),
+          );
+          expect(await importedFile.exists(), isFalse);
+        });
+        await restoring;
         final newId = sync
             .lastMergeReport!
             .remappedConversationIds['fixture-conversation'];
@@ -1430,9 +1454,9 @@ void main() {
                 ),
               ],
             );
-            if (automaticCleanup) {
-              await chat.deleteConversation(conversation.id);
-            }
+            // Both cleanup paths can remove only unreferenced attachments.
+            // Deleting the conversation leaves the file within its grace period.
+            await chat.deleteConversation(conversation.id);
             expect(await file.exists(), isTrue);
             final sync = DataSync(
               businessRepository: businessRepository,
@@ -1475,8 +1499,11 @@ void main() {
               input.closeSync();
             }
           } finally {
-            await maintenance;
-            await chat.close();
+            try {
+              await maintenance;
+            } finally {
+              await chat.close();
+            }
           }
         },
       );

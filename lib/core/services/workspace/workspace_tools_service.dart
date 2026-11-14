@@ -415,7 +415,7 @@ class WorkspaceToolsService {
       ..writeln('- $skills — installed skills (read-only)');
     if (paths.sandboxed) {
       final source = defaultTargetPlatform == TargetPlatform.iOS
-          ? "from iOS Files (e.g. an Obsidian vault, Downloads, another app's iCloud container)"
+          ? 'from iOS Files (e.g. Downloads or iCloud Drive)'
           : 'from Environment settings (on-device folders)';
       final readOnly = paths.externalMounts
           .where((mount) => mount.readOnly)

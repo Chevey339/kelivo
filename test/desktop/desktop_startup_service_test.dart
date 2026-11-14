@@ -138,6 +138,7 @@ void main() {
     final settings = SettingsProvider(createBusinessTestPreferences());
     addTearDown(settings.dispose);
     await settings.loaded;
+    await settings.refreshDesktopStartup();
     expect(settings.desktopAutostartSupported, isFalse);
     await settings.setDesktopAutostartEnabled(true);
     expect(enabled, isFalse);

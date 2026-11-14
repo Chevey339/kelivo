@@ -33,6 +33,7 @@ final class BusinessKeyRegistry {
     'ios_native_selection_menu_enabled_v1',
     'flutter_log_enabled_v1',
     'model_catalog_auto_update_v1',
+    'ollama_model_metadata_v1',
   };
 
   static const discardedKeys = <String>{

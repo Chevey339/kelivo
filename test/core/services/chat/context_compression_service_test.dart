@@ -710,11 +710,10 @@ void main() {
           loadReference: (_) async => 'current reference',
         ),
       );
-      await until(
-        () => compression.taskFor(id)!.phase == CompressionPhase.review,
-      );
-      // Let the run finish its final status write before inspecting cleanup.
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await until(() {
+        final task = compression.taskFor(id)!;
+        return task.phase == CompressionPhase.review && task.request == null;
+      });
       final task = compression.taskFor(id)!;
       expect(task.request, isNull);
       expect(task.validateReferences, isNull);

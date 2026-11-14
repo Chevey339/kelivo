@@ -29,6 +29,7 @@ import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
 import '../storage/attachment_file_lock.dart';
+import '../workspace/workspace_file_coordinator.dart';
 import '../migration/legacy_message_content_decoder.dart';
 import '../migration/legacy_record_sanitizer.dart';
 import '../../utils/multimodal_input_utils.dart';
@@ -2840,26 +2841,25 @@ class DataSync {
     for (final name in assetRoots) {
       final src = Directory(p.join(payloadDirectory.path, name));
       final dst = await _liveAssetRoot(name);
-      if (overwriteRoots.contains(name) && await dst.exists()) {
-        await dst.delete(recursive: true);
-      }
-      if (!await src.exists()) continue;
-      if (!await dst.exists()) {
+      // Session cleanup and workspace writers must not see an empty directory
+      // between its creation and the arrival of its contents.
+      await WorkspaceFileCoordinator.run(dst.path, () async {
+        final overwrite = overwriteRoots.contains(name);
+        if (overwrite && await dst.exists()) await dst.delete(recursive: true);
+        if (!await src.exists()) return;
         await dst.create(recursive: true);
-      }
-      for (final ent in src.listSync(recursive: true)) {
-        if (ent is File) {
-          final rel = p.relative(ent.path, from: src.path);
-          final segments = p.split(rel);
+        for (final ent in src.listSync(recursive: true)) {
+          if (ent is! File) continue;
+          final segments = p.split(p.relative(ent.path, from: src.path));
           if (name == 'sessions' && segments.length > 1) {
             segments[0] = remappedConversationIds[segments[0]] ?? segments[0];
           }
-          final targetFile = File(p.joinAll([dst.path, ...segments]));
-          if (!await targetFile.exists()) {
-            await _copyRestoredFile(ent, targetFile);
+          final target = File(p.joinAll([dst.path, ...segments]));
+          if (overwrite || !await target.exists()) {
+            await _copyRestoredFile(ent, target);
           }
         }
-      }
+      });
     }
   }
 
@@ -3707,17 +3707,19 @@ class DataSync {
             final src = Directory(p.join(restorePayloadDirectory.path, name));
             if (!await src.exists()) continue;
             final dst = await _liveAssetRoot(name);
-            if (await dst.exists()) {
-              await dst.delete(recursive: true);
-            }
-            await dst.create(recursive: true);
-            for (final ent in src.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: src.path);
-                final target = File(p.join(dst.path, rel));
-                await _copyRestoredFile(ent, target);
+            await WorkspaceFileCoordinator.run(dst.path, () async {
+              if (await dst.exists()) {
+                await dst.delete(recursive: true);
               }
-            }
+              await dst.create(recursive: true);
+              for (final ent in src.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: src.path);
+                  final target = File(p.join(dst.path, rel));
+                  await _copyRestoredFile(ent, target);
+                }
+              }
+            });
           }
         } else {
           // Merge mode: Only copy non-existing files

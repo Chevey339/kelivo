@@ -1229,7 +1229,6 @@ class SettingsProvider extends ChangeNotifier {
         (localPreferences.getBool(LinuxWindowService.hideTitleBarKey) ?? false);
 
     _desktopAutostartHidden = await DesktopStartupService.readHidden();
-    await refreshDesktopStartup(notify: false);
 
     // Desktop: tray settings (default enabled on desktop platforms)
     final trayPref = prefs.getBool(_displayDesktopShowTrayKey);
@@ -5509,7 +5508,7 @@ Requirements:
   bool _desktopAutostartHidden = false;
   bool get desktopAutostartHidden => _desktopAutostartHidden;
 
-  Future<void> refreshDesktopStartup({bool notify = true}) async {
+  Future<void> refreshDesktopStartup() async {
     if (!DesktopStartupService.isDesktop || _desktopAutostartBusy) return;
     final revision = ++_desktopStartupRevision;
     try {
@@ -5522,7 +5521,7 @@ Requirements:
       if (revision != _desktopStartupRevision) return;
       _desktopAutostartFailed = true;
     }
-    if (notify) notifyListeners();
+    notifyListeners();
   }
 
   Future<void> setDesktopAutostartEnabled(bool enabled) async {

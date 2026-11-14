@@ -1084,11 +1084,12 @@ class RequestImageContext {
     }, nativeImage: addExternal);
     final carriedHandles = {
       for (final field in ['input', 'messages', 'contents'])
-        for (final item in (body[field] as List? ?? const []).whereType<Map>())
-          if (item[historySourceKey] is String &&
-              (item[historySourceKey] as String).startsWith(carriedPrefix))
-            ...(item[carriedImageHandlesKey] as List? ?? const [])
-                .whereType<String>(),
+        if (body[field] case final List items)
+          for (final item in items.whereType<Map>())
+            if (item[historySourceKey] case final String owner
+                when owner.startsWith(carriedPrefix))
+              if (item[carriedImageHandlesKey] case final List handles)
+                ...handles.whereType<String>(),
     };
     final omittedByCount = {
       ...await historyOmissions(),

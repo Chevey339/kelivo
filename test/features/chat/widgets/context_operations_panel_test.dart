@@ -32,6 +32,7 @@ import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import '../../../support/business_test_harness.dart';
 
@@ -54,6 +55,10 @@ void check(String name, WidgetTesterCallback body) {
     try {
       await body(tester);
     } finally {
+      // Actions reached via runAsync can leave a real-time toast timer.
+      // Finish its exit animation while this test still owns the navigator.
+      AppSnackBarManager().dismissAll();
+      await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox.shrink());
       debugDefaultTargetPlatformOverride = null;
     }

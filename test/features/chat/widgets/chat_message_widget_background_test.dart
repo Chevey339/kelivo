@@ -1304,7 +1304,7 @@ void main() {
         expect(find.text('Deep Thinking'), findsOneWidget);
         expect(renderedParagraphsWith('结构化思考', exact: false), hasLength(1));
         expect(
-          renderedParagraphsWith('正文 literal 继续显示', exact: false),
+          renderedParagraphsWith('正文 <think>literal</think> 继续显示'),
           hasLength(1),
         );
       },
