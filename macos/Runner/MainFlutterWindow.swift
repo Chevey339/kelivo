@@ -596,6 +596,9 @@ class MainFlutterWindow: NSWindow {
       }
     }
 
+    // The nib starts hidden. Dart decides whether to show the window or tray,
+    // so it must start before the view's first appearance.
+    flutterViewController.engine.run(withEntrypoint: nil)
     super.awakeFromNib()
   }
 }
