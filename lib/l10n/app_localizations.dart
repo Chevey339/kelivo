@@ -1051,7 +1051,7 @@ abstract class AppLocalizations {
   /// Subtitle showing the Afdian sponsor URL 'afdian.com/a/kelivo' under the Afdian option.
   ///
   /// In en, this message translates to:
-  /// **'afdian.com/a/kelivo'**
+  /// **'ifdian.net/a/kelivo'**
   String get sponsorPageAfdianSubtitle;
 
   /// Label for the WeChat sponsorship option; also used as the title of the inline WeChat QR preview card in the desktop about pane.
