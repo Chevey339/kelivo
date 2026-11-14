@@ -6151,27 +6151,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageViewerPageNextButton => '下一张图片';
 
   @override
-  String get imageViewerPageZoomInButton => '放大';
-
-  @override
-  String get imageViewerPageZoomOutButton => '缩小';
-
-  @override
-  String get imageViewerPageResetZoomButton => '重置缩放';
-
-  @override
-  String get imageViewerPageFlipHorizontalButton => '左右镜像';
-
-  @override
-  String get imageViewerPageFlipVerticalButton => '上下镜像';
-
-  @override
-  String get imageViewerPageRotateLeftButton => '向左旋转';
-
-  @override
-  String get imageViewerPageRotateRightButton => '向右旋转';
-
-  @override
   String imageViewerPageCounter(int index, int total) {
     return '$index/$total';
   }
@@ -16027,6 +16006,101 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => '文件信息';
+
+  @override
+  String get imageEditorCancel => '取消';
+
+  @override
+  String get imageEditorDone => '完成';
+
+  @override
+  String get imageEditorUndo => '撤销';
+
+  @override
+  String get imageEditorRedo => '重做';
+
+  @override
+  String get imageEditorToolCrop => '裁剪';
+
+  @override
+  String get imageEditorToolDraw => '画笔';
+
+  @override
+  String get imageEditorToolText => '文字';
+
+  @override
+  String get imageEditorToolMosaic => '马赛克';
+
+  @override
+  String get imageEditorPen => '画笔';
+
+  @override
+  String get imageEditorArrow => '箭头';
+
+  @override
+  String get imageEditorEraser => '橡皮';
+
+  @override
+  String get imageEditorAspectFree => '自由';
+
+  @override
+  String get imageEditorAspectOriginal => '原比例';
+
+  @override
+  String get imageEditorRotate => '向左旋转';
+
+  @override
+  String get imageEditorFlip => '镜像';
+
+  @override
+  String get imageEditorTextPlain => '普通';
+
+  @override
+  String get imageEditorTextOutline => '描边';
+
+  @override
+  String get imageEditorTextFill => '底色';
+
+  @override
+  String get imageEditorAlign => '对齐';
+
+  @override
+  String get imageEditorMosaicBrush => '涂抹';
+
+  @override
+  String get imageEditorMosaicRect => '框选';
+
+  @override
+  String get imageEditorDiscardTitle => '放弃修改？';
+
+  @override
+  String get imageEditorKeepEditing => '继续编辑';
+
+  @override
+  String get imageEditorDiscard => '放弃修改';
+
+  @override
+  String get imageEditorProcessFailed => '图片处理失败';
+
+  @override
+  String get imageEditorRetry => '重试';
+
+  @override
+  String get imageEditorRemove => '移除';
+
+  @override
+  String get imageEditorRestore => '还原';
+
+  @override
+  String imageEditorColor(String color) {
+    return '颜色 $color';
+  }
+
+  @override
+  String get imageViewerPageEditButton => '编辑';
+
+  @override
+  String get imageViewerPageFileSize => '图片大小';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -22176,27 +22250,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get imageViewerPageNextButton => '下一张图片';
 
   @override
-  String get imageViewerPageZoomInButton => '放大';
-
-  @override
-  String get imageViewerPageZoomOutButton => '缩小';
-
-  @override
-  String get imageViewerPageResetZoomButton => '重置缩放';
-
-  @override
-  String get imageViewerPageFlipHorizontalButton => '左右镜像';
-
-  @override
-  String get imageViewerPageFlipVerticalButton => '上下镜像';
-
-  @override
-  String get imageViewerPageRotateLeftButton => '向左旋转';
-
-  @override
-  String get imageViewerPageRotateRightButton => '向右旋转';
-
-  @override
   String imageViewerPageCounter(int index, int total) {
     return '$index/$total';
   }
@@ -32052,6 +32105,101 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageAttachmentDetailsTitle => '文件信息';
+
+  @override
+  String get imageEditorCancel => '取消';
+
+  @override
+  String get imageEditorDone => '完成';
+
+  @override
+  String get imageEditorUndo => '撤销';
+
+  @override
+  String get imageEditorRedo => '重做';
+
+  @override
+  String get imageEditorToolCrop => '裁剪';
+
+  @override
+  String get imageEditorToolDraw => '画笔';
+
+  @override
+  String get imageEditorToolText => '文字';
+
+  @override
+  String get imageEditorToolMosaic => '马赛克';
+
+  @override
+  String get imageEditorPen => '画笔';
+
+  @override
+  String get imageEditorArrow => '箭头';
+
+  @override
+  String get imageEditorEraser => '橡皮';
+
+  @override
+  String get imageEditorAspectFree => '自由';
+
+  @override
+  String get imageEditorAspectOriginal => '原比例';
+
+  @override
+  String get imageEditorRotate => '向左旋转';
+
+  @override
+  String get imageEditorFlip => '镜像';
+
+  @override
+  String get imageEditorTextPlain => '普通';
+
+  @override
+  String get imageEditorTextOutline => '描边';
+
+  @override
+  String get imageEditorTextFill => '底色';
+
+  @override
+  String get imageEditorAlign => '对齐';
+
+  @override
+  String get imageEditorMosaicBrush => '涂抹';
+
+  @override
+  String get imageEditorMosaicRect => '框选';
+
+  @override
+  String get imageEditorDiscardTitle => '放弃修改？';
+
+  @override
+  String get imageEditorKeepEditing => '继续编辑';
+
+  @override
+  String get imageEditorDiscard => '放弃修改';
+
+  @override
+  String get imageEditorProcessFailed => '图片处理失败';
+
+  @override
+  String get imageEditorRetry => '重试';
+
+  @override
+  String get imageEditorRemove => '移除';
+
+  @override
+  String get imageEditorRestore => '还原';
+
+  @override
+  String imageEditorColor(String color) {
+    return '颜色 $color';
+  }
+
+  @override
+  String get imageViewerPageEditButton => '编辑';
+
+  @override
+  String get imageViewerPageFileSize => '图片大小';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -38198,27 +38346,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get imageViewerPageNextButton => '下一張圖片';
-
-  @override
-  String get imageViewerPageZoomInButton => '放大';
-
-  @override
-  String get imageViewerPageZoomOutButton => '縮小';
-
-  @override
-  String get imageViewerPageResetZoomButton => '重設縮放';
-
-  @override
-  String get imageViewerPageFlipHorizontalButton => '左右鏡像';
-
-  @override
-  String get imageViewerPageFlipVerticalButton => '上下鏡像';
-
-  @override
-  String get imageViewerPageRotateLeftButton => '向左旋轉';
-
-  @override
-  String get imageViewerPageRotateRightButton => '向右旋轉';
 
   @override
   String imageViewerPageCounter(int index, int total) {
@@ -48084,4 +48211,99 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageAttachmentDetailsTitle => '檔案資訊';
+
+  @override
+  String get imageEditorCancel => '取消';
+
+  @override
+  String get imageEditorDone => '完成';
+
+  @override
+  String get imageEditorUndo => '復原';
+
+  @override
+  String get imageEditorRedo => '重做';
+
+  @override
+  String get imageEditorToolCrop => '裁剪';
+
+  @override
+  String get imageEditorToolDraw => '畫筆';
+
+  @override
+  String get imageEditorToolText => '文字';
+
+  @override
+  String get imageEditorToolMosaic => '馬賽克';
+
+  @override
+  String get imageEditorPen => '畫筆';
+
+  @override
+  String get imageEditorArrow => '箭頭';
+
+  @override
+  String get imageEditorEraser => '橡皮擦';
+
+  @override
+  String get imageEditorAspectFree => '自由';
+
+  @override
+  String get imageEditorAspectOriginal => '原始比例';
+
+  @override
+  String get imageEditorRotate => '向左旋轉';
+
+  @override
+  String get imageEditorFlip => '鏡像';
+
+  @override
+  String get imageEditorTextPlain => '一般';
+
+  @override
+  String get imageEditorTextOutline => '描邊';
+
+  @override
+  String get imageEditorTextFill => '底色';
+
+  @override
+  String get imageEditorAlign => '對齊';
+
+  @override
+  String get imageEditorMosaicBrush => '塗抹';
+
+  @override
+  String get imageEditorMosaicRect => '框選';
+
+  @override
+  String get imageEditorDiscardTitle => '放棄修改？';
+
+  @override
+  String get imageEditorKeepEditing => '繼續編輯';
+
+  @override
+  String get imageEditorDiscard => '放棄修改';
+
+  @override
+  String get imageEditorProcessFailed => '圖片處理失敗';
+
+  @override
+  String get imageEditorRetry => '重試';
+
+  @override
+  String get imageEditorRemove => '移除';
+
+  @override
+  String get imageEditorRestore => '還原';
+
+  @override
+  String imageEditorColor(String color) {
+    return '顏色 $color';
+  }
+
+  @override
+  String get imageViewerPageEditButton => '編輯';
+
+  @override
+  String get imageViewerPageFileSize => '圖片大小';
 }

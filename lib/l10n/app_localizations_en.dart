@@ -6415,27 +6415,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imageViewerPageNextButton => 'Next Image';
 
   @override
-  String get imageViewerPageZoomInButton => 'Zoom In';
-
-  @override
-  String get imageViewerPageZoomOutButton => 'Zoom Out';
-
-  @override
-  String get imageViewerPageResetZoomButton => 'Reset Zoom';
-
-  @override
-  String get imageViewerPageFlipHorizontalButton => 'Flip Horizontal';
-
-  @override
-  String get imageViewerPageFlipVerticalButton => 'Flip Vertical';
-
-  @override
-  String get imageViewerPageRotateLeftButton => 'Rotate Left';
-
-  @override
-  String get imageViewerPageRotateRightButton => 'Rotate Right';
-
-  @override
   String imageViewerPageCounter(int index, int total) {
     return '$index/$total';
   }
@@ -16902,4 +16881,99 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => 'File info';
+
+  @override
+  String get imageEditorCancel => 'Cancel';
+
+  @override
+  String get imageEditorDone => 'Done';
+
+  @override
+  String get imageEditorUndo => 'Undo';
+
+  @override
+  String get imageEditorRedo => 'Redo';
+
+  @override
+  String get imageEditorToolCrop => 'Crop';
+
+  @override
+  String get imageEditorToolDraw => 'Draw';
+
+  @override
+  String get imageEditorToolText => 'Text';
+
+  @override
+  String get imageEditorToolMosaic => 'Mosaic';
+
+  @override
+  String get imageEditorPen => 'Pen';
+
+  @override
+  String get imageEditorArrow => 'Arrow';
+
+  @override
+  String get imageEditorEraser => 'Eraser';
+
+  @override
+  String get imageEditorAspectFree => 'Free';
+
+  @override
+  String get imageEditorAspectOriginal => 'Original';
+
+  @override
+  String get imageEditorRotate => 'Rotate left';
+
+  @override
+  String get imageEditorFlip => 'Flip';
+
+  @override
+  String get imageEditorTextPlain => 'Plain';
+
+  @override
+  String get imageEditorTextOutline => 'Outline';
+
+  @override
+  String get imageEditorTextFill => 'Fill';
+
+  @override
+  String get imageEditorAlign => 'Align';
+
+  @override
+  String get imageEditorMosaicBrush => 'Brush';
+
+  @override
+  String get imageEditorMosaicRect => 'Box';
+
+  @override
+  String get imageEditorDiscardTitle => 'Discard changes?';
+
+  @override
+  String get imageEditorKeepEditing => 'Keep editing';
+
+  @override
+  String get imageEditorDiscard => 'Discard';
+
+  @override
+  String get imageEditorProcessFailed => 'Couldn\'t process image';
+
+  @override
+  String get imageEditorRetry => 'Retry';
+
+  @override
+  String get imageEditorRemove => 'Remove';
+
+  @override
+  String get imageEditorRestore => 'Revert';
+
+  @override
+  String imageEditorColor(String color) {
+    return 'Color $color';
+  }
+
+  @override
+  String get imageViewerPageEditButton => 'Edit';
+
+  @override
+  String get imageViewerPageFileSize => 'Image size';
 }

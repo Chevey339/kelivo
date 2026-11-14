@@ -6243,27 +6243,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get imageViewerPageNextButton => '다음 이미지';
 
   @override
-  String get imageViewerPageZoomInButton => '확대';
-
-  @override
-  String get imageViewerPageZoomOutButton => '축소';
-
-  @override
-  String get imageViewerPageResetZoomButton => '확대/축소 초기화';
-
-  @override
-  String get imageViewerPageFlipHorizontalButton => '좌우 반전';
-
-  @override
-  String get imageViewerPageFlipVerticalButton => '상하 반전';
-
-  @override
-  String get imageViewerPageRotateLeftButton => '왼쪽으로 회전';
-
-  @override
-  String get imageViewerPageRotateRightButton => '오른쪽으로 회전';
-
-  @override
   String imageViewerPageCounter(int index, int total) {
     return '$index/$total';
   }
@@ -16385,4 +16364,99 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => '파일 정보';
+
+  @override
+  String get imageEditorCancel => '취소';
+
+  @override
+  String get imageEditorDone => '완료';
+
+  @override
+  String get imageEditorUndo => '실행 취소';
+
+  @override
+  String get imageEditorRedo => '다시 실행';
+
+  @override
+  String get imageEditorToolCrop => '자르기';
+
+  @override
+  String get imageEditorToolDraw => '그리기';
+
+  @override
+  String get imageEditorToolText => '텍스트';
+
+  @override
+  String get imageEditorToolMosaic => '모자이크';
+
+  @override
+  String get imageEditorPen => '펜';
+
+  @override
+  String get imageEditorArrow => '화살표';
+
+  @override
+  String get imageEditorEraser => '지우개';
+
+  @override
+  String get imageEditorAspectFree => '자유';
+
+  @override
+  String get imageEditorAspectOriginal => '원본';
+
+  @override
+  String get imageEditorRotate => '왼쪽으로 회전';
+
+  @override
+  String get imageEditorFlip => '뒤집기';
+
+  @override
+  String get imageEditorTextPlain => '일반';
+
+  @override
+  String get imageEditorTextOutline => '외곽선';
+
+  @override
+  String get imageEditorTextFill => '채우기';
+
+  @override
+  String get imageEditorAlign => '정렬';
+
+  @override
+  String get imageEditorMosaicBrush => '브러시';
+
+  @override
+  String get imageEditorMosaicRect => '상자';
+
+  @override
+  String get imageEditorDiscardTitle => '변경 사항을 버릴까요?';
+
+  @override
+  String get imageEditorKeepEditing => '계속 편집';
+
+  @override
+  String get imageEditorDiscard => '버리기';
+
+  @override
+  String get imageEditorProcessFailed => '이미지를 처리할 수 없습니다';
+
+  @override
+  String get imageEditorRetry => '다시 시도';
+
+  @override
+  String get imageEditorRemove => '제거';
+
+  @override
+  String get imageEditorRestore => '되돌리기';
+
+  @override
+  String imageEditorColor(String color) {
+    return '색상 $color';
+  }
+
+  @override
+  String get imageViewerPageEditButton => '편집';
+
+  @override
+  String get imageViewerPageFileSize => '이미지 크기';
 }

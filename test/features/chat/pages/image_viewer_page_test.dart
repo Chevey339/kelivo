@@ -192,10 +192,6 @@ Future<void> _pumpViewerRoute(
   await tester.pumpAndSettle();
 }
 
-Finder _displayTransformFinder(int index) {
-  return find.byKey(ValueKey('image-viewer-display-transform-$index'));
-}
-
 class _ViewerSavePathProvider extends PathProviderPlatform {
   _ViewerSavePathProvider(this.path);
 
@@ -404,25 +400,35 @@ void main() {
     },
   );
 
-  testWidgets('ImageViewerPage compact tap closes preview', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    _setTestViewSize(tester, _mobileSize);
-    try {
-      await _pumpViewerRoute(tester, images: const [_transparentPngDataUrl]);
+  testWidgets(
+    'ImageViewerPage compact tap hides controls and keeps preview open',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      _setTestViewSize(tester, _mobileSize);
+      try {
+        await _pumpViewerRoute(tester, images: const [_transparentPngDataUrl]);
 
-      expect(find.byTooltip('Close preview'), findsOneWidget);
+        expect(find.byTooltip('Close preview'), findsOneWidget);
 
-      await tester.tapAt(
-        tester.getCenter(find.byKey(const ValueKey('image-viewer-page-view'))),
-      );
-      await tester.pump(kDoubleTapTimeout);
-      await tester.pumpAndSettle();
+        await tester.tapAt(
+          tester.getCenter(
+            find.byKey(const ValueKey('image-viewer-page-view')),
+          ),
+        );
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
 
-      expect(find.byType(ImageViewerPage), findsNothing);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
+        expect(find.byType(ImageViewerPage), findsOneWidget);
+        final chrome = find.ancestor(
+          of: find.byTooltip('Close preview'),
+          matching: find.byType(AnimatedOpacity),
+        );
+        expect(tester.widget<AnimatedOpacity>(chrome).opacity, 0);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   testWidgets('ImageViewerPage compact image uses the full viewport width', (
     tester,
@@ -572,42 +578,6 @@ void main() {
     },
   );
 
-  testWidgets('ImageViewerPage compact transform actions update the image', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    _setTestViewSize(tester, _mobileSize);
-    try {
-      await tester.pumpWidget(
-        _viewerApp(images: const [_transparentPngDataUrl], size: _mobileSize),
-      );
-      await tester.pump();
-
-      expect(find.byTooltip('Flip Horizontal'), findsOneWidget);
-      expect(find.byTooltip('Flip Vertical'), findsOneWidget);
-      expect(find.byTooltip('Rotate Left'), findsOneWidget);
-      expect(find.byTooltip('Rotate Right'), findsOneWidget);
-
-      final initial = tester.widget<Transform>(_displayTransformFinder(0));
-      expect(initial.transform.storage[0], moreOrLessEquals(1));
-
-      await tester.tap(find.byTooltip('Flip Horizontal'));
-      await tester.pumpAndSettle();
-
-      final flipped = tester.widget<Transform>(_displayTransformFinder(0));
-      expect(flipped.transform.storage[0], moreOrLessEquals(-1));
-
-      await tester.tap(find.byTooltip('Rotate Right'));
-      await tester.pumpAndSettle();
-
-      final rotated = tester.widget<Transform>(_displayTransformFinder(0));
-      expect(rotated.transform.storage[0].abs(), lessThan(0.001));
-      expect(rotated.transform.storage[1].abs(), moreOrLessEquals(1));
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
-
   testWidgets('ImageViewerPage desktop background tap closes preview', (
     tester,
   ) async {
@@ -651,53 +621,8 @@ void main() {
     }
   });
 
-  testWidgets('ImageViewerPage rotate actions animate by the shortest turn', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _viewerApp(images: const [_transparentPngDataUrl], size: _desktopSize),
-    );
-    await tester.pump();
-
-    await tester.tap(find.byTooltip('Rotate Left'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Rotate Left'));
-    await tester.pumpAndSettle();
-
-    final afterTwoLeft = tester.widget<Transform>(_displayTransformFinder(0));
-    expect(afterTwoLeft.transform.storage[0], moreOrLessEquals(-1));
-    expect(afterTwoLeft.transform.storage[5], moreOrLessEquals(-1));
-
-    await tester.tap(find.byTooltip('Rotate Right'));
-    await tester.pumpAndSettle();
-
-    final afterOneRight = tester.widget<Transform>(_displayTransformFinder(0));
-    expect(afterOneRight.transform.storage[0].abs(), lessThan(0.001));
-    expect(afterOneRight.transform.storage[1], moreOrLessEquals(-1));
-
-    await tester.tap(find.byTooltip('Rotate Right'));
-    await tester.pump();
-    final beforeMidTurn = tester.widget<Transform>(_displayTransformFinder(0));
-    expect(beforeMidTurn.transform.storage[0].abs(), lessThan(0.001));
-    await tester.pump(const Duration(milliseconds: 40));
-
-    final midTurn = tester.widget<Transform>(_displayTransformFinder(0));
-    final cosine = midTurn.transform.storage[0];
-    expect(cosine, inExclusiveRange(0, 1));
-
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Rotate Right'));
-    await tester.pumpAndSettle();
-
-    final afterThreeRight = tester.widget<Transform>(
-      _displayTransformFinder(0),
-    );
-    expect(afterThreeRight.transform.storage[0].abs(), lessThan(0.001));
-    expect(afterThreeRight.transform.storage[1], moreOrLessEquals(1));
-  });
-
   testWidgets(
-    'ImageViewerPage wide layout exposes navigation and zoom actions',
+    'ImageViewerPage wide layout exposes exports and filmstrip only',
     (tester) async {
       const secondImage =
           'data:image/png;base64,'
@@ -715,13 +640,13 @@ void main() {
       expect(find.text('1/2'), findsOneWidget);
       expect(find.byTooltip('Previous Image'), findsOneWidget);
       expect(find.byTooltip('Next Image'), findsOneWidget);
-      expect(find.byTooltip('Zoom In'), findsOneWidget);
-      expect(find.byTooltip('Zoom Out'), findsOneWidget);
-      expect(find.byTooltip('Reset Zoom'), findsOneWidget);
-      expect(find.byTooltip('Flip Horizontal'), findsOneWidget);
-      expect(find.byTooltip('Flip Vertical'), findsOneWidget);
-      expect(find.byTooltip('Rotate Left'), findsOneWidget);
-      expect(find.byTooltip('Rotate Right'), findsOneWidget);
+      expect(find.byTooltip('Zoom In'), findsNothing);
+      expect(find.byTooltip('Zoom Out'), findsNothing);
+      expect(find.byTooltip('Reset Zoom'), findsNothing);
+      expect(find.byTooltip('Flip Horizontal'), findsNothing);
+      expect(find.byTooltip('Flip Vertical'), findsNothing);
+      expect(find.byTooltip('Rotate Left'), findsNothing);
+      expect(find.byTooltip('Rotate Right'), findsNothing);
     },
   );
 
@@ -1192,57 +1117,6 @@ void main() {
       ),
       isTrue,
     );
-  });
-
-  testWidgets('rotate swaps decode axes and restores them after a full turn', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(1024, 720);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    try {
-      await tester.pumpWidget(
-        _viewerApp(
-          images: const [_widePngDataUrl],
-          size: const Size(1024, 720),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final initial =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(initial.width, greaterThan(initial.height));
-
-      await tester.tap(find.byTooltip('Rotate Right'));
-      await tester.pumpAndSettle();
-      final right =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(right.height, greaterThan(right.width));
-
-      await tester.tap(find.byTooltip('Rotate Left'));
-      await tester.pumpAndSettle();
-      final leftBack =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(leftBack.width, initial.width);
-      expect(leftBack.height, initial.height);
-
-      await tester.tap(find.byTooltip('Rotate Left'));
-      await tester.pumpAndSettle();
-      final left =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(left.height, greaterThan(left.width));
-
-      await tester.tap(find.byTooltip('Rotate Right'));
-      await tester.pumpAndSettle();
-      final restored =
-          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-      expect(restored.width, initial.width);
-      expect(restored.height, initial.height);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
   });
 
   testWidgets(

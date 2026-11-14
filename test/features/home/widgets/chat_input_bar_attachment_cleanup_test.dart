@@ -229,10 +229,14 @@ void main() {
       messenger.setMockMethodCallHandler(clipboardChannel, null);
     });
 
-    final settings = SettingsProvider(createBusinessTestPreferences());
+    final settings = (await tester.runAsync(() async {
+      final provider = SettingsProvider(createBusinessTestPreferences());
+      await provider.loaded;
+      return provider;
+    }))!;
     addTearDown(settings.dispose);
-    await settings.loaded;
-    await settings.setLongPasteAsFileThreshold(100);
+
+    await tester.runAsync(() => settings.setLongPasteAsFileThreshold(100));
     final controller = TextEditingController(text: 'before after');
     final focusNode = FocusNode();
     final mediaController = ChatInputBarController();

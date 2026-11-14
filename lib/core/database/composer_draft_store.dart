@@ -1,3 +1,4 @@
+import '../../utils/upload_dedupe.dart';
 import '../../features/intelligent_ui/models/ui_context_attachment.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -476,10 +477,11 @@ class ComposerDraftStore extends ChangeNotifier {
     return input.copyWith(
       images: [
         for (final image in input.images)
-          DraftImage(
+          image.copyWith(
             path: paths[image.path]!,
-            processing: image.processing,
-            failed: image.failed,
+            sourcePath: image.sourcePath == null
+                ? null
+                : paths[image.sourcePath],
           ),
       ],
       documents: [
@@ -659,12 +661,21 @@ class ComposerDraftStore extends ChangeNotifier {
   }) async {
     final draft = _drafts[submission.conversationId];
     if (draft == null) return;
+    final retired = <String>{};
     if (await wasSubmitted(submission.id)) {
+      for (final image in draft.pending?.images ?? const <DraftImage>[]) {
+        if (image.sourcePath != null && image.sourcePath != image.path) {
+          retired.add(image.sourcePath!);
+        }
+      }
       await _removeCommittedSubmission(draft, preserveEdit: preserveEdit);
       _entries.removeWhere((_, entry) => entry.id == submission.conversationId);
     }
     _changed(draft);
     await flush();
+    if (retired.isNotEmpty) {
+      await releaseReplacedFiles(draft.conversationId, retired);
+    }
   }
 
   /// Only explicit submission publishes a private attachment into upload/.
@@ -981,6 +992,47 @@ class ComposerDraftStore extends ChangeNotifier {
       });
     } finally {
       await flush();
+    }
+  }
+
+  /// Only retire named replaced files after their replacement is durable.
+  /// A directory-wide sweep here could race an image import still in flight.
+  Future<void> releaseReplacedFiles(String id, Iterable<String> paths) async {
+    final candidates = paths.toSet();
+    if (candidates.isEmpty) return;
+    while (!_disposed && !suspended && !_deleted.contains(id)) {
+      await flush();
+      final settled = await _serialize(() async {
+        final draft = _drafts[id];
+        if (draft == null || suspended || _deleted.contains(id)) return true;
+        final directory = await directoryFor(id);
+        String ownedPath(String raw) {
+          final fixed = SandboxPathResolver.fix(raw);
+          return p.normalize(_ownedPaths['$id\u0000$fixed'] ?? fixed);
+        }
+
+        for (final path in candidates.map(ownedPath).toSet()) {
+          // Typing may have changed the draft while its transaction committed.
+          // Wait for the next durable version before deciding which files go.
+          if (_dirty.contains(id)) return false;
+          if (!p.isWithin(directory.path, path) ||
+              draft.paths.any((live) => ownedPath(live) == path) ||
+              UploadDedupe.isShared(path)) {
+            continue;
+          }
+          // Re-adding the same external file must import it again.
+          for (final alias
+              in _ownedPaths.keys
+                  .where((k) => _ownedPaths[k] == path)
+                  .toList()) {
+            _ownedPaths.remove(alias);
+            _imports.removeWhere((key, _) => key.startsWith('$alias\u0000'));
+          }
+          await UploadDedupe.deleteIfUnshared(path);
+        }
+        return true;
+      });
+      if (settled) return;
     }
   }
 

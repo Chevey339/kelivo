@@ -24,8 +24,12 @@ void main() {
     FocusNode focusNode, {
     FocusNode? otherFocusNode,
   }) async {
-    final settings = SettingsProvider(createBusinessTestPreferences());
-    await settings.loaded;
+    final settings = (await tester.runAsync(() async {
+      final provider = SettingsProvider(createBusinessTestPreferences());
+      await provider.loaded;
+      return provider;
+    }))!;
+
     await tester.pumpWidget(
       MultiProvider(
         providers: [

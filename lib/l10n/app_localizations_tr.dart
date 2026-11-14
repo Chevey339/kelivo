@@ -6470,27 +6470,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get imageViewerPageNextButton => 'Sonraki Görsel';
 
   @override
-  String get imageViewerPageZoomInButton => 'Yakınlaştır';
-
-  @override
-  String get imageViewerPageZoomOutButton => 'Uzaklaştır';
-
-  @override
-  String get imageViewerPageResetZoomButton => 'Yakınlaştırmayı Sıfırla';
-
-  @override
-  String get imageViewerPageFlipHorizontalButton => 'Yatay Çevir';
-
-  @override
-  String get imageViewerPageFlipVerticalButton => 'Dikey Çevir';
-
-  @override
-  String get imageViewerPageRotateLeftButton => 'Sola Döndür';
-
-  @override
-  String get imageViewerPageRotateRightButton => 'Sağa Döndür';
-
-  @override
   String imageViewerPageCounter(int index, int total) {
     return '$index/$total';
   }
@@ -16998,4 +16977,99 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get storageAttachmentDetailsTitle => 'Dosya bilgisi';
+
+  @override
+  String get imageEditorCancel => 'İptal';
+
+  @override
+  String get imageEditorDone => 'Bitti';
+
+  @override
+  String get imageEditorUndo => 'Geri al';
+
+  @override
+  String get imageEditorRedo => 'Yinele';
+
+  @override
+  String get imageEditorToolCrop => 'Kırp';
+
+  @override
+  String get imageEditorToolDraw => 'Çiz';
+
+  @override
+  String get imageEditorToolText => 'Metin';
+
+  @override
+  String get imageEditorToolMosaic => 'Mozaik';
+
+  @override
+  String get imageEditorPen => 'Kalem';
+
+  @override
+  String get imageEditorArrow => 'Ok';
+
+  @override
+  String get imageEditorEraser => 'Silgi';
+
+  @override
+  String get imageEditorAspectFree => 'Serbest';
+
+  @override
+  String get imageEditorAspectOriginal => 'Orijinal';
+
+  @override
+  String get imageEditorRotate => 'Sola döndür';
+
+  @override
+  String get imageEditorFlip => 'Çevir';
+
+  @override
+  String get imageEditorTextPlain => 'Düz';
+
+  @override
+  String get imageEditorTextOutline => 'Dış çizgi';
+
+  @override
+  String get imageEditorTextFill => 'Dolgu';
+
+  @override
+  String get imageEditorAlign => 'Hizala';
+
+  @override
+  String get imageEditorMosaicBrush => 'Fırça';
+
+  @override
+  String get imageEditorMosaicRect => 'Kutu';
+
+  @override
+  String get imageEditorDiscardTitle => 'Değişiklikler atılsın mı?';
+
+  @override
+  String get imageEditorKeepEditing => 'Düzenlemeye devam et';
+
+  @override
+  String get imageEditorDiscard => 'At';
+
+  @override
+  String get imageEditorProcessFailed => 'Görsel işlenemedi';
+
+  @override
+  String get imageEditorRetry => 'Yeniden dene';
+
+  @override
+  String get imageEditorRemove => 'Kaldır';
+
+  @override
+  String get imageEditorRestore => 'Geri yükle';
+
+  @override
+  String imageEditorColor(String color) {
+    return 'Renk $color';
+  }
+
+  @override
+  String get imageViewerPageEditButton => 'Düzenle';
+
+  @override
+  String get imageViewerPageFileSize => 'Görsel boyutu';
 }
