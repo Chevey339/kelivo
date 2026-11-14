@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import '../../../support/business_test_harness.dart';
@@ -5,6 +6,7 @@ import 'dart:io';
 import 'package:Kelivo/core/models/image_edit_document.dart';
 import 'package:Kelivo/features/chat/pages/image_editor_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,12 +90,12 @@ void main() {
       Map<int, ImageEditDocument>? saved;
       await open(tester, onSave: (docs) async => saved = docs);
       expect(tester.takeException(), isNull);
-      expect(find.text('Revert'), findsNothing);
+      expect(find.text('Revert').hitTestable(), findsNothing);
       await tester.tap(find.byKey(const ValueKey('image-editor-tool-crop')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('1:1'));
       await tester.pumpAndSettle();
-      expect(find.text('Revert'), findsOneWidget);
+      expect(find.text('Revert').hitTestable(), findsOneWidget);
       final cropCenter = tester.getCenter(
         find.byKey(const ValueKey('image-editor-stage')),
       );
@@ -114,10 +116,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Revert'));
       await tester.pumpAndSettle();
-      expect(find.text('Revert'), findsNothing);
+      expect(find.text('Revert').hitTestable(), findsNothing);
       await tester.tap(find.byTooltip('Undo'));
       await tester.pumpAndSettle();
-      expect(find.text('Revert'), findsOneWidget);
+      expect(find.text('Revert').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
       expect(find.byType(ImageEditorPage), findsNothing);
@@ -143,7 +145,7 @@ void main() {
         ],
         onSave: (docs) async => saved = docs,
       );
-      expect(find.text('Revert'), findsOneWidget);
+      expect(find.text('Revert').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Revert'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Done'));
@@ -162,9 +164,16 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(find.text('Discard changes?'), findsOneWidget);
-      await tester.tap(find.text('Keep editing'));
+      final keep = find.ancestor(
+        of: find.text('Keep editing'),
+        matching: find.byType(IosCardPress),
+      );
+      final keepRect = tester.getRect(keep);
+      expect(keepRect.height, greaterThanOrEqualTo(48));
+      await tester.tapAt(keepRect.centerRight - const Offset(12, 0));
       await tester.pumpAndSettle();
       expect(find.byType(ImageEditorPage), findsOneWidget);
+      expect(find.text('Discard changes?'), findsNothing);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Discard'));
@@ -259,7 +268,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Undo'));
       await tester.pumpAndSettle();
-      expect(find.text('Revert'), findsNothing);
+      expect(find.text('Revert').hitTestable(), findsNothing);
       await tester.tap(find.byTooltip('Redo'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Done'));
@@ -288,7 +297,7 @@ void main() {
       const Offset(0, 48),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Revert'), findsNothing);
+    expect(find.text('Revert').hitTestable(), findsNothing);
   });
 
   testWidgets('a locked crop can grow again from an edge midpoint', (
@@ -315,6 +324,142 @@ void main() {
     expect(crop.width, closeTo(.625 - 15 / photoWidth, .01));
     expect(crop.left, closeTo(.1875, .01));
     expect(crop.height * 500, closeTo(crop.width * 800, 1));
+  });
+
+  testWidgets('the full crop border and its outside margin follow the finger', (
+    tester,
+  ) async {
+    Map<int, ImageEditDocument>? saved;
+    await open(tester, onSave: (docs) async => saved = docs);
+    await tester.tap(find.byKey(const ValueKey('image-editor-tool-crop')));
+    await tester.pumpAndSettle();
+    final stage = tester.getRect(
+      find.byKey(const ValueKey('image-editor-stage')),
+    );
+    final width = stage.width - 24, height = width * 500 / 800;
+    final frame = Rect.fromCenter(
+      center: stage.center,
+      width: width,
+      height: height,
+    );
+    await tester.dragFrom(
+      frame.topCenter - const Offset(72, 15),
+      const Offset(0, 40),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Revert').hitTestable(), findsOneWidget);
+    await tester.dragFrom(
+      frame.bottomRight + const Offset(8, 14),
+      const Offset(-45, -33),
+    );
+    await tester.pumpAndSettle();
+    // A drag starting far from the frame must not edit it when it crosses the edge.
+    await tester.dragFrom(
+      frame.topCenter - const Offset(0, 75),
+      const Offset(0, 110),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    final crop = saved![1]!.crop!;
+    expect(crop.left, 0);
+    expect(crop.top, closeTo(40 / height, .003));
+    expect(crop.right, closeTo(1 - 45 / width, .003));
+    expect(crop.bottom, closeTo(1 - 33 / height, .003));
+  });
+
+  testWidgets('Done keeps its button state and bounds when Revert appears', (
+    tester,
+  ) async {
+    final saving = Completer<void>();
+    var saves = 0;
+    await open(
+      tester,
+      onSave: (_) {
+        saves++;
+        return saving.future;
+      },
+    );
+    final done = find.ancestor(
+      of: find.text('Done'),
+      matching: find.byType(IosCardPress),
+    );
+    final state = tester.state(done);
+    final bounds = tester.getRect(done);
+    await tester.tap(find.byKey(const ValueKey('image-editor-tool-crop')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Rotate left'));
+    await tester.pump();
+    expect(tester.state(done), same(state));
+    expect(tester.getRect(done), bounds);
+    await tester.tap(find.text('Revert'));
+    await tester.pumpAndSettle();
+    expect(tester.state(done), same(state));
+    expect(tester.getRect(done), bounds);
+    await tester.tap(find.text('Done'));
+    await tester.pump();
+    expect(tester.state(done), same(state));
+    expect(tester.getRect(done), bounds);
+    expect(
+      find.descendant(
+        of: done,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+    await tester.tapAt(bounds.center);
+    await tester.pump();
+    expect(saves, 1);
+    saving.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(ImageEditorPage), findsNothing);
+  });
+
+  testWidgets('rotated crop edges keep a screen-sized hit area while zoomed', (
+    tester,
+  ) async {
+    Map<int, ImageEditDocument>? saved;
+    await open(
+      tester,
+      images: [
+        EditorImage(
+          id: 1,
+          path: path,
+          document: const ImageEditDocument(quarterTurns: 1),
+        ),
+      ],
+      onSave: (docs) async => saved = docs,
+    );
+    await tester.tap(find.byKey(const ValueKey('image-editor-tool-crop')));
+    await tester.pumpAndSettle();
+    final stage = tester.getRect(
+      find.byKey(const ValueKey('image-editor-stage')),
+    );
+    final height = (stage.width - 24) * 800 / 500;
+    final viewer = tester.widget<InteractiveViewer>(
+      find.byType(InteractiveViewer),
+    );
+    viewer.transformationController!.value = Matrix4.identity()
+      ..translateByDouble(
+        -stage.width / 2,
+        height * .8 - stage.height / 2,
+        0,
+        1,
+      )
+      ..scaleByDouble(2, 2, 1, 1);
+    await tester.pump();
+    // After the quarter turn, the visible top edge represents source left.
+    final top = stage.center - Offset(0, height * .2);
+    await tester.dragFrom(top + const Offset(48, -35), const Offset(0, 60));
+    await tester.dragFrom(top + const Offset(48, -20), const Offset(0, 40));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    final crop = saved![1]!.crop!;
+    expect(crop.left, closeTo(40 / (height * 2), .003));
+    expect(crop.right, 1);
+    expect(crop.top, 0);
+    expect(crop.bottom, 1);
   });
 
   testWidgets(
@@ -389,7 +534,7 @@ void main() {
       await tester.pump();
     }
     expect(find.text('1:1'), findsOneWidget);
-    expect(find.text('Revert'), findsNothing);
+    expect(find.text('Revert').hitTestable(), findsNothing);
   });
   testWidgets('failed input shows retry and remove with disabled tools', (
     tester,

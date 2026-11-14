@@ -33,6 +33,53 @@ enum _Tool { crop, draw, text, mosaic }
 
 enum _Pen { pen, arrow, eraser }
 
+enum _CropHandle {
+  topLeft,
+  top,
+  topRight,
+  right,
+  bottomRight,
+  bottom,
+  bottomLeft,
+  left,
+  move;
+
+  static _CropHandle? hitTest(Rect frame, Offset point, double radius) {
+    if (!frame.inflate(radius).contains(point)) return null;
+    // Keep the center available for moving even a very small crop. Outside
+    // the frame the finger always gets the entire hit target.
+    final innerX = math.min(radius, frame.width / 3);
+    final innerY = math.min(radius, frame.height / 3);
+    final nearLeft = point.dx <= frame.left + innerX;
+    final nearRight = point.dx >= frame.right - innerX;
+    final nearTop = point.dy <= frame.top + innerY;
+    final nearBottom = point.dy >= frame.bottom - innerY;
+    if (nearTop && nearLeft) return topLeft;
+    if (nearTop && nearRight) return topRight;
+    if (nearBottom && nearLeft) return bottomLeft;
+    if (nearBottom && nearRight) return bottomRight;
+    if (nearTop) return top;
+    if (nearBottom) return bottom;
+    if (nearLeft) return left;
+    if (nearRight) return right;
+    return move;
+  }
+
+  bool get movesLeft => this == left || this == topLeft || this == bottomLeft;
+  bool get movesRight =>
+      this == right || this == topRight || this == bottomRight;
+  bool get movesTop => this == top || this == topLeft || this == topRight;
+  bool get movesBottom =>
+      this == bottom || this == bottomLeft || this == bottomRight;
+}
+
+Rect _cropInSource(Rect crop, Size source) => Rect.fromLTRB(
+  crop.left * source.width,
+  crop.top * source.height,
+  crop.right * source.width,
+  crop.bottom * source.height,
+);
+
 const _accent = Color(0xff9aa8f0);
 const _colors = [
   0xffffffff,
@@ -97,8 +144,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
   Map<int, ImageEditDocument>? _textBefore, _gestureBefore, _sizeBefore;
   List<Offset> _points = [];
   Offset? _start, _hover;
-  Rect? _startCrop;
-  int _cropHandle = -1;
+  _CropHandle? _cropHandle;
   double? _aspect;
   Size _viewport = Size.zero;
   Rect _fit = Rect.zero;
@@ -305,17 +351,20 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
               context: context,
               builder: (ctx) => Dialog(
                 backgroundColor: Colors.transparent,
+                constraints: const BoxConstraints(maxWidth: 320),
                 child: _discardCard(ctx, false),
               ),
             )
           : await showModalBottomSheet<bool>(
               context: context,
               backgroundColor: Colors.transparent,
+              showDragHandle: false,
+              useSafeArea: true,
+              isScrollControlled: true,
               builder: (ctx) => SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: _discardCard(ctx, true),
-                ),
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: SingleChildScrollView(child: _discardCard(ctx, true)),
               ),
             );
       _confirming = false;
@@ -328,33 +377,83 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
   }
 
   Widget _discardCard(BuildContext ctx, bool mobile) => Container(
-    width: mobile ? double.infinity : 288,
-    padding: const EdgeInsets.all(18),
+    width: double.infinity,
+    padding: EdgeInsets.fromLTRB(16, mobile ? 9 : 22, 16, 16),
     decoration: BoxDecoration(
       color: const Color(0xff1f2027),
       borderRadius: BorderRadius.circular(mobile ? 22 : 18),
+      border: Border.all(color: Colors.white12, width: .7),
     ),
     child: Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (mobile) ...[
+          Center(
+            child: Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         Text(
           _l.imageEditorDiscardTitle,
+          textAlign: TextAlign.center,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 17,
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 20),
-        _button(
+        const SizedBox(height: 16),
+        _discardAction(
           _l.imageEditorDiscard,
           () => Navigator.pop(ctx, true),
-          color: const Color(0xffff8a80),
-          fill: const Color(0x29ff6363),
+          destructive: true,
         ),
         const SizedBox(height: 8),
-        _button(_l.imageEditorKeepEditing, () => Navigator.pop(ctx, false)),
+        _discardAction(
+          _l.imageEditorKeepEditing,
+          () => Navigator.pop(ctx, false),
+        ),
       ],
+    ),
+  );
+  Widget _discardAction(
+    String label,
+    VoidCallback onTap, {
+    bool destructive = false,
+  }) => Semantics(
+    button: true,
+    child: IosCardPress(
+      onTap: onTap,
+      focusable: true,
+      borderRadius: BorderRadius.circular(14),
+      baseColor: destructive
+          ? const Color(0x24ff6363)
+          : const Color(0x12ffffff),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Center(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: destructive ? const Color(0xffff9189) : Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
     ),
   );
   Future<void> _save() async {
@@ -393,7 +492,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted && !_allowPop) setState(() => _saving = false);
     }
   }
 
@@ -463,17 +562,18 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     _doc,
     full: _tool == _Tool.crop,
   );
-  Offset _sourcePoint(Offset local) {
+  Offset _sourcePoint(Offset local, ImageEditGeometry geometry) {
     final scene = _zoom.toScene(local);
-    final point = (scene - _fit.topLeft) / (_fit.width / _geometry.size.width);
-    final source = _geometry.toSource(point);
+    final point = (scene - _fit.topLeft) / (_fit.width / geometry.size.width);
+    final source = geometry.toSource(point);
+    if (_tool == _Tool.crop) return source;
     // Mosaic strokes and rectangles use the unflipped photo's coordinates.
     final x = _tool == _Tool.mosaic && _doc.flipX
         ? 1000 - source.dx
         : source.dx;
     return Offset(
       x.clamp(0, 1000),
-      source.dy.clamp(0, _geometry.sourceSize.height),
+      source.dy.clamp(0, geometry.sourceSize.height),
     );
   }
 
@@ -506,57 +606,29 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     if (_unavailable || _tool == null || _editingText != null || _saving) {
       return;
     }
-    if (!_fit.contains(_zoom.toScene(e.localPosition))) return;
-    _start = _sourcePoint(e.localPosition);
+    final geometry = _geometry;
+    final point = _sourcePoint(e.localPosition, geometry);
+    if (_tool == _Tool.crop) {
+      final frame = _doc.crop ?? const Rect.fromLTWH(0, 0, 1, 1);
+      final targetRadius = e.kind == ui.PointerDeviceKind.mouse ? 10.0 : 26.0;
+      final scale =
+          _zoom.value.getMaxScaleOnAxis() * _fit.width / geometry.size.width;
+      _cropHandle = _CropHandle.hitTest(
+        _cropInSource(frame, geometry.sourceSize),
+        point,
+        targetRadius / scale,
+      );
+      if (_cropHandle == null) return;
+    } else if (!_fit.contains(_zoom.toScene(e.localPosition))) {
+      return;
+    }
+    _start = point;
     _points = [_start!];
     _dragging = false;
     _gestureBefore = Map.of(_docs);
     if (_tool == _Tool.text) {
       _previousTextSelection = _selectedText;
       _selectedText = _hitText(_start!);
-    }
-    if (_tool == _Tool.crop) {
-      _startCrop = _doc.crop ?? const Rect.fromLTWH(0, 0, 1, 1);
-      final size = _geometry.sourceSize;
-      final point = Offset(_start!.dx / 1000, _start!.dy / size.height);
-      final r = _startCrop!;
-      final handles = [
-        r.topLeft,
-        r.topCenter,
-        r.topRight,
-        r.centerRight,
-        r.bottomRight,
-        r.bottomCenter,
-        r.bottomLeft,
-        r.centerLeft,
-      ];
-      var nearest = 24.0;
-      _cropHandle = -1;
-      for (var i = 0; i < handles.length; i++) {
-        final sourcePoint = Offset(
-          handles[i].dx * 1000,
-          handles[i].dy * size.height,
-        );
-        final output = MatrixUtils.transformPoint(
-          _geometry.transform,
-          sourcePoint,
-        );
-        final viewportPoint =
-            _fit.topLeft + output * (_fit.width / _geometry.size.width);
-        final screenPoint = MatrixUtils.transformPoint(
-          _zoom.value,
-          viewportPoint,
-        );
-        final distance = (screenPoint - e.localPosition).distance;
-        if (distance <= nearest) {
-          nearest = distance;
-          _cropHandle = i;
-        }
-      }
-      if (_cropHandle == -1 && !r.contains(point)) {
-        _start = null;
-        _gestureBefore = null;
-      }
     }
     setState(() {});
   }
@@ -568,7 +640,8 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         _unavailable) {
       return;
     }
-    final point = _sourcePoint(e.localPosition);
+    final geometry = _geometry;
+    final point = _sourcePoint(e.localPosition, geometry);
     if ((point - _start!).distance > 3) _dragging = true;
     final initial = _gestureBefore![_image.id]!;
     setState(() {
@@ -618,7 +691,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
             _docs[_image.id] = initial.copyWith(texts: list);
           }
         case _Tool.crop:
-          _dragCrop(point);
+          _dragCrop(point, initial, geometry.sourceSize);
         case null:
           break;
       }
@@ -690,47 +763,53 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     if (mounted) setState(() {});
   }
 
-  void _dragCrop(Offset point) {
-    final h = _geometry.sourceSize.height;
+  void _dragCrop(Offset point, ImageEditDocument initial, Size source) {
     final delta = Offset(
-      (point.dx - _start!.dx) / 1000,
-      (point.dy - _start!.dy) / h,
+      (point.dx - _start!.dx) / source.width,
+      (point.dy - _start!.dy) / source.height,
     );
-    final r = _startCrop!;
+    final r = initial.crop ?? const Rect.fromLTWH(0, 0, 1, 1);
+    final handle = _cropHandle!;
     final minWidth = math.min(.04, r.width / 2);
     final minHeight = math.min(.04, r.height / 2);
     double l = r.left, t = r.top, right = r.right, bottom = r.bottom;
-    if (_cropHandle == -1) {
+    if (handle == _CropHandle.move) {
       l = (l + delta.dx).clamp(0, 1 - r.width);
       t = (t + delta.dy).clamp(0, 1 - r.height);
       right = l + r.width;
       bottom = t + r.height;
     } else {
-      if ([0, 6, 7].contains(_cropHandle)) {
+      if (handle.movesLeft) {
         l = (l + delta.dx).clamp(0, right - minWidth);
       }
-      if ([0, 1, 2].contains(_cropHandle)) {
+      if (handle.movesTop) {
         t = (t + delta.dy).clamp(0, bottom - minHeight);
       }
-      if ([2, 3, 4].contains(_cropHandle)) {
+      if (handle.movesRight) {
         right = (right + delta.dx).clamp(l + minWidth, 1);
       }
-      if ([4, 5, 6].contains(_cropHandle)) {
+      if (handle.movesBottom) {
         bottom = (bottom + delta.dy).clamp(t + minHeight, 1);
       }
       if (_aspect != null) {
         final ratio =
-            (_doc.quarterTurns.isOdd ? 1 / _aspect! : _aspect!) * h / 1000;
-        if (_cropHandle.isOdd) {
+            (_doc.quarterTurns.isOdd ? 1 / _aspect! : _aspect!) *
+            source.height /
+            source.width;
+        final verticalEdge =
+            handle == _CropHandle.top || handle == _CropHandle.bottom;
+        if (verticalEdge ||
+            handle == _CropHandle.left ||
+            handle == _CropHandle.right) {
           // Keep the opposite edge fixed and grow both orthogonal edges
           // symmetrically around the original center.
-          if (_cropHandle == 1 || _cropHandle == 5) {
+          if (verticalEdge) {
             final maxWidth = 2 * math.min(r.center.dx, 1 - r.center.dx);
             final height = math.min(bottom - t, maxWidth / ratio);
             final width = height * ratio;
             l = r.center.dx - width / 2;
             right = r.center.dx + width / 2;
-            if (_cropHandle == 1) {
+            if (handle == _CropHandle.top) {
               t = bottom - height;
             } else {
               bottom = t + height;
@@ -741,7 +820,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
             final height = width / ratio;
             t = r.center.dy - height / 2;
             bottom = r.center.dy + height / 2;
-            if (_cropHandle == 7) {
+            if (handle == _CropHandle.left) {
               l = right - width;
             } else {
               right = l + width;
@@ -750,12 +829,12 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         } else {
           final width = math.min(right - l, (bottom - t) * ratio);
           final height = width / ratio;
-          if (_cropHandle == 0 || _cropHandle == 6) {
+          if (handle.movesLeft) {
             l = right - width;
           } else {
             right = l + width;
           }
-          if (_cropHandle == 0 || _cropHandle == 2) {
+          if (handle.movesTop) {
             t = bottom - height;
           } else {
             bottom = t + height;
@@ -1012,8 +1091,12 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (!_doc.isEmpty && !_unavailable)
-                    Flexible(
+                  Flexible(
+                    child: Visibility(
+                      visible: !_doc.isEmpty && !_unavailable,
+                      maintainState: true,
+                      maintainAnimation: true,
+                      maintainSize: true,
                       child: _button(
                         _l.imageEditorRestore,
                         _saving
@@ -1026,6 +1109,8 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
                               },
                       ),
                     ),
+                  ),
+                  const SizedBox(width: 4),
                   Flexible(
                     child: _button(
                       _l.imageEditorDone,
@@ -1156,6 +1241,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
                 onExit: (_) => setState(() => _hover = null),
                 child: Listener(
                   key: const ValueKey('image-editor-stage'),
+                  behavior: HitTestBehavior.opaque,
                   onPointerDown: _pointerDown,
                   onPointerMove: _pointerMove,
                   onPointerUp: _pointerUp,
@@ -1790,16 +1876,15 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     ),
     borderRadius: BorderRadius.circular(20),
     baseColor: fill,
-    child: busy
-        ? const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.white,
-            ),
-          )
-        : Text(
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        Visibility(
+          visible: !busy,
+          maintainState: true,
+          maintainAnimation: true,
+          maintainSize: true,
+          child: Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1809,6 +1894,19 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
               fontWeight: fill == _accent ? FontWeight.w600 : FontWeight.w500,
             ),
           ),
+        ),
+        if (busy)
+          Positioned.fill(
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              ),
+            ),
+          ),
+      ],
+    ),
   );
 }
 
@@ -1822,12 +1920,8 @@ class _CropPainter extends CustomPainter {
     c.scale(size.width / geometry.size.width);
     c.transform(geometry.transform.storage);
     final source = geometry.sourceSize;
-    final r = Rect.fromLTRB(
-      crop.left * source.width,
-      crop.top * source.height,
-      crop.right * source.width,
-      crop.bottom * source.height,
-    );
+    final r = _cropInSource(crop, source);
+    final unit = geometry.size.width / size.width;
     final shade = Path()
       ..fillType = PathFillType.evenOdd
       ..addRect(Offset.zero & source)
@@ -1836,7 +1930,7 @@ class _CropPainter extends CustomPainter {
     final line = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5 * geometry.size.width / size.width;
+      ..strokeWidth = unit;
     c.drawRect(r, line);
     for (var i = 1; i < 3; i++) {
       c.drawLine(
@@ -1850,22 +1944,45 @@ class _CropPainter extends CustomPainter {
         line,
       );
     }
-    for (final point in [
-      r.topLeft,
-      r.topCenter,
-      r.topRight,
-      r.centerRight,
-      r.bottomRight,
-      r.bottomCenter,
-      r.bottomLeft,
-      r.centerLeft,
+    final arm = math.min(15 * unit, r.shortestSide / 4);
+    final handles = Path();
+    for (final (corner, dx, dy) in [
+      (r.topLeft, 1, 1),
+      (r.topRight, -1, 1),
+      (r.bottomRight, -1, -1),
+      (r.bottomLeft, 1, -1),
     ]) {
-      c.drawCircle(
-        point,
-        4 * geometry.size.width / size.width,
-        Paint()..color = Colors.white,
-      );
+      handles
+        ..moveTo(corner.dx + arm * dx, corner.dy)
+        ..lineTo(corner.dx, corner.dy)
+        ..lineTo(corner.dx, corner.dy + arm * dy);
     }
+    final halfGrip = math.min(8 * unit, arm / 1.5);
+    for (final point in [r.topCenter, r.bottomCenter]) {
+      handles
+        ..moveTo(point.dx - halfGrip, point.dy)
+        ..lineTo(point.dx + halfGrip, point.dy);
+    }
+    for (final point in [r.centerLeft, r.centerRight]) {
+      handles
+        ..moveTo(point.dx, point.dy - halfGrip)
+        ..lineTo(point.dx, point.dy + halfGrip);
+    }
+    line
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    c.drawPath(
+      handles,
+      line
+        ..color = Colors.black45
+        ..strokeWidth = 4.8 * unit,
+    );
+    c.drawPath(
+      handles,
+      line
+        ..color = Colors.white
+        ..strokeWidth = 3.0 * unit,
+    );
     c.restore();
   }
 
