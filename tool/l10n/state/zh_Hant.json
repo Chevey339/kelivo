@@ -4985,5 +4985,11 @@
   "imageEditorRestore": "3f2ae909f41498c53e0cb7cf1cbf70bcb04cc8dd176bd0c768c9bb6897403c3a",
   "imageEditorColor": "174415ac0cb6a63b63b1d611523e24a668b35f069bf4f92302ce5278a2aaf16d",
   "imageViewerPageEditButton": "725eb271afb089ada71600cb6dc3d11e01bc1b404b6cde9c6141ec8f3738bc29",
-  "imageViewerPageFileSize": "c986b140d09468f219cde6dbc702697adc398c3da08fe39d921975ecf786460e"
+  "imageViewerPageFileSize": "c986b140d09468f219cde6dbc702697adc398c3da08fe39d921975ecf786460e",
+  "compressionCarryModeCount": "7822b6c708b99386c3622d42a41df0f42250f10c46ba7bc3b7e8b03c7ddd78a7",
+  "compressionCarryListTitle": "7852fe08ca724996936edbd65f726d2367924989c7db814fe21965c5d7b6c500",
+  "compressionCarryImageCount": "7e900b0e1e2b99029c33d2b43288d1f0cc64bb424fd40a6162412b243c6fb766",
+  "compressionCarryAttachmentCount": "41ee71b1a63e73759afbd2250a306261411ea5d12d21d980b520ec54c366c21e",
+  "compressionCarryNoText": "7fe26a388d313e1cdfbb74153416b0b02d1945e327495e2afcf46573277a83ba",
+  "compressionCarryInvalidCount": "39593264434149a48c1cc8523fc552bf77b4823948aff3fce7f369cd23f31873"
 }

@@ -30047,6 +30047,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Image size'**
   String get imageViewerPageFileSize;
+
+  /// Segment in the earlier-message settings that selects a fixed number of recent messages.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest messages'**
+  String get compressionCarryModeCount;
+
+  /// Heading above the list of messages the user can select in the compression settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Message preview'**
+  String get compressionCarryListTitle;
+
+  /// Preview title for a message containing only images. Count is the number of images.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 image} other{{count} images}}'**
+  String compressionCarryImageCount(int count);
+
+  /// Preview label for a message with multiple attachments or without known file names. Count is the number of attachments.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 attachment} other{{count} attachments}}'**
+  String compressionCarryAttachmentCount(int count);
+
+  /// Shown in the compression preview when the selected message has neither readable text nor identifiable attachments.
+  ///
+  /// In en, this message translates to:
+  /// **'No message text'**
+  String get compressionCarryNoText;
+
+  /// Validation message beside the number of earlier messages to send in compression settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number from 1 to 10,000.'**
+  String get compressionCarryInvalidCount;
 }
 
 class _AppLocalizationsDelegate

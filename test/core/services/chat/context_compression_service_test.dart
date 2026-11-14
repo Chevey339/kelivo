@@ -364,6 +364,41 @@ void main() {
     },
   );
 
+  test(
+    'preview carries user-visible image references and file names without changing request data',
+    () async {
+      const uri = 'data:image/png;base64,YWJj';
+      final msg = await chat.addMessage(
+        conversationId: id,
+        role: 'user',
+        parts: [
+          const ImagePart(uri: uri),
+          const FilePart(
+            uri: '/tmp/notes.pdf',
+            name: 'Notes.pdf',
+            mime: 'application/pdf',
+          ),
+        ],
+      );
+      final r = request(
+        (_, _) async => 'summary',
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.unlimited,
+          carry: CarrySetting(mode: CarryMode.count, count: 1),
+        ),
+      );
+      final result = await compression.previewCarried(id, r);
+      final row = result.rows.single;
+      expect(row.item.sourceMessageId, msg.id);
+      expect(row.messageText, '');
+      expect(row.imageUris, [uri]);
+      expect(row.fileNames, ['Notes.pdf']);
+      expect(row.attachmentCount, 2);
+      final stored = result.freeze(r.options.carry!).toJson().toString();
+      expect(stored, isNot(contains(uri)));
+      expect(stored, isNot(contains('Notes.pdf')));
+    },
+  );
   test('paged preview matches execution including optional replies', () async {
     compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
         (usedTokens: 100, contextWindow: 20000);

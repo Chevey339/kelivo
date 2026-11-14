@@ -22259,5 +22259,39 @@
   "imageViewerPageFileSize": "Image size",
   "@imageViewerPageFileSize": {
     "description": "Accessible label and tooltip of the draft image size chip that opens per-image compression quality controls."
+  },
+  "compressionCarryModeCount": "Latest messages",
+  "@compressionCarryModeCount": {
+    "description": "Segment in the earlier-message settings that selects a fixed number of recent messages."
+  },
+  "compressionCarryListTitle": "Message preview",
+  "@compressionCarryListTitle": {
+    "description": "Heading above the list of messages the user can select in the compression settings."
+  },
+  "compressionCarryImageCount": "{count, plural, =1{1 image} other{{count} images}}",
+  "@compressionCarryImageCount": {
+    "description": "Preview title for a message containing only images. Count is the number of images.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionCarryAttachmentCount": "{count, plural, =1{1 attachment} other{{count} attachments}}",
+  "@compressionCarryAttachmentCount": {
+    "description": "Preview label for a message with multiple attachments or without known file names. Count is the number of attachments.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compressionCarryNoText": "No message text",
+  "@compressionCarryNoText": {
+    "description": "Shown in the compression preview when the selected message has neither readable text nor identifiable attachments."
+  },
+  "compressionCarryInvalidCount": "Enter a number from 1 to 10,000.",
+  "@compressionCarryInvalidCount": {
+    "description": "Validation message beside the number of earlier messages to send in compression settings."
   }
 }

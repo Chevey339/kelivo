@@ -12,6 +12,9 @@ import 'image_context.dart';
 import 'message_part.dart';
 import 'native_compaction.dart';
 
+/// Source occurrences used for estimation and for the local preview only.
+typedef CarrySourceImage = ({String handle, String uri, bool available});
+
 class CarryRow {
   const CarryRow({
     required this.item,
@@ -21,6 +24,9 @@ class CarryRow {
     this.replyInRetained = false,
     this.hadAttachments = false,
     this.attachmentCount = 0,
+    this.imageUris = const [],
+    this.fileNames = const [],
+    this.messageText,
     this.replyDoesNotFit = false,
   });
   final CarriedOriginal item;
@@ -30,6 +36,13 @@ class CarryRow {
   final bool replyInRetained;
   final bool hadAttachments;
   final int attachmentCount;
+
+  /// A missing URI preserves the position of an unavailable image.
+  final List<String?> imageUris;
+  final List<String> fileNames;
+
+  /// User-authored text before document extraction, or the edited/truncated copy.
+  final String? messageText;
   final bool replyDoesNotFit;
 }
 
@@ -262,7 +275,7 @@ CarrySelection selectCarriedOriginals({
   Map<String, List<CarriedOriginal>>? inheritedItems,
   bool nativeWire = false,
   bool automaticWire = false,
-  Map<String, List<String>> images = const {},
+  Map<String, List<CarrySourceImage>> images = const {},
 }) {
   if (setting.mode == CarryMode.off || setting.mode == CarryMode.unset) {
     return const CarrySelection();
@@ -319,14 +332,14 @@ CarrySelection selectCarriedOriginals({
     if (item.fromOperationId == null &&
         images[item.sourceMessageId]?.isNotEmpty == true) {
       item = item.copyWith(
-        imageHandles: images[item.sourceMessageId],
+        imageHandles: images[item.sourceMessageId]!
+            .map((image) => image.handle)
+            .toList(),
         hasAttachments: true,
       );
     }
-    final hadAttachments = item.hasAttachments;
-    final attachmentCount = item.attachmentCount > 0
-        ? item.attachmentCount
-        : item.imageHandles.length;
+    final sourcePosition = positions[item.sourceMessageId];
+    final source = sourcePosition == null ? null : messages[sourcePosition];
     if (!includeAttachments && item.fromOperationId != null) {
       item = item
           .copyWith(
@@ -356,6 +369,49 @@ CarrySelection selectCarriedOriginals({
         wire: automaticWire ? wire : explicitCarriedWire(wire, text),
       );
     }
+    // Describe the same frozen copy that will be sent. Revisiting the source
+    // must not resurrect formerly excluded files or images whose source is gone.
+    final sourceImages =
+        images[item.sourceMessageId] ?? const <CarrySourceImage>[];
+    final handles = item.imageHandles.toSet();
+    final showSource =
+        includeAttachments &&
+        source != null &&
+        (item.fromOperationId == null ||
+            item.hasAttachments ||
+            handles.isNotEmpty);
+    final imageUris = <String?>[
+      if (showSource)
+        for (final image in sourceImages)
+          if (handles.contains(image.handle))
+            image.available ? image.uri : null,
+    ];
+    final wireContent = item.wire?['content'];
+    if (includeAttachments &&
+        nativeWire &&
+        source == null &&
+        item.sourceMessageId.startsWith('legacy-native:') &&
+        wireContent is List) {
+      for (final part in wireContent.whereType<Map>()) {
+        if (part['type'] == 'input_image') {
+          final uri = part['image_url'];
+          imageUris.add(uri is String && uri.isNotEmpty ? uri : null);
+        }
+      }
+    }
+    final fileNames = <String>[
+      if (showSource)
+        for (final file in source.parts.whereType<FilePart>())
+          if (!sourceImages.any((im) => im.uri == file.uri)) file.name,
+    ];
+    final attachmentCount = showSource
+        ? [
+            item.attachmentCount,
+            handles.length,
+            imageUris.length + fileNames.length,
+          ].reduce((a, b) => a > b ? a : b)
+        : imageUris.length;
+    final hadAttachments = attachmentCount > 0;
     if ((newConversation && !automaticWire) ||
         (!positions.containsKey(item.sourceMessageId) &&
             !item.sourceMessageId.startsWith('legacy-native:'))) {
@@ -399,6 +455,28 @@ CarrySelection selectCarriedOriginals({
         available != null) {
       item = item.copyWith(reply: available);
     }
+    CarryRow row(int tokens, {bool replyDoesNotFit = false}) => CarryRow(
+      item: item,
+      selected: selected,
+      tokens: tokens,
+      availableReply: available,
+      replyInRetained: inRetained,
+      hadAttachments: hadAttachments,
+      replyDoesNotFit: replyDoesNotFit,
+      imageUris: imageUris,
+      fileNames: fileNames,
+      attachmentCount: attachmentCount,
+      messageText:
+          !automaticWire &&
+              !item.isEdited &&
+              !item.truncated &&
+              attachmentCount > 0
+          ? item.textWithoutAttachments ??
+                (item.fromOperationId == null
+                    ? plainTexts[item.sourceMessageId]
+                    : null)
+          : null,
+    );
     var tokens = count(item);
     if (selected &&
         setting.mode == CarryMode.all &&
@@ -419,17 +497,7 @@ CarrySelection selectCarriedOriginals({
         if (total + tokens <= budget) {
           items.add(item.copyWith(estimatedTokens: tokens));
           total += tokens;
-          rows.add(
-            CarryRow(
-              item: item,
-              selected: true,
-              tokens: tokens,
-              availableReply: available,
-              replyInRetained: inRetained,
-              hadAttachments: hadAttachments,
-              attachmentCount: attachmentCount,
-            ),
-          );
+          rows.add(row(tokens));
         } else {
           notFit++;
         }
@@ -437,15 +505,7 @@ CarrySelection selectCarriedOriginals({
         notFit++;
         if (item.reply != null) {
           rows.add(
-            CarryRow(
-              item: item,
-              selected: true,
-              tokens: count(item.copyWith(removeReply: true)),
-              availableReply: available,
-              replyDoesNotFit: true,
-              hadAttachments: hadAttachments,
-              attachmentCount: attachmentCount,
-            ),
+            row(count(item.copyWith(removeReply: true)), replyDoesNotFit: true),
           );
         }
       }
@@ -462,16 +522,8 @@ CarrySelection selectCarriedOriginals({
     }
     if (fitting) fitCount = i + 1;
     rows.add(
-      CarryRow(
-        item: item,
-        selected: selected,
-        tokens: item.reply == null
-            ? tokens
-            : count(item.copyWith(removeReply: true)),
-        availableReply: available,
-        replyInRetained: inRetained,
-        hadAttachments: hadAttachments,
-        attachmentCount: attachmentCount,
+      row(
+        item.reply == null ? tokens : count(item.copyWith(removeReply: true)),
       ),
     );
   }
@@ -536,7 +588,7 @@ class CarriedSelectionJob {
   final Map<String, List<CarriedOriginal>>? inheritedItems;
   final bool automaticWire;
   final Map<String, String> plainTexts;
-  final Map<String, List<String>> images;
+  final Map<String, List<CarrySourceImage>> images;
   final bool automatic;
   CarrySelection call() => selectCarriedOriginals(
     messages: messages,

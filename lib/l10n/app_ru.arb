@@ -4985,5 +4985,11 @@
   "imageEditorRestore": "Восстановить",
   "imageEditorColor": "Цвет {color}",
   "imageViewerPageEditButton": "Редактировать",
-  "imageViewerPageFileSize": "Размер изображения"
+  "imageViewerPageFileSize": "Размер изображения",
+  "compressionCarryModeCount": "Последние сообщения",
+  "compressionCarryListTitle": "Предпросмотр сообщений",
+  "compressionCarryImageCount": "{count, plural, one{{count} изображение} few{{count} изображения} many{{count} изображений} other{{count} изображения}}",
+  "compressionCarryAttachmentCount": "{count, plural, one{{count} вложение} few{{count} вложения} many{{count} вложений} other{{count} вложения}}",
+  "compressionCarryNoText": "Нет текста сообщения",
+  "compressionCarryInvalidCount": "Введите число от 1 до 10 000."
 }

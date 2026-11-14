@@ -34,6 +34,7 @@ import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/segmented_tabs.dart';
 import '../../home/widgets/model_icon.dart';
+import '../../home/utils/model_display_helper.dart' show resolveChatModel;
 
 Future<CompressContextOptions?> showCompressContextOptions({
   required BuildContext context,
@@ -81,7 +82,11 @@ class CompressContextOptionsDialog extends StatefulWidget {
 class _CompressContextOptionsDialogState
     extends State<CompressContextOptionsDialog> {
   Object? _carryError;
-  CarrySelection _carryPreview = const CarrySelection();
+  CarrySelection? _carryPreview;
+  ({String key, String scope, CarrySelection value})? _lastCarryPreview;
+  bool _carryEditingSelection = false;
+  int _carryGeneration = 0;
+  (String?, String?)? _carryModel;
   bool _carryLoading = false;
   bool _carryCountValid = true;
   String? _carryKey;
@@ -206,7 +211,10 @@ class _CompressContextOptionsDialogState
 
   void _historyChanged() {
     setState(() {
+      _carryGeneration++;
       _carryKey = null;
+      _carryPreview = null;
+      _lastCarryPreview = null;
       _history = null;
       _loadedHistory = null;
       _rangeKey = null;
@@ -234,6 +242,8 @@ class _CompressContextOptionsDialogState
     _planKey = null;
     _cancelPlanDelay();
     _rangeKey = key;
+    _carryKey = null;
+    _carryGeneration++;
     _selection = null;
     _rangeError = null;
     final generation = ++_rangeGeneration;
@@ -287,6 +297,9 @@ class _CompressContextOptionsDialogState
   void _setNative(bool value) => setState(() {
     if (value == _native) return;
     _carryCountValid = true;
+    _carryPreview = null;
+    _carryKey = null;
+    _carryGeneration++;
     if (value) {
       _textMode = _mode;
       _textKeep = _keep.text;
@@ -451,7 +464,14 @@ class _CompressContextOptionsDialogState
         regenerate || (!_native && _source != ContextHistorySource.effective),
     previewOnly: trial,
   );
-  void _ensureCarryPreview(bool codex) {
+  void _ensureCarryPreview(bool codex, String? provider, String? model) {
+    if (_carryModel != (provider, model)) {
+      _carryModel = (provider, model);
+      _carryPreview = null;
+      _lastCarryPreview = null;
+      _carryKey = null;
+      _carryGeneration++;
+    }
     final setting = _native
         ? _config.nativeCarryOriginals
         : _config.carryOriginals;
@@ -460,7 +480,8 @@ class _CompressContextOptionsDialogState
         setting.mode == CarryMode.all ||
         (_native && codex && setting.mode == CarryMode.unset);
     if (!enabled || (_native && !codex)) {
-      _carryPreview = const CarrySelection();
+      if (_carryKey != null) _carryGeneration++;
+      _carryPreview = null;
       _carryLoading = false;
       _carryKey = null;
       _carryError = null;
@@ -475,27 +496,44 @@ class _CompressContextOptionsDialogState
           int.tryParse(_length.text)?.clamp(128, 65536) ??
           _config.summaryTokens,
     });
-    final key = jsonEncode([
-      options.toJson(),
+    final rangeOptions = options.toJson()
+      ..remove('carryExcluded')
+      ..remove('carryReplies');
+    final scope = jsonEncode([
+      rangeOptions,
       config.toJson(),
       _rangeGeneration,
+      provider,
+      model,
+    ]);
+    final key = jsonEncode([
+      scope,
+      options.carryExcluded,
+      options.carryReplies,
     ]);
     if (_carryKey == key) return;
     _carryKey = key;
+    _carryEditingSelection = _lastCarryPreview?.scope == scope;
     _carryError = null;
-    _carryPreview = const CarrySelection();
+    final generation = ++_carryGeneration;
+    if (_lastCarryPreview case final cached? when cached.key == key) {
+      _carryPreview = cached.value;
+      _carryLoading = false;
+      return;
+    }
     _carryLoading = true;
     Future(() => callback(options, config)).then(
       (preview) {
-        if (mounted && _carryKey == key) {
+        if (mounted && _carryGeneration == generation) {
           setState(() {
             _carryPreview = preview;
+            _lastCarryPreview = (key: key, scope: scope, value: preview);
             _carryLoading = false;
           });
         }
       },
       onError: (Object error) {
-        if (mounted && _carryKey == key) {
+        if (mounted && _carryGeneration == generation) {
           setState(() {
             _carryLoading = false;
             _carryError = error;
@@ -507,16 +545,9 @@ class _CompressContextOptionsDialogState
 
   Widget _carrySection(bool codex) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
-    child: SectionCard(
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_carryError != null) ...[
-          CompressionErrorNotice(error: _carryError.toString()),
-          IosTextButton(
-            label: AppLocalizations.of(context)!.retry,
-            onPressed: () => setState(() => _carryKey = null),
-          ),
-        ],
         CarriedOptionsSection(
           key: ValueKey(_native),
           setting: _native
@@ -526,6 +557,8 @@ class _CompressContextOptionsDialogState
           serverKeeps: _native && !codex,
           preview: _carryPreview,
           loading: _carryLoading,
+          editingSelection: _carryEditingSelection,
+          excluded: _carryExcluded,
           hasSummaries: _selection?.dependencies.isNotEmpty ?? false,
           earlier: _carryEarlier,
           newConversation: _newConversation,
@@ -565,6 +598,13 @@ class _CompressContextOptionsDialogState
             });
           },
         ),
+        if (_carryError != null) ...[
+          CompressionErrorNotice(error: _carryError.toString()),
+          IosTextButton(
+            label: AppLocalizations.of(context)!.retry,
+            onPressed: () => setState(() => _carryKey = null),
+          ),
+        ],
       ],
     ),
   );
@@ -662,7 +702,7 @@ class _CompressContextOptionsDialogState
         _carryLoading ||
         _carryError != null ||
         !_carryCountValid ||
-        _carryPreview.overBudget) {
+        (_carryPreview?.overBudget ?? false)) {
       return;
     }
     setState(() => _saving = true);
@@ -1091,22 +1131,24 @@ class _CompressContextOptionsDialogState
     final chat = context.read<ChatService?>();
     final conversation = chat?.getConversation(widget.conversationId ?? '');
     final assistant = context
-        .read<AssistantProvider?>()
+        .watch<AssistantProvider?>()
         ?.resolveConversationAssistant(conversation?.assistantId);
+    final chatModel = resolveChatModel(
+      settings,
+      conversation: conversation,
+      assistant: assistant,
+    );
     final resolved = resolveCompressContextModel(
       compressProvider: _native ? null : _config.providerId,
       compressModelId: _native ? null : _config.modelId,
-      assistantProvider:
-          conversation?.chatModelProvider ?? assistant?.chatModelProvider,
-      assistantModelId: conversation?.chatModelId ?? assistant?.chatModelId,
-      currentProvider: settings.currentModelProvider,
-      currentModelId: settings.currentModelId,
+      currentProvider: chatModel.providerKey,
+      currentModelId: chatModel.modelId,
     );
     final provider = resolved.providerKey == null
         ? null
         : settings.getProviderConfig(resolved.providerKey!);
     final codex = provider?.oauthProvider == OAuthProvider.chatgpt;
-    _ensureCarryPreview(codex);
+    _ensureCarryPreview(codex, chatModel.providerKey, chatModel.modelId);
     final selectedTemplate = _templates
         .where((t) => t.id == _config.templateId)
         .firstOrNull;
@@ -1138,7 +1180,13 @@ class _CompressContextOptionsDialogState
         ],
         CompressionPanelHeader(
           title: _advanced ? l10n.compressionMore : l10n.compressContext,
-          onBack: _advanced ? () => setState(() => _advanced = false) : null,
+          onBack: _advanced
+              ? () => setState(() {
+                  _advanced = false;
+                  // Leaving the number field discards an unfinished, unsaved value.
+                  _carryCountValid = true;
+                })
+              : null,
           onClose: () => Navigator.pop(context),
         ),
         Flexible(
@@ -1280,7 +1328,6 @@ class _CompressContextOptionsDialogState
                     CompressionRecoveryTarget.range,
                     _rangeSettings(selection),
                   ),
-                  _carrySection(codex),
                   if (_native && _newConversation)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -1309,6 +1356,16 @@ class _CompressContextOptionsDialogState
                       ),
                       CompressionSettingRow(
                         label: l10n.compressionMore,
+                        subtitle: _carryError != null
+                            ? l10n.contextOperationsLoadFailed
+                            : _carryPreview?.overBudget == true
+                            ? l10n.compressionCarryOverBudget
+                            : _carryPreview != null && !_carryLoading
+                            ? l10n.compressionCarryPreview(
+                                _carryPreview!.items.length,
+                                contextTokenValue(_carryPreview!.totalTokens),
+                              )
+                            : null,
                         leading: Icon(
                           LucideIcons.slidersHorizontal,
                           size: 18,
@@ -1380,6 +1437,7 @@ class _CompressContextOptionsDialogState
                     ),
                   ),
                 ] else ...[
+                  _carrySection(codex),
                   if (!_native)
                     _section(l10n.compressionOutputSettings, [
                       _number(l10n.compressionLength, _length),
@@ -1702,11 +1760,10 @@ class _CompressContextOptionsDialogState
             busy: _saving,
             onConfirm:
                 _saving ||
-                    (!_advanced &&
-                        (_carryLoading ||
-                            _carryError != null ||
-                            !_carryCountValid ||
-                            _carryPreview.overBudget))
+                    !_carryCountValid ||
+                    _carryLoading ||
+                    _carryError != null ||
+                    (_carryPreview?.overBudget ?? false)
                 ? null
                 : _advanced
                 ? () async {

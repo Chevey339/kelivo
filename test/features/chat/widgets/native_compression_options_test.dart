@@ -1,6 +1,9 @@
 import '../../../support/compression_options_pump.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
+import 'package:Kelivo/core/models/carried_original.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -63,6 +66,19 @@ void main() {
       late ChatService chat;
       late String conversationId;
       var previewAttempts = 0;
+      final pendingCount = Completer<CarrySelection>();
+      const candidate = CarriedOriginal(
+        sourceMessageId: 'earlier',
+        sourceGroupId: 'earlier',
+        sourceVersion: 0,
+        contentHash: '',
+        text: 'Keep exactly this phrase.',
+      );
+      const preview = CarrySelection(
+        items: [candidate],
+        rows: [CarryRow(item: candidate, selected: true, tokens: 18)],
+        totalTokens: 18,
+      );
       await tester.runAsync(() async {
         final harness = await createBusinessTestHarness();
         settings = SettingsProvider(harness.preferences);
@@ -81,7 +97,11 @@ void main() {
             enabled: true,
             baseUrl: 'https://self-hosted.example/api',
             apiKey: 'test',
-            models: const ['unknown-model'],
+            models: const [
+              'unknown-model',
+              'other-chat-model',
+              'summary-model',
+            ],
             useResponseApi: false,
           ),
         );
@@ -91,6 +111,8 @@ void main() {
             mode: AutoCompressionMode.auto,
             keepRecentUserTurns: 2,
             templateId: 'code',
+            providerId: 'private',
+            modelId: 'summary-model',
             summaryTokens: 8192,
             requestTimeoutMinutes: 7,
           ),
@@ -126,11 +148,14 @@ void main() {
                       builder: (sheet) => CompressContextOptionsDialog(
                         sheet: sheet,
                         conversationId: conversationId,
-                        previewCarried: (_, _) async {
+                        previewCarried: (options, _) async {
                           if (++previewAttempts == 1) {
                             throw StateError('preview unavailable');
                           }
-                          return const CarrySelection();
+                          if (options.carryExcluded.isNotEmpty) {
+                            return pendingCount.future;
+                          }
+                          return preview;
                         },
                         loadHistory: () async =>
                             CompressionHistory.fromMessages([
@@ -184,6 +209,10 @@ void main() {
       final carryToggle = find.byWidgetPredicate(
         (w) => w is IosSwitch && w.semanticLabel == l10n.compressionCarryTitle,
       );
+      expect(carryToggle, findsNothing);
+      await tester.ensureVisible(find.text(l10n.compressionMore));
+      await tester.tap(find.text(l10n.compressionMore));
+      await settleCompressionOptions(tester);
       await tester.ensureVisible(carryToggle);
       await tester.tap(carryToggle);
       await settleCompressionOptions(tester);
@@ -203,8 +232,52 @@ void main() {
             .onConfirm,
         isNotNull,
       );
+      Finder candidateCheck() => find.byWidgetPredicate(
+        (w) => w is IosCheckbox && w.semanticLabel == candidate.text,
+      );
+      await tester.ensureVisible(candidateCheck());
+      await tester.tap(candidateCheck());
+      await settleCompressionOptions(tester);
+      expect(find.text(candidate.text), findsOneWidget);
+      expect(tester.widget<IosCheckbox>(candidateCheck()).value, false);
+      expect(find.text(l10n.compressionCarryPreview(0, '0')), findsOneWidget);
+      expect(
+        tester
+            .widget<FormSheetActions>(find.byType(FormSheetActions))
+            .onConfirm,
+        isNull,
+      );
+      // Returning to the previous selection while its replacement is pending
+      // must keep both the current check mark and the last completed preview.
+      await tester.ensureVisible(candidateCheck());
+      await settleCompressionOptions(tester);
+      await tester.tap(candidateCheck());
+      await settleCompressionOptions(tester);
+      pendingCount.complete(const CarrySelection());
+      await settleCompressionOptions(tester);
+      expect(find.text(candidate.text), findsOneWidget);
+      expect(tester.widget<IosCheckbox>(candidateCheck()).value, true);
+      expect(find.text(l10n.compressionCarryPreview(1, '18')), findsOneWidget);
+      final previousAttempts = previewAttempts;
+      await tester.runAsync(
+        () => settings.setCurrentModel('private', 'other-chat-model'),
+      );
+      await settleCompressionOptions(tester);
+      expect(previewAttempts, greaterThan(previousAttempts));
+      await tester.runAsync(
+        () => settings.setCurrentModel('private', 'unknown-model'),
+      );
+      await settleCompressionOptions(tester);
       await tester.ensureVisible(carryToggle);
       await tester.tap(carryToggle);
+      await settleCompressionOptions(tester);
+      await tester.tap(
+        find.byTooltip(
+          MaterialLocalizations.of(
+            tester.element(find.byType(CompressContextOptionsDialog)),
+          ).backButtonTooltip,
+        ),
+      );
       await settleCompressionOptions(tester);
       await flip();
       expect(find.text(l10n.compressionManage), findsNothing);

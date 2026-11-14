@@ -17379,4 +17379,42 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get imageViewerPageFileSize => 'Размер изображения';
+
+  @override
+  String get compressionCarryModeCount => 'Последние сообщения';
+
+  @override
+  String get compressionCarryListTitle => 'Предпросмотр сообщений';
+
+  @override
+  String compressionCarryImageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count изображения',
+      many: '$count изображений',
+      few: '$count изображения',
+      one: '$count изображение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String compressionCarryAttachmentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вложения',
+      many: '$count вложений',
+      few: '$count вложения',
+      one: '$count вложение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compressionCarryNoText => 'Нет текста сообщения';
+
+  @override
+  String get compressionCarryInvalidCount => 'Введите число от 1 до 10 000.';
 }

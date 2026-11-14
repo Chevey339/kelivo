@@ -17097,4 +17097,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imageViewerPageFileSize => 'Image size';
+
+  @override
+  String get compressionCarryModeCount => 'Latest messages';
+
+  @override
+  String get compressionCarryListTitle => 'Message preview';
+
+  @override
+  String compressionCarryImageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count images',
+      one: '1 image',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String compressionCarryAttachmentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count attachments',
+      one: '1 attachment',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compressionCarryNoText => 'No message text';
+
+  @override
+  String get compressionCarryInvalidCount => 'Enter a number from 1 to 10,000.';
 }

@@ -16207,6 +16207,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get imageViewerPageFileSize => '图片大小';
+
+  @override
+  String get compressionCarryModeCount => '最近几条';
+
+  @override
+  String get compressionCarryListTitle => '消息预览';
+
+  @override
+  String compressionCarryImageCount(int count) {
+    return '$count 张图片';
+  }
+
+  @override
+  String compressionCarryAttachmentCount(int count) {
+    return '$count 个附件';
+  }
+
+  @override
+  String get compressionCarryNoText => '没有正文';
+
+  @override
+  String get compressionCarryInvalidCount => '请输入 1 到 10000 之间的条数。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -32412,6 +32434,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get imageViewerPageFileSize => '图片大小';
+
+  @override
+  String get compressionCarryModeCount => '最近几条';
+
+  @override
+  String get compressionCarryListTitle => '消息预览';
+
+  @override
+  String compressionCarryImageCount(int count) {
+    return '$count 张图片';
+  }
+
+  @override
+  String compressionCarryAttachmentCount(int count) {
+    return '$count 个附件';
+  }
+
+  @override
+  String get compressionCarryNoText => '没有正文';
+
+  @override
+  String get compressionCarryInvalidCount => '请输入 1 到 10000 之间的条数。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -48624,4 +48668,36 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get imageViewerPageFileSize => '圖片大小';
+
+  @override
+  String get compressionCarryModeCount => '最近幾則';
+
+  @override
+  String get compressionCarryListTitle => '訊息預覽';
+
+  @override
+  String compressionCarryImageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 張圖片',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String compressionCarryAttachmentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 個附件',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compressionCarryNoText => '沒有正文';
+
+  @override
+  String get compressionCarryInvalidCount => '請輸入 1 到 10000 之間的則數。';
 }

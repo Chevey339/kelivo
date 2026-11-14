@@ -513,6 +513,7 @@ void main() {
         await screenshot('settings');
         expect(field(l10n.compressionTrigger), findsNothing);
         expect(field(l10n.compressionTarget), findsNothing);
+        await tester.ensureVisible(find.text(l10n.compressionAutoNotify));
         await tester.tap(find.text(l10n.compressionAutoNotify));
         await settleCompressionOptions(tester);
         expect(field(l10n.compressionTrigger), findsOneWidget);

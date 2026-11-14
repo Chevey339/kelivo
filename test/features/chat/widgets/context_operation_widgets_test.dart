@@ -839,15 +839,12 @@ void main() {
       await settleCompressionOptions(tester);
       final start = find.byType(FormSheetActions);
       expect(tester.widget<FormSheetActions>(start).onConfirm, isNull);
-      expect(find.byType(IosSwitch), findsNWidgets(3));
-      expect(
-        find.text(AppLocalizationsEn().compressionCarryTitle),
-        findsOneWidget,
+      final carryToggle = find.byWidgetPredicate(
+        (w) =>
+            w is IosSwitch &&
+            w.semanticLabel == AppLocalizationsEn().compressionCarryTitle,
       );
-      expect(
-        tester.widget<IosSwitch>(find.byType(IosSwitch).first).value,
-        isFalse,
-      );
+      expect(carryToggle, findsNothing);
       final field = find.descendant(
         of: find.widgetWithText(IosFormTextField, 'Keep recent'),
         matching: find.byType(TextField),
@@ -857,6 +854,7 @@ void main() {
       await tester.ensureVisible(find.text('More settings'));
       await tester.tap(find.text('More settings'));
       await settleCompressionOptions(tester);
+      expect(tester.widget<IosSwitch>(carryToggle).value, isFalse);
       expect(tester.widget<SegmentedTabs>(find.byType(SegmentedTabs)).index, 0);
       expect(field, findsNothing);
       await tester.tap(find.byIcon(LucideIcons.chevronLeft));

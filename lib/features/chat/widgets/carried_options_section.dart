@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/models/carried_original.dart';
 import '../../../core/models/carried_selection.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_text_button.dart';
-import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/segmented_tabs.dart';
+import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
+import 'carried_preview_row.dart';
 import 'compression_controls.dart';
 import 'context_dialog.dart';
 
@@ -28,10 +31,12 @@ class CarriedOptionsSection extends StatefulWidget {
     this.automatic = false,
     this.newConversation = false,
     this.loading = false,
+    this.editingSelection = false,
+    this.excluded,
     this.replies = const {},
   });
   final CarrySetting setting;
-  final CarrySelection preview;
+  final CarrySelection? preview;
   final ValueChanged<CarrySetting> onSetting;
   final void Function(String, bool) onExcluded, onReply;
   final ValueChanged<bool> onEarlier;
@@ -43,31 +48,32 @@ class CarriedOptionsSection extends StatefulWidget {
       automatic,
       newConversation,
       loading;
+  final bool editingSelection;
+  final Set<String>? excluded;
   final Set<String> replies;
   @override
   State<CarriedOptionsSection> createState() => _CarriedOptionsSectionState();
 }
 
 class _CarriedOptionsSectionState extends State<CarriedOptionsSection> {
-  String _displayCount(CarriedOptionsSection section) =>
-      (section.codex && section.setting.mode == CarryMode.unset
-              ? section.preview.items.length
-              : section.setting.count)
-          .toString();
-  late final _count = TextEditingController(text: _displayCount(widget));
-  final _expanded = <String>{};
+  late final _count = TextEditingController(
+    text: widget.setting.count.toString(),
+  );
+  bool _invalidCount = false;
   int _shown = 50;
-  bool get _auto => widget.codex && widget.setting.mode == CarryMode.unset;
-  bool get _all => _auto || widget.setting.mode == CarryMode.all;
+  bool get _all =>
+      widget.setting.mode == CarryMode.all ||
+      (widget.codex && widget.setting.mode == CarryMode.unset);
   bool get _on => _all || widget.setting.mode == CarryMode.count;
+
   @override
   void didUpdateWidget(covariant CarriedOptionsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final text = _displayCount(widget);
-    if ((_displayCount(oldWidget) != text ||
-            oldWidget.setting.mode != widget.setting.mode) &&
-        _count.text != text) {
-      _count.text = text;
+    if (oldWidget.setting.count != widget.setting.count ||
+        oldWidget.setting.mode != widget.setting.mode) {
+      final text = widget.setting.count.toString();
+      if (_count.text != text) _count.text = text;
+      _invalidCount = false;
     }
   }
 
@@ -78,217 +84,232 @@ class _CarriedOptionsSectionState extends State<CarriedOptionsSection> {
   }
 
   void _set(CarryMode mode, [int? count]) {
+    if (mode != CarryMode.count) FocusManager.instance.primaryFocus?.unfocus();
+    if (_invalidCount) setState(() => _invalidCount = false);
     widget.onValidity?.call(true);
     widget.onSetting(
       CarrySetting(mode: mode, count: count ?? widget.setting.count),
     );
   }
 
+  String _total(AppLocalizations l, CarrySelection preview) {
+    if (!widget.loading) {
+      return l.compressionCarryPreview(
+        preview.items.length,
+        contextTokenValue(preview.totalTokens),
+      );
+    }
+    // Count mode has a fixed shortlist. Checkbox and reply changes can be
+    // counted immediately without waiting for another snapshot of the chat.
+    if (!widget.editingSelection || _all) return l.contextUsageStateComputing;
+    var count = 0;
+    var tokens = 0;
+    for (final row in preview.rows) {
+      final id = row.item.sourceMessageId;
+      if (widget.excluded?.contains(id) ?? !row.selected) continue;
+      count++;
+      tokens += row.tokens;
+      if (widget.replies.contains(id) && !row.replyInRetained) {
+        tokens += row.availableReply?.estimatedTokens ?? 0;
+      }
+    }
+    return l.compressionCarryPreview(count, contextTokenValue(tokens));
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    Widget hint(String text, {bool warning = false}) => Padding(
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+    final preview = widget.preview;
+    final rows = preview?.rows ?? const <CarryRow>[];
+    final secondary = TextStyle(
+      fontSize: 12,
+      height: 1.45,
+      color: cs.onSurfaceVariant,
+    );
+    Widget note(String text, {bool warning = false}) => Padding(
+      padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: 12,
-          height: 1.4,
-          color: warning ? context.appColors.warning : cs.onSurfaceVariant,
-        ),
+        style: warning
+            ? secondary.copyWith(color: context.appColors.warning)
+            : secondary,
       ),
     );
-    Widget check(
-      String label,
-      bool value,
-      ValueChanged<bool> change, {
-      String? subtitle,
-    }) => CompressionSettingRow(
-      label: label,
-      subtitle: subtitle,
-      onTap: () => change(!value),
-      trailing: IosCheckbox(
-        value: value,
-        onChanged: change,
-        semanticLabel: label,
-      ),
-    );
-    if (widget.serverKeeps) return hint(l.compressionCarryServerKeeps);
+    if (widget.serverKeeps) {
+      return SectionCard(
+        padding: const EdgeInsets.all(14),
+        child: Text(l.compressionCarryServerKeeps, style: secondary),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CompressionSettingRow(
-          label: l.compressionCarryTitle,
-          subtitle: !_on ? l.compressionCarryHint : null,
-          onTap: () => _set(_on ? CarryMode.off : CarryMode.count),
-          trailing: IosSwitch(
-            value: _on,
-            semanticLabel: l.compressionCarryTitle,
-            onChanged: (v) => _set(v ? CarryMode.count : CarryMode.off),
-          ),
-        ),
-        if (_on) ...[
-          CompressionNumberRow(
-            label: l.compressionCarryCountLabel,
-            controller: _count,
-            unit: l.compressionCarryUnit,
-            enabled: !_all,
-            onChanged: (v) {
-              final n = int.tryParse(v);
-              if (n == null || n < 1 || n > 10000) {
-                widget.onValidity?.call(false);
-              } else {
-                _set(CarryMode.count, n);
-              }
-            },
-          ),
-          check(
-            l.compressionCarryAll,
-            _all,
-            (v) => _set(v ? CarryMode.all : CarryMode.count),
-          ),
-          if (_all) hint(l.compressionCarryAllHint),
-          if (widget.hasSummaries)
-            check(
-              l.compressionCarryEarlier,
-              widget.earlier,
-              widget.onEarlier,
-              subtitle: l.compressionCarryEarlierHint,
-            ),
-          hint(
-            l.compressionCarryPreview(
-              widget.preview.items.length,
-              contextTokenValue(widget.preview.totalTokens),
-            ),
-          ),
-          if (widget.loading)
-            const Padding(padding: EdgeInsets.all(12), child: Text('…')),
-          if (!widget.loading &&
-              widget.preview.rows.isEmpty &&
-              widget.preview.notFit == 0)
-            hint(l.compressionCarryNone),
-          for (final row in widget.preview.rows.take(_shown)) ...[
-            Opacity(
-              opacity: row.selected ? 1 : .45,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IosCheckbox(
-                      value: row.selected,
-                      semanticLabel: row.item.effectiveText,
-                      onChanged: (v) =>
-                          widget.onExcluded(row.item.sourceMessageId, !v),
-                    ),
-                    Expanded(
-                      child: IosCardPress(
-                        baseColor: Colors.transparent,
-                        borderRadius: BorderRadius.circular(6),
-                        padding: const EdgeInsets.all(4),
-                        onTap: () => setState(() {
-                          if (!_expanded.add(row.item.sourceMessageId)) {
-                            _expanded.remove(row.item.sourceMessageId);
-                          }
-                        }),
-                        child: Text(
-                          _excerpt(
-                            row.item.effectiveText,
-                            _expanded.contains(row.item.sourceMessageId)
-                                ? 600
-                                : 60,
-                          ),
-                          maxLines: _expanded.contains(row.item.sourceMessageId)
-                              ? 6
-                              : 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    if (row.hadAttachments || row.item.hasAttachments) ...[
-                      const Icon(LucideIcons.paperclip, size: 13),
-                      Text(
-                        '${row.attachmentCount.clamp(1, 10000)}',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ],
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        l.compressApproxTokens(contextTokenValue(row.tokens)),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+        SectionCard(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CompressionSettingRow(
+              label: l.compressionCarryTitle,
+              subtitle: l.compressionCarryHint,
+              onTap: () => _set(_on ? CarryMode.off : CarryMode.count),
+              trailing: IosSwitch(
+                value: _on,
+                semanticLabel: l.compressionCarryTitle,
+                onChanged: (v) => _set(v ? CarryMode.count : CarryMode.off),
               ),
             ),
-            if (row.replyDoesNotFit) hint(l.compressionCarryNotFit(1)),
-            if (row.item.truncated) hint(l.compressionCarryTruncated),
-            if (widget.newConversation &&
-                (row.hadAttachments || row.item.hasAttachments))
-              hint(l.compressionCarryNewChatText),
-            if (row.selected && row.availableReply != null)
+            if (_on) ...[
               Padding(
-                padding: const EdgeInsets.only(left: 24),
-                child: CompressionSettingRow(
-                  label: l.compressionCarryReply,
-                  subtitle: row.replyInRetained
-                      ? l.compressionCarryReplyInKept
-                      : widget.replies.contains(row.item.sourceMessageId)
-                      ? l.compressionCarryReplyTokens(
-                          contextTokenValue(
-                            row.availableReply!.estimatedTokens,
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                child: SegmentedTabs(
+                  radioGroup: true,
+                  height: 42,
+                  backgroundColor: context.appColors.surfaceFill,
+                  tabs: [
+                    SegmentedTab(label: l.compressionCarryModeCount),
+                    SegmentedTab(label: l.compressionCarryAll),
+                  ],
+                  index: _all ? 1 : 0,
+                  onChanged: (index) =>
+                      _set(index == 1 ? CarryMode.all : CarryMode.count),
+                ),
+              ),
+              if (_all)
+                note(l.compressionCarryAllHint)
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l.compressionCarryCountLabel,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 68,
+                        child: Semantics(
+                          label: l.compressionCarryCountLabel,
+                          child: IosFormTextField(
+                            label: '',
+                            inlineLabel: false,
+                            compact: true,
+                            outerPadding: EdgeInsets.zero,
+                            controller: _count,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            selectAllOnFocus: true,
+                            textInputAction: TextInputAction.done,
+                            onChanged: (v) {
+                              final n = int.tryParse(v);
+                              if (n == null || n < 1 || n > 10000) {
+                                if (!_invalidCount) {
+                                  setState(() => _invalidCount = true);
+                                }
+                                widget.onValidity?.call(false);
+                              } else {
+                                _set(CarryMode.count, n);
+                              }
+                            },
                           ),
-                        )
-                      : null,
-                  trailing: IosSwitch(
-                    value:
-                        widget.replies.contains(row.item.sourceMessageId) &&
-                        !row.replyInRetained,
-                    semanticLabel: l.compressionCarryReply,
-                    onChanged: row.replyInRetained
-                        ? null
-                        : (v) => widget.onReply(row.item.sourceMessageId, v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(l.compressionCarryUnit, style: secondary),
+                    ],
                   ),
                 ),
-              ),
+              if (_invalidCount)
+                note(l.compressionCarryInvalidCount, warning: true),
+              if (widget.hasSummaries)
+                CompressionSettingRow(
+                  label: l.compressionCarryEarlier,
+                  subtitle: l.compressionCarryEarlierHint,
+                  onTap: () => widget.onEarlier(!widget.earlier),
+                  trailing: IosCheckbox(
+                    value: widget.earlier,
+                    onChanged: widget.onEarlier,
+                    semanticLabel: l.compressionCarryEarlier,
+                  ),
+                ),
+              if (widget.automatic) note(l.compressionCarryAutoToo),
+            ],
           ],
-          if (widget.preview.rows.length > _shown)
-            IosTextButton(
-              label: l.compressionCarryMoreRows(
-                widget.preview.rows.length - _shown,
+        ),
+        if (_on) ...[
+          Padding(
+            padding: EdgeInsets.fromLTRB(2, 16, 2, preview == null ? 8 : 3),
+            child: Text(
+              l.compressionCarryListTitle,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.semibold,
+                color: cs.onSurface,
               ),
-              onPressed: () => setState(() => _shown += 50),
             ),
-          if (widget.preview.notFit > 0)
-            hint(l.compressionCarryNotFit(widget.preview.notFit)),
-          if (widget.preview.overBudget) ...[
-            hint(l.compressionCarryOverBudget, warning: true),
-            if (widget.preview.fitCount > 0)
-              IosTextButton(
-                label: l.compressionCarryFitAction(widget.preview.fitCount),
-                onPressed: () => _set(CarryMode.count, widget.preview.fitCount),
+          ),
+          if (preview != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+              child: Text(_total(l, preview), style: secondary),
+            ),
+          if (rows.isNotEmpty)
+            SectionCard(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, row) in rows.take(_shown).indexed) ...[
+                  if (i > 0)
+                    Divider(
+                      indent: 14,
+                      endIndent: 14,
+                      height: 1,
+                      color: context.appColors.hairline,
+                    ),
+                  CarriedPreviewRow(
+                    key: ValueKey(row.item.sourceMessageId),
+                    row: row,
+                    selected: widget.excluded != null
+                        ? !widget.excluded!.contains(row.item.sourceMessageId)
+                        : row.selected,
+                    includeReply: widget.replies.contains(
+                      row.item.sourceMessageId,
+                    ),
+                    newConversation: widget.newConversation,
+                    onSelect: (v) =>
+                        widget.onExcluded(row.item.sourceMessageId, !v),
+                    onReply: (v) => widget.onReply(row.item.sourceMessageId, v),
+                  ),
+                ],
+                if (rows.length > _shown)
+                  IosTextButton(
+                    label: l.compressionCarryMoreRows(rows.length - _shown),
+                    onPressed: () => setState(() => _shown += 50),
+                  ),
+              ],
+            )
+          else if (widget.loading || (preview != null && preview.notFit == 0))
+            SectionCard(
+              padding: const EdgeInsets.all(14),
+              child: Text(
+                widget.loading ? l.contextLogLoading : l.compressionCarryNone,
+                style: secondary,
               ),
+            ),
+          if (!widget.loading && preview != null) ...[
+            if (preview.notFit > 0)
+              note(l.compressionCarryNotFit(preview.notFit)),
+            if (preview.overBudget) ...[
+              note(l.compressionCarryOverBudget, warning: true),
+              if (preview.fitCount > 0)
+                IosTextButton(
+                  label: l.compressionCarryFitAction(preview.fitCount),
+                  onPressed: () => _set(CarryMode.count, preview.fitCount),
+                ),
+            ],
           ],
-          if (widget.automatic) hint(l.compressionCarryAutoToo),
         ],
       ],
     );
-  }
-
-  String _excerpt(String text, int length) {
-    final head = text.characters.take(length + 1).toString();
-    return head.characters.length > length
-        ? '${head.characters.take(length)}…'
-        : head;
   }
 }

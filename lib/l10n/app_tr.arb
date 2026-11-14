@@ -4985,5 +4985,11 @@
   "imageEditorRestore": "Geri yükle",
   "imageEditorColor": "Renk {color}",
   "imageViewerPageEditButton": "Düzenle",
-  "imageViewerPageFileSize": "Görsel boyutu"
+  "imageViewerPageFileSize": "Görsel boyutu",
+  "compressionCarryModeCount": "Son mesajlar",
+  "compressionCarryListTitle": "Mesaj önizlemesi",
+  "compressionCarryImageCount": "{count, plural, =1{1 görsel} other{{count} görsel}}",
+  "compressionCarryAttachmentCount": "{count, plural, =1{1 ek} other{{count} ek}}",
+  "compressionCarryNoText": "Mesaj metni yok",
+  "compressionCarryInvalidCount": "1 ile 10.000 arasında bir sayı girin."
 }

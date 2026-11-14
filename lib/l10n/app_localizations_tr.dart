@@ -17191,4 +17191,39 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get imageViewerPageFileSize => 'Görsel boyutu';
+
+  @override
+  String get compressionCarryModeCount => 'Son mesajlar';
+
+  @override
+  String get compressionCarryListTitle => 'Mesaj önizlemesi';
+
+  @override
+  String compressionCarryImageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count görsel',
+      one: '1 görsel',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String compressionCarryAttachmentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ek',
+      one: '1 ek',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compressionCarryNoText => 'Mesaj metni yok';
+
+  @override
+  String get compressionCarryInvalidCount =>
+      '1 ile 10.000 arasında bir sayı girin.';
 }

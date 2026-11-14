@@ -4985,5 +4985,11 @@
   "imageEditorRestore": "還原",
   "imageEditorColor": "顏色 {color}",
   "imageViewerPageEditButton": "編輯",
-  "imageViewerPageFileSize": "圖片大小"
+  "imageViewerPageFileSize": "圖片大小",
+  "compressionCarryModeCount": "最近幾則",
+  "compressionCarryListTitle": "訊息預覽",
+  "compressionCarryImageCount": "{count, plural, other{{count} 張圖片}}",
+  "compressionCarryAttachmentCount": "{count, plural, other{{count} 個附件}}",
+  "compressionCarryNoText": "沒有正文",
+  "compressionCarryInvalidCount": "請輸入 1 到 10000 之間的則數。"
 }

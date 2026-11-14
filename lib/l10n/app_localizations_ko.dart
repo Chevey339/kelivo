@@ -16571,4 +16571,38 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get imageViewerPageFileSize => '이미지 크기';
+
+  @override
+  String get compressionCarryModeCount => '최근 메시지';
+
+  @override
+  String get compressionCarryListTitle => '메시지 미리보기';
+
+  @override
+  String compressionCarryImageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '이미지 $count개',
+      one: '이미지 1개',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String compressionCarryAttachmentCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '첨부 파일 $count개',
+      one: '첨부 파일 1개',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compressionCarryNoText => '메시지 본문 없음';
+
+  @override
+  String get compressionCarryInvalidCount => '1에서 10,000 사이의 숫자를 입력하세요.';
 }

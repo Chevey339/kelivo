@@ -6231,5 +6231,11 @@
   "imageEditorRestore": "还原",
   "imageEditorColor": "颜色 {color}",
   "imageViewerPageEditButton": "编辑",
-  "imageViewerPageFileSize": "图片大小"
+  "imageViewerPageFileSize": "图片大小",
+  "compressionCarryModeCount": "最近几条",
+  "compressionCarryListTitle": "消息预览",
+  "compressionCarryImageCount": "{count} 张图片",
+  "compressionCarryAttachmentCount": "{count} 个附件",
+  "compressionCarryNoText": "没有正文",
+  "compressionCarryInvalidCount": "请输入 1 到 10000 之间的条数。"
 }

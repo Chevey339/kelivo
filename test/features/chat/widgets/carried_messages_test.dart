@@ -120,9 +120,9 @@ void main() {
           .value,
       true,
     );
-    final field = tester.widget<TextField>(find.byType(TextField));
-    expect(field.enabled, false);
-    expect(field.controller!.text, '1');
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text(l.compressionCarryAll), findsOneWidget);
+    expect(find.text(l.compressionCarryPreview(1, '90')), findsOneWidget);
     expect(changed, false);
     expect(find.textContaining('64k'), findsNothing);
     await tester.pumpWidget(app(section(true)));
@@ -157,15 +157,112 @@ void main() {
     expect(setting.count, 7);
     await tester.enterText(find.byType(TextField), '');
     expect(valid, false);
-    await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is IosCheckbox && w.semanticLabel == l.compressionCarryAll,
-      ),
-    );
+    await tester.tap(find.text(l.compressionCarryAll));
     await tester.pumpAndSettle();
     expect(valid, true);
-    expect(tester.widget<TextField>(find.byType(TextField)).enabled, false);
+    expect(find.byType(TextField), findsNothing);
   });
+  testWidgets(
+    'attachment-only rows show images or filenames, and a selected reply shows its text',
+    (tester) async {
+      final withoutText = item.copyWith(text: '\n   ', hasAttachments: true);
+      const png =
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+      final photo = CarryRow(
+        item: withoutText,
+        selected: true,
+        tokens: 4000,
+        imageUris: const [png, png, png, png],
+        attachmentCount: 4,
+        availableReply: itemReply,
+      );
+      final file = CarryRow(
+        item: withoutText.copyWith(sourceMessageId: 'doc'),
+        messageText: '',
+        fileNames: const ['Notes.pdf'],
+        selected: true,
+        tokens: 40,
+        attachmentCount: 1,
+      );
+      final selection = CarrySelection(
+        items: [photo.item, file.item],
+        rows: [photo, file],
+        totalTokens: 4040,
+      );
+      final replies = <String>{};
+      await tester.pumpWidget(
+        app(
+          StatefulBuilder(
+            builder: (context, setState) => CarriedOptionsSection(
+              setting: const CarrySetting(mode: CarryMode.count),
+              preview: selection,
+              replies: replies,
+              onSetting: (_) {},
+              onExcluded: (_, _) {},
+              onReply: (id, v) =>
+                  setState(() => v ? replies.add(id) : replies.remove(id)),
+              onEarlier: (_) {},
+            ),
+          ),
+        ),
+      );
+      expect(find.text(l.compressionCarryImageCount(4)), findsOneWidget);
+      expect(find.byType(Image), findsNWidgets(4));
+      expect(find.text('Notes.pdf'), findsOneWidget);
+      expect(find.text(itemReply.text), findsNothing);
+      final toggle = find.byWidgetPredicate(
+        (w) => w is IosSwitch && w.semanticLabel == l.compressionCarryReply,
+      );
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(find.text(itemReply.text), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'pending reply choices update totals immediately only for a fixed shortlist',
+    (tester) async {
+      const row = CarryRow(
+        item: item,
+        selected: true,
+        tokens: 40,
+        availableReply: itemReply,
+      );
+      const result = CarrySelection(
+        items: [item],
+        rows: [row],
+        totalTokens: 40,
+      );
+      Widget section(CarryMode mode) => app(
+        CarriedOptionsSection(
+          setting: CarrySetting(mode: mode),
+          preview: result,
+          loading: true,
+          editingSelection: true,
+          replies: const {'u'},
+          excluded: const {},
+          onSetting: (_) {},
+          onEarlier: (_) {},
+          onReply: (_, _) {},
+          onExcluded: (_, _) {},
+        ),
+      );
+      await tester.pumpWidget(section(CarryMode.count));
+      expect(
+        find.text(
+          l.compressionCarryPreview(
+            1,
+            (40 + itemReply.estimatedTokens).toString(),
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(section(CarryMode.all));
+      expect(find.text(l.contextUsageStateComputing), findsOneWidget);
+      expect(find.text(item.text), findsOneWidget);
+    },
+  );
   testWidgets('details edit freezes a copy and rejects empty text', (
     tester,
   ) async {

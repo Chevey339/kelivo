@@ -493,14 +493,18 @@ class ContextCompressionService extends ChangeNotifier {
       includeAttachments: options.includeAttachmentsAndTools,
       quoteMarker: request.quoteMarker,
     );
-    final imageHandles = <String, List<String>>{};
+    final images = <String, List<CarrySourceImage>>{};
     if (options.includeAttachmentsAndTools) {
       for (final image in await RequestImageContext.collectHistory(
         candidates,
         parseMarkdownImages: true,
         allowRemoteImages: true,
       )) {
-        (imageHandles[image.identity.messageId] ??= []).add(image.handle);
+        (images[image.identity.messageId] ??= []).add((
+          handle: image.handle,
+          uri: image.uri,
+          available: !image.unavailable,
+        ));
       }
     }
     final job = CarriedSelectionJob(
@@ -523,7 +527,7 @@ class ContextCompressionService extends ChangeNotifier {
           ? wires.keys.toList().reversed.toList()
           : order,
       inheritedItems: copies,
-      images: imageHandles,
+      images: images,
       automatic: request.automatic,
     );
     var selected = await Isolate.run(job.call);

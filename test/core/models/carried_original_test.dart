@@ -203,6 +203,56 @@ void main() {
     );
   });
   test(
+    'inherited preview never restores excluded files or counts deleted images',
+    () {
+      final m = rounds('ABCDE');
+      m[2] = message(
+        'Bu',
+        parts: [
+          const TextPart('body'),
+          const FilePart(uri: '/tmp/notes.pdf', name: 'Notes.pdf'),
+        ],
+      );
+      var first = operation('one', m, choose(m));
+      first = first.withCarried(
+        first.carried!.withItems([
+          carriedFromMessage(m[2], includeAttachments: false),
+        ]),
+      );
+      final withoutFile = choose(m, operations: [first]).rows.single;
+      expect(withoutFile.fileNames, isEmpty);
+      expect(withoutFile.attachmentCount, 0);
+
+      m[2] = message(
+        'Bu',
+        parts: [
+          const TextPart('caption'),
+          const ImagePart(uri: '/tmp/photo.png'),
+        ],
+      );
+      final image = operation('image', m, choose(m));
+      final deleted = m.where((m) => m.id != 'Bu').toList();
+      final row = choose(deleted, operations: [image]).rows.single;
+      expect(row.attachmentCount, 0);
+      expect(row.imageUris, isEmpty);
+      expect(row.item.imageHandles, isEmpty);
+      final copied = selectCarriedOriginals(
+        messages: m,
+        operations: [],
+        selection: range(m),
+        setting: const CarrySetting(mode: CarryMode.count, count: 1),
+        fromSummaries: false,
+        excluded: {},
+        replies: {},
+        budgetTokens: null,
+        count: (i) => countCarriedTokens(i, ProviderKind.openai),
+        newConversation: true,
+      );
+      expect(copied.rows.single.hadAttachments, true);
+      expect(copied.items.single.imageHandles, isEmpty);
+    },
+  );
+  test(
     'deleted and copied originals keep frozen order and never carry the summary row',
     () {
       final m = rounds('ABCDE');
