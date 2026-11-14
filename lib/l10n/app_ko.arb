@@ -1779,6 +1779,7 @@
   "asrServicesMimoSubtitle": "분할 클라우드 전사",
   "asrServicesStepTitle": "Step",
   "asrServicesStepSubtitle": "Step Audio 분할 클라우드 전사",
+  "asrServicesDeepSeekSubtitle": "DeepSeek 분할 클라우드 전사",
   "asrServicesAddTitle": "음성 인식 추가",
   "asrServicesEditTitle": "음성 인식 편집",
   "asrServicesSelectedLabel": "선택됨",

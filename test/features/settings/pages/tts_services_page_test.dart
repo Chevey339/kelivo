@@ -303,7 +303,12 @@ void main() {
     Future<void> selectProvider(String current, String next) async {
       await tester.tap(find.text(current).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text(next).last);
+      final option = find.text(next).last;
+      // The provider list is taller than the test surface now, so reveal the
+      // entry before tapping it.
+      await tester.ensureVisible(option);
+      await tester.pumpAndSettle();
+      await tester.tap(option);
       await tester.pumpAndSettle();
     }
 

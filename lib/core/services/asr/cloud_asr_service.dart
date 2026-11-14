@@ -99,6 +99,14 @@ class CloudAsrService {
           ownsClient: httpClient == null,
           completionTimeout: completionTimeout,
         );
+      case DeepSeekAsrOptions():
+        return _DeepSeekAsrSession(
+          options: options,
+          endpoint: _deepSeekEndpoint(options),
+          client: httpClient ?? http.Client(),
+          ownsClient: httpClient == null,
+          completionTimeout: completionTimeout,
+        );
       case StepAsrOptions():
         final client = httpClient ?? http.Client();
         return _StepAsrSession(
@@ -1065,6 +1073,58 @@ class _AudioTranscriptionAsrSession extends _SegmentedHttpAsrSession {
       : null;
 }
 
+class _DeepSeekAsrSession extends _SegmentedHttpAsrSession {
+  _DeepSeekAsrSession({
+    required DeepSeekAsrOptions options,
+    required this._endpoint,
+    required super.client,
+    required super.ownsClient,
+    required super.completionTimeout,
+  }) : _options = options,
+       super(
+         label: 'DeepSeek',
+         apiKey: options.apiKey,
+         sampleRate: options.sampleRate,
+         segmentDurationSec: options.segmentDurationSec,
+       );
+
+  final DeepSeekAsrOptions _options;
+  final Uri _endpoint;
+
+  // The service rejects a single upload longer than 120 s of audio.
+  @override
+  int get _segmentByteLimit {
+    final maximum =
+        _options.sampleRate * 2 * DeepSeekAsrOptions.maximumSegmentDurationSec;
+    return super._segmentByteLimit.clamp(2, maximum);
+  }
+
+  @override
+  http.BaseRequest _buildRequest(Uint8List pcm, Future<void> abortTrigger) {
+    return http.AbortableMultipartRequest(
+        'POST',
+        _endpoint,
+        abortTrigger: abortTrigger,
+      )
+      ..headers[HttpHeaders.authorizationHeader] =
+          'Bearer ${_options.apiKey.trim()}'
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          _pcm16MonoToWav(pcm, _options.sampleRate),
+          filename: 'recording.wav',
+          contentType: MediaType('audio', 'wav'),
+        ),
+      );
+  }
+
+  @override
+  String? _readTranscript(Object? decoded) =>
+      decoded is Map && decoded['text'] is String
+      ? decoded['text'] as String
+      : null;
+}
+
 class _QwenAudioHttpAsrSession extends _SegmentedHttpAsrSession {
   _QwenAudioHttpAsrSession({
     required QwenAudioAsrOptions options,
@@ -1918,6 +1978,17 @@ Uri _audioTranscriptionEndpoint(AudioTranscriptionAsrOptions options) {
   var path = uri.path.replaceFirst(RegExp(r'/+$'), '');
   if (isElevenLabs && path.isEmpty) path = '/v1';
   return uri.replace(path: path.endsWith(suffix) ? path : '$path$suffix');
+}
+
+Uri _deepSeekEndpoint(DeepSeekAsrOptions options) {
+  final base = options.baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
+  final uri = Uri.tryParse('$base/tools/asr');
+  if (uri == null ||
+      (uri.scheme != 'http' && uri.scheme != 'https') ||
+      uri.host.isEmpty) {
+    throw const AsrException('DeepSeek ASR base URL is invalid');
+  }
+  return uri;
 }
 
 Uri _mimoEndpoint(String value) {

@@ -10795,6 +10795,12 @@ abstract class AppLocalizations {
   /// **'Step Audio segmented transcription'**
   String get asrServicesStepSubtitle;
 
+  /// Subtitle describing the DeepSeek ASR service as segmented cloud transcription with automatic language detection.
+  ///
+  /// In en, this message translates to:
+  /// **'Segmented transcription via DeepSeek ASR'**
+  String get asrServicesDeepSeekSubtitle;
+
   /// Dialog/app bar title shown when creating a new speech recognition service configuration.
   ///
   /// In en, this message translates to:

@@ -6025,6 +6025,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сегментированная транскрипция Step Audio';
 
   @override
+  String get asrServicesDeepSeekSubtitle =>
+      'Сегментированная расшифровка через DeepSeek';
+
+  @override
   String get asrServicesAddTitle => 'Добавить распознавание речи';
 
   @override

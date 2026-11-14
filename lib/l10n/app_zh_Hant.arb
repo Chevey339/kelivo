@@ -1779,6 +1779,7 @@
   "asrServicesMimoSubtitle": "分段雲端轉寫",
   "asrServicesStepTitle": "Step",
   "asrServicesStepSubtitle": "Step Audio 分段雲端轉寫",
+  "asrServicesDeepSeekSubtitle": "DeepSeek 分段雲端轉寫",
   "asrServicesAddTitle": "新增語音辨識",
   "asrServicesEditTitle": "編輯語音辨識",
   "asrServicesSelectedLabel": "已選擇",

@@ -14,6 +14,7 @@ enum NetworkTtsKind {
   qwen,
   qwenAudio,
   groq,
+  deepseek,
   xai,
   elevenlabs,
   mimo,
@@ -37,6 +38,8 @@ String networkTtsKindDisplayName(NetworkTtsKind k) {
       return 'Qwen Audio';
     case NetworkTtsKind.groq:
       return 'Groq';
+    case NetworkTtsKind.deepseek:
+      return 'DeepSeek';
     case NetworkTtsKind.xai:
       return 'xAI';
     case NetworkTtsKind.elevenlabs:
@@ -183,6 +186,17 @@ abstract class TtsServiceOptions {
               .toString(),
           model: (json['model'] ?? 'canopylabs/orpheus-v1-english').toString(),
           voice: (json['voice'] ?? 'austin').toString(),
+        );
+      case 'deepseek':
+        return DeepSeekTtsOptions(
+          id: id.isEmpty ? null : id,
+          enabled: enabled,
+          name: name.isEmpty ? 'DeepSeek TTS' : name,
+          apiKey: (json['apiKey'] ?? '').toString(),
+          baseUrl: (json['baseUrl'] ?? DeepSeekTtsOptions.defaultBaseUrl)
+              .toString(),
+          voiceId: (json['voiceId'] ?? DeepSeekTtsOptions.defaultVoiceId)
+              .toString(),
         );
       case 'xai':
         return XaiTtsOptions(
@@ -489,6 +503,41 @@ class GroqTtsOptions extends TtsServiceOptions {
     'baseUrl': baseUrl,
     'model': model,
     'voice': voice,
+  };
+}
+
+/// DeepSeek speech synthesis (`POST {baseUrl}/tools/tts`).
+///
+/// The service returns a streamed WAV whose RIFF length fields are placeholders,
+/// so responses are normalized before playback. Voices are `stella` (female) and
+/// `tide` (male); the language is detected from the text, so there is no voice
+/// model and no language parameter.
+class DeepSeekTtsOptions extends TtsServiceOptions {
+  static const String defaultBaseUrl = 'https://api.deepseek.com/v1';
+  static const String defaultVoiceId = 'stella';
+
+  final String apiKey;
+  final String baseUrl;
+  final String voiceId;
+
+  DeepSeekTtsOptions({
+    super.id,
+    required super.enabled,
+    required super.name,
+    required this.apiKey,
+    required this.baseUrl,
+    required this.voiceId,
+  }) : super(kind: NetworkTtsKind.deepseek);
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'enabled': enabled,
+    'name': name,
+    'kind': 'deepseek',
+    'apiKey': apiKey,
+    'baseUrl': baseUrl,
+    'voiceId': voiceId,
   };
 }
 
@@ -840,6 +889,13 @@ class NetworkTtsService {
         case NetworkTtsKind.groq:
           return await _groqSpeech(
             options as GroqTtsOptions,
+            text,
+            c,
+            cancelled,
+          );
+        case NetworkTtsKind.deepseek:
+          return await _deepSeekSpeech(
+            options as DeepSeekTtsOptions,
             text,
             c,
             cancelled,
@@ -1296,6 +1352,40 @@ class NetworkTtsService {
     final bytes = await resp.stream.toBytes();
     return NetworkTtsResult(
       bytes: Uint8List.fromList(bytes),
+      mime: 'audio/wav',
+    );
+  }
+
+  static Future<NetworkTtsResult> _deepSeekSpeech(
+    DeepSeekTtsOptions opt,
+    String text,
+    http.Client c,
+    FutureOr<bool> Function()? cancelled,
+  ) async {
+    final uri = Uri.parse(_joinUrl(opt.baseUrl, '/tools/tts'));
+    final body = jsonEncode({
+      'text': text,
+      'voice_id': opt.voiceId.trim(),
+      'format': 'wav',
+      'filter_markdown': true,
+    });
+    final req = http.Request('POST', uri)
+      ..headers['Authorization'] = 'Bearer ${opt.apiKey.trim()}'
+      ..headers['Content-Type'] = 'application/json'
+      ..body = body;
+    final resp = await c.send(req);
+    if (cancelled != null && await cancelled()) {
+      throw _Cancelled();
+    }
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      final txt = await resp.stream.bytesToString();
+      throw Exception(
+        'DeepSeek TTS failed: ${resp.statusCode} ${resp.reasonPhrase} $txt',
+      );
+    }
+    final bytes = await resp.stream.toBytes();
+    return NetworkTtsResult(
+      bytes: _finalizeStreamedWav(Uint8List.fromList(bytes)),
       mime: 'audio/wav',
     );
   }
@@ -2104,6 +2194,18 @@ Uint8List _pcmToWav(
   writeInt32LE(dataLength);
   out.add(pcm);
   return out.toBytes();
+}
+
+/// Rewrites the placeholder RIFF/data lengths that streaming TTS servers leave
+/// behind, so players can compute a duration and seek. DeepSeek streams WAV with
+/// `0xFFFFFFFF` sizes. Returns the original bytes when the header is unexpected.
+Uint8List _finalizeStreamedWav(Uint8List bytes) {
+  try {
+    final parsed = _parseWav(bytes, allowStreamingLengths: true);
+    return _encodeWav(parsed.formatData, parsed.audioData);
+  } on FormatException {
+    return bytes;
+  }
 }
 
 /// Concatenates RIFF/WAVE files that use the same `fmt ` chunk.

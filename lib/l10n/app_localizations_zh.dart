@@ -5692,6 +5692,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get asrServicesStepSubtitle => 'Step Audio 分段云端转写';
 
   @override
+  String get asrServicesDeepSeekSubtitle => 'DeepSeek 分段云端转写';
+
+  @override
   String get asrServicesAddTitle => '添加语音识别';
 
   @override
@@ -21919,6 +21922,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get asrServicesStepSubtitle => 'Step Audio 分段云端转写';
 
   @override
+  String get asrServicesDeepSeekSubtitle => 'DeepSeek 分段云端转写';
+
+  @override
   String get asrServicesAddTitle => '添加语音识别';
 
   @override
@@ -38143,6 +38149,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get asrServicesStepSubtitle => 'Step Audio 分段雲端轉寫';
+
+  @override
+  String get asrServicesDeepSeekSubtitle => 'DeepSeek 分段雲端轉寫';
 
   @override
   String get asrServicesAddTitle => '新增語音辨識';

@@ -932,6 +932,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         ? initial.apiKey
         : (initial is FishAudioTtsOptions)
         ? initial.apiKey
+        : (initial is DeepSeekTtsOptions)
+        ? initial.apiKey
         : '',
   );
   final baseCtl = TextEditingController(
@@ -958,6 +960,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         : (initial is StepTtsOptions)
         ? initial.baseUrl
         : (initial is FishAudioTtsOptions)
+        ? initial.baseUrl
+        : (initial is DeepSeekTtsOptions)
         ? initial.baseUrl
         : '',
   );
@@ -1009,6 +1013,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         ? initial.voice
         : (initial is FishAudioTtsOptions)
         ? initial.referenceId
+        : (initial is DeepSeekTtsOptions)
+        ? initial.voiceId
         : '',
   );
   final emotionCtl = TextEditingController(
@@ -1183,6 +1189,9 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 ),
                                 networkTtsKindDisplayName(NetworkTtsKind.qwen),
                                 networkTtsKindDisplayName(NetworkTtsKind.groq),
+                                networkTtsKindDisplayName(
+                                  NetworkTtsKind.deepseek,
+                                ),
                                 networkTtsKindDisplayName(NetworkTtsKind.xai),
                                 networkTtsKindDisplayName(
                                   NetworkTtsKind.elevenlabs,
@@ -1234,6 +1243,12 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                         NetworkTtsKind.groq,
                                       )) {
                                     kind = NetworkTtsKind.groq;
+                                  }
+                                  if (picked ==
+                                      networkTtsKindDisplayName(
+                                        NetworkTtsKind.deepseek,
+                                      )) {
+                                    kind = NetworkTtsKind.deepseek;
                                   }
                                   if (picked ==
                                       networkTtsKindDisplayName(
@@ -1339,7 +1354,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                             ),
                             const SizedBox(height: 6),
                             if (kind != NetworkTtsKind.xai &&
-                                kind != NetworkTtsKind.azure) ...[
+                                kind != NetworkTtsKind.azure &&
+                                kind != NetworkTtsKind.deepseek) ...[
                               _InputRow(
                                 label: l10n.ttsServicesFieldModelLabel,
                                 controller: modelCtl,
@@ -1804,6 +1820,15 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                   model: model,
                                   voice: voice,
                                 );
+                              } else if (kind == NetworkTtsKind.deepseek) {
+                                result = DeepSeekTtsOptions(
+                                  id: initial?.id,
+                                  enabled: true,
+                                  name: name,
+                                  apiKey: apiKey,
+                                  baseUrl: base,
+                                  voiceId: voice,
+                                );
                               } else if (kind == NetworkTtsKind.xai) {
                                 result = XaiTtsOptions(
                                   id: initial?.id,
@@ -1995,6 +2020,8 @@ String _defaultBaseUrl(NetworkTtsKind k) {
       return 'https://dashscope.aliyuncs.com/api/v1';
     case NetworkTtsKind.groq:
       return 'https://api.groq.com/openai/v1';
+    case NetworkTtsKind.deepseek:
+      return DeepSeekTtsOptions.defaultBaseUrl;
     case NetworkTtsKind.xai:
       return 'https://api.x.ai/v1';
     case NetworkTtsKind.elevenlabs:
@@ -2024,6 +2051,8 @@ String _defaultModel(NetworkTtsKind k) {
       return 'qwen3-tts-flash';
     case NetworkTtsKind.groq:
       return 'canopylabs/orpheus-v1-english';
+    case NetworkTtsKind.deepseek:
+      return '';
     case NetworkTtsKind.xai:
       return '';
     case NetworkTtsKind.elevenlabs:
@@ -2053,6 +2082,8 @@ String _defaultVoice(NetworkTtsKind k) {
       return 'Cherry';
     case NetworkTtsKind.groq:
       return 'austin';
+    case NetworkTtsKind.deepseek:
+      return DeepSeekTtsOptions.defaultVoiceId;
     case NetworkTtsKind.xai:
       return 'eve';
     case NetworkTtsKind.elevenlabs:
@@ -2082,6 +2113,8 @@ String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.groq:
       return l10n.ttsServicesFieldVoiceLabel;
+    case NetworkTtsKind.deepseek:
+      return l10n.ttsServicesFieldVoiceIdLabel;
     case NetworkTtsKind.xai:
       return l10n.ttsServicesFieldVoiceIdLabel;
     case NetworkTtsKind.elevenlabs:

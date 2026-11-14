@@ -2070,6 +2070,7 @@
   "asrServicesMimoSubtitle": "分段云端转写",
   "asrServicesStepTitle": "Step",
   "asrServicesStepSubtitle": "Step Audio 分段云端转写",
+  "asrServicesDeepSeekSubtitle": "DeepSeek 分段云端转写",
   "asrServicesAddTitle": "添加语音识别",
   "asrServicesEditTitle": "编辑语音识别",
   "asrServicesSelectedLabel": "已选择",

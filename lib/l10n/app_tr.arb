@@ -1779,6 +1779,7 @@
   "asrServicesMimoSubtitle": "Segmentli bulut transkripsiyonu",
   "asrServicesStepTitle": "Step",
   "asrServicesStepSubtitle": "Step Audio segmentli bulut transkripsiyonu",
+  "asrServicesDeepSeekSubtitle": "DeepSeek ile segmentli bulut dökümü",
   "asrServicesAddTitle": "Konuşma Tanıma Ekle",
   "asrServicesEditTitle": "Konuşma Tanımayı Düzenle",
   "asrServicesSelectedLabel": "Seçili",

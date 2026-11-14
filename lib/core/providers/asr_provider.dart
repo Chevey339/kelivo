@@ -570,6 +570,7 @@ class AsrProvider extends ChangeNotifier {
     VolcengineAsrOptions() => 16000,
     MimoAsrOptions() => options.sampleRate,
     StepAsrOptions() => options.sampleRate,
+    DeepSeekAsrOptions() => options.sampleRate,
     SystemAsrOptions() => 16000,
     _ => throw StateError('Unsupported ASR service: ${options.kind.id}'),
   };
