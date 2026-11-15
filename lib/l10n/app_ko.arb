@@ -2831,6 +2831,8 @@
   "messageStyleSettingsPageDark": "다크",
   "messageStyleSettingsPageDefaultHint": "기본 스타일은 현재 테마를 따르며 조정할 수 있는 항목이 없습니다.",
   "messageStyleSettingsPageStyleDefaultSubtitle": "테마를 따르며 사용자 지정 불가",
+  "messageStyleSettingsPageShowAssistantBodyBubble": "어시스턴트 답변 말풍선 표시",
+  "messageStyleSettingsPageShowAssistantBodyBubbleSubtitle": "끄면 답변 텍스트가 채팅 배경에 바로 표시됩니다",
   "messageStyleSettingsPageAssistantFitContent": "어시스턴트 말풍선을 내용에 맞추기",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "어시스턴트 말풍선이 행을 채우지 않고 텍스트 너비에 맞게 줄어듭니다",
   "messageStyleSettingsPageAssistantSplitParagraphs": "문단을 말풍선으로 나누기",

@@ -9510,6 +9510,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Follows the theme; not customizable';
 
   @override
+  String get messageStyleSettingsPageShowAssistantBodyBubble =>
+      'Show assistant reply bubbles';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubbleSubtitle =>
+      'Turn off to show reply text directly on the chat background';
+
+  @override
   String get messageStyleSettingsPageAssistantFitContent =>
       'Fit assistant bubble to content';
 

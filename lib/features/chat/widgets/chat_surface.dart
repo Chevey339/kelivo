@@ -48,7 +48,7 @@ Widget buildSharedChatSurface(
   required BorderRadius borderRadius,
   required EdgeInsetsGeometry padding,
   Color? defaultColor,
-  bool bareOnDefault = false,
+  bool bare = false,
   bool isUser = false,
 }) {
   final theme = Theme.of(context);
@@ -57,6 +57,16 @@ Widget buildSharedChatSurface(
   final style = selection.style;
   final overrides = selection.overrides;
   final resolved = resolveBubbleStyle(cs, theme.brightness, style, overrides);
+  Widget content = bare ? child : Padding(padding: padding, child: child);
+  if (style != ChatMessageBackgroundStyle.defaultStyle &&
+      overrides.hasTextOverride(theme.brightness)) {
+    content = DefaultTextStyle.merge(
+      style: TextStyle(color: resolved.text),
+      child: content,
+    );
+  }
+  if (bare) return content;
+
   final customBackgroundArgb = theme.brightness == Brightness.dark
       ? overrides.backgroundArgbDark
       : overrides.backgroundArgbLight;
@@ -70,15 +80,6 @@ Widget buildSharedChatSurface(
       : style == ChatMessageBackgroundStyle.solid && resolved.background.a == 1
       ? MarkdownSurfaceKind.solid
       : MarkdownSurfaceKind.frosted;
-  Widget paddedChild = Padding(padding: padding, child: child);
-  if (style != ChatMessageBackgroundStyle.defaultStyle &&
-      overrides.hasTextOverride(theme.brightness)) {
-    paddedChild = DefaultTextStyle.merge(
-      style: TextStyle(color: resolved.text),
-      child: paddedChild,
-    );
-  }
-
   switch (style) {
     case ChatMessageBackgroundStyle.frosted:
       final radius = BorderRadius.circular(resolved.radius);
@@ -89,7 +90,7 @@ Widget buildSharedChatSurface(
         child: MarkdownSurfaceScope(
           kind: surfaceKind,
           customBackground: customBackground,
-          child: paddedChild,
+          child: content,
         ),
       );
     case ChatMessageBackgroundStyle.solid:
@@ -106,15 +107,12 @@ Widget buildSharedChatSurface(
         child: MarkdownSurfaceScope(
           kind: surfaceKind,
           customBackground: customBackground,
-          child: paddedChild,
+          child: content,
         ),
       );
     case ChatMessageBackgroundStyle.defaultStyle:
-      if (bareOnDefault) {
-        return child;
-      }
       if (defaultColor == null) {
-        return paddedChild;
+        return content;
       }
       return DecoratedBox(
         decoration: BoxDecoration(
@@ -123,7 +121,7 @@ Widget buildSharedChatSurface(
         ),
         child: MarkdownSurfaceScope(
           kind: MarkdownSurfaceKind.tinted,
-          child: paddedChild,
+          child: content,
         ),
       );
   }

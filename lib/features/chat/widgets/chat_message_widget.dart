@@ -2843,6 +2843,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     BorderRadius radius = BorderRadius.circular(16);
+    final showBubble =
+        isUser ||
+        context.select<SettingsProvider, bool>(
+          (s) => s.assistantBodyBubbleVisible,
+        );
     return buildSharedChatSurface(
       context,
       borderRadius: radius,
@@ -2852,7 +2857,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ? cs.primary.withValues(alpha: 0.15)
                 : cs.primary.withValues(alpha: 0.08))
           : null,
-      bareOnDefault: !isUser,
+      bare: !showBubble,
       isUser: isUser,
       child: child,
     );
@@ -2862,7 +2867,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     required BuildContext context,
     required Widget child,
   }) {
-    // Reuse same styles, but flag as non-user for default fallthrough
     return _buildBubbleContainer(context: context, isUser: false, child: child);
   }
 

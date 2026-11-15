@@ -2831,6 +2831,8 @@
   "messageStyleSettingsPageDark": "1053c9a3ebf9268c6e6357722c539cc482259356a18f2d1aba57082591c56f18",
   "messageStyleSettingsPageDefaultHint": "b7d02fbed3deb6362bbdb711f776923ccd7a7cdee958e281ddabc1639adee24b",
   "messageStyleSettingsPageStyleDefaultSubtitle": "9f8f73ce089e360c3fe20f36d54bd8b4f58e44ccf30011df8d29d2f089a6cb6e",
+  "messageStyleSettingsPageShowAssistantBodyBubble": "97d613de10b315e86702d14a5fa839ca86e2e6ea743a2350724fa0f192ff95ad",
+  "messageStyleSettingsPageShowAssistantBodyBubbleSubtitle": "6194243179b1dc8277419b2372f7d2bf305f15b1adfd36081cc21379dc80536c",
   "messageStyleSettingsPageAssistantFitContent": "14d917622d297a47166aa72ade49112dc60ebd9dbe3e5ff42a367c501cfd99d5",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "f6a18fec5f4eeed85d30959f9dfe3a9729ec20a9d17bb4aa80a101ecbac9a099",
   "messageStyleSettingsPageAssistantSplitParagraphs": "8a94bbf16055f381155934bd776371ba0163d1ce0ca115c44abc5204c28838fe",

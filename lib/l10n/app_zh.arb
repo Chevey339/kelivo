@@ -3536,6 +3536,8 @@
   "messageStyleSettingsPageDark": "深色",
   "messageStyleSettingsPageDefaultHint": "默认样式跟随当前主题，没有可调参数。",
   "messageStyleSettingsPageStyleDefaultSubtitle": "跟随主题，不可调节",
+  "messageStyleSettingsPageShowAssistantBodyBubble": "助手正文显示气泡",
+  "messageStyleSettingsPageShowAssistantBodyBubbleSubtitle": "关闭后，助手正文直接显示在聊天背景上",
   "messageStyleSettingsPageAssistantFitContent": "助手气泡贴合内容",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "助手气泡按文字宽度收缩，不再占满整行",
   "messageStyleSettingsPageAssistantSplitParagraphs": "分段显示为多个气泡",

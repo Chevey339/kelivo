@@ -121,12 +121,15 @@ void main() {
     );
   });
 
-  testWidgets('markdown headings use the override text color', (tester) async {
+  testWidgets('bare markdown replies retain the custom text color', (
+    tester,
+  ) async {
     final harness = await createBusinessTestHarness(
       initial: {'display_chat_message_background_style_v1': 'solid'},
     );
     final settings = SettingsProvider(harness.preferences);
     await settings.loaded;
+    await settings.setAssistantBubbleSplitParagraphs(true);
     await settings.setChatBubbleStyleOverrides(
       const ChatBubbleStyleOverrides(textArgbLight: 0xFF224466),
     );
@@ -149,7 +152,7 @@ void main() {
             body: ChatMessageWidget(
               message: ChatMessage(
                 role: 'assistant',
-                content: '# Custom heading\n\nBody copy.',
+                content: '# Custom heading\n\nBody copy.\n\nAnother paragraph.',
                 conversationId: 'conversation-heading-overrides',
               ),
               showModelIcon: false,
@@ -160,7 +163,7 @@ void main() {
     );
     await tester.pump();
 
-    final heading = find
+    RenderParagraph heading() => find
         .byType(RichText)
         .evaluate()
         .map((element) => element.renderObject)
@@ -169,7 +172,16 @@ void main() {
           (paragraph) =>
               paragraph.text.toPlainText().contains('Custom heading'),
         );
-    expect(heading.text.style?.color, const Color(0xFF224466));
+    final sections = find.byType(SelectionArea);
+    expect(sections, findsNWidgets(2));
+    final withBubble = tester.getTopLeft(sections.first).dx;
+    expect(heading().text.style?.color, const Color(0xFF224466));
+
+    await settings.setShowAssistantBodyBubble(false);
+    await tester.pump();
+    expect(sections, findsOneWidget);
+    expect(tester.getTopLeft(sections).dx, lessThan(withBubble));
+    expect(heading().text.style?.color, const Color(0xFF224466));
   });
 
   testWidgets(
@@ -245,20 +257,17 @@ void main() {
       );
       await tester.pump();
 
-      final userSurface = tester.widget<FrostedSurface>(
-        find.descendant(
-          of: find.byKey(const ValueKey('user-message-text-bubble:$userId')),
-          matching: find.byType(FrostedSurface),
-        ),
+      final userBubble = find.descendant(
+        of: find.byKey(const ValueKey('user-message-text-bubble:$userId')),
+        matching: find.byType(FrostedSurface),
       );
-      final assistantSurface = tester.widget<FrostedSurface>(
-        find
-            .ancestor(
-              of: find.text('Assistant override text'),
-              matching: find.byType(FrostedSurface),
-            )
-            .first,
+      final assistantText = find.text('Assistant override text');
+      final assistantBubble = find.ancestor(
+        of: assistantText,
+        matching: find.byType(FrostedSurface),
       );
+      final userSurface = tester.widget<FrostedSurface>(userBubble);
+      final assistantSurface = tester.widget<FrostedSurface>(assistantBubble);
 
       expect(userSurface.isUser, isTrue);
       expect(assistantSurface.isUser, isFalse);
@@ -269,7 +278,16 @@ void main() {
         const Color(0xFFAA2200),
       );
       expect(
-        tester.widget<Text>(find.text('Assistant override text')).style?.color,
+        tester.widget<Text>(assistantText).style?.color,
+        const Color(0xFF224466),
+      );
+
+      await settings.setShowAssistantBodyBubble(false);
+      await tester.pump();
+      expect(userBubble, findsOneWidget);
+      expect(assistantBubble, findsNothing);
+      expect(
+        tester.widget<Text>(assistantText).style?.color,
         const Color(0xFF224466),
       );
     },

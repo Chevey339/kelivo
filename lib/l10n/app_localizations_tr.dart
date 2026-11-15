@@ -9576,6 +9576,14 @@ class AppLocalizationsTr extends AppLocalizations {
       'Temayı izler; özelleştirilemez';
 
   @override
+  String get messageStyleSettingsPageShowAssistantBodyBubble =>
+      'Asistan yanıt balonlarını göster';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubbleSubtitle =>
+      'Yanıt metnini doğrudan sohbet arka planında göstermek için kapatın';
+
+  @override
   String get messageStyleSettingsPageAssistantFitContent =>
       'Asistan balonunu içeriğe sığdır';
 

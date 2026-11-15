@@ -67,9 +67,11 @@ class MessageStyleSettingsPage extends StatelessWidget {
 Future<void> resetMessageStyleSettings(BuildContext context) async {
   final ok = await _confirmReset(context);
   if (!ok || !context.mounted) return;
-  await context.read<SettingsProvider>().setChatBubbleStyleOverrides(
-    const ChatBubbleStyleOverrides(),
-  );
+  final settings = context.read<SettingsProvider>();
+  await Future.wait([
+    settings.setChatBubbleStyleOverrides(const ChatBubbleStyleOverrides()),
+    settings.setShowAssistantBodyBubble(true),
+  ]);
 }
 
 Future<void> showMessageStyleSettingsDialog(BuildContext context) {
@@ -177,20 +179,31 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
 
     final layoutCard = SectionCard(
       children: [
-        _SwitchRow(
-          label: l10n.messageStyleSettingsPageAssistantFitContent,
-          subtitle: l10n.messageStyleSettingsPageAssistantFitContentSubtitle,
-          value: settings.assistantBubbleFitContent,
-          onChanged: settings.setAssistantBubbleFitContent,
-        ),
-        _iosDivider(context),
-        _SwitchRow(
-          label: l10n.messageStyleSettingsPageAssistantSplitParagraphs,
-          subtitle:
-              l10n.messageStyleSettingsPageAssistantSplitParagraphsSubtitle,
-          value: settings.assistantBubbleSplitParagraphs,
-          onChanged: settings.setAssistantBubbleSplitParagraphs,
-        ),
+        if (!isDefault)
+          _SwitchRow(
+            label: l10n.messageStyleSettingsPageShowAssistantBodyBubble,
+            subtitle:
+                l10n.messageStyleSettingsPageShowAssistantBodyBubbleSubtitle,
+            value: settings.assistantBodyBubbleVisible,
+            onChanged: settings.setShowAssistantBodyBubble,
+          ),
+        if (settings.assistantBubbleLayoutEnabled) ...[
+          if (!isDefault) _iosDivider(context),
+          _SwitchRow(
+            label: l10n.messageStyleSettingsPageAssistantFitContent,
+            subtitle: l10n.messageStyleSettingsPageAssistantFitContentSubtitle,
+            value: settings.assistantBubbleFitContent,
+            onChanged: settings.setAssistantBubbleFitContent,
+          ),
+          _iosDivider(context),
+          _SwitchRow(
+            label: l10n.messageStyleSettingsPageAssistantSplitParagraphs,
+            subtitle:
+                l10n.messageStyleSettingsPageAssistantSplitParagraphsSubtitle,
+            value: settings.assistantBubbleSplitParagraphs,
+            onChanged: settings.setAssistantBubbleSplitParagraphs,
+          ),
+        ],
       ],
     );
 
@@ -688,7 +701,7 @@ class _SwitchRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          IosSwitch(value: value, onChanged: onChanged),
+          IosSwitch(value: value, onChanged: onChanged, semanticLabel: label),
         ],
       ),
     );
@@ -1219,7 +1232,9 @@ class _PreviewScene extends StatelessWidget {
                       child: _PreviewSurface(
                         style: style,
                         resolved: assistantResolved,
-                        bareOnDefault: true,
+                        bare: !context.select<SettingsProvider, bool>(
+                          (s) => s.assistantBodyBubbleVisible,
+                        ),
                         padding: const EdgeInsets.all(11),
                         child: Text(
                           l10n.messageStyleSettingsPagePreviewAssistant,
@@ -1263,7 +1278,7 @@ class _PreviewSurface extends StatelessWidget {
     required this.padding,
     required this.child,
     this.defaultColor,
-    this.bareOnDefault = false,
+    this.bare = false,
   });
 
   final ChatMessageBackgroundStyle style;
@@ -1271,10 +1286,11 @@ class _PreviewSurface extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final Widget child;
   final Color? defaultColor;
-  final bool bareOnDefault;
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
+    if (bare) return child;
     final padded = Padding(padding: padding, child: child);
     switch (style) {
       case ChatMessageBackgroundStyle.frosted:
@@ -1297,7 +1313,6 @@ class _PreviewSurface extends StatelessWidget {
           child: padded,
         );
       case ChatMessageBackgroundStyle.defaultStyle:
-        if (bareOnDefault) return child;
         if (defaultColor == null) return padded;
         return DecoratedBox(
           decoration: BoxDecoration(

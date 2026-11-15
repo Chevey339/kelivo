@@ -4499,6 +4499,8 @@
   "messageStyleSettingsPageDark": "Dark",
   "messageStyleSettingsPageDefaultHint": "Default style follows the current theme and has no extra controls.",
   "messageStyleSettingsPageStyleDefaultSubtitle": "Follows the theme; not customizable",
+  "messageStyleSettingsPageShowAssistantBodyBubble": "Show assistant reply bubbles",
+  "messageStyleSettingsPageShowAssistantBodyBubbleSubtitle": "Turn off to show reply text directly on the chat background",
   "messageStyleSettingsPageAssistantFitContent": "Fit assistant bubble to content",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "Assistant bubbles hug their text instead of filling the row",
   "messageStyleSettingsPageAssistantSplitParagraphs": "Split paragraphs into bubbles",
@@ -16311,6 +16313,12 @@
   },
   "@messageStyleSettingsPageStyleDefaultSubtitle": {
     "description": "Subtitle under the Default background style option noting it follows the theme and cannot be customized."
+  },
+  "@messageStyleSettingsPageShowAssistantBodyBubble": {
+    "description": "Switch label in Message Style settings for Frosted Glass and Solid styles. Controls the bubble around the main assistant reply, independently of user messages and cards."
+  },
+  "@messageStyleSettingsPageShowAssistantBodyBubbleSubtitle": {
+    "description": "Subtitle below the assistant reply bubble switch explaining where the reply text appears when the switch is off."
   },
   "@messageStyleSettingsPageAssistantFitContent": {
     "description": "Switch label to make assistant bubbles shrink to their text width instead of filling the row."

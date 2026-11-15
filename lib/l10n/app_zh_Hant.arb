@@ -2831,6 +2831,8 @@
   "messageStyleSettingsPageDark": "深色",
   "messageStyleSettingsPageDefaultHint": "預設樣式跟隨目前主題，沒有可調參數。",
   "messageStyleSettingsPageStyleDefaultSubtitle": "跟隨主題，不可調節",
+  "messageStyleSettingsPageShowAssistantBodyBubble": "顯示助手回覆氣泡",
+  "messageStyleSettingsPageShowAssistantBodyBubbleSubtitle": "關閉後，助手回覆文字會直接顯示在聊天背景上",
   "messageStyleSettingsPageAssistantFitContent": "助手氣泡貼合內容",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "助手氣泡按文字寬度收縮，不再佔滿整行",
   "messageStyleSettingsPageAssistantSplitParagraphs": "分段顯示為多個氣泡",

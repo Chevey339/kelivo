@@ -29,6 +29,47 @@ void main() {
   });
 
   test(
+    'hiding custom reply bubbles preserves the saved layout options',
+    () async {
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      await settings.setChatMessageBackgroundStyle(
+        ChatMessageBackgroundStyle.frosted,
+      );
+      expect(settings.assistantBodyBubbleVisible, isTrue);
+      await settings.setAssistantBubbleFitContent(true);
+      await settings.setAssistantBubbleSplitParagraphs(true);
+      await settings.setShowAssistantBodyBubble(false);
+
+      final reloaded = SettingsProvider(harness.preferences);
+      await reloaded.loaded;
+      await reloaded.setChatMessageBackgroundStyle(
+        ChatMessageBackgroundStyle.solid,
+      );
+      expect(reloaded.assistantBodyBubbleVisible, isFalse);
+      expect(reloaded.assistantBubbleFitContent, isFalse);
+      expect(reloaded.assistantBubbleSplitParagraphs, isFalse);
+
+      await reloaded.setChatMessageBackgroundStyle(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      expect(reloaded.assistantBodyBubbleVisible, isFalse);
+      expect(reloaded.assistantBubbleFitContent, isTrue);
+      expect(reloaded.assistantBubbleSplitParagraphs, isTrue);
+
+      await reloaded.setChatMessageBackgroundStyle(
+        ChatMessageBackgroundStyle.frosted,
+      );
+      expect(reloaded.assistantBodyBubbleVisible, isFalse);
+      await reloaded.setShowAssistantBodyBubble(true);
+      expect(reloaded.assistantBodyBubbleVisible, isTrue);
+      expect(reloaded.assistantBubbleFitContent, isTrue);
+      expect(reloaded.assistantBubbleSplitParagraphs, isTrue);
+    },
+  );
+
+  test(
     'user-only overrides leave assistant unchanged and survive reload',
     () async {
       final harness = await createBusinessTestHarness(initial: {});

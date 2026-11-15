@@ -9646,6 +9646,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Следует теме; не настраивается';
 
   @override
+  String get messageStyleSettingsPageShowAssistantBodyBubble =>
+      'Показывать пузыри ответов ассистента';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubbleSubtitle =>
+      'Отключите, чтобы текст ответа отображался прямо на фоне чата';
+
+  @override
   String get messageStyleSettingsPageAssistantFitContent =>
       'Подгонять пузырь ассистента по содержимому';
 

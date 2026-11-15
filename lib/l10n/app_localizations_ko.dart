@@ -9252,6 +9252,14 @@ class AppLocalizationsKo extends AppLocalizations {
       '테마를 따르며 사용자 지정 불가';
 
   @override
+  String get messageStyleSettingsPageShowAssistantBodyBubble =>
+      '어시스턴트 답변 말풍선 표시';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubbleSubtitle =>
+      '끄면 답변 텍스트가 채팅 배경에 바로 표시됩니다';
+
+  @override
   String get messageStyleSettingsPageAssistantFitContent =>
       '어시스턴트 말풍선을 내용에 맞추기';
 

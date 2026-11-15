@@ -352,6 +352,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_use_layered_surfaces_v1';
   static const String _displayUseLayeredSheetTilesKey =
       'display_use_layered_sheet_tiles_v1';
+  static const String _displayShowAssistantBodyBubbleKey =
+      'display_show_assistant_body_bubble_v1';
   static const String _displayAssistantBubbleFitContentKey =
       'display_assistant_bubble_fit_content_v1';
   static const String _displayAssistantBubbleSplitParagraphsKey =
@@ -559,13 +561,25 @@ class SettingsProvider extends ChangeNotifier {
   bool _useLayeredSheetTiles = false;
   bool get useLayeredSheetTiles => _useLayeredSheetTiles;
 
+  bool _showAssistantBodyBubble = true;
+  bool get assistantBodyBubbleVisible =>
+      _chatMessageBackgroundStyle != ChatMessageBackgroundStyle.defaultStyle &&
+      _showAssistantBodyBubble;
+
+  // The default style supports both layout options even though its body is bare.
+  bool get assistantBubbleLayoutEnabled =>
+      _chatMessageBackgroundStyle == ChatMessageBackgroundStyle.defaultStyle ||
+      _showAssistantBodyBubble;
+
   // When on, assistant bubbles hug their text instead of spanning the row.
   bool _assistantBubbleFitContent = false;
-  bool get assistantBubbleFitContent => _assistantBubbleFitContent;
+  bool get assistantBubbleFitContent =>
+      assistantBubbleLayoutEnabled && _assistantBubbleFitContent;
 
   // When on, blank lines split assistant text into one bubble per paragraph.
   bool _assistantBubbleSplitParagraphs = false;
-  bool get assistantBubbleSplitParagraphs => _assistantBubbleSplitParagraphs;
+  bool get assistantBubbleSplitParagraphs =>
+      assistantBubbleLayoutEnabled && _assistantBubbleSplitParagraphs;
 
   // Desktop UI persisted state
   double _desktopSidebarWidth = 240;
@@ -1178,6 +1192,8 @@ class SettingsProvider extends ChangeNotifier {
     _useLayeredSurfaces = prefs.getBool(_displayUseLayeredSurfacesKey) ?? false;
     _useLayeredSheetTiles =
         prefs.getBool(_displayUseLayeredSheetTilesKey) ?? false;
+    _showAssistantBodyBubble =
+        prefs.getBool(_displayShowAssistantBodyBubbleKey) ?? true;
     _assistantBubbleFitContent =
         prefs.getBool(_displayAssistantBubbleFitContentKey) ?? false;
     _assistantBubbleSplitParagraphs =
@@ -2900,6 +2916,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_displayUseLayeredSurfacesKey, v);
+  }
+
+  Future<void> setShowAssistantBodyBubble(bool value) async {
+    if (_showAssistantBodyBubble == value) return;
+    _showAssistantBodyBubble = value;
+    notifyListeners();
+    await _preferences.setBool(_displayShowAssistantBodyBubbleKey, value);
   }
 
   Future<void> setAssistantBubbleFitContent(bool v) async {
@@ -6321,6 +6344,7 @@ Requirements:
     copy._usePureBackground = _usePureBackground;
     copy._useLayeredSurfaces = _useLayeredSurfaces;
     copy._useLayeredSheetTiles = _useLayeredSheetTiles;
+    copy._showAssistantBodyBubble = _showAssistantBodyBubble;
     copy._assistantBubbleFitContent = _assistantBubbleFitContent;
     copy._assistantBubbleSplitParagraphs = _assistantBubbleSplitParagraphs;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;

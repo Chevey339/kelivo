@@ -9106,6 +9106,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
 
   @override
+  String get messageStyleSettingsPageShowAssistantBodyBubble => '助手正文显示气泡';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubbleSubtitle =>
+      '关闭后，助手正文直接显示在聊天背景上';
+
+  @override
   String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
 
   @override
@@ -25515,6 +25522,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubble => '助手正文显示气泡';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubbleSubtitle =>
+      '关闭后，助手正文直接显示在聊天背景上';
 
   @override
   String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
@@ -41932,6 +41946,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟隨主題，不可調節';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubble => '顯示助手回覆氣泡';
+
+  @override
+  String get messageStyleSettingsPageShowAssistantBodyBubbleSubtitle =>
+      '關閉後，助手回覆文字會直接顯示在聊天背景上';
 
   @override
   String get messageStyleSettingsPageAssistantFitContent => '助手氣泡貼合內容';

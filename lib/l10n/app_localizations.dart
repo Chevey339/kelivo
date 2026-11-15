@@ -17107,6 +17107,18 @@ abstract class AppLocalizations {
   /// **'Follows the theme; not customizable'**
   String get messageStyleSettingsPageStyleDefaultSubtitle;
 
+  /// Switch label in Message Style settings for Frosted Glass and Solid styles. Controls the bubble around the main assistant reply, independently of user messages and cards.
+  ///
+  /// In en, this message translates to:
+  /// **'Show assistant reply bubbles'**
+  String get messageStyleSettingsPageShowAssistantBodyBubble;
+
+  /// Subtitle below the assistant reply bubble switch explaining where the reply text appears when the switch is off.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off to show reply text directly on the chat background'**
+  String get messageStyleSettingsPageShowAssistantBodyBubbleSubtitle;
+
   /// Switch label to make assistant bubbles shrink to their text width instead of filling the row.
   ///
   /// In en, this message translates to:

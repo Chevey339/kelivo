@@ -76,7 +76,7 @@ Future<MarkstreamCodeBlock> _mount(
                 alpha: scheme.brightness == Brightness.dark ? .15 : .08,
               )
             : null,
-        bareOnDefault: !user,
+        bare: !user && !settings.assistantBodyBubbleVisible,
         child: MarkdownWithCodeHighlight(text: source),
       ),
     ),

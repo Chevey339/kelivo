@@ -649,6 +649,10 @@ void main() {
         tester.widget<Text>(find.text('Show 2 more steps')).style?.color,
         _expectedNeutralStrong(),
       );
+
+      await settings.setShowAssistantBodyBubble(false);
+      await tester.pump();
+      expect(find.byType(FrostedSurface), findsOneWidget);
     });
 
     testWidgets('thinking/tool timeline card does not use blur in solid mode', (
@@ -786,6 +790,16 @@ void main() {
         expect(
           tester.widget<Text>(find.text('Translation')).style?.color,
           _expectedNeutralStrong(),
+        );
+        await settings.setShowAssistantBodyBubble(false);
+        await tester.pump();
+        expect(find.byType(FrostedSurface), findsOneWidget);
+        expect(
+          find.ancestor(
+            of: find.text('Translation'),
+            matching: find.byType(FrostedSurface),
+          ),
+          findsOneWidget,
         );
       },
     );

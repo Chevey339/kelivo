@@ -2831,6 +2831,8 @@
   "messageStyleSettingsPageDark": "Тёмная",
   "messageStyleSettingsPageDefaultHint": "Стиль по умолчанию следует текущей теме и не имеет дополнительных настроек.",
   "messageStyleSettingsPageStyleDefaultSubtitle": "Следует теме; не настраивается",
+  "messageStyleSettingsPageShowAssistantBodyBubble": "Показывать пузыри ответов ассистента",
+  "messageStyleSettingsPageShowAssistantBodyBubbleSubtitle": "Отключите, чтобы текст ответа отображался прямо на фоне чата",
   "messageStyleSettingsPageAssistantFitContent": "Подгонять пузырь ассистента по содержимому",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "Пузыри ассистента сжимаются по ширине текста, а не занимают всю строку",
   "messageStyleSettingsPageAssistantSplitParagraphs": "Разделять абзацы на пузыри",

@@ -2831,6 +2831,8 @@
   "messageStyleSettingsPageDark": "Koyu",
   "messageStyleSettingsPageDefaultHint": "Varsayılan stil geçerli temayı izler ve ek ayar içermez.",
   "messageStyleSettingsPageStyleDefaultSubtitle": "Temayı izler; özelleştirilemez",
+  "messageStyleSettingsPageShowAssistantBodyBubble": "Asistan yanıt balonlarını göster",
+  "messageStyleSettingsPageShowAssistantBodyBubbleSubtitle": "Yanıt metnini doğrudan sohbet arka planında göstermek için kapatın",
   "messageStyleSettingsPageAssistantFitContent": "Asistan balonunu içeriğe sığdır",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "Asistan balonları satırı doldurmak yerine metin genişliğine göre daralır",
   "messageStyleSettingsPageAssistantSplitParagraphs": "Paragrafları ayrı balonlara böl",
