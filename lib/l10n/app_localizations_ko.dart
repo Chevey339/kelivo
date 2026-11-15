@@ -137,6 +137,12 @@ class AppLocalizationsKo extends AppLocalizations {
       '파일을 불러오거나 이미지 사용 여부를 확인할 수 없습니다. 새로고침 후 다시 시도하세요.';
 
   @override
+  String get storageSpaceCopyErrorDetails => '오류 세부 정보 복사';
+
+  @override
+  String get storageSpaceCopyErrorFailed => '오류 세부 정보를 복사할 수 없습니다. 다시 시도해 주세요.';
+
+  @override
   String get storageSpaceTotalLabel => '사용 중';
 
   @override

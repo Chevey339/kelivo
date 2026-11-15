@@ -39,6 +39,8 @@
   "storageSpacePageTitle": "存储空间",
   "storageSpaceRefreshTooltip": "刷新",
   "storageSpaceLoadFailed": "无法加载文件或检查图片使用情况，请刷新后重试。",
+  "storageSpaceCopyErrorDetails": "复制错误详情",
+  "storageSpaceCopyErrorFailed": "无法复制错误详情，请重试。",
   "storageSpaceTotalLabel": "已用空间",
   "storageSpaceClearableLabel": "可清理：{size}",
   "storageSpaceClearableHint": "共发现可清理空间 {size}",

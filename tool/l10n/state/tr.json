@@ -39,6 +39,8 @@
   "storageSpacePageTitle": "d8bf119e5c0c75f32f27928e005cfcd8d5cd6fd3127a41e98de7f15cc573676a",
   "storageSpaceRefreshTooltip": "28c0a61ee6008d5b87bc607c8cde78d5a98acf41be33e321bd27110aba02106c",
   "storageSpaceLoadFailed": "8db5fb3074a879dbb3421fcb0e5a4634a72bb255867d8b50e224d97c8946f293",
+  "storageSpaceCopyErrorDetails": "ffc0f4acd120d40fcdff583ebf661d74e05593aeda1619bdfbc3c81680b0812c",
+  "storageSpaceCopyErrorFailed": "167aa0fe2dd124ad4a9ad5fcb50b6110c407c3acf5fbc44aa2557e54fa6f64d3",
   "storageSpaceTotalLabel": "b0bc6c9c621789cad0e4efc11711633cd0698132713db6b2406a8e74ab415a8a",
   "storageSpaceClearableLabel": "cb55f8d0e4ea574850e4b53769859d23010c977c15e6181b0d4d7063f4ac185c",
   "storageSpaceClearableHint": "45011810ed639403875e151d801f41e9c2274621efd5c6b309f8352b33209ef5",

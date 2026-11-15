@@ -39,6 +39,8 @@
   "storageSpacePageTitle": "Depolama Alanı",
   "storageSpaceRefreshTooltip": "Yenile",
   "storageSpaceLoadFailed": "Dosyalar yüklenemedi veya hangi görsellerin kullanımda olduğu kontrol edilemedi. Lütfen yenileyip tekrar deneyin.",
+  "storageSpaceCopyErrorDetails": "Hata ayrıntılarını kopyala",
+  "storageSpaceCopyErrorFailed": "Hata ayrıntıları kopyalanamadı. Lütfen tekrar deneyin.",
   "storageSpaceTotalLabel": "Kullanılan",
   "storageSpaceClearableLabel": "Temizlenebilir: {size}",
   "storageSpaceClearableHint": "Güvenle temizlenebilir: {size}",

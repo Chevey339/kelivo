@@ -131,6 +131,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceLoadFailed => '无法加载文件或检查图片使用情况，请刷新后重试。';
 
   @override
+  String get storageSpaceCopyErrorDetails => '复制错误详情';
+
+  @override
+  String get storageSpaceCopyErrorFailed => '无法复制错误详情，请重试。';
+
+  @override
   String get storageSpaceTotalLabel => '已用空间';
 
   @override
@@ -16549,6 +16555,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceLoadFailed => '无法加载文件或检查图片使用情况，请刷新后重试。';
 
   @override
+  String get storageSpaceCopyErrorDetails => '复制错误详情';
+
+  @override
+  String get storageSpaceCopyErrorFailed => '无法复制错误详情，请重试。';
+
+  @override
   String get storageSpaceTotalLabel => '已用空间';
 
   @override
@@ -32965,6 +32977,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceLoadFailed => '無法載入檔案或檢查圖片使用情況，請重新整理後重試。';
+
+  @override
+  String get storageSpaceCopyErrorDetails => '複製錯誤詳情';
+
+  @override
+  String get storageSpaceCopyErrorFailed => '無法複製錯誤詳情，請重試。';
 
   @override
   String get storageSpaceTotalLabel => '已用空間';

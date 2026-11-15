@@ -143,6 +143,13 @@ class AppLocalizationsTr extends AppLocalizations {
       'Dosyalar yüklenemedi veya hangi görsellerin kullanımda olduğu kontrol edilemedi. Lütfen yenileyip tekrar deneyin.';
 
   @override
+  String get storageSpaceCopyErrorDetails => 'Hata ayrıntılarını kopyala';
+
+  @override
+  String get storageSpaceCopyErrorFailed =>
+      'Hata ayrıntıları kopyalanamadı. Lütfen tekrar deneyin.';
+
+  @override
   String get storageSpaceTotalLabel => 'Kullanılan';
 
   @override

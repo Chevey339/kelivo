@@ -330,10 +330,9 @@ class SandboxPathResolver {
       final host = parsed.host.toLowerCase();
       // Non-local hosts (SMB/UNC via file://server/...) are rejected.
       if (host.isNotEmpty && host != 'localhost') return null;
-      // Dart's toFilePath rejects file://localhost/... on non-Windows; drop
-      // the authority first. Empty-host UNC forms (file:////server/share)
-      // still decode to //server/... and are rejected below.
-      final local = host.isEmpty
+      // Only the path identifies the file. Keep its percent escapes intact
+      // when removing localhost or a document link's query and fragment.
+      final local = host.isEmpty && !parsed.hasQuery && !parsed.hasFragment
           ? parsed
           : Uri(scheme: 'file', path: parsed.path);
       final path = local.toFilePath();

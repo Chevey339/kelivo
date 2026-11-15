@@ -279,6 +279,123 @@ void main() {
     },
   );
 
+  test(
+    'storage details preserve local files referenced by decorated file URIs',
+    () async {
+      final image = await fixture.file("images/John's photo (1) #1.png");
+      final pdf = await fixture.file('upload/manual #1.pdf');
+      final unused = await fixture.file('upload/unreferenced.pdf');
+      final pdfLink = pdf.uri
+          .replace(fragment: 'page=2')
+          .toString()
+          .replaceFirst('file:', 'FILE:');
+      final imageLink = image.uri.replace(
+        host: 'localhost',
+        query: 'width=200',
+      );
+      final remote = unused.uri.replace(host: 'files.example');
+      await fixture.message([
+        TextPart('[Page]($pdfLink)'),
+        TextPart('[Remote]($remote)'),
+        ToolCallPart(
+          jsonEncode({
+            'result': 'Preview saved at $imageLink',
+            'unreadable': 'file:///tmp/%FF.png',
+          }),
+        ),
+      ]);
+
+      final images = await StorageUsageService.listUploadEntries(images: true);
+      expect(images.single.path, image.path);
+      expect(images.single.isInUse, isTrue);
+      expect(images.single.imageKind, StorageImageKind.tool);
+      final files = await StorageUsageService.listUploadEntries(images: false);
+      final document = files.singleWhere((entry) => entry.path == pdf.path);
+      expect(document.isInUse, isTrue);
+      expect(document.conversations.values, ['Images']);
+      expect(
+        files.singleWhere((entry) => entry.path == unused.path).isInUse,
+        isFalse,
+      );
+
+      expect(
+        await StorageUsageService.deleteUploadFiles([image.path], images: true),
+        0,
+      );
+      expect(
+        await StorageUsageService.deleteUploadFiles([
+          pdf.path,
+          unused.path,
+        ], images: false),
+        1,
+      );
+      expect(await pdf.exists(), isTrue);
+      expect(await image.exists(), isTrue);
+      expect(await unused.exists(), isFalse);
+    },
+  );
+
+  test(
+    'quoted tool links retain filename punctuation and stay separate',
+    () async {
+      final first = await fixture.file("images/John's (edited).png");
+      final second = await fixture.file('images/photo (2).png');
+      final markdown = await fixture.file("images/Sara's copy (3).png");
+      final adjacent = await fixture.file('images/near.png');
+      final fields = await fixture.file("images/Peter's (4).png");
+      final sentence = await fixture.file("images/June's notes.png");
+      final xml = await fixture.file('images/xml.png');
+      final output = await fixture.file('sessions/demo/outputs/report(2)');
+      await fixture.message([
+        ToolCallPart(
+          jsonEncode({
+            'previews': "['${first.uri}','${second.uri}']",
+            'result': 'Saved (${output.uri}).',
+            'markdown': '已保存[高清图](${markdown.uri})，请查看',
+            'comparison': '[图](${adjacent.uri})[对比](${second.uri})',
+            'fields': "{'preview':'${fields.uri}','status':'ok'}",
+            'sentence': "Preview saved to '${sentence.uri}'.",
+            'xml': "<resource uri='${xml.uri}'/>",
+          }),
+        ),
+      ]);
+      final usage = await StorageAttachmentUsage.load();
+      for (final file in [
+        first,
+        second,
+        markdown,
+        adjacent,
+        fields,
+        sentence,
+        xml,
+        output,
+      ]) {
+        expect(usage.isInUse(file.path), isTrue, reason: file.path);
+      }
+    },
+  );
+
+  test(
+    'a malformed terminal link in tool output cannot block file lookup or cleanup',
+    () async {
+      final unused = await fixture.file('upload/unused.pdf');
+      await fixture.message([
+        const ToolCallPart(
+          '{"result":"For reference, KELIVO://terminal?cmd=echo+100%"}',
+        ),
+      ]);
+      final files = await StorageUsageService.listUploadEntries(images: false);
+      expect(files.single.path, unused.path);
+      expect(files.single.isInUse, isFalse);
+      expect(
+        await StorageUsageService.deleteUploadFiles([
+          unused.path,
+        ], images: false),
+        1,
+      );
+    },
+  );
+
   for (final svg in [false, true]) {
     test('protects imported MCP icons in file cleanup (svg=$svg)', () async {
       final source = await fixture.file(

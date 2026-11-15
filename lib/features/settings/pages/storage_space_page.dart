@@ -4,12 +4,15 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
 import '../../../desktop/macos_window_drag_area.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/logging/log_redactor.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import '../../../core/services/storage/storage_attachment_usage.dart';
@@ -2087,7 +2090,7 @@ enum _StorageEntrySort { newest, oldest, largest, smallest }
 
 class _UploadManagerState extends State<_UploadManager> {
   bool _loading = false;
-  bool _loadFailed = false;
+  ({String summary, String details})? _loadFailure;
   bool _deleting = false;
   List<StorageFileEntry> _entries = const <StorageFileEntry>[];
   List<StorageFileEntry> _visibleEntries = const <StorageFileEntry>[];
@@ -2138,23 +2141,50 @@ class _UploadManagerState extends State<_UploadManager> {
       setState(() {
         _entries = list;
         _visibleEntries = _buildVisibleEntries();
-        _loadFailed = false;
+        _loadFailure = null;
         final paths = _visibleEntries
             .where((e) => !e.isInUse)
             .map((e) => e.path)
             .toSet();
         _selected.removeWhere((p) => !paths.contains(p));
       });
-    } catch (_) {
+    } catch (error, stack) {
+      // A FormatException's source can contain the private message payload.
+      final message = error is FormatException
+          ? error.message
+          : error.toString();
+      final reason = LogRedactor.redactText(message.split('\n').first);
+      final type = error.runtimeType.toString();
+      final summary = reason.startsWith(type) ? reason : '$type: $reason';
+      final details = '$summary\n$stack';
+      FlutterLogger.log(details, tag: 'StorageAttachments');
       if (mounted) {
         setState(() {
-          _loadFailed = true;
+          _loadFailure = (summary: summary, details: details);
           _selected.clear();
         });
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _copyLoadFailure(String details) async {
+    var copied = true;
+    try {
+      await Clipboard.setData(ClipboardData(text: details));
+    } on Exception {
+      copied = false;
+    }
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    showAppSnackBar(
+      context,
+      message: copied
+          ? l10n.chatMessageWidgetCopiedToClipboard
+          : l10n.storageSpaceCopyErrorFailed,
+      type: copied ? NotificationType.success : NotificationType.error,
+    );
   }
 
   List<StorageFileEntry> _buildVisibleEntries() {
@@ -2360,8 +2390,31 @@ class _UploadManagerState extends State<_UploadManager> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_loadFailed) {
-      return Center(child: Text(l10n.storageSpaceLoadFailed));
+    if (_loadFailure case final failure?) {
+      return Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.storageSpaceLoadFailed, textAlign: TextAlign.center),
+              const SizedBox(height: 6),
+              Text(
+                failure.summary,
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              IosTileButton(
+                icon: Lucide.Copy,
+                label: l10n.storageSpaceCopyErrorDetails,
+                onTap: () => _copyLoadFailure(failure.details),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final entries = _visibleEntries;

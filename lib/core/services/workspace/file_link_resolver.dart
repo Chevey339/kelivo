@@ -95,7 +95,13 @@ class KelivoLink {
     if (host == 'terminal') {
       var command = '';
       if (query != null && query.length > 1) {
-        command = Uri.splitQueryString(query.substring(1))['cmd'] ?? '';
+        try {
+          command = Uri.splitQueryString(query.substring(1))['cmd'] ?? '';
+        } on ArgumentError {
+          return null;
+        } on FormatException {
+          return null;
+        }
       }
       return KelivoLink(
         kind: KelivoLinkKind.terminal,

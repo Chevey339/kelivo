@@ -39,6 +39,8 @@
   "storageSpacePageTitle": "儲存空間",
   "storageSpaceRefreshTooltip": "重新整理",
   "storageSpaceLoadFailed": "無法載入檔案或檢查圖片使用情況，請重新整理後重試。",
+  "storageSpaceCopyErrorDetails": "複製錯誤詳情",
+  "storageSpaceCopyErrorFailed": "無法複製錯誤詳情，請重試。",
   "storageSpaceTotalLabel": "已用空間",
   "storageSpaceClearableLabel": "可清理：{size}",
   "storageSpaceClearableHint": "共發現可清理空間 {size}",

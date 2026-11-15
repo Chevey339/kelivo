@@ -47,6 +47,14 @@
   "storageSpacePageTitle": "Storage Space",
   "storageSpaceRefreshTooltip": "Refresh",
   "storageSpaceLoadFailed": "Could not load files or check which images are in use. Please refresh and try again.",
+  "storageSpaceCopyErrorDetails": "Copy error details",
+  "@storageSpaceCopyErrorDetails": {
+    "description": "Button on the Images and Files storage detail pages that copies the load error and its stack trace to the clipboard."
+  },
+  "storageSpaceCopyErrorFailed": "Could not copy the error details. Please try again.",
+  "@storageSpaceCopyErrorFailed": {
+    "description": "Error notification on the Images and Files storage detail pages when the clipboard cannot accept the diagnostic text. The user can tap the copy button again."
+  },
   "storageSpaceTotalLabel": "Used",
   "storageSpaceClearableLabel": "Clearable: {size}",
   "@storageSpaceClearableLabel": {

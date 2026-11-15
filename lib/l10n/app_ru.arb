@@ -39,6 +39,8 @@
   "storageSpacePageTitle": "Хранилище",
   "storageSpaceRefreshTooltip": "Обновить",
   "storageSpaceLoadFailed": "Не удалось загрузить файлы или проверить использование изображений. Обновите и повторите попытку.",
+  "storageSpaceCopyErrorDetails": "Копировать сведения об ошибке",
+  "storageSpaceCopyErrorFailed": "Не удалось скопировать сведения об ошибке. Попробуйте ещё раз.",
   "storageSpaceTotalLabel": "Использовано",
   "storageSpaceClearableLabel": "Можно очистить: {size}",
   "storageSpaceClearableHint": "Безопасно очистить: {size}",

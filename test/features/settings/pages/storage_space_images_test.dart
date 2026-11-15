@@ -2,11 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_icon_cache.dart';
 import 'package:Kelivo/features/settings/pages/storage_space_page.dart';
@@ -40,6 +42,75 @@ Widget _storagePage(StorageImagesFixture fixture) => ChangeNotifierProvider(
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  testWidgets(
+    'storage details can copy a load failure and recover on refresh',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      String? copied;
+      var clipboardBusy = true;
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          if (clipboardBusy) throw PlatformException(code: 'clipboard_busy');
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+      addTearDown(fixture.dispose);
+      const part = FilePart(
+        uri: 'kelivo-file:///upload/manual.pdf',
+        name: 'manual.pdf',
+      );
+      Future<void> setPayload(String payload) =>
+          fixture.database.customStatement(
+            "UPDATE message_part_rows SET payload = ? WHERE kind = 'file'",
+            [payload],
+          );
+      await tester.runAsync(() async {
+        await fixture.file('upload/manual.pdf');
+        await fixture.message([part]);
+        await setPayload('private message content');
+      });
+      await tester.pumpWidget(_storagePage(fixture));
+      await _until(tester, () => find.text('文件').evaluate().isNotEmpty);
+      await tester.tap(find.text('文件').last);
+      await _until(tester, () => find.text('复制错误详情').evaluate().isNotEmpty);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('FormatException'), findsOneWidget);
+      expect(find.text('清理未使用'), findsNothing);
+      await tester.tap(find.text('复制错误详情'));
+      await tester.pumpAndSettle();
+      expect(find.text('无法复制错误详情，请重试。'), findsOneWidget);
+      expect(copied, isNull);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      clipboardBusy = false;
+      await tester.tap(find.text('复制错误详情'));
+      await tester.pump();
+      expect(copied, contains('FormatException'));
+      expect(copied, contains('storage_attachment_usage.dart'));
+      expect(copied, isNot(contains('private message content')));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      await tester.runAsync(() => setPayload(part.encodePayload()));
+      await tester.tap(find.bySemanticsLabel('刷新').hitTestable());
+      await _until(tester, () => find.text('使用中').evaluate().isNotEmpty);
+      expect(find.text('复制错误详情'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
   testWidgets('active MCP icons are visibly protected in the file list', (
     tester,
   ) async {

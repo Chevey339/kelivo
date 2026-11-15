@@ -142,6 +142,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load files or check which images are in use. Please refresh and try again.';
 
   @override
+  String get storageSpaceCopyErrorDetails => 'Copy error details';
+
+  @override
+  String get storageSpaceCopyErrorFailed =>
+      'Could not copy the error details. Please try again.';
+
+  @override
   String get storageSpaceTotalLabel => 'Used';
 
   @override

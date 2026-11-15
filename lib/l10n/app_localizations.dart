@@ -346,6 +346,18 @@ abstract class AppLocalizations {
   /// **'Could not load files or check which images are in use. Please refresh and try again.'**
   String get storageSpaceLoadFailed;
 
+  /// Button on the Images and Files storage detail pages that copies the load error and its stack trace to the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy error details'**
+  String get storageSpaceCopyErrorDetails;
+
+  /// Error notification on the Images and Files storage detail pages when the clipboard cannot accept the diagnostic text. The user can tap the copy button again.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the error details. Please try again.'**
+  String get storageSpaceCopyErrorFailed;
+
   /// Label for total used storage space, displayed with a formatted byte size.
   ///
   /// In en, this message translates to:

@@ -144,6 +144,13 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить файлы или проверить использование изображений. Обновите и повторите попытку.';
 
   @override
+  String get storageSpaceCopyErrorDetails => 'Копировать сведения об ошибке';
+
+  @override
+  String get storageSpaceCopyErrorFailed =>
+      'Не удалось скопировать сведения об ошибке. Попробуйте ещё раз.';
+
+  @override
   String get storageSpaceTotalLabel => 'Использовано';
 
   @override

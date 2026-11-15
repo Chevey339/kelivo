@@ -16,6 +16,7 @@ import '../../models/mcp_presentation.dart';
 import '../../../shared/markdown/markdown_image_sources.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/kelivo_file_uri.dart';
+import '../../../utils/sandbox_path_resolver.dart';
 
 enum StorageImageKind { chat, tool, avatar }
 
@@ -412,15 +413,72 @@ Iterable<String> _paths(String uri, String root) sync* {
         );
   final path = canonical != null
       ? KelivoFileUri.resolveToAbsolute(canonical, root: root)
-      : uri.startsWith('file:')
-      ? Uri.tryParse(uri)?.toFilePath()
+      : uri.toLowerCase().startsWith('file:')
+      ? SandboxPathResolver.tryDecodeLocalFileUri(uri)
       : uri;
-  if (path == null || !p.isAbsolute(path)) return;
+  if (path == null || !p.isAbsolute(path) || path.contains('\x00')) return;
   yield p.normalize(path);
   try {
     yield p.normalize(File(path).resolveSymbolicLinksSync());
   } on FileSystemException {
     /* Keep missing references protected. */
+  }
+}
+
+const _attachmentUriPrefix =
+    r'(?:kelivo-file:///|file://(?:localhost)?/|kelivo://)';
+final _attachmentUriStart = RegExp(_attachmentUriPrefix, caseSensitive: false);
+final _attachmentUriEnd = RegExp(
+  r'''[\s<>"`]|'''
+  '$_attachmentUriPrefix',
+  caseSensitive: false,
+  unicode: true,
+);
+final _attachmentUriDelimiters = RegExp(r'''[()\[\]{}]|'(?=$|[',:;)\]}])''');
+final _plainTextUriCloser = RegExp(r'''[')\]]''');
+final _trailingProsePunctuation = RegExp(r'[.,;!?]+$');
+
+Iterable<String> _embeddedAttachmentUris(String text) sync* {
+  for (final start in _attachmentUriStart.allMatches(text)) {
+    final stop = text.indexOf(_attachmentUriEnd, start.end);
+    final uri = text.substring(start.start, stop < 0 ? text.length : stop);
+    final singleQuoted = start.start > 0 && text[start.start - 1] == "'";
+    final closers = <String>[];
+    var end = uri.length;
+    for (final match in _attachmentUriDelimiters.allMatches(uri)) {
+      final mark = match[0]!;
+      if (mark == "'") {
+        end = match.start;
+        break;
+      }
+      if (singleQuoted) continue;
+      const pairs = {'(': ')', '[': ']', '{': '}'};
+      if (pairs[mark] case final closer?) {
+        closers.add(closer);
+      } else if (closers.isNotEmpty && closers.last == mark) {
+        closers.removeLast();
+      } else {
+        // The closing delimiter belongs to the surrounding markup or prose.
+        end = match.start;
+        break;
+      }
+    }
+    // A tool's free text can use the same punctuation for a filename and
+    // the text surrounding it. Keep each plausible path protected during cleanup.
+    final plainEnd = uri.indexOf(_plainTextUriCloser);
+    final quoteEnd = singleQuoted ? uri.lastIndexOf("'") : -1;
+    final punctuation = _trailingProsePunctuation.firstMatch(
+      uri.substring(0, end),
+    );
+    for (final length in {
+      uri.length,
+      end,
+      if (plainEnd >= 0) plainEnd,
+      if (quoteEnd >= 0) quoteEnd,
+      if (punctuation != null) punctuation.start,
+    }) {
+      yield uri.substring(0, length);
+    }
   }
 }
 
@@ -434,20 +492,17 @@ Iterable<String> _uris(Object? value) sync* {
       yield* _uris(item);
     }
   } else if (value is String) {
+    final lower = value.toLowerCase();
     if (p.isAbsolute(value) ||
         value.startsWith('kelivo-file:') ||
         value.startsWith('kelivo:') ||
-        value.startsWith('file:')) {
+        lower.startsWith('file:')) {
       yield value;
     }
-    if (value.contains('![') || value.toLowerCase().contains('<img')) {
+    if (value.contains('![') || lower.contains('<img')) {
       yield* markdownImageSources(value);
     }
-    for (final match in RegExp(
-      r'''(?:kelivo-file|file):///[^\s<>"')\]]+|kelivo://[^\s<>"')\]]+''',
-    ).allMatches(value)) {
-      yield match.group(0)!;
-    }
+    yield* _embeddedAttachmentUris(value);
   }
 }
 
@@ -536,47 +591,54 @@ _AttachmentReferences _readReferences(
       result.conversations.putIfAbsent(uri, () => {})[id] = title;
     }
 
-    // Every version and fork participates, regardless of timeline selection.
-    for (final row in database.select(
+    // Read every version and fork one row at a time. Tool payloads can be large.
+    final parts = database.prepare(
       'SELECT p.kind, p.payload, m.conversation_id, c.title '
       'FROM message_part_rows p JOIN message_rows m ON m.id = p.revision_id '
       'JOIN conversation_rows c ON c.id = m.conversation_id '
       "WHERE p.kind IN ('image', 'file', 'tool_call') OR "
       "(p.kind = 'text' AND (instr(p.payload, '![') > 0 OR "
-      "instr(lower(p.payload), '<img') > 0 OR instr(p.payload, 'kelivo-file:') > 0 OR "
-      "instr(p.payload, 'file:') > 0 OR instr(p.payload, 'kelivo:') > 0 OR instr(p.payload, '](/') > 0))",
-    )) {
-      final raw = row['payload'] as String;
-      Object? payload = raw;
-      if (row['kind'] != 'text' && row['kind'] != 'reasoning') {
-        try {
-          payload = jsonDecode(raw);
-        } on FormatException {
-          // A malformed attachment cannot establish a trustworthy unused set.
-          if (row['kind'] == 'image' || row['kind'] == 'file') rethrow;
+      "instr(lower(p.payload), '<img') > 0 OR instr(lower(p.payload), 'file:') > 0 OR "
+      "instr(p.payload, 'kelivo:') > 0 OR instr(p.payload, '](/') > 0))",
+    );
+    try {
+      final rows = parts.selectCursor();
+      while (rows.moveNext()) {
+        final row = rows.current;
+        final raw = row['payload'] as String;
+        Object? payload = raw;
+        if (row['kind'] != 'text' && row['kind'] != 'reasoning') {
+          try {
+            payload = jsonDecode(raw);
+          } on FormatException {
+            // A malformed attachment cannot establish a trustworthy unused set.
+            if (row['kind'] == 'image' || row['kind'] == 'file') rethrow;
+          }
+        }
+        final uris = row['kind'] == 'text'
+            ? markdownImageSources(raw, includeLinks: true).toSet()
+            : row['kind'] == 'tool_call'
+            ? storageToolAttachmentUris(
+                payload,
+                root,
+                row['conversation_id'] as String,
+              ).toSet()
+            : _uris(payload).toSet();
+        (row['kind'] == 'tool_call' ? result.tools : result.chat).addAll(uris);
+        for (final uri in uris) {
+          associate(
+            resolveStorageSessionReference(
+              uri,
+              row['conversation_id'] as String,
+              root,
+            ),
+            row['conversation_id'] as String,
+            row['title'] as String,
+          );
         }
       }
-      final uris = row['kind'] == 'text'
-          ? markdownImageSources(raw, includeLinks: true).toSet()
-          : row['kind'] == 'tool_call'
-          ? storageToolAttachmentUris(
-              payload,
-              root,
-              row['conversation_id'] as String,
-            ).toSet()
-          : _uris(payload).toSet();
-      (row['kind'] == 'tool_call' ? result.tools : result.chat).addAll(uris);
-      for (final uri in uris) {
-        associate(
-          resolveStorageSessionReference(
-            uri,
-            row['conversation_id'] as String,
-            root,
-          ),
-          row['conversation_id'] as String,
-          row['title'] as String,
-        );
-      }
+    } finally {
+      parts.close();
     }
     for (final row in database.select(
       'SELECT a.path, a.thumbnail_path, a.extras_json, c.id, c.title FROM asset_rows a '
