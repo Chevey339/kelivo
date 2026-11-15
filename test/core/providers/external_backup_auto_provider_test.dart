@@ -26,7 +26,11 @@ class _Vault extends BackupSecurePasswordStore {
   }
 
   @override
-  Future<void> remember(String password) async {
+  Future<void> remember(
+    String password, {
+    bool newConsent = false,
+    bool previousRemovalPending = false,
+  }) async {
     if (cancelAuthorization) {
       throw const BackupMacKeychainAccessError(
         MacBackupAuthorization.cancelled,

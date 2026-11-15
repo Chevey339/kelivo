@@ -2248,7 +2248,11 @@ class SettingsProvider extends ChangeNotifier {
             final pendingRemoval = _preferences.getBool(_purgeKey) == true;
             await _preferences.setBool(_purgeKey, true);
             try {
-              await backupPasswordStore.remember(password);
+              await backupPasswordStore.remember(
+                password,
+                newConsent: !autoBackupEnabled,
+                previousRemovalPending: pendingRemoval,
+              );
             } on BackupMacKeychainAccessError catch (error) {
               if (!pendingRemoval &&
                   error.reason == MacBackupAuthorization.cancelled) {

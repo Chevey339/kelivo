@@ -1,8 +1,8 @@
 import Foundation
 import Security
 
-/// Kelivo's Mac builds use the user's file-based default keychain, including
-/// when the app is signed locally without a provisioned keychain access group.
+/// Stores one backup password in the supplied macOS file-based keychain.
+/// Existing credentials use the user's default keychain.
 struct BackupPasswordKeychain {
   // Keep the account and service of existing flutter_secure_storage items.
   static let account = "kelivo.backup.encryption_password"
@@ -43,8 +43,12 @@ struct BackupPasswordKeychain {
     return flags & UInt32(kSecUnlockStateStatus) != 0
   }
 
+  static func validAccount(_ value: String) -> Bool {
+    value == account || value.hasPrefix(account + ".")
+  }
+
   private func identity(_ account: String) throws -> [CFString: Any] {
-    guard account == Self.account || account.hasPrefix(Self.account + ".") else {
+    guard Self.validAccount(account) else {
       throw Failure(status: errSecParam)
     }
     return [kSecClass: kSecClassGenericPassword, kSecAttrService: Self.service, kSecAttrAccount: account]
@@ -58,7 +62,7 @@ struct BackupPasswordKeychain {
 
   /// File-based keychains do not honor the data-protection keychain's
   /// authentication UI attributes. Restore the previous setting on every exit.
-  private func withoutPrompt<T>(_ work: () throws -> T) throws -> T {
+  static func withoutPrompt<T>(_ work: () throws -> T) throws -> T {
     var allowed: DarwinBoolean = false
     try Self.check(SecKeychainGetUserInteractionAllowed(&allowed))
     if allowed.boolValue { try Self.check(SecKeychainSetUserInteractionAllowed(false)) }
@@ -67,7 +71,7 @@ struct BackupPasswordKeychain {
   }
 
   func read(_ account: String) throws -> String? {
-    try withoutPrompt {
+    try Self.withoutPrompt {
       let target = try keychain()
       guard try isUnlocked(target) else { throw Failure(status: errSecInteractionNotAllowed, locked: true) }
       var query = try lookup(identity(account), in: target)
@@ -116,7 +120,7 @@ struct BackupPasswordKeychain {
   }
 
   func forget(_ account: String) throws {
-    try withoutPrompt {
+    try Self.withoutPrompt {
       let target = try keychain()
       guard try isUnlocked(target) else { throw Failure(status: errSecInteractionNotAllowed, locked: true) }
       let query = try lookup(identity(account), in: target)

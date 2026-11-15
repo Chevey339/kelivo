@@ -50,11 +50,18 @@ class BackupSecurePasswordStore {
     }
   }
 
-  Future<T?> _mac<T>(String method, {String? password}) async {
+  Future<T?> _mac<T>(
+    String method, {
+    String? password,
+    bool newConsent = false,
+    bool previousRemovalPending = false,
+  }) async {
     try {
       return await _channel.invokeMethod<T>(method, {
         'account': _key,
         if (password != null) 'password': password,
+        if (newConsent) 'newConsent': true,
+        if (previousRemovalPending) 'previousRemovalPending': true,
       });
     } on PlatformException catch (error) {
       throw switch (error.code) {
@@ -84,8 +91,19 @@ class BackupSecurePasswordStore {
     }
   }
 
-  Future<void> remember(String password) async {
-    if (Platform.isMacOS) return _mac<void>('remember', password: password);
+  Future<void> remember(
+    String password, {
+    bool newConsent = false,
+    bool previousRemovalPending = false,
+  }) async {
+    if (Platform.isMacOS) {
+      return _mac<void>(
+        'remember',
+        password: password,
+        newConsent: newConsent,
+        previousRemovalPending: previousRemovalPending,
+      );
+    }
     try {
       await _store.write(key: _key, value: password);
       if (await read() != password) throw const BackupKeychainUnavailable();

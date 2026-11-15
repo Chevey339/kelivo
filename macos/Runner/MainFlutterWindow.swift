@@ -456,7 +456,7 @@ class MainFlutterWindow: NSWindow {
       }
     }
     let keychainChannel = FlutterMethodChannel(name: "kelivo/backup_keychain", binaryMessenger: flutterViewController.engine.binaryMessenger)
-    let backupKeychain = BackupPasswordKeychain()
+    let backupKeychain = MacBackupPasswordStore()
     let keychainQueue = DispatchQueue(label: "kelivo.backup-keychain")
     keychainChannel.setMethodCallHandler { call, result in
       if call.method == "openKeychainAccess" {
@@ -469,7 +469,7 @@ class MainFlutterWindow: NSWindow {
         }
         return
       }
-      guard let args = call.arguments as? [String: String], let account = args["account"] else {
+      guard let args = call.arguments as? [String: Any], let account = args["account"] as? String else {
         result(FlutterError(code: "invalid_backup_account", message: nil, details: nil))
         return
       }
@@ -482,10 +482,11 @@ class MainFlutterWindow: NSWindow {
           case "read":
             value = try backupKeychain.read(account)
           case "remember":
-            guard let password = args["password"], !password.isEmpty else {
+            guard let password = args["password"] as? String, !password.isEmpty else {
               throw BackupPasswordKeychain.Failure(status: errSecParam)
             }
-            try backupKeychain.remember(password, account: account)
+            try backupKeychain.remember(password, account: account, newConsent: args["newConsent"] as? Bool == true,
+                                        previousRemovalPending: args["previousRemovalPending"] as? Bool == true)
             value = nil
           case "forget":
             try backupKeychain.forget(account)
