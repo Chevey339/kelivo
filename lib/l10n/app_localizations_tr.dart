@@ -13691,7 +13691,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get backupEncryptionPasswordHint =>
-      'Bu parolayı güvenli tutun. Kaybederseniz yedek geri yüklenemez. Uygulamadan çıkana kadar yalnızca bellekte tutulur.';
+      'Bu parolayı güvenli bir yerde saklayın. Yedekleri başka bir cihazda geri yüklemek için bu parolaya ihtiyacınız olacak.';
 
   @override
   String get backupEncryptionPassword => 'Parola';
@@ -17372,7 +17372,22 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get backupEncryptionOnHintRemembered =>
-      'Yedekler şifrelenecek. Parola, otomatik yedeklemeler için bu cihazda hatırlanıyor.';
+      'Yedekler şifrelenir. Parola bu cihazda kayıtlı.';
+
+  @override
+  String get backupRememberPasswordOnDevice => 'Parolayı bu cihazda hatırla';
+
+  @override
+  String get backupForgetDisablesAutomaticHint =>
+      'Bunu kapatmak otomatik yedeklemeyi de kapatır.';
+
+  @override
+  String get backupManualPasswordHint =>
+      'Şifreli yedekler için belirlediğiniz parolayı girin.';
+
+  @override
+  String get backupManualPasswordNotSaved =>
+      'Parola bu cihazda kaydedilemedi. Bu yedekleme devam edecek.';
 
   @override
   String get backupEncryptionChangePassword => 'Yedek parolasını değiştir';

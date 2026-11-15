@@ -13804,7 +13804,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get backupEncryptionPasswordHint =>
-      'Надёжно сохраните этот пароль. Если вы его потеряете, резервную копию нельзя будет восстановить. Он хранится в памяти до выхода из приложения.';
+      'Надёжно сохраните этот пароль. Он понадобится для восстановления резервных копий на другом устройстве.';
 
   @override
   String get backupEncryptionPassword => 'Пароль';
@@ -17570,7 +17570,23 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get backupEncryptionOnHintRemembered =>
-      'Резервные копии будут зашифрованы. Пароль запомнен на этом устройстве для автоматического резервного копирования.';
+      'Резервные копии шифруются. Пароль сохранён на этом устройстве.';
+
+  @override
+  String get backupRememberPasswordOnDevice =>
+      'Запомнить пароль на этом устройстве';
+
+  @override
+  String get backupForgetDisablesAutomaticHint =>
+      'Если отключить эту функцию, автоматические резервные копии также будут отключены.';
+
+  @override
+  String get backupManualPasswordHint =>
+      'Введите пароль, заданный для зашифрованных резервных копий.';
+
+  @override
+  String get backupManualPasswordNotSaved =>
+      'Не удалось сохранить пароль на этом устройстве. Резервное копирование продолжится.';
 
   @override
   String get backupEncryptionChangePassword =>

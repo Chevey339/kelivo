@@ -83,47 +83,46 @@ class _ExternalBackupControlsState extends State<ExternalBackupControls> {
     final l10n = AppLocalizations.of(context)!;
     String? password;
     if (value && settings.backupEncryptionEnabled) {
-      password = await settings.resolveBackupEncryptionPassword(() async {
-        if (!mounted) return null;
-        return showBackupPasswordDialog(context);
-      });
+      password = await backupPasswordForRemembering(context);
       if (!mounted) return;
-      final remember = await showAppDialog<bool>(
-        context,
-        maxWidth: 390,
-        child: Builder(
-          builder: (dialog) => Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.backupAutoRememberPasswordTitle,
-                  style: Theme.of(dialog).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-                Text(l10n.backupAutoRememberPasswordMessage),
-                const SizedBox(height: 18),
-                FormSheetActions(
-                  cancelLabel: l10n.backupAutoRememberPasswordDecline,
-                  confirmLabel: l10n.backupAutoRememberPasswordConfirm,
-                  onCancel: () => Navigator.pop(dialog, false),
-                  onConfirm: () => Navigator.pop(dialog, true),
-                ),
-              ],
+      if (!settings.backupPasswordRemembered) {
+        final remember = await showAppDialog<bool>(
+          context,
+          maxWidth: 390,
+          child: Builder(
+            builder: (dialog) => Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.backupAutoRememberPasswordTitle,
+                    style: Theme.of(dialog).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(l10n.backupAutoRememberPasswordMessage),
+                  const SizedBox(height: 18),
+                  FormSheetActions(
+                    cancelLabel: l10n.backupAutoRememberPasswordDecline,
+                    confirmLabel: l10n.backupAutoRememberPasswordConfirm,
+                    onCancel: () => Navigator.pop(dialog, false),
+                    onConfirm: () => Navigator.pop(dialog, true),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      );
-      if (!mounted) return;
-      if (remember != true) {
-        showAppSnackBar(
-          context,
-          message: l10n.backupAutoRememberDeclined,
-          type: NotificationType.info,
         );
-        return;
+        if (!mounted) return;
+        if (remember != true) {
+          showAppSnackBar(
+            context,
+            message: l10n.backupAutoRememberDeclined,
+            type: NotificationType.info,
+          );
+          return;
+        }
       }
     }
     await auto.enable(value, password: password);

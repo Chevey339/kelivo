@@ -90,6 +90,7 @@ final class BusinessKeyRegistry {
     'backup_auto_local_bookmark_v1',
     'backup_auto_local_retention_v1',
     'backup_password_forget_pending_v1',
+    'backup_password_remember_manual_v1',
     'backup_password_verifier_v1',
     'backup_install_id_v1',
     'backup_outstanding_partial_v1',

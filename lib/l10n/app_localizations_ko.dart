@@ -13200,7 +13200,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get backupEncryptionPasswordHint =>
-      '이 비밀번호를 안전하게 보관하세요. 분실하면 백업을 복원할 수 없습니다. 비밀번호는 앱을 종료할 때까지 메모리에만 보관됩니다.';
+      '이 비밀번호를 안전하게 보관하세요. 다른 기기에서 백업을 복원할 때 필요합니다.';
 
   @override
   String get backupEncryptionPassword => '비밀번호';
@@ -16748,7 +16748,20 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get backupEncryptionOnHintRemembered =>
-      '백업이 암호화됩니다. 자동 백업을 위해 이 기기에 비밀번호가 기억되어 있습니다.';
+      '백업이 암호화됩니다. 비밀번호는 이 기기에 저장되어 있습니다.';
+
+  @override
+  String get backupRememberPasswordOnDevice => '이 기기에 비밀번호 저장';
+
+  @override
+  String get backupForgetDisablesAutomaticHint => '이 기능을 끄면 자동 백업도 꺼집니다.';
+
+  @override
+  String get backupManualPasswordHint => '암호화된 백업에 설정한 비밀번호를 입력하세요.';
+
+  @override
+  String get backupManualPasswordNotSaved =>
+      '이 기기에 비밀번호를 저장하지 못했습니다. 이번 백업은 계속 진행됩니다.';
 
   @override
   String get backupEncryptionChangePassword => '백업 비밀번호 변경';

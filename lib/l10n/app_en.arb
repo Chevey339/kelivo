@@ -6493,7 +6493,7 @@
   "backupEncryptionTitle": "Encrypt backups",
   "backupEncryptionOffHint": "Unencrypted backups can be read by anyone with the file.",
   "backupEncryptionOnHint": "Backups are encrypted. Enter the password again after restarting the app.",
-  "backupEncryptionPasswordHint": "Keep this password safe. If you lose it, the backup cannot be restored. It is kept in memory until you exit the app.",
+  "backupEncryptionPasswordHint": "Keep this password safe. You will need it to restore backups on another device.",
   "backupEncryptionPassword": "Password",
   "backupEncryptionConfirmPassword": "Confirm password",
   "backupEncryptionMismatch": "Passwords do not match.",
@@ -19560,7 +19560,7 @@
     "description": "Subtitle noting backups are encrypted and the password must be re-entered after restarting."
   },
   "@backupEncryptionPasswordHint": {
-    "description": "Warning to keep the password safe since a lost password makes the backup unrestorable, kept only in memory."
+    "description": "Hint when setting an encryption password. A password remembered on this device is still needed to restore an encrypted backup on another device."
   },
   "@backupEncryptionPassword": {
     "description": "Field label for the backup encryption password input."
@@ -22478,9 +22478,25 @@
   "@backupReminderSidebarSubtitleAutoFailed": {
     "description": "Sidebar reminder after a due automatic external backup fails."
   },
-  "backupEncryptionOnHintRemembered": "Backups will be encrypted. The password is remembered on this device for automatic backups.",
+  "backupEncryptionOnHintRemembered": "Backups are encrypted. The password is saved on this device.",
   "@backupEncryptionOnHintRemembered": {
-    "description": "Shown in external backup settings or completion notifications. Backups will be encrypted. The password is remembered on this device for automatic backups."
+    "description": "Subtitle for backup encryption when the device remembers the password for manual or automatic backups."
+  },
+  "backupRememberPasswordOnDevice": "Remember password on this device",
+  "@backupRememberPasswordOnDevice": {
+    "description": "Backup encryption settings switch and optional password dialog checkbox. Saves the backup encryption password on this device for future backups, including manual backups."
+  },
+  "backupForgetDisablesAutomaticHint": "Turning this off also turns off automatic backups.",
+  "@backupForgetDisablesAutomaticHint": {
+    "description": "Subtitle of the remember-password switch when encrypted automatic backups are on, explaining what forgetting the password will do."
+  },
+  "backupManualPasswordHint": "Enter the password you set for encrypted backups.",
+  "@backupManualPasswordHint": {
+    "description": "Hint when entering the current encryption password to make a backup or save it on this device."
+  },
+  "backupManualPasswordNotSaved": "The password couldn’t be saved on this device. This backup will continue.",
+  "@backupManualPasswordNotSaved": {
+    "description": "Notice when the user chose to remember the password during a manual backup but secure storage failed. The current backup still uses the password they entered."
   },
   "backupEncryptionChangePassword": "Change backup password",
   "@backupEncryptionChangePassword": {

@@ -12974,8 +12974,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupEncryptionOnHint => '备份将加密保存，重启应用后需重新输入口令。';
 
   @override
-  String get backupEncryptionPasswordHint =>
-      '请妥善保存口令，遗忘后无法恢复备份。口令仅在内存中保留至退出应用。';
+  String get backupEncryptionPasswordHint => '请妥善保存密码。在其他设备上恢复备份时仍需输入。';
 
   @override
   String get backupEncryptionPassword => '口令';
@@ -16366,7 +16365,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupReminderSidebarSubtitleAutoFailed => '自动备份没成功，请检查网络或手动备份。';
 
   @override
-  String get backupEncryptionOnHintRemembered => '备份将加密保存。已在本机记住口令，可用于自动备份。';
+  String get backupEncryptionOnHintRemembered => '备份将加密保存，密码已记在本机。';
+
+  @override
+  String get backupRememberPasswordOnDevice => '在本机记住密码';
+
+  @override
+  String get backupForgetDisablesAutomaticHint => '关闭后，自动备份也会关闭。';
+
+  @override
+  String get backupManualPasswordHint => '请输入设置加密备份时使用的密码。';
+
+  @override
+  String get backupManualPasswordNotSaved => '未能在本机记住密码，本次备份会继续。';
 
   @override
   String get backupEncryptionChangePassword => '更改备份密码';
@@ -29353,8 +29364,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupEncryptionOnHint => '备份将加密保存，重启应用后需重新输入口令。';
 
   @override
-  String get backupEncryptionPasswordHint =>
-      '请妥善保存口令，遗忘后无法恢复备份。口令仅在内存中保留至退出应用。';
+  String get backupEncryptionPasswordHint => '请妥善保存密码。在其他设备上恢复备份时仍需输入。';
 
   @override
   String get backupEncryptionPassword => '口令';
@@ -32745,7 +32755,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupReminderSidebarSubtitleAutoFailed => '自动备份没成功，请检查网络或手动备份。';
 
   @override
-  String get backupEncryptionOnHintRemembered => '备份将加密保存。已在本机记住口令，可用于自动备份。';
+  String get backupEncryptionOnHintRemembered => '备份将加密保存，密码已记在本机。';
+
+  @override
+  String get backupRememberPasswordOnDevice => '在本机记住密码';
+
+  @override
+  String get backupForgetDisablesAutomaticHint => '关闭后，自动备份也会关闭。';
+
+  @override
+  String get backupManualPasswordHint => '请输入设置加密备份时使用的密码。';
+
+  @override
+  String get backupManualPasswordNotSaved => '未能在本机记住密码，本次备份会继续。';
 
   @override
   String get backupEncryptionChangePassword => '更改备份密码';
@@ -45737,8 +45759,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupEncryptionOnHint => '備份將加密儲存，重新啟動應用程式後需重新輸入口令。';
 
   @override
-  String get backupEncryptionPasswordHint =>
-      '請妥善保存口令，遺忘後無法還原備份。口令僅在記憶體中保留至結束應用程式。';
+  String get backupEncryptionPasswordHint => '請妥善保存密碼。在其他裝置上還原備份時仍需輸入。';
 
   @override
   String get backupEncryptionPassword => '口令';
@@ -49141,7 +49162,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupReminderSidebarSubtitleAutoFailed => '自動備份沒成功，請檢查網路或手動備份。';
 
   @override
-  String get backupEncryptionOnHintRemembered => '備份將加密保存。已在本機記住口令，可用於自動備份。';
+  String get backupEncryptionOnHintRemembered => '備份將加密儲存，密碼已記在本機。';
+
+  @override
+  String get backupRememberPasswordOnDevice => '在本機記住密碼';
+
+  @override
+  String get backupForgetDisablesAutomaticHint => '關閉後，自動備份也會關閉。';
+
+  @override
+  String get backupManualPasswordHint => '請輸入設定加密備份時使用的密碼。';
+
+  @override
+  String get backupManualPasswordNotSaved => '未能在本機記住密碼，本次備份會繼續。';
 
   @override
   String get backupEncryptionChangePassword => '變更備份密碼';

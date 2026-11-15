@@ -24216,10 +24216,10 @@ abstract class AppLocalizations {
   /// **'Backups are encrypted. Enter the password again after restarting the app.'**
   String get backupEncryptionOnHint;
 
-  /// Warning to keep the password safe since a lost password makes the backup unrestorable, kept only in memory.
+  /// Hint when setting an encryption password. A password remembered on this device is still needed to restore an encrypted backup on another device.
   ///
   /// In en, this message translates to:
-  /// **'Keep this password safe. If you lose it, the backup cannot be restored. It is kept in memory until you exit the app.'**
+  /// **'Keep this password safe. You will need it to restore backups on another device.'**
   String get backupEncryptionPasswordHint;
 
   /// Field label for the backup encryption password input.
@@ -30330,11 +30330,35 @@ abstract class AppLocalizations {
   /// **'The automatic backup didn\'t finish. Check the network or back up manually.'**
   String get backupReminderSidebarSubtitleAutoFailed;
 
-  /// Shown in external backup settings or completion notifications. Backups will be encrypted. The password is remembered on this device for automatic backups.
+  /// Subtitle for backup encryption when the device remembers the password for manual or automatic backups.
   ///
   /// In en, this message translates to:
-  /// **'Backups will be encrypted. The password is remembered on this device for automatic backups.'**
+  /// **'Backups are encrypted. The password is saved on this device.'**
   String get backupEncryptionOnHintRemembered;
+
+  /// Backup encryption settings switch and optional password dialog checkbox. Saves the backup encryption password on this device for future backups, including manual backups.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember password on this device'**
+  String get backupRememberPasswordOnDevice;
+
+  /// Subtitle of the remember-password switch when encrypted automatic backups are on, explaining what forgetting the password will do.
+  ///
+  /// In en, this message translates to:
+  /// **'Turning this off also turns off automatic backups.'**
+  String get backupForgetDisablesAutomaticHint;
+
+  /// Hint when entering the current encryption password to make a backup or save it on this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the password you set for encrypted backups.'**
+  String get backupManualPasswordHint;
+
+  /// Notice when the user chose to remember the password during a manual backup but secure storage failed. The current backup still uses the password they entered.
+  ///
+  /// In en, this message translates to:
+  /// **'The password couldn’t be saved on this device. This backup will continue.'**
+  String get backupManualPasswordNotSaved;
 
   /// Action in backup encryption settings to choose a new password for future external backups while keeping encryption enabled.
   ///

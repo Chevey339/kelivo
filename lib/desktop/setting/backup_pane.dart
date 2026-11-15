@@ -248,7 +248,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final webdavVm = context.watch<BackupProvider>();
@@ -343,13 +342,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               await _applyS3Partial(scope: scope);
                             },
                     ),
-                    BackupEncryptionTile(
-                      remembered: settings.autoBackupEnabled,
-                      enabled: settings.backupEncryptionEnabled,
-                      onChanged: busy
-                          ? null
-                          : settings.setBackupEncryptionPassword,
-                    ),
+                    BackupEncryptionTile(busy: busy),
                   ],
                 ),
               ),

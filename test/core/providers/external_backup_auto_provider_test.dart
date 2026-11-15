@@ -14,43 +14,7 @@ import 'package:Kelivo/core/services/backup/backup_secure_password_store.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import '../../support/business_test_harness.dart';
-
-class _Vault extends BackupSecurePasswordStore {
-  bool available = true;
-  bool cancelAuthorization = false;
-  String? value;
-  @override
-  Future<String?> read() async {
-    if (!available) throw const BackupKeychainUnavailable();
-    return value;
-  }
-
-  @override
-  Future<void> remember(
-    String password, {
-    bool newConsent = false,
-    bool previousRemovalPending = false,
-  }) async {
-    if (cancelAuthorization) {
-      throw const BackupMacKeychainAccessError(
-        MacBackupAuthorization.cancelled,
-      );
-    }
-    if (!available) throw const BackupKeychainUnavailable();
-    value = password;
-  }
-
-  @override
-  Future<void> requireUnlocked() async {
-    if (!available) throw const BackupKeychainUnavailable();
-  }
-
-  @override
-  Future<void> forget() async {
-    if (!available) throw const BackupKeychainUnavailable();
-    value = null;
-  }
-}
+import '../../support/backup_password_store.dart';
 
 class _WebDav extends BackupProvider {
   _WebDav(BusinessTestHarness db)
@@ -79,7 +43,7 @@ void main() {
     'foreground due work runs once, waits for busy tasks, never counts failure and honours reminder disable',
     () async {
       final db = await createBusinessTestHarness();
-      final store = _Vault();
+      final store = TestBackupPasswordStore();
       final settings = SettingsProvider(
         db.preferences,
         backupPasswordStore: store,
@@ -153,7 +117,7 @@ void main() {
     'credential consent persists across sessions; inaccessible vault blocks automatic use and password rotation disables it',
     () async {
       final db = await createBusinessTestHarness();
-      final vault = _Vault();
+      final vault = TestBackupPasswordStore();
       final settings = SettingsProvider(
         db.preferences,
         backupPasswordStore: vault,

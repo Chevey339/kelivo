@@ -13611,7 +13611,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupEncryptionPasswordHint =>
-      'Keep this password safe. If you lose it, the backup cannot be restored. It is kept in memory until you exit the app.';
+      'Keep this password safe. You will need it to restore backups on another device.';
 
   @override
   String get backupEncryptionPassword => 'Password';
@@ -17278,7 +17278,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupEncryptionOnHintRemembered =>
-      'Backups will be encrypted. The password is remembered on this device for automatic backups.';
+      'Backups are encrypted. The password is saved on this device.';
+
+  @override
+  String get backupRememberPasswordOnDevice =>
+      'Remember password on this device';
+
+  @override
+  String get backupForgetDisablesAutomaticHint =>
+      'Turning this off also turns off automatic backups.';
+
+  @override
+  String get backupManualPasswordHint =>
+      'Enter the password you set for encrypted backups.';
+
+  @override
+  String get backupManualPasswordNotSaved =>
+      'The password couldn’t be saved on this device. This backup will continue.';
 
   @override
   String get backupEncryptionChangePassword => 'Change backup password';

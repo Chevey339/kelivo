@@ -5,7 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
+import 'package:Kelivo/core/services/backup/backup_encryption.dart';
+import 'package:Kelivo/core/services/backup/backup_secure_password_store.dart';
 
+import '../../support/backup_password_store.dart';
 import '../../support/business_test_harness.dart';
 
 const _enabledKey = 'backup_encryption_enabled_v1';
@@ -107,4 +110,104 @@ void main() {
     expect(settings.backupEncryptionEnabled, isFalse);
     expect(business.preferences.getBool(_enabledKey), isNull);
   });
+
+  test(
+    'manual consent survives a restart, rotation and disabling automatic backups',
+    () async {
+      final db = await createBusinessTestHarness();
+      final vault = TestBackupPasswordStore();
+      final first = SettingsProvider(
+        db.preferences,
+        backupPasswordStore: vault,
+      );
+      addTearDown(first.dispose);
+      await first.setBackupEncryptionPassword(_password);
+      await expectLater(
+        first.rememberBackupPassword('wrong'),
+        throwsA(isA<BackupDecryptionException>()),
+      );
+      expect(vault.value, isNull);
+      await first.rememberBackupPassword(_password);
+      expect(vault.lastNewConsent, true);
+      final next = SettingsProvider(
+        BusinessPreferences(db.repository),
+        backupPasswordStore: vault,
+      );
+      addTearDown(next.dispose);
+      Future<String?> noPrompt() =>
+          next.resolveBackupEncryptionPassword(() => fail('unexpected prompt'));
+      expect(await noPrompt(), _password);
+      expect(next.backupPasswordRemembered, true);
+      expect(next.autoBackupEnabled, false);
+      await expectLater(
+        next.automaticBackupPassword(),
+        throwsA(isA<BackupKeychainUnavailable>()),
+      );
+      expect(
+        jsonEncode((await db.repository.readSnapshot()).preferences),
+        isNot(contains(_password)),
+      );
+
+      await next.setBackupEncryptionPassword('changed');
+      expect(vault.value, 'changed');
+      expect(vault.lastNewConsent, false);
+      vault.readable = false;
+      await next.rememberBackupPassword('changed');
+      expect(vault.lastNewConsent, false);
+      vault.readable = true;
+      vault.cancelAuthorization = true; // Reading works, rewriting would fail.
+      await next.setAutomaticBackup(true, password: 'changed');
+      vault.cancelAuthorization = false;
+      await next.setAutomaticBackup(false);
+      expect(next.backupPasswordRemembered, true);
+      expect(vault.value, 'changed');
+      await next.setAutomaticBackup(true, password: 'changed');
+      await next.forgetBackupPassword();
+      expect(next.backupEncryptionEnabled, true);
+      expect(next.autoBackupEnabled, false);
+      expect(next.backupPasswordRemembered, false);
+      expect(vault.value, isNull);
+      await expectLater(
+        next.resolveBackupEncryptionPassword(() async => null),
+        throwsA(isA<BackupCancelledException>()),
+      );
+      await next.rememberBackupPassword('changed');
+      await next.setBackupEncryptionPassword(null);
+      expect(vault.value, isNull);
+    },
+  );
+
+  test(
+    'forget takes effect while the keychain is offline and cleanup retries after restart',
+    () async {
+      final db = await createBusinessTestHarness();
+      final vault = TestBackupPasswordStore();
+      final settings = SettingsProvider(
+        db.preferences,
+        backupPasswordStore: vault,
+      );
+      addTearDown(settings.dispose);
+      await settings.setBackupEncryptionPassword(_password);
+      await settings.rememberBackupPassword(_password);
+      vault.available = false;
+      await expectLater(
+        settings.forgetBackupPassword(),
+        throwsA(isA<BackupKeychainUnavailable>()),
+      );
+      final next = SettingsProvider(
+        BusinessPreferences(db.repository),
+        backupPasswordStore: vault,
+      );
+      addTearDown(next.dispose);
+      vault.available = true;
+      await expectLater(
+        next.resolveBackupEncryptionPassword(() async => null),
+        throwsA(isA<BackupCancelledException>()),
+      );
+      expect(vault.value, _password);
+      await next.retryBackupPasswordRemoval();
+      expect(vault.value, isNull);
+      expect(next.backupPasswordRemembered, false);
+    },
+  );
 }

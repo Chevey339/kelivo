@@ -2207,6 +2207,13 @@ class SettingsProvider extends ChangeNotifier {
 
   static const _verifierKey = 'backup_password_verifier_v1';
   static const _purgeKey = 'backup_password_forget_pending_v1';
+  static const _manualRememberKey = 'backup_password_remember_manual_v1';
+  bool get _rememberForManual =>
+      _preferences.getBool(_manualRememberKey) == true;
+  bool get backupPasswordRemembered =>
+      _backupEncryptionEnabled && (_rememberForManual || autoBackupEnabled);
+  bool get hasBackupPasswordVerifier =>
+      _preferences.getString(_verifierKey)?.isNotEmpty == true;
 
   Future<void> _verifyPassword(String password) async {
     final saved = _preferences.getString(_verifierKey);
@@ -2224,12 +2231,98 @@ class SettingsProvider extends ChangeNotifier {
     await loaded;
     await _preferences.runExclusiveMutation(() async {
       if (_preferences.getBool(_purgeKey) == true &&
-          (!autoBackupEnabled || !_backupEncryptionEnabled)) {
+          !backupPasswordRemembered) {
         await backupPasswordStore.requireUnlocked();
-        await backupPasswordStore.forget();
-        await _preferences.remove(_purgeKey);
+        await _finishPasswordRemoval();
       }
     });
+  }
+
+  Future<void> _finishPasswordRemoval() async {
+    await backupPasswordStore.forget();
+    await _preferences.remove(_purgeKey);
+  }
+
+  /// Called inside a preference mutation. Publish consent only after the
+  /// keychain confirms the write. An interrupted new enrollment can be erased.
+  Future<void> _rememberBackupPassword(
+    String? password,
+    String consentKey,
+  ) async {
+    if (!_backupEncryptionEnabled || password == null || password.isEmpty) {
+      throw const BackupCancelledException();
+    }
+    await _verifyPassword(password);
+    final verifier = hasBackupPasswordVerifier
+        ? _preferences.getString(_verifierKey)!
+        : await BackupEncryption.passwordVerifier(password);
+    final newConsent = !backupPasswordRemembered;
+    final pending = _preferences.getBool(_purgeKey) == true;
+    if (newConsent && !pending) await _preferences.setBool(_purgeKey, true);
+    try {
+      String? stored;
+      var missing = newConsent;
+      if (!newConsent) {
+        try {
+          stored = await backupPasswordStore.read();
+          missing = stored == null;
+        } on BackupKeychainUnavailable {
+          // An explicit save can authorize a write where a silent read failed.
+          // Keep using the existing credential's location in that case.
+        }
+      }
+      if (stored != password) {
+        await backupPasswordStore.remember(
+          password,
+          newConsent: missing,
+          previousRemovalPending: pending,
+        );
+      }
+    } on BackupMacKeychainAccessError catch (error) {
+      if (newConsent &&
+          !pending &&
+          error.reason == MacBackupAuthorization.cancelled) {
+        await _preferences.remove(_purgeKey);
+      }
+      rethrow;
+    }
+    await _preferences.setMany({
+      consentKey: true,
+      _purgeKey: false,
+      _verifierKey: verifier,
+    });
+    _backupEncryptionPassword = password;
+  }
+
+  Future<void> rememberBackupPassword(String password) async {
+    await loaded;
+    await _preferences
+        .runExclusiveMutation(
+          () => _rememberBackupPassword(password, _manualRememberKey),
+        )
+        .whenComplete(notifyListeners);
+  }
+
+  Future<void> _forgetBackupPassword({required bool disableAutomatic}) async {
+    final purge =
+        backupPasswordRemembered || _preferences.getBool(_purgeKey) == true;
+    await _preferences.setMany({
+      _manualRememberKey: false,
+      if (disableAutomatic) autoBackupEnabledKey: false,
+      if (purge) _purgeKey: true,
+    });
+    _backupEncryptionPassword = null;
+    if (purge) await _finishPasswordRemoval();
+  }
+
+  Future<void> forgetBackupPassword() async {
+    await loaded;
+    await _preferences
+        .runExclusiveMutation(
+          () =>
+              _forgetBackupPassword(disableAutomatic: _backupEncryptionEnabled),
+        )
+        .whenComplete(notifyListeners);
   }
 
   Future<void> setAutomaticBackup(bool value, {String? password}) async {
@@ -2237,48 +2330,15 @@ class SettingsProvider extends ChangeNotifier {
     await _preferences
         .runExclusiveMutation(() async {
           if (value && _backupEncryptionEnabled) {
-            if (password == null || password.isEmpty) {
-              throw const BackupCancelledException();
-            }
-            await _verifyPassword(password);
-            final saved = _preferences.getString(_verifierKey);
-            final verifier = saved == null || saved.isEmpty
-                ? await BackupEncryption.passwordVerifier(password)
-                : saved;
-            final pendingRemoval = _preferences.getBool(_purgeKey) == true;
-            await _preferences.setBool(_purgeKey, true);
-            try {
-              await backupPasswordStore.remember(
-                password,
-                newConsent: !autoBackupEnabled,
-                previousRemovalPending: pendingRemoval,
-              );
-            } on BackupMacKeychainAccessError catch (error) {
-              if (!pendingRemoval &&
-                  error.reason == MacBackupAuthorization.cancelled) {
-                await _preferences.remove(_purgeKey);
-              }
-              rethrow;
-            }
-            await _preferences.setMany({
-              autoBackupEnabledKey: true,
-              _purgeKey: false,
-              _verifierKey: verifier,
-            });
-            _backupEncryptionPassword = password;
+            await _rememberBackupPassword(password, autoBackupEnabledKey);
           } else if (!value &&
-              (autoBackupEnabled && _backupEncryptionEnabled ||
+              !_rememberForManual &&
+              (backupPasswordRemembered ||
                   _preferences.getBool(_purgeKey) == true)) {
-            await _preferences.setMany({
-              autoBackupEnabledKey: false,
-              _purgeKey: true,
-            });
-            _backupEncryptionPassword = null;
-            await backupPasswordStore.forget();
-            await _preferences.remove(_purgeKey);
+            await _forgetBackupPassword(disableAutomatic: true);
           } else {
             await _preferences.setBool(autoBackupEnabledKey, value);
-            if (!value) _backupEncryptionPassword = null;
+            if (!value && !_rememberForManual) _backupEncryptionPassword = null;
           }
         })
         .whenComplete(notifyListeners);
@@ -2293,12 +2353,13 @@ class SettingsProvider extends ChangeNotifier {
         .runExclusiveMutation(() async {
           final wasEnabled = _backupEncryptionEnabled;
           final wasAutomatic = autoBackupEnabled;
+          final wasRemembered = backupPasswordRemembered;
           final enabled = password != null;
           final verifier = password == null
               ? ''
               : await BackupEncryption.passwordVerifier(password);
           BackupKeychainUnavailable? failedWrite;
-          if (wasAutomatic && wasEnabled && password != null) {
+          if (wasRemembered && password != null) {
             try {
               await backupPasswordStore.remember(password);
             } on BackupKeychainUnavailable catch (error) {
@@ -2314,11 +2375,11 @@ class SettingsProvider extends ChangeNotifier {
           final purge =
               failedWrite != null ||
               (!enabled &&
-                  ((wasAutomatic && wasEnabled) ||
-                      _preferences.getBool(_purgeKey) == true));
+                  (wasRemembered || _preferences.getBool(_purgeKey) == true));
           await _preferences.setMany({
             _backupEncryptionEnabledKey: enabled,
             _verifierKey: verifier,
+            if (!enabled || failedWrite != null) _manualRememberKey: false,
             if (wasAutomatic &&
                 (!enabled || !wasEnabled || failedWrite != null))
               autoBackupEnabledKey: false,
@@ -2328,8 +2389,7 @@ class SettingsProvider extends ChangeNotifier {
           _backupEncryptionPassword = failedWrite == null ? password : null;
           if (purge) {
             try {
-              await backupPasswordStore.forget();
-              await _preferences.remove(_purgeKey);
+              await _finishPasswordRemoval();
             } on BackupKeychainUnavailable {
               // Keep the original write failure and the pending revocation.
               if (failedWrite == null) rethrow;
@@ -2342,8 +2402,14 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<String?> automaticBackupPassword() async {
     await loaded;
-    if (!_backupEncryptionEnabled) return null;
-    if (!autoBackupEnabled) throw const BackupKeychainUnavailable();
+    return _preferences.runExclusiveMutation(() async {
+      if (!_backupEncryptionEnabled) return null;
+      if (!autoBackupEnabled) throw const BackupKeychainUnavailable();
+      return _readRememberedBackupPassword();
+    });
+  }
+
+  Future<String> _readRememberedBackupPassword() async {
     final password = await backupPasswordStore.read();
     if (password == null || password.isEmpty) {
       throw const BackupKeychainUnavailable();
@@ -2357,24 +2423,30 @@ class SettingsProvider extends ChangeNotifier {
     Future<String?> Function() prompt,
   ) async {
     await loaded;
-    if (!_backupEncryptionEnabled) return null;
-    if (_backupEncryptionPassword case final String password) return password;
-    if (autoBackupEnabled) {
-      try {
-        return await automaticBackupPassword();
-      } on BackupKeychainUnavailable {
-        /* Manual backups may still prompt. */
-      } on BackupDecryptionException {
-        /* Let the user supply the correct password. */
+    final existing = await _preferences.runExclusiveMutation(() async {
+      if (!_backupEncryptionEnabled || _backupEncryptionPassword != null) {
+        return _backupEncryptionPassword;
       }
-    }
+      if (!backupPasswordRemembered) return null;
+      try {
+        return await _readRememberedBackupPassword();
+      } on BackupKeychainUnavailable {
+        return null;
+      } on BackupDecryptionException {
+        return null;
+      }
+    });
+    if (!_backupEncryptionEnabled) return null;
+    if (existing != null) return existing;
     final password = await prompt();
-    if (password == null || password.isEmpty || !_backupEncryptionEnabled) {
-      throw const BackupCancelledException();
-    }
-    await _verifyPassword(password);
-    _backupEncryptionPassword = password;
-    return password;
+    return _preferences.runExclusiveMutation(() async {
+      if (password == null || password.isEmpty || !_backupEncryptionEnabled) {
+        throw const BackupCancelledException();
+      }
+      await _verifyPassword(password);
+      _backupEncryptionPassword = password;
+      return password;
+    });
   }
 
   WebDavConfig _webDavConfig = const WebDavConfig();

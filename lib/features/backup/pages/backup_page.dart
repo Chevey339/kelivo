@@ -288,13 +288,7 @@ class _BackupPageState extends State<BackupPage> {
                       },
               ),
               _iosDivider(context),
-              BackupEncryptionTile(
-                remembered: settings.autoBackupEnabled,
-                enabled: settings.backupEncryptionEnabled,
-                onChanged: busy || vm.busy || s3Vm.busy
-                    ? null
-                    : settings.setBackupEncryptionPassword,
-              ),
+              BackupEncryptionTile(busy: busy || vm.busy || s3Vm.busy),
             ],
           ),
 
