@@ -709,6 +709,30 @@ void main() {
     },
   );
 
+  test(
+    'deleting inactive versions keeps a summary of the selected revision',
+    () async {
+      final edited = (await repo.appendMessageVersion(
+        messageId: 'u1',
+        content: 'selected',
+      ))!.message;
+      await compact('S1', ['u1', 'a1']);
+      final before = await effective();
+      final result = await repo.deleteMessages(
+        conversationId: 'chat',
+        messageIds: {'u1'},
+        versionSelectionChanges: {},
+        retainedMessageId: edited.id,
+      );
+      expect(result?.messages.map((m) => m.id), ['u1']);
+      expect(
+        (await repo.readContextOperations('chat')).single.revoked,
+        isFalse,
+      );
+      expect(await effective(), before);
+    },
+  );
+
   test('undo and guarded restore preserve later messages', () async {
     await compact('S1', ['u1', 'a1']);
     final before = await repo.readContextOperations('chat');

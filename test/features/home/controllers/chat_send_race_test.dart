@@ -2865,6 +2865,75 @@ void main() {
     );
   }
 
+  testWidgets(
+    'a stale delete-other-versions confirmation leaves regeneration running',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final chat = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'hello'));
+        await waitFor(
+          () =>
+              streamRequestCount == 1 &&
+              !controller.chatController.isConversationLoading(chat.id),
+          'original reply',
+        );
+        final original = (await service.loadMessages(
+          chat.id,
+        )).singleWhere((m) => m.role == 'assistant');
+        final hold = Completer<void>();
+        streamHold = hold;
+        final generation = controller.regenerateAtMessage(original);
+        try {
+          await waitFor(() => streamRequestCount == 2, 'regeneration to start');
+          final versions = await service.loadMessageVersionHeaders(chat.id, {
+            original.groupId ?? original.id,
+          });
+          final streaming = versions.singleWhere((m) => m.id != original.id);
+          final vm = controller.debugViewModel;
+          expect(
+            await vm.deleteMessageVersions(
+              message: original,
+              versionsBefore: versions,
+              deletedMessageIds: {streaming.id},
+            ),
+            isEmpty,
+          );
+          expect(
+            vm.debugChatActions.activeStreamingMessageId(chat.id),
+            streaming.id,
+          );
+          // The same stream may be kept while its inactive sibling is removed.
+          expect(
+            await vm.deleteMessageVersions(
+              message: streaming,
+              versionsBefore: versions,
+              deletedMessageIds: {original.id},
+            ),
+            {original.id},
+          );
+          expect(
+            vm.debugChatActions.activeStreamingMessageId(chat.id),
+            streaming.id,
+          );
+        } finally {
+          hold.complete();
+          await generation;
+        }
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(chat.id),
+          'regeneration to finish',
+        );
+        final kept = (await service.loadMessages(
+          chat.id,
+        )).singleWhere((m) => m.role == 'assistant');
+        expect(kept.isStreaming, isFalse);
+        expect(kept.content, isNotEmpty);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('double regenerate tap creates a single new version', (
     tester,
   ) async {

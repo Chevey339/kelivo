@@ -786,6 +786,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Are you sure you want to delete this version? This cannot be undone.';
 
   @override
+  String get homePageDeleteOtherVersions => 'Delete Other Versions';
+
+  @override
+  String homePageDeleteOtherVersionsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count other versions will be deleted.',
+      one: '$count other version will be deleted.',
+    );
+    return 'Keep this version of the message? $_temp0 This cannot be undone.';
+  }
+
+  @override
   String get homePageDeleteAllVersions => 'Delete All Versions';
 
   @override

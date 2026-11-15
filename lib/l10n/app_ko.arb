@@ -234,6 +234,8 @@
   "userProviderDefaultUserName": "사용자",
   "homePageDeleteMessage": "이 버전 삭제",
   "homePageDeleteMessageConfirm": "현재 버전을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+  "homePageDeleteOtherVersions": "다른 버전 삭제",
+  "homePageDeleteOtherVersionsConfirm": "이 버전의 메시지를 유지하시겠습니까? {count, plural, other{{count}개의 다른 버전이 삭제됩니다.}} 이 작업은 되돌릴 수 없습니다.",
   "homePageDeleteAllVersions": "모든 버전 삭제",
   "homePageDeleteAllVersionsConfirm": "이 메시지의 모든 버전을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
   "homePageCancel": "취소",

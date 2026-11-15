@@ -49,15 +49,7 @@ typedef OnResendMessage = void Function(ChatMessage message);
 typedef OnTranslateMessage = void Function(ChatMessage message);
 typedef OnEditMessage = void Function(ChatMessage message);
 typedef OnDeleteMessage =
-    Future<void> Function(
-      ChatMessage message,
-      Map<String, List<ChatMessage>> byGroup,
-    );
-typedef OnDeleteAllVersions =
-    Future<void> Function(
-      ChatMessage message,
-      Map<String, List<ChatMessage>> byGroup,
-    );
+    Future<void> Function(ChatMessage message, MessageVersionDeleteScope scope);
 typedef OnForkConversation = Future<void> Function(ChatMessage message);
 typedef OnSelectMessages =
     void Function(int messageIndex, List<ChatMessage> messages);
@@ -147,7 +139,6 @@ class MessageListView extends StatefulWidget {
     this.onTranslateMessage,
     this.onEditMessage,
     this.onDeleteMessage,
-    this.onDeleteAllVersions,
     this.onForkConversation,
     this.onSelectMessages,
     this.onSpeakMessage,
@@ -251,7 +242,6 @@ class MessageListView extends StatefulWidget {
   final OnTranslateMessage? onTranslateMessage;
   final OnEditMessage? onEditMessage;
   final OnDeleteMessage? onDeleteMessage;
-  final OnDeleteAllVersions? onDeleteAllVersions;
   final OnForkConversation? onForkConversation;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
@@ -2172,7 +2162,7 @@ class _MessageListViewState extends State<MessageListView> {
     final availableVersions = model.availableVersions;
     final selectedVersion = model.selectedVersion;
     final selectedIdx = model.selectedVersionIndex;
-    final total = availableVersions.length;
+    final hasMultipleVersions = model.versionCount > 1;
     final messageSuggestions =
         !widget.selecting &&
             model.isLatestCompleteAssistant &&
@@ -2255,7 +2245,7 @@ class _MessageListViewState extends State<MessageListView> {
                                 availableVersions: availableVersions,
                                 selectedVersion: selectedVersion,
                                 selectedIdx: selectedIdx,
-                                total: total,
+                                hasMultipleVersions: hasMultipleVersions,
                                 isProcessingFiles: isProcessingFiles,
                                 suggestions: messageSuggestions,
                                 presentation: presentation,
@@ -2273,7 +2263,7 @@ class _MessageListViewState extends State<MessageListView> {
                                 availableVersions: availableVersions,
                                 selectedVersion: selectedVersion,
                                 selectedIdx: selectedIdx,
-                                total: total,
+                                hasMultipleVersions: hasMultipleVersions,
                                 isProcessingFiles: isProcessingFiles,
                                 suggestions: messageSuggestions,
                                 presentation: presentation,
@@ -2442,7 +2432,7 @@ class _MessageListViewState extends State<MessageListView> {
     required List<int> availableVersions,
     required int selectedVersion,
     required int selectedIdx,
-    required int total,
+    required bool hasMultipleVersions,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
@@ -2507,7 +2497,7 @@ class _MessageListViewState extends State<MessageListView> {
             availableVersions: availableVersions,
             selectedVersion: selectedVersion,
             selectedIdx: selectedIdx,
-            total: total,
+            hasMultipleVersions: hasMultipleVersions,
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
             presentation: presentation,
@@ -2536,7 +2526,7 @@ class _MessageListViewState extends State<MessageListView> {
     required List<int> availableVersions,
     required int selectedVersion,
     required int selectedIdx,
-    required int total,
+    required bool hasMultipleVersions,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
@@ -2555,7 +2545,7 @@ class _MessageListViewState extends State<MessageListView> {
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
       versionIndex: currentIdx < 0 ? selectedIdx : currentIdx,
-      versionCount: total > 0 ? total : 1,
+      versionCount: availableVersions.length,
       onPrevVersion: (currentIdx > 0)
           ? () => widget.onVersionChange?.call(
               gid,
@@ -2635,14 +2625,17 @@ class _MessageListViewState extends State<MessageListView> {
           ? () => widget.onEditMessage?.call(message)
           : null,
       onDelete: message.role == 'user'
-          ? () => widget.onDeleteMessage?.call(message, widget.byGroup)
+          ? () => widget.onDeleteMessage?.call(
+              message,
+              MessageVersionDeleteScope.current,
+            )
           : null,
       onMore: () async {
         final start = ContextHistory.fixedStart(widget.contextOperations);
         final action = await showMessageMoreSheet(
           context,
           message,
-          canDeleteAllVersions: total > 1,
+          hasMultipleVersions: hasMultipleVersions,
           canCreateBranch: widget.onForkConversation != null,
           canSetContextStart:
               widget.onSetContextStart != null && !message.isStreaming,
@@ -2652,10 +2645,8 @@ class _MessageListViewState extends State<MessageListView> {
           widget.onSetContextStart?.call(message);
         } else if (action == MessageMoreAction.cancelContextStart) {
           if (start != null) widget.onUndoContextOperation?.call(start);
-        } else if (action == MessageMoreAction.deleteCurrentVersion) {
-          await widget.onDeleteMessage?.call(message, widget.byGroup);
-        } else if (action == MessageMoreAction.deleteAllVersions) {
-          await widget.onDeleteAllVersions?.call(message, widget.byGroup);
+        } else if (action?.deleteScope case final scope?) {
+          await widget.onDeleteMessage?.call(message, scope);
         } else if (action == MessageMoreAction.edit) {
           widget.onEditMessage?.call(message);
         } else if (action == MessageMoreAction.fork) {

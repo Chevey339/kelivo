@@ -770,6 +770,19 @@ class AppLocalizationsKo extends AppLocalizations {
       '현재 버전을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.';
 
   @override
+  String get homePageDeleteOtherVersions => '다른 버전 삭제';
+
+  @override
+  String homePageDeleteOtherVersionsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개의 다른 버전이 삭제됩니다.',
+    );
+    return '이 버전의 메시지를 유지하시겠습니까? $_temp0 이 작업은 되돌릴 수 없습니다.';
+  }
+
+  @override
   String get homePageDeleteAllVersions => '모든 버전 삭제';
 
   @override

@@ -831,44 +831,6 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
-  /// Delete a message and adjust version selections.
-  ///
-  /// Returns the list of message IDs to clean up UI state for.
-  /// The UI layer should handle confirmation dialog before calling this.
-  Future<void> deleteMessage({
-    required ChatMessage message,
-    required Map<String, List<ChatMessage>> byGroup,
-    String? expectedContextState,
-  }) async {
-    final gid = (message.groupId ?? message.id);
-    final versBefore = List<ChatMessage>.of(
-      byGroup[gid] ?? const <ChatMessage>[],
-    )..sort((a, b) => a.version.compareTo(b.version));
-    await _deleteMessageVersions(
-      expectedContextState: expectedContextState,
-      gid: gid,
-      versionsBefore: versBefore,
-      deletedMessageIds: <String>{message.id},
-    );
-  }
-
-  Future<void> deleteAllMessageVersions({
-    required ChatMessage message,
-    required Map<String, List<ChatMessage>> byGroup,
-    String? expectedContextState,
-  }) async {
-    final gid = (message.groupId ?? message.id);
-    final versBefore = List<ChatMessage>.of(
-      byGroup[gid] ?? const <ChatMessage>[],
-    )..sort((a, b) => a.version.compareTo(b.version));
-    await _deleteMessageVersions(
-      expectedContextState: expectedContextState,
-      gid: gid,
-      versionsBefore: versBefore,
-      deletedMessageIds: versBefore.map((m) => m.id).toSet(),
-    );
-  }
-
   @visibleForTesting
   static int? computeNextVersionSelection({
     required List<ChatMessage> versionsBefore,
@@ -1063,88 +1025,71 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _deleteMessageVersions({
-    required String gid,
+  /// Applies the exact revisions confirmed for one message group.
+  Future<Set<String>> deleteMessageVersions({
+    required ChatMessage message,
     required List<ChatMessage> versionsBefore,
     required Set<String> deletedMessageIds,
     String? expectedContextState,
   }) async {
-    if (deletedMessageIds.isEmpty) return;
-
-    // The animated delete flow awaits the removal animation before calling
-    // this, so the user may have switched conversations in the meantime.
-    // Deleting against whichever conversation is current would silently
-    // no-op (the ids belong to another conversation), so target the
-    // conversation the revisions belong to and only touch the loaded
-    // timeline while it is still the current one.
-    final targetConversationId = versionsBefore.isNotEmpty
-        ? versionsBefore.first.conversationId
-        : currentConversation?.id;
-    final conversation = targetConversationId == currentConversation?.id
-        ? currentConversation
-        : (targetConversationId == null
-              ? null
-              : _chatService.getConversation(targetConversationId));
-    bool isCurrentConversation() =>
-        conversation != null && conversation.id == currentConversation?.id;
-
-    Map<String, int> selections = const <String, int>{};
-    if (isCurrentConversation()) {
-      selections = versionSelections;
-    } else if (conversation != null) {
-      try {
-        selections = _chatService.getVersionSelections(conversation.id);
-      } catch (_) {}
+    final gid = message.groupId ?? message.id;
+    final conversationId = message.conversationId;
+    bool isCurrentConversation() => currentConversation?.id == conversationId;
+    final keepingCurrent = !deletedMessageIds.contains(message.id);
+    final selections = isCurrentConversation()
+        ? versionSelections
+        : _chatService.getVersionSelections(conversationId);
+    final streamingId = _chatActions.activeStreamingMessageId(conversationId);
+    if (streamingId != null && deletedMessageIds.contains(streamingId)) {
+      if (keepingCurrent &&
+          !await _chatService.canDeleteOtherVersions(
+            conversationId,
+            message.id,
+            deletedMessageIds,
+          )) {
+        return const {};
+      }
+      final active = _chatActions.activeStreamingMessageId(conversationId);
+      if (active != null) {
+        if (active != streamingId) return const {};
+        await _chatActions.cancelStreamingById(conversationId);
+      }
     }
-    final oldSel =
-        selections[gid] ??
-        (versionsBefore.isNotEmpty ? versionsBefore.last.version : 0);
-    final newSel = computeNextVersionSelection(
-      versionsBefore: versionsBefore,
-      deletedMessageIds: deletedMessageIds,
-      oldSelection: oldSel,
+    final removedIds = await _chatService.deleteMessages(
+      conversationId: conversationId,
+      messageIds: deletedMessageIds,
+      versionSelectionChanges: {
+        if (!keepingCurrent)
+          gid: computeNextVersionSelection(
+            versionsBefore: versionsBefore,
+            deletedMessageIds: deletedMessageIds,
+            oldSelection: selections[gid],
+          ),
+      },
+      retainedMessageId: keepingCurrent ? message.id : null,
+      expectedContextState: expectedContextState,
     );
-
-    var removedRevisionIds = deletedMessageIds;
-    if (conversation != null) {
-      // Deleting the row an active generation checkpoints into would make the
-      // next streaming write hit a foreign key on deleted messages; stop the
-      // generation first.
-      final streamingMessageId = _chatActions.activeStreamingMessageId(
-        conversation.id,
-      );
-      if (streamingMessageId != null &&
-          deletedMessageIds.contains(streamingMessageId)) {
-        await _chatActions.cancelStreaming(conversation);
-      }
-      removedRevisionIds = await _chatService.deleteMessages(
-        expectedContextState: expectedContextState,
-        conversationId: conversation.id,
-        messageIds: deletedMessageIds,
-        versionSelectionChanges: {gid: newSel},
-      );
-      if (isCurrentConversation()) {
-        _chatController.updateCurrentConversation(
-          _chatService.getConversation(conversation.id),
-        );
-      }
-    }
-    for (final id in removedRevisionIds) {
+    if (removedIds.isEmpty) return removedIds;
+    for (final id in removedIds) {
       _streamController.clearMessageState(id);
     }
     if (isCurrentConversation()) {
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(conversationId),
+      );
       _chatController.loadVersionSelections();
       await _chatController.refreshTimelineAfterMutation(
-        removedRevisionIds: removedRevisionIds,
+        removedRevisionIds: removedIds,
         survivingVersionsByGroup: {
           gid: [
             for (final candidate in versionsBefore)
-              if (!removedRevisionIds.contains(candidate.id)) candidate,
+              if (!removedIds.contains(candidate.id)) candidate,
           ],
         },
       );
     }
     notifyListeners();
+    return removedIds;
   }
 
   // ============================================================================

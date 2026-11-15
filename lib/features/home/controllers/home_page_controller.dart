@@ -56,6 +56,7 @@ import '../../chat/widgets/context_operation_actions.dart';
 import '../../../core/models/context_operation.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../../chat/widgets/message_edit_sheet.dart';
+import '../../chat/widgets/message_more_sheet.dart';
 import '../../chat/widgets/message_export_sheet.dart';
 import '../../../desktop/message_edit_dialog.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
@@ -2114,84 +2115,78 @@ class HomePageController extends ChangeNotifier {
   // Public Methods - Message Operations
   // ============================================================================
 
-  Future<void> deleteMessage({
-    required ChatMessage message,
-    required Map<String, List<ChatMessage>> byGroup,
-  }) async {
-    if (!_context.mounted) return;
-    final approved = await confirmContextSourceMutation(
-      _context,
-      deleting: true,
-      chat: _chatService,
-      conversationId: message.conversationId,
-      groups: {ContextHistory.group(message)},
-      removedGroups: (byGroup[ContextHistory.group(message)]?.length ?? 1) <= 1
-          ? {ContextHistory.group(message)}
-          : {},
+  Future<void> deleteMessageVersions(
+    ChatMessage message,
+    MessageVersionDeleteScope scope,
+  ) async {
+    final gid = ContextHistory.group(message);
+    final versions = await _chatService.loadMessageVersionHeaders(
+      message.conversationId,
+      {gid},
     );
-    if (approved == null) return;
-    final keepAtBottom = _scrollCtrl.isNearBottom();
-    final gid = (message.groupId ?? message.id);
-    // Deleting the only version removes the whole slot; deleting one version
-    // of several swaps content in place, which reads better without a
-    // removal animation.
-    final slotDisappears = (byGroup[gid] ?? const <ChatMessage>[]).length <= 1;
-    int? preserveRequest;
-    if (slotDisappears && _shouldAnimateSlotRemoval(message)) {
-      preserveRequest = await _playSlotRemovalAnimation(
-        gid,
-        keepAtBottom: keepAtBottom,
-      );
+    if (!_context.mounted ||
+        currentConversation?.id != message.conversationId ||
+        !versions.any((version) => version.id == message.id)) {
+      return;
     }
-    _translations.remove(message.id);
-    try {
-      await _viewModel.deleteMessage(
-        message: message,
-        byGroup: byGroup,
-        expectedContextState: approved,
-      );
-    } finally {
-      _settleAfterSlotRemoval(
-        gid,
-        conversationId: message.conversationId,
-        keepAtBottom: keepAtBottom,
-        preserveRequest: preserveRequest,
-      );
-    }
-  }
+    final deletedIds = switch (scope) {
+      MessageVersionDeleteScope.current => {message.id},
+      MessageVersionDeleteScope.others => {
+        for (final version in versions)
+          if (version.id != message.id) version.id,
+      },
+      MessageVersionDeleteScope.all =>
+        versions.map((version) => version.id).toSet(),
+    };
+    if (deletedIds.isEmpty) return;
+    final confirmed = await confirmMessageVersionDeletion(
+      _context,
+      scope,
+      deletedIds.length,
+    );
+    if (!confirmed || !_context.mounted) return;
 
-  Future<void> deleteAllMessageVersions({
-    required ChatMessage message,
-    required Map<String, List<ChatMessage>> byGroup,
-  }) async {
-    if (!_context.mounted) return;
-    final approved = await confirmContextSourceMutation(
-      _context,
-      deleting: true,
-      chat: _chatService,
-      conversationId: message.conversationId,
-      groups: {ContextHistory.group(message)},
-      removedGroups: {ContextHistory.group(message)},
-    );
-    if (approved == null) return;
+    final removesGroup = deletedIds.length == versions.length;
+    String? approved;
+    if (scope != MessageVersionDeleteScope.others) {
+      approved = await confirmContextSourceMutation(
+        _context,
+        deleting: true,
+        chat: _chatService,
+        conversationId: message.conversationId,
+        groups: {gid},
+        removedGroups: removesGroup ? {gid} : {},
+      );
+      if (approved == null) return;
+    }
     final keepAtBottom = _scrollCtrl.isNearBottom();
-    final gid = (message.groupId ?? message.id);
     int? preserveRequest;
-    if (_shouldAnimateSlotRemoval(message)) {
+    if (removesGroup && _shouldAnimateSlotRemoval(message)) {
       preserveRequest = await _playSlotRemovalAnimation(
         gid,
         keepAtBottom: keepAtBottom,
       );
     }
-    for (final version in byGroup[gid] ?? const <ChatMessage>[]) {
-      _translations.remove(version.id);
-    }
     try {
-      await _viewModel.deleteAllMessageVersions(
+      final removedIds = await _viewModel.deleteMessageVersions(
         message: message,
-        byGroup: byGroup,
+        versionsBefore: versions,
+        deletedMessageIds: deletedIds,
         expectedContextState: approved,
       );
+      if (scope == MessageVersionDeleteScope.others &&
+          removedIds.isEmpty &&
+          _context.mounted &&
+          currentConversation?.id == message.conversationId) {
+        showAppSnackBar(
+          _context,
+          message: AppLocalizations.of(_context)!.contextChanged,
+          type: NotificationType.warning,
+        );
+      }
+      for (final id in removedIds) {
+        _translations.remove(id);
+      }
     } finally {
       _settleAfterSlotRemoval(
         gid,

@@ -790,6 +790,20 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bu sürümü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.';
 
   @override
+  String get homePageDeleteOtherVersions => 'Diğer Sürümleri Sil';
+
+  @override
+  String homePageDeleteOtherVersionsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count diğer sürüm silinecek.',
+      one: '$count diğer sürüm silinecek.',
+    );
+    return 'Mesajın bu sürümü korunsun mu? $_temp0 Bu işlem geri alınamaz.';
+  }
+
+  @override
   String get homePageDeleteAllVersions => 'Tüm Sürümleri Sil';
 
   @override

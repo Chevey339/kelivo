@@ -7178,10 +7178,34 @@ class ChatDatabaseRepository {
     );
   }
 
+  Future<bool> canDeleteOtherVersions(
+    String conversationId,
+    String retainedMessageId,
+    Set<String> messageIds,
+  ) => _db.transaction(() async {
+    if (messageIds.isEmpty || messageIds.contains(retainedMessageId)) {
+      return false;
+    }
+    final window = await loadLinearMessageWindow(
+      conversationId: conversationId,
+      aroundRevisionId: retainedMessageId,
+      limit: 1,
+    );
+    final slot = window.slots.singleOrNull;
+    if (slot == null ||
+        slot.revisionId != retainedMessageId ||
+        slot.versionCount != messageIds.length + 1) {
+      return false;
+    }
+    final ids = await getMessageIdsForGroups(conversationId, {slot.groupId});
+    return ids.containsAll(messageIds);
+  });
+
   Future<DeletedMessagesResult?> deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    String? retainedMessageId,
     String? expectedContextState,
   }) {
     return _observer.measure(
@@ -7192,6 +7216,7 @@ class ChatDatabaseRepository {
           conversationId: conversationId,
           messageIds: messageIds,
           versionSelectionChanges: versionSelectionChanges,
+          retainedMessageId: retainedMessageId,
         );
       },
     );
@@ -7201,6 +7226,7 @@ class ChatDatabaseRepository {
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    String? retainedMessageId,
     String? expectedContextState,
   }) async {
     if (messageIds.isEmpty) return null;
@@ -7228,6 +7254,16 @@ class ChatDatabaseRepository {
           .where((row) => messageIds.contains(row.id))
           .toList(growable: false);
       if (deletedRows.isEmpty) return null;
+      // Only inactive siblings may be removed without invalidating context.
+      // Recheck the confirmed set and selection inside the write transaction.
+      if (retainedMessageId != null &&
+          !await canDeleteOtherVersions(
+            conversationId,
+            retainedMessageId,
+            messageIds,
+          )) {
+        return null;
+      }
       if (deletedRows.length != messageIds.length) {
         throw StateError('delete_messages_not_found');
       }
@@ -7276,17 +7312,19 @@ class ChatDatabaseRepository {
       await _revokeContextForGroups(
         conversationId,
         {
-          for (final row in deletedRows) row.groupId ?? row.id,
+          if (retainedMessageId == null)
+            for (final row in deletedRows) row.groupId ?? row.id,
           ...versionSelectionChanges.keys,
         },
         removedGroups: {
-          for (final row in deletedRows)
-            if (!remainingRows.any(
-              (remaining) =>
-                  (remaining.groupId ?? remaining.id) ==
-                  (row.groupId ?? row.id),
-            ))
-              row.groupId ?? row.id,
+          if (retainedMessageId == null)
+            for (final row in deletedRows)
+              if (!remainingRows.any(
+                (remaining) =>
+                    (remaining.groupId ?? remaining.id) ==
+                    (row.groupId ?? row.id),
+              ))
+                row.groupId ?? row.id,
         },
       );
       final deletedIds = deletedRows
@@ -7351,7 +7389,9 @@ class ChatDatabaseRepository {
         truncateIndex: -1,
         messageIds: orderedIds,
         versionSelections: selections,
-        chatSuggestions: const <String>[],
+        chatSuggestions: retainedMessageId == null
+            ? const <String>[]
+            : currentConversation.chatSuggestions,
         updatedAt: DateTime.now(),
       );
       await (_db.update(_db.conversationRows)

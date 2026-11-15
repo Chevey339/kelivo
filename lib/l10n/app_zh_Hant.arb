@@ -234,6 +234,8 @@
   "userProviderDefaultUserName": "使用者",
   "homePageDeleteMessage": "刪除本版本",
   "homePageDeleteMessageConfirm": "確定要刪除目前版本嗎？此操作不可撤銷。",
+  "homePageDeleteOtherVersions": "刪除其他版本",
+  "homePageDeleteOtherVersionsConfirm": "保留這則訊息的目前版本？{count, plural, other{將刪除其他 {count} 個版本。}}此操作無法復原。",
   "homePageDeleteAllVersions": "刪除全部版本",
   "homePageDeleteAllVersionsConfirm": "確定要刪除這則訊息的全部版本嗎？此操作不可撤銷。",
   "homePageCancel": "取消",

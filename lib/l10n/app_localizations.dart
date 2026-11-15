@@ -1516,6 +1516,18 @@ abstract class AppLocalizations {
   /// **'Are you sure you want to delete this version? This cannot be undone.'**
   String get homePageDeleteMessageConfirm;
 
+  /// Action in a chat message's More menu and its confirmation dialog title. Deletes the other versions of this message while keeping the version on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Other Versions'**
+  String get homePageDeleteOtherVersions;
+
+  /// Confirmation dialog body for deleting the other versions of one chat message. The version on screen is kept. Count is the number of other versions being permanently deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this version of the message? {count, plural, one{{count} other version will be deleted.} other{{count} other versions will be deleted.}} This cannot be undone.'**
+  String homePageDeleteOtherVersionsConfirm(int count);
+
   /// Dialog title and option label for deleting all versions of a message.
   ///
   /// In en, this message translates to:

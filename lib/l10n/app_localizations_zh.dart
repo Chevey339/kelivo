@@ -756,6 +756,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageDeleteMessageConfirm => '确定要删除当前版本吗？此操作不可撤销。';
 
   @override
+  String get homePageDeleteOtherVersions => '删除其他版本';
+
+  @override
+  String homePageDeleteOtherVersionsConfirm(int count) {
+    return '保留当前版本，删除这条消息的其他 $count 个版本？此操作不可撤销。';
+  }
+
+  @override
   String get homePageDeleteAllVersions => '删除全部版本';
 
   @override
@@ -17159,6 +17167,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageDeleteMessageConfirm => '确定要删除当前版本吗？此操作不可撤销。';
 
   @override
+  String get homePageDeleteOtherVersions => '删除其他版本';
+
+  @override
+  String homePageDeleteOtherVersionsConfirm(int count) {
+    return '保留当前版本，删除这条消息的其他 $count 个版本？此操作不可撤销。';
+  }
+
+  @override
   String get homePageDeleteAllVersions => '删除全部版本';
 
   @override
@@ -33560,6 +33576,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get homePageDeleteMessageConfirm => '確定要刪除目前版本嗎？此操作不可撤銷。';
+
+  @override
+  String get homePageDeleteOtherVersions => '刪除其他版本';
+
+  @override
+  String homePageDeleteOtherVersionsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '將刪除其他 $count 個版本。',
+    );
+    return '保留這則訊息的目前版本？$_temp0此操作無法復原。';
+  }
 
   @override
   String get homePageDeleteAllVersions => '刪除全部版本';

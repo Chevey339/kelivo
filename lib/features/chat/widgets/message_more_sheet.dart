@@ -22,21 +22,90 @@ import 'dart:convert';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/ios_text_button.dart';
+import 'context_dialog.dart';
+
+enum MessageVersionDeleteScope { current, others, all }
 
 enum MessageMoreAction {
   edit,
   fork,
-  deleteCurrentVersion,
-  deleteAllVersions,
+  deleteCurrentVersion(MessageVersionDeleteScope.current),
+  deleteOtherVersions(MessageVersionDeleteScope.others),
+  deleteAllVersions(MessageVersionDeleteScope.all),
   selectMessages,
   setContextStart,
-  cancelContextStart,
+  cancelContextStart;
+
+  const MessageMoreAction([this.deleteScope]);
+  final MessageVersionDeleteScope? deleteScope;
+}
+
+Future<bool> confirmMessageVersionDeletion(
+  BuildContext context,
+  MessageVersionDeleteScope scope,
+  int count,
+) async {
+  final l10n = AppLocalizations.of(context)!;
+  final (title, body) = switch (scope) {
+    MessageVersionDeleteScope.current => (
+      l10n.homePageDeleteMessage,
+      l10n.homePageDeleteMessageConfirm,
+    ),
+    MessageVersionDeleteScope.others => (
+      l10n.homePageDeleteOtherVersions,
+      l10n.homePageDeleteOtherVersionsConfirm(count),
+    ),
+    MessageVersionDeleteScope.all => (
+      l10n.homePageDeleteAllVersions,
+      l10n.homePageDeleteAllVersionsConfirm,
+    ),
+  };
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => ContextDialog(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: AppFontWeights.emphasis,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(body),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              children: [
+                IosTextButton(
+                  label: l10n.homePageCancel,
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                ),
+                IosTextButton(
+                  label: l10n.homePageDelete,
+                  color: Theme.of(ctx).colorScheme.error,
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  return result == true;
 }
 
 Future<MessageMoreAction?> showMessageMoreSheet(
   BuildContext context,
   ChatMessage message, {
-  required bool canDeleteAllVersions,
+  required bool hasMultipleVersions,
   required bool canCreateBranch,
   bool canSetContextStart = false,
   bool isContextStart = false,
@@ -57,7 +126,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
       builder: (ctx) => _MessageMoreSheet(
         message: message,
         parentContext: context,
-        canDeleteAllVersions: canDeleteAllVersions,
+        hasMultipleVersions: hasMultipleVersions,
         canCreateBranch: canCreateBranch,
         canSetContextStart: canSetContextStart,
         isContextStart: isContextStart,
@@ -168,7 +237,15 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           selected = MessageMoreAction.deleteCurrentVersion;
         },
       ),
-      if (canDeleteAllVersions)
+      if (hasMultipleVersions) ...[
+        DesktopContextMenuItem(
+          icon: LucideIcons.listMinus,
+          label: l10n.homePageDeleteOtherVersions,
+          danger: true,
+          onTap: () {
+            selected = MessageMoreAction.deleteOtherVersions;
+          },
+        ),
         DesktopContextMenuItem(
           icon: Lucide.Trash,
           label: l10n.messageMoreSheetDeleteAllVersions,
@@ -177,6 +254,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
             selected = MessageMoreAction.deleteAllVersions;
           },
         ),
+      ],
     ],
   );
   if (afterClose != null) {
@@ -189,14 +267,14 @@ class _MessageMoreSheet extends StatefulWidget {
   const _MessageMoreSheet({
     required this.message,
     required this.parentContext,
-    required this.canDeleteAllVersions,
+    required this.hasMultipleVersions,
     required this.canCreateBranch,
     required this.canSetContextStart,
     required this.isContextStart,
   });
   final ChatMessage message;
   final BuildContext parentContext;
-  final bool canDeleteAllVersions;
+  final bool hasMultipleVersions;
   final bool canCreateBranch;
   final bool canSetContextStart;
   final bool isContextStart;
@@ -432,7 +510,15 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                           ).pop(MessageMoreAction.deleteCurrentVersion);
                         },
                       ),
-                      if (widget.canDeleteAllVersions)
+                      if (widget.hasMultipleVersions) ...[
+                        _actionItem(
+                          icon: LucideIcons.listMinus,
+                          label: l10n.homePageDeleteOtherVersions,
+                          danger: true,
+                          onTap: () => Navigator.of(
+                            context,
+                          ).pop(MessageMoreAction.deleteOtherVersions),
+                        ),
                         _actionItem(
                           icon: Lucide.Trash,
                           label: l10n.messageMoreSheetDeleteAllVersions,
@@ -443,6 +529,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                             ).pop(MessageMoreAction.deleteAllVersions);
                           },
                         ),
+                      ],
                     ]),
                   ],
                 ),

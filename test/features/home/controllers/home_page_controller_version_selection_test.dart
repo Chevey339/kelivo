@@ -15,6 +15,7 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/features/chat/widgets/message_more_sheet.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
@@ -253,6 +254,7 @@ class _SelectionFakeChatService extends ChatService {
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    String? retainedMessageId,
     String? expectedContextState,
   }) async {
     lastDeletedIds = Set<String>.of(messageIds);
@@ -279,6 +281,65 @@ ChatMessage _msg({
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('confirms the number of siblings and deletes only those IDs', (
+    tester,
+  ) async {
+    final kept = _msg(
+      id: 'kept',
+      role: 'assistant',
+      groupId: 'answer',
+      version: 2,
+    );
+    final service = _SelectionFakeChatService(
+      conversation: Conversation(id: 'conversation-1', title: 'Chat'),
+      seededMessages: [
+        _msg(id: 'original', role: 'assistant', groupId: 'answer'),
+        _msg(id: 'other-message', role: 'user'),
+        kept,
+        _msg(id: 'latest', role: 'assistant', groupId: 'answer', version: 4),
+      ],
+      versionSelections: const {'answer': 2},
+    );
+    late HomePageController controller;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider<ChatService>.value(value: service),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: _ControllerHarness(onCreated: (value) => controller = value),
+        ),
+      ),
+    );
+    await controller.chatController.setCurrentConversationAndLoad(
+      service.conversation,
+    );
+    await tester.pumpAndSettle();
+
+    for (final button in ['Cancel', 'Delete']) {
+      final pending = controller.deleteMessageVersions(
+        kept,
+        MessageVersionDeleteScope.others,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('2 other versions will be deleted'),
+        findsOneWidget,
+      );
+      expect(service.lastDeletedIds, isNull);
+      await tester.tap(find.text(button));
+      await tester.pumpAndSettle();
+      await pending;
+    }
+    expect(service.lastDeletedIds, {'original', 'latest'});
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   for (final restartSelection in [false, true]) {
     testWidgets(

@@ -234,6 +234,8 @@
   "userProviderDefaultUserName": "Пользователь",
   "homePageDeleteMessage": "Удалить эту версию",
   "homePageDeleteMessageConfirm": "Вы уверены, что хотите удалить эту версию? Это действие нельзя отменить.",
+  "homePageDeleteOtherVersions": "Удалить другие версии",
+  "homePageDeleteOtherVersionsConfirm": "Оставить эту версию сообщения? {count, plural, one{Будет удалена {count} другая версия.} few{Будут удалены {count} другие версии.} many{Будет удалено {count} других версий.} other{Будет удалено {count} других версии.}} Это действие нельзя отменить.",
   "homePageDeleteAllVersions": "Удалить все версии",
   "homePageDeleteAllVersionsConfirm": "Вы уверены, что хотите удалить все версии этого сообщения? Это действие нельзя отменить.",
   "homePageCancel": "Отмена",

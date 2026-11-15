@@ -4999,10 +4999,58 @@ class ChatService extends ChangeNotifier {
     );
   }
 
+  Future<bool> canDeleteOtherVersions(
+    String conversationId,
+    String retainedMessageId,
+    Set<String> messageIds,
+  ) {
+    if (_temporaryConversationIds.contains(conversationId)) {
+      return Future.value(
+        _canDeleteOtherTemporaryVersions(
+          conversationId,
+          retainedMessageId,
+          messageIds,
+        ),
+      );
+    }
+    return _repo.canDeleteOtherVersions(
+      conversationId,
+      retainedMessageId,
+      messageIds,
+    );
+  }
+
+  bool _canDeleteOtherTemporaryVersions(
+    String conversationId,
+    String retainedMessageId,
+    Set<String> messageIds,
+  ) {
+    if (messageIds.isEmpty || messageIds.contains(retainedMessageId)) {
+      return false;
+    }
+    final page = _loadTemporaryTimelinePage(
+      conversationId,
+      aroundRevisionId: retainedMessageId,
+      fromStart: false,
+      limit: 1,
+    );
+    final slot = page?.slots.singleOrNull?.identity;
+    if (slot == null ||
+        slot.revisionId != retainedMessageId ||
+        slot.versionCount != messageIds.length + 1) {
+      return false;
+    }
+    return getMessagesForGroups(conversationId, {slot.slotId}).every(
+      (version) =>
+          version.id == retainedMessageId || messageIds.contains(version.id),
+    );
+  }
+
   Future<Set<String>> deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    String? retainedMessageId,
     String? expectedContextState,
   }) async {
     if (!_initialized || messageIds.isEmpty) return const <String>{};
@@ -5015,29 +5063,57 @@ class ChatService extends ChangeNotifier {
           .map((message) => message.id)
           .toSet();
       if (deletedIds.isEmpty) return const <String>{};
+      if (retainedMessageId != null &&
+          !_canDeleteOtherTemporaryVersions(
+            conversationId,
+            retainedMessageId,
+            messageIds,
+          )) {
+        return const {};
+      }
       _revokeTemporaryContext(
         conversationId,
         {
-          for (final message in messages)
-            if (deletedIds.contains(message.id)) ContextHistory.group(message),
+          if (retainedMessageId == null)
+            for (final message in messages)
+              if (deletedIds.contains(message.id))
+                ContextHistory.group(message),
           ...versionSelectionChanges.keys,
         },
         expectedState: expectedContextState,
         removedGroups: {
-          for (final message in messages)
-            if (deletedIds.contains(message.id) &&
-                !messages.any(
-                  (other) =>
-                      !deletedIds.contains(other.id) &&
-                      ContextHistory.group(other) ==
-                          ContextHistory.group(message),
-                ))
-              ContextHistory.group(message),
+          if (retainedMessageId == null)
+            for (final message in messages)
+              if (deletedIds.contains(message.id) &&
+                  !messages.any(
+                    (other) =>
+                        !deletedIds.contains(other.id) &&
+                        ContextHistory.group(other) ==
+                            ContextHistory.group(message),
+                  ))
+                ContextHistory.group(message),
         },
       );
+      // Persistent groups keep their earliest message order when the anchor
+      // is deleted. Keep the same slot in the temporary conversation's lists.
+      if (retainedMessageId != null) {
+        final retainedIndex = messages.indexWhere(
+          (message) => message.id == retainedMessageId,
+        );
+        final anchor = messages.indexWhere(
+          (message) => deletedIds.contains(message.id),
+        );
+        if (anchor < retainedIndex) {
+          messages.insert(anchor, messages.removeAt(retainedIndex));
+        }
+      }
       messages.removeWhere((message) => deletedIds.contains(message.id));
-      conversation.messageIds.removeWhere(deletedIds.contains);
-      conversation.chatSuggestions = const <String>[];
+      conversation.messageIds
+        ..clear()
+        ..addAll(messages.map((message) => message.id));
+      if (retainedMessageId == null) {
+        conversation.chatSuggestions = const <String>[];
+      }
       for (final entry in versionSelectionChanges.entries) {
         final version = entry.value;
         if (version == null) {
@@ -5061,6 +5137,7 @@ class ChatService extends ChangeNotifier {
       conversationId: conversationId,
       messageIds: messageIds,
       versionSelectionChanges: versionSelectionChanges,
+      retainedMessageId: retainedMessageId,
     );
     if (result == null) return const <String>{};
 

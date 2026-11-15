@@ -816,6 +816,8 @@
   "mermaidPreviewOpenFailed": "无法打开预览",
   "homePageDeleteMessage": "删除本版本",
   "homePageDeleteMessageConfirm": "确定要删除当前版本吗？此操作不可撤销。",
+  "homePageDeleteOtherVersions": "删除其他版本",
+  "homePageDeleteOtherVersionsConfirm": "保留当前版本，删除这条消息的其他 {count} 个版本？此操作不可撤销。",
   "homePageDeleteAllVersions": "删除全部版本",
   "homePageDeleteAllVersionsConfirm": "确定要删除这条消息的全部版本吗？此操作不可撤销。",
   "homePageCancel": "取消",

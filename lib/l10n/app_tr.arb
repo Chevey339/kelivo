@@ -234,6 +234,8 @@
   "userProviderDefaultUserName": "Kullanıcı",
   "homePageDeleteMessage": "Bu Sürümü Sil",
   "homePageDeleteMessageConfirm": "Bu sürümü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+  "homePageDeleteOtherVersions": "Diğer Sürümleri Sil",
+  "homePageDeleteOtherVersionsConfirm": "Mesajın bu sürümü korunsun mu? {count, plural, one{{count} diğer sürüm silinecek.} other{{count} diğer sürüm silinecek.}} Bu işlem geri alınamaz.",
   "homePageDeleteAllVersions": "Tüm Sürümleri Sil",
   "homePageDeleteAllVersionsConfirm": "Bu mesajın tüm sürümlerini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
   "homePageCancel": "İptal",

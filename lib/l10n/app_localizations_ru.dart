@@ -803,6 +803,22 @@ class AppLocalizationsRu extends AppLocalizations {
       'Вы уверены, что хотите удалить эту версию? Это действие нельзя отменить.';
 
   @override
+  String get homePageDeleteOtherVersions => 'Удалить другие версии';
+
+  @override
+  String homePageDeleteOtherVersionsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Будет удалено $count других версии.',
+      many: 'Будет удалено $count других версий.',
+      few: 'Будут удалены $count другие версии.',
+      one: 'Будет удалена $count другая версия.',
+    );
+    return 'Оставить эту версию сообщения? $_temp0 Это действие нельзя отменить.';
+  }
+
+  @override
   String get homePageDeleteAllVersions => 'Удалить все версии';
 
   @override

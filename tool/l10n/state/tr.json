@@ -234,6 +234,8 @@
   "userProviderDefaultUserName": "701f56006b5d620db4ab5ca06f614c7be7143fcb922ad8d9d43a78202889162c",
   "homePageDeleteMessage": "0565baa3af9ea55b11a6fae4ce4440809d2bd87f43d065a23eefefdf9d0100e2",
   "homePageDeleteMessageConfirm": "8655955245b96e6537a583546b4354b50db4889540b983fa8ef45a6f3e919bee",
+  "homePageDeleteOtherVersions": "97293f03d25832c869c2f9e9c50b9ddf4d626d1d1db3944c1e3eed19f9692c1c",
+  "homePageDeleteOtherVersionsConfirm": "00022e720946db91826dac07752633e227793851769bfdbeb282f1d788e9d610",
   "homePageDeleteAllVersions": "307192071118217cadee91408678476fb4d180f599dfd2b772357fbd91ca100b",
   "homePageDeleteAllVersionsConfirm": "254149b4705427080521466222fb00e0fb723aacd9beeb7d4429d0b86602eb04",
   "homePageCancel": "7f44de62df63a16a3b5661633ae742b61c40bd8733ce7159ef3ed917597c3802",
