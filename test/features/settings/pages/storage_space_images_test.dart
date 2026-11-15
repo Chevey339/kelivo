@@ -27,6 +27,17 @@ Future<void> _until(WidgetTester tester, bool Function() ready) async {
   expect(ready(), isTrue);
 }
 
+Widget _storagePage(StorageImagesFixture fixture) => ChangeNotifierProvider(
+  create: (_) => SettingsProvider(fixture.preferences),
+  child: MaterialApp(
+    locale: const Locale('zh'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    builder: (_, child) => AppSnackBarOverlay(child: child!),
+    home: const StorageSpacePage(),
+  ),
+);
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   testWidgets('active MCP icons are visibly protected in the file list', (
@@ -81,6 +92,61 @@ void main() {
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   for (final desktop in [false, true]) {
+    final platform = TargetPlatformVariant.only(
+      desktop ? TargetPlatform.macOS : TargetPlatform.android,
+    );
+    testWidgets(
+      'image thumbnails preserve aspect ratio and crop centrally, desktop=$desktop',
+      (tester) async {
+        tester.view.devicePixelRatio = 4;
+        tester.view.physicalSize =
+            Size(desktop ? 1200 : 400, 900) * tester.view.devicePixelRatio;
+        addTearDown(tester.view.reset);
+        final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+        addTearDown(fixture.dispose);
+        final expectedSizes = <File, (int, int)>{};
+        await tester.runAsync(() async {
+          for (final (width, height, expectedSize) in const [
+            (256, 768, (256, 768)),
+            (768, 256, (768, 256)),
+            (256, 5120, (204, 4096)), // Limited by the longest decode edge.
+            (384, 3072, (362, 2896)), // Limited by the decoded pixel count.
+          ]) {
+            final file = await fixture.file(
+              'upload/${width}x$height.png',
+              img.encodePng(img.Image(width: width, height: height)),
+            );
+            expectedSizes[file] = expectedSize;
+          }
+        });
+        await tester.pumpWidget(_storagePage(fixture));
+        await _until(tester, () => find.text('图片').evaluate().isNotEmpty);
+        if (!desktop) await tester.tap(find.text('图片').last);
+
+        for (final sample in expectedSizes.entries) {
+          final tile = find.byKey(ValueKey('storage-image-${sample.key.path}'));
+          final pixels = find.descendant(
+            of: tile,
+            matching: find.byType(RawImage),
+          );
+          await _until(
+            tester,
+            () =>
+                pixels.evaluate().isNotEmpty &&
+                tester.widget<RawImage>(pixels).image != null,
+          );
+          final thumbnail = tester.widget<RawImage>(pixels);
+          final decoded = thumbnail.image!;
+          expect((decoded.width, decoded.height), sample.value);
+          expect(thumbnail.fit, BoxFit.cover);
+          expect(thumbnail.alignment, Alignment.center);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+      variant: platform,
+    );
+
     testWidgets(
       'image filters, counts and protected selection, desktop=$desktop',
       (tester) async {
@@ -101,18 +167,7 @@ void main() {
             {'id': 'a', 'name': 'A', 'avatar': active.path},
           ]);
         });
-        await tester.pumpWidget(
-          ChangeNotifierProvider(
-            create: (_) => SettingsProvider(fixture.preferences),
-            child: MaterialApp(
-              locale: const Locale('zh'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              builder: (_, child) => AppSnackBarOverlay(child: child!),
-              home: const StorageSpacePage(),
-            ),
-          ),
-        );
+        await tester.pumpWidget(_storagePage(fixture));
         await _until(tester, () => find.text('图片').evaluate().isNotEmpty);
         expect(find.text('助手'), findsNothing);
         if (!desktop) {
@@ -201,9 +256,7 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pumpAndSettle();
       },
-      variant: TargetPlatformVariant.only(
-        desktop ? TargetPlatform.macOS : TargetPlatform.android,
-      ),
+      variant: platform,
     );
   }
 }

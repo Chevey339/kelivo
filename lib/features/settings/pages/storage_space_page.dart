@@ -22,6 +22,7 @@ import '../../../shared/widgets/selection_back_scope.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/platform_utils.dart';
+import '../../../utils/safe_resize_image.dart';
 import '../../backup/pages/local_snapshots_page.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import '../../workspace/pages/environment_page.dart';
@@ -2677,6 +2678,9 @@ class _ImageTile extends StatelessWidget {
     required this.onLongPress,
   });
 
+  static const _maxTileEdge = 1024;
+  static const _maxDecodeEdge = 4096;
+
   final StorageFileEntry entry;
   final bool selected;
   final VoidCallback onToggle;
@@ -2693,7 +2697,7 @@ class _ImageTile extends StatelessWidget {
         final side = constraints.maxWidth.isFinite && constraints.maxWidth > 0
             ? constraints.maxWidth
             : 140.0;
-        final int cachePx = (side * dpr).clamp(64.0, 1024.0).round();
+        final cachePx = (side * dpr).clamp(64, _maxTileEdge).round();
 
         return Container(
           decoration: BoxDecoration(
@@ -2714,11 +2718,16 @@ class _ImageTile extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.file(
-                  File(entry.path),
+                Image(
+                  image: SafeResizeImage.wrap(
+                    FileImage(File(entry.path)),
+                    width: cachePx,
+                    height: cachePx,
+                    fit: SafeResizeFit.cover,
+                    maxEdge: _maxDecodeEdge,
+                    maxPixels: _maxTileEdge * _maxTileEdge,
+                  ),
                   fit: BoxFit.cover,
-                  cacheWidth: cachePx,
-                  cacheHeight: cachePx,
                   filterQuality: FilterQuality.low,
                   errorBuilder: (_, __, ___) {
                     return Container(
