@@ -5,6 +5,7 @@ import '../../../core/providers/external_backup_auto_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/backup_encryption.dart';
+import '../../../core/services/backup/backup_secure_password_store.dart';
 import '../../../desktop/widgets/desktop_select_dropdown.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -37,12 +38,38 @@ class _ExternalBackupControlsState extends State<ExternalBackupControls> {
       return;
     } catch (error) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        final macReason = error is BackupMacKeychainAccessError
+            ? error.reason
+            : null;
+        final canOpenKeychain =
+            macReason == MacBackupAuthorization.locked ||
+            macReason == MacBackupAuthorization.denied;
         showAppSnackBar(
           context,
           message: error is BackupDecryptionException
-              ? AppLocalizations.of(context)!.backupAutoFailedPassword
-              : backupRestoreErrorMessage(AppLocalizations.of(context)!, error),
-          type: NotificationType.error,
+              ? l10n.backupAutoFailedPassword
+              : backupRestoreErrorMessage(l10n, error),
+          type: macReason == MacBackupAuthorization.cancelled
+              ? NotificationType.info
+              : NotificationType.error,
+          duration: Duration(seconds: canOpenKeychain ? 10 : 3),
+          actionLabel: canOpenKeychain
+              ? l10n.backupMacOpenKeychainAccess
+              : null,
+          onAction: canOpenKeychain
+              ? () async {
+                  final opened =
+                      await BackupSecurePasswordStore.openMacKeychainAccess();
+                  if (!opened && mounted) {
+                    showAppSnackBar(
+                      context,
+                      message: backupRestoreErrorMessage(l10n, error),
+                      type: NotificationType.error,
+                    );
+                  }
+                }
+              : null,
         );
       }
     } finally {

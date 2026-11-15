@@ -5028,11 +5028,14 @@
   "backupAutoRememberPasswordConfirm": "Hatırla",
   "backupAutoRememberPasswordDecline": "Şimdi değil",
   "backupAutoRememberDeclined": "Otomatik yedekleme açılmadı. Zamanı geldiğinde yine hatırlatma alacaksınız.",
-  "backupAutoKeychainUnavailable": "Bu cihazda kullanılabilir bir sistem anahtarlığı yok, bu yüzden şifrelenmiş yedeklemeler otomatik olarak çalışamaz. Zamanı geldiğinde yine hatırlatma alacaksınız.",
+  "backupAutoKeychainUnavailable": "Kelivo, yedekleme parolası için sistem anahtarlığına erişemiyor. Yine de manuel olarak yedekleme yapabilirsiniz.",
   "backupAutoSucceeded": "Otomatik yedekleme tamamlandı",
   "backupAutoFailed": "Otomatik yedekleme başarısız oldu: {error}",
   "backupAutoFailedPassword": "Otomatik yedekleme başarısız oldu: parola yanlış.",
   "backupReminderSidebarSubtitleAutoFailed": "Otomatik yedekleme tamamlanmadı. Ağı kontrol edin veya elle yedekleyin.",
   "backupEncryptionOnHintRemembered": "Yedekler şifrelenecek. Parola, otomatik yedeklemeler için bu cihazda hatırlanıyor.",
-  "backupEncryptionChangePassword": "Yedek parolasını değiştir"
+  "backupEncryptionChangePassword": "Yedek parolasını değiştir",
+  "backupMacKeychainNeedsUnlock": "macOS oturum açma anahtarlığının kilidini açamadı. Anahtar Zinciri Erişimi'ni açın, “oturum açma” anahtarlığının kilidini açın ve ardından Kelivo'da tekrar deneyin.",
+  "backupMacOpenKeychainAccess": "Anahtar Zinciri Erişimi'ni aç",
+  "backupMacKeychainAccessDenied": "macOS yedek parolasına erişimi reddetti. Bir sistem istemi görünürse Kelivo'nun erişmesine izin verin. Ayrıca Anahtar Zinciri Erişimi'nde varsayılan anahtar zincirini ve parola öğesinin izinlerini kontrol edebilirsiniz."
 }

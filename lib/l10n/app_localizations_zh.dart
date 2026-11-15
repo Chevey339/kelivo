@@ -16349,7 +16349,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupAutoKeychainUnavailable =>
-      '这台设备没有可用的系统钥匙串，加密备份无法自动进行。仍会到期提醒。';
+      'Kelivo 暂时无法访问系统钥匙串来保存或读取备份密码。你仍可手动备份。';
 
   @override
   String get backupAutoSucceeded => '已完成自动备份';
@@ -16370,6 +16370,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupEncryptionChangePassword => '更改备份密码';
+
+  @override
+  String get backupMacKeychainNeedsUnlock =>
+      'macOS 无法解锁登录钥匙串。请打开「钥匙串访问」，解锁「登录」，再回到 Kelivo 重试。';
+
+  @override
+  String get backupMacOpenKeychainAccess => '打开钥匙串访问';
+
+  @override
+  String get backupMacKeychainAccessDenied =>
+      'macOS 拒绝访问备份密码。如果出现系统提示，请允许 Kelivo 访问。你也可以在「钥匙串访问」中检查默认钥匙串和备份密码项目的权限。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -32717,7 +32728,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupAutoKeychainUnavailable =>
-      '这台设备没有可用的系统钥匙串，加密备份无法自动进行。仍会到期提醒。';
+      'Kelivo 暂时无法访问系统钥匙串来保存或读取备份密码。你仍可手动备份。';
 
   @override
   String get backupAutoSucceeded => '已完成自动备份';
@@ -32738,6 +32749,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupEncryptionChangePassword => '更改备份密码';
+
+  @override
+  String get backupMacKeychainNeedsUnlock =>
+      'macOS 无法解锁登录钥匙串。请打开「钥匙串访问」，解锁「登录」，再回到 Kelivo 重试。';
+
+  @override
+  String get backupMacOpenKeychainAccess => '打开钥匙串访问';
+
+  @override
+  String get backupMacKeychainAccessDenied =>
+      'macOS 拒绝访问备份密码。如果出现系统提示，请允许 Kelivo 访问。你也可以在「钥匙串访问」中检查默认钥匙串和备份密码项目的权限。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -49102,7 +49124,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupAutoKeychainUnavailable =>
-      '這台裝置沒有可用的系統鑰匙圈，加密備份無法自動進行。仍會到期提醒。';
+      'Kelivo 暫時無法存取系統鑰匙圈來儲存或讀取備份密碼。你仍可手動備份。';
 
   @override
   String get backupAutoSucceeded => '已完成自動備份';
@@ -49123,4 +49145,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupEncryptionChangePassword => '變更備份密碼';
+
+  @override
+  String get backupMacKeychainNeedsUnlock =>
+      'macOS 無法解鎖登入鑰匙圈。請開啟「鑰匙串存取」，解鎖「登入」，再回到 Kelivo 重試。';
+
+  @override
+  String get backupMacOpenKeychainAccess => '開啟鑰匙圈存取';
+
+  @override
+  String get backupMacKeychainAccessDenied =>
+      'macOS 拒絕存取備份密碼。如果出現系統提示，請允許 Kelivo 存取。你也可以在「鑰匙串存取」中檢查預設鑰匙串和備份密碼項目的權限。';
 }

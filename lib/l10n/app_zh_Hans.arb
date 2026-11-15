@@ -6274,11 +6274,14 @@
   "backupAutoRememberPasswordConfirm": "记住",
   "backupAutoRememberPasswordDecline": "不了",
   "backupAutoRememberDeclined": "未开启自动备份，仍会到期提醒。",
-  "backupAutoKeychainUnavailable": "这台设备没有可用的系统钥匙串，加密备份无法自动进行。仍会到期提醒。",
+  "backupAutoKeychainUnavailable": "Kelivo 暂时无法访问系统钥匙串来保存或读取备份密码。你仍可手动备份。",
   "backupAutoSucceeded": "已完成自动备份",
   "backupAutoFailed": "自动备份失败：{error}",
   "backupAutoFailedPassword": "自动备份失败：密码不正确。",
   "backupReminderSidebarSubtitleAutoFailed": "自动备份没成功，请检查网络或手动备份。",
   "backupEncryptionOnHintRemembered": "备份将加密保存。已在本机记住口令，可用于自动备份。",
-  "backupEncryptionChangePassword": "更改备份密码"
+  "backupEncryptionChangePassword": "更改备份密码",
+  "backupMacKeychainNeedsUnlock": "macOS 无法解锁登录钥匙串。请打开「钥匙串访问」，解锁「登录」，再回到 Kelivo 重试。",
+  "backupMacOpenKeychainAccess": "打开钥匙串访问",
+  "backupMacKeychainAccessDenied": "macOS 拒绝访问备份密码。如果出现系统提示，请允许 Kelivo 访问。你也可以在「钥匙串访问」中检查默认钥匙串和备份密码项目的权限。"
 }

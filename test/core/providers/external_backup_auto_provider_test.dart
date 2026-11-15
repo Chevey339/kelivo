@@ -17,6 +17,7 @@ import '../../support/business_test_harness.dart';
 
 class _Vault extends BackupSecurePasswordStore {
   bool available = true;
+  bool cancelAuthorization = false;
   String? value;
   @override
   Future<String?> read() async {
@@ -26,6 +27,11 @@ class _Vault extends BackupSecurePasswordStore {
 
   @override
   Future<void> remember(String password) async {
+    if (cancelAuthorization) {
+      throw const BackupMacKeychainAccessError(
+        MacBackupAuthorization.cancelled,
+      );
+    }
     if (!available) throw const BackupKeychainUnavailable();
     value = password;
   }
@@ -175,6 +181,24 @@ void main() {
         throwsA(isA<BackupDecryptionException>()),
       );
       expect(vault.value, 'unexpected credential');
+      vault.value = 'first';
+      vault.cancelAuthorization = true;
+      final oldVerifier = db.preferences.getString(
+        'backup_password_verifier_v1',
+      );
+      await expectLater(
+        next.setBackupEncryptionPassword('cancelled change'),
+        throwsA(isA<BackupMacKeychainAccessError>()),
+      );
+      expect(next.autoBackupEnabled, true);
+      expect(vault.value, 'first');
+      expect(
+        db.preferences.getString('backup_password_verifier_v1'),
+        oldVerifier,
+      );
+      await next.retryBackupPasswordRemoval();
+      expect(await next.automaticBackupPassword(), 'first');
+      vault.cancelAuthorization = false;
       await next.setBackupEncryptionPassword('second');
       expect(vault.value, 'second');
       vault.available = false;

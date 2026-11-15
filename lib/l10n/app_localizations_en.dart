@@ -17258,7 +17258,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupAutoKeychainUnavailable =>
-      'This device has no system keychain available, so encrypted backups can\'t run automatically. You\'ll still get a reminder when it\'s due.';
+      'Kelivo can’t access the system keychain for the backup password. You can still back up manually.';
 
   @override
   String get backupAutoSucceeded => 'Automatic backup finished';
@@ -17282,4 +17282,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupEncryptionChangePassword => 'Change backup password';
+
+  @override
+  String get backupMacKeychainNeedsUnlock =>
+      'macOS couldn’t unlock the login keychain. Open Keychain Access, unlock “login”, then try again in Kelivo.';
+
+  @override
+  String get backupMacOpenKeychainAccess => 'Open Keychain Access';
+
+  @override
+  String get backupMacKeychainAccessDenied =>
+      'macOS denied access to the backup password. If a system prompt appears, allow Kelivo to access it. You can also check the default keychain and the password item’s permissions in Keychain Access.';
 }

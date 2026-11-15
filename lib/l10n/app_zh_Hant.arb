@@ -5028,11 +5028,14 @@
   "backupAutoRememberPasswordConfirm": "記住",
   "backupAutoRememberPasswordDecline": "不用了",
   "backupAutoRememberDeclined": "未開啟自動備份，仍會到期提醒。",
-  "backupAutoKeychainUnavailable": "這台裝置沒有可用的系統鑰匙圈，加密備份無法自動進行。仍會到期提醒。",
+  "backupAutoKeychainUnavailable": "Kelivo 暫時無法存取系統鑰匙圈來儲存或讀取備份密碼。你仍可手動備份。",
   "backupAutoSucceeded": "已完成自動備份",
   "backupAutoFailed": "自動備份失敗：{error}",
   "backupAutoFailedPassword": "自動備份失敗：密碼不正確。",
   "backupReminderSidebarSubtitleAutoFailed": "自動備份沒成功，請檢查網路或手動備份。",
   "backupEncryptionOnHintRemembered": "備份將加密保存。已在本機記住口令，可用於自動備份。",
-  "backupEncryptionChangePassword": "變更備份密碼"
+  "backupEncryptionChangePassword": "變更備份密碼",
+  "backupMacKeychainNeedsUnlock": "macOS 無法解鎖登入鑰匙圈。請開啟「鑰匙串存取」，解鎖「登入」，再回到 Kelivo 重試。",
+  "backupMacOpenKeychainAccess": "開啟鑰匙圈存取",
+  "backupMacKeychainAccessDenied": "macOS 拒絕存取備份密碼。如果出現系統提示，請允許 Kelivo 存取。你也可以在「鑰匙串存取」中檢查預設鑰匙串和備份密碼項目的權限。"
 }

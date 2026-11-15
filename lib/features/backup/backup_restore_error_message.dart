@@ -8,6 +8,15 @@ import '../../core/services/backup/backup_cancel_token.dart';
 import '../../core/services/backup/backup_encryption.dart';
 
 String backupRestoreErrorMessage(AppLocalizations localizations, Object error) {
+  if (error is BackupMacKeychainAccessError) {
+    return switch (error.reason) {
+      MacBackupAuthorization.locked =>
+        localizations.backupMacKeychainNeedsUnlock,
+      MacBackupAuthorization.denied =>
+        localizations.backupMacKeychainAccessDenied,
+      MacBackupAuthorization.cancelled => localizations.backupProgressCancelled,
+    };
+  }
   if (error is BackupKeychainUnavailable) {
     return localizations.backupAutoKeychainUnavailable;
   }

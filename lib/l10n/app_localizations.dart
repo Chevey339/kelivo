@@ -30300,10 +30300,10 @@ abstract class AppLocalizations {
   /// **'Automatic backup was not turned on. You\'ll still get a reminder when it\'s due.'**
   String get backupAutoRememberDeclined;
 
-  /// Shown in external backup settings or completion notifications. This device has no system keychain available, so encrypted backups can't run automatically. You'll still get a reminder when it's due.
+  /// Backup settings or automatic backup failure when access to the device credential store is unavailable. Manual backups can still prompt for the password.
   ///
   /// In en, this message translates to:
-  /// **'This device has no system keychain available, so encrypted backups can\'t run automatically. You\'ll still get a reminder when it\'s due.'**
+  /// **'Kelivo can’t access the system keychain for the backup password. You can still back up manually.'**
   String get backupAutoKeychainUnavailable;
 
   /// Shown in external backup settings or completion notifications. Automatic backup finished
@@ -30341,6 +30341,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change backup password'**
   String get backupEncryptionChangePassword;
+
+  /// Shown after macOS denies authorization for the local backup password. Keychain Access is the name of the macOS utility. The user should unlock their login keychain there and retry.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS couldn’t unlock the login keychain. Open Keychain Access, unlock “login”, then try again in Kelivo.'**
+  String get backupMacKeychainNeedsUnlock;
+
+  /// Button on a backup-password authorization error that opens Apple’s Keychain Access app on macOS so the user can unlock their default keychain.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Keychain Access'**
+  String get backupMacOpenKeychainAccess;
+
+  /// Backup password error when macOS denied access even though the default keychain was reported unlocked. Covers access denied by item permissions or an unusable login keychain without assuming that the user cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS denied access to the backup password. If a system prompt appears, allow Kelivo to access it. You can also check the default keychain and the password item’s permissions in Keychain Access.'**
+  String get backupMacKeychainAccessDenied;
 }
 
 class _AppLocalizationsDelegate

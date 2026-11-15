@@ -17352,7 +17352,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get backupAutoKeychainUnavailable =>
-      'Bu cihazda kullanılabilir bir sistem anahtarlığı yok, bu yüzden şifrelenmiş yedeklemeler otomatik olarak çalışamaz. Zamanı geldiğinde yine hatırlatma alacaksınız.';
+      'Kelivo, yedekleme parolası için sistem anahtarlığına erişemiyor. Yine de manuel olarak yedekleme yapabilirsiniz.';
 
   @override
   String get backupAutoSucceeded => 'Otomatik yedekleme tamamlandı';
@@ -17376,4 +17376,15 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get backupEncryptionChangePassword => 'Yedek parolasını değiştir';
+
+  @override
+  String get backupMacKeychainNeedsUnlock =>
+      'macOS oturum açma anahtarlığının kilidini açamadı. Anahtar Zinciri Erişimi\'ni açın, “oturum açma” anahtarlığının kilidini açın ve ardından Kelivo\'da tekrar deneyin.';
+
+  @override
+  String get backupMacOpenKeychainAccess => 'Anahtar Zinciri Erişimi\'ni aç';
+
+  @override
+  String get backupMacKeychainAccessDenied =>
+      'macOS yedek parolasına erişimi reddetti. Bir sistem istemi görünürse Kelivo\'nun erişmesine izin verin. Ayrıca Anahtar Zinciri Erişimi\'nde varsayılan anahtar zincirini ve parola öğesinin izinlerini kontrol edebilirsiniz.';
 }

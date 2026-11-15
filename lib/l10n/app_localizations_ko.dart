@@ -16729,7 +16729,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get backupAutoKeychainUnavailable =>
-      '이 기기에는 사용 가능한 시스템 키체인이 없어 암호화된 백업을 자동으로 실행할 수 없습니다. 예정 시각이 되면 계속 알려드립니다.';
+      'Kelivo가 백업 비밀번호를 위해 시스템 키체인에 접근할 수 없습니다. 수동으로 백업할 수는 있습니다.';
 
   @override
   String get backupAutoSucceeded => '자동 백업 완료';
@@ -16752,4 +16752,15 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get backupEncryptionChangePassword => '백업 비밀번호 변경';
+
+  @override
+  String get backupMacKeychainNeedsUnlock =>
+      'macOS에서 로그인 키체인을 잠금 해제하지 못했습니다. 키체인 접근을 열어 \'로그인\'을 잠금 해제한 후 Kelivo에서 다시 시도하세요.';
+
+  @override
+  String get backupMacOpenKeychainAccess => '키체인 접근 열기';
+
+  @override
+  String get backupMacKeychainAccessDenied =>
+      'macOS에서 백업 비밀번호 접근이 거부되었습니다. 시스템 프롬프트가 나타나면 Kelivo의 접근을 허용해 주세요. 키체인 접근에서 기본 키체인과 비밀번호 항목의 권한을 확인할 수도 있습니다.';
 }

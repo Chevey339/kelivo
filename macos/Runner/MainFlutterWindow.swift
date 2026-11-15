@@ -456,10 +456,50 @@ class MainFlutterWindow: NSWindow {
       }
     }
     let keychainChannel = FlutterMethodChannel(name: "kelivo/backup_keychain", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    let backupKeychain = BackupPasswordKeychain()
+    let keychainQueue = DispatchQueue(label: "kelivo.backup-keychain")
     keychainChannel.setMethodCallHandler { call, result in
-      guard call.method == "unlocked" else { result(FlutterMethodNotImplemented); return }
-      var status: SecKeychainStatus = 0
-      result(SecKeychainGetStatus(nil, &status) == errSecSuccess && (status & UInt32(kSecUnlockStateStatus)) != 0)
+      if call.method == "openKeychainAccess" {
+        guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.keychainaccess") else {
+          result(false)
+          return
+        }
+        NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration()) { running, _ in
+          DispatchQueue.main.async { result(running != nil) }
+        }
+        return
+      }
+      guard let args = call.arguments as? [String: String], let account = args["account"] else {
+        result(FlutterError(code: "invalid_backup_account", message: nil, details: nil))
+        return
+      }
+      // A user-initiated write can wait for macOS authorization. Leave the
+      // Flutter UI responsive and serialize this keychain's read/write/delete.
+      keychainQueue.async {
+        let value: Any?
+        do {
+          switch call.method {
+          case "read":
+            value = try backupKeychain.read(account)
+          case "remember":
+            guard let password = args["password"], !password.isEmpty else {
+              throw BackupPasswordKeychain.Failure(status: errSecParam)
+            }
+            try backupKeychain.remember(password, account: account)
+            value = nil
+          case "forget":
+            try backupKeychain.forget(account)
+            value = nil
+          default:
+            value = FlutterMethodNotImplemented
+          }
+        } catch let failure as BackupPasswordKeychain.Failure {
+          value = FlutterError(code: failure.code, message: nil, details: Int(failure.status))
+        } catch {
+          value = FlutterError(code: "backup_keychain_unavailable", message: nil, details: nil)
+        }
+        DispatchQueue.main.async { result(value) }
+      }
     }
     backupFolderAccess = BackupFolderAccessChannel(messenger: flutterViewController.engine.binaryMessenger)
     RegisterGeneratedPlugins(registry: flutterViewController)

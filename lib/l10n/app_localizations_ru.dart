@@ -17549,7 +17549,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get backupAutoKeychainUnavailable =>
-      'На этом устройстве нет доступной системной связки ключей, поэтому зашифрованные резервные копии не могут создаваться автоматически. Напоминание всё равно придёт, когда наступит срок.';
+      'Kelivo не может получить доступ к системной связке ключей для пароля резервной копии. Вы по-прежнему можете создать резервную копию вручную.';
 
   @override
   String get backupAutoSucceeded =>
@@ -17575,4 +17575,15 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get backupEncryptionChangePassword =>
       'Изменить пароль резервной копии';
+
+  @override
+  String get backupMacKeychainNeedsUnlock =>
+      'macOS не удалось разблокировать связку ключей «login». Откройте «Связка ключей» (Keychain Access), разблокируйте «login», затем повторите попытку в Kelivo.';
+
+  @override
+  String get backupMacOpenKeychainAccess => 'Открыть «Связку ключей»';
+
+  @override
+  String get backupMacKeychainAccessDenied =>
+      'macOS запретила доступ к паролю резервной копии. Если появится системный запрос, разрешите Kelivo доступ к нему. Также можно проверить связку ключей по умолчанию и разрешения элемента пароля в «Связке ключей».';
 }

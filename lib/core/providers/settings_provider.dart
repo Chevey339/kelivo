@@ -2245,8 +2245,17 @@ class SettingsProvider extends ChangeNotifier {
             final verifier = saved == null || saved.isEmpty
                 ? await BackupEncryption.passwordVerifier(password)
                 : saved;
+            final pendingRemoval = _preferences.getBool(_purgeKey) == true;
             await _preferences.setBool(_purgeKey, true);
-            await backupPasswordStore.remember(password);
+            try {
+              await backupPasswordStore.remember(password);
+            } on BackupMacKeychainAccessError catch (error) {
+              if (!pendingRemoval &&
+                  error.reason == MacBackupAuthorization.cancelled) {
+                await _preferences.remove(_purgeKey);
+              }
+              rethrow;
+            }
             await _preferences.setMany({
               autoBackupEnabledKey: true,
               _purgeKey: false,
@@ -2281,42 +2290,48 @@ class SettingsProvider extends ChangeNotifier {
           final wasEnabled = _backupEncryptionEnabled;
           final wasAutomatic = autoBackupEnabled;
           final enabled = password != null;
+          final verifier = password == null
+              ? ''
+              : await BackupEncryption.passwordVerifier(password);
+          BackupKeychainUnavailable? failedWrite;
+          if (wasAutomatic && wasEnabled && password != null) {
+            try {
+              await backupPasswordStore.remember(password);
+            } on BackupKeychainUnavailable catch (error) {
+              // A dismissed native authorization dialog did not change the
+              // existing item. Keep the working password and its verifier.
+              if (error is BackupMacKeychainAccessError &&
+                  error.reason == MacBackupAuthorization.cancelled) {
+                rethrow;
+              }
+              failedWrite = error;
+            }
+          }
           final purge =
-              !enabled &&
-              ((wasAutomatic && wasEnabled) ||
-                  _preferences.getBool(_purgeKey) == true);
+              failedWrite != null ||
+              (!enabled &&
+                  ((wasAutomatic && wasEnabled) ||
+                      _preferences.getBool(_purgeKey) == true));
           await _preferences.setMany({
             _backupEncryptionEnabledKey: enabled,
-            _verifierKey: password == null
-                ? ''
-                : await BackupEncryption.passwordVerifier(password),
-            if (wasAutomatic && (!enabled || !wasEnabled))
+            _verifierKey: verifier,
+            if (wasAutomatic &&
+                (!enabled || !wasEnabled || failedWrite != null))
               autoBackupEnabledKey: false,
             if (purge) _purgeKey: true,
           });
           _backupEncryptionEnabled = enabled;
-          _backupEncryptionPassword = password;
+          _backupEncryptionPassword = failedWrite == null ? password : null;
           if (purge) {
-            await backupPasswordStore.forget();
-            await _preferences.remove(_purgeKey);
-          } else if (wasAutomatic && wasEnabled && password != null) {
             try {
-              await backupPasswordStore.remember(password);
+              await backupPasswordStore.forget();
+              await _preferences.remove(_purgeKey);
             } on BackupKeychainUnavailable {
-              await _preferences.setMany({
-                autoBackupEnabledKey: false,
-                _purgeKey: true,
-              });
-              _backupEncryptionPassword = null;
-              try {
-                await backupPasswordStore.forget();
-                await _preferences.remove(_purgeKey);
-              } on BackupKeychainUnavailable {
-                /* Retain the revocation for startup. */
-              }
-              rethrow;
+              // Keep the original write failure and the pending revocation.
+              if (failedWrite == null) rethrow;
             }
           }
+          if (failedWrite != null) throw failedWrite;
         })
         .whenComplete(notifyListeners);
   }

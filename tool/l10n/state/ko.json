@@ -5028,11 +5028,14 @@
   "backupAutoRememberPasswordConfirm": "28681497935f2d010e8c5a7604af6b351c01ca73261ef415bac17cc468250dff",
   "backupAutoRememberPasswordDecline": "e7758984020da703bd2e0a74f0d0b3336a12bc70f7f6aeeee025d1f5d0a73ae6",
   "backupAutoRememberDeclined": "4fb048edc7b65952f57fd2038de23bbfc4c38c2f9a99c413835a4d234a3f6520",
-  "backupAutoKeychainUnavailable": "9e3e018757a4a5678e8fd2cd23c8244c52f11c9dc399bb0f83950b3d5732c73d",
+  "backupAutoKeychainUnavailable": "854cd24d2fbff2a0903852177523a871b7800789bf70469a7a441995e3d7027b",
   "backupAutoSucceeded": "ee3e13701e85c8bb62ab6d7673cf89d1b45e487189f0dbaf1c8185180bfdf16a",
   "backupAutoFailed": "c6d13dbf5fa179d413e17111f9bed4f567ce0972e4eec2e0d6d0ffccc2b72341",
   "backupAutoFailedPassword": "f38682eea14e0f1595b98daf716e5579f00c9b7d7537d082e8cc830f3b87e504",
   "backupReminderSidebarSubtitleAutoFailed": "873e0af28a134f4f4677b69db86c50a1850c64bef5e1acf26d84dc3bddb7c5ab",
   "backupEncryptionOnHintRemembered": "32cec780041dced662ceac37e84d77a61098bea1746d735371b31fb13afb4daa",
-  "backupEncryptionChangePassword": "e553b975c27a684929fec792e07a96eba365f2a786460bc6b8d0d938c049f666"
+  "backupEncryptionChangePassword": "e553b975c27a684929fec792e07a96eba365f2a786460bc6b8d0d938c049f666",
+  "backupMacKeychainNeedsUnlock": "e6f9c6b6e30d4c57a6e73b658a07844bc15daeb2e0e08bac26bb0beb49ad7520",
+  "backupMacOpenKeychainAccess": "39f5ed534a71e3efbbca8ce30693bb774a7e6ff81ff2b896728c42c18fe18dee",
+  "backupMacKeychainAccessDenied": "1180accbf16f8c29d0174143757601bc8d38dadf2c73c76d465f3b4d2ea989b8"
 }
