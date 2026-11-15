@@ -110,6 +110,7 @@ void main() {
       expect(AsrServiceKind.sherpaOnnx.id, 'sherpa_onnx');
       expect(AsrServiceKind.system.id, 'system');
       expect(AsrServiceKind.openAiRealtime.id, 'openai_realtime');
+      expect(AsrServiceKind.deepseek.id, 'deepseek');
       expect(AsrServiceKind.groq.id, 'groq');
       expect(AsrServiceKind.mistral.id, 'mistral');
       expect(AsrServiceKind.elevenLabs.id, 'elevenlabs');
@@ -128,6 +129,31 @@ void main() {
   });
 
   group('AsrServiceOptions', () {
+    test(
+      'DeepSeek restores recording settings without a model or language',
+      () {
+        final original = AudioTranscriptionAsrOptions(
+          kind: AsrServiceKind.deepseek,
+          apiKey: 'key',
+          sampleRate: 44100,
+          segmentDurationSec: 17,
+          model: 'unused',
+          language: 'zh',
+        );
+        expect(original.isConfigured, isTrue);
+        expect(original.baseUrl, 'https://api.deepseek.com/v1');
+        final json = original.toJson();
+        expect(json.containsKey('model'), isFalse);
+        expect(json.containsKey('language'), isFalse);
+        final restored =
+            AsrServiceOptions.fromJson(json) as AudioTranscriptionAsrOptions;
+        expect(restored.toJson(), original.toJson());
+        expect(restored.sampleRate, 44100);
+        expect(restored.copyWith(sampleRate: 96000).sampleRate, 16000);
+        expect(restored.copyWith(apiKey: '').isConfigured, isFalse);
+      },
+    );
+
     for (final (kind, name, baseUrl, model) in [
       (
         AsrServiceKind.groq,

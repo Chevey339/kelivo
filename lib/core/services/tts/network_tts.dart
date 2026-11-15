@@ -6,8 +6,11 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../network/deepseek_endpoint.dart';
+
 enum NetworkTtsKind {
   openai,
+  deepseek,
   gemini,
   azure,
   minimax,
@@ -25,6 +28,8 @@ String networkTtsKindDisplayName(NetworkTtsKind k) {
   switch (k) {
     case NetworkTtsKind.openai:
       return 'OpenAI';
+    case NetworkTtsKind.deepseek:
+      return 'DeepSeek';
     case NetworkTtsKind.gemini:
       return 'Gemini';
     case NetworkTtsKind.azure:
@@ -95,6 +100,17 @@ abstract class TtsServiceOptions {
           baseUrl: (json['baseUrl'] ?? 'https://api.openai.com/v1').toString(),
           model: (json['model'] ?? 'gpt-4o-mini-tts').toString(),
           voice: (json['voice'] ?? 'alloy').toString(),
+        );
+      case 'deepseek':
+        return DeepSeekTtsOptions(
+          id: id.isEmpty ? null : id,
+          enabled: enabled,
+          name: name.isEmpty ? 'DeepSeek TTS' : name,
+          apiKey: (json['apiKey'] ?? '').toString(),
+          baseUrl: (json['baseUrl'] ?? DeepSeekTtsOptions.defaultBaseUrl)
+              .toString(),
+          voiceId: (json['voiceId'] ?? DeepSeekTtsOptions.defaultVoiceId)
+              .toString(),
         );
       case 'gemini':
         return GeminiTtsOptions(
@@ -308,6 +324,36 @@ class OpenAiTtsOptions extends TtsServiceOptions {
     'baseUrl': baseUrl,
     'model': model,
     'voice': voice,
+  };
+}
+
+class DeepSeekTtsOptions extends TtsServiceOptions {
+  static const defaultBaseUrl = deepSeekApiBaseUrl;
+  static const defaultVoiceId = 'stella';
+  static const voiceIds = [defaultVoiceId, 'tide'];
+
+  final String apiKey;
+  final String baseUrl;
+  final String voiceId;
+
+  DeepSeekTtsOptions({
+    super.id,
+    required super.enabled,
+    required super.name,
+    required this.apiKey,
+    this.baseUrl = defaultBaseUrl,
+    this.voiceId = defaultVoiceId,
+  }) : super(kind: NetworkTtsKind.deepseek);
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'enabled': enabled,
+    'name': name,
+    'kind': kind.name,
+    'apiKey': apiKey,
+    'baseUrl': baseUrl,
+    'voiceId': voiceId,
   };
 }
 
@@ -802,6 +848,13 @@ class NetworkTtsService {
             c,
             cancelled,
           );
+        case NetworkTtsKind.deepseek:
+          return await _deepSeekSpeech(
+            options as DeepSeekTtsOptions,
+            text,
+            c,
+            cancelled,
+          );
         case NetworkTtsKind.gemini:
           return await _geminiSpeech(
             options as GeminiTtsOptions,
@@ -920,6 +973,61 @@ class NetworkTtsService {
       bytes: Uint8List.fromList(bytes),
       mime: 'audio/mpeg',
     );
+  }
+
+  static Future<NetworkTtsResult> _deepSeekSpeech(
+    DeepSeekTtsOptions opt,
+    String text,
+    http.Client client,
+    FutureOr<bool> Function()? cancelled,
+  ) async {
+    if (cancelled != null && await cancelled()) throw _Cancelled();
+    final uri = deepSeekToolEndpoint(Uri.parse(opt.baseUrl.trim()), 'tts');
+    final abort = Completer<void>();
+    final request =
+        http.AbortableRequest('POST', uri, abortTrigger: abort.future)
+          ..headers['Authorization'] = 'Bearer ${opt.apiKey}'
+          ..headers['Content-Type'] = 'application/json'
+          ..body = jsonEncode({
+            'text': text,
+            'voice_id': opt.voiceId,
+            'format': 'pcm',
+            'filter_markdown': false,
+          });
+    try {
+      final response = await _waitWithCancellation(
+        client.send(request).then(http.Response.fromStream),
+        cancelled,
+      );
+      if (response.statusCode != 200) {
+        throw Exception(
+          'DeepSeek TTS failed: ${response.statusCode} ${response.body}',
+        );
+      }
+      final type = response.headers['content-type']
+          ?.split(';')
+          .first
+          .trim()
+          .toLowerCase();
+      if (type != 'audio/pcm' && type != 'application/octet-stream') {
+        throw FormatException(
+          'DeepSeek TTS returned an unexpected content type: $type',
+        );
+      }
+      final pcm = response.bodyBytes;
+      if (pcm.isEmpty || pcm.length.isOdd) {
+        throw const FormatException(
+          'DeepSeek TTS returned incomplete 16-bit PCM audio.',
+        );
+      }
+      return NetworkTtsResult(
+        bytes: _pcmToWav(pcm, sampleRate: 24000),
+        mime: 'audio/wav',
+        sampleRate: 24000,
+      );
+    } finally {
+      abort.complete();
+    }
   }
 
   static Future<NetworkTtsResult> _geminiSpeech(
@@ -1960,18 +2068,24 @@ Future<bool> _moveNextWithCancellation<T>(
   }
 }
 
-Future<void> _waitWithCancellation(
-  Future<void> future,
+Future<T> _waitWithCancellation<T>(
+  Future<T> future,
   FutureOr<bool> Function()? cancelled,
 ) async {
   if (cancelled == null) return future;
-  while (true) {
-    final completed = await Future.any<bool>([
-      future.then((_) => true),
-      Future<bool>.delayed(const Duration(milliseconds: 50), () => false),
-    ]);
-    if (completed) return;
-    if (await cancelled()) throw _Cancelled();
+  var finished = false;
+  Future<T> watchCancellation() async {
+    while (!finished) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      if (!finished && await cancelled()) throw _Cancelled();
+    }
+    return future;
+  }
+
+  try {
+    return await Future.any([future, watchCancellation()]);
+  } finally {
+    finished = true;
   }
 }
 

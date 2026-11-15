@@ -2764,6 +2764,7 @@
   "asrServicesLocalSubtitle": "Runs offline on this device after download",
   "asrServicesOpenAiTitle": "OpenAI Realtime",
   "asrServicesOpenAiSubtitle": "Low-latency streaming transcription",
+  "asrServicesDeepSeekSubtitle": "Transcribes recordings and detects the language automatically",
   "asrServicesGroqSubtitle": "Whisper segmented transcription",
   "asrServicesMistralSubtitle": "Voxtral segmented transcription",
   "asrServicesElevenLabsSubtitle": "Scribe segmented transcription",
@@ -2871,6 +2872,7 @@
   "ttsServicesFieldBaseUrlLabel": "API Base URL",
   "ttsServicesFieldModelLabel": "Model",
   "ttsServicesFieldVoiceLabel": "Voice",
+  "ttsServicesDeepSeekVoice": "{voiceId, select, stella{Stella (female)} tide{Tide (male)} other{{voiceId}}}",
   "ttsServicesFieldVoiceIdLabel": "Voice ID",
   "ttsServicesFieldEmotionLabel": "Emotion",
   "ttsServicesFieldSpeedLabel": "Speed",
@@ -13367,6 +13369,9 @@
   "@asrServicesOpenAiSubtitle": {
     "description": "Subtitle describing the OpenAI Realtime ASR service as low-latency streaming transcription."
   },
+  "@asrServicesDeepSeekSubtitle": {
+    "description": "Subtitle in the speech recognition provider list for DeepSeek. It transcribes recorded audio segments and determines the spoken language from the audio."
+  },
   "@asrServicesGroqSubtitle": {
     "description": "Subtitle describing the Groq ASR service as Whisper-based segmented cloud transcription."
   },
@@ -13606,6 +13611,14 @@
   },
   "@ttsServicesFieldVoiceLabel": {
     "description": "Label for the voice field, used for providers like OpenAI, Gemini, Azure, Qwen and xAI."
+  },
+  "@ttsServicesDeepSeekVoice": {
+    "description": "Name and gender of the selected DeepSeek voice in the mobile and desktop TTS service editor. The voiceId is the API identifier. Preserve the select keys stella and tide and display any other identifier as supplied.",
+    "placeholders": {
+      "voiceId": {
+        "type": "String"
+      }
+    }
   },
   "@ttsServicesFieldVoiceIdLabel": {
     "description": "Label for the voice ID field, used for providers like MiniMax, xAI and ElevenLabs."

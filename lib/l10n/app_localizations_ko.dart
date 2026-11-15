@@ -5771,6 +5771,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get asrServicesOpenAiSubtitle => '저지연 스트리밍 전사';
 
   @override
+  String get asrServicesDeepSeekSubtitle => '녹음을 전사하고 언어를 자동으로 감지합니다';
+
+  @override
   String get asrServicesGroqSubtitle => 'Whisper 분할 클라우드 전사';
 
   @override
@@ -6027,6 +6030,16 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get ttsServicesFieldVoiceLabel => '음성';
+
+  @override
+  String ttsServicesDeepSeekVoice(String voiceId) {
+    String _temp0 = intl.Intl.selectLogic(voiceId, {
+      'stella': 'Stella (여성)',
+      'tide': 'Tide (남성)',
+      'other': '$voiceId',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get ttsServicesFieldVoiceIdLabel => '음성 ID';

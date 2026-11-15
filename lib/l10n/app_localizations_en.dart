@@ -5929,6 +5929,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get asrServicesOpenAiSubtitle => 'Low-latency streaming transcription';
 
   @override
+  String get asrServicesDeepSeekSubtitle =>
+      'Transcribes recordings and detects the language automatically';
+
+  @override
   String get asrServicesGroqSubtitle => 'Whisper segmented transcription';
 
   @override
@@ -6193,6 +6197,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ttsServicesFieldVoiceLabel => 'Voice';
+
+  @override
+  String ttsServicesDeepSeekVoice(String voiceId) {
+    String _temp0 = intl.Intl.selectLogic(voiceId, {
+      'stella': 'Stella (female)',
+      'tide': 'Tide (male)',
+      'other': '$voiceId',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get ttsServicesFieldVoiceIdLabel => 'Voice ID';

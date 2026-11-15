@@ -1,9 +1,12 @@
 import 'package:uuid/uuid.dart';
 
+import '../network/deepseek_endpoint.dart';
+
 enum AsrServiceKind {
   sherpaOnnx('sherpa_onnx'),
   system('system'),
   openAiRealtime('openai_realtime'),
+  deepseek('deepseek'),
   groq('groq'),
   mistral('mistral'),
   elevenLabs('elevenlabs'),
@@ -29,6 +32,8 @@ enum AsrServiceKind {
         return AsrServiceKind.openAiRealtime;
       case 'groq':
         return AsrServiceKind.groq;
+      case 'deepseek':
+        return AsrServiceKind.deepseek;
       case 'mistral':
         return AsrServiceKind.mistral;
       case 'elevenlabs':
@@ -100,6 +105,7 @@ abstract class AsrServiceOptions {
           prefixPaddingMs: _nonNegativeInt(json['prefixPaddingMs'], 300),
           silenceDurationMs: _nonNegativeInt(json['silenceDurationMs'], 500),
         );
+      case AsrServiceKind.deepseek:
       case AsrServiceKind.groq:
       case AsrServiceKind.mistral:
       case AsrServiceKind.elevenLabs:
@@ -326,8 +332,18 @@ class OpenAiRealtimeAsrOptions extends AsrServiceOptions {
   };
 }
 
-/// File transcription settings shared by Groq, Mistral, and ElevenLabs.
+/// Settings for cloud services that transcribe WAV files uploaded over HTTP.
 class AudioTranscriptionAsrOptions extends AsrServiceOptions {
+  static const _deepSeekSampleRates = {
+    8000,
+    16000,
+    22050,
+    24000,
+    32000,
+    44100,
+    48000,
+  };
+
   factory AudioTranscriptionAsrOptions({
     String? id,
     required AsrServiceKind kind,
@@ -340,6 +356,11 @@ class AudioTranscriptionAsrOptions extends AsrServiceOptions {
     int segmentDurationSec = 30,
   }) {
     final defaults = switch (kind) {
+      AsrServiceKind.deepseek => (
+        name: 'DeepSeek',
+        baseUrl: deepSeekApiBaseUrl,
+        model: '',
+      ),
       AsrServiceKind.groq => (
         name: 'Groq',
         baseUrl: 'https://api.groq.com/openai/v1',
@@ -361,15 +382,18 @@ class AudioTranscriptionAsrOptions extends AsrServiceOptions {
         'Unsupported transcription provider',
       ),
     };
+    final isDeepSeek = kind == AsrServiceKind.deepseek;
     return AudioTranscriptionAsrOptions._(
       id: id,
       kind: kind,
       name: name ?? defaults.name,
       apiKey: apiKey,
       baseUrl: baseUrl ?? defaults.baseUrl,
-      model: model ?? defaults.model,
-      language: language,
-      sampleRate: sampleRate,
+      model: isDeepSeek ? '' : model ?? defaults.model,
+      language: isDeepSeek ? '' : language,
+      sampleRate: isDeepSeek && !_deepSeekSampleRates.contains(sampleRate)
+          ? 16000
+          : sampleRate,
       segmentDurationSec: segmentDurationSec,
     );
   }
@@ -397,7 +421,7 @@ class AudioTranscriptionAsrOptions extends AsrServiceOptions {
   bool get isConfigured =>
       apiKey.trim().isNotEmpty &&
       baseUrl.trim().isNotEmpty &&
-      model.trim().isNotEmpty &&
+      (kind == AsrServiceKind.deepseek || model.trim().isNotEmpty) &&
       sampleRate > 0;
 
   AudioTranscriptionAsrOptions copyWith({
@@ -426,8 +450,10 @@ class AudioTranscriptionAsrOptions extends AsrServiceOptions {
     ...baseJson(),
     'apiKey': apiKey,
     'baseUrl': baseUrl,
-    'model': model,
-    'language': language,
+    if (kind != AsrServiceKind.deepseek) ...{
+      'model': model,
+      'language': language,
+    },
     'sampleRate': sampleRate,
     'segmentDurationSec': segmentDurationSec,
   };

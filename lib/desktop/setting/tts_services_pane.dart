@@ -910,6 +910,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
   final apiKeyCtl = TextEditingController(
     text: (initial is OpenAiTtsOptions)
         ? initial.apiKey
+        : (initial is DeepSeekTtsOptions)
+        ? initial.apiKey
         : (initial is GeminiTtsOptions)
         ? initial.apiKey
         : (initial is AzureTtsOptions)
@@ -936,6 +938,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
   );
   final baseCtl = TextEditingController(
     text: (initial is OpenAiTtsOptions)
+        ? initial.baseUrl
+        : (initial is DeepSeekTtsOptions)
         ? initial.baseUrl
         : (initial is GeminiTtsOptions)
         ? initial.baseUrl
@@ -987,6 +991,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
   final voiceCtl = TextEditingController(
     text: (initial is OpenAiTtsOptions)
         ? initial.voice
+        : (initial is DeepSeekTtsOptions)
+        ? initial.voiceId
         : (initial is GeminiTtsOptions)
         ? initial.voiceName
         : (initial is AzureTtsOptions)
@@ -1114,10 +1120,14 @@ Future<TtsServiceOptions?> _showNetworkDialog(
       : false;
 
   TtsServiceOptions? result;
+  Future<void>? dialogExit;
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (ctx) {
+      if (ModalRoute.of(ctx) case DialogRoute<void> route) {
+        dialogExit = route.completed;
+      }
       return Dialog(
         backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1167,111 +1177,29 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // Provider kind
-                            _SelectRow(
+                            VoiceServiceSelectRow<NetworkTtsKind>(
                               label: l10n.ttsServicesDialogProviderType,
-                              value: networkTtsKindDisplayName(kind),
-                              options: [
-                                networkTtsKindDisplayName(
-                                  NetworkTtsKind.openai,
-                                ),
-                                networkTtsKindDisplayName(
-                                  NetworkTtsKind.gemini,
-                                ),
-                                networkTtsKindDisplayName(NetworkTtsKind.azure),
-                                networkTtsKindDisplayName(
-                                  NetworkTtsKind.minimax,
-                                ),
-                                networkTtsKindDisplayName(NetworkTtsKind.qwen),
-                                networkTtsKindDisplayName(NetworkTtsKind.groq),
-                                networkTtsKindDisplayName(NetworkTtsKind.xai),
-                                networkTtsKindDisplayName(
-                                  NetworkTtsKind.elevenlabs,
-                                ),
-                                networkTtsKindDisplayName(NetworkTtsKind.mimo),
-                                networkTtsKindDisplayName(
-                                  NetworkTtsKind.qwenAudio,
-                                ),
-                                networkTtsKindDisplayName(NetworkTtsKind.step),
-                                networkTtsKindDisplayName(
-                                  NetworkTtsKind.fishAudio,
-                                ),
+                              value: kind,
+                              labelFor: networkTtsKindDisplayName,
+                              options: const [
+                                NetworkTtsKind.openai,
+                                NetworkTtsKind.deepseek,
+                                NetworkTtsKind.gemini,
+                                NetworkTtsKind.azure,
+                                NetworkTtsKind.minimax,
+                                NetworkTtsKind.qwen,
+                                NetworkTtsKind.groq,
+                                NetworkTtsKind.xai,
+                                NetworkTtsKind.elevenlabs,
+                                NetworkTtsKind.mimo,
+                                NetworkTtsKind.qwenAudio,
+                                NetworkTtsKind.step,
+                                NetworkTtsKind.fishAudio,
                               ],
                               onSelected: (picked) {
-                                final previousKind = kind;
                                 setState(() {
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.openai,
-                                      )) {
-                                    kind = NetworkTtsKind.openai;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.gemini,
-                                      )) {
-                                    kind = NetworkTtsKind.gemini;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.azure,
-                                      )) {
-                                    kind = NetworkTtsKind.azure;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.minimax,
-                                      )) {
-                                    kind = NetworkTtsKind.minimax;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.qwen,
-                                      )) {
-                                    kind = NetworkTtsKind.qwen;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.groq,
-                                      )) {
-                                    kind = NetworkTtsKind.groq;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.xai,
-                                      )) {
-                                    kind = NetworkTtsKind.xai;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.elevenlabs,
-                                      )) {
-                                    kind = NetworkTtsKind.elevenlabs;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.mimo,
-                                      )) {
-                                    kind = NetworkTtsKind.mimo;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.qwenAudio,
-                                      )) {
-                                    kind = NetworkTtsKind.qwenAudio;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.step,
-                                      )) {
-                                    kind = NetworkTtsKind.step;
-                                  }
-                                  if (picked ==
-                                      networkTtsKindDisplayName(
-                                        NetworkTtsKind.fishAudio,
-                                      )) {
-                                    kind = NetworkTtsKind.fishAudio;
-                                  }
-                                  if (kind != previousKind) {
+                                  if (kind != picked) {
+                                    kind = picked;
                                     baseCtl.text =
                                         kind == NetworkTtsKind.qwenAudio
                                         ? ''
@@ -1338,7 +1266,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                   : _defaultBaseUrl(kind),
                             ),
                             const SizedBox(height: 6),
-                            if (kind != NetworkTtsKind.xai &&
+                            if (kind != NetworkTtsKind.deepseek &&
+                                kind != NetworkTtsKind.xai &&
                                 kind != NetworkTtsKind.azure) ...[
                               _InputRow(
                                 label: l10n.ttsServicesFieldModelLabel,
@@ -1350,7 +1279,16 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                               ),
                               const SizedBox(height: 6),
                             ],
-                            if (!isMimoVoiceDesign)
+                            if (kind == NetworkTtsKind.deepseek)
+                              _SelectRow(
+                                label: l10n.ttsServicesFieldVoiceLabel,
+                                value: voiceCtl.text,
+                                options: DeepSeekTtsOptions.voiceIds,
+                                labelFor: l10n.ttsServicesDeepSeekVoice,
+                                onSelected: (value) =>
+                                    setState(() => voiceCtl.text = value),
+                              )
+                            else if (!isMimoVoiceDesign)
                               _InputRow(
                                 label: isMimoVoiceClone
                                     ? l10n.ttsServicesFieldReferenceAudioLabel
@@ -1722,6 +1660,15 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                   model: model,
                                   voice: voice,
                                 );
+                              } else if (kind == NetworkTtsKind.deepseek) {
+                                result = DeepSeekTtsOptions(
+                                  id: initial?.id,
+                                  enabled: true,
+                                  name: name,
+                                  apiKey: apiKey,
+                                  baseUrl: base,
+                                  voiceId: voice,
+                                );
                               } else if (kind == NetworkTtsKind.gemini) {
                                 result = GeminiTtsOptions(
                                   id: initial?.id,
@@ -1951,6 +1898,8 @@ Future<TtsServiceOptions?> _showNetworkDialog(
       );
     },
   );
+  // Text fields can still rebuild during the dialog's exit transition.
+  await dialogExit;
   for (final controller in <TextEditingController>[
     nameCtl,
     apiKeyCtl,
@@ -1985,6 +1934,8 @@ String _defaultBaseUrl(NetworkTtsKind k) {
   switch (k) {
     case NetworkTtsKind.openai:
       return 'https://api.openai.com/v1';
+    case NetworkTtsKind.deepseek:
+      return DeepSeekTtsOptions.defaultBaseUrl;
     case NetworkTtsKind.gemini:
       return 'https://generativelanguage.googleapis.com/v1beta';
     case NetworkTtsKind.azure:
@@ -2016,6 +1967,7 @@ String _defaultModel(NetworkTtsKind k) {
       return 'gpt-4o-mini-tts';
     case NetworkTtsKind.gemini:
       return 'gemini-3.1-flash-tts-preview';
+    case NetworkTtsKind.deepseek:
     case NetworkTtsKind.azure:
       return '';
     case NetworkTtsKind.minimax:
@@ -2043,6 +1995,8 @@ String _defaultVoice(NetworkTtsKind k) {
   switch (k) {
     case NetworkTtsKind.openai:
       return 'alloy';
+    case NetworkTtsKind.deepseek:
+      return DeepSeekTtsOptions.defaultVoiceId;
     case NetworkTtsKind.gemini:
       return 'Kore';
     case NetworkTtsKind.azure:
@@ -2070,6 +2024,7 @@ String _defaultVoice(NetworkTtsKind k) {
 
 String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
   switch (k) {
+    case NetworkTtsKind.deepseek:
     case NetworkTtsKind.openai:
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.gemini:

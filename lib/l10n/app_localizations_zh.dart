@@ -5684,6 +5684,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get asrServicesOpenAiSubtitle => '低延迟流式转写';
 
   @override
+  String get asrServicesDeepSeekSubtitle => '转写录音并自动识别语言';
+
+  @override
   String get asrServicesGroqSubtitle => 'Whisper 分段云端转写';
 
   @override
@@ -5940,6 +5943,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ttsServicesFieldVoiceLabel => '音色';
+
+  @override
+  String ttsServicesDeepSeekVoice(String voiceId) {
+    String _temp0 = intl.Intl.selectLogic(voiceId, {
+      'stella': '海星（女声）',
+      'tide': '暗潮（男声）',
+      'other': '$voiceId',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get ttsServicesFieldVoiceIdLabel => '音色 ID';
@@ -22074,6 +22087,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get asrServicesOpenAiSubtitle => '低延迟流式转写';
 
   @override
+  String get asrServicesDeepSeekSubtitle => '转写录音并自动识别语言';
+
+  @override
   String get asrServicesGroqSubtitle => 'Whisper 分段云端转写';
 
   @override
@@ -22330,6 +22346,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get ttsServicesFieldVoiceLabel => '音色';
+
+  @override
+  String ttsServicesDeepSeekVoice(String voiceId) {
+    String _temp0 = intl.Intl.selectLogic(voiceId, {
+      'stella': '海星（女声）',
+      'tide': '暗潮（男声）',
+      'other': '$voiceId',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get ttsServicesFieldVoiceIdLabel => '音色 ID';
@@ -38463,6 +38489,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get asrServicesOpenAiSubtitle => '低延遲串流轉寫';
 
   @override
+  String get asrServicesDeepSeekSubtitle => '轉寫錄音並自動辨識語言';
+
+  @override
   String get asrServicesGroqSubtitle => 'Whisper 分段雲端轉寫';
 
   @override
@@ -38719,6 +38748,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesFieldVoiceLabel => '音色';
+
+  @override
+  String ttsServicesDeepSeekVoice(String voiceId) {
+    String _temp0 = intl.Intl.selectLogic(voiceId, {
+      'stella': '海星（女聲）',
+      'tide': '暗潮（男聲）',
+      'other': '$voiceId',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get ttsServicesFieldVoiceIdLabel => '音色 ID';

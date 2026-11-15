@@ -10777,6 +10777,12 @@ abstract class AppLocalizations {
   /// **'Low-latency streaming transcription'**
   String get asrServicesOpenAiSubtitle;
 
+  /// Subtitle in the speech recognition provider list for DeepSeek. It transcribes recorded audio segments and determines the spoken language from the audio.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribes recordings and detects the language automatically'**
+  String get asrServicesDeepSeekSubtitle;
+
   /// Subtitle describing the Groq ASR service as Whisper-based segmented cloud transcription.
   ///
   /// In en, this message translates to:
@@ -11274,6 +11280,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voice'**
   String get ttsServicesFieldVoiceLabel;
+
+  /// Name and gender of the selected DeepSeek voice in the mobile and desktop TTS service editor. The voiceId is the API identifier. Preserve the select keys stella and tide and display any other identifier as supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'{voiceId, select, stella{Stella (female)} tide{Tide (male)} other{{voiceId}}}'**
+  String ttsServicesDeepSeekVoice(String voiceId);
 
   /// Label for the voice ID field, used for providers like MiniMax, xAI and ElevenLabs.
   ///

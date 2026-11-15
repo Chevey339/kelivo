@@ -5,9 +5,31 @@ import 'dart:typed_data';
 
 import 'package:Kelivo/core/services/tts/network_tts.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 void main() {
   group('TtsServiceOptions', () {
+    test('DeepSeek restores its defaults and round-trips custom settings', () {
+      final defaults =
+          TtsServiceOptions.fromJson({'kind': 'deepseek'})
+              as DeepSeekTtsOptions;
+      expect(defaults.baseUrl, 'https://api.deepseek.com/v1');
+      expect(defaults.voiceId, 'stella');
+      final options = DeepSeekTtsOptions(
+        id: 'saved-voice',
+        enabled: true,
+        name: 'My voice',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/proxy/v1',
+        voiceId: 'tide',
+      );
+      expect(
+        TtsServiceOptions.fromJson(options.toJson()).toJson(),
+        options.toJson(),
+      );
+    });
+
     test('deserializes RikkaHub-aligned provider defaults', () {
       final qwen = TtsServiceOptions.fromJson({
         'kind': 'qwen',
@@ -231,6 +253,166 @@ void main() {
   });
 
   group('NetworkTtsService', () {
+    test(
+      'DeepSeek sends the selected voice and returns a playable WAV',
+      () async {
+        const text = '你好，[原文](https://example.com)！';
+        final targets = <String>[];
+        final server = await _bindServer((request) async {
+          targets.add(request.uri.toString());
+          expect(request.method, 'POST');
+          expect(
+            request.headers.value(HttpHeaders.authorizationHeader),
+            'Bearer test-key',
+          );
+          expect(request.headers.contentType?.mimeType, 'application/json');
+          expect(jsonDecode(await utf8.decoder.bind(request).join()), {
+            'text': text,
+            'voice_id': 'tide',
+            'format': 'pcm',
+            'filter_markdown': false,
+          });
+          request.response.headers.contentType = ContentType('audio', 'pcm');
+          request.response.add([1]);
+          await request.response.flush();
+          request.response.add([2, 3, 4]);
+          await request.response.close();
+        });
+        addTearDown(() => server.close(force: true));
+
+        for (final base in [
+          _hostOnlyBaseUrl(server),
+          '${_baseUrl(server)}/?tenant=voice',
+          '${_baseUrl(server)}/tools/tts?tenant=voice',
+        ]) {
+          final result = await NetworkTtsService.synthesize(
+            options: DeepSeekTtsOptions(
+              enabled: true,
+              name: 'DeepSeek',
+              apiKey: 'test-key',
+              baseUrl: base,
+              voiceId: 'tide',
+            ),
+            text: text,
+          );
+          expect(result.mime, 'audio/wav');
+          expect(
+            result.bytes,
+            _buildWav([
+              ('fmt ', _pcmFormat(24000)),
+              ('data', [1, 2, 3, 4]),
+            ]),
+          );
+        }
+        expect(targets, [
+          '/v1/tools/tts',
+          '/api/v1/tools/tts?tenant=voice',
+          '/api/v1/tools/tts?tenant=voice',
+        ]);
+      },
+    );
+
+    test(
+      'DeepSeek rejects failed, interrupted and malformed responses',
+      () async {
+        final options = DeepSeekTtsOptions(
+          enabled: true,
+          name: 'DeepSeek',
+          apiKey: 'k',
+        );
+        Future<NetworkTtsResult> synthesize(http.StreamedResponse response) {
+          return NetworkTtsService.synthesize(
+            options: options,
+            text: 'Hello',
+            client: MockClient.streaming((request, _) async {
+              expect(
+                request.url.toString(),
+                'https://api.deepseek.com/v1/tools/tts',
+              );
+              return response;
+            }),
+          );
+        }
+
+        await expectLater(
+          synthesize(
+            http.StreamedResponse(
+              Stream.value(utf8.encode('invalid key')),
+              401,
+            ),
+          ),
+          throwsA(predicate((e) => e.toString().contains('401 invalid key'))),
+        );
+        Stream<List<int>> interrupted() async* {
+          yield [1, 2];
+          throw const HttpException(
+            'Connection closed before response completed',
+          );
+        }
+
+        const pcmHeaders = {'content-type': 'audio/pcm'};
+        await expectLater(
+          synthesize(
+            http.StreamedResponse(interrupted(), 200, headers: pcmHeaders),
+          ),
+          throwsA(isA<HttpException>()),
+        );
+        for (final bytes in [
+          <int>[],
+          [1],
+        ]) {
+          await expectLater(
+            synthesize(
+              http.StreamedResponse(
+                Stream.value(bytes),
+                200,
+                headers: pcmHeaders,
+              ),
+            ),
+            throwsFormatException,
+          );
+        }
+      },
+    );
+
+    test(
+      'DeepSeek stops waiting for audio when playback is cancelled',
+      () async {
+        final bodyStarted = Completer<void>();
+        final release = Completer<void>();
+        final server = await _bindServer((request) async {
+          await request.drain<void>();
+          request.response.headers.contentType = ContentType('audio', 'pcm');
+          request.response.add([1, 2]);
+          await request.response.flush();
+          bodyStarted.complete();
+          await release.future;
+          await request.response.close();
+        });
+        addTearDown(() async {
+          release.complete();
+          await server.close(force: true);
+        });
+        var cancelled = false;
+        final synthesis = NetworkTtsService.synthesize(
+          options: DeepSeekTtsOptions(
+            enabled: true,
+            name: 'DeepSeek',
+            apiKey: 'k',
+            baseUrl: _hostOnlyBaseUrl(server),
+          ),
+          text: 'Hello',
+          cancelled: () => cancelled,
+        );
+        await bodyStarted.future.timeout(const Duration(seconds: 2));
+        cancelled = true;
+        await expectLater(
+          synthesis,
+          throwsA(isA<Exception>()),
+        ).timeout(const Duration(seconds: 2));
+      },
+    );
+
     test('Azure sends escaped SSML and returns MP3 audio', () async {
       late HttpRequest captured;
       late String requestBody;

@@ -298,12 +298,14 @@ void main() {
     await tester.tap(find.byTooltip('Add'));
     await tester.pumpAndSettle();
     expect(find.text('Add TTS Service'), findsOneWidget);
-    expect(find.byType(VoiceServiceSelectRow<String>), findsOneWidget);
+    expect(find.byType(VoiceServiceSelectRow<NetworkTtsKind>), findsOneWidget);
 
     Future<void> selectProvider(String current, String next) async {
       await tester.tap(find.text(current).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text(next).last);
+      final option = find.text(next).last;
+      await tester.ensureVisible(option);
+      await tester.tap(option);
       await tester.pumpAndSettle();
     }
 
@@ -348,6 +350,77 @@ void main() {
     expect(find.text('Model'), findsNothing);
     expect(find.text('Language'), findsOneWidget);
   });
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'adds and edits a DeepSeek voice on ${desktop ? 'desktop' : 'mobile'}',
+      (tester) async {
+        if (!desktop) {
+          tester.view.physicalSize = const Size(430, 1000);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+        }
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        final tts = TtsProvider(preferences: createBusinessTestPreferences());
+        addTearDown(tts.dispose);
+        await _pumpVoiceServices(
+          tester,
+          settings: settings,
+          tts: tts,
+          desktop: desktop,
+        );
+        await tester.tap(find.byTooltip('Add'));
+        await tester.pumpAndSettle();
+        if (desktop) {
+          await tester.tap(find.text('OpenAI').first);
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.text('DeepSeek'));
+        await tester.pumpAndSettle();
+        expect(find.text('Model'), findsNothing);
+        expect(find.text('Language'), findsNothing);
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is TextField &&
+                w.controller?.text == 'https://api.deepseek.com/v1',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Stella (female)'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Tide (male)'));
+        await tester.pumpAndSettle();
+        final keyField = find.byWidgetPredicate(
+          (w) => w is TextField && w.obscureText,
+        );
+        await tester.enterText(keyField, 'test-key');
+        await tester.tap(
+          desktop ? find.text('Add').last : find.byTooltip('Add'),
+        );
+        await tester.pumpAndSettle();
+        final saved = settings.selectedTtsService as DeepSeekTtsOptions;
+        expect(saved.apiKey, 'test-key');
+        expect(saved.voiceId, 'tide');
+        expect(saved.baseUrl, 'https://api.deepseek.com/v1');
+
+        await tester.tap(_iconBeside('DeepSeek', Lucide.Settings2));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(keyField).controller?.text, 'test-key');
+        expect(find.text('Tide (male)'), findsOneWidget);
+        await tester.tap(find.text('Tide (male)'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Stella (female)'));
+        await tester.pumpAndSettle();
+        await tester.tap(desktop ? find.text('Save') : find.byTooltip('Save'));
+        await tester.pumpAndSettle();
+        final edited = settings.ttsServices.single as DeepSeekTtsOptions;
+        expect(edited.id, saved.id);
+        expect(edited.voiceId, 'stella');
+      },
+    );
+  }
 
   testWidgets('mobile reorders network TTS after a long press', (tester) async {
     final settings = SettingsProvider(createBusinessTestPreferences());

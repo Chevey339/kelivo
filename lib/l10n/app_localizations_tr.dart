@@ -5979,6 +5979,10 @@ class AppLocalizationsTr extends AppLocalizations {
       'Düşük gecikmeli akışlı transkripsiyon';
 
   @override
+  String get asrServicesDeepSeekSubtitle =>
+      'Kayıtları yazıya döker ve dili otomatik olarak algılar';
+
+  @override
   String get asrServicesGroqSubtitle => 'Whisper segmentli transkripsiyon';
 
   @override
@@ -6246,6 +6250,16 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get ttsServicesFieldVoiceLabel => 'Ses';
+
+  @override
+  String ttsServicesDeepSeekVoice(String voiceId) {
+    String _temp0 = intl.Intl.selectLogic(voiceId, {
+      'stella': 'Stella (kadın)',
+      'tide': 'Tide (erkek)',
+      'other': '$voiceId',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get ttsServicesFieldVoiceIdLabel => 'Ses Kimliği';

@@ -87,6 +87,7 @@ void main() {
   }
 
   for (final kind in [
+    AsrServiceKind.deepseek,
     AsrServiceKind.groq,
     AsrServiceKind.mistral,
     AsrServiceKind.elevenLabs,
@@ -101,11 +102,11 @@ void main() {
             requestCount++;
             expect(
               request.url.path,
-              endsWith(
-                kind == AsrServiceKind.elevenLabs
-                    ? '/speech-to-text'
-                    : '/audio/transcriptions',
-              ),
+              endsWith(switch (kind) {
+                AsrServiceKind.deepseek => '/v1/tools/asr',
+                AsrServiceKind.elevenLabs => '/speech-to-text',
+                _ => '/audio/transcriptions',
+              }),
             );
             return http.Response.bytes(utf8.encode('{"text":"语音输入"}'), 200);
           }),

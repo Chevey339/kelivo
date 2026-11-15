@@ -13,6 +13,7 @@ final class BackupSettingsValidator {
   static const _cloudAsrKinds = {
     'openai_realtime',
     'openAiRealtime',
+    'deepseek',
     'groq',
     'mistral',
     'elevenlabs',

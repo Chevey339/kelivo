@@ -6012,6 +6012,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Потоковая транскрипция с низкой задержкой';
 
   @override
+  String get asrServicesDeepSeekSubtitle =>
+      'Транскрибирует записи и автоматически определяет язык';
+
+  @override
   String get asrServicesGroqSubtitle => 'Сегментированная транскрипция Whisper';
 
   @override
@@ -6284,6 +6288,16 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get ttsServicesFieldVoiceLabel => 'Голос';
+
+  @override
+  String ttsServicesDeepSeekVoice(String voiceId) {
+    String _temp0 = intl.Intl.selectLogic(voiceId, {
+      'stella': 'Stella (женский)',
+      'tide': 'Tide (мужской)',
+      'other': '$voiceId',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get ttsServicesFieldVoiceIdLabel => 'ID голоса';

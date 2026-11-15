@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 
+import '../network/deepseek_endpoint.dart';
 import 'asr_service_options.dart';
 
 typedef AsrWebSocketConnector =
@@ -53,12 +54,17 @@ class CloudAsrService {
   CloudAsrService({
     this.httpClient,
     AsrWebSocketConnector? websocketConnector,
-    this.completionTimeout = const Duration(seconds: 30),
-  }) : _websocketConnector = websocketConnector ?? _defaultWebSocketConnector;
+    Duration? completionTimeout,
+  }) : completionTimeout = completionTimeout ?? const Duration(seconds: 30),
+       // DeepSeek allows ten minutes to upload, before returning the transcript.
+       _deepSeekRequestTimeout =
+           completionTimeout ?? const Duration(minutes: 10, seconds: 30),
+       _websocketConnector = websocketConnector ?? _defaultWebSocketConnector;
 
   final http.Client? httpClient;
   final AsrWebSocketConnector _websocketConnector;
   final Duration completionTimeout;
+  final Duration _deepSeekRequestTimeout;
 
   Future<CloudAsrSession> startSession(AsrServiceOptions options) async {
     if (!options.isConfigured) {
@@ -75,7 +81,9 @@ class CloudAsrService {
           endpoint: endpoint,
           client: httpClient ?? http.Client(),
           ownsClient: httpClient == null,
-          completionTimeout: completionTimeout,
+          completionTimeout: options.kind == AsrServiceKind.deepseek
+              ? _deepSeekRequestTimeout
+              : completionTimeout,
         );
       case DashScopeAsrOptions():
         return _startDashScope(options);
@@ -846,7 +854,7 @@ abstract class _SegmentedHttpAsrSession implements CloudAsrSession {
   final Completer<void> _abort = Completer<void>();
   final StreamController<String> _partialController =
       StreamController<String>.broadcast(sync: true);
-  final List<String> _transcripts = [];
+  String _transcript = '';
   Future<String>? _finishFuture;
   bool _cancelled = false;
   bool _closed = false;
@@ -856,7 +864,8 @@ abstract class _SegmentedHttpAsrSession implements CloudAsrSession {
 
   String? _readTranscript(Object? decoded);
 
-  String get _transcript => _transcripts.join(' ');
+  String _appendTranscript(String next) =>
+      _transcript.isEmpty ? next : '$_transcript $next';
 
   @override
   Stream<String> get partialTranscripts => _partialController.stream;
@@ -946,7 +955,7 @@ abstract class _SegmentedHttpAsrSession implements CloudAsrSession {
     }
     final text = transcript.trim();
     if (text.isEmpty) return;
-    _transcripts.add(text);
+    _transcript = _appendTranscript(text);
     _partialController.add(_transcript);
   }
 
@@ -997,6 +1006,7 @@ class _AudioTranscriptionAsrSession extends _SegmentedHttpAsrSession {
   }) : _options = options,
        super(
          label: switch (options.kind) {
+           AsrServiceKind.deepseek => 'DeepSeek',
            AsrServiceKind.groq => 'Groq',
            AsrServiceKind.mistral => 'Mistral',
            AsrServiceKind.elevenLabs => 'ElevenLabs',
@@ -1009,6 +1019,17 @@ class _AudioTranscriptionAsrSession extends _SegmentedHttpAsrSession {
 
   final AudioTranscriptionAsrOptions _options;
   final Uri _endpoint;
+
+  @override
+  String _appendTranscript(String next) =>
+      _options.kind == AsrServiceKind.deepseek
+      ? combineAsrTranscript(_transcript, next)
+      : super._appendTranscript(next);
+
+  @override
+  int get _segmentByteLimit => _options.kind == AsrServiceKind.deepseek
+      ? super._segmentByteLimit.clamp(2, _options.sampleRate * 2 * 120)
+      : super._segmentByteLimit;
 
   @override
   http.BaseRequest _buildRequest(Uint8List pcm, Future<void> abortTrigger) {
@@ -1046,6 +1067,7 @@ class _AudioTranscriptionAsrSession extends _SegmentedHttpAsrSession {
     } else {
       request.headers[HttpHeaders.authorizationHeader] =
           'Bearer ${_options.apiKey.trim()}';
+      if (_options.kind == AsrServiceKind.deepseek) return request;
       request.fields['model'] = _options.model.trim();
     }
     final language = _options.language.trim();
@@ -1086,7 +1108,8 @@ class _QwenAudioHttpAsrSession extends _SegmentedHttpAsrSession {
       super._segmentByteLimit.clamp(2, _options.sampleRate * 2 * 300);
 
   @override
-  String get _transcript => _transcripts.fold('', combineQwenAudioTranscript);
+  String _appendTranscript(String next) =>
+      combineAsrTranscript(_transcript, next);
 
   @override
   http.BaseRequest _buildRequest(Uint8List pcm, Future<void> abortTrigger) {
@@ -1665,13 +1688,10 @@ class _QwenAudioAsrSession implements CloudAsrSession {
       // Official Fun-ASR / Qwen Audio protocol returns the *current* sentence
       // only. Accumulate finalized sentences, then append the active partial.
       if (_isQwenAudioSentenceEnd(sentence)) {
-        _finalizedTranscript = combineQwenAudioTranscript(
-          _finalizedTranscript,
-          text,
-        );
+        _finalizedTranscript = combineAsrTranscript(_finalizedTranscript, text);
         _transcript = _finalizedTranscript;
       } else {
-        _transcript = combineQwenAudioTranscript(_finalizedTranscript, text);
+        _transcript = combineAsrTranscript(_finalizedTranscript, text);
       }
       if (!_partialController.isClosed) {
         _partialController.add(_transcript);
@@ -1744,12 +1764,12 @@ bool _isQwenAudioSentenceEnd(Map<String, dynamic> sentence) {
   return false;
 }
 
-/// Joins Qwen Audio finalized/partial segments.
+/// Joins transcript segments while respecting the language's word boundaries.
 ///
 /// Inserts word separators across scripts that use spaces, including after
 /// punctuation. Chinese, Japanese and Thai boundaries remain unspaced.
 @visibleForTesting
-String combineQwenAudioTranscript(String prefix, String next) {
+String combineAsrTranscript(String prefix, String next) {
   if (prefix.isEmpty) return next;
   if (next.isEmpty) return prefix;
   if (RegExp(r'^\s').hasMatch(next)) return '$prefix$next';
@@ -1757,16 +1777,28 @@ String combineQwenAudioTranscript(String prefix, String next) {
     r'[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]',
     unicode: true,
   );
-  if (unspacedScript.hasMatch(String.fromCharCode(prefix.runes.last)) ||
-      unspacedScript.hasMatch(String.fromCharCode(next.runes.first))) {
+  if (unspacedScript.hasMatch(String.fromCharCode(prefix.runes.last))) {
     return '$prefix$next';
   }
   final prefixEndsWordOrPunctuation = RegExp(
     r'''[\p{L}\p{M}\p{N}\p{Pe}\p{Pf}.!?…,;:'"،؛؟।॥]$''',
     unicode: true,
   ).hasMatch(prefix);
-  final nextStartsWord = RegExp(r'^[\p{L}\p{N}]', unicode: true).hasMatch(next);
-  final needsSpace = nextStartsWord && prefixEndsWordOrPunctuation;
+  // A lone straight apostrophe can continue a word split across recordings.
+  if (next.startsWith("'") &&
+      !next.contains("'", 1) &&
+      RegExp(r'[\p{L}\p{M}\p{N}]$', unicode: true).hasMatch(prefix)) {
+    return '$prefix$next';
+  }
+  // A sentence can start with an opening quote or inverted Spanish punctuation.
+  final nextWord = RegExp(
+    r'''^(?:[\p{Ps}\p{Pi}"'¿¡]\s*)*([\p{L}\p{N}])''',
+    unicode: true,
+  ).firstMatch(next);
+  final needsSpace =
+      prefixEndsWordOrPunctuation &&
+      nextWord != null &&
+      !unspacedScript.hasMatch(nextWord[1]!);
   return needsSpace ? '$prefix $next' : '$prefix$next';
 }
 
@@ -1912,6 +1944,9 @@ Uri _audioTranscriptionEndpoint(AudioTranscriptionAsrOptions options) {
       (uri.scheme != 'http' && uri.scheme != 'https') ||
       uri.host.isEmpty) {
     throw const AsrException('Audio transcription base URL is invalid');
+  }
+  if (options.kind == AsrServiceKind.deepseek) {
+    return deepSeekToolEndpoint(uri, 'asr');
   }
   final isElevenLabs = options.kind == AsrServiceKind.elevenLabs;
   final suffix = isElevenLabs ? '/speech-to-text' : '/audio/transcriptions';
