@@ -404,7 +404,7 @@ class WorkspaceToolsService {
         ? WorkspacePaths.guestSkills
         : paths.skillsHostDir;
     final tmp = paths.sandboxed ? WorkspacePaths.guestTmp : paths.tmpHostRoot;
-    // Expose session paths, permissions and cross-tool policy here. Per-tool
+    // Expose session facts and file link formatting here. Per-tool
     // instructions (including the shell output path) belong in definitions().
     final buf = StringBuffer()
       ..writeln('<workspace>')
@@ -441,13 +441,6 @@ class WorkspaceToolsService {
           'Use ${shell?.environmentReference ?? (defaultTargetPlatform == TargetPlatform.windows ? 'the selected shell’s environment variable syntax' : r'$NAME')} references; '
           'do not print or attempt to discover their values.',
         );
-    }
-    if (ctx.workspace.isToolEnabled('read_file') &&
-        ctx.workspace.isToolEnabled('edit_file') &&
-        ctx.workspace.isToolEnabled('write_file')) {
-      buf
-        ..writeln()
-        ..writeln('Prefer read_file, edit_file, and write_file over cat/sed.');
     }
     buf
       ..writeln()

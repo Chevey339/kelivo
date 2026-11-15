@@ -419,7 +419,7 @@ void main() {
     expect(prompt, isNot(contains('Sandbox environment not installed')));
   });
 
-  test('the workspace lists session facts and enabled cross-tool guidance', () {
+  test('workspace session facts are independent of file tool selection', () {
     String fragment(Set<String> disabled) =>
         WorkspaceToolsService.buildPromptFragment(
           ctx(disabledTools: disabled),
@@ -428,7 +428,7 @@ void main() {
     const prefer = 'Prefer read_file, edit_file, and write_file over cat/sed.';
     final all = fragment({});
     expect(all, contains('MODEL_ENV'));
-    expect(all, contains(prefer));
+    expect(all, isNot(contains(prefer)));
     for (final text in [
       'Enabled tools:',
       'shell is one-shot',
@@ -440,9 +440,9 @@ void main() {
     }
     final withoutShell = fragment({'shell'});
     expect(withoutShell, isNot(contains('MODEL_ENV')));
-    expect(withoutShell, contains(prefer));
+    expect(withoutShell, isNot(contains(prefer)));
     for (final name in ['read_file', 'edit_file', 'write_file']) {
-      expect(fragment({name}), isNot(contains(prefer)));
+      expect(fragment({name}), all, reason: name);
     }
     final edit = service()
         .buildToolDefinitions(ctx())

@@ -43,8 +43,6 @@ Path zones:
 - /tmp — scratch (writable, ephemeral)
 cwd: /workspace/editorial
 
-Prefer read_file, edit_file, and write_file over cat/sed.
-
 Cite files as [name](kelivo://workspace/rel/path), outputs as kelivo://chat/outputs/x.txt, images as ![alt](kelivo://workspace/plot.png). Percent-encode each path segment (spaces, non-ASCII); raw UTF-8 is also accepted.
 
 Engine: Linux (PRoot); check /etc/os-release for distro
