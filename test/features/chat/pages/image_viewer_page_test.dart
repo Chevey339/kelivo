@@ -202,11 +202,15 @@ class _ViewerSavePathProvider extends PathProviderPlatform {
 }
 
 void main() {
-  group('saving GIFs to the gallery', () {
+  group('saving original images to the gallery', () {
     late Directory temporaryDirectory;
     late PathProviderPlatform previousPaths;
     const channel = MethodChannel('image_gallery_saver_plus');
     const nativeChannel = MethodChannel('app.file_save');
+    final platforms = TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    });
 
     setUp(() {
       temporaryDirectory = Directory.systemTemp.createTempSync(
@@ -227,22 +231,28 @@ void main() {
       temporaryDirectory.deleteSync(recursive: true);
     });
 
-    for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
-      for (final sourceType in ['data', 'local', 'network', 'denied']) {
-        final denied = sourceType == 'denied';
-        final description = denied
-            ? '$platform reports GIF save failure and removes temporary files'
-            : '$platform preserves the original $sourceType GIF';
+    for (final format in ['gif', 'png']) {
+      for (final sourceType in ['data', 'local', 'network', 'failure']) {
+        final saveFails = sourceType == 'failure';
+        final description = saveFails
+            ? 'reports $format save failure and removes temporary files'
+            : 'preserves the original $sourceType $format';
         testWidgets(description, (tester) async {
           _setTestViewSize(tester, _mobileSize);
-          final original = base64Decode(_animatedGifBase64);
-          // Misleading extensions and MIME hints must not turn a GIF into JPEG.
+          final platform = defaultTargetPlatform;
+          final original = format == 'gif'
+              ? base64Decode(_animatedGifBase64)
+              : image_lib.encodePng(
+                  image_lib.Image(width: 2, height: 1, numChannels: 4)
+                    ..setPixelRgba(1, 0, 0, 255, 0, 128),
+                );
+          // Source names and MIME hints deliberately disagree with the bytes.
           final source = switch (sourceType) {
             'local' => File(
               '${temporaryDirectory.path}/original.jpg',
             )..writeAsBytesSync(original),
             'network' => 'https://example.com/generated-image',
-            _ => 'data:image/png;base64,$_animatedGifBase64',
+            _ => 'data:image/jpeg;base64,${base64Encode(original)}',
           };
           final sourcePath = source is File ? source.path : source as String;
           final calls = <MethodCall>[];
@@ -254,23 +264,30 @@ void main() {
                 platform == TargetPlatform.iOS ? nativeChannel : channel,
                 (call) async {
                   calls.add(call);
-                  if (call.method == 'saveFileToGallery' ||
-                      call.method == 'saveImageToGallery') {
-                    final path =
-                        call.arguments[platform == TargetPlatform.iOS
-                                ? 'sourcePath'
-                                : 'file']
-                            as String;
+                  final pathKey = platform == TargetPlatform.iOS
+                      ? 'sourcePath'
+                      : 'file';
+                  final path = call.arguments[pathKey] as String?;
+                  if (path != null) {
                     savedFile = File(path);
                     savedBytes = savedFile!.readAsBytesSync();
                   }
                   saved.complete();
-                  if (denied) {
-                    throw PlatformException(code: 'photo_permission_denied');
+                  if (platform == TargetPlatform.iOS) {
+                    if (saveFails) {
+                      throw PlatformException(code: 'photo_permission_denied');
+                    }
+                    return true;
                   }
-                  return platform == TargetPlatform.iOS
-                      ? true
-                      : {'isSuccess': true};
+                  return {
+                    'isSuccess': !saveFails,
+                    'filePath': saveFails
+                        ? null
+                        : 'content://media/external/images/media/42',
+                    'errorMessage': saveFails
+                        ? 'saveFileToGallery failed'
+                        : null,
+                  };
                 },
               );
 
@@ -322,20 +339,30 @@ void main() {
                 ? 'saveImageToGallery'
                 : 'saveFileToGallery',
           );
-          expect(savedFile!.path, endsWith('.gif'));
+          expect(savedFile!.path, endsWith('.$format'));
           expect(savedBytes, orderedEquals(original));
-          expect(image_lib.decodeGif(savedBytes!)!.numFrames, 2);
+          if (format == 'gif') {
+            expect(image_lib.decodeGif(savedBytes!)!.numFrames, 2);
+          } else {
+            final png = image_lib.decodePng(savedBytes!)!;
+            expect(png.getPixel(0, 0).a, 0);
+            expect(png.getPixel(1, 0).a, 128);
+          }
           expect(savedFile!.parent.existsSync(), isFalse);
           final notification =
               AppSnackBarManager().activeToasts.first.notification;
-          expect(
-            notification.type,
-            denied ? NotificationType.error : NotificationType.success,
-          );
-          expect(
-            notification.message,
-            denied ? contains('photo_permission_denied') : 'Saved to gallery',
-          );
+          if (saveFails) {
+            expect(notification.type, NotificationType.error);
+            expect(
+              notification.message,
+              platform == TargetPlatform.iOS
+                  ? contains('photo_permission_denied')
+                  : startsWith('Save failed:'),
+            );
+          } else {
+            expect(notification.type, NotificationType.success);
+            expect(notification.message, 'Saved to gallery');
+          }
           expect(
             requests,
             sourceType == 'network' ? [Uri.parse(sourcePath)] : isEmpty,
@@ -346,7 +373,7 @@ void main() {
           AppSnackBarManager().dismissAll();
           await tester.pumpAndSettle();
           await tester.pumpWidget(const SizedBox.shrink());
-        }, variant: TargetPlatformVariant({platform}));
+        }, variant: platforms);
       }
     }
   });

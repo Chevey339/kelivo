@@ -1096,13 +1096,14 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       }
 
       final name = 'kelivo-${DateTime.now().millisecondsSinceEpoch}';
+      final format = _formatFromMagicBytes(bytes);
       final dynamic result;
-      if (_formatFromMagicBytes(bytes) == 'gif') {
-        // saveImage re-encodes as JPEG on Android and iOS, losing animation.
+      if (format == 'png' || format == 'gif') {
+        // saveImage re-encodes as JPEG, discarding transparency and animation.
         final temp = await getTemporaryDirectory();
         final directory = await temp.createTemp('kelivo-image-save-');
         try {
-          final file = File(p.join(directory.path, '$name.gif'));
+          final file = File(p.join(directory.path, '$name.$format'));
           await file.writeAsBytes(bytes);
           if (defaultTargetPlatform == TargetPlatform.iOS) {
             result = {
