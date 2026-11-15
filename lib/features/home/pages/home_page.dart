@@ -77,6 +77,7 @@ import '../../mcp/pages/mcp_page.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
+import '../../workspace/widgets/skills/conversation_skills_sheet.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/mini_map_sheet.dart';
 import '../widgets/instruction_injection_sheet.dart';
@@ -1691,12 +1692,21 @@ class _HomePageState extends State<HomePage>
           assistantId: assistant?.id,
         );
         if (id == null || !context.mounted) return;
-        await showDesktopSkillsPopover(
-          context,
-          anchorKey: _inputBarKey,
-          conversationId: id,
-          assistant: assistant,
-        );
+        if (_controller.isDesktopPlatform) {
+          await showDesktopSkillsPopover(
+            context,
+            anchorKey: _inputBarKey,
+            conversationId: id,
+            assistant: assistant,
+          );
+        } else {
+          _controller.dismissKeyboard();
+          await showConversationSkillsSheet(
+            context,
+            conversationId: id,
+            assistant: assistant,
+          );
+        }
       },
       onOpenTools: () {
         final a = context.read<AssistantProvider>().currentAssistant;

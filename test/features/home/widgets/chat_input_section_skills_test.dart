@@ -5,9 +5,11 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/skills_binding.dart';
 import 'package:Kelivo/core/providers/asr_provider.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/desktop/skills_popover.dart';
@@ -40,6 +42,8 @@ void main() {
     WidgetTester tester, {
     double width = 800,
     bool empty = false,
+    bool isTablet = false,
+    VoidCallback? onOpenSkills,
   }) async {
     tester.view.physicalSize = const Size(1000, 700);
     tester.view.devicePixelRatio = 1;
@@ -86,6 +90,13 @@ void main() {
           ChangeNotifierProvider(
             create: (_) => QuickPhraseProvider(preferences: preferences),
           ),
+          ChangeNotifierProvider(
+            create: (_) => WorldBookProvider(preferences: preferences),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                InstructionInjectionProvider(preferences: preferences),
+          ),
           ChangeNotifierProvider<SkillsService>.value(value: skills),
           ChangeNotifierProvider<ChatService>.value(value: chat),
         ],
@@ -102,19 +113,21 @@ void main() {
                     inputFocus: focus,
                     inputController: controller,
                     mediaController: ChatInputBarController(),
-                    isTablet: false,
+                    isTablet: isTablet,
                     isLoading: false,
                     isToolModel: (_, _) => true,
                     isReasoningModel: (_, _) => false,
                     isReasoningEnabled: (_) => false,
                     conversationId: 'c1',
                     onOpenWorkspace: () {},
-                    onOpenSkills: () => showDesktopSkillsPopover(
-                      context,
-                      anchorKey: inputBarKey,
-                      conversationId: 'c1',
-                      assistant: assistants.currentAssistant,
-                    ),
+                    onOpenSkills:
+                        onOpenSkills ??
+                        () => showDesktopSkillsPopover(
+                          context,
+                          anchorKey: inputBarKey,
+                          conversationId: 'c1',
+                          assistant: assistants.currentAssistant,
+                        ),
                   ),
                 ),
               ),
@@ -247,4 +260,41 @@ void main() {
       TargetPlatform.android,
     }),
   );
+
+  for (final overflow in [false, true]) {
+    testWidgets(
+      'tablet skills action opens from the ${overflow ? 'overflow menu' : 'toolbar'}',
+      (tester) async {
+        const haptics = MethodChannel('haptic_feedback');
+        final messenger = tester.binding.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(haptics, (_) async => null);
+        addTearDown(() => messenger.setMockMethodCallHandler(haptics, null));
+        var opens = 0;
+        await pumpComposer(
+          tester,
+          isTablet: true,
+          width: overflow ? 160 : 800,
+          onOpenSkills: () => opens++,
+        );
+        final bar = find.byType(ChatInputBar);
+        final l10n = AppLocalizations.of(tester.element(bar))!;
+        expect(tester.widget<ChatInputBar>(bar).skillsActive, isTrue);
+        final skills = find.byTooltip(l10n.workspaceEntrySessionSkills);
+        if (overflow) {
+          expect(skills, findsNothing);
+          await tester.tap(find.byTooltip(l10n.chatInputBarMoreTooltip));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(l10n.workspaceEntrySessionSkills));
+        } else {
+          await tester.tap(skills);
+        }
+        await tester.pumpAndSettle();
+        expect(opens, 1);
+      },
+      variant: TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      }),
+    );
+  }
 }

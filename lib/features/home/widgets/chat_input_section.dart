@@ -196,6 +196,7 @@ class ChatInputSection extends StatelessWidget {
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
     final showWorkspaceButton = isDesktop && onOpenWorkspace != null;
+    final openSkills = isDesktop || isTablet ? onOpenSkills : null;
     final showEnvChip = !isDesktop && (Platform.isAndroid || Platform.isIOS);
     var workspaceBound = false;
     if (showWorkspaceButton || showEnvChip) {
@@ -217,9 +218,8 @@ class ChatInputSection extends StatelessWidget {
       onOpenWorkspace: onOpenWorkspace,
       showWorkspaceButton: showWorkspaceButton,
       workspaceActive: workspaceBound,
-      onOpenSkills: isDesktop ? onOpenSkills : null,
-      skillsActive:
-          isDesktop && onOpenSkills != null && _isSkillsActive(context, a),
+      onOpenSkills: openSkills,
+      skillsActive: openSkills != null && _isSkillsActive(context, a),
       onStop: onStop,
       modelIcon: (pk != null && mid != null)
           ? CurrentModelIcon(
