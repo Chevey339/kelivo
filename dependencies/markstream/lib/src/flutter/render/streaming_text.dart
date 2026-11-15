@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../selection/selectable_rich_text.dart';
 import 'block_list.dart';
-import 'prose_direction.dart';
+import '../prose_direction_resolver.dart';
 import '../performance_limits.dart';
 
 /// Shapes long text in bounded windows, committing only complete visual lines.

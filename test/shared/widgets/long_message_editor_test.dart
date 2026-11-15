@@ -264,7 +264,7 @@ void main() {
   });
 
   testWidgets(
-    'draft direction changes only when its first strong character changes',
+    'draft direction follows prose while preserving the caret and focus',
     (tester) async {
       final controller = TextEditingController();
       addTearDown(controller.dispose);
@@ -277,7 +277,18 @@ void main() {
       for (final (draft, direction) in [
         ('🙂 ۱۲۳', TextDirection.ltr),
         ('🙂 ۱۲۳ سلام Gemini؟', TextDirection.rtl),
-        ('Gemini چیه و چطور کار می‌کنه؟', TextDirection.ltr),
+        ('Gemini', TextDirection.ltr),
+        ('Gemini چیه؟', TextDirection.rtl),
+        ('Gemini چیه و چطور با `v1beta` کار می‌کنه؟', TextDirection.rtl),
+        ('Translate «مرحبا»', TextDirection.ltr),
+        ('Translate كيف حالك؟', TextDirection.ltr),
+        ('Çevir كيف حالك؟', TextDirection.ltr),
+        ('Is العربية a language؟', TextDirection.ltr),
+        (
+          'Gemini چیه با `extremelyLongConfigurationIdentifier`؟',
+          TextDirection.rtl,
+        ),
+        ('Gemini\nچیه؟', TextDirection.ltr),
         ('中文 עברית', TextDirection.ltr),
         ('שלום! English', TextDirection.rtl),
         ('', TextDirection.ltr),

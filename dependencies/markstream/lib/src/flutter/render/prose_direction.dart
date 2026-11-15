@@ -1,22 +1,5 @@
 import 'package:flutter/widgets.dart';
 
-import '../../core/ast/nodes.dart';
-import 'bidi_classes.dart';
-
-final _strong = RegExp('([$rtlCharacters])|[$ltrCharacters]', unicode: true);
-final _rtl = RegExp('[$rtlCharacters]', unicode: true);
-
-/// HTML dir=auto uses the first Unicode L, R or AL character. A neutral
-/// string has no direction of its own and can inherit its surrounding one.
-TextDirection? firstStrongDirection(String text) {
-  final match = _strong.firstMatch(text);
-  if (match == null) return null;
-  return match.group(1) == null ? TextDirection.ltr : TextDirection.rtl;
-}
-
-/// Whether a left-to-right-only line renderer can encounter strong RTL text.
-bool containsStrongRtl(String text) => _rtl.hasMatch(text);
-
 /// A loose, start-aligned Markdown column would otherwise place a short RTL
 /// block on the left even if its glyphs were shaped in the correct direction.
 Widget directionalBlock(
@@ -75,47 +58,4 @@ Widget proseColumn({required List<Widget> children, double spacing = 0}) {
           : CrossAxisAlignment.start,
     ),
   );
-}
-
-/// Look through emphasis and link labels, skipping isolated inline widgets
-/// and syntax such as link destinations, code fences and list markers.
-TextDirection? proseDirection(Iterable<MarkdownNode> nodes) {
-  for (final node in nodes) {
-    if (_isolated(node)) continue;
-    final direction = node is TextNode
-        ? firstStrongDirection(node.text)
-        : proseDirection(node.children);
-    if (direction != null) return direction;
-  }
-  return null;
-}
-
-bool _isolated(MarkdownNode node) =>
-    node is CodeSpanNode ||
-    node is CodeBlockNode ||
-    node is ImageNode ||
-    node is MathInlineNode ||
-    node is MathBlockNode ||
-    (node is NamedInlineNode && node.syntax == NamedInlineSyntax.extension) ||
-    (node is HtmlElementNode &&
-        const {'code', 'kbd', 'pre', 'img'}.contains(node.tag));
-
-/// Only paragraphs and containers with an RTL start need a shared width.
-/// A Latin paragraph that quotes Persian, or a code block containing Persian,
-/// must retain its normal layout and streaming path.
-bool hasRtlBlock(MarkdownNode node) {
-  if (_isolated(node)) return false;
-  if (node is ParagraphNode ||
-      node is HeadingNode ||
-      node is TaskItemNode ||
-      node is TableCellNode ||
-      node is DetailsSummaryNode ||
-      node is DirectiveLabelNode) {
-    return proseDirection(node.children) == TextDirection.rtl;
-  }
-  if (node is HtmlBlockNode && node.fullDocument) return false;
-  if (node is HtmlElementNode || node is HtmlBlockNode) {
-    if (proseDirection(node.children) == TextDirection.rtl) return true;
-  }
-  return node.children.any(hasRtlBlock);
 }

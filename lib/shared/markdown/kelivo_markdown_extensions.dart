@@ -10,6 +10,7 @@ import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/features/intelligent_ui/host/ui_markdown_builder.dart';
 
 import 'citation_syntax.dart';
+import 'chat_prose_direction.dart';
 import 'quote_syntax.dart';
 import 'diagram_code_blocks.dart';
 import 'highlight_adapter.dart';
@@ -31,6 +32,7 @@ MarkstreamExtensions markdownExtensionsFor(BuildContext context) =>
 
 MarkstreamExtensions _extensions({LiteralSpanBuilder? literalSpanBuilder}) =>
     MarkstreamExtensions(
+      proseDirection: chatProseDirection,
       inlineSyntaxes: const [
         CitationSyntax(),
         LocalImagePathSyntax(),

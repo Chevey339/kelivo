@@ -143,7 +143,9 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
         : TableAlignment.none;
     return directionalBlock(
       context,
-      cell == null ? null : proseDirection(cell.children),
+      cell == null
+          ? null
+          : widget.extensions.proseDirection.forNodes(cell.children),
       Padding(
         padding: widget.theme.table.cellPadding,
         child: DefaultTextStyle.merge(

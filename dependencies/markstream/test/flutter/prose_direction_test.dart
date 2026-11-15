@@ -7,17 +7,20 @@ import 'markstream_view_test.dart' show host, paragraph;
 import 'rich_blocks_test.dart' show tableSource;
 
 Rect bounds(RenderParagraph p) => p.localToGlobal(Offset.zero) & p.size;
+bool _knownModel(String word) =>
+    const {'gemini', 'mistral'}.contains(word.toLowerCase());
+const _direction = ProseDirectionResolver(isKnownName: _knownModel);
+final _extensions = MarkstreamExtensions(proseDirection: _direction);
 
 void main() {
   test('Unicode strong characters decide the base direction', () {
     for (final text in [
-      'Gemini چیه؟',
       '… ۱۲ 中文 שלום',
       'Ａ مرحبا',
       'हिन्दी سلام',
       '\u200eשלום',
     ]) {
-      expect(firstStrongDirection(text), TextDirection.ltr, reason: text);
+      expect(_direction.forText(text), TextDirection.ltr, reason: text);
     }
     for (final text in [
       '🙂 123 (سلام)',
@@ -27,10 +30,66 @@ void main() {
       '🫠 𞤀',
       '\u200fEnglish',
     ]) {
-      expect(firstStrongDirection(text), TextDirection.rtl, reason: text);
+      expect(_direction.forText(text), TextDirection.rtl, reason: text);
     }
     for (final text in ['', '🧑‍💻 123، ١٢٣ ۴۵۶', '\u2066…\u2069']) {
-      expect(firstStrongDirection(text), isNull, reason: text);
+      expect(_direction.forText(text), isNull, reason: text);
+    }
+  });
+
+  test('a Latin name needs evidence of an unquoted RTL sentence', () {
+    for (final text in [
+      'Gemini چیه؟',
+      'GPT-4o چیه و چطور کار می‌کنه؟',
+      'Gemini-2.5 چطور کار می‌کند؟',
+      'OpenAI איך אפשר להשתמש בזה?',
+      'gemini چیه',
+      'Gemini چیه و چطور با `v1beta` کار می‌کنه؟',
+      'Gemini چیه با `extremelyLongConfigurationIdentifier`؟',
+      'Gemini دربارهٔ «هوش مصنوعی» چه می‌گوید؟',
+      'Gemini یہ بہت مفید ہے۔',
+      'Gemini איך אפשר להשתמש בזה',
+      'Gemini اب؟', // Three out of nine strong characters are RTL.
+      'Gemini چیه؟ `parameter`',
+      'Gemini چیه؟ 😊',
+      'Gemini چه فرقی دارد با ((Gemini) Advanced)؟',
+      'Gemini چیه با `a ``` b`؟',
+    ]) {
+      expect(_direction.forText(text), TextDirection.rtl, reason: text);
+    }
+    for (final text in [
+      'Translate «مرحبا»',
+      'Translate «چیه؟»',
+      'Translate "שלום לכולם כאן היום"',
+      'Translate كيف حالك؟',
+      'Translate איך אפשר להשתמש במילים האלה',
+      'Is العربية a language؟',
+      'Say مرحبا in English؟',
+      'Copy كيف حالك؟',
+      'COPY كيف حالك؟',
+      'Paraphrase كيف حالك؟',
+      'Çevir كيف حالك؟',
+      'Traduce كيف حالك؟',
+      'Gemini مرحبا in English؟',
+      'OpenAI مرحبا in English؟',
+      'GPT-4o. كيف حالك؟',
+      'Translate this سؤال طويل جدا؟',
+      'Gemini says سلام و احوال شما چطور است؟',
+      'Mistral اب؟', // Exactly 30%, not above the threshold.
+      'Hello שלום',
+      'Gemini چیه «؟', // Still typing a quotation.
+      'Gemini א «ارقام بسیار زیاد در این نمونه»؟',
+      'English: كيف حالك اليوم؟',
+      'Translate (كيف حالك اليوم؟)',
+      'Translate `چیه؟`',
+      'https://example.test/كيف/حالك؟',
+      '中文 چیه و چطور کار می‌کنه؟',
+      'Gemini\nچیه؟',
+      'Gemini שלום uses English.',
+      'Gemini ؟؟؟',
+      '\u200eGemini چیه؟',
+    ]) {
+      expect(_direction.forText(text), TextDirection.ltr, reason: text);
     }
   });
 
@@ -42,6 +101,7 @@ void main() {
         await tester.pumpWidget(
           host(
             MarkstreamView(
+              extensions: _extensions,
               source: '$prefix$tail',
               streaming: streaming,
               cullToViewport: false,
@@ -63,11 +123,52 @@ void main() {
         expect(bounds(rtl).right, closeTo(start + 390, .01));
         expect(bounds(paragraph('中文')).left, start);
       }
-      await show('Gemini چیه و چطور کار می‌کنه؟', true);
+      await show('**Gemini**', true);
       expect(paragraph('Gemini').textDirection, TextDirection.ltr);
-      expect(bounds(paragraph('Gemini')).left, start);
+      for (final active in [true, false]) {
+        await show('**Ge**mini [چیه](https://example.test/english)؟', active);
+        expect(paragraph('Gemini').textDirection, TextDirection.rtl);
+        expect(bounds(paragraph('Gemini')).right, closeTo(start + 390, .01));
+        expect(paragraph('中文').textDirection, TextDirection.ltr);
+      }
+      await show('**Translate** «مرحبا»', false);
+      expect(paragraph('Translate').textDirection, TextDirection.ltr);
+      expect(bounds(paragraph('Translate')).left, start);
+      await show('**Is** العربية a language؟', false);
+      expect(paragraph('Is').textDirection, TextDirection.ltr);
+      await show(
+        'Gemini چیه با `extremelyLongConfigurationIdentifier`؟',
+        false,
+      );
+      expect(paragraph('Gemini').textDirection, TextDirection.rtl);
+      expect(paragraph('extremelyLong').textDirection, TextDirection.ltr);
+      await show('Gemini چیه؟ `parameter`', true);
+      expect(paragraph('Gemini').textDirection, TextDirection.rtl);
+      expect(paragraph('parameter').textDirection, TextDirection.ltr);
     },
   );
+
+  testWidgets('mixed lists resolve visible content within each item', (
+    tester,
+  ) async {
+    const source =
+        '1. **Gemini** چیه و چطور با `v1beta` کار می‌کنه؟\n'
+        '2. **Translate** «مرحبا»\n'
+        '3. Gemini `چیه؟`\n'
+        '4. Gemini\n\n   چیه؟';
+    await tester.pumpWidget(
+      host(MarkstreamView(source: source, extensions: _extensions)),
+    );
+    final rtl = paragraph('Gemini چیه');
+    expect(
+      bounds(paragraph('1.')).left,
+      greaterThanOrEqualTo(bounds(rtl).right),
+    );
+    expect(paragraph('v1beta').textDirection, TextDirection.ltr);
+    expect(paragraph('Translate').textDirection, TextDirection.ltr);
+    expect(paragraph('3.').textDirection, TextDirection.ltr);
+    expect(paragraph('4.').textDirection, TextDirection.ltr);
+  });
 
   testWidgets(
     'markers, quote, heading and table cells follow prose while code and explicit alignments stay independent',

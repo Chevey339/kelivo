@@ -96,7 +96,7 @@ class _ParagraphRunState extends State<ParagraphRun> {
           return !embedded;
         });
         final Widget body;
-        final direction = proseDirection(node.children) ?? ambient;
+        final direction = renderer.proseDirection(node.children) ?? ambient;
         final short =
             node.span.length <=
             (active

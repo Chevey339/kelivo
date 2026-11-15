@@ -34,6 +34,8 @@ class MarkstreamRenderer {
   late DocumentNode document;
   late MarkstreamTheme theme;
   late MarkstreamExtensions extensions;
+  TextDirection? proseDirection(Iterable<MarkdownNode> nodes) =>
+      extensions.proseDirection.forNodes(nodes);
   CodeHighlighter? codeHighlighter;
   MathRenderer? mathRenderer;
   ImageBuilder? imageBuilder;

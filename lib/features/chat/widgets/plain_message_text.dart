@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:markstream/markstream.dart';
+import '../../../shared/markdown/chat_prose_direction.dart';
 
 final _lineBreak = RegExp(r'\r\n|[\r\n\u2028\u2029]');
 
@@ -22,7 +23,7 @@ Widget plainMessageText({
     textHeightBehavior: textHeightBehavior,
   );
 
-  final first = firstStrongDirection(text);
+  final first = chatProseDirection.forText(text);
   Widget wholeMessage() {
     if (buildSpan != null) return paragraph(span(0, text.length), first);
     return Text(
@@ -45,7 +46,7 @@ Widget plainMessageText({
       start: start,
       end: end,
       next: next,
-      direction: firstStrongDirection(text.substring(start, end)),
+      direction: chatProseDirection.forText(text.substring(start, end)),
     ));
     start = next;
   }

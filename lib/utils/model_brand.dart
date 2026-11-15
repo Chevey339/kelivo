@@ -9,6 +9,12 @@ class ModelBrand {
   final String asset;
   final RegExp _pattern;
 
+  static final _groupNames = {
+    for (final brand in _brands) brand.group.toLowerCase(),
+  };
+  static bool isGroupName(String word) =>
+      _groupNames.contains(word.toLowerCase());
+
   static ModelBrand? match(String name) {
     final key = name.trim();
     // Prefer the model over its hosting namespace (e.g. google/gemma-4).

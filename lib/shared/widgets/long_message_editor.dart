@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:re_editor/re_editor.dart';
-import 'package:markstream/markstream.dart'
-    show containsStrongRtl, firstStrongDirection;
+import 'package:markstream/markstream.dart' show containsStrongRtl;
 import 'dart:async';
 import '../text_input/message_editing_controller.dart';
+import '../markdown/chat_prose_direction.dart';
 import 'app_text_selection_toolbar.dart';
 
 typedef LongMessageContextMenuBuilder =
@@ -122,7 +122,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
   void initState() {
     super.initState();
     _text = widget.controller.text;
-    _textDirection = firstStrongDirection(_text);
+    _textDirection = chatProseDirection.forText(_text);
     _focus = widget.focusNode ?? FocusNode();
     _long = _supportsLineEditing(_text);
     _scroll = _makeScrollController();
@@ -404,7 +404,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
   void _replaceText(String text) {
     if (identical(_text, text)) return;
     _text = text;
-    _textDirection = firstStrongDirection(text);
+    _textDirection = chatProseDirection.forText(text);
     _lineStarts = null;
   }
 

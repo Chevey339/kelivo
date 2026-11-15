@@ -26,7 +26,7 @@ void main() {
         await settings.setEnableAssistantMarkdown(false);
       });
       addTearDown(settings.dispose);
-      const source = '中文 Gemini שלום\r\n\r\n🙂 ۱۲۳ سلام ؟';
+      const source = '中文 Gemini שלום\r\n\r\nGemini چیه؟\nTranslate «مرحبا»';
       for (final role in ['user', 'assistant']) {
         await tester.pumpWidget(
           MultiProvider(
@@ -67,9 +67,13 @@ void main() {
         );
         await tester.pumpAndSettle();
         final ltr = renderedParagraphsWith('中文 Gemini').single;
-        final rtl = renderedParagraphsWith('سلام').single;
+        final rtl = renderedParagraphsWith('چیه').single;
         expect(ltr.textDirection, TextDirection.ltr);
         expect(rtl.textDirection, TextDirection.rtl);
+        expect(
+          renderedParagraphsWith('Translate').single.textDirection,
+          TextDirection.ltr,
+        );
         expect(
           rtl.localToGlobal(Offset.zero).dx,
           greaterThan(ltr.localToGlobal(Offset.zero).dx),
@@ -78,7 +82,12 @@ void main() {
           final bubble = find.byKey(
             const ValueKey('user-message-text-bubble:user'),
           );
-          expect(tester.getSize(bubble).width, closeTo(ltr.size.width + 24, 1));
+          final widest = [
+            ltr,
+            rtl,
+            renderedParagraphsWith('Translate').single,
+          ].map((p) => p.size.width).reduce((a, b) => a > b ? a : b);
+          expect(tester.getSize(bubble).width, closeTo(widest + 24, 1));
         }
         await tester.pumpWidget(const SizedBox.shrink());
       }
@@ -186,6 +195,16 @@ void main() {
               closeTo(persian.size.width + 24, 1),
             );
           }
+          source.value = 'Gemini چیه؟ `parameter`';
+          await tester.pumpAndSettle();
+          expect(
+            markdownParagraph(tester, 'چیه').textDirection,
+            TextDirection.rtl,
+          );
+          expect(
+            markdownParagraph(tester, 'parameter').textDirection,
+            TextDirection.ltr,
+          );
           await tester.runAsync(() async {
             if (translation) {
               await settings.setEnableAssistantMarkdown(false);
