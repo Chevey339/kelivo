@@ -8471,7 +8471,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String legacyMemoryModeCacheWarning(String token) {
-    return 'The default template injects the current time via $token, which affects cache hit rate. Remove it if you do not need it.';
+    return 'If a template still contains $token, it is stripped on inject and is no longer filled with the current time. If the model needs the current time, turn on \"Append current time\" in assistant settings.';
   }
 
   @override

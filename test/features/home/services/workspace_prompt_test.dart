@@ -122,11 +122,30 @@ void main() {
     if (await tmp.exists()) await tmp.delete(recursive: true);
   });
 
+  WorkspaceToolContext withRuntimeStatus(RuntimeStatus? status) =>
+      WorkspaceToolContext(
+        workspace: sandboxed.workspace,
+        binding: sandboxed.binding,
+        paths: sandboxed.paths,
+        sessionDir: sandboxed.sessionDir,
+        outputsDir: sandboxed.outputsDir,
+        runtimeStatus: status,
+        runtimeRegistered: status != null,
+      );
+
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     test('fragment includes the ${platform.name} directory description', () {
       debugDefaultTargetPlatformOverride = platform;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final fragment = WorkspaceToolsService.buildPromptFragment(sandboxed);
+      final android = platform == TargetPlatform.android;
+      final context = withRuntimeStatus(
+        RuntimeStatus(
+          ready: true,
+          engine: android ? 'proot' : 'ish',
+          sandboxed: true,
+        ),
+      );
+      final fragment = WorkspaceToolsService.buildPromptFragment(context);
       expect(fragment, contains('<workspace>'));
       expect(fragment, contains('/workspace'));
       expect(fragment, contains('/chat'));
@@ -156,22 +175,31 @@ void main() {
       expect(fragment, contains('kelivo://workspace/rel/path'));
       expect(fragment, contains('kelivo://chat/outputs/x.txt'));
       expect(fragment, contains('kelivo://workspace/plot.png'));
-      expect(fragment, contains('Linux (PRoot)'));
-      expect(fragment, contains('/etc/os-release'));
+      expect(
+        fragment,
+        contains(
+          android
+              ? 'Engine: Linux (PRoot); check /etc/os-release for distro'
+              : 'Engine: Alpine (iSH)',
+        ),
+      );
+      final shell =
+          WorkspaceToolsService()
+                  .buildToolDefinitions(context)
+                  .singleWhere(
+                    (tool) => tool['function']['name'] == 'shell',
+                  )['function']['description']
+              as String;
+      expect(shell, contains(android ? 'configured shell -lc' : 'sh -lc'));
+      expect(shell.contains('Environment > PRoot settings'), android);
+      expect(shell, contains('/chat/outputs/<id>.txt'));
       expect(fragment.length, lessThan(1200));
     });
   }
 
   test('fragment warns when the sandbox is not installed', () {
     final fragment = WorkspaceToolsService.buildPromptFragment(
-      WorkspaceToolContext(
-        workspace: sandboxed.workspace,
-        binding: sandboxed.binding,
-        paths: sandboxed.paths,
-        sessionDir: sandboxed.sessionDir,
-        outputsDir: sandboxed.outputsDir,
-        runtimeRegistered: false,
-      ),
+      withRuntimeStatus(null),
     );
     expect(
       fragment,

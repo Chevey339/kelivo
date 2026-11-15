@@ -2535,7 +2535,7 @@
   "legacyMemoryMigrationErrorOther": "遷移失敗：{message}",
   "legacyMemoryModeTitle": "使用舊版記憶",
   "legacyMemoryModeSubtitle": "全域設定，影響所有助手",
-  "legacyMemoryModeCacheWarning": "預設模板會注入目前時間 {token}，影響快取命中率，如不需要可刪除",
+  "legacyMemoryModeCacheWarning": "模板裡若還留著 {token}，注入時會被去掉，不會再填入目前時間。需要讓模型知道目前時間時，請在助手設定裡打開「追加目前時間」。",
   "memoryUiContentLabel": "內容",
   "memoryUiValueLabel": "值",
   "memoryUiCustomKeyLabel": "鍵名",

@@ -2535,7 +2535,7 @@
   "legacyMemoryMigrationErrorOther": "Geçiş başarısız: {message}",
   "legacyMemoryModeTitle": "Eski anıları kullan",
   "legacyMemoryModeSubtitle": "Tüm asistanlar için genel ayar",
-  "legacyMemoryModeCacheWarning": "Varsayılan şablon {token} aracılığıyla geçerli saati ekler, bu da önbellek isabet oranını etkiler. İhtiyacınız yoksa kaldırın.",
+  "legacyMemoryModeCacheWarning": "Şablon hâlâ {token} içeriyorsa, enjekte edilirken çıkarılır ve artık geçerli zamanla doldurulmaz. Modelin geçerli zamanı bilmesi gerekiyorsa, asistan ayarlarında \"Geçerli saati ekle\" seçeneğini açın.",
   "memoryUiContentLabel": "İçerik",
   "memoryUiValueLabel": "Değer",
   "memoryUiCustomKeyLabel": "Anahtar",

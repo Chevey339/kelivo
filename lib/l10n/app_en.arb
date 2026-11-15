@@ -3924,14 +3924,14 @@
   },
   "legacyMemoryModeTitle": "Use legacy memory",
   "legacyMemoryModeSubtitle": "Global setting for all assistants",
-  "legacyMemoryModeCacheWarning": "The default template injects the current time via {token}, which affects cache hit rate. Remove it if you do not need it.",
+  "legacyMemoryModeCacheWarning": "If a template still contains {token}, it is stripped on inject and is no longer filled with the current time. If the model needs the current time, turn on \"Append current time\" in assistant settings.",
   "@legacyMemoryModeCacheWarning": {
     "placeholders": {
       "token": {
         "type": "String"
       }
     },
-    "description": "Info banner warning that the default legacy template injects the current time via the given token placeholder, which hurts cache hit rate."
+    "description": "Banner in the legacy memory rule editor. {token} is the literal placeholder removed when sending the template. Directs users who want the model to see the current time to the assistant's Append current time setting."
   },
   "memoryUiContentLabel": "Content",
   "memoryUiValueLabel": "Value",

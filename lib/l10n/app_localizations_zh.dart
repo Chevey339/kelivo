@@ -8117,7 +8117,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String legacyMemoryModeCacheWarning(String token) {
-    return '默认模板会注入当前时间 $token，影响缓存命中率，如不需要可删除';
+    return '模板里若还留着 $token，注入时会被去掉，不会再填入当前时间。需要让模型知道当前时间时，请在助手设置里打开「追加当前时间」。';
   }
 
   @override
@@ -24507,7 +24507,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String legacyMemoryModeCacheWarning(String token) {
-    return '默认模板会注入当前时间 $token，影响缓存命中率，如不需要可删除';
+    return '模板里若还留着 $token，注入时会被去掉，不会再填入当前时间。需要让模型知道当前时间时，请在助手设置里打开「追加当前时间」。';
   }
 
   @override
@@ -40898,7 +40898,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String legacyMemoryModeCacheWarning(String token) {
-    return '預設模板會注入目前時間 $token，影響快取命中率，如不需要可刪除';
+    return '模板裡若還留著 $token，注入時會被去掉，不會再填入目前時間。需要讓模型知道目前時間時，請在助手設定裡打開「追加目前時間」。';
   }
 
   @override

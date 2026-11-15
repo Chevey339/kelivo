@@ -404,9 +404,8 @@ class WorkspaceToolsService {
         ? WorkspacePaths.guestSkills
         : paths.skillsHostDir;
     final tmp = paths.sandboxed ? WorkspacePaths.guestTmp : paths.tmpHostRoot;
-    final outputsHint = paths.sandboxed
-        ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
-        : '${paths.sessionHostDir}/outputs/<id>.txt';
+    // Expose session paths, permissions and cross-tool policy here. Per-tool
+    // instructions (including the shell output path) belong in definitions().
     final buf = StringBuffer()
       ..writeln('<workspace>')
       ..writeln('Path zones:')
@@ -431,34 +430,24 @@ class WorkspaceToolsService {
     }
     buf
       ..writeln('- $tmp — scratch (writable, ephemeral)')
-      ..writeln('cwd: ${ctx.cwd}')
-      ..writeln(
-        'Enabled tools: ${toolNames.where(ctx.workspace.isToolEnabled).join(', ')}',
-      )
-      ..writeln();
-    if (ctx.workspace.isToolEnabled('shell')) {
-      buf.writeln(
-        'shell is one-shot: ${_shellInstructions(shell)} '
-        'Use non-interactive flags (-y). '
-        'Output is capped; long output is saved to $outputsHint.',
-      );
-      if (environmentVariableNames.isNotEmpty) {
-        buf.writeln(
+      ..writeln('cwd: ${ctx.cwd}');
+    if (ctx.workspace.isToolEnabled('shell') &&
+        environmentVariableNames.isNotEmpty) {
+      buf
+        ..writeln()
+        ..writeln(
           'User-configured environment variables are already injected: '
           '${environmentVariableNames.join(', ')}. '
           'Use ${shell?.environmentReference ?? (defaultTargetPlatform == TargetPlatform.windows ? 'the selected shell’s environment variable syntax' : r'$NAME')} references; '
           'do not print or attempt to discover their values.',
         );
-      }
     }
     if (ctx.workspace.isToolEnabled('read_file') &&
-        ctx.workspace.isToolEnabled('edit_file')) {
-      if (ctx.workspace.isToolEnabled('write_file')) {
-        buf.writeln(
-          'Prefer read_file, edit_file, and write_file over cat/sed.',
-        );
-      }
-      buf.writeln('Always read_file before editing.');
+        ctx.workspace.isToolEnabled('edit_file') &&
+        ctx.workspace.isToolEnabled('write_file')) {
+      buf
+        ..writeln()
+        ..writeln('Prefer read_file, edit_file, and write_file over cat/sed.');
     }
     buf
       ..writeln()

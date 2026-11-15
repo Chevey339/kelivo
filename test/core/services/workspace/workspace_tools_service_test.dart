@@ -348,32 +348,44 @@ void main() {
     const DesktopShell(r'C:\Windows\cmd.exe', DesktopShellKind.cmd),
     const DesktopShell('/bin/zsh', DesktopShellKind.posix),
   ]) {
-    test('tool schema and prompt use resolved ${shell.name}', () {
-      final context = ctx(
-        status: RuntimeStatus(
-          ready: true,
-          engine: 'process',
-          sandboxed: false,
-          shell: shell,
-        ),
-      );
-      final definition = service()
-          .buildToolDefinitions(context)
-          .firstWhere((tool) => (tool['function'] as Map)['name'] == 'shell');
-      final schema = jsonEncode(definition);
-      final prompt = WorkspaceToolsService.buildPromptFragment(
-        context,
-        environmentVariableNames: ['API_KEY'],
-      );
-      expect(schema, contains(shell.name));
-      expect(prompt, contains(shell.invocation));
-      expect(prompt, contains('Use ${shell.environmentReference} references'));
-      expect(prompt, contains(shell.syntaxHint));
-      expect(schema, isNot(contains('sh -lc')));
-      if (shell.version?.startsWith('5.') == true) {
-        expect(prompt, isNot(contains('Chain with &&.')));
-      }
-    });
+    test(
+      'tool schema uses ${shell.name} and the prompt lists its variable references',
+      () {
+        final context = ctx(
+          status: RuntimeStatus(
+            ready: true,
+            engine: 'process',
+            sandboxed: false,
+            shell: shell,
+          ),
+        );
+        final definition = service()
+            .buildToolDefinitions(context)
+            .firstWhere((tool) => (tool['function'] as Map)['name'] == 'shell');
+        final schema = (definition['function'] as Map)['description'] as String;
+        final prompt = WorkspaceToolsService.buildPromptFragment(
+          context,
+          environmentVariableNames: ['API_KEY'],
+        );
+        expect(schema, contains(shell.name));
+        expect(schema, contains(shell.invocation));
+        expect(prompt, isNot(contains('Fresh non-interactive')));
+        expect(
+          prompt,
+          contains('Use ${shell.environmentReference} references'),
+        );
+        expect(schema, contains(shell.syntaxHint));
+        expect(schema, contains('Use non-interactive flags'));
+        expect(
+          schema,
+          contains('${context.paths.sessionHostDir}/outputs/<id>.txt'),
+        );
+        expect(schema, isNot(contains('sh -lc')));
+        if (shell.version?.startsWith('5.') == true) {
+          expect(schema, isNot(contains('Chain with &&.')));
+        }
+      },
+    );
   }
 
   test('tool execution carries the shell used in the model prompt', () async {
@@ -405,6 +417,40 @@ void main() {
     final prompt = WorkspaceToolsService.buildPromptFragment(context);
     expect(prompt, contains('Environment > Default shell'));
     expect(prompt, isNot(contains('Sandbox environment not installed')));
+  });
+
+  test('the workspace lists session facts and enabled cross-tool guidance', () {
+    String fragment(Set<String> disabled) =>
+        WorkspaceToolsService.buildPromptFragment(
+          ctx(disabledTools: disabled),
+          environmentVariableNames: ['MODEL_ENV'],
+        );
+    const prefer = 'Prefer read_file, edit_file, and write_file over cat/sed.';
+    final all = fragment({});
+    expect(all, contains('MODEL_ENV'));
+    expect(all, contains(prefer));
+    for (final text in [
+      'Enabled tools:',
+      'shell is one-shot',
+      'Always read_file before editing.',
+      'Use non-interactive flags',
+      'long output is saved',
+    ]) {
+      expect(all, isNot(contains(text)));
+    }
+    final withoutShell = fragment({'shell'});
+    expect(withoutShell, isNot(contains('MODEL_ENV')));
+    expect(withoutShell, contains(prefer));
+    for (final name in ['read_file', 'edit_file', 'write_file']) {
+      expect(fragment({name}), isNot(contains(prefer)));
+    }
+    final edit = service()
+        .buildToolDefinitions(ctx())
+        .singleWhere((tool) => tool['function']['name'] == 'edit_file');
+    expect(
+      edit['function']['description'],
+      contains('Read the file before editing.'),
+    );
   });
 
   test('workspace prompt lists names without including values', () {

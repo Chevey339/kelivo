@@ -3105,7 +3105,7 @@
   },
   "legacyMemoryModeTitle": "使用旧版记忆",
   "legacyMemoryModeSubtitle": "全局设置，影响所有助手",
-  "legacyMemoryModeCacheWarning": "默认模板会注入当前时间 {token}，影响缓存命中率，如不需要可删除",
+  "legacyMemoryModeCacheWarning": "模板里若还留着 {token}，注入时会被去掉，不会再填入当前时间。需要让模型知道当前时间时，请在助手设置里打开「追加当前时间」。",
   "memoryUiContentLabel": "内容",
   "memoryUiValueLabel": "值",
   "memoryUiCustomKeyLabel": "键名",

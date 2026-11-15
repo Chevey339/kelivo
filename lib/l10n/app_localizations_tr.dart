@@ -8535,7 +8535,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String legacyMemoryModeCacheWarning(String token) {
-    return 'Varsayılan şablon $token aracılığıyla geçerli saati ekler, bu da önbellek isabet oranını etkiler. İhtiyacınız yoksa kaldırın.';
+    return 'Şablon hâlâ $token içeriyorsa, enjekte edilirken çıkarılır ve artık geçerli zamanla doldurulmaz. Modelin geçerli zamanı bilmesi gerekiyorsa, asistan ayarlarında \"Geçerli saati ekle\" seçeneğini açın.';
   }
 
   @override

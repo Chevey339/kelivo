@@ -15331,10 +15331,10 @@ abstract class AppLocalizations {
   /// **'Global setting for all assistants'**
   String get legacyMemoryModeSubtitle;
 
-  /// Info banner warning that the default legacy template injects the current time via the given token placeholder, which hurts cache hit rate.
+  /// Banner in the legacy memory rule editor. {token} is the literal placeholder removed when sending the template. Directs users who want the model to see the current time to the assistant's Append current time setting.
   ///
   /// In en, this message translates to:
-  /// **'The default template injects the current time via {token}, which affects cache hit rate. Remove it if you do not need it.'**
+  /// **'If a template still contains {token}, it is stripped on inject and is no longer filled with the current time. If the model needs the current time, turn on \"Append current time\" in assistant settings.'**
   String legacyMemoryModeCacheWarning(String token);
 
   /// Label for a memory content field in the memory UI; no caller supplied, evidently names the content input.

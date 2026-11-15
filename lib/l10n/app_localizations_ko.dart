@@ -8240,7 +8240,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String legacyMemoryModeCacheWarning(String token) {
-    return '기본 템플릿은 $token을(를) 통해 현재 시간을 주입하며, 이는 캐시 적중률에 영향을 줍니다. 필요하지 않으면 삭제하세요.';
+    return '템플릿에 $token이(가) 남아 있으면 주입 시 제거되며 더 이상 현재 시간으로 채워지지 않습니다. 모델이 현재 시간을 알아야 한다면 어시스턴트 설정에서 \"현재 시간 추가\"를 켜세요.';
   }
 
   @override

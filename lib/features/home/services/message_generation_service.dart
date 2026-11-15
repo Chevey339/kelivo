@@ -309,12 +309,14 @@ class MessageGenerationService {
       conversation: promptConversation,
       conversationScoped: assistant?.allowConversationPromptInjection ?? false,
     );
+    var afterWorldBook = '';
     await messageBuilderService.injectWorldBookPrompts(
       apiMessages,
       assistantId,
       conversation: promptConversation,
       conversationScoped: assistant?.allowConversationPromptInjection ?? false,
       persistActivation: persistWorldBookActivation,
+      deferAfterSystemPrompt: (content) => afterWorldBook = content,
       onActivationPersisted: onWorldBookActivationPersisted,
       sourceMessages: messageBuilderService.collapseVersions(
         messages,
@@ -323,6 +325,7 @@ class MessageGenerationService {
     );
 
     WorkspaceToolContext? workspaceContext;
+    var addedWorkspace = false;
     var workspaceAttachments = const <AttachmentInfo>[];
     try {
       if (workspaceProvider != null && runtimeProvider != null) {
@@ -348,7 +351,7 @@ class MessageGenerationService {
         );
       }
       if (workspaceContext != null) {
-        await messageBuilderService.injectWorkspacePrompt(
+        addedWorkspace = await messageBuilderService.injectWorkspacePrompt(
           apiMessages,
           assistant,
           conversationId: currentConversation?.id,
@@ -361,11 +364,17 @@ class MessageGenerationService {
       }
       debugPrint('Workspace prompt/attachments failed: $e');
     }
-    await messageBuilderService.injectSkillsPrompt(
+    final addedSkills = await messageBuilderService.injectSkillsPrompt(
       apiMessages,
       assistant,
       conversationId: currentConversation?.id,
       workspaceContext: workspaceContext,
+    );
+
+    messageBuilderService.appendWorldBookAfterPrompt(
+      apiMessages,
+      afterWorldBook,
+      afterNewSection: addedWorkspace || addedSkills,
     );
 
     final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
