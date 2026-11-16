@@ -4083,8 +4083,6 @@ class HomePageController extends ChangeNotifier {
   // Public Methods - Helpers
   // ============================================================================
 
-  String titleForLocale() => _titleForLocale(_context);
-
   String? currentStreamingMessageId() {
     for (int i = messages.length - 1; i >= 0; i--) {
       final m = messages[i];

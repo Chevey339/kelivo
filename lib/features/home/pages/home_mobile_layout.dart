@@ -9,6 +9,7 @@ import 'dart:ui' as ui;
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
 import '../widgets/side_drawer.dart';
+import '../widgets/conversation_title_builder.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -32,7 +33,7 @@ class HomeMobileScaffold extends StatelessWidget {
     required this.drawerController,
     required this.assistantPickerCloseTick,
     required this.loadingConversationIds,
-    required this.title,
+    required this.conversationId,
     required this.providerName,
     required this.modelDisplay,
     required this.onToggleDrawer,
@@ -59,7 +60,7 @@ class HomeMobileScaffold extends StatelessWidget {
   final InteractiveDrawerController drawerController;
   final ValueNotifier<int> assistantPickerCloseTick;
   final Set<String> loadingConversationIds;
-  final String title;
+  final String? conversationId;
   final String? providerName;
   final String? modelDisplay;
   final VoidCallback onToggleDrawer;
@@ -154,6 +155,17 @@ class HomeMobileScaffold extends StatelessWidget {
     final useNewAssistantAvatarUx = context
         .watch<SettingsProvider>()
         .useNewAssistantAvatarUx;
+    final conversationTitle = ConversationTitleBuilder(
+      conversationId: conversationId,
+      isTemporary: temporaryConversationEnabled,
+      builder: (context, title) => AnimatedTextSwap(
+        text: title,
+        style: TextStyle(
+          fontSize: isDesktopPlatform ? 14 : 16,
+          fontWeight: AppFontWeights.medium,
+        ),
+      ),
+    );
 
     return AppBar(
       systemOverlayStyle: (Theme.of(context).brightness == Brightness.dark)
@@ -201,13 +213,7 @@ class HomeMobileScaffold extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      AnimatedTextSwap(
-                        text: title,
-                        style: TextStyle(
-                          fontSize: isDesktopPlatform ? 14 : 16,
-                          fontWeight: AppFontWeights.medium,
-                        ),
-                      ),
+                      conversationTitle,
                       if (providerName != null && modelDisplay != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
@@ -238,13 +244,7 @@ class HomeMobileScaffold extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedTextSwap(
-                  text: title,
-                  style: TextStyle(
-                    fontSize: isDesktopPlatform ? 14 : 16,
-                    fontWeight: AppFontWeights.medium,
-                  ),
-                ),
+                conversationTitle,
                 if (providerName != null && modelDisplay != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),

@@ -1029,19 +1029,12 @@ class _HomePageState extends State<HomePage>
       assistant: assistant,
     );
 
-    final title = _controller.isTemporaryConversation
-        ? AppLocalizations.of(context)!.temporaryChatTitle
-        : ((_controller.currentConversation?.title ?? '').trim().isNotEmpty)
-        ? _controller.currentConversation!.title
-        : _controller.titleForLocale();
-
     _controller.setCompactDesktopLayout(
       desktop && width < AppBreakpoints.tablet,
     );
     if (desktop || width >= AppBreakpoints.tablet) {
       return _buildTabletLayout(
         context,
-        title: title,
         providerName: modelInfo.providerName,
         modelDisplay: modelInfo.modelDisplay,
         cs: cs,
@@ -1050,7 +1043,6 @@ class _HomePageState extends State<HomePage>
 
     return _buildMobileLayout(
       context,
-      title: title,
       providerName: modelInfo.providerName,
       modelDisplay: modelInfo.modelDisplay,
       cs: cs,
@@ -1059,7 +1051,6 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMobileLayout(
     BuildContext context, {
-    required String title,
     required String? providerName,
     required String? modelDisplay,
     required ColorScheme cs,
@@ -1071,7 +1062,7 @@ class _HomePageState extends State<HomePage>
       drawerController: _drawerController,
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
-      title: title,
+      conversationId: _controller.currentConversation?.id,
       providerName: providerName,
       modelDisplay: modelDisplay,
       onToggleDrawer: () => _drawerController.toggle(),
@@ -1192,7 +1183,6 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildTabletLayout(
     BuildContext context, {
-    required String title,
     required String? providerName,
     required String? modelDisplay,
     required ColorScheme cs,
@@ -1205,7 +1195,7 @@ class _HomePageState extends State<HomePage>
       scaffoldKey: _scaffoldKey,
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
-      title: title,
+      conversationId: _controller.currentConversation?.id,
       providerName: providerName,
       modelDisplay: modelDisplay,
       modelProviderKey: _resolvedChatModel().providerKey,

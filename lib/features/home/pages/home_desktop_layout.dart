@@ -15,6 +15,7 @@ import 'dart:ui' as ui;
 import '../../../desktop/macos_window_drag_area.dart';
 import '../../../l10n/app_localizations.dart';
 import '../widgets/side_drawer.dart';
+import '../widgets/conversation_title_builder.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/user_provider.dart';
@@ -41,7 +42,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.scaffoldKey,
     required this.assistantPickerCloseTick,
     required this.loadingConversationIds,
-    required this.title,
+    required this.conversationId,
     required this.providerName,
     required this.modelDisplay,
     this.modelProviderKey,
@@ -75,7 +76,7 @@ class HomeDesktopScaffold extends StatelessWidget {
   final GlobalKey<ScaffoldState> scaffoldKey;
   final ValueNotifier<int> assistantPickerCloseTick;
   final Set<String> loadingConversationIds;
-  final String title;
+  final String? conversationId;
   final String? providerName;
   final String? modelDisplay;
   final String? modelProviderKey;
@@ -338,12 +339,16 @@ class HomeDesktopScaffold extends StatelessWidget {
         onTap: onToggleSidebar,
       ),
       titleSpacing: 2,
-      title: _buildTitle(context, cs),
+      title: ConversationTitleBuilder(
+        conversationId: conversationId,
+        isTemporary: temporaryConversationEnabled,
+        builder: (context, title) => _buildTitle(context, cs, title),
+      ),
       actions: _buildActions(context, topicsOnRight),
     );
   }
 
-  Widget _buildTitle(BuildContext context, ColorScheme cs) {
+  Widget _buildTitle(BuildContext context, ColorScheme cs, String title) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final useNewAssistantAvatarUx = context
         .watch<SettingsProvider>()

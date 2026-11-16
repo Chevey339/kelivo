@@ -11,8 +11,10 @@ import 'package:Kelivo/core/providers/tag_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/widgets/side_drawer.dart';
+import 'package:Kelivo/features/home/widgets/conversation_title_builder.dart';
 import 'package:Kelivo/features/home/pages/home_mobile_layout.dart';
 import 'package:Kelivo/shared/animations/status_animation.dart';
+import 'package:Kelivo/shared/animations/widgets.dart';
 import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/visible_route_theme.dart';
@@ -207,7 +209,7 @@ void main() {
                   drawerController: mobileDrawer,
                   assistantPickerCloseTick: closeTick,
                   loadingConversationIds: loadingIds,
-                  title: 'Conversation',
+                  conversationId: service.currentConversationId,
                   providerName: null,
                   modelDisplay: null,
                   onToggleDrawer: mobileDrawer.toggle,
@@ -701,6 +703,106 @@ void main() {
       expect(find.text('Orphaned topic'), findsOneWidget);
       expect(find.text('Second topic'), findsOneWidget);
     });
+  });
+
+  testWidgets('the open chat header rebuilds only for its own title', (
+    tester,
+  ) async {
+    final service = createService();
+    late Conversation open;
+    late Conversation other;
+    await tester.runAsync(() async {
+      other = await service.createConversation(title: 'Other chat');
+      open = await service.createConversation(title: 'Open chat');
+    });
+    final drawer = InteractiveDrawerController();
+    addTearDown(drawer.dispose);
+    await pumpDrawer(tester, service, mobileDrawer: drawer);
+    await tester.pumpAndSettle();
+
+    final appBar = find.byType(AppBar);
+    AnimatedTextSwap header() => tester.widget<AnimatedTextSwap>(
+      find.descendant(of: appBar, matching: find.byType(AnimatedTextSwap)),
+    );
+    final initial = header();
+    expect(initial.text, 'Open chat');
+
+    // Appending replaces the service's cached Conversation for the same ID.
+    await tester.runAsync(() async {
+      await service.addMessage(
+        conversationId: open.id,
+        role: 'user',
+        content: 'Hello',
+      );
+      await service.renameConversation(other.id, 'Another name');
+    });
+    await tester.pumpAndSettle();
+    expect(header(), same(initial));
+
+    final initialBar = tester.widget<AppBar>(appBar);
+    await tester.runAsync(() => service.renameConversation(open.id, 'Renamed'));
+    await tester.pumpAndSettle();
+    expect(header().text, 'Renamed');
+    expect(tester.widget<AppBar>(appBar), same(initialBar));
+
+    await tester.runAsync(() => service.renameConversation(open.id, '   '));
+    await tester.pumpAndSettle();
+    expect(
+      header().text,
+      AppLocalizations.of(tester.element(appBar))!.titleForLocale,
+    );
+  });
+
+  testWidgets('temporary and empty headers stop observing the previous chat', (
+    tester,
+  ) async {
+    final service = createService();
+    late Conversation open;
+    late Conversation temporary;
+    await tester.runAsync(() async {
+      open = await service.createConversation(title: 'Open');
+      temporary = await service.createDraftConversation(temporary: true);
+    });
+
+    var builds = 0;
+    Future<void> showHeader(String? id) async {
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ChatService>.value(
+          value: service,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: ConversationTitleBuilder(
+              conversationId: id,
+              isTemporary: service.isTemporaryConversation(id),
+              builder: (_, title) {
+                builds++;
+                return Text(title);
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    for (final id in [temporary.id, null]) {
+      await showHeader(open.id);
+      await showHeader(id);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(ConversationTitleBuilder)),
+      )!;
+      expect(
+        find.text(id == null ? l10n.titleForLocale : l10n.temporaryChatTitle),
+        findsOneWidget,
+      );
+      final before = builds;
+      await tester.runAsync(
+        () => service.renameConversation(open.id, 'Renamed while showing $id'),
+      );
+      await tester.pumpAndSettle();
+      expect(builds, before);
+    }
   });
 
   testWidgets('list does not rebuild on unrelated ChatService notify', (
