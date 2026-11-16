@@ -8,7 +8,6 @@ import '../../../utils/utf16_safe_cut.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
@@ -29,7 +28,6 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../utils/mcp_structured_image.dart';
-import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/logging/context_log_models.dart';
 import '../../../core/services/memory/memory_block_builder.dart';
@@ -167,7 +165,8 @@ class MessageBuilderService {
     this.ocrHandler,
     this.ocrPrefetch,
     this.providerArtifactLookup,
-  });
+    DocumentExtractionCache? documentCache,
+  }) : documentCache = documentCache ?? DocumentExtractionCache();
 
   final ChatService chatService;
 
@@ -221,10 +220,7 @@ class MessageBuilderService {
     return providerArtifactLookup?.call(message, kind);
   }
 
-  /// Cache for document text extraction to avoid re-reading files on every message
-  /// Keyed by path, validated with (modified + size) to avoid stale reuse.
-  final Map<String, _DocTextCacheEntry> _docTextCache =
-      <String, _DocTextCacheEntry>{};
+  final DocumentExtractionCache documentCache;
 
   /// Read-only, bounded context for a result that will be published later.
   /// In particular, World Book timers and prompt/memory receipts are not written.
@@ -1064,7 +1060,7 @@ class MessageBuilderService {
       final mediaPaths = <String>{};
       for (final document in parsed.documents) {
         final mime = _effectiveAttachmentMime(document);
-        if (nativePdfInput && isPdfMime(mime)) continue;
+        if (isImageMime(mime) || (nativePdfInput && isPdfMime(mime))) continue;
         if (isVideoMime(mime) || isAudioMime(mime)) {
           final path = document.path.trim();
           if (path.isNotEmpty) mediaPaths.add(path);
@@ -1120,14 +1116,14 @@ class MessageBuilderService {
     Map<String, AttachmentInfo> workspaceAttachments = const {},
     bool useWorkspaceForDocuments = true,
   }) async {
-    late final quoteMarker = lookupAppLocalizations(
+    late final l10n = lookupAppLocalizations(
       basicLocaleListResolution(
         settings.isFollowingSystemLocale
             ? WidgetsBinding.instance.platformDispatcher.locales
             : [settings.appLocale],
         AppLocalizations.supportedLocales,
       ),
-    ).selectionQuoteMarker;
+    );
     final bool ocrActive =
         settings.ocrEnabled &&
         settings.ocrModelProvider != null &&
@@ -1242,55 +1238,6 @@ class MessageBuilderService {
         } catch (_) {
           ocrSession = null;
         }
-      }
-    }
-
-    Future<String?> readDocument(DocumentAttachment d) async {
-      if (previewOnly) return null;
-      // Resolve once so cache key and extractor share the same absolute path.
-      // null means rejected (UNC/SMB) — never fall back to the raw path.
-      final resolvedPath = SandboxPathResolver.resolveForIo(d.path);
-      if (resolvedPath == null) return null;
-      // Use file stat to detect content changes without hashing.
-      FileStat? stat;
-      try {
-        stat = await File(resolvedPath).stat();
-      } catch (_) {
-        stat = null;
-      }
-      if (stat != null) {
-        final cached = _docTextCache[resolvedPath];
-        if (cached != null &&
-            cached.modifiedMs == stat.modified.millisecondsSinceEpoch &&
-            cached.size == stat.size) {
-          return cached.text;
-        }
-      }
-      try {
-        final text = await DocumentTextExtractor.extractResolved(
-          path: resolvedPath,
-          mime: _effectiveAttachmentMime(d),
-        );
-        // Cache only when stat is available; otherwise avoid staleness.
-        if (stat != null) {
-          _docTextCache[resolvedPath] = _DocTextCacheEntry(
-            text: text,
-            modifiedMs: stat.modified.millisecondsSinceEpoch,
-            size: stat.size,
-          );
-        }
-        return text;
-      } on AttachmentRequiresWorkspace {
-        throw AttachmentRequiresWorkspace(d.fileName);
-      } catch (_) {
-        if (stat != null) {
-          _docTextCache[resolvedPath] = _DocTextCacheEntry(
-            text: null,
-            modifiedMs: stat.modified.millisecondsSinceEpoch,
-            size: stat.size,
-          );
-        }
-        return null;
       }
     }
 
@@ -1489,7 +1436,7 @@ class MessageBuilderService {
       final replacedUserText = applyAssistantRegexes(
         parsedUser.quotes.isEmpty
             ? parsedUser.text
-            : parsedUser.quotedText(quoteMarker),
+            : parsedUser.quotedText(l10n.selectionQuoteMarker),
         assistant: assistant,
         scope: AssistantRegexScope.user,
         target: AssistantRegexTransformTarget.send,
@@ -1504,36 +1451,56 @@ class MessageBuilderService {
           : '$frozenUi\n\n$ordinaryUser';
 
       final filePrompts = StringBuffer();
-      var leftToSandbox = false;
+      var canFreezeDocuments = true;
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (nativePdfInput && isPdfMime(effectiveMime)) continue;
         if (useWorkspaceForDocuments &&
             workspaceAttachments.containsKey(d.path)) {
-          leftToSandbox = true;
+          canFreezeDocuments = false;
           continue;
         }
-        if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
+        if (isImageMime(effectiveMime) ||
+            isVideoMime(effectiveMime) ||
+            isAudioMime(effectiveMime)) {
           continue;
         }
         if (sandboxDataFiles &&
             isSandboxDataFile(fileName: d.fileName, mime: effectiveMime)) {
-          leftToSandbox = true;
+          canFreezeDocuments = false;
           continue;
         }
-        final text = await readDocument(d);
-        if (text == null || text.trim().isEmpty) continue;
+        if (previewOnly) continue;
+        final DocumentText result;
+        try {
+          result = await documentCache.read(d);
+        } on AttachmentReadError catch (error) {
+          if (error.problem != AttachmentProblem.missing || i == lastUserIdx) {
+            rethrow;
+          }
+          // An expired historical source cannot block new messages. Leave the
+          // prompt unfrozen so restoring the file can restore its contents.
+          canFreezeDocuments = false;
+          continue;
+        }
+        final hasText = result.text.trim().isNotEmpty;
+        if (!hasText && !result.truncated) continue;
         filePrompts.writeln('## user sent a file: ${d.fileName}');
-        filePrompts.writeln('<content>');
-        filePrompts.writeln('```');
-        filePrompts.writeln(text);
-        filePrompts.writeln('```');
-        filePrompts.writeln('</content>');
+        if (hasText) {
+          filePrompts.writeln('<content>');
+          filePrompts.writeln('```');
+          filePrompts.writeln(result.text);
+          filePrompts.writeln('```');
+          filePrompts.writeln('</content>');
+        }
+        if (result.truncated) {
+          filePrompts.writeln(l10n.attachmentTruncatedNotice(result.count));
+        }
         filePrompts.writeln();
       }
 
       String merged = (filePrompts.toString() + cleanedUser).trim();
-      var canFreezePrompt = !previewOnly && !leftToSandbox && !hasNativePdf;
+      var canFreezePrompt = !previewOnly && canFreezeDocuments && !hasNativePdf;
 
       if (!previewOnly && ocrActive && ocrHandler != null) {
         final ocrTargets = parsedUser.imagePaths
@@ -2800,16 +2767,4 @@ class MessageBuilderService {
       return false;
     }
   }
-}
-
-class _DocTextCacheEntry {
-  const _DocTextCacheEntry({
-    required this.text,
-    required this.modifiedMs,
-    required this.size,
-  });
-
-  final String? text;
-  final int modifiedMs;
-  final int size;
 }

@@ -219,7 +219,7 @@ void main() {
         ..writeAsBytesSync(await pdf.save());
       pdf.dispose();
       final xml = utf8.encode(
-        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Shared DOCX text</w:t></w:r></w:p></w:body></w:document>',
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>中文 DOCX</w:t></w:r></w:p></w:body></w:document>',
       );
       final docx = File(p.join(root.path, 'docx-source'))
         ..writeAsBytesSync(
@@ -252,18 +252,18 @@ void main() {
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       );
       expect(
-        await DocumentTextExtractor.extractResolved(
+        (await DocumentTextExtractor.extractResolved(
           path: input.documents[0].path,
           mime: input.documents[0].mime,
-        ),
+        )).text,
         contains('Shared PDF text'),
       );
       expect(
-        await DocumentTextExtractor.extractResolved(
+        (await DocumentTextExtractor.extractResolved(
           path: input.documents[1].path,
           mime: input.documents[1].mime,
-        ),
-        contains('Shared DOCX text'),
+        )).text,
+        contains('中文 DOCX'),
       );
     },
   );

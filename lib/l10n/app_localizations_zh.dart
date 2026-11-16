@@ -11221,6 +11221,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get incomingShareMoveFailed => '无法切换对话，草稿已保留。';
 
   @override
+  String attachmentEncodingUnrecognized(String name) {
+    return '「$name」无法识别这个文本的编码，可以另存为 UTF-8 后重发';
+  }
+
+  @override
+  String get attachmentEncodingUnrecognizedShort => '无法识别编码';
+
+  @override
+  String attachmentNotText(String name) {
+    return '「$name」这个文件不是文本，暂不支持';
+  }
+
+  @override
+  String get attachmentNotTextShort => '不是文本';
+
+  @override
+  String attachmentTruncatedNotice(int count) {
+    return '文件过大，只读取了前 $count 字，建议拆分后再发送';
+  }
+
+  @override
+  String get attachmentTruncatedCard => '将只发送开头';
+
+  @override
+  String attachmentDocumentTooLarge(String name) {
+    return '「$name」文件过大，无法在普通对话中读取';
+  }
+
+  @override
+  String get attachmentDocumentTooLargeShort => '文件过大';
+
+  @override
   String attachmentRequiresWorkspace(String name) {
     return '「$name」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
   }
@@ -27643,6 +27675,38 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get incomingShareMoveFailed => '无法切换对话，草稿已保留。';
+
+  @override
+  String attachmentEncodingUnrecognized(String name) {
+    return '「$name」无法识别这个文本的编码，可以另存为 UTF-8 后重发';
+  }
+
+  @override
+  String get attachmentEncodingUnrecognizedShort => '无法识别编码';
+
+  @override
+  String attachmentNotText(String name) {
+    return '「$name」这个文件不是文本，暂不支持';
+  }
+
+  @override
+  String get attachmentNotTextShort => '不是文本';
+
+  @override
+  String attachmentTruncatedNotice(int count) {
+    return '文件过大，只读取了前 $count 字，建议拆分后再发送';
+  }
+
+  @override
+  String get attachmentTruncatedCard => '将只发送开头';
+
+  @override
+  String attachmentDocumentTooLarge(String name) {
+    return '「$name」文件过大，无法在普通对话中读取';
+  }
+
+  @override
+  String get attachmentDocumentTooLargeShort => '文件过大';
 
   @override
   String attachmentRequiresWorkspace(String name) {
@@ -44076,8 +44140,40 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get incomingShareMoveFailed => '無法切換對話，草稿已保留。';
 
   @override
+  String attachmentEncodingUnrecognized(String name) {
+    return '無法辨識「$name」的文字編碼。請另存為 UTF-8 後重新傳送。';
+  }
+
+  @override
+  String get attachmentEncodingUnrecognizedShort => '無法辨識編碼';
+
+  @override
+  String attachmentNotText(String name) {
+    return '「$name」不是文字檔，因此無法在此使用。';
+  }
+
+  @override
+  String get attachmentNotTextShort => '不是文字檔';
+
+  @override
+  String attachmentTruncatedNotice(int count) {
+    return '檔案過大，僅讀取了前 $count 個字元。如需其餘內容，請拆分後重新傳送。';
+  }
+
+  @override
+  String get attachmentTruncatedCard => '將只傳送開頭部分';
+
+  @override
+  String attachmentDocumentTooLarge(String name) {
+    return '「$name」檔案過大，無法在一般對話中讀取。';
+  }
+
+  @override
+  String get attachmentDocumentTooLargeShort => '檔案過大';
+
+  @override
   String attachmentRequiresWorkspace(String name) {
-    return '「$name」無法在一般對話中直接讀取。請綁定工作區並啟用檔案工具，或將草稿移到已有工作區的對話。';
+    return '若要使用「$name」，請綁定工作區並啟用檔案工具，或將此草稿移至已有工作區的對話。此檔案無法在一般對話中直接讀取。';
   }
 
   @override

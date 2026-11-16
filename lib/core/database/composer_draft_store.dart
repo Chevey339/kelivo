@@ -18,6 +18,14 @@ import '../models/conversation.dart';
 import '../models/tool_permission_mode.dart';
 import 'app_database.dart';
 
+typedef DocumentCopyObserver =
+    Future<void> Function(
+      DocumentAttachment document,
+      File source,
+      FileStat beforeCopy,
+      File destination,
+    );
+
 /// Device-local editor state. All mutations have an owner, including writes
 /// completing after navigation. Files live outside the portable backup roots.
 class ComposerDraftStore extends ChangeNotifier {
@@ -497,7 +505,8 @@ class ComposerDraftStore extends ChangeNotifier {
 
   bool sameOwnedFile(String id, String stored, String source) =>
       stored == source ||
-      stored == _ownedPaths['$id\u0000${SandboxPathResolver.fix(source)}'];
+      stored ==
+          _ownedPaths['$id\u0000${SandboxPathResolver.resolveForIo(source)}'];
 
   Future<String> ownFile(String id, String path) async {
     if (path.startsWith('data:') ||
@@ -505,7 +514,11 @@ class ComposerDraftStore extends ChangeNotifier {
         path.startsWith('https://')) {
       return path;
     }
-    final source = File(SandboxPathResolver.fix(path));
+    final local = SandboxPathResolver.resolveForIo(path);
+    if (local == null) {
+      return path; // Keep the unavailable reference in the draft.
+    }
+    final source = File(local);
     final dir = await directoryFor(id);
     if (p.isWithin(dir.path, source.absolute.path)) return source.path;
     final sourceKey = '$id\u0000${source.path}';
@@ -681,7 +694,10 @@ class ComposerDraftStore extends ChangeNotifier {
   /// Only explicit submission publishes a private attachment into upload/.
   /// The marker is committed before the file appears and consumed together
   /// with the message, so interrupted sends remain excluded from backups.
-  Future<ChatInputData> prepareSubmissionInput(ChatInputData input) async {
+  Future<ChatInputData> prepareSubmissionInput(
+    ChatInputData input, {
+    DocumentCopyObserver? onDocumentCopied,
+  }) async {
     final submission = input.draftSubmission;
     if (submission == null) return input;
     void checkOwner() {
@@ -705,6 +721,7 @@ class ComposerDraftStore extends ChangeNotifier {
     final dir = await AppDirectories.getUploadDirectory();
     await dir.create(recursive: true);
     final paths = <String, String>{};
+    final documents = {for (final doc in input.documents) doc.path: doc};
     var index = 0;
     for (final raw in [
       ...input.imagePaths,
@@ -717,10 +734,13 @@ class ComposerDraftStore extends ChangeNotifier {
         paths[raw] = raw;
         continue;
       }
-      final source = File(
-        SandboxPathResolver.fix(await ownFile(submission.conversationId, raw)),
+      final local = SandboxPathResolver.resolveForIo(
+        await ownFile(submission.conversationId, raw),
       );
-      if (!await source.exists()) {
+      if (local == null) throw StateError('composer_attachment_missing');
+      final source = File(local);
+      final beforeCopy = await source.stat();
+      if (beforeCopy.type != FileSystemEntityType.file) {
         throw StateError('composer_attachment_missing');
       }
       final target = File(
@@ -742,10 +762,21 @@ class ComposerDraftStore extends ChangeNotifier {
           '${p.basename(target.path)}.part',
         ),
       );
-      await source.copy(staging.path);
+      try {
+        await source.copy(staging.path);
+      } on FileSystemException {
+        if (!await source.exists()) {
+          throw StateError('composer_attachment_missing');
+        }
+        rethrow;
+      }
       checkOwner();
       await staging.rename(target.path);
       paths[raw] = target.path;
+      final document = documents[raw];
+      if (document != null && onDocumentCopied != null) {
+        await onDocumentCopied(document, source, beforeCopy, target);
+      }
     }
     checkOwner();
     return ChatInputData(

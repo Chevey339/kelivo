@@ -5716,6 +5716,58 @@
   "incomingShareNoConversations": "No matching conversations",
   "chatInputBarRemoveAttachment": "Remove attachment",
   "incomingShareMoveFailed": "Could not switch conversations. Your draft has been kept.",
+  "attachmentEncodingUnrecognized": "Couldn’t recognize the text encoding of “{name}”. Save it as UTF-8 and send it again.",
+  "@attachmentEncodingUnrecognized": {
+    "description": "Detailed composer or generation error for an attachment whose text encoding cannot be recognized. {name} is the displayed file name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attachmentEncodingUnrecognizedShort": "Encoding unrecognized",
+  "@attachmentEncodingUnrecognizedShort": {
+    "description": "Short error label on a composer attachment card when its text encoding cannot be recognized."
+  },
+  "attachmentNotText": "“{name}” isn’t a text file, so it can’t be used here.",
+  "@attachmentNotText": {
+    "description": "Detailed composer or generation error for a binary attachment. {name} is the displayed file name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attachmentNotTextShort": "Not a text file",
+  "@attachmentNotTextShort": {
+    "description": "Short error label on a composer attachment card for binary content."
+  },
+  "attachmentTruncatedNotice": "This file is too large, so only the first {count} characters were read. Split it and send again if you need the rest.",
+  "@attachmentTruncatedNotice": {
+    "description": "Shown on tapping a truncated composer attachment and after its text in the model prompt. {count} is the actual number of Unicode characters included.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attachmentTruncatedCard": "Only the beginning will be sent",
+  "@attachmentTruncatedCard": {
+    "description": "Short warning on a composer attachment card when only the start of its text will be sent."
+  },
+  "attachmentDocumentTooLarge": "“{name}” is too large to read in a regular chat.",
+  "@attachmentDocumentTooLarge": {
+    "description": "Detailed composer or generation error when a document exceeds the local extraction size limit. {name} is the displayed file name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attachmentDocumentTooLargeShort": "File too large",
+  "@attachmentDocumentTooLargeShort": {
+    "description": "Short error label on a composer attachment card when a document exceeds the local extraction limit."
+  },
   "attachmentRequiresWorkspace": "To use “{name}”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.",
   "@attachmentRequiresWorkspace": {
     "placeholders": {
@@ -5723,7 +5775,7 @@
         "type": "String"
       }
     },
-    "description": "Warning shown when an attachment named {name} needs a bound workspace with file tools; suggests binding one or moving the draft to a workspace conversation."
+    "description": "Warning in a conversation already bound to a workspace when an attachment cannot be read locally and the necessary file tools are unavailable. {name} is the displayed file name."
   },
   "storageSessionFilesUnlinked": "Unlinked conversation",
   "workspaceExternalMount": "Mount external folder",

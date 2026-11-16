@@ -1,3 +1,4 @@
+import '../services/composer_document_route.dart';
 import '../../chat/controllers/conversation_find_controller.dart';
 import '../../chat/models/conversation_find_candidate.dart';
 import '../../chat/services/conversation_find_service.dart';
@@ -1618,14 +1619,35 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildChatInputBar(BuildContext context, {required bool isTablet}) {
-    final conversation = _controller.currentConversation;
+    final conversation = watchComposerConversation(
+      context,
+      _controller.currentConversation,
+    );
     final settings = context.watch<SettingsProvider>();
+    final assistants = context.watch<AssistantProvider>();
+    // The toolbar edits the selected assistant's capabilities. During a switch
+    // its model can differ briefly from the conversation that owns this draft.
     final chatModel = resolveChatModel(
       settings,
       conversation: conversation,
-      assistant: context.watch<AssistantProvider>().currentAssistant,
+      assistant: assistants.currentAssistant,
+    );
+    final owner = assistants.resolveConversationAssistant(
+      conversation?.assistantId,
     );
     return ChatInputSection(
+      documentRoute: resolveComposerDocumentRoute(
+        context,
+        conversation: conversation,
+        settings: settings,
+        assistant: owner,
+        model: resolveChatModel(
+          settings,
+          conversation: conversation,
+          assistant: owner,
+        ),
+        listen: true,
+      ),
       inputBarKey: _inputBarKey,
       chatModelProviderKey: chatModel.providerKey,
       chatModelId: chatModel.modelId,

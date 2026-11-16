@@ -11399,8 +11399,40 @@ class AppLocalizationsKo extends AppLocalizations {
   String get incomingShareMoveFailed => '대화를 전환하지 못했습니다. 초안은 유지되었습니다.';
 
   @override
+  String attachmentEncodingUnrecognized(String name) {
+    return '“$name”의 텍스트 인코딩을 인식할 수 없습니다. UTF-8로 저장한 후 다시 보내 주세요.';
+  }
+
+  @override
+  String get attachmentEncodingUnrecognizedShort => '인코딩 인식 불가';
+
+  @override
+  String attachmentNotText(String name) {
+    return '“$name”은(는) 텍스트 파일이 아니므로 여기에서 사용할 수 없습니다.';
+  }
+
+  @override
+  String get attachmentNotTextShort => '텍스트 파일 아님';
+
+  @override
+  String attachmentTruncatedNotice(int count) {
+    return '파일이 너무 커서 처음 $count자만 읽었습니다. 나머지가 필요하면 파일을 나눠서 다시 보내 주세요.';
+  }
+
+  @override
+  String get attachmentTruncatedCard => '앞부분만 전송됩니다';
+
+  @override
+  String attachmentDocumentTooLarge(String name) {
+    return '“$name” 파일이 너무 커서 일반 대화에서 읽을 수 없습니다.';
+  }
+
+  @override
+  String get attachmentDocumentTooLargeShort => '파일이 너무 큼';
+
+  @override
   String attachmentRequiresWorkspace(String name) {
-    return '「$name」은(는) 일반 대화에서 직접 읽을 수 없습니다. 작업 공간을 연결하고 파일 도구를 활성화하거나, 초안을 작업 공간이 있는 대화로 이동하세요.';
+    return '“$name”을(를) 사용하려면 작업 공간을 연결하고 파일 도구를 활성화하거나, 이 초안을 작업 공간이 있는 대화로 옮기세요. 이 파일은 일반 대화에서 직접 읽을 수 없습니다.';
   }
 
   @override

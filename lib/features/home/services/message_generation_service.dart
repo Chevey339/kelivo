@@ -794,14 +794,14 @@ class MessageGenerationService {
             workspaceAttachments: localAttachments,
             useWorkspaceForDocuments: hasWorkspaceFileTools,
           );
-    } on AttachmentRequiresWorkspace catch (e) {
-      if (!contextProvider.mounted) rethrow;
-      throw Exception(
-        AppLocalizations.of(
-              contextProvider,
-            )?.attachmentRequiresWorkspace(e.name) ??
-            e.toString(),
-      );
+    } on AttachmentReadError catch (e) {
+      if (resolvedWorkspace != null &&
+          !resolvedWorkspace.skillsOnly &&
+          !hasWorkspaceFileTools &&
+          e.problem != AttachmentProblem.missing) {
+        throw AttachmentReadError(AttachmentProblem.workspace, e.name);
+      }
+      rethrow;
     } finally {
       if (indicatorMessageId != null) {
         onFileProcessingFinished?.call(indicatorMessageId);

@@ -241,6 +241,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.4"
+  chinese_codec:
+    dependency: "direct main"
+    description:
+      name: chinese_codec
+      sha256: aba83f46dc922249d30661b5a9eb04b8eba0f2624b6cc433c1e8eefa82b013a9
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.2"
   cli_util:
     dependency: transitive
     description:

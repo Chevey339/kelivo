@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
@@ -315,11 +317,15 @@ void main() {
     final key = GlobalKey<_HarnessState>();
     await tester.pumpWidget(_app(service, key));
     final state = key.currentState!;
-    const input = ChatInputData(
+    final dir = Directory.systemTemp.createTempSync('kelivo_shared_binary_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/app.apk')
+      ..writeAsBytesSync([0x50, 0x4b, 3, 4, 0, 1]);
+    final input = ChatInputData(
       text: 'inspect this',
       documents: [
         DocumentAttachment(
-          path: '/upload/app.apk',
+          path: file.path,
           fileName: 'app.apk',
           mime: 'application/vnd.android.package-archive',
         ),
@@ -330,8 +336,12 @@ void main() {
       state.controller.openIncomingShareDraft(input),
     );
     expect(
-      await state.controller.sendMessage(input),
+      await tester.runAsync(() => state.controller.sendMessage(input)),
       ChatInputSubmissionResult.rejected,
+    );
+    expect(
+      AppSnackBarManager().activeToasts.first.notification.message,
+      '“app.apk” isn’t a text file, so it can’t be used here.',
     );
     expect(state.text.text, 'inspect this');
     expect(state.media.files, input.documents);

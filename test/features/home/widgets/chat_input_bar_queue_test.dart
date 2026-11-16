@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/features/home/services/composer_document_route.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
 import "../../../support/business_test_harness.dart";
 import 'dart:async';
@@ -29,6 +32,8 @@ void main() {
     required FocusNode focusNode,
     required Future<ChatInputSubmissionResult> Function(ChatInputData input)
     onSend,
+    ComposerDocumentRoute documentRoute = regularDocumentRoute,
+    Locale? locale,
     SettingsProvider? settingsProvider,
     AssistantProvider? assistantProvider,
     ChatInputBarController? mediaController,
@@ -64,6 +69,8 @@ void main() {
         ChangeNotifierProvider.value(value: assistants),
       ],
       child: MaterialApp(
+        locale: locale,
+        builder: (context, child) => AppSnackBarOverlay(child: child!),
         theme: theme,
         darkTheme: theme,
         themeMode: theme?.brightness == Brightness.dark
@@ -73,6 +80,7 @@ void main() {
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ChatInputBar(
+            documentRoute: documentRoute,
             chatModelProviderKey: chatModel.providerKey,
             chatModelId: chatModel.modelId,
             controller: controller,
@@ -391,25 +399,106 @@ void main() {
         },
       ),
     );
-    mediaController.addFiles(const [
+    final dir = Directory.systemTemp.createTempSync('kelivo_queue_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/queued.txt')
+      ..writeAsBytesSync([0xd6, 0xd0, 0xce, 0xc4]);
+    mediaController.addFiles([
       DocumentAttachment(
-        path: '/tmp/queued.pdf',
-        fileName: 'queued.pdf',
-        mime: 'application/pdf',
+        path: file.path,
+        fileName: 'queued.txt',
+        mime: 'text/plain',
       ),
     ]);
+    await _waitForAttachment(tester, () => _sendEnabled(tester));
     await tester.pumpAndSettle();
-
     expect(find.byIcon(Lucide.ArrowUp), findsOneWidget);
     expect(find.byKey(const ValueKey('stop')), findsNothing);
     await tapSendButton(tester);
 
     expect(submitted?.text, isEmpty);
-    expect(submitted?.documents.single.fileName, 'queued.pdf');
+    expect(submitted?.documents.single.fileName, 'queued.txt');
     expect(mediaController.hasDraftMedia, isFalse);
     expect(stopCount, 0);
     expect(find.byKey(const ValueKey('stop')), findsOneWidget);
   });
+
+  testWidgets(
+    'draft recognition blocks sending, shows the reason, and updates when the route changes',
+    (tester) async {
+      final dir = Directory.systemTemp.createTempSync('kelivo_cards_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final file = File('${dir.path}/稿.txt')..writeAsBytesSync([0xff, 0xff]);
+      final attachment = DocumentAttachment(
+        path: file.path,
+        fileName: '稿.txt',
+        mime: 'text/plain',
+      );
+      final media = ChatInputBarController();
+      final input = TextEditingController();
+      final focus = FocusNode();
+      addTearDown(input.dispose);
+      addTearDown(focus.dispose);
+      var sends = 0;
+      Future<void> mount(ComposerDocumentRoute route) => tester.pumpWidget(
+        buildHarness(
+          documentRoute: route,
+          locale: const Locale('zh'),
+          controller: input,
+          focusNode: focus,
+          mediaController: media,
+          onSend: (_) async {
+            sends++;
+            return ChatInputSubmissionResult.sent;
+          },
+        ),
+      );
+      await mount(regularDocumentRoute);
+      media.addFiles([attachment]);
+      await tester.pump();
+      expect(_sendEnabled(tester), isFalse);
+      await tester.tap(find.byIcon(Lucide.ArrowUp));
+      expect(sends, 0);
+      await _waitForAttachment(
+        tester,
+        () => find.text('无法识别编码').evaluate().isNotEmpty,
+      );
+      expect(_sendEnabled(tester), isFalse);
+      await tester.tap(find.text('无法识别编码'));
+      await tester.pump();
+      expect(find.text('「稿.txt」无法识别这个文本的编码，可以另存为 UTF-8 后重发'), findsOneWidget);
+      await mount((
+        workspaceBound: true,
+        workspaceFiles: true,
+        nativePdf: false,
+        sandboxData: false,
+      ));
+      expect(_sendEnabled(tester), isTrue);
+      expect(find.text('无法识别编码'), findsNothing);
+      await mount(regularDocumentRoute);
+      file.writeAsBytesSync([0x50, 0x4b, 3, 4, 0, 1]);
+      media.restoreInput(ChatInputData(text: '', documents: [attachment]));
+      await _waitForAttachment(
+        tester,
+        () => find.text('不是文本').evaluate().isNotEmpty,
+      );
+      expect(_sendEnabled(tester), isFalse);
+      file.writeAsStringSync('a' * 100001);
+      media.restoreInput(ChatInputData(text: '', documents: [attachment]));
+      await _waitForAttachment(
+        tester,
+        () => find.text('将只发送开头').evaluate().isNotEmpty,
+      );
+      expect(_sendEnabled(tester), isTrue);
+      file.deleteSync();
+      await tapSendButton(tester);
+      expect(sends, 0);
+      expect(media.hasDraftMedia, isTrue);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   testWidgets('已有排队消息时非空的锁定输入框仍可停止输出', (tester) async {
     final controller = TextEditingController(text: 'editing history');
@@ -979,6 +1068,33 @@ void main() {
     expect(find.byTooltip('Reasoning Strength'), findsOneWidget);
     expect(find.text('low'), findsOneWidget);
   });
+}
+
+bool _sendEnabled(WidgetTester tester) =>
+    tester
+        .widget<InkWell>(
+          find
+              .ancestor(
+                of: find.byIcon(Lucide.ArrowUp),
+                matching: find.byType(InkWell),
+              )
+              .first,
+        )
+        .onTap !=
+    null;
+
+Future<void> _waitForAttachment(
+  WidgetTester tester,
+  bool Function() ready,
+) async {
+  final timer = Stopwatch()..start();
+  do {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump(const Duration(milliseconds: 10));
+  } while (!ready() && timer.elapsed < const Duration(seconds: 5));
+  expect(ready(), isTrue);
 }
 
 Future<void> tapSendButton(WidgetTester tester) async {

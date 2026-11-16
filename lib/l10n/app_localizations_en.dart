@@ -11744,6 +11744,38 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not switch conversations. Your draft has been kept.';
 
   @override
+  String attachmentEncodingUnrecognized(String name) {
+    return 'Couldn’t recognize the text encoding of “$name”. Save it as UTF-8 and send it again.';
+  }
+
+  @override
+  String get attachmentEncodingUnrecognizedShort => 'Encoding unrecognized';
+
+  @override
+  String attachmentNotText(String name) {
+    return '“$name” isn’t a text file, so it can’t be used here.';
+  }
+
+  @override
+  String get attachmentNotTextShort => 'Not a text file';
+
+  @override
+  String attachmentTruncatedNotice(int count) {
+    return 'This file is too large, so only the first $count characters were read. Split it and send again if you need the rest.';
+  }
+
+  @override
+  String get attachmentTruncatedCard => 'Only the beginning will be sent';
+
+  @override
+  String attachmentDocumentTooLarge(String name) {
+    return '“$name” is too large to read in a regular chat.';
+  }
+
+  @override
+  String get attachmentDocumentTooLargeShort => 'File too large';
+
+  @override
   String attachmentRequiresWorkspace(String name) {
     return 'To use “$name”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.';
   }

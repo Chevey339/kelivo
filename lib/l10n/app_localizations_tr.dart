@@ -11816,8 +11816,40 @@ class AppLocalizationsTr extends AppLocalizations {
       'Sohbetler arasında geçiş yapılamadı. Taslağınız korundu.';
 
   @override
+  String attachmentEncodingUnrecognized(String name) {
+    return '“$name” dosyasının metin kodlaması tanınamadı. UTF-8 olarak kaydedip yeniden gönderin.';
+  }
+
+  @override
+  String get attachmentEncodingUnrecognizedShort => 'Kodlama tanınamadı';
+
+  @override
+  String attachmentNotText(String name) {
+    return '“$name” bir metin dosyası değil, bu yüzden burada kullanılamaz.';
+  }
+
+  @override
+  String get attachmentNotTextShort => 'Metin dosyası değil';
+
+  @override
+  String attachmentTruncatedNotice(int count) {
+    return 'Bu dosya çok büyük, bu yüzden yalnızca ilk $count karakter okundu. Kalanına ihtiyacınız varsa dosyayı bölüp yeniden gönderin.';
+  }
+
+  @override
+  String get attachmentTruncatedCard => 'Yalnızca başlangıç gönderilecek';
+
+  @override
+  String attachmentDocumentTooLarge(String name) {
+    return '“$name” normal bir sohbette okunamayacak kadar büyük.';
+  }
+
+  @override
+  String get attachmentDocumentTooLargeShort => 'Dosya çok büyük';
+
+  @override
   String attachmentRequiresWorkspace(String name) {
-    return '“$name” kullanmak için bir çalışma alanı bağlayıp dosya araçlarını etkinleştirin veya bu taslağı çalışma alanı olan bir sohbete taşıyın. Bu dosya normal bir sohbette doğrudan okunamaz.';
+    return '“$name” dosyasını kullanmak için bir çalışma alanı bağlayıp dosya araçlarını etkinleştirin veya bu taslağı çalışma alanı olan bir sohbete taşıyın. Bu dosya normal bir sohbette doğrudan okunamaz.';
   }
 
   @override

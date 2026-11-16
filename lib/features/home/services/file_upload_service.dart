@@ -93,17 +93,6 @@ class FileUploadService {
     'yaml',
   ];
 
-  static bool supportsWithoutWorkspace(DocumentAttachment file) {
-    final mime = resolveDocumentAttachmentMime(file);
-    return isImageMime(mime) ||
-        isAudioMime(mime) ||
-        isVideoMime(mime) ||
-        supportedExtensions.contains(
-          p.extension(file.fileName).replaceFirst('.', '').toLowerCase(),
-        ) ||
-        isSandboxDataFile(fileName: file.fileName, mime: file.mime);
-  }
-
   /// 复制选中的文件到应用上传目录
   ///
   /// [files] 要复制的文件列表
@@ -285,6 +274,7 @@ class FileUploadService {
     final lower = name.toLowerCase();
     // Documents / text
     if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.doc')) return 'application/msword';
     if (lower.endsWith('.docx')) {
       return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     }

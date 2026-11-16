@@ -1,3 +1,4 @@
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:Kelivo/core/models/image_edit_document.dart';
 import 'package:Kelivo/core/models/image_upload_quality.dart';
 import 'package:Kelivo/features/intelligent_ui/models/ui_context_attachment.dart';
@@ -57,6 +58,20 @@ void main() {
       sourceHash: 'a' * 64,
     ),
     text: UiContextText(title: 'Parameters', body: 'value: $value'),
+  );
+
+  test(
+    'restoring a missing draft document never adopts an unrelated same-named upload',
+    () async {
+      SandboxPathResolver.debugSetDirs(docsDir: root.path);
+      addTearDown(SandboxPathResolver.debugSetDirs);
+      final missing = '${root.path}/drafts/A/report.txt';
+      final other = File('${root.path}/upload/report.txt')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('other document');
+      expect(await store.ownFile('a', missing), missing);
+      expect(await other.readAsString(), 'other document');
+    },
   );
 
   test(

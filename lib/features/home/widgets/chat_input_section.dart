@@ -1,3 +1,4 @@
+import '../services/composer_document_route.dart';
 import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'dart:io';
 
@@ -47,6 +48,7 @@ class ChatInputSection extends StatelessWidget {
   const ChatInputSection({
     super.key,
     required this.inputBarKey,
+    this.documentRoute = regularDocumentRoute,
     this.chatModelProviderKey,
     this.chatModelId,
     this.chatModelIsConversationOverride = false,
@@ -98,6 +100,7 @@ class ChatInputSection extends StatelessWidget {
   });
 
   final GlobalKey inputBarKey;
+  final ComposerDocumentRoute documentRoute;
   final FocusNode inputFocus;
   final TextEditingController inputController;
   final ChatInputBarController mediaController;
@@ -207,6 +210,7 @@ class ChatInputSection extends StatelessWidget {
         ? _toolsState(context, a, workspaceBound)
         : (active: false, connectionIssue: false);
     final bar = ChatInputBar(
+      documentRoute: documentRoute,
       chatModelProviderKey: pk,
       chatModelId: mid,
       onMore: onMore,

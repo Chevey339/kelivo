@@ -692,13 +692,16 @@ void main() {
     expect(mediaController.snapshotInput('').imagePaths, isEmpty);
 
     controller.text = 'send with image';
-    const lateDocument = DocumentAttachment(
-      path: '/tmp/late.pdf',
-      fileName: 'late.pdf',
-      mime: 'application/pdf',
+    final source = File('${userDir.path}/late.txt')
+      ..writeAsStringSync('late attachment');
+    final lateDocument = DocumentAttachment(
+      path: source.path,
+      fileName: 'late.txt',
+      mime: 'text/plain',
     );
-    mediaController.addFiles(const [lateDocument]);
     await tester.runAsync(() async {
+      mediaController.addFiles([lateDocument]);
+      await mediaController.documentCache.read(lateDocument);
       tester
           .state<EditableTextState>(find.byType(EditableText))
           .insertContent(

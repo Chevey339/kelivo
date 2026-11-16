@@ -1,3 +1,5 @@
+import '../../../shared/utils/attachment_read_labels.dart';
+import '../../../core/services/chat/document_text_extractor.dart';
 import 'dart:async';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/widgets/desktop_scheduled_task_tile.dart';
@@ -370,6 +372,8 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     _ => l.scheduledTasksFailed,
   };
   String _error(String value, AppLocalizations l) {
+    final attachment = AttachmentReadError.fromMessage(value);
+    if (attachment != null) return attachment.message(l);
     if (value == 'preparation_context_changed') {
       return l.scheduledTasksPreparationContextChanged;
     }

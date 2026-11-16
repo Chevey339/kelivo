@@ -11912,8 +11912,40 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось переключить чат. Ваш черновик сохранён.';
 
   @override
+  String attachmentEncodingUnrecognized(String name) {
+    return 'Не удалось распознать кодировку текста в «$name». Сохраните файл в UTF-8 и отправьте снова.';
+  }
+
+  @override
+  String get attachmentEncodingUnrecognizedShort => 'Кодировка не распознана';
+
+  @override
+  String attachmentNotText(String name) {
+    return '«$name» — не текстовый файл, поэтому его нельзя использовать здесь.';
+  }
+
+  @override
+  String get attachmentNotTextShort => 'Не текстовый файл';
+
+  @override
+  String attachmentTruncatedNotice(int count) {
+    return 'Файл слишком большой, поэтому прочитаны только первые $count символов. Разделите его и отправьте снова, если нужна остальная часть.';
+  }
+
+  @override
+  String get attachmentTruncatedCard => 'Будет отправлено только начало';
+
+  @override
+  String attachmentDocumentTooLarge(String name) {
+    return '«$name» слишком большой для чтения в обычном чате.';
+  }
+
+  @override
+  String get attachmentDocumentTooLargeShort => 'Файл слишком большой';
+
+  @override
   String attachmentRequiresWorkspace(String name) {
-    return 'Чтобы использовать «$name», привяжите рабочую область и включите файловые инструменты или переместите этот черновик в чат с рабочей областью. Этот файл нельзя прочитать напрямую в обычном чате.';
+    return 'Чтобы использовать «$name», привяжите рабочую область и включите файловые инструменты или перенесите этот черновик в чат с рабочей областью. Этот файл нельзя прочитать напрямую в обычном чате.';
   }
 
   @override

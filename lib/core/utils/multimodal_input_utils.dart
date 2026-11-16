@@ -196,6 +196,7 @@ String resolveDocumentAttachmentMime(DocumentAttachment attachment) {
   }
   final name = attachment.fileName.toLowerCase();
   if (name.endsWith('.pdf')) return 'application/pdf';
+  if (name.endsWith('.doc')) return 'application/msword';
   if (name.endsWith('.docx')) {
     return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   }

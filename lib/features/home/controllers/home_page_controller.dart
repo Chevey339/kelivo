@@ -1,3 +1,4 @@
+import '../../../shared/utils/attachment_read_labels.dart';
 import '../../../core/models/context_compression_task.dart'
     show CompressionRequestPreview;
 import '../../chat/widgets/context_compression_status.dart';
@@ -74,6 +75,8 @@ import '../services/ask_user_interaction_service.dart';
 import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
+import '../services/composer_document_route.dart';
+import '../../../core/services/chat/document_text_extractor.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/share_destination_sheet.dart';
@@ -859,6 +862,7 @@ class HomePageController extends ChangeNotifier {
       hasWorkspace: () => hasWorkspace,
     );
     _messageBuilderService = MessageBuilderService(
+      documentCache: _mediaController.documentCache,
       chatService: _chatService,
       contextProvider: _context,
       ocrHandler: (imagePaths, {revisionId, session, requestId}) =>
@@ -1026,6 +1030,8 @@ class HomePageController extends ChangeNotifier {
   }
 
   String _localizeGenerationError(AppLocalizations l10n, String error) {
+    final attachment = AttachmentReadError.fromMessage(error);
+    if (attachment != null) return attachment.message(l10n);
     if (error.contains('compression_') ||
         error.contains('native_compaction_')) {
       return compressionErrorLabel(l10n, error);
@@ -1509,9 +1515,11 @@ class HomePageController extends ChangeNotifier {
 
   bool get hasWorkspace {
     final provider = _context.read<WorkspaceProvider?>();
-    return provider != null &&
+    final id = currentConversation?.id;
+    return id != null &&
+        provider != null &&
         WorkspaceBinding.extrasHaveWorkspace(
-          currentConversation?.extras,
+          _chatService.getConversation(id)?.extras,
           (id) => provider.byId(id) != null,
         );
   }
@@ -1523,7 +1531,10 @@ class HomePageController extends ChangeNotifier {
       return _sendComposerMessage(input);
     }
     try {
-      final prepared = await drafts.prepareSubmissionInput(input);
+      final prepared = await drafts.prepareSubmissionInput(
+        input,
+        onDocumentCopied: _mediaController.documentCache.reusePublishedCopy,
+      );
       final result = await _sendComposerMessage(prepared);
       if (result == ChatInputSubmissionResult.queued) return result;
       await _finishComposerSubmission(submission);
@@ -1532,7 +1543,7 @@ class HomePageController extends ChangeNotifier {
       }
       await _recoverComposerSubmission(submission.conversationId);
       return result;
-    } catch (_) {
+    } catch (error) {
       if (await drafts.wasSubmitted(submission.id)) {
         await _finishComposerSubmission(submission);
         return ChatInputSubmissionResult.sent;
@@ -1541,7 +1552,11 @@ class HomePageController extends ChangeNotifier {
       if (_context.mounted) {
         showAppSnackBar(
           _context,
-          message: AppLocalizations.of(_context)!.composerDraftSaveFailed,
+          message:
+              error is StateError &&
+                  error.message == 'composer_attachment_missing'
+              ? AppLocalizations.of(_context)!.composerDraftMissingFile
+              : AppLocalizations.of(_context)!.composerDraftSaveFailed,
           type: NotificationType.error,
         );
       }
@@ -1578,26 +1593,50 @@ class HomePageController extends ChangeNotifier {
     if (input.isEmpty) {
       return ChatInputSubmissionResult.rejected;
     }
-    final submissionConversation = input.draftSubmission == null
-        ? currentConversation
-        : _chatService.getConversation(input.draftSubmission!.conversationId);
-    final workspaceProvider = _context.read<WorkspaceProvider?>();
-    final acceptsWorkspaceFiles =
-        workspaceProvider != null &&
-        WorkspaceBinding.extrasHaveWorkspace(
-          submissionConversation?.extras,
-          (id) => workspaceProvider.byId(id) != null,
+    if (input.documents.isNotEmpty) {
+      final owner =
+          input.draftSubmission?.conversationId ?? currentConversation?.id;
+      final submissionConversation = owner == null
+          ? null
+          : _chatService.getConversation(owner);
+      final serial = _composerSwitch;
+      final settings = _context.read<SettingsProvider>();
+      final assistant = _context
+          .read<AssistantProvider>()
+          .resolveConversationAssistant(submissionConversation?.assistantId);
+      final route = resolveComposerDocumentRoute(
+        _context,
+        conversation: submissionConversation,
+        settings: settings,
+        assistant: assistant,
+        model: _messageGenerationService.getModelConfig(
+          settings,
+          assistant,
+          conversation: submissionConversation,
+        ),
+      );
+      bool stillVisible() =>
+          serial == _composerSwitch &&
+          submissionConversation?.id == currentConversation?.id;
+      try {
+        await route.validate(
+          input.documents,
+          _messageBuilderService.documentCache,
         );
-    if (!acceptsWorkspaceFiles) {
-      for (final file in input.documents) {
-        if (FileUploadService.supportsWithoutWorkspace(file)) continue;
-        showAppSnackBar(
-          _context,
-          message: AppLocalizations.of(
+      } on AttachmentReadError catch (error) {
+        if (_context.mounted && stillVisible()) {
+          showAppSnackBar(
             _context,
-          )!.attachmentRequiresWorkspace(file.fileName),
-          type: NotificationType.warning,
-        );
+            message: error.message(AppLocalizations.of(_context)!),
+            type: NotificationType.warning,
+          );
+        }
+        return ChatInputSubmissionResult.rejected;
+      }
+      // A durable submission already owns its conversation and can finish
+      // after the user navigates. A transient submission has no such target.
+      if (!_context.mounted ||
+          (input.draftSubmission == null && !stillVisible())) {
         return ChatInputSubmissionResult.rejected;
       }
     }

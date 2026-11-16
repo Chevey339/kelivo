@@ -1,3 +1,5 @@
+import '../services/composer_document_route.dart';
+import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/models/carried_original.dart';
 import '../../../core/services/tools/view_image_tool.dart';
 import '../../../core/models/image_context.dart';
@@ -27,6 +29,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/utf16_safe_cut.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -703,6 +706,7 @@ class ChatActions {
     String conversationId,
     ChatMessage fallback,
     PrepareErrorAction action,
+    Object cause,
   ) async {
     switch (action) {
       case PrepareErrorAction.skip:
@@ -715,7 +719,15 @@ class ChatActions {
           errorCode: null,
         );
       case PrepareErrorAction.failed:
-        await _finishPreparingMessage(conversationId, fallback);
+        await _finishPreparingMessage(
+          conversationId,
+          fallback,
+          // generation_runs.error_code is limited to 128 characters. Keep the
+          // full filename on the live error channel, and both ends in history.
+          errorCode: cause is AttachmentReadError
+              ? truncateHeadTailUtf16Safe(cause.toString(), 128, marker: '…')
+              : 'preparation_failed',
+        );
     }
   }
 
@@ -1286,6 +1298,40 @@ class ChatActions {
     late final ChatMessage assistantMessage;
     String? generationRunId;
     try {
+      // A queued turn can start under a different model/workspace from the
+      // one on its composer card. Validate the route this generation captured
+      // before inserting either message. Cached local texts need only a stat.
+      if (input.documents.isNotEmpty) {
+        ComposerDocumentRoute routeNow() => resolveComposerDocumentRoute(
+          contextProvider,
+          conversation:
+              chatService.getConversation(conversation.id) ?? conversation,
+          assistant: assistant,
+          settings: settings,
+          model: (providerKey: providerKey, modelId: modelId),
+        );
+        var route = routeNow();
+        while (true) {
+          AttachmentReadError? failure;
+          try {
+            await route.validate(
+              input.documents,
+              messageGenerationService.messageBuilderService.documentCache,
+            );
+          } on AttachmentReadError catch (e) {
+            failure = e;
+          }
+          if (!contextProvider.mounted) {
+            return ChatActionResult.error('context_changed');
+          }
+          final current = routeNow();
+          if (current == route) {
+            if (failure != null) throw failure;
+            break;
+          }
+          route = current;
+        }
+      }
       final begin = await messageGenerationService.beginSendGeneration(
         conversationId: conversation.id,
         input: input,
@@ -1487,7 +1533,12 @@ class ChatActions {
       requestCancelled: isStopping(conversationId),
     );
     try {
-      await _finishPrepareError(conversationId, assistantMessage, action);
+      await _finishPrepareError(
+        conversationId,
+        assistantMessage,
+        action,
+        error,
+      );
     } catch (cleanupError, stackTrace) {
       FlutterLogger.log(
         '[ChatActions] finishPreparingMessage failed after send error: '
@@ -1917,7 +1968,7 @@ class ChatActions {
           e,
           requestCancelled: isStopping(conversation.id),
         );
-        await _finishPrepareError(conversation.id, assistantMessage, action);
+        await _finishPrepareError(conversation.id, assistantMessage, action, e);
         if (action != PrepareErrorAction.failed) {
           return ChatActionResult.success(
             assistantMessage,
@@ -2130,7 +2181,7 @@ class ChatActions {
         e,
         requestCancelled: isStopping(conversation.id),
       );
-      await _finishPrepareError(conversation.id, streamingMessage, action);
+      await _finishPrepareError(conversation.id, streamingMessage, action, e);
       if (action != PrepareErrorAction.failed) {
         return ChatActionResult.success(streamingMessage);
       }

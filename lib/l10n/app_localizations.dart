@@ -20949,7 +20949,55 @@ abstract class AppLocalizations {
   /// **'Could not switch conversations. Your draft has been kept.'**
   String get incomingShareMoveFailed;
 
-  /// Warning shown when an attachment named {name} needs a bound workspace with file tools; suggests binding one or moving the draft to a workspace conversation.
+  /// Detailed composer or generation error for an attachment whose text encoding cannot be recognized. {name} is the displayed file name.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t recognize the text encoding of “{name}”. Save it as UTF-8 and send it again.'**
+  String attachmentEncodingUnrecognized(String name);
+
+  /// Short error label on a composer attachment card when its text encoding cannot be recognized.
+  ///
+  /// In en, this message translates to:
+  /// **'Encoding unrecognized'**
+  String get attachmentEncodingUnrecognizedShort;
+
+  /// Detailed composer or generation error for a binary attachment. {name} is the displayed file name.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” isn’t a text file, so it can’t be used here.'**
+  String attachmentNotText(String name);
+
+  /// Short error label on a composer attachment card for binary content.
+  ///
+  /// In en, this message translates to:
+  /// **'Not a text file'**
+  String get attachmentNotTextShort;
+
+  /// Shown on tapping a truncated composer attachment and after its text in the model prompt. {count} is the actual number of Unicode characters included.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is too large, so only the first {count} characters were read. Split it and send again if you need the rest.'**
+  String attachmentTruncatedNotice(int count);
+
+  /// Short warning on a composer attachment card when only the start of its text will be sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the beginning will be sent'**
+  String get attachmentTruncatedCard;
+
+  /// Detailed composer or generation error when a document exceeds the local extraction size limit. {name} is the displayed file name.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” is too large to read in a regular chat.'**
+  String attachmentDocumentTooLarge(String name);
+
+  /// Short error label on a composer attachment card when a document exceeds the local extraction limit.
+  ///
+  /// In en, this message translates to:
+  /// **'File too large'**
+  String get attachmentDocumentTooLargeShort;
+
+  /// Warning in a conversation already bound to a workspace when an attachment cannot be read locally and the necessary file tools are unavailable. {name} is the displayed file name.
   ///
   /// In en, this message translates to:
   /// **'To use “{name}”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.'**

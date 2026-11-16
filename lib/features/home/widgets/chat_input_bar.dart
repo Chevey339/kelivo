@@ -1,3 +1,4 @@
+import '../../../shared/utils/attachment_read_labels.dart';
 import '../../../core/models/image_edit_document.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import '../../chat/pages/image_editor_page.dart';
@@ -66,12 +67,15 @@ import '../../../shared/widgets/context_usage_ring.dart';
 import '../../../shared/widgets/long_message_editor.dart';
 import '../../../shared/widgets/app_text_selection_toolbar.dart';
 import '../services/context_usage_service.dart';
+import '../services/composer_document_route.dart';
+import '../../../core/services/chat/document_text_extractor.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../../../core/models/composer_draft.dart';
 import '../../../core/database/composer_draft_store.dart';
 
 class ChatInputBarController {
   ChatInputBarController();
+  late final DocumentExtractionCache documentCache = DocumentExtractionCache();
   ChatInputBarController._captured(
     this._origin,
     this._owner,
@@ -694,6 +698,14 @@ class _ImageProcessingTask {
   final bool deleteSourceAfterProcessing;
 }
 
+class _DocumentCheck {
+  _DocumentCheck(this.file);
+  final DocumentAttachment file;
+  bool pending = true;
+  AttachmentReadError? error;
+  int? truncatedCount;
+}
+
 class ChatInputBar extends StatefulWidget {
   const ChatInputBar({
     super.key,
@@ -708,6 +720,7 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenWorkspace,
     this.showWorkspaceButton = false,
     this.workspaceActive = false,
+    this.documentRoute = regularDocumentRoute,
     this.onOpenSkills,
     this.skillsActive = false,
     this.onOpenSearch,
@@ -775,6 +788,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenWorkspace;
   final bool showWorkspaceButton;
   final bool workspaceActive;
+  final ComposerDocumentRoute documentRoute;
   final VoidCallback? onOpenSkills;
   final bool skillsActive;
   final VoidCallback? onOpenSearch;
@@ -926,6 +940,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   Future<void> _textPasteWriteTail = Future<void>.value();
   final List<DocumentAttachment> _docs =
       <DocumentAttachment>[]; // files to upload
+  final _documentChecks = <String, _DocumentCheck>{};
+  bool _checkingDocuments = false;
   final Map<LogicalKeyboardKey, Timer?> _repeatTimers = {};
   static const Duration _repeatInitialDelay = Duration(milliseconds: 300);
   static const Duration _repeatPeriod = Duration(milliseconds: 35);
@@ -1028,6 +1044,12 @@ class _ChatInputBarState extends State<ChatInputBar>
       _pendingImagePasteIds.isNotEmpty ||
       _pendingTextPasteIds.isNotEmpty ||
       (_nativeOwner?.pending ?? 0) != 0;
+
+  bool get _hasUnreadyAttachments =>
+      _hasUnreadyImages ||
+      _documentChecks.values.any(
+        (check) => check.pending || check.error != null,
+      );
 
   void _onNativeOwnerChanged() {
     if (mounted) setState(() {});
@@ -1288,15 +1310,99 @@ class _ChatInputBarState extends State<ChatInputBar>
     unawaited(_releaseReplacedImageFiles(target, retired));
   }
 
+  /// Reconcile by file identity. Results from removed files, another draft or
+  /// a different model/workspace route must never update the current cards.
+  void _syncDocumentChecks({bool reset = false}) {
+    if (reset) _documentChecks.clear();
+    final needed = {
+      for (final doc in _docs)
+        if (widget.documentRoute.needsLocalText(doc)) doc.path: doc,
+    };
+    _documentChecks.removeWhere(
+      (path, check) =>
+          !needed.containsKey(path) ||
+          needed[path]!.mime != check.file.mime ||
+          needed[path]!.fileName != check.file.fileName,
+    );
+    for (final doc in needed.values) {
+      _documentChecks.putIfAbsent(doc.path, () => _DocumentCheck(doc));
+    }
+    if (!_checkingDocuments && _documentChecks.isNotEmpty) {
+      unawaited(_checkDocuments());
+    }
+  }
+
+  Future<void> _checkDocuments() async {
+    _checkingDocuments = true;
+    try {
+      while (mounted) {
+        final check = _documentChecks.values
+            .where((c) => c.pending)
+            .firstOrNull;
+        if (check == null) return;
+        int? count;
+        AttachmentReadError? error;
+        try {
+          final result = await (widget.mediaController ?? _ownedNativeMedia)
+              .documentCache
+              .read(check.file);
+          if (result.truncated) count = result.count;
+        } on AttachmentReadError catch (e) {
+          error = e;
+        }
+        if (!mounted) return;
+        if (!identical(_documentChecks[check.file.path], check)) continue;
+        // Analysis is transient; don't schedule a draft write on completion.
+        super.setState(() {
+          check.pending = false;
+          check.error = error;
+          check.truncatedCount = count;
+        });
+      }
+    } finally {
+      _checkingDocuments = false;
+    }
+  }
+
+  ComposerAttachmentNotice? _documentNotice(DocumentAttachment file) {
+    final check = _documentChecks[file.path];
+    final l = AppLocalizations.of(context)!;
+    final error = check?.error;
+    if (error != null) {
+      return (
+        label: error.shortMessage(l),
+        detail: error.message(
+          l,
+          workspaceUnavailable:
+              widget.documentRoute.workspaceBound &&
+              !widget.documentRoute.workspaceFiles,
+        ),
+        failed: true,
+      );
+    }
+    final count = check?.truncatedCount;
+    return count == null
+        ? null
+        : (
+            label: l.attachmentTruncatedCard,
+            detail: l.attachmentTruncatedNotice(count),
+            failed: false,
+          );
+  }
+
   void _addFiles(List<DocumentAttachment> docs) {
     if (docs.isEmpty) return;
-    setState(() => _docs.addAll(docs));
+    setState(() {
+      _docs.addAll(docs);
+      _syncDocumentChecks();
+    });
   }
 
   void _clearFiles() {
     setState(() {
       _pendingTextPasteIds.clear();
       _docs.clear();
+      _documentChecks.clear();
     });
   }
 
@@ -1323,6 +1429,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       _docs
         ..clear()
         ..addAll(input.documents);
+      _syncDocumentChecks(reset: true);
     });
   }
 
@@ -1390,16 +1497,26 @@ class _ChatInputBarState extends State<ChatInputBar>
     final config = context
         .read<SettingsProvider>()
         .resolveImageCompressConfig();
+    final documents = [
+      for (final doc in input.documents)
+        DocumentAttachment(
+          path: isRemoteOrDataUri(doc.path)
+              ? doc.path
+              : SandboxPathResolver.resolveForIo(doc.path) ?? doc.path,
+          fileName: doc.fileName,
+          mime: doc.mime,
+        ),
+    ];
     _missingDocumentPaths
       ..clear()
       ..addAll(
-        input.documents
+        documents
             .where(
               (doc) =>
                   !isRemoteOrDataUri(doc.path) &&
-                  !File(SandboxPathResolver.fix(doc.path)).existsSync(),
+                  !SandboxPathResolver.localFileExists(doc.path),
             )
-            .map((doc) => SandboxPathResolver.fix(doc.path)),
+            .map((doc) => doc.path),
       );
     setState(() {
       _draftReplacementRevision++;
@@ -1449,15 +1566,8 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
       _docs
         ..clear()
-        ..addAll(
-          input.documents.map(
-            (doc) => DocumentAttachment(
-              path: SandboxPathResolver.fix(doc.path),
-              fileName: doc.fileName,
-              mime: doc.mime,
-            ),
-          ),
-        );
+        ..addAll(documents);
+      _syncDocumentChecks(reset: resetHistory);
       _restoredRoutingChoice = input.allowImagesApiRouting;
     });
     _pumpImageProcessingQueue();
@@ -1477,6 +1587,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       _discardImageState(_images.map((image) => image.id));
       _images.clear();
       _docs.clear();
+      _documentChecks.clear();
     });
     unawaited(_releaseReplacedImageFiles(target, retired));
   }
@@ -1492,7 +1603,10 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _removeDocumentAt(int index) {
-    setState(() => _docs.removeAt(index));
+    setState(() {
+      _docs.removeAt(index);
+      _syncDocumentChecks();
+    });
   }
 
   @override
@@ -1586,6 +1700,10 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void didUpdateWidget(covariant ChatInputBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.documentRoute != widget.documentRoute ||
+        oldWidget.conversationId != widget.conversationId) {
+      _syncDocumentChecks(reset: true);
+    }
     final previousConversationId = oldWidget.conversationId;
     final nextConversationId = widget.conversationId;
     if (previousConversationId != nextConversationId) {
@@ -2202,7 +2320,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         const SizedBox(width: 8),
         // Send: transcribe (or attach the audio) and send right away
         _CompactSendButton(
-          enabled: canFinish,
+          enabled: canFinish && !_hasUnreadyAttachments,
           onSend: () => unawaited(
             _voiceTranscribes
                 ? _finishVoiceInput(sendAfter: true)
@@ -2229,17 +2347,16 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
     if (_composerLocked ||
         _isSubmitting ||
-        _hasUnreadyImages ||
+        _hasUnreadyAttachments ||
         _ownsVoiceSession ||
         _finishingVoice) {
       return;
     }
-    if (widget.mediaController?.draftStore != null &&
-        _docs.any(
-          (doc) =>
-              !isRemoteOrDataUri(doc.path) &&
-              !File(SandboxPathResolver.fix(doc.path)).existsSync(),
-        )) {
+    if (_docs.any(
+      (doc) =>
+          !isRemoteOrDataUri(doc.path) &&
+          !SandboxPathResolver.localFileExists(doc.path),
+    )) {
       showAppSnackBar(
         context,
         message: AppLocalizations.of(context)!.composerDraftMissingFile,
@@ -2300,6 +2417,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       for (final document in submittedDocuments) {
         _docs.remove(document);
       }
+      _syncDocumentChecks();
     });
 
     Future<void> restoreRejected() async {
@@ -2412,6 +2530,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       0,
       submittedDocuments.where((document) => !_docs.contains(document)),
     );
+    _syncDocumentChecks();
   }
 
   void _restoreSubmittedText(TextEditingValue submittedValue) {
@@ -3124,7 +3243,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         if (target != null) {
           target.addFiles([attachment]);
         } else {
-          setState(() => _docs.add(attachment!));
+          _addFiles([attachment]);
         }
         return;
       }
@@ -4441,6 +4560,7 @@ class _ChatInputBarState extends State<ChatInputBar>
               child: ComposerAttachmentCard(
                 key: ValueKey(file.path),
                 file: file,
+                notice: _documentNotice(file),
                 removeKey: ValueKey('chat-input-document-remove:$docIndex'),
                 onRemove: () => _removeDocumentAt(docIndex),
               ),
@@ -5064,7 +5184,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     enabled:
                                                         hasInput &&
                                                         !_composerLocked &&
-                                                        !_hasUnreadyImages,
+                                                        !_hasUnreadyAttachments,
                                                     loading:
                                                         widget.loading &&
                                                         (!hasInput ||

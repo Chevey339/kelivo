@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/services/chat/document_text_extractor.dart';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
@@ -251,6 +252,143 @@ void main() {
         apiMessages.single.containsKey(multimodalInternalDocumentPathsKey),
         isFalse,
       );
+    },
+  );
+
+  test(
+    'regular chat sends decoded historical text and a localized notice after the truncated file only',
+    () async {
+      final s = await setUpService();
+      await s.settings.setAppLocale(const Locale('zh'));
+      notes.writeAsBytesSync([0xd6, 0xd0, 0xce, 0xc4]);
+      csv.writeAsStringSync('😀' * 100000 + '不应发送');
+      final api = s.service.buildApiMessages(
+        messages: [s.m],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      await s.service.processUserMessagesForApi(
+        api,
+        s.settings,
+        null,
+        sourceMessages: [s.m],
+      );
+      final content = api.single['content'] as String;
+      expect(content, contains('中文'));
+      expect(content, isNot(contains('不应发送')));
+      expect(
+        content,
+        contains(
+          '</content>\n文件过大，只读取了前 100000 字，建议拆分后再发送\n\n## user sent a file: notes.txt',
+        ),
+      );
+      expect('建议拆分'.allMatches(content), hasLength(1));
+    },
+  );
+
+  test(
+    'missing historical files do not block a later turn, but an unreadable current attachment is reported',
+    () async {
+      final s = await setUpService();
+      final current = ChatMessage(
+        id: 'new',
+        role: 'user',
+        conversationId: 'c1',
+        content: 'continue',
+      );
+      notes.deleteSync();
+      Future<String> prompt(List<ChatMessage> turns) async {
+        final api = s.service.buildApiMessages(
+          messages: turns,
+          versionSelections: const {},
+          currentConversation: Conversation(title: 'test'),
+        );
+        await s.service.processUserMessagesForApi(
+          api,
+          s.settings,
+          null,
+          sourceMessages: turns,
+        );
+        return api.map((m) => m['content']).join();
+      }
+
+      expect(await prompt([s.m, current]), contains('continue'));
+      await expectLater(
+        prompt([s.m]),
+        throwsA(
+          isA<AttachmentReadError>().having(
+            (error) => error.problem,
+            'reason',
+            AttachmentProblem.missing,
+          ),
+        ),
+      );
+      notes.writeAsBytesSync([0xd6, 0xd0, 0xce, 0xc4]);
+      expect(await prompt([s.m, current]), contains('中文'));
+    },
+  );
+
+  test(
+    'images stored as FileParts use the media path without a text probe',
+    () async {
+      final s = await setUpService();
+      final image = File('${tempDir.path}/image.png')
+        ..writeAsBytesSync([0, 0, 0, 1]);
+      final turn = ChatMessage(
+        id: 'old-image',
+        role: 'user',
+        conversationId: 'c1',
+        parts: [
+          const TextPart('view'),
+          FilePart(uri: image.path, name: 'image.png', mime: 'image/png'),
+        ],
+      );
+      final api = s.service.buildApiMessages(
+        messages: [turn],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      expect(
+        s.service.hasPendingAttachmentWork(
+          api,
+          s.settings,
+          sourceMessages: [turn],
+        ),
+        isFalse,
+      );
+      expect(
+        await s.service.processUserMessagesForApi(
+          api,
+          s.settings,
+          null,
+          sourceMessages: [turn],
+        ),
+        contains(image.path),
+      );
+      expect(api.single['content'], 'view');
+    },
+  );
+
+  test(
+    'truncated whitespace sends its notice without a huge empty content block',
+    () async {
+      final s = await setUpService();
+      await s.settings.setAppLocale(const Locale('en'));
+      notes.writeAsStringSync('\n' * 100001);
+      final api = s.service.buildApiMessages(
+        messages: [s.m],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      await s.service.processUserMessagesForApi(
+        api,
+        s.settings,
+        null,
+        sourceMessages: [s.m],
+      );
+      final prompt = api.single['content'] as String;
+      expect(prompt, contains('only the first 100000 characters were read'));
+      expect(prompt.length, lessThan(1000));
     },
   );
 
