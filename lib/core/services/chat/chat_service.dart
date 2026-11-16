@@ -225,6 +225,18 @@ class ChatService extends ChangeNotifier {
   }
 
   final Set<String> _temporaryConversationIds = <String>{};
+  bool _hadTemporaryConversations = false;
+
+  @override
+  void notifyListeners() {
+    final temporary = _temporaryConversationIds.isNotEmpty;
+    if (temporary || _hadTemporaryConversations) {
+      AttachmentFileLock.notifyTransientChanged();
+    }
+    _hadTemporaryConversations = temporary;
+    super.notifyListeners();
+  }
+
   // Evicting these ids could reopen persistence races with background work.
   final Set<String> _discardedTemporaryConversationIds = <String>{};
   final Set<String> _discardedTemporaryMessageIds = <String>{};
@@ -539,7 +551,7 @@ class ChatService extends ChangeNotifier {
       await contextCompression.restore();
       AttachmentFileLock.registerTransientOwner(
         this,
-        references: () => transientAttachmentReferences,
+        capture: _captureTemporaryReferences,
         active: () => hasTransientGeneration,
       );
       notifyListeners();
@@ -2665,23 +2677,47 @@ class ChatService extends ChangeNotifier {
     _deferredAssetMaintenance = pending;
   }
 
-  Map<String, Map<String, String>> get transientAttachmentReferences =>
-      _attachmentReferencesFor([
+  AttachmentReferenceReader? _captureTemporaryReferences() =>
+      _captureAttachmentReferences([
         for (final id in _temporaryConversationIds) ...?_messagesCache[id],
       ], _temporaryToolEvents);
 
-  Map<String, Map<String, String>> _attachmentReferencesFor(
+  AttachmentReferenceReader? _captureAttachmentReferences(
     Iterable<ChatMessage> messages,
     Map<String, List<Map<String, dynamic>>> toolEvents,
   ) {
+    if (messages.isEmpty) return null;
+    return _attachmentReader(SandboxPathResolver.docsDir ?? '', [
+      for (final message in messages)
+        (
+          conversationId: message.conversationId,
+          title: getConversation(message.conversationId)?.title ?? '',
+          parts: message.parts,
+          events: toolEvents[message.id] ?? const <Map<String, dynamic>>[],
+        ),
+    ]);
+  }
+
+  // Build this closure in a static method so it carries only the snapshot,
+  // never ChatService, a database connection, or a live HiveObject.
+  static AttachmentReferenceReader _attachmentReader(
+    String root,
+    List<
+      ({
+        String conversationId,
+        String title,
+        List<MessagePart> parts,
+        List<Map<String, dynamic>> events,
+      })
+    >
+    messages,
+  ) => () {
     final references = <String, Map<String, String>>{};
-    final root = SandboxPathResolver.docsDir ?? '';
     for (final message in messages) {
       final id = message.conversationId;
       void add(String uri) {
         final source = resolveStorageSessionReference(uri, id, root);
-        references.putIfAbsent(source, () => {})[id] =
-            getConversation(id)?.title ?? '';
+        references.putIfAbsent(source, () => {})[id] = message.title;
       }
 
       for (final part in message.parts) {
@@ -2700,13 +2736,12 @@ class ChatService extends ChangeNotifier {
         };
         uris.forEach(add);
       }
-      for (final event
-          in toolEvents[message.id] ?? const <Map<String, dynamic>>[]) {
+      for (final event in message.events) {
         storageToolAttachmentUris(event, root, id).forEach(add);
       }
     }
     return references;
-  }
+  };
 
   Future<void> runAssetMaintenance({DateTime? now}) =>
       AttachmentFileLock.synchronized(() => _runAssetMaintenance(now: now));
@@ -2725,7 +2760,9 @@ class ChatService extends ChangeNotifier {
           now: effectiveNow,
           generationActive: AttachmentFileLock.hasActiveTransientGeneration,
           protectedPaths: {
-            for (final uri in AttachmentFileLock.transientReferences.keys) ...[
+            for (final uri
+                in (await AttachmentFileLock.readTransientReferences())
+                    .keys) ...[
               uri,
               SandboxPathResolver.canonicalize(uri),
               ?SandboxPathResolver.resolveForIo(uri),
@@ -2733,11 +2770,7 @@ class ChatService extends ChangeNotifier {
           },
         );
         if (candidates.isEmpty) break;
-        final imageUsage = (await StorageAttachmentUsage.load())
-          ..includeConversations(
-            AttachmentFileLock.transientReferences,
-            generationActive: AttachmentFileLock.hasActiveTransientGeneration,
-          );
+        final imageUsage = await StorageAttachmentUsage.load();
         final appDataDir = await AppDirectories.getContentDirectory();
         final allowedRoots = [
           p.normalize(p.join(appDataDir.absolute.path, 'upload')),
@@ -2866,13 +2899,9 @@ class ChatService extends ChangeNotifier {
         await deleteSessionAttachmentCopies(
           deletedPaths,
           sessionsDirectory: await AppDirectories.getSessionsDirectory(),
-          protectedPaths: AttachmentFileLock.transientReferences.keys.toSet(),
-          generationActive: AttachmentFileLock.hasActiveTransientGeneration,
         );
       }
-      await StorageAttachmentUsage.cleanSessions(
-        protectedPaths: AttachmentFileLock.transientReferences.keys.toSet(),
-      );
+      await StorageAttachmentUsage.cleanSessions();
     } catch (error) {
       debugPrint('Asset maintenance failed: $error');
     }
@@ -3941,7 +3970,11 @@ class ChatService extends ChangeNotifier {
         _compressionHistoryCache = null;
       }
       if (shouldBump) _bumpContextRevision(temporaryMessage.conversationId);
-      if (notify) notifyListeners();
+      if (notify) {
+        notifyListeners();
+      } else if (content != null || parts != null || isStreaming != null) {
+        AttachmentFileLock.notifyTransientChanged();
+      }
       return;
     }
 
@@ -4007,6 +4040,7 @@ class ChatService extends ChangeNotifier {
       _temporaryToolEvents[message.id] = List<Map<String, dynamic>>.of(
         toolEvents,
       );
+      AttachmentFileLock.notifyTransientChanged();
       return;
     }
 
@@ -4421,7 +4455,7 @@ class ChatService extends ChangeNotifier {
     final attachmentOwner = Object();
     AttachmentFileLock.registerTransientOwner(
       attachmentOwner,
-      references: () => _attachmentReferencesFor(sourceMessages, cachedTools),
+      capture: () => _captureAttachmentReferences(sourceMessages, cachedTools),
       active: () => false,
     );
     try {

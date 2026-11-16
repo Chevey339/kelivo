@@ -51,6 +51,14 @@
   "@storageSpaceCopyErrorDetails": {
     "description": "Button on the Images and Files storage detail pages that copies the load error and its stack trace to the clipboard."
   },
+  "storageAttachmentChecking": "Checking attachment usage…",
+  "@storageAttachmentChecking": {
+    "description": "Inline status on the Images and Files storage pages while files are visible and the app checks which attachments are safe to delete."
+  },
+  "storageAttachmentCheckFailed": "Could not check attachment usage. Refresh to try again.",
+  "@storageAttachmentCheckFailed": {
+    "description": "Inline error on the Images and Files storage pages when files can still be opened but their reference check failed and cleanup is unavailable."
+  },
   "storageSpaceCopyErrorFailed": "Could not copy the error details. Please try again.",
   "@storageSpaceCopyErrorFailed": {
     "description": "Error notification on the Images and Files storage detail pages when the clipboard cannot accept the diagnostic text. The user can tap the copy button again."

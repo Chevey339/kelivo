@@ -1,4 +1,24 @@
 import 'dart:async';
+import 'dart:isolate';
+
+typedef AttachmentReferenceReader = Map<String, Map<String, String>> Function();
+
+/// Contains only data that can be sent to the worker doing the reference check.
+final class TransientAttachmentSnapshot {
+  TransientAttachmentSnapshot._(this._readers, this.generationActive);
+  final List<AttachmentReferenceReader> _readers;
+  final bool generationActive;
+
+  Map<String, Map<String, String>> resolve() {
+    final result = <String, Map<String, String>>{};
+    for (final read in _readers) {
+      for (final entry in read().entries) {
+        result.putIfAbsent(entry.key, () => {}).addAll(entry.value);
+      }
+    }
+    return result;
+  }
+}
 
 /// Coordinates backup readers and attachment deletion on the app isolate.
 /// Acquire before taking the database snapshot and keep the lease until the
@@ -7,11 +27,21 @@ final class AttachmentFileLock {
   AttachmentFileLock._(this._released);
 
   static Future<void>? _tail;
+  static final _changes = StreamController<void>.broadcast();
+  static int _transientRevision = 0;
+  static int get transientRevision => _transientRevision;
+  static Stream<void> get transientChanges => _changes.stream;
+
+  static void notifyTransientChanged() {
+    _transientRevision++;
+    if (_changes.hasListener) _changes.add(null);
+  }
+
   static final _transientOwners =
       <
         Object,
         ({
-          Map<String, Map<String, String>> Function() references,
+          AttachmentReferenceReader? Function() capture,
           bool Function() active,
         })
       >{};
@@ -20,24 +50,29 @@ final class AttachmentFileLock {
   /// after acquiring it so a queued cleanup cannot use an obsolete snapshot.
   static void registerTransientOwner(
     Object owner, {
-    required Map<String, Map<String, String>> Function() references,
+    required AttachmentReferenceReader? Function() capture,
     required bool Function() active,
-  }) => _transientOwners[owner] = (references: references, active: active);
+  }) {
+    _transientOwners[owner] = (capture: capture, active: active);
+    notifyTransientChanged();
+  }
 
-  static void unregisterTransientOwner(Object owner) =>
-      _transientOwners.remove(owner);
+  static void unregisterTransientOwner(Object owner) {
+    if (_transientOwners.remove(owner) != null) notifyTransientChanged();
+  }
 
   static bool get hasActiveTransientGeneration =>
       _transientOwners.values.any((owner) => owner.active());
 
-  static Map<String, Map<String, String>> get transientReferences {
-    final result = <String, Map<String, String>>{};
-    for (final owner in _transientOwners.values) {
-      for (final entry in owner.references().entries) {
-        result.putIfAbsent(entry.key, () => {}).addAll(entry.value);
-      }
-    }
-    return result;
+  static TransientAttachmentSnapshot captureTransient() =>
+      TransientAttachmentSnapshot._([
+        for (final owner in _transientOwners.values) ?owner.capture(),
+      ], hasActiveTransientGeneration);
+
+  static Future<Map<String, Map<String, String>>>
+  readTransientReferences() async {
+    final snapshot = captureTransient();
+    return snapshot._readers.isEmpty ? {} : Isolate.run(snapshot.resolve);
   }
 
   final Completer<void> _released;

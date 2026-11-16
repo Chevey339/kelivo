@@ -140,6 +140,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get storageSpaceCopyErrorDetails => '오류 세부 정보 복사';
 
   @override
+  String get storageAttachmentChecking => '첨부 파일 사용량 확인 중…';
+
+  @override
+  String get storageAttachmentCheckFailed =>
+      '첨부 파일 사용량을 확인할 수 없습니다. 새로 고쳐 다시 시도하세요.';
+
+  @override
   String get storageSpaceCopyErrorFailed => '오류 세부 정보를 복사할 수 없습니다. 다시 시도해 주세요.';
 
   @override

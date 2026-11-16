@@ -147,6 +147,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get storageSpaceCopyErrorDetails => 'Копировать сведения об ошибке';
 
   @override
+  String get storageAttachmentChecking => 'Проверка использования вложений…';
+
+  @override
+  String get storageAttachmentCheckFailed =>
+      'Не удалось проверить использование вложений. Обновите, чтобы повторить попытку.';
+
+  @override
   String get storageSpaceCopyErrorFailed =>
       'Не удалось скопировать сведения об ошибке. Попробуйте ещё раз.';
 

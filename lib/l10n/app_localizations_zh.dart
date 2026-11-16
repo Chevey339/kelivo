@@ -134,6 +134,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCopyErrorDetails => '复制错误详情';
 
   @override
+  String get storageAttachmentChecking => '正在检查附件使用情况…';
+
+  @override
+  String get storageAttachmentCheckFailed => '无法检查附件使用情况，请刷新后重试。';
+
+  @override
   String get storageSpaceCopyErrorFailed => '无法复制错误详情，请重试。';
 
   @override
@@ -16590,6 +16596,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCopyErrorDetails => '复制错误详情';
 
   @override
+  String get storageAttachmentChecking => '正在检查附件使用情况…';
+
+  @override
+  String get storageAttachmentCheckFailed => '无法检查附件使用情况，请刷新后重试。';
+
+  @override
   String get storageSpaceCopyErrorFailed => '无法复制错误详情，请重试。';
 
   @override
@@ -33044,6 +33056,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceCopyErrorDetails => '複製錯誤詳情';
+
+  @override
+  String get storageAttachmentChecking => '正在檢查附件使用情況…';
+
+  @override
+  String get storageAttachmentCheckFailed => '無法檢查附件使用情況，請重新整理後再試。';
 
   @override
   String get storageSpaceCopyErrorFailed => '無法複製錯誤詳情，請重試。';

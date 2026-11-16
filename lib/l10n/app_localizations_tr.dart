@@ -146,6 +146,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get storageSpaceCopyErrorDetails => 'Hata ayrıntılarını kopyala';
 
   @override
+  String get storageAttachmentChecking => 'Ek kullanımı kontrol ediliyor…';
+
+  @override
+  String get storageAttachmentCheckFailed =>
+      'Ek kullanımı kontrol edilemedi. Yeniden denemek için yenileyin.';
+
+  @override
   String get storageSpaceCopyErrorFailed =>
       'Hata ayrıntıları kopyalanamadı. Lütfen tekrar deneyin.';
 

@@ -352,6 +352,18 @@ abstract class AppLocalizations {
   /// **'Copy error details'**
   String get storageSpaceCopyErrorDetails;
 
+  /// Inline status on the Images and Files storage pages while files are visible and the app checks which attachments are safe to delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking attachment usage…'**
+  String get storageAttachmentChecking;
+
+  /// Inline error on the Images and Files storage pages when files can still be opened but their reference check failed and cleanup is unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not check attachment usage. Refresh to try again.'**
+  String get storageAttachmentCheckFailed;
+
   /// Error notification on the Images and Files storage detail pages when the clipboard cannot accept the diagnostic text. The user can tap the copy button again.
   ///
   /// In en, this message translates to:

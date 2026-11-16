@@ -40,6 +40,8 @@
   "storageSpaceRefreshTooltip": "Yenile",
   "storageSpaceLoadFailed": "Dosyalar yüklenemedi veya hangi görsellerin kullanımda olduğu kontrol edilemedi. Lütfen yenileyip tekrar deneyin.",
   "storageSpaceCopyErrorDetails": "Hata ayrıntılarını kopyala",
+  "storageAttachmentChecking": "Ek kullanımı kontrol ediliyor…",
+  "storageAttachmentCheckFailed": "Ek kullanımı kontrol edilemedi. Yeniden denemek için yenileyin.",
   "storageSpaceCopyErrorFailed": "Hata ayrıntıları kopyalanamadı. Lütfen tekrar deneyin.",
   "storageSpaceTotalLabel": "Kullanılan",
   "storageSpaceClearableLabel": "Temizlenebilir: {size}",

@@ -80,11 +80,13 @@ class StorageUsageReport {
   final int totalFiles;
   final StorageUsageStats clearable;
   final List<StorageUsageCategory> categories;
+  final StorageUploadFiles uploads;
   const StorageUsageReport({
     required this.totalBytes,
     required this.totalFiles,
     required this.clearable,
     required this.categories,
+    this.uploads = const StorageUploadFiles(),
   });
 }
 
@@ -94,7 +96,10 @@ class StorageFileEntry {
   final int bytes;
   final DateTime modifiedAt;
   final StorageImageKind? imageKind;
-  final bool isInUse;
+
+  /// Null until the reference scan has confirmed the file's status.
+  final bool? isInUse;
+  bool get canDelete => isInUse == false;
   final Map<String, String> conversations;
   final DateTime? pendingDeletionAt;
   const StorageFileEntry({
@@ -103,10 +108,113 @@ class StorageFileEntry {
     required this.bytes,
     required this.modifiedAt,
     this.imageKind,
-    this.isInUse = false,
+    this.isInUse,
     this.conversations = const {},
     this.pendingDeletionAt,
   });
+}
+
+class StorageUploadFiles {
+  const StorageUploadFiles({this.images = const [], this.files = const []});
+
+  final List<StorageFileEntry> images;
+  final List<StorageFileEntry> files;
+  bool get isEmpty => images.isEmpty && files.isEmpty;
+
+  bool hasSameFiles(StorageUploadFiles other) {
+    bool same(List<StorageFileEntry> a, List<StorageFileEntry> b) {
+      if (a.length != b.length) return false;
+      for (var i = 0; i < a.length; i++) {
+        if (a[i].path != b[i].path ||
+            a[i].bytes != b[i].bytes ||
+            a[i].modifiedAt != b[i].modifiedAt) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    return same(images, other.images) && same(files, other.files);
+  }
+}
+
+/// The storage page owns this cache. Only the listed files and their labels
+/// survive a scan; the database, message payloads and full index stay in the worker.
+class StorageUploadSession {
+  StorageUploadSession({this.readVersion});
+  final Future<(int, int)> Function()? readVersion;
+  StorageUploadFiles _directory = const StorageUploadFiles();
+  StorageUploadFiles get directory => _directory;
+  StorageUploadFiles? _checked;
+  Future<StorageUploadFiles?>? _listing;
+  int _directoryRevision = 0;
+  Future<StorageUploadFiles>? _inFlight;
+  ({(int, int)? database, int transient})? _version;
+
+  void reset(StorageUploadFiles files) {
+    invalidateDirectory();
+    _directory = files;
+    _checked = null;
+  }
+
+  void invalidateDirectory() => _directoryRevision++;
+
+  /// Share the directory walk across categories. A change during the walk
+  /// returns null so the latest visible request can enumerate again.
+  Future<StorageUploadFiles?> refreshDirectory() =>
+      _listing ??= _refreshDirectory().whenComplete(() => _listing = null);
+
+  Future<StorageUploadFiles?> _refreshDirectory() async {
+    final revision = _directoryRevision;
+    final StorageUploadFiles files;
+    try {
+      files = await StorageUsageService.readUploadFiles();
+    } catch (_) {
+      if (revision == _directoryRevision) rethrow;
+      return null;
+    }
+    if (revision != _directoryRevision) return null;
+    if (!_directory.hasSameFiles(files)) reset(files);
+    return _directory;
+  }
+
+  Future<StorageUploadFiles> inspect() =>
+      _inFlight ??= _inspect().whenComplete(() => _inFlight = null);
+
+  Future<StorageUploadFiles> _inspect() async {
+    if (_directory.isEmpty) return _directory;
+    final version = (
+      database: await readVersion?.call(),
+      transient: AttachmentFileLock.transientRevision,
+    );
+    final files = _directory;
+    if (files.isEmpty) return files;
+    if (version.database != null && _version == version && _checked != null) {
+      return _checked!;
+    }
+
+    // A write or refresh supersedes both labels and errors from that snapshot.
+    // Only a visible detail will retry a result that is still unknown.
+    Future<bool> isCurrent() async =>
+        version.database == await readVersion?.call() &&
+        version.transient == AttachmentFileLock.transientRevision &&
+        identical(files, _directory);
+
+    final StorageUploadFiles checked;
+    try {
+      checked = await StorageUsageService._inspectUploads(
+        files,
+        AttachmentFileLock.captureTransient(),
+      );
+    } catch (_) {
+      if (await isCurrent()) rethrow;
+      return _directory;
+    }
+    if (!await isCurrent()) return _directory;
+    _version = version;
+    _checked = checked;
+    return checked;
+  }
 }
 
 /// Name of the append-only record written before an unattended database
@@ -160,6 +268,7 @@ abstract final class StorageUsageService {
   }
 
   static Future<StorageUsageReport> computeReport({
+    bool includeUploadFiles = false,
     Future<Directory> Function()? workspacesDirectory,
     Future<Directory> Function()? environmentDirectory,
     Future<Directory> Function()? skillsDirectory,
@@ -221,6 +330,7 @@ abstract final class StorageUsageService {
 
     int totalBytes = 0;
     int totalFiles = 0;
+    final uploadDirectories = <String>[];
 
     if (!await root.exists() && !await contentRoot.exists()) {
       return StorageUsageReport(
@@ -245,14 +355,23 @@ abstract final class StorageUsageService {
       try {
         await for (final ent in _listFiles(
           scanRoot,
-          excludedTopDirectories: _isolateMeasuredTopDirs,
+          skipTopDirectory: (dir) {
+            final name = p.basename(dir.path);
+            if (includeUploadFiles &&
+                (!splitStorage || publicFiles) &&
+                _uploadDirectories.any((known) => p.equals(name, known))) {
+              uploadDirectories.add(dir.path);
+              return true;
+            }
+            return _isolateMeasuredTopDirs.contains(name.toLowerCase());
+          },
         )) {
           final rel = p.relative(ent.path, from: scanRoot.path);
           final parts = p.split(rel);
           int bytes = 0;
           try {
             bytes = await ent.length();
-          } catch (_) {
+          } on FileSystemException {
             bytes = 0;
           }
           totalFiles += 1;
@@ -377,6 +496,17 @@ abstract final class StorageUsageService {
       } catch (_) {
         // Keep successfully measured files if a file disappears during the scan.
       }
+    }
+
+    var uploads = const StorageUploadFiles();
+    if (uploadDirectories.isNotEmpty) {
+      final inventory = await _readUploadDirectories(uploadDirectories);
+      uploads = inventory.files;
+      byCat[StorageUsageCategoryKey.images]!.addStats(inventory.imagesStats);
+      byCat[StorageUsageCategoryKey.files]!.addStats(inventory.filesStats);
+      totalFiles +=
+          inventory.imagesStats.fileCount + inventory.filesStats.fileCount;
+      totalBytes += inventory.imagesStats.bytes + inventory.filesStats.bytes;
     }
 
     final [
@@ -659,6 +789,7 @@ abstract final class StorageUsageService {
       totalFiles: totalFiles,
       clearable: clearable,
       categories: categories,
+      uploads: uploads,
     );
   }
 
@@ -769,71 +900,144 @@ abstract final class StorageUsageService {
     await _deleteDirectoryContents(Directory(p.join(root.path, 'asr_models')));
   }
 
+  static const _uploadDirectories = ['upload', 'images', 'avatars'];
+
+  static Future<StorageFileEntry> _fileInfo(File file) async {
+    var bytes = 0;
+    var modified = DateTime.fromMillisecondsSinceEpoch(0);
+    try {
+      final stat = await file.stat();
+      if (stat.type == FileSystemEntityType.file) {
+        bytes = stat.size;
+        modified = stat.modified;
+      }
+    } on FileSystemException {
+      try {
+        bytes = await file.length();
+      } on FileSystemException {
+        // The file may have disappeared during enumeration.
+      }
+    }
+    return StorageFileEntry(
+      path: file.path,
+      name: p.basename(file.path),
+      bytes: bytes,
+      modifiedAt: modified,
+    );
+  }
+
+  static void _sortUploads(StorageUploadFiles uploads) {
+    int newest(StorageFileEntry a, StorageFileEntry b) {
+      final order = b.modifiedAt.compareTo(a.modifiedAt);
+      return order == 0 ? a.path.compareTo(b.path) : order;
+    }
+
+    uploads.images.sort(newest);
+    uploads.files.sort(newest);
+  }
+
+  static Future<StorageUploadFiles> readUploadFiles() async {
+    final root = (await AppDirectories.getContentDirectory()).path;
+    final inventory = await _readUploadDirectories([
+      for (final name in _uploadDirectories) p.join(root, name),
+    ]);
+    return inventory.files;
+  }
+
+  static Future<
+    ({
+      StorageUploadFiles files,
+      StorageUsageStats imagesStats,
+      StorageUsageStats filesStats,
+    })
+  >
+  _readUploadDirectories(List<String> directories) => Isolate.run(() async {
+    final uploads = StorageUploadFiles(images: [], files: []);
+    final imagesStats = _MutableStats(), filesStats = _MutableStats();
+    for (final path in directories) {
+      await for (final file in _listFiles(Directory(path))) {
+        final entry = await _fileInfo(file);
+        if (_isImageExt(entry.name)) {
+          uploads.images.add(entry);
+          imagesStats.add(entry.bytes);
+        } else {
+          uploads.files.add(entry);
+          filesStats.add(entry.bytes);
+        }
+      }
+    }
+    _sortUploads(uploads);
+    return (
+      files: uploads,
+      imagesStats: imagesStats.toStats(),
+      filesStats: filesStats.toStats(),
+    );
+  });
+
+  static Future<StorageUploadFiles> _inspectUploads(
+    StorageUploadFiles files,
+    TransientAttachmentSnapshot transient, {
+    Map<String, Map<String, String>> additionalReferences = const {},
+    bool generationActive = false,
+  }) async {
+    final root = (await AppDirectories.getContentDirectory()).path;
+    final databasePath = p.join(
+      (await AppDirectories.getAppDataDirectory()).path,
+      AppDatabase.databaseFileName,
+    );
+    return Isolate.run(() {
+      final usage = StorageAttachmentUsage.readInWorker(databasePath, root)
+        ..includeConversations(
+          transient.resolve(),
+          generationActive: generationActive || transient.generationActive,
+        )
+        ..includeConversations(additionalReferences);
+      StorageFileEntry inspect(StorageFileEntry file, {required bool image}) {
+        String? realPath;
+        try {
+          realPath = File(file.path).resolveSymbolicLinksSync();
+        } on FileSystemException {
+          // Retain lexical references if the file disappeared during the scan.
+        }
+        return StorageFileEntry(
+          path: file.path,
+          name: file.name,
+          bytes: file.bytes,
+          modifiedAt: file.modifiedAt,
+          conversations: usage.conversationsFor(file.path),
+          pendingDeletionAt: usage.pendingDeletionFor(file.path),
+          imageKind: image
+              ? usage.kindFor(file.path, realPath: realPath)
+              : null,
+          isInUse:
+              usage.isInUse(file.path) ||
+              (realPath != null && usage.isInUse(realPath)),
+        );
+      }
+
+      return StorageUploadFiles(
+        images: [for (final file in files.images) inspect(file, image: true)],
+        files: [for (final file in files.files) inspect(file, image: false)],
+      );
+    });
+  }
+
   static Future<List<StorageFileEntry>> listUploadEntries({
     required bool images,
     Map<String, Map<String, String>> additionalReferences = const {},
     bool generationActive = false,
   }) async {
-    final dir = await AppDirectories.getUploadDirectory();
-    final imagesDir = await AppDirectories.getImagesDirectory();
-    final avatarsDir = await AppDirectories.getAvatarsDirectory();
-    final usage = (await StorageAttachmentUsage.load())
-      ..includeConversations(
-        additionalReferences,
-        generationActive: generationActive,
-      );
-    final out = <StorageFileEntry>[];
-    Future<void> addFromDir(Directory d) async {
-      if (!await d.exists()) return;
-      try {
-        await for (final ent in _listFiles(d)) {
-          final name = p.basename(ent.path);
-          final isImg = _isImageExt(name);
-          if (isImg != images) continue;
-          int bytes = 0;
-          DateTime modifiedAt = DateTime.fromMillisecondsSinceEpoch(0);
-          try {
-            final stat = await ent.stat();
-            bytes = stat.size;
-            modifiedAt = stat.modified;
-          } catch (_) {
-            try {
-              bytes = await ent.length();
-            } catch (_) {}
-          }
-          String? realPath;
-          try {
-            realPath = await ent.resolveSymbolicLinks();
-          } on FileSystemException {
-            // A concurrent removal must not stop listing the remaining files.
-          }
-          out.add(
-            StorageFileEntry(
-              path: ent.path,
-              name: name,
-              bytes: bytes,
-              modifiedAt: modifiedAt,
-              conversations: usage.conversationsFor(ent.path),
-              pendingDeletionAt: usage.pendingDeletionFor(ent.path),
-              imageKind: images
-                  ? usage.kindFor(ent.path, realPath: realPath)
-                  : null,
-              isInUse:
-                  usage.isInUse(ent.path) ||
-                  (realPath != null && usage.isInUse(realPath)),
-            ),
-          );
-        }
-      } catch (_) {
-        // Ignore listing errors and return partial results.
-      }
-    }
-
-    await addFromDir(dir);
-    await addFromDir(imagesDir);
-    await addFromDir(avatarsDir);
-    out.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
-    return out;
+    final files = await readUploadFiles();
+    if ((images ? files.images : files.files).isEmpty) return [];
+    final inspected = await _inspectUploads(
+      images
+          ? StorageUploadFiles(images: files.images)
+          : StorageUploadFiles(files: files.files),
+      AttachmentFileLock.captureTransient(),
+      additionalReferences: additionalReferences,
+      generationActive: generationActive,
+    );
+    return images ? inspected.images : inspected.files;
   }
 
   static Future<int> deleteUploadFiles(
@@ -1013,7 +1217,7 @@ abstract final class StorageUsageService {
   /// to the unreadable directory rather than aborting all remaining siblings.
   static Stream<File> _listFiles(
     Directory root, {
-    Set<String> excludedTopDirectories = const {},
+    bool Function(Directory)? skipTopDirectory,
   }) async* {
     final pending = <Directory>[root];
     while (pending.isNotEmpty) {
@@ -1022,9 +1226,7 @@ abstract final class StorageUsageService {
         await for (final entity in dir.list(followLinks: false)) {
           if (entity is Directory) {
             if (dir.path == root.path &&
-                excludedTopDirectories.contains(
-                  p.basename(entity.path).toLowerCase(),
-                )) {
+                (skipTopDirectory?.call(entity) ?? false)) {
               continue;
             }
             pending.add(entity);

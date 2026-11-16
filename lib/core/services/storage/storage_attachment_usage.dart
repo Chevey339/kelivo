@@ -58,17 +58,22 @@ class StorageAttachmentUsage {
       (await AppDirectories.getAppDataDirectory()).path,
       AppDatabase.databaseFileName,
     );
-    final usage = await Isolate.run(
-      () => _load(databasePath, root, includeMessages),
+    final transient = AttachmentFileLock.captureTransient();
+    return Isolate.run(
+      () => readInWorker(databasePath, root, includeMessages: includeMessages)
+        ..includeConversations(
+          transient.resolve(),
+          generationActive: transient.generationActive,
+        ),
     );
-    usage.includeConversations(
-      AttachmentFileLock.transientReferences,
-      generationActive: AttachmentFileLock.hasActiveTransientGeneration,
-    );
-    return usage;
   }
 
-  static StorageAttachmentUsage _load(String path, String root, bool messages) {
+  /// Synchronous read for callers already running on a worker isolate.
+  static StorageAttachmentUsage readInWorker(
+    String path,
+    String root, {
+    bool includeMessages = true,
+  }) {
     if (!File(path).existsSync()) {
       return StorageAttachmentUsage._(root, _AttachmentReferences());
     }
@@ -77,7 +82,7 @@ class StorageAttachmentUsage {
       database.execute('BEGIN');
       return StorageAttachmentUsage._(
         root,
-        _readReferences(database, messages, root),
+        _readReferences(database, includeMessages, root),
       );
     } finally {
       database.close();
@@ -132,15 +137,14 @@ class StorageAttachmentUsage {
     bool sessionCopies = false,
     bool generationActive = false,
   }) async {
+    final targets = paths.toSet();
+    if (targets.isEmpty) return {};
     final root = (await AppDirectories.getContentDirectory()).path;
     final databasePath = p.join(
       (await AppDirectories.getAppDataDirectory()).path,
       AppDatabase.databaseFileName,
     );
-    final transient = AttachmentFileLock.transientReferences;
-    generationActive |= AttachmentFileLock.hasActiveTransientGeneration;
-    final targets = paths.toSet();
-    if (targets.isEmpty) return {};
+    final transient = AttachmentFileLock.captureTransient();
     return Isolate.run(() {
       final database = File(databasePath).existsSync()
           ? sqlite3.open(databasePath, mode: OpenMode.readWrite)
@@ -155,8 +159,8 @@ class StorageAttachmentUsage {
               : _readReferences(database, true, root),
         );
         usage.includeConversations(
-          transient,
-          generationActive: generationActive,
+          transient.resolve(),
+          generationActive: generationActive || transient.generationActive,
         );
         final protected = usage._resolveSet(protectedPaths);
         final roots = [
@@ -213,8 +217,9 @@ class StorageAttachmentUsage {
       (await AppDirectories.getAppDataDirectory()).path,
       AppDatabase.databaseFileName,
     );
-    final transient = AttachmentFileLock.transientReferences;
-    final generationActive = AttachmentFileLock.hasActiveTransientGeneration;
+    final transient = includeOrphans
+        ? AttachmentFileLock.captureTransient()
+        : null;
     return WorkspaceFileCoordinator.run(
       sessions.path,
       () => Isolate.run(() {
@@ -238,8 +243,8 @@ class StorageAttachmentUsage {
                 : _readReferences(database, true, root),
           );
           usage.includeConversations(
-            transient,
-            generationActive: generationActive,
+            transient!.resolve(),
+            generationActive: transient.generationActive,
           );
           usage._protected.addAll(usage._resolveSet(protectedPaths));
           final ids = database == null

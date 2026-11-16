@@ -20,13 +20,13 @@ class _GatedPathProvider extends PathProviderPlatform {
 
   final String root;
   Completer<void>? documentsGate;
-  bool waitingForDocuments = false;
+  int gatedReads = 0;
 
   @override
   Future<String?> getApplicationDocumentsPath() async {
     final gate = documentsGate;
     if (gate != null) {
-      waitingForDocuments = true;
+      gatedReads++;
       await gate.future;
     }
     return root;
@@ -52,7 +52,65 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() ready) async {
   expect(ready(), isTrue);
 }
 
+Widget _storagePage() => ChangeNotifierProvider(
+  create: (_) => SettingsProvider(createBusinessTestPreferences()),
+  child: MaterialApp(
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    builder: (_, child) => AppSnackBarOverlay(child: child!),
+    home: const StorageSpacePage(),
+  ),
+);
+
 void main() {
+  testWidgets(
+    'reopening files while the previous directory walk is pending rechecks the inventory',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final root = Directory.systemTemp.createTempSync(
+        'storage_directory_navigation_',
+      );
+      final previousPaths = PathProviderPlatform.instance;
+      final paths = _GatedPathProvider(root.path);
+      PathProviderPlatform.instance = paths;
+      addTearDown(() {
+        PathProviderPlatform.instance = previousPaths;
+        root.deleteSync(recursive: true);
+      });
+      await tester.pumpWidget(_storagePage());
+      await _pumpUntil(tester, () => find.text('Files').evaluate().isNotEmpty);
+      // Settings startup also asks for Documents to clean logs. Finish that
+      // lookup before measuring just the directory walks across navigation.
+      var settingsReady = false;
+      final settings = tester
+          .element(find.byType(StorageSpacePage))
+          .read<SettingsProvider>();
+      settings.loaded.then((_) => settingsReady = true);
+      await _pumpUntil(tester, () => settingsReady);
+      final gate = paths.documentsGate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      await tester.tap(find.text('Files').last);
+      await _pumpUntil(tester, () => paths.gatedReads == 1);
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Files').last);
+      await tester.pumpAndSettle();
+      expect(paths.gatedReads, 1);
+      gate.complete();
+      // Neither category contains any files, so a second path lookup belongs
+      // to the new directory walk, not a database reference check.
+      await _pumpUntil(tester, () => paths.gatedReads == 2);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
   testWidgets(
     'back and a new selection cannot change a confirmed file deletion',
     (tester) async {
@@ -73,25 +131,11 @@ void main() {
         PathProviderPlatform.instance = previousPaths;
         root.deleteSync(recursive: true);
       });
-      await tester.pumpWidget(
-        ChangeNotifierProvider(
-          create: (_) => SettingsProvider(createBusinessTestPreferences()),
-          child: MaterialApp(
-            locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            builder: (_, child) => AppSnackBarOverlay(child: child!),
-            home: const StorageSpacePage(),
-          ),
-        ),
-      );
+      await tester.pumpWidget(_storagePage());
       await _pumpUntil(tester, () => find.text('Files').evaluate().isNotEmpty);
       await tester.ensureVisible(find.text('Files').last);
       await tester.tap(find.text('Files').last);
-      await _pumpUntil(
-        tester,
-        () => find.text('first.txt').evaluate().isNotEmpty,
-      );
+      await _pumpUntil(tester, () => find.text('Unused').evaluate().isNotEmpty);
       await tester.pumpAndSettle();
       await tester.longPress(find.text('first.txt'));
       await tester.pumpAndSettle();
@@ -107,7 +151,7 @@ void main() {
       });
       await tester.tap(find.widgetWithText(IosTileButton, 'Delete').last);
       await tester.pumpAndSettle();
-      expect(paths.waitingForDocuments, isTrue);
+      expect(paths.gatedReads, greaterThan(0));
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.text('Select all'), findsOneWidget);

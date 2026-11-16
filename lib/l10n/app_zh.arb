@@ -40,6 +40,8 @@
   "storageSpaceRefreshTooltip": "刷新",
   "storageSpaceLoadFailed": "无法加载文件或检查图片使用情况，请刷新后重试。",
   "storageSpaceCopyErrorDetails": "复制错误详情",
+  "storageAttachmentChecking": "正在检查附件使用情况…",
+  "storageAttachmentCheckFailed": "无法检查附件使用情况，请刷新后重试。",
   "storageSpaceCopyErrorFailed": "无法复制错误详情，请重试。",
   "storageSpaceTotalLabel": "已用空间",
   "storageSpaceClearableLabel": "可清理：{size}",

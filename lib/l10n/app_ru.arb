@@ -40,6 +40,8 @@
   "storageSpaceRefreshTooltip": "Обновить",
   "storageSpaceLoadFailed": "Не удалось загрузить файлы или проверить использование изображений. Обновите и повторите попытку.",
   "storageSpaceCopyErrorDetails": "Копировать сведения об ошибке",
+  "storageAttachmentChecking": "Проверка использования вложений…",
+  "storageAttachmentCheckFailed": "Не удалось проверить использование вложений. Обновите, чтобы повторить попытку.",
   "storageSpaceCopyErrorFailed": "Не удалось скопировать сведения об ошибке. Попробуйте ещё раз.",
   "storageSpaceTotalLabel": "Использовано",
   "storageSpaceClearableLabel": "Можно очистить: {size}",

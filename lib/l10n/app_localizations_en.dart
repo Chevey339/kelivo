@@ -145,6 +145,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCopyErrorDetails => 'Copy error details';
 
   @override
+  String get storageAttachmentChecking => 'Checking attachment usage…';
+
+  @override
+  String get storageAttachmentCheckFailed =>
+      'Could not check attachment usage. Refresh to try again.';
+
+  @override
   String get storageSpaceCopyErrorFailed =>
       'Could not copy the error details. Please try again.';
 

@@ -282,9 +282,10 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
                                 key: ValueKey('translate_page'),
                               ),
                               _storageVisited
-                                  ? const StorageSpacePage(
-                                      key: ValueKey('storage_space_page'),
+                                  ? StorageSpacePage(
+                                      key: const ValueKey('storage_space_page'),
                                       embedded: true,
+                                      active: _tabIndex == 2,
                                     )
                                   : const SizedBox.shrink(),
                               DesktopSettingsPage(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,10 +8,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3/sqlite3.dart';
 
+import 'package:Kelivo/core/database/business_repository.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/mcp/mcp_icon_cache.dart';
+import 'package:Kelivo/core/services/storage/attachment_file_lock.dart';
 import 'package:Kelivo/features/settings/pages/storage_space_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
@@ -29,19 +35,214 @@ Future<void> _until(WidgetTester tester, bool Function() ready) async {
   expect(ready(), isTrue);
 }
 
-Widget _storagePage(StorageImagesFixture fixture) => ChangeNotifierProvider(
-  create: (_) => SettingsProvider(fixture.preferences),
-  child: MaterialApp(
-    locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    builder: (_, child) => AppSnackBarOverlay(child: child!),
-    home: const StorageSpacePage(),
-  ),
-);
+Widget _storagePage(StorageImagesFixture fixture, {ChatService? chat}) =>
+    MultiProvider(
+      providers: [
+        Provider<BusinessRepository>.value(
+          value: BusinessRepository(fixture.database),
+        ),
+        if (chat != null)
+          ChangeNotifierProvider<ChatService>.value(value: chat),
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(fixture.preferences),
+        ),
+      ],
+      child: MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (_, child) => AppSnackBarOverlay(child: child!),
+        home: const StorageSpacePage(),
+      ),
+    );
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'file metadata is browsable while the database is busy, desktop=$desktop',
+      (tester) async {
+        tester.view.physicalSize = Size(desktop ? 1200 : 400, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+        addTearDown(fixture.dispose);
+        final photo = (await tester.runAsync(() async {
+          await fixture.file('upload/manual.pdf');
+          return fixture.file(
+            'images/photo.png',
+            img.encodePng(img.Image(width: 2, height: 2)),
+          );
+        }))!;
+        var scans = 0;
+        final owner = Object();
+        AttachmentFileLock.registerTransientOwner(
+          owner,
+          capture: () {
+            scans++;
+            return null;
+          },
+          active: () => false,
+        );
+        addTearDown(() => AttachmentFileLock.unregisterTransientOwner(owner));
+        await tester.pumpWidget(_storagePage(fixture));
+        await _until(tester, () => find.text('文件').evaluate().isNotEmpty);
+        final release = Completer<void>();
+        late Future<void> transaction;
+        await tester.runAsync(() async {
+          final entered = Completer<void>();
+          transaction = fixture.database.transaction(() async {
+            await fixture.database.customSelect('SELECT 1').get();
+            entered.complete();
+            await release.future;
+          });
+          await entered.future;
+        });
+        try {
+          await tester.tap(find.text('文件').last);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(find.text('manual.pdf'), findsOneWidget);
+          expect(find.text('正在检查附件使用情况…'), findsOneWidget);
+          expect(find.byType(CircularProgressIndicator), findsNothing);
+          expect(find.byType(IosCheckbox), findsNothing);
+          expect(
+            tester
+                .widget<IosTileButton>(
+                  find.widgetWithText(IosTileButton, '清理未使用'),
+                )
+                .enabled,
+            isFalse,
+          );
+          await tester.longPress(find.text('manual.pdf'));
+          expect(find.text('已选 1 项'), findsNothing);
+        } finally {
+          release.complete();
+          await tester.runAsync(() => transaction);
+        }
+        await _until(tester, () => find.text('未使用').evaluate().isNotEmpty);
+        expect(find.text('manual.pdf'), findsOneWidget);
+        expect(find.byType(IosCheckbox), findsOneWidget);
+        final firstCheck = scans;
+        expect(firstCheck, greaterThan(0));
+        if (!desktop) {
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.text('图片').last);
+        await tester.pumpAndSettle();
+        await _until(
+          tester,
+          () =>
+              find
+                  .byKey(ValueKey('storage-image-${photo.path}'))
+                  .evaluate()
+                  .isNotEmpty &&
+              find.text('未使用').evaluate().isNotEmpty,
+        );
+        expect(scans, firstCheck);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+      variant: TargetPlatformVariant.only(
+        desktop ? TargetPlatform.macOS : TargetPlatform.android,
+      ),
+    );
+  }
+  testWidgets(
+    'visible usage updates after raw settings and external WAL writes',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+      addTearDown(fixture.dispose);
+      final file = (await tester.runAsync(
+        () => fixture.file('upload/icon.dat'),
+      ))!;
+      await tester.pumpWidget(_storagePage(fixture));
+      await _until(tester, () => find.text('文件').evaluate().isNotEmpty);
+      await tester.tap(find.text('文件').last);
+      await _until(tester, () => find.text('未使用').evaluate().isNotEmpty);
+      await tester.longPress(find.text('icon.dat'));
+      await tester.pump();
+      expect(find.text('已选 1 项'), findsOneWidget);
+
+      final write = fixture.preferences.setString('avatar_value', file.path);
+      await _until(
+        tester,
+        () => find.text('正在检查附件使用情况…').evaluate().isNotEmpty,
+      );
+      expect(await write, isTrue);
+      expect(find.text('已选 1 项'), findsNothing);
+      expect(find.byType(IosCheckbox), findsNothing);
+      await _until(tester, () => find.text('使用中').evaluate().isNotEmpty);
+      expect(find.byType(IosCheckbox), findsNothing);
+
+      await tester.runAsync(() async {
+        final other = sqlite3.open('${fixture.root.path}/kelivo.db');
+        try {
+          other.execute('DELETE FROM preference_rows WHERE key = ?', [
+            'avatar_value',
+          ]);
+        } finally {
+          other.close();
+        }
+      });
+      await _until(tester, () => find.text('未使用').evaluate().isNotEmpty);
+      expect(find.text('已选 1 项'), findsNothing);
+      expect(find.byType(IosCheckbox), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets('an empty open category picks up new temporary attachments', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+    addTearDown(fixture.dispose);
+    final chat = ChatService(
+      existingRepository: ChatDatabaseRepository(fixture.database),
+    );
+    await tester.runAsync(() async {
+      await chat.init();
+      await chat.runAssetReferenceMaintenance();
+      await chat.runAssetMaintenance();
+    });
+    addTearDown(chat.close);
+    await tester.pumpWidget(_storagePage(fixture, chat: chat));
+    await _until(tester, () => find.text('文件').evaluate().isNotEmpty);
+    await tester.tap(find.text('文件').last);
+    await _until(tester, () => find.text('暂无内容').evaluate().isNotEmpty);
+
+    await tester.runAsync(() async {
+      final business = BusinessRepository(fixture.database);
+      final before = await business.readStorageChangeVersion();
+      final conversation = await chat.createDraftConversation(
+        temporary: true,
+        title: 'Temporary',
+      );
+      final file = await fixture.file('upload/new.txt');
+      await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        parts: [FilePart(uri: file.path, name: 'new.txt')],
+      );
+      expect(await business.readStorageChangeVersion(), before);
+    });
+    await _until(
+      tester,
+      () => find.textContaining('Temporary').evaluate().isNotEmpty,
+    );
+    expect(find.text('new.txt'), findsOneWidget);
+    expect(find.byType(IosCheckbox), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
   testWidgets(
     'storage details can copy a load failure and recover on refresh',
     (tester) async {
@@ -84,6 +285,8 @@ void main() {
       await _until(tester, () => find.text('复制错误详情').evaluate().isNotEmpty);
       await tester.pumpAndSettle();
       expect(find.textContaining('FormatException'), findsOneWidget);
+      expect(find.text('manual.pdf'), findsOneWidget);
+      expect(find.byType(IosCheckbox), findsNothing);
       expect(find.text('清理未使用'), findsNothing);
       await tester.tap(find.text('复制错误详情'));
       await tester.pumpAndSettle();
@@ -244,7 +447,7 @@ void main() {
         if (!desktop) {
           await tester.tap(find.text('图片').last);
         }
-        await _until(tester, () => find.text('共 4 项').evaluate().isNotEmpty);
+        await _until(tester, () => find.text('使用中').evaluate().isNotEmpty);
         await tester.pumpAndSettle();
         expect(find.text('使用中'), findsOneWidget);
         expect(find.text('用户上传'), findsNothing);
