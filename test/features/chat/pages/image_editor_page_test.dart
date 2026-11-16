@@ -8,6 +8,7 @@ import 'package:Kelivo/features/chat/pages/image_editor_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image;
@@ -367,6 +368,77 @@ void main() {
     expect(crop.right, closeTo(1 - 45 / width, .003));
     expect(crop.bottom, closeTo(1 - 33 / height, .003));
   });
+
+  for (final (language, width, scale) in [
+    ('en', 360.0, 1.0),
+    ('zh', 360.0, 1.0),
+    ('zh', 320.0, 1.25),
+  ]) {
+    testWidgets('the full Done label fits at ${width}dp in $language', (
+      tester,
+    ) async {
+      tester.platformDispatcher.localesTestValue = [Locale(language)];
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await open(tester, size: Size(width, 800));
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(ImageEditorPage)),
+      )!;
+      final done = find.text(l10n.imageEditorDone).hitTestable();
+      final undo = tester.getCenter(find.byTooltip(l10n.imageEditorUndo));
+      final redo = tester.getCenter(find.byTooltip(l10n.imageEditorRedo));
+      expect((undo.dx + redo.dx) / 2, closeTo(width / 2, 0.01));
+      expect(
+        tester.renderObject<RenderParagraph>(done).didExceedMaxLines,
+        isFalse,
+      );
+      await tester.tap(find.byKey(const ValueKey('image-editor-tool-crop')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(l10n.imageEditorRotate));
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.imageEditorRestore).hitTestable(), findsOneWidget);
+      expect(
+        tester.renderObject<RenderParagraph>(done).didExceedMaxLines,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'Cancel, Revert and Done fit beside the window controls on a narrow Mac',
+    (tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('zh')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      await open(
+        tester,
+        size: const Size(375, 640),
+        images: [
+          EditorImage(
+            id: 1,
+            path: path,
+            document: const ImageEditDocument(quarterTurns: 1),
+          ),
+        ],
+      );
+      for (final label in ['取消', '还原', '完成']) {
+        final text = find.text(label);
+        expect(
+          tester.renderObject<RenderParagraph>(text).didExceedMaxLines,
+          isFalse,
+          reason: label,
+        );
+        expect(text.hitTestable(), findsOneWidget, reason: label);
+      }
+      final cancel = find.ancestor(
+        of: find.text('取消'),
+        matching: find.byType(IosCardPress),
+      );
+      expect(tester.getRect(cancel).left, greaterThanOrEqualTo(84));
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
 
   testWidgets('Done keeps its button state and bounds when Revert appears', (
     tester,

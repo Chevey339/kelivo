@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:io';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -1062,66 +1063,59 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     height: desktop ? 58 : 56,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
+      child: CustomMultiChildLayout(
+        delegate: _EditorToolbarLayout(
+          Directionality.of(context),
+          windowControlsWidth: defaultTargetPlatform == TargetPlatform.macOS
+              ? 84
+              : 0,
+        ),
         children: [
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: desktop && Platform.isMacOS ? 84 : 0,
+          LayoutId(
+            id: _ToolbarItem.cancel,
+            child: _button(_l.imageEditorCancel, _saving ? null : _cancel),
+          ),
+          LayoutId(
+            id: _ToolbarItem.history,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _icon(
+                  LucideIcons.undo2,
+                  _l.imageEditorUndo,
+                  _undo.isEmpty || _saving ? null : () => _undoStep(),
                 ),
-                child: _button(_l.imageEditorCancel, _saving ? null : _cancel),
-              ),
+                _icon(
+                  LucideIcons.redo2,
+                  _l.imageEditorRedo,
+                  _redo.isEmpty || _saving ? null : () => _undoStep(redo: true),
+                ),
+              ],
             ),
           ),
-          _icon(
-            LucideIcons.undo2,
-            _l.imageEditorUndo,
-            _undo.isEmpty || _saving ? null : () => _undoStep(),
-          ),
-          _icon(
-            LucideIcons.redo2,
-            _l.imageEditorRedo,
-            _redo.isEmpty || _saving ? null : () => _undoStep(redo: true),
-          ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Visibility(
-                      visible: !_doc.isEmpty && !_unavailable,
-                      maintainState: true,
-                      maintainAnimation: true,
-                      maintainSize: true,
-                      child: _button(
-                        _l.imageEditorRestore,
-                        _saving
-                            ? null
-                            : () {
-                                _finishText();
-                                _change(const ImageEditDocument());
-                                _selectedText = null;
-                                _zoom.value = Matrix4.identity();
-                              },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: _button(
-                      _l.imageEditorDone,
-                      _canSave ? _save : null,
-                      color: const Color(0xff1d2550),
-                      fill: _accent,
-                      busy: _saving,
-                    ),
-                  ),
-                ],
+          if (!_doc.isEmpty && !_unavailable)
+            LayoutId(
+              id: _ToolbarItem.restore,
+              child: _button(
+                _l.imageEditorRestore,
+                _saving
+                    ? null
+                    : () {
+                        _finishText();
+                        _change(const ImageEditDocument());
+                        _selectedText = null;
+                        _zoom.value = Matrix4.identity();
+                      },
               ),
+            ),
+          LayoutId(
+            id: _ToolbarItem.done,
+            child: _button(
+              _l.imageEditorDone,
+              _canSave ? _save : null,
+              color: const Color(0xff1d2550),
+              fill: _accent,
+              busy: _saving,
             ),
           ),
         ],
@@ -1908,6 +1902,65 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       ],
     ),
   );
+}
+
+enum _ToolbarItem { cancel, history, restore, done }
+
+class _EditorToolbarLayout extends MultiChildLayoutDelegate {
+  _EditorToolbarLayout(this.direction, {required this.windowControlsWidth});
+  final TextDirection direction;
+  final double windowControlsWidth;
+
+  @override
+  void performLayout(Size size) {
+    final width = math.max(0.0, size.width - windowControlsWidth);
+    final toolbarStart = direction == TextDirection.ltr
+        ? windowControlsWidth
+        : 0.0;
+    final bounds = BoxConstraints.loose(Size(width, size.height));
+    final done = layoutChild(_ToolbarItem.done, bounds);
+    final history = layoutChild(_ToolbarItem.history, bounds);
+    final hasRestore = hasChild(_ToolbarItem.restore);
+    final gap = hasRestore ? 4.0 : 0.0;
+    final available = math.max(0.0, width - done.width - history.width - gap);
+    final cancel = layoutChild(
+      _ToolbarItem.cancel,
+      bounds.copyWith(maxWidth: hasRestore ? available / 2 : available),
+    );
+    final cancelEnd = toolbarStart + cancel.width;
+    final doneStart = toolbarStart + width - done.width;
+    var historyEnd = doneStart;
+
+    void place(_ToolbarItem item, Size child, double start) {
+      final x = direction == TextDirection.ltr
+          ? start
+          : size.width - start - child.width;
+      positionChild(item, Offset(x, (size.height - child.height) / 2));
+    }
+
+    if (hasRestore) {
+      final restore = layoutChild(
+        _ToolbarItem.restore,
+        bounds.copyWith(maxWidth: available - cancel.width),
+      );
+      historyEnd -= restore.width + gap;
+      place(_ToolbarItem.restore, restore, historyEnd);
+    }
+    // Keep Undo and Redo centered until the neighboring actions need the space.
+    final historyStart = ui.clampDouble(
+      (size.width - history.width) / 2,
+      cancelEnd,
+      math.max(cancelEnd, historyEnd - history.width),
+    );
+    place(_ToolbarItem.cancel, cancel, toolbarStart);
+    place(_ToolbarItem.history, history, historyStart);
+    place(_ToolbarItem.done, done, doneStart);
+  }
+
+  @override
+  bool shouldRelayout(_EditorToolbarLayout oldDelegate) =>
+      direction != oldDelegate.direction ||
+      windowControlsWidth != oldDelegate.windowControlsWidth;
 }
 
 class _CropPainter extends CustomPainter {
