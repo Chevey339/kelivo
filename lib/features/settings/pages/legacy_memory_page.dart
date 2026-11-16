@@ -25,6 +25,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../widgets/memory_ui.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Read-only legacy memories from [MemoryProvider] (§14.5 / D-29).
 class LegacyMemoryPage extends StatelessWidget {
@@ -350,7 +351,10 @@ Future<void> _showLegacyMemoryMigration(
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480, maxHeight: 680),
+          constraints: BoxConstraints(
+            maxWidth: scaledDim(context, 480),
+            maxHeight: scaledDim(context, 680),
+          ),
           child: panel,
         ),
       ),
@@ -369,7 +373,7 @@ Future<void> _showLegacyMemoryMigration(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: 560,
+              maxWidth: scaledDim(context, 560),
               maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.9,
             ),
             child: Material(

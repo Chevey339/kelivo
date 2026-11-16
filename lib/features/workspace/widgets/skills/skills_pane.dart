@@ -17,6 +17,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import '../../../../utils/ui_scale.dart';
 
 /// Embeddable skills list for the Skills page and desktop settings.
 ///
@@ -71,7 +72,7 @@ class SkillsPaneState extends State<SkillsPane> {
     final child = Center(
       key: SkillsPane.emptyKey,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 420)),
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 48),
           child: Column(

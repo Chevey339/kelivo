@@ -10,6 +10,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class WorldBookSheet extends StatelessWidget {
   const WorldBookSheet({
@@ -138,7 +139,7 @@ class _SheetTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox(
-      height: 52,
+      height: scaledDim(context, 52),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(

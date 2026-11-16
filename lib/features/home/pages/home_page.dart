@@ -97,6 +97,7 @@ import '../controllers/scroll_controller.dart' as scroll_ctrl;
 import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -130,7 +131,7 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
           bottomContentPadding + 24,
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 420)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1543,7 +1544,9 @@ class _HomePageState extends State<HomePage>
         _controller.cancelFindJump();
         _controller.scrollCtrl.handleUserScrollIntent();
       },
-      chatFontScale: settings.chatFontScale,
+      // includes uiFontScale from main.dart) by this value; divide the UI
+      // scale out so the chat font scale stays absolute.
+      chatFontScale: settings.chatFontScale / settings.uiFontScale,
       collapseThinking: settings.autoCollapseThinking,
       collapseThinkingSteps: settings.collapseThinkingSteps,
       showThinkingCards: settings.showThinkingCards,

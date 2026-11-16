@@ -31,6 +31,7 @@ import 'image_recall_control.dart';
 import '../../mcp/widgets/mcp_server_avatar.dart';
 import '../../mcp/widgets/mcp_tool_connection_status.dart';
 import '../../mcp/utils/mcp_tool_groups.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Everything the model can call in this chat: device-local tools, connected
 /// MCP servers, and the workspace binding. Replaces the MCP-only sheet that
@@ -157,7 +158,7 @@ class _ChatToolsSheetState extends State<ChatToolsSheet> {
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 34,
+              height: scaledDim(context, 34),
               child: Center(
                 child: Text(
                   l10n.chatInputBarToolsTooltip,
@@ -273,7 +274,7 @@ class _ToolsGroup extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: _rowPadding),
               child: SizedBox(
-                height: 32,
+                height: scaledDim(context, 32),
                 child: Row(
                   children: [
                     SizedBox(
