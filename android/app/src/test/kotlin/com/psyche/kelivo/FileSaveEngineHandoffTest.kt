@@ -1,16 +1,22 @@
 package com.psyche.kelivo
 
 import android.app.Activity
+import android.app.Instrumentation
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ProviderInfo
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
+import android.os.Bundle
 import android.os.CancellationSignal
+import android.os.IBinder
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import com.crazecoder.openfile.OpenFilePlugin
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterJNI
 import io.flutter.embedding.engine.dart.PlatformMessageHandler
@@ -18,6 +24,7 @@ import io.flutter.embedding.engine.loader.FlutterLoader
 import io.flutter.plugin.common.FlutterException
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.StandardMethodCodec
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -25,6 +32,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
@@ -32,6 +40,7 @@ import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowContentResolver
+import org.robolectric.shadows.ShadowInstrumentation
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
@@ -77,6 +86,21 @@ class FileSaveEngineHandoffTest {
         @Implementation fun initialized() = true
         @Implementation fun findAppBundlePath() = "flutter_assets"
         @Implementation fun automaticallyRegisterPlugins() = false
+    }
+
+    @Implements(Instrumentation::class)
+    class FileViewerInstrumentation : ShadowInstrumentation() {
+        var caller: Context? = null
+            private set
+
+        @Implementation
+        override fun execStartActivity(
+            who: Context, contextThread: IBinder?, token: IBinder?, target: Activity?,
+            intent: Intent, requestCode: Int, options: Bundle?,
+        ): Instrumentation.ActivityResult? {
+            if (intent.action == Intent.ACTION_VIEW) caller = who
+            return super.execStartActivity(who, contextThread, token, target, intent, requestCode, options)
+        }
     }
 
     private class DestinationProvider(private val file: File) : DocumentsProvider() {
@@ -125,13 +149,13 @@ class FileSaveEngineHandoffTest {
         .also { activities += it }
         .create()
 
-    private fun queueFileCall(method: String, arguments: Any? = null): Int {
+    private fun queueFileCall(method: String, arguments: Any? = null, channel: String = "app.file_save"): Int {
         val id = nextReplyId++
         val message = StandardMethodCodec.INSTANCE.encodeMethodCall(
             MethodCall(method, arguments),
         )
         message.flip()
-        native.messages.handleMessageFromDart("app.file_save", message, id, 0)
+        native.messages.handleMessageFromDart(channel, message, id, 0)
         return id
     }
 
@@ -215,6 +239,43 @@ class FileSaveEngineHandoffTest {
         val replacement = createActivity()
         assertSame(engine, (replacement.get().application as KelivoApplication).engine)
         assertSavePickerWorks(replacement.get())
+    }
+
+    @Test
+    @Config(shadows = [FileViewerInstrumentation::class])
+    fun openWithLaunchesWorkspaceApkAfterActivityReopens() {
+        val application = RuntimeEnvironment.getApplication() as KelivoApplication
+        val launches = Shadow.extract<FileViewerInstrumentation>(InstrumentationRegistry.getInstrumentation())
+        // The test loader disables generated plugin registration.
+        application.engine.plugins.add(OpenFilePlugin())
+        val previous = createActivity()
+        val apk = File(application.dataDir, "app_flutter/sessions/test/sample.apk")
+        apk.parentFile!!.mkdirs()
+        apk.writeBytes(byteArrayOf(0x50, 0x4b))
+
+        fun assertOpensApk(activity: MainActivity) {
+            val call = queueFileCall("open_file", mapOf("file_path" to apk.path), channel = "open_file")
+            val reply = awaitReply(call)
+            val intent = shadowOf(application).nextStartedActivity
+            assertNotNull("open_file must launch the APK viewer, got $reply", intent)
+            assertSame("The current Activity must launch the APK viewer", activity, launches.caller)
+            assertEquals(0, JSONObject(reply as String).getInt("type"))
+            assertEquals(Intent.ACTION_VIEW, intent.action)
+            assertEquals("application/vnd.android.package-archive", intent.type)
+            assertEquals("content", intent.data?.scheme)
+            assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+        }
+
+        assertOpensApk(previous.get())
+        previous.destroy()
+        activities.remove(previous)
+        val reopened = createActivity()
+        assertOpensApk(reopened.get())
+
+        val replacement = createActivity()
+        reopened.destroy()
+        activities.remove(reopened)
+        assertOpensApk(replacement.get())
     }
 
     @Test fun queuedCompletionCannotSucceedAfterHandoffDiscardsTheDestination() {

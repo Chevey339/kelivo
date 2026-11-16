@@ -15,6 +15,7 @@ import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import com.psyche.kelivo.workspace.WorkspacePlugin
 import io.flutter.plugin.common.MethodChannel
+import com.crazecoder.openfile.OpenFilePlugin
 import com.dexterous.flutterlocalnotifications.FlutterLocalNotificationsPlugin
 import java.io.File
 import java.io.FileInputStream
@@ -80,6 +81,7 @@ class MainActivity : FlutterActivity() {
     private val fileSaveChannelName = "app.file_save"
     private val deviceStorageChannelName = "app.device_storage"
     private var processTextChannel: MethodChannel? = null
+    private lateinit var openFileChannel: MethodChannel
     private var fileSaveChannel: MethodChannel? = null
     private var deviceStorageChannel: MethodChannel? = null
     private var pendingProcessText: String? = null
@@ -117,7 +119,12 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-         super.configureFlutterEngine(flutterEngine)
+        super.configureFlutterEngine(flutterEngine)
+        // open_filex clears its handler on Activity detach but only registers
+        // it on engine creation. Rebind the retained plugin for each new host.
+        openFileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "open_file")
+        val openFilePlugin = flutterEngine.plugins.get(OpenFilePlugin::class.java) as? OpenFilePlugin
+        openFileChannel.setMethodCallHandler(openFilePlugin)
         kelivo.messageInput.attachActivity(this)
         selectionMenu = AndroidSelectionMenu(flutterEngine.dartExecutor.binaryMessenger) {
             findViewById<FlutterView>(FlutterActivity.FLUTTER_VIEW_ID)
@@ -200,6 +207,7 @@ class MainActivity : FlutterActivity() {
         OAuthHandler.detachActivity(this)
         processTextChannel?.setMethodCallHandler(null)
         processTextChannel = null
+        openFileChannel.setMethodCallHandler(null)
         fileSaveChannel?.setMethodCallHandler(null)
         fileSaveChannel = null
         deviceStorageChannel?.setMethodCallHandler(null)
