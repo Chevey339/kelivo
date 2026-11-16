@@ -54,8 +54,10 @@ void main() {
           settings: _SuggestionSettings(provider),
           providerKey: provider.id,
           modelId: modelId,
-          messages: [_suggestionMessage(0, '问题'), _suggestionMessage(1, '回答')],
-          truncateIndex: -1,
+          content: ChatSuggestionService.buildContent([
+            _suggestionMessage(0, '问题'),
+            _suggestionMessage(1, '回答'),
+          ]),
           locale: 'zh-CN',
         );
 

@@ -3,12 +3,12 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../utils/utf16_safe_cut.dart';
 import '../../database/chat_database_repository.dart';
 import '../../models/assistant.dart';
 import '../../models/reasoning_request.dart';
 import '../../models/chat_message.dart';
 import '../../models/memory_entry.dart';
-import '../../models/message_part.dart';
 import '../../providers/assistant_provider.dart';
 import '../../providers/memory_provider_v2.dart';
 import '../../providers/settings_provider.dart';
@@ -22,6 +22,39 @@ import 'memory_prompts.dart';
 import 'memory_repository.dart';
 import 'memory_smart_add.dart';
 import 'memory_trace.dart';
+
+class _MemoryPromptTail {
+  _MemoryPromptTail(this.lang);
+
+  static const maxMessageChars = 2000;
+  final MemoryPromptLang lang;
+  final List<String> _lines = [];
+  int _length = 0;
+
+  // Newest first. Once the suffix is longer than the prompt budget, earlier
+  // messages cannot change either the text or its leading truncation marker.
+  bool addText(String role, String text) {
+    final prefix = switch (role) {
+      'user' => lang == MemoryPromptLang.zh ? '用户：' : 'User: ',
+      'assistant' => lang == MemoryPromptLang.zh ? '助手：' : 'Assistant: ',
+      _ => null,
+    };
+    if (prefix == null || text.isEmpty) return true;
+    final line = text.length > maxMessageChars
+        ? '$prefix${text.substring(0, utf16SafeHeadEnd(text, maxMessageChars))}…'
+        : '$prefix$text';
+    _length += (_lines.isEmpty ? 0 : 2) + line.length;
+    _lines.add(line);
+    return _length <= 12000;
+  }
+
+  String build() {
+    final joined = _lines.reversed.join('\n\n');
+    return joined.length > 12000
+        ? '…${joined.substring(utf16SafeTailStart(joined, joined.length - 12000))}'
+        : joined;
+  }
+}
 
 /// Result of a background organize run (§12 / §13.6).
 class MemoryOrganizeResult {
@@ -149,74 +182,16 @@ class MemoryPipelineService {
   MemoryOrganizeStatus _lastStatus = const MemoryOrganizeStatus();
   MemoryOrganizeStatus get lastStatus => _lastStatus;
 
-  /// Collapse to the selected version chain (same rules as title generation).
-  static List<ChatMessage> collapseSelectedVersions(
-    List<ChatMessage> messages,
-    Map<String, int> selections,
-  ) {
-    final byGroup = <String, List<ChatMessage>>{};
-    final order = <String>[];
-    for (final message in messages) {
-      final groupId = message.groupId ?? message.id;
-      byGroup
-          .putIfAbsent(groupId, () {
-            order.add(groupId);
-            return <ChatMessage>[];
-          })
-          .add(message);
-    }
-    for (final list in byGroup.values) {
-      list.sort((a, b) => a.version.compareTo(b.version));
-    }
-    return [
-      for (final groupId in order)
-        () {
-          final versions = byGroup[groupId]!;
-          final sel = selections[groupId];
-          if (sel != null) {
-            for (final c in versions) {
-              if (c.version == sel) return c;
-            }
-          }
-          return versions.last;
-        }(),
-    ];
-  }
-
   /// Build `buildConversationText(window)` (§12.3).
   static String buildConversationText(
     List<ChatMessage> window,
     MemoryPromptLang lang,
   ) {
-    final userPrefix = lang == MemoryPromptLang.zh ? '用户：' : 'User: ';
-    final assistantPrefix = lang == MemoryPromptLang.zh ? '助手：' : 'Assistant: ';
-    final lines = <String>[];
-    for (final m in window) {
-      String prefix;
-      if (m.role == 'user') {
-        prefix = userPrefix;
-      } else if (m.role == 'assistant') {
-        prefix = assistantPrefix;
-      } else {
-        continue;
-      }
-      // TextPart bodies only — image/file attachments live as structured parts.
-      var text = m.parts
-          .whereType<TextPart>()
-          .map((part) => part.text)
-          .join()
-          .trim();
-      if (text.isEmpty) continue;
-      if (text.length > 2000) {
-        text = '${text.substring(0, 2000)}…';
-      }
-      lines.add('$prefix$text');
+    final tail = _MemoryPromptTail(lang);
+    for (final m in window.reversed) {
+      if (!tail.addText(m.role, m.content.trim())) break;
     }
-    var out = lines.join('\n\n');
-    if (out.length > 12000) {
-      out = '…${out.substring(out.length - 12000)}';
-    }
-    return out;
+    return tail.build();
   }
 
   /// Whether conversation summary generation is allowed (§12.10 / D-27).
@@ -448,11 +423,20 @@ class MemoryPipelineService {
       );
     }
 
-    // Skip while this conversation still has a streaming message (§12.1).
-    // Finalize already ran after the turn; a racing stream is rare — the next
-    // successful finalize will re-trigger, so do not re-enqueue here (avoids
-    // draining the same job forever).
-    if (chatService.getMessages(job.conversationId).any((m) => m.isStreaming)) {
+    final watermark = convo.lastMemoryExtractedOrder;
+    final tail = _MemoryPromptTail(settings.resolvedMemoryPromptLang);
+    final window = await chatRepository.readMemoryOrganizeWindow(
+      job.conversationId,
+      watermark: watermark,
+      minAssistantTurns: job.force
+          ? 0
+          : assistant.memoryOrganizeEveryNTurns.clamp(1, 20),
+      firstWindowLimit: firstWindowCap,
+      // The extra unit distinguishes an exact fit from a truncated message.
+      textPrefixLength: _MemoryPromptTail.maxMessageChars + 1,
+      addText: tail.addText,
+    );
+    if (window == null) {
       return const MemoryOrganizeResult(
         advanced: false,
         gate: null,
@@ -460,57 +444,25 @@ class MemoryPipelineService {
       );
     }
 
-    final all = await chatService.loadMessages(job.conversationId);
-    final selected = collapseSelectedVersions(
-      all,
-      chatService.getVersionSelections(job.conversationId),
-    );
-
-    final watermark = convo.lastMemoryExtractedOrder;
-    final withOrder = <({ChatMessage message, int order})>[];
-    for (final m in selected) {
-      if (m.isStreaming) continue;
-      final order = chatService.getMessageIndex(job.conversationId, m.id);
-      if (order < 0) continue;
-      if (order <= watermark) continue;
-      withOrder.add((message: m, order: order));
-    }
-    withOrder.sort((a, b) => a.order.compareTo(b.order));
-
-    final pendingTurns = withOrder
-        .where((e) => e.message.role == 'assistant')
-        .length;
-    if (!job.force &&
-        pendingTurns < assistant.memoryOrganizeEveryNTurns.clamp(1, 20)) {
-      return const MemoryOrganizeResult(
+    if (window.length == 0) {
+      return MemoryOrganizeResult(
         advanced: false,
         gate: null,
-        error: 'below_threshold',
+        error: job.force ? 'empty_window' : 'below_threshold',
       );
-    }
-    if (withOrder.isEmpty) {
-      return const MemoryOrganizeResult(
-        advanced: false,
-        gate: null,
-        error: 'empty_window',
-      );
-    }
-
-    var window = withOrder;
-    if (watermark == -1 && window.length > firstWindowCap) {
-      window = window.sublist(window.length - firstWindowCap);
     }
     final reasoning = settings.memoryModelThinkingEnabled
         ? (assistant.reasoning ?? ReasoningRequest.auto)
         : ReasoningRequest.off;
 
-    return processWindow(
+    return _processWindowBody(
       conversationId: job.conversationId,
       assistant: assistant,
       settings: settings,
       watermark: watermark,
       window: window,
-      trace: handle,
+      conversationText: tail.build(),
+      handle: handle,
       llmCall: (prompt) => _generateText(
         conversationId: job.conversationId,
         config: cfg,
@@ -566,7 +518,14 @@ class MemoryPipelineService {
         assistant: assistant,
         settings: settings,
         watermark: watermark,
-        window: window,
+        window: (
+          startOrder: window.isEmpty ? -1 : window.first.order,
+          endOrder: window.isEmpty ? -1 : window.last.order,
+          length: window.length,
+        ),
+        conversationText: buildConversationText([
+          for (final row in window) row.message,
+        ], settings.resolvedMemoryPromptLang),
         llmCall: llmCall,
         handle: handle,
       );
@@ -589,26 +548,24 @@ class MemoryPipelineService {
     required Assistant assistant,
     required SettingsProvider settings,
     required int watermark,
-    required List<({ChatMessage message, int order})> window,
+    required ({int startOrder, int endOrder, int length}) window,
+    required String conversationText,
     required Future<String> Function(String prompt) llmCall,
     required MemoryTraceHandle? handle,
   }) async {
-    if (window.isEmpty) {
+    if (window.length == 0) {
       return const MemoryOrganizeResult(
         advanced: false,
         gate: null,
         error: 'empty_window',
       );
     }
-    final windowEnd = window.last.order;
+    final windowEnd = window.endOrder;
     final failureKey = '$conversationId|$watermark|$windowEnd';
     final lang = settings.resolvedMemoryPromptLang;
-    final conversationText = buildConversationText([
-      for (final e in window) e.message,
-    ], lang);
     handle?.setWindow(
       watermark: watermark,
-      startOrder: window.first.order,
+      startOrder: window.startOrder,
       endOrder: windowEnd,
       size: window.length,
     );

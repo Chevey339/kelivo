@@ -632,6 +632,8 @@ void main() {
     late ChatActions actions;
     const channel = MethodChannel('test.chat_actions.background');
     final notifications = <String?>[];
+    final notifying = Completer<void>();
+    final releaseNotification = Completer<void>();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           channel,
@@ -643,6 +645,8 @@ void main() {
       notificationSender: ({required conversationId, title, body}) async {
         expect(service.terminalStates.last, GenerationRunState.failed);
         notifications.add(body);
+        notifying.complete();
+        await releaseNotification.future;
       },
     );
     addTearDown(background.dispose);
@@ -711,6 +715,7 @@ void main() {
       ),
     );
     state.fullContentRaw = 'partial';
+    actions.debugTrackActiveMessage(state.ctx.assistantMessage, state: state);
 
     await expectLater(
       actions.debugFinishStreaming(state),
@@ -722,7 +727,22 @@ void main() {
     expect(background.activeTaskIds, {'assistant-1'});
     expect(notifications, isEmpty);
 
-    await actions.debugHandleStreamError(StateError('persist failed'), state);
+    final finishing = actions.debugHandleStreamError(
+      StateError('persist failed'),
+      state,
+    );
+    await notifying.future;
+    try {
+      expect(
+        actions.activeStreamingMessageId(state.conversationId),
+        state.messageId,
+      );
+      expect(streamErrors, isEmpty);
+    } finally {
+      releaseNotification.complete();
+      await finishing;
+    }
+    expect(actions.activeStreamingMessageId(state.conversationId), isNull);
 
     expect(state.terminalPersisted, isTrue);
     expect(service.terminalStates, [

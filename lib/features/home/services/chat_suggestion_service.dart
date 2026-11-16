@@ -4,12 +4,15 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 
 class ChatSuggestionService {
   static const int maxSuggestionCount = 3;
   static const int maxSuggestionChars = 300;
+  static const int _maxMessages = 8;
+  static const int _maxChars = 6000;
 
   const ChatSuggestionService();
 
@@ -76,34 +79,76 @@ The suggestions array must contain 0 to 3 distinct, concise strings, each at mos
   static String buildContent(
     List<ChatMessage> messages, {
     int truncateIndex = -1,
-    int maxMessages = 8,
-    int maxChars = 6000,
+    int maxMessages = _maxMessages,
+    int maxChars = _maxChars,
   }) {
     if (maxMessages <= 0 || maxChars <= 0) return '';
-    final effectiveMessages = truncateIndex >= 0
-        ? messages.skip(truncateIndex)
-        : messages;
-    final dialogue = effectiveMessages
-        .where((m) => m.role == 'user' || m.role == 'assistant')
-        .toList();
-    // Never fall back to an older answer after a new user turn, empty reply,
-    // or unfinished generation.
-    if (dialogue.isEmpty ||
-        dialogue.last.role != 'assistant' ||
-        dialogue.last.isStreaming) {
-      return '';
+    final recent = <Map<String, String>>[];
+    _collectRecent(
+      messages.reversed
+          .take(messages.length - truncateIndex.clamp(0, messages.length))
+          .map((m) => m.textProjection),
+      recent,
+      maxMessages,
+    );
+    return _encodeContent(recent, maxChars);
+  }
+
+  static Future<({String messageId, String content})?> loadSource(
+    ChatService chat,
+    String conversationId, {
+    required int truncateIndex,
+  }) async {
+    while (true) {
+      final recent = <Map<String, String>>[];
+      String? sourceId;
+      final revision = chat.contextRevision(conversationId);
+      await chat.readSelectedMessageTextTail(
+        conversationId,
+        start: truncateIndex,
+        visit: (page) {
+          if (page.isEmpty) return false;
+          sourceId ??= page.first.id;
+          return !_collectRecent(page, recent, _maxMessages);
+        },
+      );
+      if (chat.contextRevision(conversationId) != revision) continue;
+      if (sourceId == null || recent.isEmpty) return null;
+      return (messageId: sourceId!, content: _encodeContent(recent, _maxChars));
     }
-    final recent = dialogue.where((m) => !m.isStreaming).map((m) {
-      final text = m.role == 'assistant'
-          ? ThinkingTagParser.parseWithRanges(m.content).visibleContent
-          : m.content;
-      return {'role': m.role, 'content': text.trim()};
-    }).toList();
-    if (recent.last['content']!.isEmpty) return '';
-    recent.removeWhere((m) => m['content']!.isEmpty);
-    final selected = recent.length > maxMessages
-        ? recent.sublist(recent.length - maxMessages)
-        : recent;
+  }
+
+  // Walk from the newest message. An empty, unfinished, or superseded final
+  // answer suppresses suggestions even when an older usable answer exists.
+  static bool _collectRecent(
+    Iterable<ChatMessageText> newestFirst,
+    List<Map<String, String>> recent,
+    int limit,
+  ) {
+    for (final m in newestFirst) {
+      if (m.role != 'user' && m.role != 'assistant') continue;
+      if (recent.isEmpty && (m.isStreaming || m.role != 'assistant')) {
+        return true;
+      }
+      if (m.isStreaming) continue;
+      final text =
+          (m.role == 'assistant'
+                  ? ThinkingTagParser.parseWithRanges(m.text).visibleContent
+                  : m.text)
+              .trim();
+      if (text.isEmpty) {
+        if (recent.isEmpty) return true;
+        continue;
+      }
+      recent.add({'role': m.role, 'content': text});
+      if (recent.length == limit) return true;
+    }
+    return false;
+  }
+
+  static String _encodeContent(List<Map<String, String>> recent, int maxChars) {
+    if (recent.isEmpty) return '';
+    final selected = recent.reversed.toList(growable: false);
     // Allocate short messages first so their unused share remains available
     // to longer turns. Messages that fit the total budget stay intact.
     if (maxChars < selected.length) return '';
@@ -142,12 +187,10 @@ The suggestions array must contain 0 to 3 distinct, concise strings, each at mos
     required SettingsProvider settings,
     required String providerKey,
     required String modelId,
-    required List<ChatMessage> messages,
-    required int truncateIndex,
+    required String content,
     required String locale,
     ReasoningRequest reasoning = ReasoningRequest.auto,
   }) async {
-    final content = buildContent(messages, truncateIndex: truncateIndex);
     if (content.isEmpty) return const <String>[];
     // Substitute once so literal placeholders in conversation text stay data.
     final prompt = settings.suggestionPrompt.replaceAllMapped(

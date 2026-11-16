@@ -8,6 +8,7 @@ import 'package:sqlite3/common.dart' show AllowedArgumentCount, CommonDatabase;
 
 import '../../features/intelligent_ui/catalog/ui_budgets.dart';
 import '../../utils/app_directories.dart';
+import '../../utils/utf16_safe_cut.dart';
 import 'schema_versions.dart';
 
 part 'app_database.g.dart';
@@ -908,6 +909,21 @@ class AppDatabase extends _$AppDatabase {
           deterministic: true,
           directOnly: true,
           function: (args) => (args.single as String).length,
+        );
+        // Background prompts consume a trimmed prefix. Clip on this worker
+        // before transferring text and keep the last Unicode scalar intact.
+        database.createFunction(
+          functionName: 'kelivo_trimmed_prefix',
+          argumentCount: const AllowedArgumentCount(2),
+          deterministic: true,
+          directOnly: true,
+          function: (args) {
+            final text = (args[0] as String? ?? '').trim();
+            final limit = args[1] as int;
+            return text.length <= limit
+                ? text
+                : text.substring(0, utf16SafeTailStart(text, limit));
+          },
         );
         database.createFunction(
           functionName: 'kelivo_timestamp_micros',

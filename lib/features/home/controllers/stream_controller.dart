@@ -1713,8 +1713,7 @@ class StreamingState {
 
   /// Freeze before UI draining, persistence or cancellation cleanup.
   void finishRequestTiming() => requestFinishedAt ??= DateTime.now();
-  int? generationStateRevision;
-  bool generationStreamingStarted = false;
+  bool stopRequested = false;
   final Map<String, String> pendingToolNames = <String, String>{};
   List<int> contentSplitOffsets = <int>[];
   List<int> reasoningCountAtSplit = <int>[];

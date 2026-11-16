@@ -234,6 +234,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test(
+    'summary reads only new user revisions up to the original character budget',
+    () async {
+      final convo = await chatService.createConversation(
+        title: 'incremental summary',
+      );
+      for (final (role, content) in [
+        ('user', 'already summarized'),
+        ('assistant', 'previous answer'),
+        ('user', '   '),
+        ('user', '  first  '),
+        ('assistant', 'assistant text'),
+        ('user', 'x' * 2100),
+        ('user', 'after snapshot'),
+      ]) {
+        await chatService.addMessage(
+          conversationId: convo.id,
+          role: role,
+          content: content,
+        );
+      }
+      expect(
+        await chatService.generateSummarySource(convo.id, start: 2, end: 6),
+        'first\n\n${'x' * 1993}',
+      );
+      expect(
+        await chatService.generateSummarySource(convo.id, start: 2, end: 5),
+        'first',
+      );
+    },
+  );
+
   testWidgets(
     'legacy mode generates summary when only allowPastConversationRecall is on',
     (tester) async {

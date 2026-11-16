@@ -1504,6 +1504,52 @@ class ChatService extends ChangeNotifier {
 
   static const int _titleSourceMaxChars = 3000;
 
+  Future<String> generateSummarySource(
+    String conversationId, {
+    required int start,
+    required int end,
+  }) {
+    if (!_initialized ||
+        isTemporaryConversation(conversationId) ||
+        end <= start) {
+      return Future.value('');
+    }
+    return _repo.getConversationSummarySource(
+      conversationId,
+      start: start,
+      end: end,
+    );
+  }
+
+  /// Selected history in reverse chronological order for background readers.
+  /// Read older pages only while the caller still needs more messages.
+  Future<void> readSelectedMessageTextTail(
+    String id, {
+    required int start,
+    required bool Function(Iterable<ChatMessageText>) visit,
+  }) async {
+    if (!_initialized) return;
+    if (_temporaryConversationIds.contains(id) ||
+        _draftConversations.containsKey(id)) {
+      final selected = _collapseTitleVersions(
+        _messagesCache[id] ?? [],
+        getVersionSelections(id),
+      );
+      visit(
+        selected.reversed
+            .take(selected.length - start.clamp(0, selected.length))
+            .map((m) => m.textProjection),
+      );
+      return;
+    }
+    await _repo.readSelectedMessageTextTail(
+      id,
+      start: start,
+      pageSize: defaultHistoryPageSize,
+      visit: visit,
+    );
+  }
+
   /// Builds the source text for LLM title generation.
   ///
   /// Collects the conversation tail (most recent ~3000 content characters,
@@ -2595,7 +2641,13 @@ class ChatService extends ChangeNotifier {
 
   Future<void> _collectDueAssetsAfterGeneration() async {
     if (!_initialized || _assetCleanupClosing) return;
-    if (await _repo.hasDueAssetGc()) await runAssetMaintenance();
+    // Maintenance runs after the reply commits. A cleanup failure must never
+    // make the generation state machine retry that already committed write.
+    try {
+      if (await _repo.hasDueAssetGc()) await runAssetMaintenance();
+    } catch (error) {
+      debugPrint('Deferred asset cleanup failed: $error');
+    }
   }
 
   void _scheduleDueAssetMaintenance() {
@@ -2605,15 +2657,11 @@ class ChatService extends ChangeNotifier {
       return;
     }
     late final Future<void> pending;
-    pending = Future<void>(_collectDueAssetsAfterGeneration)
-        .catchError((Object error) {
-          debugPrint('Deferred asset cleanup failed: $error');
-        })
-        .whenComplete(() {
-          if (identical(_deferredAssetMaintenance, pending)) {
-            _deferredAssetMaintenance = null;
-          }
-        });
+    pending = Future<void>(_collectDueAssetsAfterGeneration).whenComplete(() {
+      if (identical(_deferredAssetMaintenance, pending)) {
+        _deferredAssetMaintenance = null;
+      }
+    });
     _deferredAssetMaintenance = pending;
   }
 
@@ -3722,11 +3770,15 @@ class ChatService extends ChangeNotifier {
     return _cachedTemporaryMessage(messageId) != null;
   }
 
-  void _replaceCachedMessage(ChatMessage updatedMessage) {
+  bool _replaceCachedMessage(
+    ChatMessage updatedMessage, {
+    bool skipFinished = false,
+  }) {
     final messages = _messagesCache[updatedMessage.conversationId];
-    if (messages == null) return;
+    if (messages == null) return false;
     final index = messages.indexWhere((m) => m.id == updatedMessage.id);
     if (index >= 0) {
+      if (skipFinished && !messages[index].isStreaming) return false;
       if (updatedMessage.storageOrder == null) {
         updatedMessage.hydrateStorageOrder(messages[index].storageOrder);
       }
@@ -3739,6 +3791,7 @@ class ChatService extends ChangeNotifier {
       messages[index] = updatedMessage;
     }
     _touchMessageCache(updatedMessage.conversationId);
+    return index >= 0;
   }
 
   Future<void> updateMessage(
@@ -3945,22 +3998,25 @@ class ChatService extends ChangeNotifier {
       return;
     }
     if (isTemporaryConversation(message.conversationId)) {
+      if (!_replaceCachedMessage(message, skipFinished: message.isStreaming)) {
+        return;
+      }
       if (_compressionHistoryCache?.id == message.conversationId) {
         _compressionHistoryCache = null;
       }
-      _replaceCachedMessage(message);
       _temporaryToolEvents[message.id] = List<Map<String, dynamic>>.of(
         toolEvents,
       );
       return;
     }
 
-    await _repo.updateStreamingCheckpoint(
+    final applied = await _repo.updateStreamingCheckpoint(
       message,
       toolEvents,
       generationRunId: generationRunId,
       checkpointSeq: checkpointSeq,
     );
+    if (!applied) return;
     // Reopening during a stream should read its latest checkpoint. The open
     // dialog keeps a stable snapshot until finalization advances the revision.
     if (_compressionHistoryCache?.id == message.conversationId) {

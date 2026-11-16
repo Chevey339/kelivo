@@ -1959,39 +1959,13 @@ class HomeViewModel extends ChangeNotifier {
 
     final cfg = settings.getProviderConfig(provKey);
 
-    // Get all messages and filter user messages
-    final msgs = await _chatService.loadMessages(convo.id);
-    final allUserMsgs = msgs
-        .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
-        .toList();
-
-    if (allUserMsgs.isEmpty) return;
-
-    // Get previous summary (empty string if first time)
     final previousSummary = (convo.summary ?? '').trim();
-
-    // Get only the recent user messages since last summarization
-    // Calculate how many user messages were in the last summarized state
-    final lastSummarizedMsgCount = (convo.lastSummarizedMessageCount < 0)
-        ? 0
-        : convo.lastSummarizedMessageCount;
-    final msgsAtLastSummary = msgs.take(lastSummarizedMsgCount).toList();
-    final userMsgsAtLastSummary = msgsAtLastSummary
-        .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
-        .length;
-
-    // Get new user messages since last summary
-    final newUserMsgs = allUserMsgs.skip(userMsgsAtLastSummary).toList();
-    if (newUserMsgs.isEmpty) return;
-
-    final recentMessages = newUserMsgs
-        .map((m) => m.content.trim())
-        .join('\n\n');
-
-    // Truncate if too long
-    final content = recentMessages.length > 2000
-        ? recentMessages.substring(0, 2000)
-        : recentMessages;
+    final content = await _chatService.generateSummarySource(
+      convo.id,
+      start: convo.lastSummarizedMessageCount.clamp(0, msgCount),
+      end: msgCount,
+    );
+    if (content.isEmpty) return;
 
     final prompt = settings.summaryPrompt
         .replaceAll('{previous_summary}', previousSummary)
@@ -2131,25 +2105,16 @@ class HomeViewModel extends ChangeNotifier {
         _chatService.getConversation(conversationId) != null &&
         _chatService.getContextStartIndex(conversationId) == truncateIndex;
 
-    Future<List<ChatMessage>> loadSelectedMessages() async {
-      final loaded = await _chatService.loadMessages(conversationId);
-      // A background conversation must use its own selected versions, even
-      // when a different conversation is now displayed by the controller.
-      return _chatController.collapseVersions(
-        loaded,
-        selections: _chatService.getVersionSelections(conversationId),
-      );
-    }
+    Future<({String messageId, String content})?> loadSource() =>
+        ChatSuggestionService.loadSource(
+          _chatService,
+          conversationId,
+          truncateIndex: truncateIndex,
+        );
 
     try {
-      final msgs = await loadSelectedMessages();
-      if (!isCurrent()) return;
-      final content = ChatSuggestionService.buildContent(
-        msgs,
-        truncateIndex: truncateIndex,
-      );
-      if (content.isEmpty) return;
-      final sourceMessageId = msgs.last.id;
+      final source = await loadSource();
+      if (!isCurrent() || source == null) return;
       await _chatService.clearConversationSuggestions(conversationId);
       if (!isCurrent()) return;
       final suggestions = await _suggestionService.generate(
@@ -2157,25 +2122,15 @@ class HomeViewModel extends ChangeNotifier {
         settings: settings,
         providerKey: provKey,
         modelId: mdlId,
-        messages: msgs,
-        truncateIndex: truncateIndex,
+        content: source.content,
         locale: locale,
         reasoning: reasoning,
       );
       // An empty array is a valid decision to offer no suggestions.
       if (suggestions.isEmpty || !isCurrent()) return;
 
-      final latestMessages = await loadSelectedMessages();
-      if (!isCurrent() ||
-          latestMessages.isEmpty ||
-          latestMessages.last.id != sourceMessageId ||
-          ChatSuggestionService.buildContent(
-                latestMessages,
-                truncateIndex: truncateIndex,
-              ) !=
-              content) {
-        return;
-      }
+      final latest = await loadSource();
+      if (!isCurrent() || latest != source) return;
 
       await _chatService.updateConversationSuggestions(
         conversationId,
