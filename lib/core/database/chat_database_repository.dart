@@ -787,9 +787,13 @@ class ChatDatabaseRepository {
           'WHERE is_streaming != 0;',
           [DateTime.now().toUtc().microsecondsSinceEpoch],
         );
-        database.execute('DELETE FROM chat_storage_meta_rows WHERE key = ?;', [
-          ChatStorageMetaKeys.activeStreamingIds,
-        ]);
+        database.execute(
+          'DELETE FROM chat_storage_meta_rows WHERE key IN (?, ?);',
+          [
+            ChatStorageMetaKeys.activeStreamingIds,
+            GenUiDerivedSchema.searchBackfillKey,
+          ],
+        );
         database.execute(
           'INSERT OR REPLACE INTO chat_storage_meta_rows (key, value) '
           'VALUES (?, ?);',
@@ -3670,8 +3674,8 @@ ORDER BY m.message_order DESC LIMIT 20
     if (cleanTokens.isEmpty || limit <= 0) return const [];
     await _ensureMessageSearchFts();
     await _genUiSearch.ensure();
-    return _db.transaction(() async {
-      final useSubstringFallback = cleanTokens.any(_requiresCjkFallback);
+    final useSubstringFallback = cleanTokens.any(_requiresCjkFallback);
+    Future<List<ConversationSearchMatch>> read() => _db.transaction(() async {
       String escapeLike(String value) => value
           .replaceAll(r'\', r'\\')
           .replaceAll('%', r'\%')
@@ -3937,6 +3941,9 @@ ORDER BY m.message_order DESC LIMIT 20
       }
       return matches;
     });
+    return useSubstringFallback
+        ? read()
+        : _genUiSearch.retryOnFtsCorruption(read);
   }
 
   Future<Map<String, UiSearchText>> _searchTextForCandidates(
@@ -8083,14 +8090,15 @@ ORDER BY m.message_order DESC LIMIT 20
       }
       // Clearing is_streaming fires message_search_fts_finalize, which indexes
       // the checkpointed text parts left by the abandoned stream.
-      await (_db.update(
-        _db.messageRows,
-      )..where((row) => row.isStreaming.equals(true))).write(
-        MessageRowsCompanion(
-          isStreaming: const Value(false),
-          updatedAt: Value(DateTime.now().toUtc()),
-        ),
+      final recovered = await _db.customWriteReturning(
+        'UPDATE message_rows SET is_streaming = 0, updated_at = ? '
+        'WHERE is_streaming = 1 RETURNING id',
+        variables: [Variable<int>(now.microsecondsSinceEpoch)],
+        updates: {_db.messageRows},
+        updateKind: UpdateKind.update,
       );
+      // An in-place tool continuation can retain its original completed run.
+      await _sealGenUiSearch(recovered.map((row) => row.read<String>('id')));
       await clearActiveStreamingIds();
       return runs.length;
     });

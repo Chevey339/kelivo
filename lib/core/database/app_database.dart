@@ -10,6 +10,7 @@ import '../../features/intelligent_ui/catalog/ui_budgets.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/utf16_safe_cut.dart';
 import 'schema_versions.dart';
+import 'gen_ui_derived_schema.dart';
 
 part 'app_database.g.dart';
 
@@ -1064,6 +1065,10 @@ FROM probe;
       // v4 was never published: migrate directly between the frozen snapshots.
       from3To5: (m, schema) async {
         await m.createTable(schema.genUiSurfaceStateRows);
+        await customStatement(
+          'DELETE FROM chat_storage_meta_rows WHERE key = ?',
+          [GenUiDerivedSchema.searchBackfillKey],
+        );
         // The composite PK creates the ordinary owner index with the table.
         await m.create(schema.genUiSurfaceSearch);
         await m.create(schema.genUiStateSearchInsert);

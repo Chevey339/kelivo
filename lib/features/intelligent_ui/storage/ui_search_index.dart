@@ -1,9 +1,15 @@
+import 'dart:isolate';
+
 import 'package:drift/drift.dart';
+import 'package:drift/isolate.dart' show DriftRemoteException;
+import 'package:sqlite3/common.dart' show SqliteException, SqlError;
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/gen_ui_derived_schema.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import '../text/ui_search_text.dart';
+
+enum _IndexReadiness { unchecked, needsRebuild, ready }
 
 /// Derived text lives on the existing state row. Rebuilding touches only its
 /// search_text, preserving inputs, view, state_version and updated_at verbatim.
@@ -16,12 +22,69 @@ final class UiSearchIndex {
   final AppDatabase db;
   final Future<List<ChatMessage>> Function(List<String>) readMessages;
   final Future<void> Function(Future<void> Function()) transaction;
-  Future<void>? _ready;
-  Future<void> ensure() =>
-      _ready ??= rebuild().catchError((Object error, StackTrace stack) {
-        _ready = null;
-        Error.throwWithStackTrace(error, stack);
-      });
+  _IndexReadiness _state = _IndexReadiness.unchecked;
+  Future<void>? _preparing;
+
+  Future<void> ensure() => _state == _IndexReadiness.ready
+      ? Future<void>.value()
+      : _preparing ??= _prepare();
+
+  Future<void> rebuild() {
+    _state = _IndexReadiness.needsRebuild;
+    return ensure();
+  }
+
+  Future<bool> _canReuse() async {
+    final receipt =
+        await (db.select(
+              db.chatStorageMetaRows,
+            )..where((r) => r.key.equals(GenUiDerivedSchema.searchBackfillKey)))
+            .getSingleOrNull();
+    return receipt?.value == '1' && await GenUiDerivedSchema.hasSearchIndex(db);
+  }
+
+  Future<void> _prepare() async {
+    try {
+      final reusable = _state == _IndexReadiness.unchecked && await _canReuse();
+      // An explicit repair can also arrive while the receipt is being checked.
+      if (!reusable || _state == _IndexReadiness.needsRebuild) {
+        _state = _IndexReadiness.needsRebuild;
+        await _rebuild();
+      }
+      _state = _IndexReadiness.ready;
+    } finally {
+      _preparing = null;
+    }
+  }
+
+  static bool _isSqliteCorruption(Object error) {
+    final cause = error is DriftRemoteException ? error.remoteCause : error;
+    return cause is SqliteException &&
+        cause.resultCode == SqlError.SQLITE_CORRUPT;
+  }
+
+  Future<T> retryOnFtsCorruption<T>(Future<T> Function() query) async {
+    try {
+      return await query();
+    } catch (error) {
+      if (!_isSqliteCorruption(error)) rethrow;
+    }
+    // MATCH also reads the ordinary message FTS. Only recreate the GenUI
+    // index if its own integrity check fails, using the durable state rows.
+    await transaction(() async {
+      const fts = GenUiDerivedSchema.searchTable;
+      try {
+        await db.customStatement(
+          "INSERT INTO $fts($fts) VALUES('integrity-check')",
+        );
+      } catch (error) {
+        if (!_isSqliteCorruption(error)) rethrow;
+        await GenUiDerivedSchema.resetSearch(db);
+      }
+    });
+    // A concurrent query may have repaired the index before our check.
+    return query();
+  }
 
   static const _candidate = """
     (INSTR((SELECT GROUP_CONCAT(payload, '') FROM (
@@ -48,9 +111,14 @@ final class UiSearchIndex {
     }
   }
 
-  Future<void> rebuild() async {
-    // Recreate disposable FTS before any UPDATE trigger can touch a corrupt or
-    // absent index. All DDL remains the v5 definition, on GenUI's own table.
+  Future<void> _rebuild() async {
+    // Commit invalidation first so rolling back a failed FTS reset cannot
+    // restore the old receipt on the next launch.
+    await transaction(() async {
+      await (db.delete(
+        db.chatStorageMetaRows,
+      )..where((r) => r.key.equals(GenUiDerivedSchema.searchBackfillKey))).go();
+    });
     await transaction(() => GenUiDerivedSchema.resetSearch(db));
     String? after;
     while (true) {
@@ -63,34 +131,72 @@ final class UiSearchIndex {
             variables: [Variable<String>(after ?? '')],
           )
           .get();
-      if (rows.isEmpty) return;
+      if (rows.isEmpty) break;
       final ids = rows.map((r) => r.read<String>('id')).toList();
       await transaction(() async {
         // Read inside the same coordinated write, never resurrect a deleted
         // revision or overwrite a concurrent source edit with an earlier read.
-        for (final message in await readMessages(ids)) {
-          await seal(message);
+        final messages = await readMessages(ids);
+        final projections = await _projectBatch(messages);
+        final stored = await (db.select(
+          db.genUiSurfaceStateRows,
+        )..where((r) => r.revisionId.isIn(ids))).get();
+        final byRevision = <String, List<GenUiSurfaceStateRow>>{};
+        for (final row in stored) {
+          (byRevision[row.revisionId] ??= []).add(row);
+        }
+        for (final message in messages) {
+          await _store(
+            message,
+            projections[message.id]!,
+            byRevision[message.id] ?? const [],
+          );
         }
       });
       after = ids.last;
       // Bound both hydration and each transaction; let pending input saves run.
       await Future<void>.delayed(Duration.zero);
     }
+    // Source edits and generation completion maintain the projection from here.
+    // A failed or interrupted backfill leaves the database eligible for retry.
+    await db
+        .into(db.chatStorageMetaRows)
+        .insertOnConflictUpdate(
+          ChatStorageMetaRowsCompanion.insert(
+            key: GenUiDerivedSchema.searchBackfillKey,
+            value: '1',
+          ),
+        );
   }
+
+  static Map<String, UiSearchSurfaceText> _projection(ChatMessage message) =>
+      !message.isStreaming &&
+          message.generationState == GenerationRunState.completed
+      ? initialUiSearchText(message)
+      : const {};
+
+  static Future<Map<String, Map<String, UiSearchSurfaceText>>> _projectBatch(
+    List<ChatMessage> messages,
+  ) => Isolate.run(
+    () => {for (final message in messages) message.id: _projection(message)},
+  );
 
   /// Caller holds the repository's coordinated transaction and supplies actual
   /// persisted source plus generation evidence, not a widget's stale message.
   Future<void> seal(ChatMessage message) async {
-    final complete =
-        !message.isStreaming &&
-        message.generationState == GenerationRunState.completed;
-    final text = complete
-        ? initialUiSearchText(message)
-        : const <String, UiSearchSurfaceText>{};
     final table = db.genUiSurfaceStateRows;
     final rows = await (db.select(
       table,
     )..where((s) => s.revisionId.equals(message.id))).get();
+    await _store(message, _projection(message), rows);
+  }
+
+  Future<void> _store(
+    ChatMessage message,
+    Map<String, UiSearchSurfaceText> text,
+    List<GenUiSurfaceStateRow> rows,
+  ) async {
+    final table = db.genUiSurfaceStateRows;
     for (final row in rows) {
       final next = text[row.surfaceKey];
       // A source edit invalidates the entire row; ordinary rebuilds do not.

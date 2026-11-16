@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import "../../../support/business_test_harness.dart";
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -117,6 +118,24 @@ class _TestChatService extends ChatService {
       fromStart: fromStart,
       limit: limit,
     );
+  }
+}
+
+class _DelayedSearchService extends _TestChatService {
+  final queries = <String, Completer<List<ConversationSearchMatch>>>{};
+
+  @override
+  Future<List<ConversationSearchMatch>> searchConversationMatches({
+    required List<String> tokens,
+    int limit = 200,
+    bool includeAllRevisions = false,
+    String? conversationId,
+    String? excludeConversationId,
+    String? assistantId,
+  }) {
+    final pending = Completer<List<ConversationSearchMatch>>();
+    queries[tokens.single] = pending;
+    return pending.future;
   }
 }
 
@@ -1297,6 +1316,40 @@ void main() {
       expect(find.byType(SideDrawer.debugChatTileType), findsNothing);
     });
   });
+
+  testWidgets('editing a pending sidebar search dismisses its spinner', (
+    tester,
+  ) async {
+    final service = _DelayedSearchService();
+    services.add(service);
+    await tester.runAsync(() => service.init());
+    await pumpDrawer(
+      tester,
+      service,
+      desktopTopicsOnly: false,
+      globalSearchMode: true,
+    );
+    final field = find.byType(TextField);
+    final spinner = find.byType(CircularProgressIndicator);
+    await tester.enterText(field, 'first');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    expect(spinner, findsOneWidget);
+
+    await tester.enterText(field, 'second');
+    await tester.pump();
+    expect(spinner, findsNothing);
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    service.queries['first']!.complete([]);
+    await tester.pump();
+    expect(spinner, findsOneWidget);
+    service.queries['second']!.complete([]);
+    await tester.pump();
+    expect(spinner, findsNothing);
+    final l10n = AppLocalizations.of(tester.element(field))!;
+    expect(find.text(l10n.sideDrawerGlobalSearchNoResults), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets(
     'global search mode uses its independent results path without errors',

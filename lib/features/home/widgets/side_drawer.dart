@@ -220,19 +220,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     _searchController.addListener(() {
       final next = _searchController.text;
       if (_query == next) return;
-      setState(() => _query = next);
+      if (widget.globalSearchMode && (!_isDesktop || _globalSearchLoading)) {
+        _clearGlobalSearchState();
+      } else {
+        setState(() => _query = next);
+      }
       if (widget.globalSearchMode) {
         widget.onGlobalSearchQueryChanged?.call(next);
-        if (!_isDesktop) {
-          if (next.trim().isEmpty) {
-            _clearGlobalSearchState(clearText: false);
-          } else {
-            setState(() {
-              _globalSearchResults = const [];
-              _globalSearchHasRun = false;
-            });
-          }
-        }
       }
     });
     // Sync initial globalSearchQuery text into the controller when entering global search
