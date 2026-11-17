@@ -6,6 +6,7 @@ import 'search_api_key_rotator.dart';
 // Import statements for service implementations
 import 'providers/bing_search_service.dart';
 import 'providers/tavily_search_service.dart';
+import 'providers/specstream_search_service.dart';
 import 'providers/exa_search_service.dart';
 import 'providers/exa_mcp_search_service.dart';
 import 'providers/zhipu_search_service.dart';
@@ -73,6 +74,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return BingSearchService(locale: locale) as SearchService;
       case TavilyOptions _:
         return TavilySearchService() as SearchService;
+      case SpecStreamOptions _:
+        return SpecStreamSearchService() as SearchService;
       case ExaOptions _:
         return ExaSearchService() as SearchService;
       case ExaMcpOptions _:
@@ -238,6 +241,8 @@ abstract class SearchServiceOptions {
         return BingLocalOptions.fromJson(json);
       case 'tavily':
         return TavilyOptions.fromJson(json);
+      case 'specstream':
+        return SpecStreamOptions.fromJson(json);
       case 'exa':
         return ExaOptions.fromJson(json);
       case 'exa_mcp':
@@ -340,6 +345,41 @@ class TavilyOptions extends SearchServiceOptions {
   };
 
   factory TavilyOptions.fromJson(Map<String, dynamic> json) => TavilyOptions(
+    id: json['id'],
+    apiKey: json['apiKey'],
+    url: json['url'] ?? '',
+    extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+  );
+}
+
+class SpecStreamOptions extends SearchServiceOptions {
+  static const String defaultUrl = 'https://api.specstream.ai/v1/web-search';
+
+  final String apiKey;
+  final String url;
+
+  SpecStreamOptions({
+    required super.id,
+    required this.apiKey,
+    this.url = '',
+    super.extraApiKeys,
+  });
+
+  String get resolvedUrl {
+    final trimmed = url.trim();
+    return trimmed.isEmpty ? defaultUrl : trimmed;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'specstream',
+    'id': id,
+    'apiKey': apiKey,
+    'url': url.trim(),
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory SpecStreamOptions.fromJson(Map<String, dynamic> json) => SpecStreamOptions(
     id: json['id'],
     apiKey: json['apiKey'],
     url: json['url'] ?? '',
