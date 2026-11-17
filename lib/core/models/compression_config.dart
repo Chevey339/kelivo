@@ -27,6 +27,7 @@ class CompressionConfig {
     this.requestTimeoutMinutes,
     this.planningWindow,
     this.includeReference = true,
+    this.includeInstructionInjections = true,
     this.replaceConsumedTools = false,
     this.summaryInWorldBookScan = true,
     this.providerId,
@@ -60,6 +61,7 @@ class CompressionConfig {
         );
   final int? planningWindow;
   final bool includeReference;
+  final bool includeInstructionInjections;
   final bool replaceConsumedTools;
   final bool summaryInWorldBookScan;
   final String? providerId;
@@ -85,6 +87,7 @@ class CompressionConfig {
     'requestTimeoutMinutes': requestTimeoutMinutes,
     'planningWindow': planningWindow,
     'includeReference': includeReference,
+    'includeInstructionInjections': includeInstructionInjections,
     'replaceConsumedTools': replaceConsumedTools,
     'summaryInWorldBookScan': summaryInWorldBookScan,
     'providerId': providerId,
@@ -110,6 +113,8 @@ class CompressionConfig {
       requestTimeoutMinutes: json['requestTimeoutMinutes'] as num?,
       planningWindow: json['planningWindow'] as int?,
       includeReference: json['includeReference'] as bool? ?? true,
+      includeInstructionInjections:
+          json['includeInstructionInjections'] as bool? ?? true,
       replaceConsumedTools: json['replaceConsumedTools'] as bool? ?? false,
       summaryInWorldBookScan: json['summaryInWorldBookScan'] as bool? ?? true,
       providerId: json['providerId'] as String?,

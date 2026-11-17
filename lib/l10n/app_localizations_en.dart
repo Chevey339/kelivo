@@ -16309,12 +16309,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressionRequests => 'Maximum requests';
 
   @override
-  String get compressionReference =>
-      'Reference world books and historical memory';
+  String get compressionReference => 'Use background references';
 
   @override
   String get compressionReferenceHint =>
-      'World books are matched only against the history being compressed, using memory snapshots from that time. This is only to explain names and rules — it doesn’t mean those events happened, or that a character already knows them.';
+      'The summary can draw on the assistant’s system prompt, world book entries matched to this part of the chat, and memories saved at the time. The chat history establishes what happened and what each character knows.';
+
+  @override
+  String get compressionInstructionInjections =>
+      'Use instruction injections as references';
+
+  @override
+  String get compressionInstructionInjectionsHint =>
+      'Send the instruction cards enabled for this chat to the summary model as background references.';
 
   @override
   String get compressionToolReferences =>

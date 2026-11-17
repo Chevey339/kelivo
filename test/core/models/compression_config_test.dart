@@ -3,6 +3,20 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
+    'instruction references default on and inherit conversation overrides',
+    () {
+      final defaults = CompressionConfig.fromJson({});
+      expect(defaults.includeInstructionInjections, isTrue);
+      final disabled = defaults.withOverrides({
+        'includeInstructionInjections': false,
+      });
+      final restored = CompressionConfig.fromJson(disabled.toJson());
+      expect(restored.includeReference, isTrue);
+      expect(restored.withOverrides({}).includeInstructionInjections, isFalse);
+    },
+  );
+
+  test(
     'request timeout inherits, round trips, and clears to mode defaults',
     () {
       const defaults = CompressionConfig(requestTimeoutMinutes: 10);

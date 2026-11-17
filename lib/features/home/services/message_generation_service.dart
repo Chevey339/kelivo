@@ -410,6 +410,7 @@ class MessageGenerationService {
     required String? assistantId,
     required List<ChatMessage> messages,
     required DateTime promptTime,
+    required bool includeInstructionInjections,
   }) async {
     final assistant = assistantId == null
         ? null
@@ -428,12 +429,15 @@ class MessageGenerationService {
       conversation: conversation,
       promptTime: promptTime,
     );
-    await messageBuilderService.injectInstructionPrompts(
-      apiMessages,
-      assistantId,
-      conversation: conversation,
-      conversationScoped: assistant?.allowConversationPromptInjection ?? false,
-    );
+    if (includeInstructionInjections) {
+      await messageBuilderService.injectInstructionPrompts(
+        apiMessages,
+        assistantId,
+        conversation: conversation,
+        conversationScoped:
+            assistant?.allowConversationPromptInjection ?? false,
+      );
+    }
     await messageBuilderService.injectWorldBookPrompts(
       apiMessages,
       assistantId,

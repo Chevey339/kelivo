@@ -8165,8 +8165,10 @@
   "compressionTarget": "Compress to",
   "compressionWindow": "Summary model capacity",
   "compressionRequests": "Maximum requests",
-  "compressionReference": "Reference world books and historical memory",
-  "compressionReferenceHint": "World books are matched only against the history being compressed, using memory snapshots from that time. This is only to explain names and rules — it doesn’t mean those events happened, or that a character already knows them.",
+  "compressionReference": "Use background references",
+  "compressionReferenceHint": "The summary can draw on the assistant’s system prompt, world book entries matched to this part of the chat, and memories saved at the time. The chat history establishes what happened and what each character knows.",
+  "compressionInstructionInjections": "Use instruction injections as references",
+  "compressionInstructionInjectionsHint": "Send the instruction cards enabled for this chat to the summary model as background references.",
   "compressionToolReferences": "Keep only references to tool results already read",
   "compressionToolReferencesHint": "Only applies when tools are available. The latest unread results are kept in full. Results already read are kept as references — you can look them up, but not edit them.",
   "compressionSummaryScan": "Also match world-book keywords against the summary",
@@ -21579,10 +21581,16 @@
     "description": "Maximum number of model requests allowed for one compression task, including retries. Also labels the recovery action that opens this field."
   },
   "@compressionReference": {
-    "description": "Compression option to include world books evaluated on the selected history and memory snapshots frozen in that history, rather than current live memory or retained messages."
+    "description": "Main switch in the text compression details for including background information in the summary request. It also controls the availability of the instruction injection option. No placeholders."
   },
   "@compressionReferenceHint": {
-    "description": "Compression reference help: restrict dynamic reference sources to the selected historical range, and distinguish explanatory background from events or character knowledge. No placeholders."
+    "description": "Help below the background references switch in text compression settings. The assistant’s system prompt, world book entries matched to the selected history, and memory snapshots saved in that range help explain context. The chat history establishes events and character knowledge. No placeholders."
+  },
+  "@compressionInstructionInjections": {
+    "description": "Switch under background references in text compression settings. Enables sending the instruction cards selected for the chat as reference material to the model generating a summary. No placeholders."
+  },
+  "@compressionInstructionInjectionsHint": {
+    "description": "Help below the instruction injection switch in text compression settings. Describes the selected chat instruction cards being sent as background material for the summary. No placeholders."
   },
   "@compressionToolReferences": {
     "description": "Switch label for replacing already-consumed tool results with references."

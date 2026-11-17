@@ -5,6 +5,7 @@ import 'package:Kelivo/core/database/compression_repository.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/core/models/compression_config.dart';
+import 'package:Kelivo/core/models/instruction_injection.dart';
 import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
@@ -36,6 +37,7 @@ import 'package:Kelivo/core/services/chat/context_compression_service.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/preset_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -496,8 +498,10 @@ void main() {
     bool withComposer = false,
     List<dynamic>? storedAssistants,
     BusinessPreferences? assistantPreferences,
+    bool withInstructionInjections = false,
   }) async {
     HomePageController? controller;
+    InstructionInjectionProvider? injections;
     late Zone sendZone;
     final baseUrl = 'http://${server.address.address}:${server.port}/v1';
     // Futures only complete for awaits on the zone that created them, and the
@@ -540,6 +544,14 @@ void main() {
       }
       assistantProvider = AssistantProvider(preferences: assistantPrefs);
       await assistantProvider.loaded;
+      if (withInstructionInjections) {
+        final provider = InstructionInjectionProvider(
+          preferences: assistantPrefs,
+        );
+        await provider.initialize();
+        addTearDown(provider.dispose);
+        injections = provider;
+      }
       if (storedAssistants == null && assistantPreferences == null) {
         final assistantId = await assistantProvider.addAssistant(
           name: 'Test Assistant',
@@ -558,6 +570,10 @@ void main() {
           ChangeNotifierProvider<AssistantProvider>.value(
             value: assistantProvider,
           ),
+          if (injections != null)
+            ChangeNotifierProvider<InstructionInjectionProvider>.value(
+              value: injections!,
+            ),
           ChangeNotifierProvider<McpProvider>(
             create: (_) =>
                 McpProvider(preferences: createBusinessTestPreferences()),
@@ -5846,14 +5862,42 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
     expect(tester.takeException(), isNull);
   });
 
-  for (final enabled in [false, true]) {
+  for (final (enabled, includeCards) in [
+    (false, true),
+    (true, false),
+    (true, true),
+  ]) {
     testWidgets(
-      'automatic compression actual overflow recovery enabled=$enabled',
+      'automatic compression actual overflow recovery enabled=$enabled cards=$includeCards',
       (tester) async {
-        final controller = await pumpHarness(tester);
+        final controller = await pumpHarness(
+          tester,
+          withInstructionInjections: true,
+        );
         await tester.runAsync(() async {
           await settings.disableTitleGeneration();
           await settings.disableSuggestionGeneration();
+          final assistant = assistantProvider.currentAssistant!;
+          const card = InstructionInjection(
+            id: 'style',
+            title: 'Style',
+            prompt: 'ASSISTANT_STYLE_CARD',
+          );
+          final injections = tester
+              .element(find.byType(_ControllerHarness))
+              .read<InstructionInjectionProvider>();
+          await injections.add(card);
+          await injections.setActiveId(card.id, assistantId: assistant.id);
+          await settings.setProviderConfig(
+            'other',
+            settings
+                .getProviderConfig('SiliconFlow')
+                .copyWith(
+                  id: 'other',
+                  baseUrl:
+                      'http://${server.address.address}:${server.port}/other/v1',
+                ),
+          );
           await settings.setCompressionDefaults(
             CompressionConfig(
               mode: enabled
@@ -5862,7 +5906,11 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
               keepRecentUserTurns: 1,
               summaryTokens: 512,
               planningWindow: 32000,
-              includeReference: false,
+              includeInstructionInjections: enabled
+                  ? !includeCards
+                  : includeCards,
+              providerId: enabled ? null : 'other',
+              modelId: enabled ? null : 'dedicated-summary',
             ),
           );
           final conversation = await openConversation(controller);
@@ -5871,15 +5919,33 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
             role: 'user',
             content: 'OLD_FACTS ${'history ' * 600}',
           );
-          var summaryCalls = 0;
-          var chatCalls = 0;
+          final summaries = <({String path, Map<String, dynamic> body})>[];
+          final chats = <String>[];
           apiOverride = (request, body) async {
-            if (jsonEncode(body).contains('Target length:')) {
-              summaryCalls++;
+            final wire = jsonEncode(body);
+            if (wire.contains('Target length:')) {
+              summaries.add((path: request.uri.path, body: body));
               await compressionReply(request, summary: true);
             } else {
-              chatCalls++;
-              if (chatCalls == 1) {
+              chats.add(wire);
+              if (chats.length == 1) {
+                if (enabled) {
+                  await service.setCompressionOverrides(conversation.id, {
+                    'includeInstructionInjections': includeCards,
+                  });
+                  final other = await assistantProvider.addAssistant(
+                    name: 'Other',
+                  );
+                  await assistantProvider.updateAssistant(
+                    assistantProvider
+                        .getById(other)!
+                        .copyWith(
+                          chatModelProvider: 'other',
+                          chatModelId: 'other-chat',
+                        ),
+                  );
+                  await assistantProvider.setCurrentAssistant(other);
+                }
                 request.response.statusCode = 400;
                 request.response.write(
                   '{"error":{"code":"context_length_exceeded"}}',
@@ -5893,14 +5959,14 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
           await controller.sendMessage(ChatInputData(text: 'CURRENT_QUESTION'));
           await waitFor(
             () =>
-                chatCalls > 0 &&
+                chats.isNotEmpty &&
                 !controller.chatController.isConversationLoading(
                   conversation.id,
                 ),
             'overflow completes',
           );
-          expect(summaryCalls, enabled ? 1 : 0);
-          expect(chatCalls, enabled ? 2 : 1);
+          expect(summaries, hasLength(enabled ? 1 : 0));
+          expect(chats, hasLength(enabled ? 2 : 1));
           if (!enabled) {
             final failed = (await service.loadContextSnapshot(
               conversation.id,
@@ -5911,13 +5977,12 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
             );
             await waitFor(
               () =>
-                  chatCalls == 2 &&
+                  chats.length == 2 &&
                   !controller.chatController.isConversationLoading(
                     conversation.id,
                   ),
               'explicit compression retry completes',
             );
-            expect(summaryCalls, 1);
             final after = await service.loadContextSnapshot(conversation.id);
             expect(after.messages.last.id, failed.id);
             expect(
@@ -5930,6 +5995,19 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
             );
             expect(settings.compressionDefaults.mode, AutoCompressionMode.off);
           }
+          final summary = summaries.single;
+          expect(
+            summary.path,
+            enabled ? '/v1/chat/completions' : '/other/v1/chat/completions',
+          );
+          expect(
+            summary.body['model'],
+            enabled ? 'test-model' : 'dedicated-summary',
+          );
+          final summaryBody = jsonEncode(summary.body);
+          expect(summaryBody, contains('OLD_FACTS'));
+          expect(summaryBody.contains(card.prompt), includeCards);
+          expect(chats, everyElement(contains(card.prompt)));
         });
         AppSnackBarManager().dismissAll();
         await tester.pumpAndSettle();

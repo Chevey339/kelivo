@@ -416,6 +416,7 @@ void main() {
             ),
           ],
           promptTime: DateTime.utc(2026),
+          includeInstructionInjections: true,
         );
         final texts = ['BEFORE', persona, 'Use short paragraphs.', 'AFTER'];
         var lastIndex = -1;

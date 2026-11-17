@@ -1620,6 +1620,16 @@ class _CompressContextOptionsDialogState
                                   hint: l10n.compressionReferenceHint,
                                 ),
                               ),
+                              if (_config.includeReference)
+                                _switch(
+                                  l10n.compressionInstructionInjections,
+                                  _config.includeInstructionInjections,
+                                  (v) => _change({
+                                    'includeInstructionInjections': v,
+                                  }),
+                                  hint:
+                                      l10n.compressionInstructionInjectionsHint,
+                                ),
                               _switch(
                                 l10n.compressionToolReferences,
                                 _config.replaceConsumedTools,

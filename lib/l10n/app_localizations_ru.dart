@@ -16590,12 +16590,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionRequests => 'Максимум запросов';
 
   @override
-  String get compressionReference =>
-      'Учитывать книги мира и историческую память';
+  String get compressionReference => 'Использовать справочные материалы';
 
   @override
   String get compressionReferenceHint =>
-      'Мировые книги сопоставляются только с историей, которая сжимается, с использованием снимков памяти того времени. Это нужно только для объяснения имён и правил — это не означает, что те события произошли или что персонаж уже о них знает.';
+      'Сводка может опираться на системный промпт ассистента, записи мировой книги, совпавшие с этой частью чата, и сохранённые на тот момент воспоминания. История чата определяет, что произошло и что знает каждый персонаж.';
+
+  @override
+  String get compressionInstructionInjections =>
+      'Учитывать внедрённые инструкции при сжатии';
+
+  @override
+  String get compressionInstructionInjectionsHint =>
+      'Отправлять модели, которая составляет сводку, включённые для этого чата карточки инструкций как справочный материал.';
 
   @override
   String get compressionToolReferences =>

@@ -16404,12 +16404,19 @@ class AppLocalizationsTr extends AppLocalizations {
   String get compressionRequests => 'Maksimum istek';
 
   @override
-  String get compressionReference =>
-      'Dünya kitaplarına ve geçmiş belleğe başvur';
+  String get compressionReference => 'Arka plan referanslarını kullan';
 
   @override
   String get compressionReferenceHint =>
-      'Dünya kitapları yalnızca sıkıştırılan geçmişe göre eşleştirilir ve o zamanki bellek anlık görüntüleri kullanılır. Bu yalnızca adları ve kuralları açıklamak içindir — bu olayların yaşandığı veya bir karakterin bunları zaten bildiği anlamına gelmez.';
+      'Özet hazırlanırken asistanın sistem isteminden, sohbetin bu bölümüyle eşleşen dünya kitabı girdilerinden ve o sırada kaydedilen anılardan yararlanılabilir. Olaylar ve her karakterin bildikleri için sohbet geçmişi esas alınır.';
+
+  @override
+  String get compressionInstructionInjections =>
+      'Talimat enjeksiyonlarını referans olarak kullan';
+
+  @override
+  String get compressionInstructionInjectionsHint =>
+      'Bu sohbet için etkinleştirilen talimat kartlarını arka plan referansı olarak özet modeline gönder.';
 
   @override
   String get compressionToolReferences =>

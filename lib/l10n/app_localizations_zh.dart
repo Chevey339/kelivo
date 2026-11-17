@@ -15462,11 +15462,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionRequests => '最多请求';
 
   @override
-  String get compressionReference => '参考世界书与历史记忆';
+  String get compressionReference => '使用背景参考资料';
 
   @override
   String get compressionReferenceHint =>
-      '只根据这次要压缩的历史来查找世界书，并使用当时保存的记忆。这些内容只帮模型理解人名和规则，不会当成已经发生的事，也不会当成角色已经知道的事。';
+      '摘要可参考助手的系统提示词、与这段历史匹配的世界书和当时保存的记忆。发生过的事和角色知道的事以聊天记录为准。';
+
+  @override
+  String get compressionInstructionInjections => '压缩时参考指令注入';
+
+  @override
+  String get compressionInstructionInjectionsHint => '将当前对话启用的指令卡作为参考资料发给摘要模型。';
 
   @override
   String get compressionToolReferences => '已读过的工具结果只保留引用';
@@ -31954,11 +31960,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressionRequests => '最多请求';
 
   @override
-  String get compressionReference => '参考世界书与历史记忆';
+  String get compressionReference => '使用背景参考资料';
 
   @override
   String get compressionReferenceHint =>
-      '只根据这次要压缩的历史来查找世界书，并使用当时保存的记忆。这些内容只帮模型理解人名和规则，不会当成已经发生的事，也不会当成角色已经知道的事。';
+      '摘要可参考助手的系统提示词、与这段历史匹配的世界书和当时保存的记忆。发生过的事和角色知道的事以聊天记录为准。';
+
+  @override
+  String get compressionInstructionInjections => '压缩时参考指令注入';
+
+  @override
+  String get compressionInstructionInjectionsHint => '将当前对话启用的指令卡作为参考资料发给摘要模型。';
 
   @override
   String get compressionToolReferences => '已读过的工具结果只保留引用';
@@ -48457,11 +48469,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressionRequests => '最多請求';
 
   @override
-  String get compressionReference => '參考世界書與歷史記憶';
+  String get compressionReference => '使用背景參考資料';
 
   @override
   String get compressionReferenceHint =>
-      '只根據這次要壓縮的歷史來查找世界書，並使用當時儲存的記憶。這些內容只幫模型理解人名和規則，不會當成已經發生的事，也不會當成角色已經知道的事。';
+      '摘要可參考助手的系統提示詞、與這段歷史相符的世界書條目，以及當時儲存的記憶。發生過的事和角色知道的事以聊天記錄為準。';
+
+  @override
+  String get compressionInstructionInjections => '使用指令注入作為參考';
+
+  @override
+  String get compressionInstructionInjectionsHint =>
+      '將目前對話啟用的指令卡作為參考資料傳送給摘要模型。';
 
   @override
   String get compressionToolReferences => '已讀過的工具結果只保留引用';

@@ -7,6 +7,7 @@ import 'dart:io';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/core/models/instruction_injection.dart';
 import 'package:Kelivo/core/models/world_book.dart';
 import 'package:Kelivo/core/services/memory/memory_prompts.dart';
 import 'package:Kelivo/core/models/memory_entry.dart';
@@ -546,7 +547,7 @@ void main() {
     },
   );
 
-  testWidgets('compression preview excludes retained text and dynamic references', (
+  testWidgets('compression respects history and reference settings', (
     tester,
   ) async {
     await mount(tester);
@@ -610,8 +611,19 @@ void main() {
         await assistants.updateAssistant(
           assistants
               .getById('assistant')!
-              .copyWith(limitContextMessages: true, contextMessageSize: 1),
+              .copyWith(
+                systemPrompt: 'ASSISTANT_BACKGROUND',
+                limitContextMessages: true,
+                contextMessageSize: 1,
+              ),
         );
+        const card = InstructionInjection(
+          id: 'style',
+          title: 'Chat style',
+          prompt: 'CHAT_STYLE_INSTRUCTION',
+        );
+        await injections.add(card);
+        await injections.setActiveId(card.id, assistantId: 'assistant');
         await books.addBook(
           const WorldBook(
             id: 'range',
@@ -648,11 +660,16 @@ void main() {
           options,
         );
         expect(selection.retained.single.id, 'retained');
-        for (final includeReference in [false, true]) {
+        for (final (includeReference, includeInstructionInjections) in [
+          (false, true),
+          (true, true),
+          (true, false),
+        ]) {
           final config = CompressionConfig(
             summaryTokens: 512,
             maxOutputTokens: 4096,
             includeReference: includeReference,
+            includeInstructionInjections: includeInstructionInjections,
           );
           final preview = await vm.previewCompressionRequest(
             'one',
@@ -664,33 +681,63 @@ void main() {
           expect(preview.prompt, contains('Decision A'));
           expect(preview.prompt, isNot(contains('FUTURE_')));
           expect(preview.prompt, isNot(contains('<continuation')));
-          if (includeReference) {
-            expect(preview.prompt, contains('PAST_REFERENCE'));
-            expect(preview.prompt, contains('PAST_MEMORY'));
-            final request = await vm.buildCompressionRequest(
-              'one',
-              options: options,
-              configOverride: config,
-            );
-            final reference = await request.loadReference!(selection);
-            expect(reference, contains('PAST_REFERENCE'));
-            expect(reference, contains('PAST_MEMORY'));
-            expect(reference, isNot(contains('SUPERSEDED_MEMORY')));
-            expect(reference, isNot(contains('FUTURE_')));
-            // A summary-only range must not read the latest real turn for timers.
-            final summaries = selection.input
-                .where(ContextOperation.isSummary)
-                .toList();
-            final summaryReference = await g.compressionReferenceText(
-              conversationId: 'one',
-              modelId: 'opaque',
-              assistantId: 'assistant',
-              messages: summaries,
-              promptTime: DateTime(2026),
-            );
-            expect(summaryReference, isNot(contains('FUTURE_')));
+          expect(
+            preview.prompt.contains('ASSISTANT_BACKGROUND'),
+            includeReference,
+          );
+          expect(preview.prompt.contains('PAST_REFERENCE'), includeReference);
+          expect(preview.prompt.contains('PAST_MEMORY'), includeReference);
+          expect(
+            preview.prompt.contains(card.prompt),
+            includeReference && includeInstructionInjections,
+          );
+          await chat.setCompressionOverrides('one', {
+            'includeReference': includeReference,
+            'includeInstructionInjections': includeInstructionInjections,
+          });
+          final request = await vm.buildCompressionRequest(
+            'one',
+            options: options,
+            automatic: true,
+          );
+          if (!includeReference) {
+            expect(request.loadReference, isNull);
+            continue;
           }
+          final reference = await request.loadReference!(selection);
+          expect(reference.contains(card.prompt), includeInstructionInjections);
+          expect(reference, contains('ASSISTANT_BACKGROUND'));
+          expect(reference, contains('PAST_REFERENCE'));
+          expect(reference, contains('PAST_MEMORY'));
+          expect(reference, isNot(contains('SUPERSEDED_MEMORY')));
+          expect(reference, isNot(contains('FUTURE_')));
         }
+        expect((await preview(g)).injectionsText, contains(card.prompt));
+        final orphaned = chat
+            .getConversation('one')!
+            .copyWith(assistantId: 'removed-assistant');
+        await repository.putConversation(orphaned);
+        chat.conversations['one'] = orphaned;
+        final orphanPreview = await vm.previewCompressionRequest(
+          'one',
+          options,
+          const CompressionConfig(),
+          history: Future.value(history),
+        );
+        expect(orphanPreview.prompt, contains(card.prompt));
+        // A summary-only range must not read the latest real turn for timers.
+        final summaries = selection.input
+            .where(ContextOperation.isSummary)
+            .toList();
+        final summaryReference = await g.compressionReferenceText(
+          conversationId: 'one',
+          modelId: 'opaque',
+          assistantId: 'assistant',
+          messages: summaries,
+          promptTime: DateTime(2026),
+          includeInstructionInjections: false,
+        );
+        expect(summaryReference, isNot(contains('FUTURE_')));
       } finally {
         vm.dispose();
         controller.dispose();

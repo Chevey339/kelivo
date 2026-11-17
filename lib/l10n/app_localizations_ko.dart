@@ -15809,11 +15809,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get compressionRequests => '최대 요청 수';
 
   @override
-  String get compressionReference => '세계관 책과 과거 기억 참조';
+  String get compressionReference => '배경 참조 사용';
 
   @override
   String get compressionReferenceHint =>
-      '이번에 압축할 기록만을 기준으로 세계관을 찾고, 당시 저장된 메모리를 사용합니다. 이 내용은 모델이 인물 이름과 규칙을 이해하도록 돕기 위한 것일 뿐, 해당 사건이 발생했다거나 캐릭터가 이미 알고 있다는 의미가 아닙니다.';
+      '요약은 어시스턴트의 시스템 프롬프트, 이 대화 구간과 일치하는 세계관 항목, 당시 저장된 메모리를 참고할 수 있습니다. 무슨 일이 있었고 각 캐릭터가 무엇을 아는지는 대화 기록을 기준으로 합니다.';
+
+  @override
+  String get compressionInstructionInjections => '지시 주입을 참고 자료로 사용';
+
+  @override
+  String get compressionInstructionInjectionsHint =>
+      '이 대화에서 활성화된 지시 카드를 배경 참조 자료로 요약 모델에 전송합니다.';
 
   @override
   String get compressionToolReferences => '이미 읽은 도구 결과는 참조만 유지';

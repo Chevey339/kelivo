@@ -2426,6 +2426,7 @@ class ChatActions {
     stream_ctrl.StreamingState state,
   ) async {
     final id = state.conversationId;
+    final String? assistantId = ctx.assistant?.id;
     final liveSettings = contextProvider.read<SettingsProvider>();
     final preferences = await chatService.compressionConfig(
       id,
@@ -2638,7 +2639,7 @@ class ChatActions {
             conversationId: id,
             providerKey: ctx.providerKey,
             modelId: ctx.modelId,
-            assistantId: chatService.getConversation(id)?.assistantId,
+            assistantId: assistantId,
             messagesOverride: messages,
           );
           return preview.apiMessages;
@@ -2646,7 +2647,7 @@ class ChatActions {
 
         List<Map<String, dynamic>>? replacement;
         try {
-          var runtimeConfig = preferences;
+          var summaryTokens = preferences.summaryTokens;
           int? carryBudgetTokens;
           if (budget != null) {
             final empty = ContextOperation(
@@ -2678,9 +2679,7 @@ class ChatActions {
                 ? space.clamp(0, 64000)
                 : (space - 128).clamp(0, space);
             if (!useNative) {
-              runtimeConfig = preferences.withOverrides({
-                'summaryTokens': space.clamp(128, preferences.summaryTokens),
-              });
+              summaryTokens = space.clamp(128, summaryTokens);
             }
           }
           final request = await viewModel.buildCompressionRequest(
@@ -2689,15 +2688,17 @@ class ChatActions {
             automatic: true,
             beforeMessageId: userId,
             effectiveMessageIds: Set.unmodifiable(allowedMessageIds),
-            configOverride: runtimeConfig,
+            // Reference choices apply at the start of each text compression.
+            configOverride: useNative
+                ? preferences
+                : preferences.withOverrides({
+                    'summaryTokens': summaryTokens,
+                    'includeReference': current.includeReference,
+                    'includeInstructionInjections':
+                        current.includeInstructionInjections,
+                  }),
             carryBudgetTokens: carryBudgetTokens,
-            nativeModel: useNative
-                ? (
-                    providerKey: ctx.providerKey,
-                    modelId: ctx.modelId,
-                    config: ctx.config,
-                  )
-                : null,
+            activeGeneration: ctx,
             isCancelled: () => cancelled() || !allowed,
             acceptCandidate: (candidate) async {
               final next = await rebuild(candidate);
@@ -2745,7 +2746,7 @@ class ChatActions {
               conversationId: id,
               providerKey: ctx.providerKey,
               modelId: ctx.modelId,
-              assistantId: chatService.getConversation(id)?.assistantId,
+              assistantId: assistantId,
               messagesOverride: candidateHistory(task.candidate!),
             );
           } catch (error) {

@@ -28698,17 +28698,29 @@ abstract class AppLocalizations {
   /// **'Maximum requests'**
   String get compressionRequests;
 
-  /// Compression option to include world books evaluated on the selected history and memory snapshots frozen in that history, rather than current live memory or retained messages.
+  /// Main switch in the text compression details for including background information in the summary request. It also controls the availability of the instruction injection option. No placeholders.
   ///
   /// In en, this message translates to:
-  /// **'Reference world books and historical memory'**
+  /// **'Use background references'**
   String get compressionReference;
 
-  /// Compression reference help: restrict dynamic reference sources to the selected historical range, and distinguish explanatory background from events or character knowledge. No placeholders.
+  /// Help below the background references switch in text compression settings. The assistant’s system prompt, world book entries matched to the selected history, and memory snapshots saved in that range help explain context. The chat history establishes events and character knowledge. No placeholders.
   ///
   /// In en, this message translates to:
-  /// **'World books are matched only against the history being compressed, using memory snapshots from that time. This is only to explain names and rules — it doesn’t mean those events happened, or that a character already knows them.'**
+  /// **'The summary can draw on the assistant’s system prompt, world book entries matched to this part of the chat, and memories saved at the time. The chat history establishes what happened and what each character knows.'**
   String get compressionReferenceHint;
+
+  /// Switch under background references in text compression settings. Enables sending the instruction cards selected for the chat as reference material to the model generating a summary. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Use instruction injections as references'**
+  String get compressionInstructionInjections;
+
+  /// Help below the instruction injection switch in text compression settings. Describes the selected chat instruction cards being sent as background material for the summary. No placeholders.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the instruction cards enabled for this chat to the summary model as background references.'**
+  String get compressionInstructionInjectionsHint;
 
   /// Switch label for replacing already-consumed tool results with references.
   ///

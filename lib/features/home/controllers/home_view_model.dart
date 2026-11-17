@@ -1409,7 +1409,7 @@ class HomeViewModel extends ChangeNotifier {
     Future<bool> Function(ContextOperation)? acceptCandidate,
     CompressionConfig? configOverride,
     int? carryBudgetTokens,
-    ({String providerKey, String modelId, ProviderConfig config})? nativeModel,
+    stream_ctrl.GenerationContext? activeGeneration,
   }) async {
     final conversation = _chatService.getConversation(conversationId);
     if (conversation == null) throw StateError('conversation_not_found');
@@ -1418,14 +1418,22 @@ class HomeViewModel extends ChangeNotifier {
     final quoteMarker = AppLocalizations.of(
       _contextProvider,
     )!.selectionQuoteMarker;
-    final assistant = _contextProvider
-        .read<AssistantProvider>()
-        .resolveConversationAssistant(conversation.assistantId);
-    final chatModel = _messageGenerationService.getModelConfig(
-      settings,
-      assistant,
-      conversation: conversation,
-    );
+    // A running turn keeps its assistant and chat model across tool calls.
+    final Assistant? assistant = activeGeneration == null
+        ? _contextProvider
+              .read<AssistantProvider>()
+              .resolveConversationAssistant(conversation.assistantId)
+        : activeGeneration.assistant;
+    final chatModel = activeGeneration == null
+        ? _messageGenerationService.getModelConfig(
+            settings,
+            assistant,
+            conversation: conversation,
+          )
+        : (
+            providerKey: activeGeneration.providerKey,
+            modelId: activeGeneration.modelId,
+          );
     final preferences =
         configOverride ??
         await _chatService.compressionConfig(
@@ -1433,20 +1441,18 @@ class HomeViewModel extends ChangeNotifier {
           settings.compressionDefaults,
         );
     if (options.native) {
-      // A tool loop owns its original connection even if the user selects
-      // another model while that turn is still running.
-      final provider = nativeModel?.providerKey ?? chatModel.providerKey;
-      final model = nativeModel?.modelId ?? chatModel.modelId;
+      final provider = chatModel.providerKey;
+      final model = chatModel.modelId;
       if (provider == null || model == null) throw StateError('no_model');
       final config =
-          nativeModel?.config ?? settings.getProviderConfig(provider);
+          activeGeneration?.config ?? settings.getProviderConfig(provider);
       final referenceTime = DateTime.now();
       Future<ContextAssemblyPreview> prepare(CompressionSelection selection) =>
           _messageGenerationService.previewContextAssembly(
             conversationId: conversationId,
             providerKey: provider,
             modelId: model,
-            assistantId: conversation.assistantId,
+            assistantId: assistant?.id,
             messagesOverride: selection.input,
             // Coverage is recorded from this selection, so never trim it again.
             applyMessageLimit: false,
@@ -1548,9 +1554,10 @@ class HomeViewModel extends ChangeNotifier {
           ? ProviderKind.openai
           : ProviderConfig.classify(
               chatModel.providerKey!,
-              explicitType: settings
-                  .getProviderConfig(chatModel.providerKey!)
-                  .providerType,
+              explicitType:
+                  (activeGeneration?.config ??
+                          settings.getProviderConfig(chatModel.providerKey!))
+                      .providerType,
             ),
       model: '$provider / $modelId',
       quoteMarker: quoteMarker,
@@ -1575,8 +1582,10 @@ class HomeViewModel extends ChangeNotifier {
                   promptTime: referenceTime,
                   conversationId: conversationId,
                   modelId: chatModel.modelId!,
-                  assistantId: conversation.assistantId,
+                  assistantId: assistant?.id,
                   messages: selection.input,
+                  includeInstructionInjections:
+                      preferences.includeInstructionInjections,
                 ),
       generate: (prompt, requestId, maxTokens, onUsage) =>
           ChatApiService.generateMessage(

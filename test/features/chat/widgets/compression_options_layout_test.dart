@@ -534,6 +534,17 @@ void main() {
         await tester.tap(find.text(l10n.compressionAdvancedOptions));
         await settleCompressionOptions(tester);
         await screenshot('settings-details');
+        final injections = find.text(l10n.compressionInstructionInjections);
+        final references = find.text(l10n.compressionReference);
+        await tester.ensureVisible(injections);
+        await tester.tap(injections);
+        await tester.ensureVisible(references);
+        await tester.tap(references);
+        await settleCompressionOptions(tester);
+        expect(injections, findsNothing);
+        await tester.tap(references);
+        await settleCompressionOptions(tester);
+        expect(injections, findsOneWidget);
         await tester.ensureVisible(field(l10n.compressionWindow));
         await tester.enterText(field(l10n.compressionWindow), '64000');
         await tester.ensureVisible(find.text(l10n.compressionAdvancedOptions));
@@ -547,6 +558,11 @@ void main() {
         expect(settings.compressionDefaults.triggerInputRatio, .75);
         expect(settings.compressionDefaults.targetInputRatio, .55);
         expect(settings.compressionDefaults.planningWindow, 64000);
+        expect(settings.compressionDefaults.includeReference, isTrue);
+        expect(
+          settings.compressionDefaults.includeInstructionInjections,
+          isFalse,
+        );
         final selected = await tester.runAsync(
           () => chat.chatRepositoryOrNull!.compression.templates(),
         );
