@@ -125,8 +125,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
-    final dav = settings.webDavConfig;
-    final s3 = settings.s3Config;
+    final (webDav: dav, :s3) = settings.backupConfigs;
     final webdavVm = context.watch<BackupProvider>();
     final s3Vm = context.watch<S3BackupProvider>();
     final busy =

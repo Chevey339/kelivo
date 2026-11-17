@@ -12,6 +12,58 @@ enum RestoreMode {
   merge, // 增量合并：智能去重
 }
 
+Map<String, dynamic>? _decodeBackupPreference(
+  Object? stored,
+  void Function(String?)? onInvalidField,
+) {
+  if (stored == null) return null;
+  if (stored is String) {
+    try {
+      final json = jsonDecode(stored);
+      if (json is Map<String, dynamic>) return json;
+    } on FormatException {
+      // The decoder's exception may contain the stored credentials.
+    }
+  }
+  onInvalidField?.call(null);
+  return null;
+}
+
+class _BackupConfigFields {
+  const _BackupConfigFields(this.json, this.onInvalidField);
+
+  final Map<String, dynamic> json;
+  final void Function(String)? onInvalidField;
+
+  T? read<T>(String name) {
+    final value = json[name];
+    if (value is T) return value;
+    if (json.containsKey(name)) onInvalidField?.call(name);
+    return null;
+  }
+
+  String trimmed(String name, [String fallback = '']) {
+    final value = read<String>(name)?.trim();
+    return value == null || value.isEmpty ? fallback : value;
+  }
+
+  BackupScope get scope {
+    final flags = read<Map<String, dynamic>>('scope');
+    if (flags == null) return const BackupScope();
+    final valid = <String, bool>{};
+    for (final category in BackupCategory.values) {
+      final name = category.name;
+      final enabled = flags[name];
+      if (enabled is bool) {
+        valid[name] = enabled;
+      } else if (flags.containsKey(name)) {
+        onInvalidField?.call('scope.$name');
+      }
+    }
+    return BackupScope.fromJson(valid);
+  }
+}
+
 class WebDavConfig {
   final String url;
   final String username;
@@ -56,26 +108,29 @@ class WebDavConfig {
     'scope': scope.toJson(),
   };
 
-  static WebDavConfig fromJson(Map<String, dynamic> json) {
+  static WebDavConfig fromJson(
+    Map<String, dynamic> json, {
+    void Function(String)? onInvalidField,
+  }) {
+    final fields = _BackupConfigFields(json, onInvalidField);
     return WebDavConfig(
-      url: (json['url'] as String?)?.trim() ?? '',
-      username: (json['username'] as String?)?.trim() ?? '',
-      password: (json['password'] as String?) ?? '',
-      path: (json['path'] as String?)?.trim().isNotEmpty == true
-          ? (json['path'] as String).trim()
-          : 'kelivo_backups',
-      userAgent: (json['userAgent'] as String?) ?? '',
-      scope: BackupScope.fromJson(json['scope']),
+      url: fields.trimmed('url'),
+      username: fields.trimmed('username'),
+      password: fields.read<String>('password') ?? '',
+      path: fields.trimmed('path', const WebDavConfig().path),
+      userAgent: fields.read<String>('userAgent') ?? '',
+      scope: fields.scope,
     );
   }
 
-  static WebDavConfig fromJsonString(String s) {
-    try {
-      final map = jsonDecode(s) as Map<String, dynamic>;
-      return WebDavConfig.fromJson(map);
-    } catch (_) {
-      return const WebDavConfig();
-    }
+  static WebDavConfig fromPreference(
+    Object? stored, {
+    void Function(String?)? onInvalidField,
+  }) {
+    final json = _decodeBackupPreference(stored, onInvalidField);
+    return json == null
+        ? const WebDavConfig()
+        : fromJson(json, onInvalidField: onInvalidField);
   }
 
   String toJsonString() => jsonEncode(toJson());
@@ -148,32 +203,33 @@ class S3Config {
     'scope': scope.toJson(),
   };
 
-  static S3Config fromJson(Map<String, dynamic> json) {
+  static S3Config fromJson(
+    Map<String, dynamic> json, {
+    void Function(String)? onInvalidField,
+  }) {
+    final fields = _BackupConfigFields(json, onInvalidField);
     return S3Config(
-      endpoint: (json['endpoint'] as String?)?.trim() ?? '',
-      region: (json['region'] as String?)?.trim().isNotEmpty == true
-          ? (json['region'] as String).trim()
-          : 'us-east-1',
-      bucket: (json['bucket'] as String?)?.trim() ?? '',
-      accessKeyId: (json['accessKeyId'] as String?)?.trim() ?? '',
-      secretAccessKey: (json['secretAccessKey'] as String?) ?? '',
-      sessionToken: (json['sessionToken'] as String?) ?? '',
-      prefix: (json['prefix'] as String?)?.trim().isNotEmpty == true
-          ? (json['prefix'] as String).trim()
-          : 'kelivo_backups',
-      pathStyle: json['pathStyle'] as bool? ?? true,
-      userAgent: (json['userAgent'] as String?) ?? '',
-      scope: BackupScope.fromJson(json['scope']),
+      endpoint: fields.trimmed('endpoint'),
+      region: fields.trimmed('region', const S3Config().region),
+      bucket: fields.trimmed('bucket'),
+      accessKeyId: fields.trimmed('accessKeyId'),
+      secretAccessKey: fields.read<String>('secretAccessKey') ?? '',
+      sessionToken: fields.read<String>('sessionToken') ?? '',
+      prefix: fields.trimmed('prefix', const S3Config().prefix),
+      pathStyle: fields.read<bool>('pathStyle') ?? const S3Config().pathStyle,
+      userAgent: fields.read<String>('userAgent') ?? '',
+      scope: fields.scope,
     );
   }
 
-  static S3Config fromJsonString(String s) {
-    try {
-      final map = jsonDecode(s) as Map<String, dynamic>;
-      return S3Config.fromJson(map);
-    } catch (_) {
-      return const S3Config();
-    }
+  static S3Config fromPreference(
+    Object? stored, {
+    void Function(String?)? onInvalidField,
+  }) {
+    final json = _decodeBackupPreference(stored, onInvalidField);
+    return json == null
+        ? const S3Config()
+        : fromJson(json, onInvalidField: onInvalidField);
   }
 
   String toJsonString() => jsonEncode(toJson());

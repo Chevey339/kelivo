@@ -1,11 +1,147 @@
+import 'dart:convert';
+
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/business_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'a damaged field preserves other stored fields and exclusions on save',
+    () async {
+      const scope = BackupScope(
+        excluded: {
+          BackupCategory.chats,
+          BackupCategory.files,
+          BackupCategory.workspaces,
+        },
+      );
+      const dav = WebDavConfig(
+        url: 'https://dav.example',
+        username: 'user',
+        password: ' secret ',
+        path: 'custom-dav',
+        scope: scope,
+      );
+      const s3 = S3Config(
+        endpoint: 'https://s3.example',
+        bucket: 'bucket',
+        accessKeyId: 'key',
+        secretAccessKey: ' secret ',
+        sessionToken: ' token ',
+        prefix: 'custom-s3',
+        scope: scope,
+      );
+      final damagedScope = {
+        ...scope.toJson(),
+        'memories': 'private-fixture',
+        'unknown-private-key': ['unknown-private-value'],
+      };
+      final initial = {
+        'webdav_config_v1': jsonEncode({
+          ...dav.toJson(),
+          'userAgent': 17,
+          'scope': damagedScope,
+        }),
+        's3_config_v1': jsonEncode({
+          ...s3.toJson(),
+          'pathStyle': 'private-fixture',
+          'scope': {...damagedScope, 'chats': 'invalid'},
+        }),
+      };
+      final business = await createBusinessTestHarness(initial: initial);
+      final warnings = <String>[];
+      final previousPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message != null && message.startsWith('[BackupSettings]')) {
+          warnings.add(message);
+        }
+      };
+      addTearDown(() => debugPrint = previousPrint);
+      final settings = SettingsProvider(business.preferences);
+      final firstDav = settings.webDavConfig;
+      final firstS3 = settings.s3Config;
+      await settings.loaded;
+      expect(firstDav.toJson(), dav.toJson());
+      expect(firstS3.toJson(), s3.toJson());
+      expect(settings.webDavConfig.scope.excluded, scope.excluded);
+      expect(settings.s3Config.scope.excluded, scope.excluded);
+      expect(
+        warnings,
+        unorderedEquals([
+          '[BackupSettings] Ignoring invalid webdav_config_v1.userAgent.',
+          '[BackupSettings] Ignoring invalid webdav_config_v1.scope.memories.',
+          '[BackupSettings] Ignoring invalid s3_config_v1.pathStyle.',
+          '[BackupSettings] Ignoring invalid s3_config_v1.scope.chats.',
+          '[BackupSettings] Ignoring invalid s3_config_v1.scope.memories.',
+        ]),
+      );
+      for (final entry in initial.entries) {
+        expect(await business.repository.getPreference(entry.key), entry.value);
+      }
+      final updated = scope
+          .withCategory(BackupCategory.chats, true)
+          .withCategory(BackupCategory.skills, false);
+      await settings.setBackupScope(updated);
+      expect(
+        await business.repository.getPreference('webdav_config_v1'),
+        dav.copyWith(scope: updated).toJsonString(),
+      );
+      expect(
+        await business.repository.getPreference('s3_config_v1'),
+        s3.copyWith(scope: updated).toJsonString(),
+      );
+    },
+  );
+
+  test('an unreadable record or scope reports only the affected location', () {
+    final invalid = <String?>[];
+    for (final stored in [42, '{"password":"sensitive"', '["sensitive"]']) {
+      invalid.clear();
+      expect(
+        WebDavConfig.fromPreference(
+          stored,
+          onInvalidField: invalid.add,
+        ).toJson(),
+        const WebDavConfig().toJson(),
+      );
+      expect(invalid, [null]);
+    }
+    invalid.clear();
+    final server = S3Config.fromPreference(
+      jsonEncode({
+        'region': '  ',
+        'bucket': ' saved-bucket ',
+        'sessionToken': ' token ',
+        'prefix': ' folder ',
+        'scope': ['sensitive'],
+      }),
+      onInvalidField: invalid.add,
+    );
+    expect(
+      server.toJson(),
+      const S3Config(
+        bucket: 'saved-bucket',
+        sessionToken: ' token ',
+        prefix: 'folder',
+      ).toJson(),
+    );
+    expect(invalid, ['scope']);
+    invalid.clear();
+    expect(
+      WebDavConfig.fromPreference(null, onInvalidField: invalid.add).toJson(),
+      const WebDavConfig().toJson(),
+    );
+    expect(
+      S3Config.fromPreference('{}', onInvalidField: invalid.add).toJson(),
+      const S3Config().toJson(),
+    );
+    expect(invalid, isEmpty);
+  });
 
   test('queued server edits merge with the latest shared scope', () async {
     final business = await createBusinessTestHarness();

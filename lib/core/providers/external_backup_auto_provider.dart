@@ -57,12 +57,12 @@ class ExternalBackupAutoProvider extends ChangeNotifier {
   DateTime? _attemptedDue;
   Future<void>? _folderCleanup;
   List<BackupDestination> get available {
-    final cfg = settings.s3Config;
+    final (:webDav, :s3) = settings.backupConfigs;
     return [
-      if (settings.webDavConfig.url.trim().isNotEmpty) BackupDestination.webdav,
-      if (cfg.endpoint.trim().isNotEmpty &&
-          cfg.bucket.trim().isNotEmpty &&
-          cfg.accessKeyId.trim().isNotEmpty)
+      if (webDav.url.trim().isNotEmpty) BackupDestination.webdav,
+      if (s3.endpoint.trim().isNotEmpty &&
+          s3.bucket.trim().isNotEmpty &&
+          s3.accessKeyId.trim().isNotEmpty)
         BackupDestination.s3,
       if (desktop && folder.path.isNotEmpty) BackupDestination.local,
     ];

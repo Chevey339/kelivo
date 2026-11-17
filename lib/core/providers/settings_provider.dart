@@ -2449,20 +2449,41 @@ class SettingsProvider extends ChangeNotifier {
 
   int _webDavWrites = 0;
   int _s3Writes = 0;
+  final _reportedInvalidBackupFields = <String>{};
   bool get savingWebDavConfig => _webDavWrites > 0;
   bool get savingS3Config => _s3Writes > 0;
 
   // BusinessStartupGate loads these preferences before the first frame.
-  WebDavConfig get webDavConfig {
-    final value = _preferences.get(_webDavConfigKey);
-    return value is String
-        ? WebDavConfig.fromJsonString(value)
-        : const WebDavConfig();
+  ({WebDavConfig webDav, S3Config s3}) get backupConfigs {
+    final webDav = WebDavConfig.fromPreference(
+      _preferences.get(_webDavConfigKey),
+      onInvalidField: (field) =>
+          _reportInvalidBackupField(_webDavConfigKey, field),
+    );
+    final s3 = S3Config.fromPreference(
+      _preferences.get(_s3ConfigKey),
+      onInvalidField: (field) => _reportInvalidBackupField(_s3ConfigKey, field),
+    );
+    if (setEquals(webDav.scope.excluded, s3.scope.excluded)) {
+      return (webDav: webDav, s3: s3);
+    }
+    // Both destinations store the shared selection. An explicit exclusion in
+    // either copy still applies if the other copy is missing or damaged.
+    final scope = webDav.scope.intersect(s3.scope);
+    return (
+      webDav: webDav.copyWith(scope: scope),
+      s3: s3.copyWith(scope: scope),
+    );
   }
 
-  S3Config get s3Config {
-    final value = _preferences.get(_s3ConfigKey);
-    return value is String ? S3Config.fromJsonString(value) : const S3Config();
+  WebDavConfig get webDavConfig => backupConfigs.webDav;
+  S3Config get s3Config => backupConfigs.s3;
+
+  void _reportInvalidBackupField(String key, String? field) {
+    final name = field == null ? key : '$key.$field';
+    if (_reportedInvalidBackupFields.add(name)) {
+      debugPrint('[BackupSettings] Ignoring invalid $name.');
+    }
   }
 
   Future<void> updateWebDavConfig(WebDavConfig Function(WebDavConfig) edit) =>
@@ -2484,10 +2505,11 @@ class SettingsProvider extends ChangeNotifier {
     if (s3 != null) _s3Writes++;
     final write = _preferences.runExclusiveMutation(() async {
       await _preferences.load();
+      final current = backupConfigs;
       await _preferences.setMany({
         if (webDav != null)
-          _webDavConfigKey: webDav(webDavConfig).toJsonString(),
-        if (s3 != null) _s3ConfigKey: s3(s3Config).toJsonString(),
+          _webDavConfigKey: webDav(current.webDav).toJsonString(),
+        if (s3 != null) _s3ConfigKey: s3(current.s3).toJsonString(),
       });
     });
     notifyListeners();

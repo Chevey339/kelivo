@@ -238,8 +238,7 @@ class _BackupPageState extends State<BackupPage> {
     final vm = context.watch<BackupProvider>();
     final s3Vm = context.watch<S3BackupProvider>();
     final busy = context.watch<ExternalBackupAutoProvider>().busy;
-    final cfg = settings.webDavConfig;
-    final s3Cfg = settings.s3Config;
+    final (webDav: cfg, s3: s3Cfg) = settings.backupConfigs;
 
     // iOS-style section header
     Widget header(String text, {bool first = false}) => Padding(

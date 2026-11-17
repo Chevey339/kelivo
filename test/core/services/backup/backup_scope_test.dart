@@ -18,6 +18,7 @@ import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
@@ -308,17 +309,59 @@ void main() {
         BackupCategory.environmentVariables,
       });
       expect(
-        WebDavConfig.fromJsonString(
+        WebDavConfig.fromPreference(
           WebDavConfig(scope: scope).toJsonString(),
         ).scope.excluded,
         scope.excluded,
       );
       expect(
-        S3Config.fromJsonString(
+        S3Config.fromPreference(
           S3Config(scope: scope).toJsonString(),
         ).scope.excluded,
         scope.excluded,
       );
+    },
+  );
+
+  test(
+    'file export honors an exclusion that survives only in the S3 settings',
+    () async {
+      const scope = BackupScope(
+        excluded: {
+          BackupCategory.chats,
+          BackupCategory.files,
+          BackupCategory.workspaces,
+        },
+      );
+      final flags = {...scope.toJson(), 'chats': 'invalid'};
+      final prefs = BusinessPreferences(sourceRepository);
+      await prefs.setMany({
+        'webdav_config_v1': jsonEncode({'scope': flags}),
+        's3_config_v1': const S3Config(scope: scope).toJsonString(),
+      });
+      final settings = SettingsProvider(prefs);
+      final config = settings.webDavConfig;
+      await settings.loaded;
+      for (final name in [
+        'images/photo.png',
+        'workspaces/example/file',
+        'skills/example/SKILL.md',
+      ]) {
+        final file = File('${root.path}/$name');
+        await file.parent.create(recursive: true);
+        await file.writeAsString('fixture');
+      }
+      final exported = await exporter.exportToFile(config);
+      final archive = ZipDecoder().decodeBytes(await exported.readAsBytes());
+      final manifest = jsonDecode(
+        utf8.decode(archive.findFile('manifest.json')!.readBytes()!),
+      );
+      expect(manifest['scope'], scope.toJson());
+      expect(archive.findFile('database/kelivo.db'), isNull);
+      expect(archive.findFile('images/photo.png'), isNull);
+      expect(archive.findFile('workspaces/example/file'), isNull);
+      expect(archive.findFile('skills/example/SKILL.md'), isNotNull);
+      expect(() => BackupScope.fromJson(flags), throwsFormatException);
     },
   );
 
