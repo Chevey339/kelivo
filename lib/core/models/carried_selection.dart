@@ -63,6 +63,8 @@ class CarrySelection {
   final bool overBudget;
   final bool reachedBudget;
   final int fitCount;
+  int get replyCount => items.where((item) => item.reply != null).length;
+
   CarriedOriginals freeze(
     CarrySetting setting, {
     bool fromSummaries = false,
@@ -595,9 +597,11 @@ class CarriedSelectionJob {
     operations: operations,
     selection: selection,
     setting: setting,
-    fromSummaries: !automatic && options.carryFromSummaries,
-    excluded: options.carryExcluded.toSet(),
-    replies: automatic ? {} : options.carryReplies.toSet(),
+    fromSummaries: !automatic && !automaticWire && options.carryFromSummaries,
+    excluded: automaticWire ? const {} : options.carryExcluded.toSet(),
+    replies: automatic || automaticWire
+        ? const {}
+        : options.carryReplies.toSet(),
     budgetTokens: budgetTokens,
     kind: kind,
     includeAttachments: options.includeAttachmentsAndTools,

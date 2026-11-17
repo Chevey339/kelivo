@@ -29880,11 +29880,11 @@ abstract class AppLocalizations {
   /// **'Your messages from parts compressed earlier can be included too.'**
   String get compressionCarryEarlierHint;
 
-  /// Compression options panel: Will send {count} · about {tokens} tokens Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
+  /// Summary below Message preview and More settings in manual context compression. Shows how many original user messages and associated assistant replies the current selection would carry, and their combined estimated input tokens. A reply already in retained history is not counted again.
   ///
   /// In en, this message translates to:
-  /// **'Will send {count} · about {tokens} tokens'**
-  String compressionCarryPreview(int count, String tokens);
+  /// **'{count, plural, =1{1 user message} other{{count} user messages}} · {replyCount, plural, =1{1 reply} other{{replyCount} replies}} · about {tokens} tokens'**
+  String compressionCarryPreview(int count, int replyCount, String tokens);
 
   /// Compression options panel: The part being summarized has no messages from you. Refers to original user messages additionally sent with a summary; replies are optional text-only copies.
   ///
@@ -30215,6 +30215,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Message preview'**
   String get compressionCarryListTitle;
+
+  /// Action beside the Message preview heading in manual context compression. Includes the available assistant replies for all currently selected user messages, including collapsed rows. Individual replies can still be switched off.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all replies'**
+  String get compressionCarrySelectAllReplies;
+
+  /// Action beside the Message preview heading in manual context compression. Clears every assistant reply selection for this compression, including collapsed replies and those outside the token budget. The selected user messages stay checked.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all replies'**
+  String get compressionCarryDeselectAllReplies;
+
+  /// Warning on the first user message whose selected assistant reply puts the pair over the remaining token budget in the fit-as-many-as-possible compression preview. This pair is omitted from the totals. The reply can still be switched off.
+  ///
+  /// In en, this message translates to:
+  /// **'This message and its reply exceed the remaining budget. Both will be left out.'**
+  String get compressionCarryPairNotFit;
 
   /// Preview title for a message containing only images. Count is the number of images.
   ///

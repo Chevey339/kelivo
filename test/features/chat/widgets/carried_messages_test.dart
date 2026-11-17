@@ -10,6 +10,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/l10n/app_localizations_en.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 
 void main() {
   final l = AppLocalizationsEn();
@@ -63,7 +64,7 @@ void main() {
               preview: preview,
               onSetting: (v) => setState(() => setting = v),
               onExcluded: (_, v) => excluded = v,
-              onReply: (_, v) => reply = v,
+              onReplies: (_, v) => reply = v,
               onEarlier: (_) {},
             ),
           ),
@@ -105,7 +106,7 @@ void main() {
       serverKeeps: server,
       onSetting: (_) => changed = true,
       onExcluded: (_, _) {},
-      onReply: (_, _) {},
+      onReplies: (_, _) {},
       onEarlier: (_) {},
     );
     await tester.pumpWidget(app(section(false)));
@@ -122,7 +123,7 @@ void main() {
     );
     expect(find.byType(TextField), findsNothing);
     expect(find.text(l.compressionCarryAll), findsOneWidget);
-    expect(find.text(l.compressionCarryPreview(1, '90')), findsOneWidget);
+    expect(find.text(l.compressionCarryPreview(1, 1, '90')), findsOneWidget);
     expect(changed, false);
     expect(find.textContaining('64k'), findsNothing);
     await tester.pumpWidget(app(section(true)));
@@ -143,7 +144,7 @@ void main() {
             onSetting: (v) => setState(() => setting = v),
             onValidity: (v) => valid = v,
             onExcluded: (_, _) {},
-            onReply: (_, _) {},
+            onReplies: (_, _) {},
             onEarlier: (_) {},
           ),
         ),
@@ -199,8 +200,9 @@ void main() {
               replies: replies,
               onSetting: (_) {},
               onExcluded: (_, _) {},
-              onReply: (id, v) =>
-                  setState(() => v ? replies.add(id) : replies.remove(id)),
+              onReplies: (ids, v) => setState(
+                () => v ? replies.addAll(ids) : replies.removeAll(ids),
+              ),
               onEarlier: (_) {},
             ),
           ),
@@ -218,6 +220,144 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(itemReply.text), findsOneWidget);
       expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'selecting and clearing replies covers collapsed rows and allows individual changes',
+    (tester) async {
+      final rows = List.generate(
+        54,
+        (i) => CarryRow(
+          item: item.copyWith(
+            sourceMessageId: 'u$i',
+            text: 'Message $i',
+            removeReply: true,
+          ),
+          selected: i != 1,
+          tokens: 40,
+          availableReply: i == 3 ? null : itemReply,
+          replyInRetained: i == 2,
+        ),
+      );
+      final replies = {'u0'};
+      final excluded = {'u1'};
+      var edits = 0;
+      await tester.pumpWidget(
+        app(
+          StatefulBuilder(
+            builder: (context, setState) => CarriedOptionsSection(
+              setting: const CarrySetting(mode: CarryMode.count, count: 54),
+              preview: CarrySelection(rows: rows),
+              replies: replies,
+              excluded: excluded,
+              onSetting: (_) => fail('Changed the retention mode'),
+              onEarlier: (_) => fail('Changed the range'),
+              onExcluded: (_, _) => fail('Changed a user selection'),
+              onReplies: (ids, included) => setState(() {
+                edits++;
+                if (included) {
+                  replies.addAll(ids);
+                } else {
+                  replies.removeAll(ids);
+                }
+              }),
+            ),
+          ),
+        ),
+      );
+      final selectAll = find.widgetWithText(
+        IosTextButton,
+        l.compressionCarrySelectAllReplies,
+      );
+      final clearAll = find.widgetWithText(
+        IosTextButton,
+        l.compressionCarryDeselectAllReplies,
+      );
+      expect(find.text('Message 53'), findsNothing);
+      expect(clearAll, findsOneWidget);
+      await tester.ensureVisible(selectAll);
+      await tester.tap(selectAll);
+      await tester.pumpAndSettle();
+      expect(edits, 1);
+      expect(replies, {'u0', for (var i = 4; i < 54; i++) 'u$i'});
+      expect(selectAll, findsNothing);
+      await tester.tap(clearAll);
+      await tester.pumpAndSettle();
+      expect(edits, 2);
+      expect(replies, isEmpty);
+      expect(excluded, {'u1'});
+      expect(clearAll, findsNothing);
+      await tester.tap(selectAll);
+      await tester.pumpAndSettle();
+
+      final more = find.text(l.compressionCarryMoreRows(4));
+      await tester.ensureVisible(more);
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      final lastReply = find
+          .byWidgetPredicate(
+            (w) => w is IosSwitch && w.semanticLabel == l.compressionCarryReply,
+          )
+          .last;
+      expect(tester.widget<IosSwitch>(lastReply).value, isTrue);
+      await tester.ensureVisible(lastReply);
+      await tester.tap(lastReply);
+      await tester.pumpAndSettle();
+      expect(edits, 4);
+      expect(replies.contains('u53'), isFalse);
+      expect(replies.length, 50);
+      expect(tester.widget<IosTextButton>(selectAll).onPressed, isNotNull);
+      await tester.ensureVisible(clearAll);
+      await tester.tap(clearAll);
+      await tester.pumpAndSettle();
+      expect(replies, isEmpty);
+    },
+  );
+  testWidgets(
+    'a reply pair outside the budget is editable and excluded from the preview',
+    (tester) async {
+      const result = CarrySelection(
+        rows: [
+          CarryRow(
+            item: item,
+            selected: true,
+            tokens: 40,
+            availableReply: itemReply,
+            replyDoesNotFit: true,
+          ),
+        ],
+        reachedBudget: true,
+        notFit: 1,
+      );
+      final replies = {'u', 'older-outside-budget'};
+      await tester.pumpWidget(
+        app(
+          CarriedOptionsSection(
+            setting: const CarrySetting(mode: CarryMode.all),
+            preview: result,
+            replies: replies,
+            onSetting: (_) {},
+            onEarlier: (_) {},
+            onExcluded: (_, _) {},
+            onReplies: (ids, included) {
+              expect(included, isFalse);
+              replies.removeAll(ids);
+            },
+          ),
+        ),
+      );
+      expect(find.text(l.compressionCarryPreview(0, 0, '0')), findsOneWidget);
+      expect(find.text(l.compressionCarryPairNotFit), findsOneWidget);
+      expect(find.text(itemReply.text), findsNothing);
+      final toggle = tester.widget<IosSwitch>(
+        find.byWidgetPredicate(
+          (w) => w is IosSwitch && w.semanticLabel == l.compressionCarryReply,
+        ),
+      );
+      expect(toggle.value, isTrue);
+      expect(toggle.onChanged, isNotNull);
+      await tester.tap(find.text(l.compressionCarryDeselectAllReplies));
+      expect(replies, isEmpty);
     },
   );
   testWidgets(
@@ -239,12 +379,11 @@ void main() {
           setting: CarrySetting(mode: mode),
           preview: result,
           loading: true,
-          editingSelection: true,
           replies: const {'u'},
           excluded: const {},
           onSetting: (_) {},
           onEarlier: (_) {},
-          onReply: (_, _) {},
+          onReplies: (_, _) {},
           onExcluded: (_, _) {},
         ),
       );
@@ -253,6 +392,7 @@ void main() {
         find.text(
           l.compressionCarryPreview(
             1,
+            1,
             (40 + itemReply.estimatedTokens).toString(),
           ),
         ),
@@ -260,6 +400,17 @@ void main() {
       );
       await tester.pumpWidget(section(CarryMode.all));
       expect(find.text(l.contextUsageStateComputing), findsOneWidget);
+      expect(
+        tester
+            .widget<IosTextButton>(
+              find.widgetWithText(
+                IosTextButton,
+                l.compressionCarryDeselectAllReplies,
+              ),
+            )
+            .onPressed,
+        isNotNull,
+      );
       expect(find.text(item.text), findsOneWidget);
     },
   );

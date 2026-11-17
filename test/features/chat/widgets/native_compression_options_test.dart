@@ -11,11 +11,13 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/models/compression_config.dart';
+import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
+import 'package:Kelivo/features/chat/widgets/carried_options_section.dart';
 import 'package:Kelivo/features/chat/widgets/compress_context_options_dialog.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
@@ -50,6 +52,136 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(const MethodChannel('haptic_feedback'), null);
   });
+  const candidate = CarriedOriginal(
+    sourceMessageId: 'earlier',
+    sourceGroupId: 'earlier',
+    sourceVersion: 0,
+    contentHash: '',
+    text: 'Keep exactly this phrase.',
+  );
+  const reply = CarriedReply(
+    messageIds: ['answer'],
+    text: 'Original reply',
+    estimatedTokens: 25,
+  );
+  const preview = CarrySelection(
+    items: [candidate],
+    rows: [
+      CarryRow(
+        item: candidate,
+        selected: true,
+        tokens: 18,
+        availableReply: reply,
+      ),
+    ],
+    totalTokens: 18,
+  );
+
+  testWidgets(
+    'restoring global Codex retention clears previously checked replies',
+    (tester) async {
+      late SettingsProvider settings;
+      await tester.runAsync(() async {
+        final harness = await createBusinessTestHarness();
+        settings = SettingsProvider(harness.preferences);
+        await settings.loaded;
+        await settings.setProviderConfig(
+          'codex',
+          ProviderConfig(
+            id: 'codex',
+            name: 'Codex',
+            enabled: true,
+            apiKey: '',
+            baseUrl: OAuthProvider.chatgpt.baseUrl,
+            oauthProvider: OAuthProvider.chatgpt,
+            models: const ['chat-model'],
+          ),
+        );
+        await settings.setCurrentModel('codex', 'chat-model');
+      });
+      addTearDown(settings.dispose);
+      late CompressContextOptions lastPreview;
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: CompressContextOptionsDialog(
+                sheet: true,
+                initialOptions: const CompressContextOptions(
+                  native: true,
+                  mode: CompressContextLimitMode.unlimited,
+                ),
+                loadHistory: () async => CompressionHistory.fromMessages([
+                  ChatMessage(
+                    id: 'earlier',
+                    role: 'user',
+                    content: candidate.text,
+                    conversationId: 'c',
+                  ),
+                  ChatMessage(
+                    id: 'answer',
+                    role: 'assistant',
+                    content: reply.text,
+                    conversationId: 'c',
+                  ),
+                ], const []),
+                previewCarried: (options, _) async {
+                  lastPreview = options;
+                  return options.carryReplies.isEmpty
+                      ? preview
+                      : CarrySelection(
+                          items: [candidate.copyWith(reply: reply)],
+                          rows: preview.rows,
+                          totalTokens: 43,
+                        );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await settleCompressionOptions(tester);
+      final context = tester.element(find.byType(CompressContextOptionsDialog));
+      final l = AppLocalizations.of(context)!;
+      final more = find.text(l.compressionMore);
+      final back = find.byTooltip(
+        MaterialLocalizations.of(context).backButtonTooltip,
+      );
+      final native = find.byWidgetPredicate(
+        (w) => w is IosSwitch && w.semanticLabel == l.compressionNativeTitle,
+      );
+      final selectReplies = find.text(l.compressionCarrySelectAllReplies);
+      Future<void> tap(Finder finder) async {
+        await tester.ensureVisible(finder);
+        await tester.tap(finder);
+        await settleCompressionOptions(tester);
+      }
+
+      await tap(more);
+      await tap(selectReplies);
+      expect(lastPreview.carry?.mode, CarryMode.all);
+      expect(lastPreview.carryReplies, [candidate.sourceMessageId]);
+      await tap(back);
+      await tap(native);
+      await tap(more);
+      await tap(find.text(l.compressionAdvancedOptions));
+      await tap(find.text(l.compressionFollowGlobal));
+      await tap(back);
+      await tap(native);
+      await tap(more);
+      expect(lastPreview.native, isTrue);
+      expect(lastPreview.carry?.mode, CarryMode.unset);
+      expect(lastPreview.carryReplies, isEmpty);
+      expect(find.text(l.compressionCarryPreview(1, 0, '18')), findsOneWidget);
+      expect(find.text(l.compressionCarryDeselectAllReplies), findsNothing);
+      await tap(selectReplies);
+      expect(lastPreview.carryReplies, [candidate.sourceMessageId]);
+    },
+  );
+
   for (final mobile in [false, true]) {
     testWidgets('native choice is unrestricted and independent mobile=$mobile', (
       tester,
@@ -67,17 +199,12 @@ void main() {
       late String conversationId;
       var previewAttempts = 0;
       final pendingCount = Completer<CarrySelection>();
-      const candidate = CarriedOriginal(
-        sourceMessageId: 'earlier',
-        sourceGroupId: 'earlier',
-        sourceVersion: 0,
-        contentHash: '',
-        text: 'Keep exactly this phrase.',
-      );
-      const preview = CarrySelection(
-        items: [candidate],
-        rows: [CarryRow(item: candidate, selected: true, tokens: 18)],
-        totalTokens: 18,
+      final pendingRange = Completer<CarrySelection>();
+      final withReply = CarrySelection(
+        items: [candidate.copyWith(reply: reply)],
+        rows: preview.rows,
+        totalTokens: 43,
+        overBudget: true,
       );
       await tester.runAsync(() async {
         final harness = await createBusinessTestHarness();
@@ -155,7 +282,13 @@ void main() {
                           if (options.carryExcluded.isNotEmpty) {
                             return pendingCount.future;
                           }
-                          return preview;
+                          if (options.carry?.count == 1 &&
+                              !pendingRange.isCompleted) {
+                            return pendingRange.future;
+                          }
+                          return options.carryReplies.isEmpty
+                              ? preview
+                              : withReply;
                         },
                         loadHistory: () async =>
                             CompressionHistory.fromMessages([
@@ -240,7 +373,10 @@ void main() {
       await settleCompressionOptions(tester);
       expect(find.text(candidate.text), findsOneWidget);
       expect(tester.widget<IosCheckbox>(candidateCheck()).value, false);
-      expect(find.text(l10n.compressionCarryPreview(0, '0')), findsOneWidget);
+      expect(
+        find.text(l10n.compressionCarryPreview(0, 0, '0')),
+        findsOneWidget,
+      );
       expect(
         tester
             .widget<FormSheetActions>(find.byType(FormSheetActions))
@@ -257,7 +393,10 @@ void main() {
       await settleCompressionOptions(tester);
       expect(find.text(candidate.text), findsOneWidget);
       expect(tester.widget<IosCheckbox>(candidateCheck()).value, true);
-      expect(find.text(l10n.compressionCarryPreview(1, '18')), findsOneWidget);
+      expect(
+        find.text(l10n.compressionCarryPreview(1, 0, '18')),
+        findsOneWidget,
+      );
       final previousAttempts = previewAttempts;
       await tester.runAsync(
         () => settings.setCurrentModel('private', 'other-chat-model'),
@@ -268,9 +407,20 @@ void main() {
         () => settings.setCurrentModel('private', 'unknown-model'),
       );
       await settleCompressionOptions(tester);
-      await tester.ensureVisible(carryToggle);
-      await tester.tap(carryToggle);
+      final selectReplies = find.text(l10n.compressionCarrySelectAllReplies);
+      await tester.ensureVisible(selectReplies);
+      await tester.tap(selectReplies);
       await settleCompressionOptions(tester);
+      expect(find.text(l10n.compressionCarryOverBudget), findsOneWidget);
+      final countField = find.descendant(
+        of: find.byType(CarriedOptionsSection),
+        matching: find.byType(TextField),
+      );
+      await tester.ensureVisible(countField);
+      await tester.enterText(countField, '1');
+      await tester.pumpAndSettle();
+      expect(candidateCheck(), findsNothing);
+      expect(find.text(l10n.compressionCarryOverBudget), findsNothing);
       await tester.tap(
         find.byTooltip(
           MaterialLocalizations.of(
@@ -278,7 +428,12 @@ void main() {
           ).backButtonTooltip,
         ),
       );
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.compressionCarryOverBudget), findsNothing);
+      expect(find.text(l10n.compressionCarryPreview(1, 1, '43')), findsNothing);
+      pendingRange.complete(withReply);
       await settleCompressionOptions(tester);
+      expect(find.text(l10n.compressionCarryOverBudget), findsOneWidget);
       await flip();
       expect(find.text(l10n.compressionManage), findsNothing);
       expect(find.text(l10n.compressionMore), findsOneWidget);
@@ -287,6 +442,7 @@ void main() {
       await tester.enterText(keep(), '');
       await flip(); // Invalid native draft must still allow returning to text.
       expect(tester.widget<TextField>(keep()).controller!.text, '2');
+      expect(find.text(l10n.compressionCarryOverBudget), findsOneWidget);
       await flip();
       await tester.ensureVisible(keep());
       await tester.enterText(keep(), '3');
@@ -349,6 +505,7 @@ void main() {
       }
       await settleCompressionOptions(tester);
       expect(result!.native, isTrue);
+      expect(result!.carryReplies, isEmpty);
       expect(result!.mode, CompressContextLimitMode.unlimited);
       expect(settings.nativeCompression.enabled, isTrue);
       expect(settings.nativeCompression.allHistory, isTrue);

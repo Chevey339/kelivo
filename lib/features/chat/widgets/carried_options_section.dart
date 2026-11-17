@@ -8,7 +8,6 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/segmented_tabs.dart';
-import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'carried_preview_row.dart';
 import 'compression_controls.dart';
@@ -21,7 +20,7 @@ class CarriedOptionsSection extends StatefulWidget {
     required this.preview,
     required this.onSetting,
     required this.onExcluded,
-    required this.onReply,
+    required this.onReplies,
     required this.onEarlier,
     this.onValidity,
     this.codex = false,
@@ -31,14 +30,14 @@ class CarriedOptionsSection extends StatefulWidget {
     this.automatic = false,
     this.newConversation = false,
     this.loading = false,
-    this.editingSelection = false,
     this.excluded,
     this.replies = const {},
   });
   final CarrySetting setting;
   final CarrySelection? preview;
   final ValueChanged<CarrySetting> onSetting;
-  final void Function(String, bool) onExcluded, onReply;
+  final void Function(String, bool) onExcluded;
+  final void Function(Iterable<String> ids, bool included) onReplies;
   final ValueChanged<bool> onEarlier;
   final ValueChanged<bool>? onValidity;
   final bool codex,
@@ -48,7 +47,6 @@ class CarriedOptionsSection extends StatefulWidget {
       automatic,
       newConversation,
       loading;
-  final bool editingSelection;
   final Set<String>? excluded;
   final Set<String> replies;
   @override
@@ -92,28 +90,41 @@ class _CarriedOptionsSectionState extends State<CarriedOptionsSection> {
     );
   }
 
+  bool _isSelected(CarryRow row) => widget.excluded == null
+      ? row.selected
+      : !widget.excluded!.contains(row.item.sourceMessageId);
+
   String _total(AppLocalizations l, CarrySelection preview) {
     if (!widget.loading) {
       return l.compressionCarryPreview(
         preview.items.length,
+        preview.replyCount,
         contextTokenValue(preview.totalTokens),
       );
     }
     // Count mode has a fixed shortlist. Checkbox and reply changes can be
     // counted immediately without waiting for another snapshot of the chat.
-    if (!widget.editingSelection || _all) return l.contextUsageStateComputing;
+    if (_all) return l.contextUsageStateComputing;
     var count = 0;
+    var replyCount = 0;
     var tokens = 0;
     for (final row in preview.rows) {
-      final id = row.item.sourceMessageId;
-      if (widget.excluded?.contains(id) ?? !row.selected) continue;
+      if (!_isSelected(row)) continue;
       count++;
       tokens += row.tokens;
-      if (widget.replies.contains(id) && !row.replyInRetained) {
-        tokens += row.availableReply?.estimatedTokens ?? 0;
+      final reply = row.availableReply;
+      if (reply != null &&
+          !row.replyInRetained &&
+          widget.replies.contains(row.item.sourceMessageId)) {
+        replyCount++;
+        tokens += reply.estimatedTokens;
       }
     }
-    return l.compressionCarryPreview(count, contextTokenValue(tokens));
+    return l.compressionCarryPreview(
+      count,
+      replyCount,
+      contextTokenValue(tokens),
+    );
   }
 
   @override
@@ -122,6 +133,18 @@ class _CarriedOptionsSectionState extends State<CarriedOptionsSection> {
     final cs = Theme.of(context).colorScheme;
     final preview = widget.preview;
     final rows = preview?.rows ?? const <CarryRow>[];
+    final replyIds = rows
+        .where(
+          (row) =>
+              _isSelected(row) &&
+              row.availableReply != null &&
+              !row.replyInRetained,
+        )
+        .map((row) => row.item.sourceMessageId);
+    final hasUncheckedReply = replyIds.any(
+      (id) => !widget.replies.contains(id),
+    );
+    final hasCheckedReplies = widget.replies.isNotEmpty;
     final secondary = TextStyle(
       fontSize: 12,
       height: 1.45,
@@ -239,14 +262,36 @@ class _CarriedOptionsSectionState extends State<CarriedOptionsSection> {
         ),
         if (_on) ...[
           Padding(
-            padding: EdgeInsets.fromLTRB(2, 16, 2, preview == null ? 8 : 3),
-            child: Text(
-              l.compressionCarryListTitle,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: AppFontWeights.semibold,
-                color: cs.onSurface,
-              ),
+            padding: const EdgeInsets.only(top: 12),
+            child: CompressionSectionTitle(
+              title: l.compressionCarryListTitle,
+              action: rows.isEmpty && !hasCheckedReplies
+                  ? null
+                  : Wrap(
+                      alignment: WrapAlignment.end,
+                      children: [
+                        if (hasUncheckedReply || !hasCheckedReplies)
+                          IosTextButton(
+                            label: l.compressionCarrySelectAllReplies,
+                            padding: const EdgeInsets.only(left: 8),
+                            onPressed:
+                                hasUncheckedReply &&
+                                    !widget.loading &&
+                                    !_invalidCount
+                                ? () => widget.onReplies(replyIds, true)
+                                : null,
+                          ),
+                        if (hasCheckedReplies)
+                          IosTextButton(
+                            label: l.compressionCarryDeselectAllReplies,
+                            padding: const EdgeInsets.only(left: 8),
+                            onPressed: () => widget.onReplies(
+                              widget.replies.toList(),
+                              false,
+                            ),
+                          ),
+                      ],
+                    ),
             ),
           ),
           if (preview != null)
@@ -269,16 +314,15 @@ class _CarriedOptionsSectionState extends State<CarriedOptionsSection> {
                   CarriedPreviewRow(
                     key: ValueKey(row.item.sourceMessageId),
                     row: row,
-                    selected: widget.excluded != null
-                        ? !widget.excluded!.contains(row.item.sourceMessageId)
-                        : row.selected,
+                    selected: _isSelected(row),
                     includeReply: widget.replies.contains(
                       row.item.sourceMessageId,
                     ),
                     newConversation: widget.newConversation,
                     onSelect: (v) =>
                         widget.onExcluded(row.item.sourceMessageId, !v),
-                    onReply: (v) => widget.onReply(row.item.sourceMessageId, v),
+                    onReply: (v) =>
+                        widget.onReplies([row.item.sourceMessageId], v),
                   ),
                 ],
                 if (rows.length > _shown)

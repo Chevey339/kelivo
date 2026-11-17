@@ -63,6 +63,8 @@ class _CarriedPreviewRowState extends State<CarriedPreviewRow> {
         clipped.characters.length > 65;
     final compact = clipped.replaceAll(RegExp(r'\s+'), ' ');
     final reply = row.availableReply;
+    final showReplyText =
+        widget.includeReply && !row.replyInRetained && !row.replyDoesNotFit;
     final fileText = files.isNotEmpty && row.item.effectiveText.trim() != raw
         ? row.item.effectiveText.trim()
         : '';
@@ -71,7 +73,7 @@ class _CarriedPreviewRowState extends State<CarriedPreviewRow> {
         count > 4 ||
         files.length > 1 ||
         fileText.isNotEmpty ||
-        (widget.includeReply && (reply?.effectiveText.length ?? 0) > 150);
+        (showReplyText && (reply?.effectiveText.length ?? 0) > 150);
     final gallery = imageItems.whereType<String>().toList();
     final visibleImages = _expanded ? imageItems : imageItems.take(4);
     return Padding(
@@ -253,10 +255,10 @@ class _CarriedPreviewRowState extends State<CarriedPreviewRow> {
                     Text(l.compressionCarryReplyInKept, style: small),
                   if (row.replyDoesNotFit && widget.includeReply)
                     Text(
-                      l.compressionCarryOverBudget,
+                      l.compressionCarryPairNotFit,
                       style: small.copyWith(color: context.appColors.warning),
                     ),
-                  if (widget.includeReply && !row.replyInRetained)
+                  if (showReplyText)
                     Padding(
                       padding: const EdgeInsets.only(left: 4, bottom: 6),
                       child: DecoratedBox(

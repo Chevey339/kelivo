@@ -79,20 +79,26 @@ class CompressContextOptionsDialog extends StatefulWidget {
       _CompressContextOptionsDialogState();
 }
 
+class _CarryChoices {
+  bool fromSummaries = false;
+  final excluded = <String>{};
+  final replies = <String>{};
+}
+
 class _CompressContextOptionsDialogState
     extends State<CompressContextOptionsDialog> {
   Object? _carryError;
   CarrySelection? _carryPreview;
   ({String key, String scope, CarrySelection value})? _lastCarryPreview;
-  bool _carryEditingSelection = false;
   int _carryGeneration = 0;
   (String?, String?)? _carryModel;
   bool _carryLoading = false;
   bool _carryCountValid = true;
   String? _carryKey;
-  bool _carryEarlier = false;
-  final _carryExcluded = <String>{};
-  final _carryReplies = <String>{};
+  final _textCarryChoices = _CarryChoices();
+  var _nativeCarryChoices = _CarryChoices();
+  _CarryChoices get _carryChoices =>
+      _native ? _nativeCarryChoices : _textCarryChoices;
   late CompressionConfig _config;
   Map<String, dynamic> _overrides = {};
   List<CompressionTemplate> _templates = builtInCompressionTemplates;
@@ -149,7 +155,6 @@ class _CompressContextOptionsDialogState
         ? null
         : widget.initialOptions;
     _nativePreferences = settings.nativeCompression;
-    _config = settings.compressionDefaults;
     _mode = initial?.mode ?? settings.compressLimitMode;
     _source = initial?.historySource ?? ContextHistorySource.effective;
     _newConversation =
@@ -158,7 +163,7 @@ class _CompressContextOptionsDialogState
     _maxChars.text = '${initial?.maxChars ?? settings.compressMaxChars}';
     _includeManual = initial?.includeEditedSummaries ?? true;
     _includeAttachments = initial?.includeAttachmentsAndTools ?? true;
-    _fillFields();
+    _restoreConfig(settings.compressionDefaults);
     if (initial?.keepUserMessages case final int keep) _keep.text = '$keep';
     _textMode = _mode;
     _textKeep = _keep.text;
@@ -328,7 +333,11 @@ class _CompressContextOptionsDialogState
     unawaited(_load());
   }
 
-  void _fillFields() {
+  void _restoreConfig(CompressionConfig config) {
+    _config = config;
+    if (config.nativeCarryOriginals.mode == CarryMode.unset) {
+      _nativeCarryChoices = _CarryChoices();
+    }
     _keep.text = '${_config.keepRecentUserTurns}';
     _length.text = '${_config.summaryTokens}';
     _outputBudget.text = _config.maxOutputTokens?.toString() ?? '';
@@ -362,9 +371,8 @@ class _CompressContextOptionsDialogState
         if (!_configLoaded) {
           _configLoaded = true;
           _overrides = overrides;
-          _config = settings.compressionDefaults.withOverrides(overrides);
           final nativeKeep = _keep.text;
-          _fillFields();
+          _restoreConfig(settings.compressionDefaults.withOverrides(overrides));
           if (widget.initialOptions?.native != true &&
               widget.initialOptions?.keepUserMessages != null) {
             _keep.text = '${widget.initialOptions!.keepUserMessages}';
@@ -444,9 +452,10 @@ class _CompressContextOptionsDialogState
     native: _native,
     carry: _native ? _config.nativeCarryOriginals : _config.carryOriginals,
     carryFromSummaries:
-        _carryEarlier && (_selection?.dependencies.isNotEmpty ?? false),
-    carryExcluded: _carryExcluded.toList(),
-    carryReplies: _carryReplies.toList(),
+        _carryChoices.fromSummaries &&
+        (_selection?.dependencies.isNotEmpty ?? false),
+    carryExcluded: _carryChoices.excluded.toList(),
+    carryReplies: _carryChoices.replies.toList(),
     maxChars:
         _mode == CompressContextLimitMode.start ||
             _mode == CompressContextLimitMode.recent
@@ -489,7 +498,14 @@ class _CompressContextOptionsDialogState
       return;
     }
     final callback = widget.previewCarried;
-    if (callback == null || _selection == null) return;
+    if (callback == null || _selection == null) {
+      if (_carryKey != null) _carryGeneration++;
+      _carryKey = null;
+      _carryPreview = null;
+      _carryError = null;
+      _carryLoading = callback != null && _rangeError == null;
+      return;
+    }
     final options = _options();
     final config = _config.withOverrides({
       'summaryTokens':
@@ -513,11 +529,13 @@ class _CompressContextOptionsDialogState
     ]);
     if (_carryKey == key) return;
     _carryKey = key;
-    _carryEditingSelection = _lastCarryPreview?.scope == scope;
+    final cached = _lastCarryPreview;
+    _carryPreview = cached != null && cached.scope == scope
+        ? cached.value
+        : null;
     _carryError = null;
     final generation = ++_carryGeneration;
-    if (_lastCarryPreview case final cached? when cached.key == key) {
-      _carryPreview = cached.value;
+    if (cached?.key == key) {
       _carryLoading = false;
       return;
     }
@@ -537,6 +555,7 @@ class _CompressContextOptionsDialogState
           setState(() {
             _carryLoading = false;
             _carryError = error;
+            _carryPreview = null;
           });
         }
       },
@@ -557,13 +576,12 @@ class _CompressContextOptionsDialogState
           serverKeeps: _native && !codex,
           preview: _carryPreview,
           loading: _carryLoading,
-          editingSelection: _carryEditingSelection,
-          excluded: _carryExcluded,
+          excluded: _carryChoices.excluded,
           hasSummaries: _selection?.dependencies.isNotEmpty ?? false,
-          earlier: _carryEarlier,
+          earlier: _carryChoices.fromSummaries,
           newConversation: _newConversation,
           automatic: _config.mode == AutoCompressionMode.auto,
-          replies: _carryReplies,
+          replies: _carryChoices.replies,
           onValidity: (valid) => setState(() => _carryCountValid = valid),
           onSetting: (value) {
             _carryCountValid = true;
@@ -574,26 +592,26 @@ class _CompressContextOptionsDialogState
           },
           onEarlier: (value) {
             _explicitCarry(codex);
-            setState(() => _carryEarlier = value);
+            setState(() => _carryChoices.fromSummaries = value);
           },
           onExcluded: (id, excluded) {
             _explicitCarry(codex);
             setState(() {
               if (excluded) {
-                _carryExcluded.add(id);
-                _carryReplies.remove(id);
+                _carryChoices.excluded.add(id);
+                _carryChoices.replies.remove(id);
               } else {
-                _carryExcluded.remove(id);
+                _carryChoices.excluded.remove(id);
               }
             });
           },
-          onReply: (id, included) {
+          onReplies: (ids, included) {
             _explicitCarry(codex);
             setState(() {
               if (included) {
-                _carryReplies.add(id);
+                _carryChoices.replies.addAll(ids);
               } else {
-                _carryReplies.remove(id);
+                _carryChoices.replies.removeAll(ids);
               }
             });
           },
@@ -750,16 +768,17 @@ class _CompressContextOptionsDialogState
       if (!mounted) return;
       setState(() {
         final mode = _config.mode;
-        _config = result.settings.withOverrides({
-          'mode': mode.name,
-          'nativeEnabled': _config.nativeEnabled,
-          'nativeKeepRecentUserTurns': _config.nativeKeepRecentUserTurns,
-          'nativeTriggerInputRatio': _config.nativeTriggerInputRatio,
-          'templateId': template.id,
-        });
+        _restoreConfig(
+          result.settings.withOverrides({
+            'mode': mode.name,
+            'nativeEnabled': _config.nativeEnabled,
+            'nativeKeepRecentUserTurns': _config.nativeKeepRecentUserTurns,
+            'nativeTriggerInputRatio': _config.nativeTriggerInputRatio,
+            'templateId': template.id,
+          }),
+        );
         _overrides.addAll(_config.toJson(includeMode: false));
         _focus.text = result.focus;
-        _fillFields();
       });
     } else if (result is CompressionTemplate) {
       _change({'templateId': result.id});
@@ -1358,14 +1377,15 @@ class _CompressContextOptionsDialogState
                         label: l10n.compressionMore,
                         subtitle: _carryError != null
                             ? l10n.contextOperationsLoadFailed
-                            : _carryPreview?.overBudget == true
+                            : _carryLoading || _carryPreview == null
+                            ? null
+                            : _carryPreview!.overBudget
                             ? l10n.compressionCarryOverBudget
-                            : _carryPreview != null && !_carryLoading
-                            ? l10n.compressionCarryPreview(
+                            : l10n.compressionCarryPreview(
                                 _carryPreview!.items.length,
+                                _carryPreview!.replyCount,
                                 contextTokenValue(_carryPreview!.totalTokens),
-                              )
-                            : null,
+                              ),
                         leading: Icon(
                           LucideIcons.slidersHorizontal,
                           size: 18,
@@ -1679,11 +1699,10 @@ class _CompressContextOptionsDialogState
                                 mainAxisAlignment: MainAxisAlignment.start,
                                 onPressed: () => setState(() {
                                   _overrides = {};
-                                  _config = settings.compressionDefaults;
                                   _mode = settings.compressLimitMode;
                                   _maxChars.text =
                                       '${settings.compressMaxChars}';
-                                  _fillFields();
+                                  _restoreConfig(settings.compressionDefaults);
                                 }),
                               ),
                             ],

@@ -116,6 +116,10 @@ void main() {
       expect(l10n.settingsSearchResultCount(21).replaceAll('21', ''), one);
       expect(l10n.settingsSearchResultCount(22).replaceAll('22', ''), few);
       expect(l10n.settingsSearchResultCount(11).replaceAll('11', ''), many);
+      expect(
+        l10n.compressionCarryPreview(101, 21, '800'),
+        contains('101 сообщение пользователя · 21 ответ'),
+      );
     },
   );
 }

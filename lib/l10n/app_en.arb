@@ -22138,13 +22138,17 @@
   "@compressionCarryEarlierHint": {
     "description": "Compression options panel: Your messages from parts compressed earlier can be included too. Refers to original user messages additionally sent with a summary; replies are optional text-only copies."
   },
-  "compressionCarryPreview": "Will send {count} · about {tokens} tokens",
+  "compressionCarryPreview": "{count, plural, =1{1 user message} other{{count} user messages}} · {replyCount, plural, =1{1 reply} other{{replyCount} replies}} · about {tokens} tokens",
   "@compressionCarryPreview": {
-    "description": "Compression options panel: Will send {count} · about {tokens} tokens Refers to original user messages additionally sent with a summary; replies are optional text-only copies.",
+    "description": "Summary below Message preview and More settings in manual context compression. Shows how many original user messages and associated assistant replies the current selection would carry, and their combined estimated input tokens. A reply already in retained history is not counted again.",
     "placeholders": {
       "count": {
         "type": "int",
-        "description": "Number of user messages"
+        "description": "Number of original user messages carried with the summary"
+      },
+      "replyCount": {
+        "type": "int",
+        "description": "Number of carried user messages that also carry their assistant reply"
       },
       "tokens": {
         "type": "String",
@@ -22406,6 +22410,18 @@
   "compressionCarryListTitle": "Message preview",
   "@compressionCarryListTitle": {
     "description": "Heading above the list of messages the user can select in the compression settings."
+  },
+  "compressionCarrySelectAllReplies": "Select all replies",
+  "@compressionCarrySelectAllReplies": {
+    "description": "Action beside the Message preview heading in manual context compression. Includes the available assistant replies for all currently selected user messages, including collapsed rows. Individual replies can still be switched off."
+  },
+  "compressionCarryDeselectAllReplies": "Deselect all replies",
+  "@compressionCarryDeselectAllReplies": {
+    "description": "Action beside the Message preview heading in manual context compression. Clears every assistant reply selection for this compression, including collapsed replies and those outside the token budget. The selected user messages stay checked."
+  },
+  "compressionCarryPairNotFit": "This message and its reply exceed the remaining budget. Both will be left out.",
+  "@compressionCarryPairNotFit": {
+    "description": "Warning on the first user message whose selected assistant reply puts the pair over the remaining token budget in the fit-as-many-as-possible compression preview. This pair is omitted from the totals. The reply can still be switched off."
   },
   "compressionCarryImageCount": "{count, plural, =1{1 image} other{{count} images}}",
   "@compressionCarryImageCount": {

@@ -17019,8 +17019,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your messages from parts compressed earlier can be included too.';
 
   @override
-  String compressionCarryPreview(int count, String tokens) {
-    return 'Will send $count · about $tokens tokens';
+  String compressionCarryPreview(int count, int replyCount, String tokens) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count user messages',
+      one: '1 user message',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      replyCount,
+      locale: localeName,
+      other: '$replyCount replies',
+      one: '1 reply',
+    );
+    return '$_temp0 · $_temp1 · about $tokens tokens';
   }
 
   @override
@@ -17210,6 +17222,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressionCarryListTitle => 'Message preview';
+
+  @override
+  String get compressionCarrySelectAllReplies => 'Select all replies';
+
+  @override
+  String get compressionCarryDeselectAllReplies => 'Deselect all replies';
+
+  @override
+  String get compressionCarryPairNotFit =>
+      'This message and its reply exceed the remaining budget. Both will be left out.';
 
   @override
   String compressionCarryImageCount(int count) {

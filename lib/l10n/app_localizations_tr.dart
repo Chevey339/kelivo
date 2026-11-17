@@ -17115,8 +17115,20 @@ class AppLocalizationsTr extends AppLocalizations {
       'Daha önce sıkıştırılan kısımlardaki mesajlarınız da dahil edilebilir.';
 
   @override
-  String compressionCarryPreview(int count, String tokens) {
-    return '$count mesaj gönderilecek · yaklaşık $tokens token';
+  String compressionCarryPreview(int count, int replyCount, String tokens) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count kullanıcı mesajı',
+      one: '1 kullanıcı mesajı',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      replyCount,
+      locale: localeName,
+      other: '$replyCount yanıt',
+      one: '1 yanıt',
+    );
+    return '$_temp0 · $_temp1 · yaklaşık $tokens token';
   }
 
   @override
@@ -17304,6 +17316,17 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressionCarryListTitle => 'Mesaj önizlemesi';
+
+  @override
+  String get compressionCarrySelectAllReplies => 'Tüm yanıtları seç';
+
+  @override
+  String get compressionCarryDeselectAllReplies =>
+      'Tüm yanıtların seçimini kaldır';
+
+  @override
+  String get compressionCarryPairNotFit =>
+      'Bu mesaj ve yanıtı kalan bütçeyi aşıyor. İkisi de dışarıda bırakılacak.';
 
   @override
   String compressionCarryImageCount(int count) {

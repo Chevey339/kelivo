@@ -444,10 +444,13 @@ void main() {
         ],
       };
       final r = CompressionRequest(
-        options: const CompressContextOptions(
+        options: CompressContextOptions(
           mode: CompressContextLimitMode.keepRecent,
           keepUserMessages: 6,
           native: true,
+          carryReplies: [original.messages[2].id],
+          carryExcluded: [original.messages.first.id],
+          carryFromSummaries: true,
         ),
         codex: true,
         model: 'test',
@@ -468,6 +471,7 @@ void main() {
         ),
       );
       final preview = await compression.previewCarried(id, r);
+      expect(preview.replyCount, 0);
       await compression.start(id, r);
       await until(
         () => compression.taskFor(id)!.phase == CompressionPhase.completed,
@@ -475,6 +479,7 @@ void main() {
       final op = (await chat.loadContextOperations(id, refresh: true)).single;
       expect(op.nativePayload!.output, hasLength(1));
       expect(op.carried!.origin, 'auto');
+      expect(op.carried!.fromSummaries, isFalse);
       expect(op.carried!.setting.mode, CarryMode.unset);
       expect(
         op.carried!.items.map((i) => i.wire),
@@ -484,6 +489,13 @@ void main() {
         original.messages[0].id,
         original.messages[2].id,
       ]);
+      expect(
+        preview.totalTokens,
+        op.carried!.items.fold<int>(
+          0,
+          (sum, item) => sum + item.estimatedTokens,
+        ),
+      );
       await chat.changeContextOperation(
         id,
         op.id,

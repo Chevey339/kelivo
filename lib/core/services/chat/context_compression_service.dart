@@ -446,7 +446,10 @@ class ContextCompressionService extends ChangeNotifier {
               .map((m) => m.id),
           covered: selection.covered.map(ContextMessageMetadata.fromMessage),
           retained: selection.retained.map((m) => m.id).toSet(),
-          fromSummaries: !request.automatic && options.carryFromSummaries,
+          fromSummaries:
+              !request.automatic &&
+              !automaticWire &&
+              options.carryFromSummaries,
           inherited: copies,
         );
     final ids =
@@ -823,17 +826,12 @@ class ContextCompressionService extends ChangeNotifier {
       );
       _check(task);
       if (carry.overBudget) throw StateError('compression_carry_over_budget');
-      final setting =
-          task.options.carry ??
-          (task.options.native
-              ? request.config.nativeCarryOriginals
-              : request.config.carryOriginals);
+      final setting = _carrySetting(request);
+      final automaticWire = request.codex && setting.mode == CarryMode.unset;
       final carried = carry.freeze(
         setting,
-        fromSummaries: task.options.carryFromSummaries,
-        origin: request.codex && setting.mode == CarryMode.unset
-            ? 'auto'
-            : 'explicit',
+        fromSummaries: !automaticWire && task.options.carryFromSummaries,
+        origin: automaticWire ? 'auto' : 'explicit',
       );
       if (task.options.native) {
         await _runNative(task, snapshot, sourceMessages, selection, carried);

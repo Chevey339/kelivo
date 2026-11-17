@@ -16497,8 +16497,20 @@ class AppLocalizationsKo extends AppLocalizations {
       '이전에 압축된 부분에 포함된 내 메시지도 함께 포함할 수 있습니다.';
 
   @override
-  String compressionCarryPreview(int count, String tokens) {
-    return '$count개 전송 · 약 $tokens 토큰';
+  String compressionCarryPreview(int count, int replyCount, String tokens) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '사용자 메시지 $count개',
+      one: '사용자 메시지 1개',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      replyCount,
+      locale: localeName,
+      other: '답변 $replyCount개',
+      one: '답변 1개',
+    );
+    return '$_temp0 · $_temp1 · 약 $tokens 토큰';
   }
 
   @override
@@ -16681,6 +16693,16 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compressionCarryListTitle => '메시지 미리보기';
+
+  @override
+  String get compressionCarrySelectAllReplies => '모든 답변 선택';
+
+  @override
+  String get compressionCarryDeselectAllReplies => '모든 답변 선택 해제';
+
+  @override
+  String get compressionCarryPairNotFit =>
+      '이 메시지와 해당 답장이 남은 예산을 초과합니다. 둘 다 제외됩니다.';
 
   @override
   String compressionCarryImageCount(int count) {
