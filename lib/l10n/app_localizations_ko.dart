@@ -2183,6 +2183,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupPageImportFromOtherApps => '다른 앱에서 가져오기';
 
   @override
+  String get backupPageImportFromOtherAppsSubtitle =>
+      '최신 Chatbox 및 Cherry Studio 2.x 백업과 ChatGPT, Claude, DeepSeek, Gemini, Grok, Open WebUI, NextChat, LobeChat을 지원합니다. 브라우저에서 로컬로 Kelivo 백업으로 변환하며 파일은 업로드되지 않습니다.';
+
+  @override
+  String get backupPageOpenImportToolbox => '도구 상자 열기';
+
+  @override
+  String backupPageImportToolboxOpenFailed(String url) {
+    return '브라우저를 열 수 없습니다. 다음 URL을 직접 여세요: $url';
+  }
+
+  @override
+  String get backupPageToolboxImportMergeOnlyHint =>
+      '공식 도구 상자에서 변환된 파일입니다. 기존 데이터에 병합되며 이 기기에 이미 있는 채팅과 어시스턴트를 대체하지 않습니다.';
+
+  @override
   String get backupPageNotSupportedYet => '아직 지원되지 않음';
 
   @override
@@ -2268,7 +2284,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return '이 백업은 Cherry Studio 형식 버전 $version을(를) 사용하며, Kelivo에서는 아직 가져올 수 없습니다. Cherry Studio v1에서 내보내거나 Cherry Studio v2 백업을 지원하는 Kelivo 업데이트를 기다리세요.';
+    return 'Cherry Studio 2.x 백업(형식 버전 $version)으로, 앱에서 직접 가져올 수 없습니다. 공식 도구 상자에서 Kelivo 백업으로 변환한 뒤 \'백업 파일 가져오기\'에서 \'병합\'을 선택하세요. 변환은 브라우저에서 로컬로 이루어지며 파일은 업로드되지 않습니다.';
+  }
+
+  @override
+  String backupPageChatboxUnsupportedBackupVersion(String version) {
+    return '최신 Chatbox 백업(형식 버전 $version)으로, 앱에서 직접 가져올 수 없습니다. 공식 도구 상자에서 Kelivo 백업으로 변환한 뒤 \'백업 파일 가져오기\'에서 \'병합\'을 선택하세요. 변환은 브라우저에서 로컬로 이루어지며 파일은 업로드되지 않습니다.';
   }
 
   @override

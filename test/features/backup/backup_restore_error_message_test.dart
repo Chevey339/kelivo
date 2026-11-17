@@ -4,10 +4,43 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
+import 'package:Kelivo/core/services/backup/chatbox_backup_archive.dart';
+import 'package:Kelivo/core/services/backup/cherry_direct_backup_reader.dart';
 import 'package:Kelivo/features/backup/backup_restore_error_message.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 void main() {
+  test(
+    'toolbox errors reference the actual backup actions in every locale',
+    () {
+      for (final locale in AppLocalizations.supportedLocales) {
+        final l10n = lookupAppLocalizations(locale);
+        for (final error in [
+          ChatboxUnsupportedBackupVersionException(4),
+          const CherryUnsupportedBackupVersionException(8),
+        ]) {
+          final failure = describeBackupTaskFailure(l10n, error);
+          expect(failure.showToolbox, isTrue);
+          expect(
+            failure.message,
+            contains(l10n.backupPageImportBackupFile),
+            reason: '$locale',
+          );
+          expect(
+            failure.message,
+            contains(l10n.backupPageMergeMode),
+            reason: '$locale',
+          );
+        }
+        const invalid = ChatboxImportException('missing manifest.json');
+        expect(describeBackupTaskFailure(l10n, invalid), (
+          message: invalid.message,
+          showToolbox: false,
+        ));
+      }
+    },
+  );
+
   testWidgets('returns a generic restore error message', (tester) async {
     late BuildContext context;
     await tester.pumpWidget(

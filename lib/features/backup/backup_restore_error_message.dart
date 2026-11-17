@@ -6,6 +6,31 @@ import '../../core/providers/external_backup_auto_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/services/backup/backup_cancel_token.dart';
 import '../../core/services/backup/backup_encryption.dart';
+import '../../core/services/backup/chatbox_backup_archive.dart';
+import '../../core/services/backup/cherry_direct_backup_reader.dart';
+
+typedef BackupTaskFailure = ({String message, bool showToolbox});
+
+BackupTaskFailure describeBackupTaskFailure(
+  AppLocalizations l10n,
+  Object error, {
+  String Function(Object)? errorMessage,
+}) {
+  final toolboxMessage = switch (error) {
+    ChatboxUnsupportedBackupVersionException(:final version) =>
+      l10n.backupPageChatboxUnsupportedBackupVersion('$version'),
+    CherryUnsupportedBackupVersionException(:final version) =>
+      l10n.backupPageCherryStudioUnsupportedBackupVersion('$version'),
+    _ => null,
+  };
+  return (
+    message:
+        toolboxMessage ??
+        errorMessage?.call(error) ??
+        backupRestoreErrorMessage(l10n, error),
+    showToolbox: toolboxMessage != null,
+  );
+}
 
 String backupRestoreErrorMessage(AppLocalizations localizations, Object error) {
   if (error is BackupMacKeychainAccessError) {

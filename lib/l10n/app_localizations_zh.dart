@@ -2134,6 +2134,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromOtherApps => '从其他APP导入';
 
   @override
+  String get backupPageImportFromOtherAppsSubtitle =>
+      '新版 Chatbox、Cherry Studio 2.x，以及 ChatGPT、Claude、DeepSeek、Gemini、Grok、Open WebUI、NextChat、LobeChat。在浏览器本地转换成 Kelivo 备份后再导入，文件不会上传。';
+
+  @override
+  String get backupPageOpenImportToolbox => '打开工具箱';
+
+  @override
+  String backupPageImportToolboxOpenFailed(String url) {
+    return '无法打开浏览器，请手动访问：$url';
+  }
+
+  @override
+  String get backupPageToolboxImportMergeOnlyHint =>
+      '这是官方工具箱转换的备份。导入会合并到现有数据，不会替换已有聊天和助手。';
+
+  @override
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
@@ -2219,7 +2235,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return '此备份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。';
+    return '这是 Cherry Studio 2.x 备份（格式版本 $version），App 里暂时不能直接导入。请到官方工具箱转换成 Kelivo 备份，再回到「备份文件导入」，并选择「合并」。转换在浏览器本地完成，文件不会上传。';
+  }
+
+  @override
+  String backupPageChatboxUnsupportedBackupVersion(String version) {
+    return '这是 Chatbox 新版备份（格式版本 $version），App 里暂时不能直接导入。请到官方工具箱转换成 Kelivo 备份，再回到「备份文件导入」，并选择「合并」。转换在浏览器本地完成，文件不会上传。';
   }
 
   @override
@@ -18605,6 +18626,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromOtherApps => '从其他APP导入';
 
   @override
+  String get backupPageImportFromOtherAppsSubtitle =>
+      '新版 Chatbox、Cherry Studio 2.x，以及 ChatGPT、Claude、DeepSeek、Gemini、Grok、Open WebUI、NextChat、LobeChat。在浏览器本地转换成 Kelivo 备份后再导入，文件不会上传。';
+
+  @override
+  String get backupPageOpenImportToolbox => '打开工具箱';
+
+  @override
+  String backupPageImportToolboxOpenFailed(String url) {
+    return '无法打开浏览器，请手动访问：$url';
+  }
+
+  @override
+  String get backupPageToolboxImportMergeOnlyHint =>
+      '这是官方工具箱转换的备份。导入会合并到现有数据，不会替换已有聊天和助手。';
+
+  @override
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
@@ -18690,7 +18727,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return '此备份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。';
+    return '这是 Cherry Studio 2.x 备份（格式版本 $version），App 里暂时不能直接导入。请到官方工具箱转换成 Kelivo 备份，再回到「备份文件导入」，并选择「合并」。转换在浏览器本地完成，文件不会上传。';
+  }
+
+  @override
+  String backupPageChatboxUnsupportedBackupVersion(String version) {
+    return '这是 Chatbox 新版备份（格式版本 $version），App 里暂时不能直接导入。请到官方工具箱转换成 Kelivo 备份，再回到「备份文件导入」，并选择「合并」。转换在浏览器本地完成，文件不会上传。';
   }
 
   @override
@@ -35082,6 +35124,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageImportFromOtherApps => '從其他APP匯入';
 
   @override
+  String get backupPageImportFromOtherAppsSubtitle =>
+      '新版 Chatbox、Cherry Studio 2.x，以及 ChatGPT、Claude、DeepSeek、Gemini、Grok、Open WebUI、NextChat、LobeChat。在瀏覽器本機轉換成 Kelivo 備份後再匯入，檔案不會上傳。';
+
+  @override
+  String get backupPageOpenImportToolbox => '開啟工具箱';
+
+  @override
+  String backupPageImportToolboxOpenFailed(String url) {
+    return '無法開啟瀏覽器，請手動前往：$url';
+  }
+
+  @override
+  String get backupPageToolboxImportMergeOnlyHint =>
+      '這是官方工具箱轉換的備份。匯入會合併到現有資料，不會取代已有聊天和助手。';
+
+  @override
   String get backupPageNotSupportedYet => '暫不支援';
 
   @override
@@ -35167,7 +35225,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return '此備份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚無法匯入。請改用 Cherry Studio v1 匯出備份，或等待後續版本支援 Cherry Studio v2。';
+    return '這是 Cherry Studio 2.x 備份（格式版本 $version），App 裡暫時無法直接匯入。請到官方工具箱轉換成 Kelivo 備份，再回到「備份檔案匯入」，並選擇「合併」。轉換在瀏覽器本機完成，檔案不會上傳。';
+  }
+
+  @override
+  String backupPageChatboxUnsupportedBackupVersion(String version) {
+    return '這是 Chatbox 新版備份（格式版本 $version），App 裡暫時無法直接匯入。請到官方工具箱轉換成 Kelivo 備份，再回到「備份檔案匯入」，並選擇「合併」。轉換在瀏覽器本機完成，檔案不會上傳。';
   }
 
   @override

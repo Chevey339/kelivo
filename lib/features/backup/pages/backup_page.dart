@@ -32,7 +32,9 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
+import '../../../core/services/backup/import_toolbox.dart';
 import '../backup_restore_error_message.dart';
+import '../import_toolbox_link.dart';
 import '../forward_compat_consent_dialog.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
@@ -155,7 +157,10 @@ class _BackupPageState extends State<BackupPage> {
     );
   }
 
-  Future<RestoreMode?> _chooseImportModeDialog(BuildContext context) {
+  Future<RestoreMode?> _chooseImportModeDialog(
+    BuildContext context, {
+    bool mergeOnly = false,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     final cardColor = context.appColors.surfaceFill;
 
@@ -166,13 +171,16 @@ class _BackupPageState extends State<BackupPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _ActionCard(
-              color: cardColor,
-              icon: Lucide.RotateCw,
-              title: l10n.backupPageOverwriteMode,
-              subtitle: l10n.backupPageOverwriteModeDescription,
-              onTap: () => Navigator.of(ctx).pop(RestoreMode.overwrite),
-            ),
+            if (mergeOnly)
+              Text(l10n.backupPageToolboxImportMergeOnlyHint)
+            else
+              _ActionCard(
+                color: cardColor,
+                icon: Lucide.RotateCw,
+                title: l10n.backupPageOverwriteMode,
+                subtitle: l10n.backupPageOverwriteModeDescription,
+                onTap: () => Navigator.of(ctx).pop(RestoreMode.overwrite),
+              ),
             const SizedBox(height: 10),
             _ActionCard(
               color: cardColor,
@@ -1143,6 +1151,14 @@ class _BackupPageState extends State<BackupPage> {
             label: l10n.backupPageImportFromChatbox,
             onTap: busy ? null : () => _doImportChatbox(context),
           ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.ExternalLink,
+            label: l10n.backupPageImportFromOtherApps,
+            subtitle: l10n.backupPageImportFromOtherAppsSubtitle,
+            onTap: () => openImportToolbox(context),
+          ),
         ],
       ),
       if (Platform.isIOS)
@@ -1186,14 +1202,7 @@ class _BackupPageState extends State<BackupPage> {
     final ok = await runBackupTask(
       context,
       title: l10n.backupPageImportFromCherryStudio,
-      errorMessage: (error) {
-        if (error is CherryUnsupportedBackupVersionException) {
-          return l10n.backupPageCherryStudioUnsupportedBackupVersion(
-            '${error.version}',
-          );
-        }
-        return error.toString();
-      },
+      errorMessage: (error) => error.toString(),
       task: (handle) async {
         imported = await CherryImporter.importFromCherryStudio(
           file: File(path),
@@ -1371,16 +1380,19 @@ class _BackupPageState extends State<BackupPage> {
       // below validates both ordinary ZIPs and encrypted backups.
       type: FileType.any,
     );
-    final path = result?.files.single.path;
+    final picked = result?.files.single;
+    final path = picked?.path;
     if (path == null) return;
+    final file = File(path);
+    final mergeOnly = await isToolboxChatImport(file, fileName: picked!.name);
     if (!context.mounted) return;
 
-    final mode = await _chooseImportModeDialog(context);
+    final mode = await _chooseImportModeDialog(context, mergeOnly: mergeOnly);
     if (mode == null) return;
     if (!context.mounted) return;
 
     // Settle the schema question before the progress dialog goes up.
-    final decision = await resolveForwardCompatibility(context, File(path));
+    final decision = await resolveForwardCompatibility(context, file);
     if (!context.mounted) return;
     if (decision == ForwardCompatDecision.cancelled) return;
     if (decision == ForwardCompatDecision.unreadable) {
@@ -1392,7 +1404,7 @@ class _BackupPageState extends State<BackupPage> {
       await _runWithImportingOverlay(
         context,
         (handle) => vm.restoreFromLocalFile(
-          File(path),
+          file,
           mode: mode,
           onProgress: handle.report,
           cancelToken: handle.cancelToken,

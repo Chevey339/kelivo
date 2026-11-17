@@ -4132,6 +4132,30 @@ abstract class AppLocalizations {
   /// **'Import from Other Apps'**
   String get backupPageImportFromOtherApps;
 
+  /// Subtitle of Import from Other Apps in Local Backup. List every supported app by its product name and explain that the official toolbox converts the file privately in the browser.
+  ///
+  /// In en, this message translates to:
+  /// **'Newer Chatbox and Cherry Studio 2.x backups, plus ChatGPT, Claude, DeepSeek, Gemini, Grok, Open WebUI, NextChat, and LobeChat. Converts locally in your browser into a Kelivo backup; the file is not uploaded.'**
+  String get backupPageImportFromOtherAppsSubtitle;
+
+  /// Action in the backup import failure dialog and notification. Opens the official Kelivo conversion toolbox in the system browser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Toolbox'**
+  String get backupPageOpenImportToolbox;
+
+  /// Notification when the system browser cannot open the import toolbox. Show its complete address {url} so the user can open it manually.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t open the browser. Open this URL yourself: {url}'**
+  String backupPageImportToolboxOpenFailed(String url);
+
+  /// Explanation above Merge in the local backup import mode dialog when the file is a toolbox chat import. The user can merge or cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'This file was converted by the official toolbox. It will be merged into your existing data and will not replace chats or assistants already on this device.'**
+  String get backupPageToolboxImportMergeOnlyHint;
+
   /// Status text indicating a feature or option is not yet supported.
   ///
   /// In en, this message translates to:
@@ -4294,11 +4318,17 @@ abstract class AppLocalizations {
   /// **'Import from Cherry Studio'**
   String get backupPageImportFromCherryStudio;
 
-  /// Error message shown when a Cherry Studio backup uses format version {version} that Kelivo cannot import; advises exporting from Cherry Studio v1 or waiting for v2 support.
+  /// Shown in the import progress dialog and notification for a Cherry Studio 2.x backup. {version} is the file format version. Refer to the official browser toolbox and the Import Backup File and Merge actions in the app.
   ///
   /// In en, this message translates to:
-  /// **'This backup uses Cherry Studio format version {version}, which Kelivo cannot import yet. Export from Cherry Studio v1 instead, or wait for a Kelivo update that supports Cherry Studio v2 backups.'**
+  /// **'This is a Cherry Studio 2.x backup (format version {version}) and can’t be imported in the app directly. Convert it with the official toolbox into a Kelivo backup, then use Import Backup File and choose Merge. Conversion happens in your browser; the file is not uploaded.'**
   String backupPageCherryStudioUnsupportedBackupVersion(String version);
+
+  /// Shown in the import progress dialog and notification for an unsupported Chatbox backup. {version} is the file format version. Refer to the official browser toolbox and the Import Backup File and Merge actions in the app.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a newer Chatbox backup (format version {version}) and can’t be imported in the app directly. Convert it with the official toolbox into a Kelivo backup, then use Import Backup File and choose Merge. Conversion happens in your browser; the file is not uploaded.'**
+  String backupPageChatboxUnsupportedBackupVersion(String version);
 
   /// Button label and task title for importing data from a Chatbox backup.
   ///

@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import 'widgets/backup_encryption_tile.dart';
 import '../../shared/widgets/snackbar.dart';
 import 'backup_restore_error_message.dart';
+import 'import_toolbox_link.dart';
 import 'widgets/backup_progress_dialog.dart';
 
 Future<bool> runBackupTask(
@@ -51,12 +52,19 @@ Future<bool> runBackupTask(
     return false;
   }
   if (result.error != null) {
+    final failure = describeBackupTaskFailure(
+      l10n,
+      result.error!,
+      errorMessage: errorMessage,
+    );
     showAppSnackBar(
       context,
-      message:
-          errorMessage?.call(result.error!) ??
-          backupRestoreErrorMessage(l10n, result.error!),
+      message: failure.message,
       type: NotificationType.error,
+      actionLabel: failure.showToolbox
+          ? l10n.backupPageOpenImportToolbox
+          : null,
+      onAction: failure.showToolbox ? () => openImportToolbox(context) : null,
     );
     return false;
   }

@@ -1,192 +1,11 @@
-import 'package:Kelivo/core/providers/external_backup_auto_provider.dart';
-import '../../support/business_test_harness.dart';
-
-import 'dart:io';
-
+import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 
-import 'package:Kelivo/core/database/business_preferences.dart';
-import 'package:Kelivo/core/models/backup.dart';
-import 'package:Kelivo/shared/widgets/ios_switch.dart';
-import 'package:Kelivo/core/database/business_repository.dart';
-import 'package:Kelivo/core/providers/backup_provider.dart';
-import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
-import 'package:Kelivo/core/providers/local_snapshot_provider.dart';
-import 'package:Kelivo/core/providers/s3_backup_provider.dart';
-import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
-import 'package:Kelivo/desktop/setting/backup_pane.dart';
-import 'package:Kelivo/features/backup/pages/backup_page.dart';
-import 'package:Kelivo/l10n/app_localizations.dart';
-
-Future<BackupReminderProvider> _createReminderProvider(
-  BusinessPreferences preferences,
-) async {
-  final provider = BackupReminderProvider(
-    preferences: preferences,
-    autoLoad: false,
-  );
-  await provider.load(startTimer: false);
-  return provider;
-}
-
-Widget _buildHarness({
-  required SettingsProvider settings,
-  required BackupReminderProvider reminder,
-  required BusinessRepository businessRepository,
-  required BusinessPreferences businessPreferences,
-}) {
-  return MultiProvider(
-    providers: [
-      Provider<BusinessRepository>.value(value: businessRepository),
-      Provider<BusinessPreferences>.value(value: businessPreferences),
-      ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-      ChangeNotifierProvider<ChatService>(create: (_) => ChatService()),
-      ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
-      ChangeNotifierProvider<LocalSnapshotProvider>(
-        create: (context) => LocalSnapshotProvider(
-          appDataDirectory: Directory.systemTemp.createTempSync(
-            'kelivo_backup_page_',
-          ),
-          chatService: context.read<ChatService>(),
-          businessRepository: businessRepository,
-          businessPreferences: businessPreferences,
-          autoLoad: false,
-        ),
-      ),
-      ChangeNotifierProvider(
-        create: (ctx) => BackupProvider(
-          chatService: ctx.read<ChatService>(),
-          businessPreferences: businessPreferences,
-          businessRepository: businessRepository,
-          initialConfig: settings.webDavConfig,
-        ),
-      ),
-      ChangeNotifierProvider(
-        create: (ctx) => S3BackupProvider(
-          chatService: ctx.read<ChatService>(),
-          businessPreferences: businessPreferences,
-          businessRepository: businessRepository,
-          initialConfig: settings.s3Config,
-        ),
-      ),
-      ChangeNotifierProvider(
-        create: (ctx) => ExternalBackupAutoProvider(
-          preferences: businessPreferences,
-          settings: ctx.read<SettingsProvider>(),
-          reminder: ctx.read<BackupReminderProvider>(),
-          webdav: ctx.read<BackupProvider>(),
-          s3: ctx.read<S3BackupProvider>(),
-          desktop: false,
-        ),
-      ),
-    ],
-    child: MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: const BackupPage(),
-    ),
-  );
-}
-
-Widget _buildDesktopHarness({
-  required SettingsProvider settings,
-  required BackupReminderProvider reminder,
-  required BusinessRepository businessRepository,
-  required BusinessPreferences businessPreferences,
-}) {
-  final chatService = ChatService();
-
-  return MultiProvider(
-    providers: [
-      Provider<BusinessRepository>.value(value: businessRepository),
-      Provider<BusinessPreferences>.value(value: businessPreferences),
-      ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-      ChangeNotifierProvider<ChatService>.value(value: chatService),
-      ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
-      ChangeNotifierProvider<LocalSnapshotProvider>(
-        create: (context) => LocalSnapshotProvider(
-          appDataDirectory: Directory.systemTemp.createTempSync(
-            'kelivo_backup_page_',
-          ),
-          chatService: context.read<ChatService>(),
-          businessRepository: businessRepository,
-          businessPreferences: businessPreferences,
-          autoLoad: false,
-        ),
-      ),
-      ChangeNotifierProvider<BackupProvider>(
-        create: (_) => BackupProvider(
-          chatService: chatService,
-          businessRepository: businessRepository,
-          businessPreferences: businessPreferences,
-          initialConfig: settings.webDavConfig,
-        ),
-      ),
-      ChangeNotifierProvider<S3BackupProvider>(
-        create: (_) => S3BackupProvider(
-          chatService: chatService,
-          businessRepository: businessRepository,
-          businessPreferences: businessPreferences,
-          initialConfig: settings.s3Config,
-        ),
-      ),
-      ChangeNotifierProvider(
-        create: (ctx) => ExternalBackupAutoProvider(
-          preferences: businessPreferences,
-          settings: ctx.read<SettingsProvider>(),
-          reminder: ctx.read<BackupReminderProvider>(),
-          webdav: ctx.read<BackupProvider>(),
-          s3: ctx.read<S3BackupProvider>(),
-          desktop: true,
-        ),
-      ),
-    ],
-    child: MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: const Scaffold(body: DesktopBackupPane()),
-    ),
-  );
-}
-
-Future<void> _pumpBackupPage(
-  WidgetTester tester, {
-  required SettingsProvider settings,
-  required BusinessTestHarness business,
-}) async {
-  final reminder = await _createReminderProvider(business.preferences);
-
-  await tester.pumpWidget(
-    _buildHarness(
-      settings: settings,
-      reminder: reminder,
-      businessRepository: business.repository,
-      businessPreferences: business.preferences,
-    ),
-  );
-  await tester.pump();
-}
-
-Future<void> _pumpDesktopBackupPane(
-  WidgetTester tester, {
-  required SettingsProvider settings,
-  required BusinessTestHarness business,
-}) async {
-  final reminder = await _createReminderProvider(business.preferences);
-
-  await tester.pumpWidget(
-    _buildDesktopHarness(
-      settings: settings,
-      reminder: reminder,
-      businessRepository: business.repository,
-      businessPreferences: business.preferences,
-    ),
-  );
-  await tester.pump();
-}
+import '../../support/backup_page_harness.dart';
+import '../../support/business_test_harness.dart';
 
 Future<void> _openSettingsPage(WidgetTester tester, String label) async {
   final target = find.text(label);
@@ -222,13 +41,12 @@ void main() {
         final settings = SettingsProvider(business.preferences);
         addTearDown(settings.dispose);
         await settings.loaded;
-        Future<void> openPage() => desktop
-            ? _pumpDesktopBackupPane(
-                tester,
-                settings: settings,
-                business: business,
-              )
-            : _pumpBackupPage(tester, settings: settings, business: business);
+        Future<void> openPage() => pumpBackupSettingsPage(
+          tester,
+          settings: settings,
+          business: business,
+          desktop: desktop,
+        );
         await openPage();
         final control = find.byKey(const ValueKey('backup-encryption-switch'));
         await tester.ensureVisible(control);
@@ -286,15 +104,12 @@ void main() {
         final business = await createBusinessTestHarness();
         final settings = SettingsProvider(business.preferences);
         await settings.loaded;
-        if (desktop) {
-          await _pumpDesktopBackupPane(
-            tester,
-            settings: settings,
-            business: business,
-          );
-        } else {
-          await _pumpBackupPage(tester, settings: settings, business: business);
-        }
+        await pumpBackupSettingsPage(
+          tester,
+          settings: settings,
+          business: business,
+          desktop: desktop,
+        );
         expect(find.text('Back Up Now').hitTestable(), findsOneWidget);
         expect(find.text('Import Backup File').hitTestable(), findsOneWidget);
         expect(
@@ -419,7 +234,11 @@ void main() {
       final settings = SettingsProvider(business.preferences);
       await settings.loaded;
 
-      await _pumpBackupPage(tester, settings: settings, business: business);
+      await pumpBackupSettingsPage(
+        tester,
+        settings: settings,
+        business: business,
+      );
 
       await _openSettingsPage(tester, 'WebDAV Server Settings');
 
@@ -452,7 +271,11 @@ void main() {
       final settings = SettingsProvider(business.preferences);
       await settings.loaded;
 
-      await _pumpBackupPage(tester, settings: settings, business: business);
+      await pumpBackupSettingsPage(
+        tester,
+        settings: settings,
+        business: business,
+      );
 
       expect(find.text('Backup Reminder'), findsOneWidget);
       expect(find.text('Local Backup'), findsOneWidget);
@@ -470,7 +293,11 @@ void main() {
       final settings = SettingsProvider(business.preferences);
       await settings.loaded;
 
-      await _pumpBackupPage(tester, settings: settings, business: business);
+      await pumpBackupSettingsPage(
+        tester,
+        settings: settings,
+        business: business,
+      );
 
       await _openSettingsPage(tester, 'S3 Settings');
 
@@ -500,8 +327,9 @@ void main() {
       final settings = SettingsProvider(business.preferences);
       await settings.loaded;
 
-      await _pumpDesktopBackupPane(
+      await pumpBackupSettingsPage(
         tester,
+        desktop: true,
         settings: settings,
         business: business,
       );

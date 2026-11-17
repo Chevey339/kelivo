@@ -10,9 +10,11 @@ import '../../../core/services/backup/backup_task_progress.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/utils/format_bytes.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/task_progress_dialog.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
 import '../backup_restore_error_message.dart';
+import '../import_toolbox_link.dart';
 
 final class BackupTaskHandle {
   BackupTaskHandle({required this.cancelToken, required this._progress});
@@ -171,7 +173,7 @@ class _BackupProgressDialogHostState<T>
   var _started = false;
   var _detached = false;
   Object? _error;
-  String? _errorMessage;
+  BackupTaskFailure? _failure;
   var _errorCopied = false;
   late T _completedValue;
 
@@ -206,9 +208,11 @@ class _BackupProgressDialogHostState<T>
     } catch (error) {
       if (!mounted || _detached) return;
       _error = error;
-      _errorMessage =
-          widget.errorMessage?.call(error) ??
-          backupRestoreErrorMessage(AppLocalizations.of(context)!, error);
+      _failure = describeBackupTaskFailure(
+        AppLocalizations.of(context)!,
+        error,
+        errorMessage: widget.errorMessage,
+      );
       setState(() => _outcome = TaskProgressOutcome.failure);
       widget.handle.report(
         BackupProgress(
@@ -245,7 +249,9 @@ class _BackupProgressDialogHostState<T>
 
   Future<void> _copyError(String phaseLabel) async {
     await Clipboard.setData(
-      ClipboardData(text: '${widget.title}\n$phaseLabel\n\n$_errorMessage'),
+      ClipboardData(
+        text: '${widget.title}\n$phaseLabel\n\n${_failure!.message}',
+      ),
     );
     if (!mounted) return;
     setState(() => _errorCopied = true);
@@ -290,7 +296,14 @@ class _BackupProgressDialogHostState<T>
           acknowledgeLabel: l10n.commonClose,
           onBackground: widget.backgroundLabel == null ? null : _background,
           backgroundLabel: widget.backgroundLabel,
-          errorMessage: _errorMessage,
+          errorMessage: _failure?.message,
+          errorAction: _failure?.showToolbox == true
+              ? IosTileButton(
+                  icon: Lucide.ExternalLink,
+                  label: l10n.backupPageOpenImportToolbox,
+                  onTap: () => openImportToolbox(context),
+                )
+              : null,
           warningMessage: warning
               ? widget.handle._skippedEntries.join('\n')
               : null,

@@ -29,6 +29,7 @@ class TaskProgressDialogCard extends StatelessWidget {
     this.onBackground,
     this.backgroundLabel,
     this.errorMessage,
+    this.errorAction,
     this.warningMessage,
     this.onCopyError,
     this.copyErrorLabel = 'Copy error',
@@ -51,6 +52,7 @@ class TaskProgressDialogCard extends StatelessWidget {
   final VoidCallback? onBackground;
   final String? backgroundLabel;
   final String? errorMessage;
+  final Widget? errorAction;
   final String? warningMessage;
   final VoidCallback? onCopyError;
   final String copyErrorLabel;
@@ -222,6 +224,11 @@ class TaskProgressDialogCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                        ),
+                      if (showError && errorAction != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: errorAction!,
                         ),
                     ],
                   ),

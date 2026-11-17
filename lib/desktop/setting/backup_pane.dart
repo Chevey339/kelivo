@@ -22,11 +22,13 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
+import '../../core/services/backup/import_toolbox.dart';
 import '../../core/services/backup/data_sync.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../features/backup/backup_restore_error_message.dart';
 import '../../features/backup/backup_task_runner.dart';
+import '../../features/backup/import_toolbox_link.dart';
 import '../../features/backup/widgets/backup_progress_dialog.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
@@ -222,22 +224,42 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     }
   }
 
-  Future<void> _chooseRestoreModeAndRun(
-    Future<void> Function(RestoreMode, BackupTaskHandle) action,
-  ) async {
+  Future<void> _doImportLocal() async {
     final rootCtx = Navigator.of(context, rootNavigator: true).context;
     final backupProvider = context.read<BackupProvider>();
     final l10n = AppLocalizations.of(context)!;
+    final result = await FilePicker.platform.pickFiles(type: FileType.any);
+    final picked = result?.files.single;
+    final path = picked?.path;
+    if (path == null || !mounted) return;
+    final file = File(path);
+    final decision = await resolveForwardCompatibility(context, file);
+    if (!mounted || decision == ForwardCompatDecision.cancelled) return;
+    if (decision == ForwardCompatDecision.unreadable) {
+      showAppSnackBar(context, message: l10n.backupPageSchemaTooNewMessage);
+      return;
+    }
+    final mergeOnly = await isToolboxChatImport(file, fileName: picked!.name);
+    if (!mounted) return;
     final mode = await showDialog<RestoreMode>(
       context: context,
-      builder: (ctx) => _RestoreModeDialog(),
+      builder: (_) => _RestoreModeDialog(mergeOnly: mergeOnly),
     );
     if (mode == null) return;
     if (!mounted) return;
     final ok = await runBackupTask(
       context,
       title: l10n.backupPageImportBackupFile,
-      task: (handle) => action(mode, handle),
+      task: (handle) => backupProvider.restoreFromLocalFile(
+        file,
+        mode: mode,
+        onProgress: handle.report,
+        cancelToken: handle.cancelToken,
+        onPassword: backupPasswordPrompt(context),
+        onForwardCompatibility: forwardCompatibilityPrompt(context),
+        allowUnverifiedForwardCompatible:
+            decision == ForwardCompatDecision.proceedUnverified,
+      ),
     );
     if (!ok || !rootCtx.mounted) return;
     await showBackupRestartRequiredDialog(
@@ -956,49 +978,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 label: l10n.backupPageImportBackupFile,
                 filled: false,
                 dense: true,
-                onTap: busy
-                    ? null
-                    : () async {
-                        final backupProvider = context.read<BackupProvider>();
-                        final result = await FilePicker.platform.pickFiles(
-                          type: FileType.any,
-                          allowMultiple: false,
-                        );
-                        final path = result?.files.single.path;
-                        if (path == null) return;
-                        if (!context.mounted) return;
-                        final f = File(path);
-                        // Settle the schema question before the progress dialog
-                        // goes up.
-                        final decision = await resolveForwardCompatibility(
-                          context,
-                          f,
-                        );
-                        if (!context.mounted) return;
-                        if (decision == ForwardCompatDecision.cancelled) return;
-                        if (decision == ForwardCompatDecision.unreadable) {
-                          showAppSnackBar(
-                            context,
-                            message: l10n.backupPageSchemaTooNewMessage,
-                          );
-                          return;
-                        }
-                        await _chooseRestoreModeAndRun((mode, handle) async {
-                          await backupProvider.restoreFromLocalFile(
-                            f,
-                            mode: mode,
-                            onProgress: handle.report,
-                            cancelToken: handle.cancelToken,
-                            onPassword: backupPasswordPrompt(context),
-                            onForwardCompatibility: forwardCompatibilityPrompt(
-                              context,
-                            ),
-                            allowUnverifiedForwardCompatible:
-                                decision ==
-                                ForwardCompatDecision.proceedUnverified,
-                          );
-                        });
-                      },
+                onTap: busy ? null : _doImportLocal,
               ),
               _DeskIosButton(
                 label: l10n.backupPageImportFromCherryStudio,
@@ -1030,16 +1010,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         final ok = await runBackupTask(
                           context,
                           title: l10n.backupPageImportFromCherryStudio,
-                          errorMessage: (error) {
-                            if (error
-                                is CherryUnsupportedBackupVersionException) {
-                              return l10n
-                                  .backupPageCherryStudioUnsupportedBackupVersion(
-                                    '${error.version}',
-                                  );
-                            }
-                            return error.toString();
-                          },
+                          errorMessage: (error) => error.toString(),
                           task: (handle) async {
                             imported =
                                 await CherryImporter.importFromCherryStudio(
@@ -1126,6 +1097,21 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       },
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: _DeskIosButton(
+              label: l10n.backupPageImportFromOtherApps,
+              filled: false,
+              dense: true,
+              onTap: () => openImportToolbox(context),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.backupPageImportFromOtherAppsSubtitle,
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -1793,6 +1779,10 @@ class _ItemRow extends StatelessWidget {
 }
 
 class _RestoreModeDialog extends StatelessWidget {
+  const _RestoreModeDialog({this.mergeOnly = false});
+
+  final bool mergeOnly;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1817,19 +1807,23 @@ class _RestoreModeDialog extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                l10n.backupPageSelectImportModeDescription,
+                mergeOnly
+                    ? l10n.backupPageToolboxImportMergeOnlyHint
+                    : l10n.backupPageSelectImportModeDescription,
                 style: TextStyle(
                   fontSize: 13,
                   color: cs.onSurface.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 12),
-              _RestoreModeTile(
-                title: l10n.backupPageOverwriteMode,
-                subtitle: l10n.backupPageOverwriteModeDescription,
-                onTap: () => Navigator.of(context).pop(RestoreMode.overwrite),
-              ),
-              const SizedBox(height: 8),
+              if (!mergeOnly) ...[
+                _RestoreModeTile(
+                  title: l10n.backupPageOverwriteMode,
+                  subtitle: l10n.backupPageOverwriteModeDescription,
+                  onTap: () => Navigator.of(context).pop(RestoreMode.overwrite),
+                ),
+                const SizedBox(height: 8),
+              ],
               _RestoreModeTile(
                 title: l10n.backupPageMergeMode,
                 subtitle: l10n.backupPageMergeModeDescription,

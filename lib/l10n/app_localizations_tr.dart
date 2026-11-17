@@ -2242,6 +2242,22 @@ class AppLocalizationsTr extends AppLocalizations {
   String get backupPageImportFromOtherApps => 'Diğer Uygulamalardan İçe Aktar';
 
   @override
+  String get backupPageImportFromOtherAppsSubtitle =>
+      'Yeni Chatbox ve Cherry Studio 2.x yedekleri ile ChatGPT, Claude, DeepSeek, Gemini, Grok, Open WebUI, NextChat ve LobeChat. Tarayıcınızda yerel olarak Kelivo yedeğine dönüştürülür; dosya yüklenmez.';
+
+  @override
+  String get backupPageOpenImportToolbox => 'Araç Kutusunu Aç';
+
+  @override
+  String backupPageImportToolboxOpenFailed(String url) {
+    return 'Tarayıcı açılamadı. Bu URL\'yi kendiniz açın: $url';
+  }
+
+  @override
+  String get backupPageToolboxImportMergeOnlyHint =>
+      'Bu dosya resmi araç kutusu tarafından dönüştürüldü. Mevcut verilerinizle birleştirilecek ve bu cihazdaki sohbetlerin veya asistanların yerini almayacak.';
+
+  @override
   String get backupPageNotSupportedYet => 'Henüz desteklenmiyor';
 
   @override
@@ -2327,7 +2343,12 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return 'Bu yedek, Kelivo\'nun henüz içe aktaramadığı Cherry Studio biçim sürümü $version kullanıyor. Bunun yerine Cherry Studio v1\'den dışa aktarın veya Cherry Studio v2 yedeklerini destekleyen bir Kelivo güncellemesini bekleyin.';
+    return 'Bu bir Cherry Studio 2.x yedeği (biçim sürümü $version) ve uygulamada doğrudan içe aktarılamaz. Resmi araç kutusuyla Kelivo yedeğine dönüştürün, ardından Yedek Dosyasını İçe Aktar\'ı kullanıp Birleştir\'i seçin. Dönüştürme tarayıcınızda gerçekleşir; dosya yüklenmez.';
+  }
+
+  @override
+  String backupPageChatboxUnsupportedBackupVersion(String version) {
+    return 'Bu daha yeni bir Chatbox yedeği (biçim sürümü $version) ve uygulamada doğrudan içe aktarılamaz. Resmi araç kutusuyla Kelivo yedeğine dönüştürün, ardından Yedek Dosyasını İçe Aktar\'ı kullanıp Birleştir\'i seçin. Dönüştürme tarayıcınızda gerçekleşir; dosya yüklenmez.';
   }
 
   @override

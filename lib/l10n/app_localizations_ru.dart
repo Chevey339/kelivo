@@ -2267,6 +2267,22 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupPageImportFromOtherApps => 'Импорт из других приложений';
 
   @override
+  String get backupPageImportFromOtherAppsSubtitle =>
+      'Резервные копии новых версий Chatbox и Cherry Studio 2.x, а также ChatGPT, Claude, DeepSeek, Gemini, Grok, Open WebUI, NextChat и LobeChat. Файл конвертируется локально в браузере в резервную копию Kelivo и не загружается.';
+
+  @override
+  String get backupPageOpenImportToolbox => 'Открыть инструменты';
+
+  @override
+  String backupPageImportToolboxOpenFailed(String url) {
+    return 'Не удалось открыть браузер. Откройте этот адрес вручную: $url';
+  }
+
+  @override
+  String get backupPageToolboxImportMergeOnlyHint =>
+      'Этот файл конвертирован официальными инструментами. При импорте данные будут объединены с существующими, а чаты и ассистенты на этом устройстве не будут заменены.';
+
+  @override
   String get backupPageNotSupportedYet => 'Пока не поддерживается';
 
   @override
@@ -2352,7 +2368,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return 'Эта резервная копия использует версию формата Cherry Studio $version, которую Kelivo пока не может импортировать. Экспортируйте резервную копию из Cherry Studio v1 или дождитесь обновления Kelivo с поддержкой резервных копий Cherry Studio v2.';
+    return 'Это резервная копия Cherry Studio 2.x (версия формата $version), её нельзя импортировать в приложение напрямую. Конвертируйте её официальными инструментами в резервную копию Kelivo, затем откройте «Импорт файла резервной копии» и выберите «Объединение». Конвертация выполняется локально в браузере, файл не загружается.';
+  }
+
+  @override
+  String backupPageChatboxUnsupportedBackupVersion(String version) {
+    return 'Это резервная копия новой версии Chatbox (версия формата $version), её нельзя импортировать в приложение напрямую. Конвертируйте её официальными инструментами в резервную копию Kelivo, затем откройте «Импорт файла резервной копии» и выберите «Объединение». Конвертация выполняется локально в браузере, файл не загружается.';
   }
 
   @override

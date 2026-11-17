@@ -104,10 +104,10 @@ void main() {
         resourceDestDir: '${root.path}/dest',
       ),
       throwsA(
-        isA<ChatboxImportException>().having(
-          (e) => e.message,
-          'message',
-          contains('formatVersion: 3'),
+        isA<ChatboxUnsupportedBackupVersionException>().having(
+          (e) => e.version,
+          'version',
+          3,
         ),
       ),
     );

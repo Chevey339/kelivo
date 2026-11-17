@@ -16,6 +16,13 @@ class ChatboxImportException implements Exception {
   String toString() => message;
 }
 
+class ChatboxUnsupportedBackupVersionException extends ChatboxImportException {
+  final Object? version;
+
+  ChatboxUnsupportedBackupVersionException(this.version)
+    : super('Unsupported Chatbox backup version: $version');
+}
+
 class ChatboxBackupReadResult {
   final Map<String, dynamic> root;
   final List<File> stagedResourceFiles;
@@ -366,10 +373,7 @@ class ChatboxBackupArchive {
     }
     final version = manifest['formatVersion'];
     if (version != backupFormatVersion) {
-      throw ChatboxImportException(
-        'Unsupported Chatbox backup formatVersion: $version. '
-        'Only formatVersion $backupFormatVersion is supported.',
-      );
+      throw ChatboxUnsupportedBackupVersionException(version);
     }
 
     final exportedAt = (manifest['exportedAt'] ?? '').toString().trim();

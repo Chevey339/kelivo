@@ -27,7 +27,8 @@ import 'backup_task_progress.dart';
 import 'chatbox_backup_archive.dart';
 import 'data_sync.dart';
 
-export 'chatbox_backup_archive.dart' show ChatboxImportException;
+export 'chatbox_backup_archive.dart'
+    show ChatboxImportException, ChatboxUnsupportedBackupVersionException;
 
 class ChatboxImportResult {
   final int providers;
