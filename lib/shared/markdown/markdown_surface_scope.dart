@@ -7,18 +7,22 @@ class MarkdownSurfaceScope extends InheritedWidget {
   const MarkdownSurfaceScope({
     super.key,
     required this.kind,
-    this.customBackground,
+    this.backgroundColor,
+    this.hasCustomBackground = false,
     required super.child,
-  });
+  }) : assert(!hasCustomBackground || backgroundColor != null);
   final MarkdownSurfaceKind kind;
-  // Opaque RGB of an explicit bubble background override. Actual opacity is
-  // accounted for by kind; export fills must never inherit that opacity.
-  final Color? customBackground;
+
+  /// The tint painted behind the Markdown, including bubble opacity.
+  final Color? backgroundColor;
+  final bool hasCustomBackground;
 
   static MarkdownSurfaceScope? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<MarkdownSurfaceScope>();
 
   @override
   bool updateShouldNotify(MarkdownSurfaceScope oldWidget) =>
-      kind != oldWidget.kind || customBackground != oldWidget.customBackground;
+      kind != oldWidget.kind ||
+      backgroundColor != oldWidget.backgroundColor ||
+      hasCustomBackground != oldWidget.hasCustomBackground;
 }

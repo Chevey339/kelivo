@@ -195,6 +195,7 @@ final class InlineCodeTheme extends _ThemeTokens {
   const InlineCodeTheme({
     required this.opticalCenter,
     required this.text,
+    this.inheritBodyColor = false,
     required this.padding,
     required this.radius,
     required this.backgroundColor,
@@ -202,6 +203,9 @@ final class InlineCodeTheme extends _ThemeTokens {
   });
   final double opticalCenter;
   final TextStyle text;
+
+  /// Use the enclosing surface's body text color, including inside painted blocks.
+  final bool inheritBodyColor;
   final EdgeInsetsGeometry padding;
   final double radius;
   final Color backgroundColor;
@@ -209,6 +213,7 @@ final class InlineCodeTheme extends _ThemeTokens {
   InlineCodeTheme copyWith({
     double? opticalCenter,
     TextStyle? text,
+    bool? inheritBodyColor,
     EdgeInsetsGeometry? padding,
     double? radius,
     Color? backgroundColor,
@@ -216,15 +221,23 @@ final class InlineCodeTheme extends _ThemeTokens {
   }) => InlineCodeTheme(
     opticalCenter: opticalCenter ?? this.opticalCenter,
     text: text ?? this.text,
+    inheritBodyColor: inheritBodyColor ?? this.inheritBodyColor,
     padding: padding ?? this.padding,
     radius: radius ?? this.radius,
     backgroundColor: backgroundColor ?? this.backgroundColor,
     borderColor: borderColor ?? this.borderColor,
   );
+
+  InlineCodeTheme _resolveBodyColor(Color color) =>
+      inheritBodyColor && text.color != color
+      ? copyWith(text: text.copyWith(color: color))
+      : this;
+
   @override
   List<Object?> get _values => [
     opticalCenter,
     text,
+    inheritBodyColor,
     padding,
     radius,
     backgroundColor,
@@ -558,8 +571,8 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.headingPadding,
     required this.blockSpacing,
     required this.link,
-    required this.inlineCode,
-    required this.keyboard,
+    required InlineCodeTheme inlineCode,
+    required InlineCodeTheme keyboard,
     required this.code,
     required this.quote,
     required this.listMarkerPadding,
@@ -574,6 +587,8 @@ final class MarkstreamTheme extends _ThemeTokens {
     required this.details,
     required this.fillAlphas,
   }) : assert(headings.length == 6),
+       inlineCode = inlineCode._resolveBodyColor(body.color ?? colors.ink),
+       keyboard = keyboard._resolveBodyColor(body.color ?? colors.ink),
        headings = List.unmodifiable(headings);
   final MarkstreamBackdrop backdrop;
   final MarkstreamChromeTheme chrome;

@@ -10,6 +10,7 @@ import 'package:Kelivo/shared/markdown/citation_syntax.dart';
 import 'package:Kelivo/shared/markdown/highlight_adapter.dart';
 import 'package:Kelivo/shared/markdown/link_image_handlers.dart';
 import 'package:Kelivo/shared/markdown/markdown_image_sources.dart';
+import 'package:Kelivo/shared/markdown/markdown_surface_scope.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/markdown/math_adapter.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
@@ -56,10 +57,15 @@ List<MarkdownNode> nodes(MarkdownNode root) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   for (final dark in [false, true]) {
-    for (final wallpaper in [false, true]) {
+    for (final (backdrop, surface) in const [
+      (MarkstreamBackdrop.plain, null),
+      (MarkstreamBackdrop.wallpaper, null),
+      (MarkstreamBackdrop.frostedBubble, MarkdownSurfaceKind.frosted),
+      (MarkstreamBackdrop.solidBubble, MarkdownSurfaceKind.solid),
+    ]) {
       for (final streaming in [false, true]) {
         testWidgets('inline code style switches live and preserves content: '
-            'dark=$dark wallpaper=$wallpaper streaming=$streaming', (
+            'dark=$dark backdrop=$backdrop streaming=$streaming', (
           tester,
         ) async {
           final settings = SettingsProvider(createBusinessTestPreferences());
@@ -78,18 +84,28 @@ void main() {
             ),
           );
           await tester.pumpWidget(
-            host(child, settings: settings, dark: dark, wallpaper: wallpaper),
+            host(
+              surface == null
+                  ? child
+                  : MarkdownSurfaceScope(kind: surface, child: child),
+              settings: settings,
+              dark: dark,
+              wallpaper: backdrop != MarkstreamBackdrop.plain,
+            ),
           );
           await tester.pumpAndSettle();
           final view = find.byType(MarkstreamView);
           final state = tester.state(view);
           final current = tester.widget<MarkstreamView>(view).theme!;
-          InlineCodeCapsule keyboard() => tester.widget<InlineCodeCapsule>(
-            find.byWidgetPredicate(
-              (widget) => widget is InlineCodeCapsule && widget.text == 'Ctrl',
-            ),
-          );
-          final originalKeyboard = keyboard();
+          expect(current.backdrop, backdrop);
+          InlineCodeCapsule capsule(String text) =>
+              tester.widget<InlineCodeCapsule>(
+                find.byWidgetPredicate(
+                  (widget) =>
+                      widget is InlineCodeCapsule && widget.text == text,
+                ),
+              );
+          final originalKeyboard = capsule('Ctrl');
           expect(current.inlineCode.text.height, 1);
           expect(current.inlineCode.borderColor, Colors.transparent);
 
@@ -100,7 +116,7 @@ void main() {
             final updated = tester.widget<MarkstreamView>(view).theme!;
             expect(tester.state(view), same(state));
             expect(updated.copyWith(inlineCode: current.inlineCode), current);
-            final key = keyboard();
+            final key = capsule('Ctrl');
             expect(
               (
                 key.style,
@@ -121,12 +137,10 @@ void main() {
             if (enabled) {
               expect(updated.inlineCode.text.height, 1.4);
               expect(updated.inlineCode.borderColor.a, greaterThan(0));
-              if (wallpaper) {
-                expect(
-                  updated.inlineCode.backgroundColor,
-                  updated.colors.fillBlock,
-                );
-              }
+              expect(
+                capsule(code).backgroundColor,
+                dark ? Colors.white12 : const Color(0x66F1F3F5),
+              );
             } else {
               expect(updated, current);
             }

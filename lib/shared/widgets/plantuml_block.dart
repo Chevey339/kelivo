@@ -76,7 +76,7 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
     final preserveImageSurface =
         _selectedTab == _PlantUMLTab.image &&
         widget.theme.backdrop != MarkstreamBackdrop.plain &&
-        MarkdownSurfaceScope.maybeOf(context)?.customBackground != null;
+        MarkdownSurfaceScope.maybeOf(context)?.hasCustomBackground == true;
     var imageColors = colors;
     if (preserveImageSurface) {
       // Remote SVGs can be transparent and keep their own line/text colors.

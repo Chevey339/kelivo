@@ -14,6 +14,7 @@ import 'package:Kelivo/shared/markdown/markdown_surface_scope.dart';
 import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/plantuml_block.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/theme/chat_bubble_style.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/utils/svg_image_provider.dart';
@@ -63,6 +64,7 @@ Future<MarkstreamCodeBlock> _mount(
   bool wallpaper = true,
   bool user = false,
   bool exporting = false,
+  Color? canvasColor,
 }) async {
   Widget child = SingleChildScrollView(
     child: Builder(
@@ -90,6 +92,7 @@ Future<MarkstreamCodeBlock> _mount(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
+          backgroundColor: canvasColor,
           body: ExportCaptureScope(enabled: exporting, child: child),
         ),
       ),
@@ -603,6 +606,99 @@ Code
     );
 
     testWidgets(
+      'legacy inline code follows the ink of its bubble or block, dark=$dark',
+      (tester) async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(settings.dispose);
+        await settings.loaded;
+        await settings.setUseLegacyInlineCodeStyle(true);
+        await settings.setChatMessageBackgroundStyle(
+          ChatMessageBackgroundStyle.solid,
+        );
+        const overrides = ChatBubbleStyleOverrides(
+          backgroundArgbLight: 0xff000000,
+          textArgbLight: 0xffffffff,
+          backgroundArgbDark: 0xffffffff,
+          textArgbDark: 0xff000000,
+        );
+        const source = '''
+`bubble`
+
+| Header |
+| --- |
+| `table` |
+
+<details open>
+<summary>More</summary>
+
+`details`
+
+</details>
+
+```text
+fenced
+```
+''';
+        final bubbleInk = dark ? Colors.black : Colors.white;
+        final bubbleFill = dark ? Colors.white : Colors.black;
+        for (final (exporting, visible, opacity) in const [
+          (false, true, 1.0),
+          (true, true, 1.0),
+          (true, false, 1.0),
+          (true, true, 0.0),
+        ]) {
+          await settings.setShowAssistantBodyBubble(visible);
+          await settings.setChatBubbleStyleOverrides(
+            overrides.copyWith(solidOpacity: () => opacity),
+          );
+          final code = await _mount(
+            tester,
+            settings,
+            scheme,
+            wallpaper: !exporting,
+            exporting: exporting,
+            source: source,
+          );
+          final paintedBubble = visible && opacity == 1;
+          for (final (label, ink, surface) in [
+            (
+              'bubble',
+              paintedBubble ? bubbleInk : scheme.onSurface,
+              paintedBubble ? bubbleFill : scheme.surface,
+            ),
+            (
+              'table',
+              code.theme.colors.ink,
+              code.theme.table.bodyBackgroundColor,
+            ),
+            (
+              'details',
+              code.theme.colors.ink,
+              code.theme.details.backgroundColor,
+            ),
+          ]) {
+            final capsule = tester.widget<InlineCodeCapsule>(
+              find.byWidgetPredicate(
+                (w) => w is InlineCodeCapsule && w.text == label,
+              ),
+            );
+            final reason =
+                '$label exporting=$exporting visible=$visible opacity=$opacity';
+            expect(capsule.style.color, ink, reason: reason);
+            expect(
+              _contrast(
+                ink,
+                Color.alphaBlend(capsule.backgroundColor, surface),
+              ),
+              greaterThanOrEqualTo(4.5),
+              reason: reason,
+            );
+          }
+        }
+      },
+    );
+
+    testWidgets(
       'custom bubble colors pair modern ink, syntax and opaque capture, dark=$dark',
       (tester) async {
         final settings = SettingsProvider(createBusinessTestPreferences());
@@ -812,6 +908,148 @@ Code
     );
   }
 
+  testWidgets('legacy inline code keeps readable ink on a midtone bubble', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setUseLegacyInlineCodeStyle(true);
+    const bubbleColor = Color(0xff555555);
+    const bodyColor = Color(0xffcccccc);
+    await settings.setChatBubbleStyleOverrides(
+      const ChatBubbleStyleOverrides(
+        backgroundArgbLight: 0xff555555,
+        textArgbLight: 0xffcccccc,
+        frostedOpacity: .98,
+      ),
+    );
+    expect(_contrast(bodyColor, bubbleColor), greaterThanOrEqualTo(4.5));
+    for (final style in [
+      ChatMessageBackgroundStyle.solid,
+      ChatMessageBackgroundStyle.frosted,
+    ]) {
+      await settings.setChatMessageBackgroundStyle(style);
+      for (final wallpaper in [false, true]) {
+        final code = await _mount(
+          tester,
+          settings,
+          ThemePalettes.defaultPalette.light,
+          wallpaper: wallpaper,
+          source: '`inline`\n\n$_source',
+        );
+        final capsule = tester.widget<InlineCodeCapsule>(
+          find.byType(InlineCodeCapsule),
+        );
+        expect(capsule.style.color, code.theme.colors.ink);
+        final bubble = bubbleColor.withValues(
+          alpha: style == ChatMessageBackgroundStyle.solid ? 1 : .98,
+        );
+        for (final wallpaperColor in [Colors.white, Colors.black]) {
+          final background = Color.alphaBlend(
+            capsule.backgroundColor,
+            Color.alphaBlend(bubble, wallpaperColor),
+          );
+          expect(
+            _contrast(capsule.style.color!, background),
+            greaterThanOrEqualTo(4.5),
+          );
+        }
+      }
+    }
+  });
+
+  testWidgets('legacy code prefers ink readable across a translucent bubble', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setUseLegacyInlineCodeStyle(true);
+    await settings.setChatMessageBackgroundStyle(
+      ChatMessageBackgroundStyle.frosted,
+    );
+    final scheme = ThemePalettes.defaultPalette.light;
+    for (final background in [0xff303030, null]) {
+      final overrides = ChatBubbleStyleOverrides(
+        backgroundArgbLight: background,
+        textArgbLight: 0xffffffff,
+        frostedOpacity: .70,
+      );
+      await settings.setChatBubbleStyleOverrides(overrides);
+      final code = await _mount(
+        tester,
+        settings,
+        scheme,
+        source: '`inline`\n\n$_source',
+      );
+      final capsule = tester.widget<InlineCodeCapsule>(
+        find.byType(InlineCodeCapsule),
+      );
+      expect(capsule.style.color, code.theme.colors.ink);
+      final bubble = resolveBubbleStyle(
+        scheme,
+        scheme.brightness,
+        ChatMessageBackgroundStyle.frosted,
+        overrides,
+      ).background;
+      for (final wallpaper in [Colors.black, Colors.white]) {
+        final surface = Color.alphaBlend(
+          capsule.backgroundColor,
+          Color.alphaBlend(bubble, wallpaper),
+        );
+        expect(
+          _contrast(capsule.style.color!, surface),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
+    }
+  });
+
+  testWidgets('legacy inline code keeps readable ink on a dark export card', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setUseLegacyInlineCodeStyle(true);
+    await settings.setChatMessageBackgroundStyle(
+      ChatMessageBackgroundStyle.solid,
+    );
+    const overrides = ChatBubbleStyleOverrides(
+      backgroundArgbDark: 0xff181818,
+      textArgbDark: 0xff999999,
+      solidOpacity: .10,
+    );
+    await settings.setChatBubbleStyleOverrides(overrides);
+    final scheme = ThemePalettes.defaultPalette.dark;
+    final card = AppSemanticColors.dark(scheme).surfaceCard;
+    final code = await _mount(
+      tester,
+      settings,
+      scheme,
+      exporting: true,
+      wallpaper: false,
+      canvasColor: card,
+      source: '`inline`\n\n$_source',
+    );
+    final capsule = tester.widget<InlineCodeCapsule>(
+      find.byType(InlineCodeCapsule),
+    );
+    final bubble = resolveBubbleStyle(
+      scheme,
+      scheme.brightness,
+      ChatMessageBackgroundStyle.solid,
+      overrides,
+    ).background;
+    final surface = Color.alphaBlend(
+      capsule.backgroundColor,
+      Color.alphaBlend(bubble, card),
+    );
+    expect(capsule.style.color, code.theme.colors.ink);
+    expect(_contrast(capsule.style.color!, surface), greaterThanOrEqualTo(4.5));
+  });
+
   testWidgets(
     'custom background changes notify even when surface kind stays equal',
     (tester) async {
@@ -822,7 +1060,7 @@ Code
       final child = Builder(
         builder: (context) {
           builds++;
-          resolved = MarkdownSurfaceScope.maybeOf(context)?.customBackground;
+          resolved = MarkdownSurfaceScope.maybeOf(context)?.backgroundColor;
           return const SizedBox();
         },
       );
@@ -831,7 +1069,8 @@ Code
           valueListenable: background,
           builder: (_, color, _) => MarkdownSurfaceScope(
             kind: MarkdownSurfaceKind.solid,
-            customBackground: color,
+            backgroundColor: color,
+            hasCustomBackground: true,
             child: child,
           ),
         ),

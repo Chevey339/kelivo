@@ -80,7 +80,8 @@ void main() {
         body: MarkdownWallpaperTestHost(
           child: MarkdownSurfaceScope(
             kind: kind,
-            customBackground: customBackground,
+            backgroundColor: customBackground,
+            hasCustomBackground: customBackground != null,
             child: DefaultTextStyle(
               style: TextStyle(
                 color: customInk ?? (dark ? Colors.white : Colors.black),
