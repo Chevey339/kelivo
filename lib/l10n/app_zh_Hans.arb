@@ -529,6 +529,7 @@
   "backupPageChooseBackupFolder": "选择备份保存文件夹",
   "backupPageChooseExternalFolder": "请选择 iCloud 云盘或“我的 iPhone > Kelivo”之外的文件夹。Kelivo 文件夹会随 App 卸载而删除，本次备份尚未保存。",
   "backupPageFilesLabel": "文件与图片",
+  "backupPageSettingsSaveFailed": "备份设置保存失败，请重试。",
   "backupPageScopeTitle": "备份与导入内容",
   "backupPageScopeSelectedCount": "{selected}/{total}",
   "@backupPageScopeSelectedCount": {

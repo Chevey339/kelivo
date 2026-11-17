@@ -24,14 +24,17 @@ class _WebDav extends BackupProvider {
         businessPreferences: db.preferences,
       );
   final passwords = <String?>[];
+  final urls = <String>[];
   Future<bool>? result;
   @override
-  Future<bool> backup({
+  Future<bool> backup(
+    WebDavConfig cfg, {
     String? password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
     passwords.add(password);
+    urls.add(cfg.url);
     return await result ?? true;
   }
 }
@@ -49,8 +52,8 @@ void main() {
         backupPasswordStore: store,
       );
       await settings.loaded;
-      await settings.setWebDavConfig(
-        const WebDavConfig(url: 'https://backup.example'),
+      await settings.updateWebDavConfig(
+        (cfg) => cfg.copyWith(url: 'https://backup.example'),
       );
       final reminder = BackupReminderProvider(
         preferences: db.preferences,
@@ -92,9 +95,20 @@ void main() {
       }
       final finishing = Completer<bool>();
       webdav.result = finishing.future;
+      final editGate = Completer<void>();
+      unawaited(db.preferences.runExclusiveMutation(() => editGate.future));
+      final s3Edit = settings.updateS3Config(
+        (cfg) => cfg.copyWith(bucket: 'other-server'),
+      );
       final run = auto.runIfDue(now, foreground: true);
-      expect(auto.busy, true);
-      expect(await auto.runIfDue(now, foreground: true), false);
+      try {
+        expect(settings.savingS3Config, isTrue);
+        expect(auto.busy, true);
+        expect(await auto.runIfDue(now, foreground: true), false);
+      } finally {
+        editGate.complete();
+      }
+      await s3Edit;
       now = now.add(const Duration(minutes: 15));
       finishing.complete(true);
       expect(await run, true);
@@ -104,7 +118,28 @@ void main() {
       expect(webdav.passwords, hasLength(1));
       now = DateTime(2026, 1, 9, 10);
       webdav.result = Future.value(false);
-      await expectLater(auto.runIfDue(now, foreground: true), throwsException);
+      final matchingEditGate = Completer<void>();
+      unawaited(
+        db.preferences.runExclusiveMutation(() => matchingEditGate.future),
+      );
+      final webDavEdit = settings.updateWebDavConfig(
+        (cfg) => cfg.copyWith(url: 'https://updated.example'),
+      );
+      final failedRun = expectLater(
+        auto.runIfDue(now, foreground: true),
+        throwsException,
+      );
+      try {
+        expect(settings.savingWebDavConfig, isTrue);
+        expect(auto.busy, isTrue);
+        expect(auto.cancellable, isTrue);
+        expect(await auto.runIfDue(now, foreground: true), isFalse);
+      } finally {
+        matchingEditGate.complete();
+      }
+      await webDavEdit;
+      await failedRun;
+      expect(webdav.urls.last, 'https://updated.example');
       expect(auto.failure, isNotNull);
       expect(reminder.lastBackupAt, DateTime(2026, 1, 7, 10, 15));
       expect(await auto.runIfDue(now, foreground: true), false);
@@ -211,8 +246,8 @@ void main() {
       );
       final settings = SettingsProvider(db.preferences);
       await settings.loaded;
-      await settings.setWebDavConfig(
-        const WebDavConfig(url: 'https://backup.example'),
+      await settings.updateWebDavConfig(
+        (cfg) => cfg.copyWith(url: 'https://backup.example'),
       );
       final reminder = BackupReminderProvider(
         preferences: db.preferences,

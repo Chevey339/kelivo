@@ -14,7 +14,6 @@ import '../services/backup/data_sync.dart';
 
 class BackupProvider extends ChangeNotifier {
   final DataSync _dataSync;
-  WebDavConfig _cfg;
   bool _busy = false;
   String? _message;
 
@@ -22,34 +21,26 @@ class BackupProvider extends ChangeNotifier {
     required ChatService chatService,
     required BusinessRepository businessRepository,
     required BusinessPreferences businessPreferences,
-    WebDavConfig? initialConfig,
   }) : _dataSync = DataSync(
          chatService: chatService,
          businessRepository: businessRepository,
          businessPreferences: businessPreferences,
-       ),
-       _cfg = initialConfig ?? const WebDavConfig();
+       );
 
-  WebDavConfig get config => _cfg;
   bool get busy => _busy;
   String? get message => _message;
   int get skippedConversations =>
       _dataSync.lastMergeReport?.skippedConversations ?? 0;
 
-  void updateConfig(WebDavConfig cfg) {
-    _cfg = cfg;
-    notifyListeners();
-  }
-
   Future<void> cleanPartials(WebDavConfig cfg) =>
       _dataSync.cleanWebDavPartials(cfg);
 
-  Future<void> test() async {
+  Future<void> test(WebDavConfig cfg) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      await _dataSync.testWebdav(_cfg);
+      await _dataSync.testWebdav(cfg);
       _message = 'OK';
     } catch (e) {
       _message = e.toString();
@@ -59,7 +50,8 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> backup({
+  Future<bool> backup(
+    WebDavConfig cfg, {
     String? password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
@@ -69,7 +61,7 @@ class BackupProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _dataSync.backupToWebDav(
-        _cfg,
+        cfg,
         password: password,
         onProgress: onProgress,
         cancelToken: cancelToken,
@@ -87,6 +79,7 @@ class BackupProvider extends ChangeNotifier {
   }
 
   Future<void> restoreFromItem(
+    WebDavConfig cfg,
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
@@ -100,7 +93,7 @@ class BackupProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _dataSync.restoreFromWebDav(
-        _cfg,
+        cfg,
         item,
         mode: mode,
         onProgress: onProgress,
@@ -119,35 +112,41 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<List<BackupFileItem>> listRemote({
+  Future<List<BackupFileItem>> listRemote(
+    WebDavConfig cfg, {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
     return _dataSync.listBackupFiles(
-      _cfg,
+      cfg,
       onProgress: onProgress,
       cancelToken: cancelToken,
     );
   }
 
-  Future<List<BackupFileItem>> deleteAndReload(BackupFileItem item) async {
-    await _dataSync.deleteWebDavBackupFile(_cfg, item);
-    return _dataSync.listBackupFiles(_cfg);
+  Future<List<BackupFileItem>> deleteAndReload(
+    WebDavConfig cfg,
+    BackupFileItem item,
+  ) async {
+    await _dataSync.deleteWebDavBackupFile(cfg, item);
+    return _dataSync.listBackupFiles(cfg);
   }
 
-  Future<File> exportToFile({
+  Future<File> exportToFile(
+    WebDavConfig cfg, {
     String? password,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) => _dataSync.exportToFile(
-    _cfg,
+    cfg,
     password: password,
     onProgress: onProgress,
     cancelToken: cancelToken,
   );
 
   Future<void> restoreFromLocalFile(
-    File file, {
+    File file,
+    WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
@@ -156,7 +155,7 @@ class BackupProvider extends ChangeNotifier {
     BackupPasswordPrompt? onPassword,
   }) => _dataSync.restoreFromLocalFile(
     file,
-    _cfg,
+    cfg,
     mode: mode,
     onProgress: onProgress,
     cancelToken: cancelToken,

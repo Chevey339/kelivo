@@ -49,170 +49,20 @@ class DesktopBackupPane extends StatefulWidget {
 }
 
 class _DesktopBackupPaneState extends State<DesktopBackupPane> {
-  // Local form controllers
-  late TextEditingController _url;
-  late TextEditingController _username;
-  late TextEditingController _password;
-  late TextEditingController _path;
-  late TextEditingController _s3Endpoint;
-  late TextEditingController _s3Region;
-  late TextEditingController _s3Bucket;
-  late TextEditingController _s3AccessKeyId;
-  late TextEditingController _s3SecretAccessKey;
-  late TextEditingController _s3SessionToken;
-  late TextEditingController _s3Prefix;
-  late TextEditingController _webDavUserAgent;
-  late TextEditingController _s3UserAgent;
-  BackupScope _scope = const BackupScope();
-  bool _s3PathStyle = true;
   bool _remoteBackupDialogActive = false;
 
-  @override
-  void initState() {
-    super.initState();
-    final settings = context.read<SettingsProvider>();
-    final cfg = settings.webDavConfig;
-    _url = TextEditingController(text: cfg.url);
-    _username = TextEditingController(text: cfg.username);
-    _password = TextEditingController(text: cfg.password);
-    _path = TextEditingController(text: cfg.path);
-    _webDavUserAgent = TextEditingController(text: cfg.userAgent);
-    _scope = cfg.scope;
-
-    final s3 = settings.s3Config;
-    _s3Endpoint = TextEditingController(text: s3.endpoint);
-    _s3Region = TextEditingController(text: s3.region);
-    _s3Bucket = TextEditingController(text: s3.bucket);
-    _s3AccessKeyId = TextEditingController(text: s3.accessKeyId);
-    _s3SecretAccessKey = TextEditingController(text: s3.secretAccessKey);
-    _s3SessionToken = TextEditingController(text: s3.sessionToken);
-    _s3Prefix = TextEditingController(text: s3.prefix);
-    _s3UserAgent = TextEditingController(text: s3.userAgent);
-    _s3PathStyle = s3.pathStyle;
-  }
-
-  @override
-  void dispose() {
-    _url.dispose();
-    _username.dispose();
-    _password.dispose();
-    _path.dispose();
-    _s3Endpoint.dispose();
-    _s3Region.dispose();
-    _s3Bucket.dispose();
-    _s3AccessKeyId.dispose();
-    _s3SecretAccessKey.dispose();
-    _s3SessionToken.dispose();
-    _s3Prefix.dispose();
-    _webDavUserAgent.dispose();
-    _s3UserAgent.dispose();
-    super.dispose();
-  }
-
-  WebDavConfig _buildConfigFromForm() {
-    return WebDavConfig(
-      url: _url.text.trim(),
-      username: _username.text.trim(),
-      password: _password.text,
-      path: _path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim(),
-      userAgent: _webDavUserAgent.text.trim(),
-      scope: _scope,
-    );
-  }
-
-  Future<void> _saveConfig() async {
-    final cfg = _buildConfigFromForm();
-    final settings = context.read<SettingsProvider>();
-    final backupProvider = context.read<BackupProvider>();
-    await settings.setWebDavConfig(cfg);
-    backupProvider.updateConfig(cfg);
-  }
-
-  Future<void> _applyPartial({
-    String? url,
-    String? username,
-    String? password,
-    String? path,
-    String? userAgent,
-    BackupScope? scope,
-  }) async {
-    final settings = context.read<SettingsProvider>();
-    final backupProvider = context.read<BackupProvider>();
-    final cfg = WebDavConfig(
-      url: url ?? _url.text.trim(),
-      username: username ?? _username.text.trim(),
-      password: password ?? _password.text,
-      path:
-          path ??
-          (_path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim()),
-      userAgent: userAgent ?? _webDavUserAgent.text.trim(),
-      scope: scope ?? _scope,
-    );
-    await settings.setWebDavConfig(cfg);
-    backupProvider.updateConfig(cfg);
-  }
-
-  S3Config _buildS3ConfigFromForm() {
-    return S3Config(
-      endpoint: _s3Endpoint.text.trim(),
-      region: _s3Region.text.trim().isEmpty
-          ? 'us-east-1'
-          : _s3Region.text.trim(),
-      bucket: _s3Bucket.text.trim(),
-      accessKeyId: _s3AccessKeyId.text.trim(),
-      secretAccessKey: _s3SecretAccessKey.text,
-      sessionToken: _s3SessionToken.text,
-      prefix: _s3Prefix.text.trim().isEmpty
-          ? 'kelivo_backups'
-          : _s3Prefix.text.trim(),
-      pathStyle: _s3PathStyle,
-      userAgent: _s3UserAgent.text.trim(),
-      scope: _scope,
-    );
-  }
-
-  Future<void> _saveS3Config() async {
-    final cfg = _buildS3ConfigFromForm();
-    final settings = context.read<SettingsProvider>();
-    final s3BackupProvider = context.read<S3BackupProvider>();
-    await settings.setS3Config(cfg);
-    s3BackupProvider.updateConfig(cfg);
-  }
-
-  Future<void> _applyS3Partial({
-    String? endpoint,
-    String? region,
-    String? bucket,
-    String? accessKeyId,
-    String? secretAccessKey,
-    String? sessionToken,
-    String? prefix,
-    bool? pathStyle,
-    String? userAgent,
-    BackupScope? scope,
-  }) async {
-    final settings = context.read<SettingsProvider>();
-    final s3BackupProvider = context.read<S3BackupProvider>();
-    final cfg = S3Config(
-      endpoint: endpoint ?? _s3Endpoint.text.trim(),
-      region:
-          region ??
-          (_s3Region.text.trim().isEmpty ? 'us-east-1' : _s3Region.text.trim()),
-      bucket: bucket ?? _s3Bucket.text.trim(),
-      accessKeyId: accessKeyId ?? _s3AccessKeyId.text.trim(),
-      secretAccessKey: secretAccessKey ?? _s3SecretAccessKey.text,
-      sessionToken: sessionToken ?? _s3SessionToken.text,
-      prefix:
-          prefix ??
-          (_s3Prefix.text.trim().isEmpty
-              ? 'kelivo_backups'
-              : _s3Prefix.text.trim()),
-      pathStyle: pathStyle ?? _s3PathStyle,
-      userAgent: userAgent ?? _s3UserAgent.text.trim(),
-      scope: scope ?? _scope,
-    );
-    await settings.setS3Config(cfg);
-    s3BackupProvider.updateConfig(cfg);
+  Future<void> _saveServerEdit(Future<void> write) async {
+    try {
+      await write;
+    } on BackupSettingsSaveException {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.backupPageSettingsSaveFailed,
+          type: NotificationType.error,
+        );
+      }
+    }
   }
 
   Future<void> _runRemoteBackupTask(BackupDestination destination) async {
@@ -225,6 +75,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   }
 
   Future<void> _doImportLocal() async {
+    final cfg = context.read<SettingsProvider>().webDavConfig;
     final rootCtx = Navigator.of(context, rootNavigator: true).context;
     final backupProvider = context.read<BackupProvider>();
     final l10n = AppLocalizations.of(context)!;
@@ -252,6 +103,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       title: l10n.backupPageImportBackupFile,
       task: (handle) => backupProvider.restoreFromLocalFile(
         file,
+        cfg,
         mode: mode,
         onProgress: handle.report,
         cancelToken: handle.cancelToken,
@@ -272,6 +124,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    final dav = settings.webDavConfig;
+    final s3 = settings.s3Config;
     final webdavVm = context.watch<BackupProvider>();
     final s3Vm = context.watch<S3BackupProvider>();
     final busy =
@@ -354,15 +209,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     ),
                     BackupScopeTile(
                       desktop: true,
-                      scope: _scope,
-                      onChanged: busy
-                          ? null
-                          : (scope) async {
-                              setState(() => _scope = scope);
-                              await _applyPartial(scope: scope);
-                              if (!mounted) return;
-                              await _applyS3Partial(scope: scope);
-                            },
+                      scope: dav.scope,
+                      onChanged: busy ? null : settings.setBackupScope,
                     ),
                     BackupEncryptionTile(busy: busy),
                   ],
@@ -404,84 +252,69 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         ],
                       ),
                     ),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageWebDavServerUrl,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _url,
-                          enabled: !busy,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(context).copyWith(
-                            hintText:
-                                'https://dav.example.com/remote.php/webdav/',
-                          ),
-                          onChanged: (v) => _applyPartial(url: v),
+                      value: dav.url,
+                      hint: 'https://dav.example.com/remote.php/webdav/',
+                      enabled: !busy,
+                      saving: settings.savingWebDavConfig,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateWebDavConfig(
+                          (cfg) => cfg.copyWith(url: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageUsername,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _username,
-                          enabled: !busy,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: l10n.backupPageUsername),
-                          onChanged: (v) => _applyPartial(username: v),
+                      value: dav.username,
+                      hint: l10n.backupPageUsername,
+                      enabled: !busy,
+                      saving: settings.savingWebDavConfig,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateWebDavConfig(
+                          (cfg) => cfg.copyWith(username: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPagePassword,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _password,
-                          enabled: !busy,
-                          obscureText: true,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: '••••••••'),
-                          onChanged: (v) => _applyPartial(password: v),
+                      value: dav.password,
+                      hint: '••••••••',
+                      enabled: !busy,
+                      saving: settings.savingWebDavConfig,
+                      obscureText: true,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateWebDavConfig(
+                          (cfg) => cfg.copyWith(password: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPagePath,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _path,
-                          enabled: !busy,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: 'kelivo_backups'),
-                          onChanged: (v) => _applyPartial(path: v),
+                      value: dav.path,
+                      hint: 'kelivo_backups',
+                      enabled: !busy,
+                      saving: settings.savingWebDavConfig,
+                      defaultValue: 'kelivo_backups',
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateWebDavConfig(
+                          (cfg) => cfg.copyWith(path: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageUserAgent,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _webDavUserAgent,
-                          enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: l10n.backupPageUserAgentHint),
-                          onChanged: (v) => _applyPartial(userAgent: v),
+                      value: dav.userAgent,
+                      hint: l10n.backupPageUserAgentHint,
+                      enabled: !busy,
+                      saving: settings.savingWebDavConfig,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateWebDavConfig(
+                          (cfg) => cfg.copyWith(userAgent: value),
                         ),
                       ),
                     ),
@@ -495,13 +328,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             label: l10n.backupPageTestConnection,
                             filled: false,
                             dense: true,
-                            onTap: busy
+                            onTap: busy || settings.savingWebDavConfig
                                 ? null
                                 : () async {
                                     final backupProvider = context
                                         .read<BackupProvider>();
-                                    await _saveConfig();
-                                    await backupProvider.test();
+                                    await backupProvider.test(dav);
                                     if (!context.mounted) return;
                                     final rawMessage = backupProvider.message;
                                     final message =
@@ -521,24 +353,24 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             label: l10n.backupPageRestore,
                             filled: false,
                             dense: true,
-                            onTap: busy
+                            onTap: busy || settings.savingWebDavConfig
                                 ? null
                                 : () async {
                                     final backupProvider = context
                                         .read<BackupProvider>();
-                                    await _saveConfig();
-                                    if (!context.mounted) return;
                                     _showRemoteBackupsDialog(
                                       context,
                                       title:
                                           '${l10n.backupPageRemoteBackups} (WebDAV)',
                                       listRemote: (handle) =>
                                           backupProvider.listRemote(
+                                            dav,
                                             onProgress: handle.report,
                                             cancelToken: handle.cancelToken,
                                           ),
                                       restoreFromItem: (it, mode, handle) async {
                                         await backupProvider.restoreFromItem(
+                                          dav,
                                           it,
                                           mode: mode,
                                           onProgress: handle.report,
@@ -558,8 +390,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       },
                                       skippedConversations: () =>
                                           backupProvider.skippedConversations,
-                                      deleteAndReload:
-                                          backupProvider.deleteAndReload,
+                                      deleteAndReload: (item) => backupProvider
+                                          .deleteAndReload(dav, item),
                                     );
                                   },
                           ),
@@ -567,11 +399,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             label: l10n.backupPageBackupNow,
                             filled: true,
                             dense: true,
-                            onTap: busy
+                            onTap: busy || settings.savingWebDavConfig
                                 ? null
                                 : () async {
-                                    await _saveConfig();
-                                    if (!context.mounted) return;
                                     await _runRemoteBackupTask(
                                       BackupDestination.webdav,
                                     );
@@ -610,132 +440,110 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         ],
                       ),
                     ),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageS3Endpoint,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _s3Endpoint,
-                          enabled: !busy,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: 'https://s3.amazonaws.com'),
-                          onChanged: (v) => _applyS3Partial(endpoint: v),
+                      value: s3.endpoint,
+                      hint: 'https://s3.amazonaws.com',
+                      enabled: !busy,
+                      saving: settings.savingS3Config,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateS3Config(
+                          (cfg) => cfg.copyWith(endpoint: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageS3Region,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _s3Region,
-                          enabled: !busy,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: 'us-east-1 / auto'),
-                          onChanged: (v) => _applyS3Partial(region: v),
+                      value: s3.region,
+                      hint: 'us-east-1 / auto',
+                      enabled: !busy,
+                      saving: settings.savingS3Config,
+                      defaultValue: 'us-east-1',
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateS3Config(
+                          (cfg) => cfg.copyWith(region: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageS3Bucket,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _s3Bucket,
-                          enabled: !busy,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: l10n.backupPageS3Bucket),
-                          onChanged: (v) => _applyS3Partial(bucket: v),
+                      value: s3.bucket,
+                      hint: l10n.backupPageS3Bucket,
+                      enabled: !busy,
+                      saving: settings.savingS3Config,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateS3Config(
+                          (cfg) => cfg.copyWith(bucket: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageS3AccessKeyId,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _s3AccessKeyId,
-                          enabled: !busy,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: l10n.backupPageS3AccessKeyId),
-                          onChanged: (v) => _applyS3Partial(accessKeyId: v),
+                      value: s3.accessKeyId,
+                      hint: l10n.backupPageS3AccessKeyId,
+                      enabled: !busy,
+                      saving: settings.savingS3Config,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateS3Config(
+                          (cfg) => cfg.copyWith(accessKeyId: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageS3SecretAccessKey,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _s3SecretAccessKey,
-                          enabled: !busy,
-                          obscureText: true,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: '••••••••'),
-                          onChanged: (v) => _applyS3Partial(secretAccessKey: v),
+                      value: s3.secretAccessKey,
+                      hint: '••••••••',
+                      enabled: !busy,
+                      saving: settings.savingS3Config,
+                      obscureText: true,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateS3Config(
+                          (cfg) => cfg.copyWith(secretAccessKey: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageS3SessionToken,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _s3SessionToken,
-                          enabled: !busy,
-                          obscureText: true,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: l10n.backupPageS3SessionToken),
-                          onChanged: (v) => _applyS3Partial(sessionToken: v),
+                      value: s3.sessionToken,
+                      hint: l10n.backupPageS3SessionToken,
+                      enabled: !busy,
+                      saving: settings.savingS3Config,
+                      obscureText: true,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateS3Config(
+                          (cfg) => cfg.copyWith(sessionToken: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageS3Prefix,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _s3Prefix,
-                          enabled: !busy,
-                          style: TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: 'kelivo_backups'),
-                          onChanged: (v) => _applyS3Partial(prefix: v),
+                      value: s3.prefix,
+                      hint: 'kelivo_backups',
+                      enabled: !busy,
+                      saving: settings.savingS3Config,
+                      defaultValue: 'kelivo_backups',
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateS3Config(
+                          (cfg) => cfg.copyWith(prefix: value),
                         ),
                       ),
                     ),
                     _rowDivider(context),
-                    _ItemRow(
+                    _ServerSettingField(
                       label: l10n.backupPageUserAgent,
-                      trailing: SizedBox(
-                        width: 420,
-                        child: TextField(
-                          controller: _s3UserAgent,
-                          enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: _deskInputDecoration(
-                            context,
-                          ).copyWith(hintText: l10n.backupPageUserAgentHint),
-                          onChanged: (v) => _applyS3Partial(userAgent: v),
+                      value: s3.userAgent,
+                      hint: l10n.backupPageUserAgentHint,
+                      enabled: !busy,
+                      saving: settings.savingS3Config,
+                      onChanged: (value) => _saveServerEdit(
+                        settings.updateS3Config(
+                          (cfg) => cfg.copyWith(userAgent: value),
                         ),
                       ),
                     ),
@@ -743,13 +551,14 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     _ItemRow(
                       label: l10n.backupPageS3PathStyle,
                       trailing: IosSwitch(
-                        value: _s3PathStyle,
-                        onChanged: busy
+                        value: s3.pathStyle,
+                        onChanged: busy || settings.savingS3Config
                             ? null
-                            : (v) async {
-                                setState(() => _s3PathStyle = v);
-                                await _applyS3Partial(pathStyle: v);
-                              },
+                            : (v) => _saveServerEdit(
+                                settings.updateS3Config(
+                                  (cfg) => cfg.copyWith(pathStyle: v),
+                                ),
+                              ),
                       ),
                     ),
                     _rowDivider(context),
@@ -762,13 +571,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             label: l10n.backupPageTestConnection,
                             filled: false,
                             dense: true,
-                            onTap: busy
+                            onTap: busy || settings.savingS3Config
                                 ? null
                                 : () async {
                                     final s3BackupProvider = context
                                         .read<S3BackupProvider>();
-                                    await _saveS3Config();
-                                    await s3BackupProvider.test();
+                                    await s3BackupProvider.test(s3);
                                     if (!context.mounted) return;
                                     final rawMessage = s3BackupProvider.message;
                                     final message =
@@ -788,24 +596,24 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             label: l10n.backupPageRestore,
                             filled: false,
                             dense: true,
-                            onTap: busy
+                            onTap: busy || settings.savingS3Config
                                 ? null
                                 : () async {
                                     final s3BackupProvider = context
                                         .read<S3BackupProvider>();
-                                    await _saveS3Config();
-                                    if (!context.mounted) return;
                                     _showRemoteBackupsDialog(
                                       context,
                                       title:
                                           '${l10n.backupPageRemoteBackups} (S3)',
                                       listRemote: (handle) =>
                                           s3BackupProvider.listRemote(
+                                            s3,
                                             onProgress: handle.report,
                                             cancelToken: handle.cancelToken,
                                           ),
                                       restoreFromItem: (it, mode, handle) async {
                                         await s3BackupProvider.restoreFromItem(
+                                          s3,
                                           it,
                                           mode: mode,
                                           onProgress: handle.report,
@@ -825,8 +633,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       },
                                       skippedConversations: () =>
                                           s3BackupProvider.skippedConversations,
-                                      deleteAndReload:
-                                          s3BackupProvider.deleteAndReload,
+                                      deleteAndReload: (item) =>
+                                          s3BackupProvider.deleteAndReload(
+                                            s3,
+                                            item,
+                                          ),
                                     );
                                   },
                           ),
@@ -834,11 +645,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             label: l10n.backupPageBackupNow,
                             filled: true,
                             dense: true,
-                            onTap: busy
+                            onTap: busy || settings.savingS3Config
                                 ? null
                                 : () async {
-                                    await _saveS3Config();
-                                    if (!context.mounted) return;
                                     await _runRemoteBackupTask(
                                       BackupDestination.s3,
                                     );
@@ -914,8 +723,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     ? null
                     : () async {
                         final backupProvider = context.read<BackupProvider>();
-                        await _saveConfig();
-                        if (!context.mounted) return;
+                        final cfg = context
+                            .read<SettingsProvider>()
+                            .webDavConfig;
                         File? file;
                         try {
                           final ok = await runBackupTask(
@@ -927,6 +737,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 ),
                             task: (handle) async {
                               file = await backupProvider.exportToFile(
+                                cfg,
                                 password: await backupPasswordForExport(
                                   context,
                                 ),
@@ -1016,7 +827,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 await CherryImporter.importFromCherryStudio(
                                   file: f,
                                   mode: mode,
-                                  scope: _scope,
+                                  scope: context
+                                      .read<SettingsProvider>()
+                                      .webDavConfig
+                                      .scope,
                                   businessRepository: context
                                       .read<BusinessRepository>(),
                                   chatService: chat,
@@ -1074,7 +888,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             imported = await ChatboxImporter.importFromChatbox(
                               file: f,
                               mode: mode,
-                              scope: _scope,
+                              scope: context
+                                  .read<SettingsProvider>()
+                                  .webDavConfig
+                                  .scope,
                               businessRepository: context
                                   .read<BusinessRepository>(),
                               chatService: chat,
@@ -1751,6 +1568,78 @@ void _showRemoteBackupsDialog(
 
 Widget _rowDivider(BuildContext context) {
   return Container(height: 1, color: context.appColors.hairline);
+}
+
+class _ServerSettingField extends StatefulWidget {
+  const _ServerSettingField({
+    required this.label,
+    required this.value,
+    required this.hint,
+    required this.enabled,
+    required this.saving,
+    required this.onChanged,
+    this.obscureText = false,
+    this.defaultValue = '',
+  });
+
+  final String label;
+  final String value;
+  final String hint;
+  final bool enabled;
+  final bool saving;
+  final ValueChanged<String> onChanged;
+  final bool obscureText;
+  final String defaultValue;
+
+  @override
+  State<_ServerSettingField> createState() => _ServerSettingFieldState();
+}
+
+class _ServerSettingFieldState extends State<_ServerSettingField> {
+  late final _controller = TextEditingController(text: widget.value);
+
+  String _storedValue(String text) {
+    if (widget.obscureText) return text;
+    final value = text.trim();
+    return value.isEmpty ? widget.defaultValue : value;
+  }
+
+  @override
+  void didUpdateWidget(_ServerSettingField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Preserve the cursor and composing text while newer edits are in flight.
+    // Once settled, a rejected edit or a write from another pane is reflected.
+    if (!widget.saving && _storedValue(_controller.text) != widget.value) {
+      _controller.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _ItemRow(
+    label: widget.label,
+    trailing: SizedBox(
+      width: 420,
+      child: TextField(
+        controller: _controller,
+        enabled: widget.enabled,
+        obscureText: widget.obscureText,
+        style: const TextStyle(fontSize: 14),
+        decoration: _deskInputDecoration(
+          context,
+        ).copyWith(hintText: widget.hint),
+        onChanged: (text) => widget.onChanged(_storedValue(text)),
+      ),
+    ),
+  );
 }
 
 class _ItemRow extends StatelessWidget {

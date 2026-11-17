@@ -3256,6 +3256,12 @@ abstract class AppLocalizations {
   /// **'Files and Images'**
   String get backupPageFilesLabel;
 
+  /// Error shown on the backup settings page when local storage cannot save WebDAV or S3 server settings or the shared backup and import content selection.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the backup settings. Please try again.'**
+  String get backupPageSettingsSaveFailed;
+
   /// Title of the backup scope selector tile listing which content categories to back up or import.
   ///
   /// In en, this message translates to:

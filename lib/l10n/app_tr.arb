@@ -524,6 +524,7 @@
   "backupPageChooseBackupFolder": "Yedek klasörü seçin",
   "backupPageChooseExternalFolder": "iCloud Drive'ı veya \"iPhone'um > Kelivo\" dışında bir klasör seçin. Kelivo klasöründeki dosyalar uygulamayla birlikte silinir. Yedek kaydedilmedi.",
   "backupPageFilesLabel": "Dosyalar ve Görseller",
+  "backupPageSettingsSaveFailed": "Yedekleme ayarları kaydedilemedi. Lütfen tekrar deneyin.",
   "backupPageScopeTitle": "Yedekleme ve içe aktarma içeriği",
   "backupPageScopeSelectedCount": "{selected}/{total}",
   "backupPageBackupManagementDescription": "Neyin yedekleneceğini ve içe aktarılacağını seçin. Yerel, WebDAV ve S3 yedekleri için geçerlidir. Seçilmeyen içerik içe aktarmada değişmeden kalır. Beceriler ve çalışma alanları kendi dosyalarını içerir.",

@@ -1724,6 +1724,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageFilesLabel => 'Files and Images';
 
   @override
+  String get backupPageSettingsSaveFailed =>
+      'Could not save the backup settings. Please try again.';
+
+  @override
   String get backupPageScopeTitle => 'Backup and import content';
 
   @override

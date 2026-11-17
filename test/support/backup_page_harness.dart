@@ -62,7 +62,6 @@ Future<void> pumpBackupSettingsPage(
                 chatService: ctx.read<ChatService>(),
                 businessPreferences: business.preferences,
                 businessRepository: business.repository,
-                initialConfig: settings.webDavConfig,
               ),
         ),
         ChangeNotifierProvider<S3BackupProvider>(
@@ -70,7 +69,6 @@ Future<void> pumpBackupSettingsPage(
             chatService: ctx.read<ChatService>(),
             businessPreferences: business.preferences,
             businessRepository: business.repository,
-            initialConfig: settings.s3Config,
           ),
         ),
         ChangeNotifierProvider(

@@ -524,6 +524,7 @@
   "backupPageChooseBackupFolder": "Выберите папку для резервной копии",
   "backupPageChooseExternalFolder": "Выберите iCloud Drive или папку вне «На моём iPhone > Kelivo». Файлы в папке Kelivo удаляются вместе с приложением. Резервная копия не сохранена.",
   "backupPageFilesLabel": "Файлы и изображения",
+  "backupPageSettingsSaveFailed": "Не удалось сохранить настройки резервного копирования. Попробуйте ещё раз.",
   "backupPageScopeTitle": "Содержимое резервной копии и импорта",
   "backupPageScopeSelectedCount": "{selected}/{total}",
   "backupPageBackupManagementDescription": "Выберите, что копировать и импортировать. Применяется к локальным, WebDAV и S3 резервным копиям. Невыбранное содержимое при импорте остаётся без изменений. Навыки и рабочие области включают собственные файлы.",

@@ -738,6 +738,10 @@
     "description": "Error shown when an iOS local backup destination is inside the app container. No file is copied and the backup is not counted as successful. Ask the user to choose a folder that survives deleting Kelivo."
   },
   "backupPageFilesLabel": "Files and Images",
+  "backupPageSettingsSaveFailed": "Could not save the backup settings. Please try again.",
+  "@backupPageSettingsSaveFailed": {
+    "description": "Error shown on the backup settings page when local storage cannot save WebDAV or S3 server settings or the shared backup and import content selection."
+  },
   "backupPageScopeTitle": "Backup and import content",
   "backupPageScopeSelectedCount": "{selected}/{total}",
   "@backupPageScopeSelectedCount": {

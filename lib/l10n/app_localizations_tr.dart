@@ -1731,6 +1731,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get backupPageFilesLabel => 'Dosyalar ve Görseller';
 
   @override
+  String get backupPageSettingsSaveFailed =>
+      'Yedekleme ayarları kaydedilemedi. Lütfen tekrar deneyin.';
+
+  @override
   String get backupPageScopeTitle => 'Yedekleme ve içe aktarma içeriği';
 
   @override

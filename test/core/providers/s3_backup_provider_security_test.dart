@@ -89,7 +89,9 @@ void main() {
           chatService: chatService,
           businessRepository: businessRepository,
           businessPreferences: BusinessPreferences(businessRepository),
-          initialConfig: S3Config(
+        );
+        await provider.restoreFromItem(
+          S3Config(
             endpoint: 'http://${server.address.address}:${server.port}',
             bucket: 'backup-bucket',
             accessKeyId: 'test-access-key',
@@ -103,8 +105,6 @@ void main() {
               },
             ),
           ),
-        );
-        await provider.restoreFromItem(
           BackupFileItem(
             href: Uri.parse('s3://backup-bucket/kelivo_backups/remote_$i.zip'),
             displayName: remoteNames[i],

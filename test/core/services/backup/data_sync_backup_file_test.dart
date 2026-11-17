@@ -2620,33 +2620,33 @@ void main() {
           addTearDown(chat.dispose);
           final preferences = BusinessPreferences(businessRepository);
           final endpoint = 'http://${server.address.address}:${server.port}';
+          final davConfig = WebDavConfig(
+            url: endpoint,
+            scope: _withoutChatsOrAssets.scope,
+          );
           final dav = BackupProvider(
             chatService: chat,
             businessRepository: businessRepository,
             businessPreferences: preferences,
-            initialConfig: WebDavConfig(
-              url: endpoint,
-              scope: _withoutChatsOrAssets.scope,
-            ),
+          );
+          final s3Config = S3Config(
+            endpoint: endpoint,
+            bucket: 'backup-bucket',
+            accessKeyId: 'test',
+            secretAccessKey: 'test-secret',
+            scope: _withoutChatsOrAssets.scope,
           );
           final s3 = S3BackupProvider(
             chatService: chat,
             businessRepository: businessRepository,
             businessPreferences: preferences,
-            initialConfig: S3Config(
-              endpoint: endpoint,
-              bucket: 'backup-bucket',
-              accessKeyId: 'test',
-              secretAccessKey: 'test-secret',
-              scope: _withoutChatsOrAssets.scope,
-            ),
           );
           addTearDown(dav.dispose);
           addTearDown(s3.dispose);
           expect(
             useS3
-                ? await s3.backup(password: 'remote password')
-                : await dav.backup(password: 'remote password'),
+                ? await s3.backup(s3Config, password: 'remote password')
+                : await dav.backup(davConfig, password: 'remote password'),
             isTrue,
             reason: useS3 ? s3.message : dav.message,
           );
@@ -2664,14 +2664,16 @@ void main() {
             ).list().toList(),
             isEmpty,
           );
-          final items = useS3 ? await s3.listRemote() : await dav.listRemote();
+          final items = useS3
+              ? await s3.listRemote(s3Config)
+              : await dav.listRemote(davConfig);
           expect(
             items.map((item) => item.displayName),
             contains(p.basename(archivePath)),
           );
           if (useS3) {
             denyBucketListing = true;
-            final manifestItems = await s3.listRemote();
+            final manifestItems = await s3.listRemote(s3Config);
             expect(
               manifestItems.map((item) => item.displayName),
               contains(p.basename(archivePath)),
@@ -2688,9 +2690,9 @@ void main() {
           }
 
           if (useS3) {
-            await s3.restoreFromItem(item, onPassword: password);
+            await s3.restoreFromItem(s3Config, item, onPassword: password);
           } else {
-            await dav.restoreFromItem(item, onPassword: password);
+            await dav.restoreFromItem(davConfig, item, onPassword: password);
           }
           expect(prompts, 1);
           expect(
@@ -2720,8 +2722,16 @@ void main() {
           await service.overwrite({'global_proxy_password_v1': 'keep-secret'});
           await expectLater(
             useS3
-                ? s3.restoreFromItem(substituted, onPassword: password)
-                : dav.restoreFromItem(substituted, onPassword: password),
+                ? s3.restoreFromItem(
+                    s3Config,
+                    substituted,
+                    onPassword: password,
+                  )
+                : dav.restoreFromItem(
+                    davConfig,
+                    substituted,
+                    onPassword: password,
+                  ),
             throwsA(
               isA<FormatException>().having(
                 (e) => e.message,
@@ -5506,7 +5516,6 @@ void main() {
           chatService: _FailingRestoreChatService(),
           businessRepository: businessRepository,
           businessPreferences: businessPreferences,
-          initialConfig: _withoutAssets,
         );
         final item = BackupFileItem(
           href: Uri.parse(
@@ -5518,7 +5527,7 @@ void main() {
         );
 
         await expectLater(
-          provider.restoreFromItem(item),
+          provider.restoreFromItem(_withoutAssets, item),
           throwsA(
             isA<StateError>().having(
               (error) => error.message,

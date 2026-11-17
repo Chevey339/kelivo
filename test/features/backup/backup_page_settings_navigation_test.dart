@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,6 +31,116 @@ void _expectAbove(WidgetTester tester, String upper, String lower) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('scope editor stays open until both settings are committed', (
+    tester,
+  ) async {
+    final business = await createBusinessTestHarness();
+    final settings = SettingsProvider(business.preferences);
+    await settings.loaded;
+    await pumpBackupSettingsPage(
+      tester,
+      settings: settings,
+      business: business,
+    );
+    await tester.tap(find.byKey(const ValueKey('backup-scope-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('backup-scope-chats')));
+
+    final gate = Completer<void>();
+    unawaited(business.preferences.runExclusiveMutation(() => gate.future));
+    try {
+      final save = find.byKey(const ValueKey('backup-scope-save'));
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(tester.widget<IosTextButton>(save).onPressed, isNull);
+      await tester.flingFrom(
+        tester.getCenter(save),
+        const Offset(0, 500),
+        1800,
+      );
+      await tester.pumpAndSettle();
+      expect(save, findsOneWidget);
+      expect(
+        settings.webDavConfig.scope.includes(BackupCategory.chats),
+        isTrue,
+      );
+    } finally {
+      gate.complete();
+    }
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(settings.webDavConfig.scope.includes(BackupCategory.chats), isFalse);
+    expect(settings.s3Config.scope.includes(BackupCategory.chats), isFalse);
+  });
+
+  testWidgets(
+    'desktop reopens during an edit and restores a rejected field independently',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1100, 4200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      const savedUrl = 'https://original.example';
+      final business = await createBusinessTestHarness(
+        initial: {
+          'webdav_config_v1': const WebDavConfig(
+            url: savedUrl,
+            password: 'private-fixture',
+          ).toJsonString(),
+        },
+      );
+      final settings = SettingsProvider(business.preferences);
+      await settings.loaded;
+      Future<void> open() => pumpBackupSettingsPage(
+        tester,
+        settings: settings,
+        business: business,
+        desktop: true,
+      );
+      Finder field(String hint) => find.byWidgetPredicate(
+        (widget) => widget is TextField && widget.decoration?.hintText == hint,
+      );
+      final url = field('https://dav.example.com/remote.php/webdav/');
+      final username = field('Username');
+      await open();
+      final gate = Completer<void>();
+      unawaited(business.preferences.runExclusiveMutation(() => gate.future));
+      const newUrl = 'https://updated.example';
+      try {
+        await tester.enterText(url, newUrl);
+        expect(settings.savingWebDavConfig, isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await open();
+        expect(tester.widget<TextField>(url).controller!.text, savedUrl);
+      } finally {
+        gate.complete();
+      }
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(url).controller!.text, newUrl);
+      await business.database.customStatement('''
+      CREATE TRIGGER reject_url BEFORE INSERT ON preference_rows
+      WHEN NEW.key = 'webdav_config_v1' AND NEW.value LIKE '%rejected.example%'
+      BEGIN SELECT RAISE(ABORT, 'private-fixture'); END
+    ''');
+      await tester.enterText(url, 'https://rejected.example');
+      await tester.enterText(username, 'updated-user');
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(url).controller!.text, newUrl);
+      expect(
+        tester.widget<TextField>(username).controller!.text,
+        'updated-user',
+      );
+      expect(settings.webDavConfig.url, newUrl);
+      expect(settings.webDavConfig.username, 'updated-user');
+      expect(settings.savingWebDavConfig, isFalse);
+      expect(
+        find.text('Could not save the backup settings. Please try again.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+    },
+  );
 
   for (final desktop in [false, true]) {
     testWidgets(
@@ -95,15 +208,37 @@ void main() {
     );
 
     testWidgets(
-      '${desktop ? 'desktop' : 'mobile'} saves category switches to both backup providers',
+      '${desktop ? 'desktop' : 'mobile'} preserves saved servers when changing backup scope after a cold start',
       (tester) async {
         await tester.binding.setSurfaceSize(
           desktop ? const Size(1100, 800) : const Size(390, 844),
         );
         addTearDown(() => tester.binding.setSurfaceSize(null));
-        final business = await createBusinessTestHarness();
+        const dav = WebDavConfig(
+          url: 'https://dav.example.com',
+          username: 'test-user',
+          password: 'test-password',
+          path: 'dav-folder',
+        );
+        const s3 = S3Config(
+          endpoint: 'https://s3.example.com',
+          bucket: 'test-bucket',
+          accessKeyId: 'test-id',
+          secretAccessKey: 'test-secret',
+          sessionToken: 'test-token',
+          prefix: 's3-folder',
+          pathStyle: false,
+        );
+        final business = await createBusinessTestHarness(
+          initial: {
+            'webdav_config_v1': dav.toJsonString(),
+            's3_config_v1': s3.toJsonString(),
+          },
+        );
         final settings = SettingsProvider(business.preferences);
-        await settings.loaded;
+        // The home screen creates backup providers in the first build.
+        expect(settings.webDavConfig.toJson(), dav.toJson());
+        expect(settings.s3Config.toJson(), s3.toJson());
         await pumpBackupSettingsPage(
           tester,
           settings: settings,
@@ -215,6 +350,14 @@ void main() {
         final reloaded = SettingsProvider(business.preferences);
         await reloaded.loaded;
         expect(
+          reloaded.webDavConfig.toJson(),
+          dav.copyWith(scope: settings.webDavConfig.scope).toJson(),
+        );
+        expect(
+          reloaded.s3Config.toJson(),
+          s3.copyWith(scope: settings.webDavConfig.scope).toJson(),
+        );
+        expect(
           reloaded.webDavConfig.scope.excluded,
           settings.webDavConfig.scope.excluded,
         );
@@ -309,7 +452,16 @@ void main() {
       final fields = find.byType(TextField);
       await tester.enterText(fields.at(0), ' https://s3.example.com ');
       await tester.enterText(fields.at(7), ' KelivoS3/1.0 ');
-      await tester.tap(find.text('Save'));
+      final gate = Completer<void>();
+      unawaited(business.preferences.runExclusiveMutation(() => gate.future));
+      try {
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(find.widgetWithText(AppBar, 'S3 Settings'), findsOne);
+        expect(tester.testTextInput.hasAnyClients, isFalse);
+      } finally {
+        gate.complete();
+      }
       await tester.pumpAndSettle();
 
       expect(find.widgetWithText(AppBar, 'S3 Settings'), findsNothing);

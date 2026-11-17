@@ -68,7 +68,6 @@ Widget _buildHarness({
           chatService: ctx.read<ChatService>(),
           businessPreferences: businessPreferences,
           businessRepository: businessRepository,
-          initialConfig: settings.webDavConfig,
         ),
       ),
       ChangeNotifierProvider(
@@ -76,7 +75,6 @@ Widget _buildHarness({
           chatService: ctx.read<ChatService>(),
           businessPreferences: businessPreferences,
           businessRepository: businessRepository,
-          initialConfig: settings.s3Config,
         ),
       ),
       ChangeNotifierProvider(

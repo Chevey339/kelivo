@@ -56,14 +56,17 @@ class ExternalBackupAutoProvider extends ChangeNotifier {
   Object? failure;
   DateTime? _attemptedDue;
   Future<void>? _folderCleanup;
-  List<BackupDestination> get available => [
-    if (settings.webDavConfig.url.trim().isNotEmpty) BackupDestination.webdav,
-    if (settings.s3Config.endpoint.trim().isNotEmpty &&
-        settings.s3Config.bucket.trim().isNotEmpty &&
-        settings.s3Config.accessKeyId.trim().isNotEmpty)
-      BackupDestination.s3,
-    if (desktop && folder.path.isNotEmpty) BackupDestination.local,
-  ];
+  List<BackupDestination> get available {
+    final cfg = settings.s3Config;
+    return [
+      if (settings.webDavConfig.url.trim().isNotEmpty) BackupDestination.webdav,
+      if (cfg.endpoint.trim().isNotEmpty &&
+          cfg.bucket.trim().isNotEmpty &&
+          cfg.accessKeyId.trim().isNotEmpty)
+        BackupDestination.s3,
+      if (desktop && folder.path.isNotEmpty) BackupDestination.local,
+    ];
+  }
 
   BackupDestination? get savedDestination => BackupDestination.values
       .where((d) => d.name == preferences.getString(_destinationKey))
@@ -177,9 +180,43 @@ class ExternalBackupAutoProvider extends ChangeNotifier {
 
   void cancel() => _active?.cancel();
 
-  /// Used by both the progress dialog and the foreground due check.
   Future<void> run(
     BackupDestination target, {
+    required Future<String?> Function() password,
+    required BackupCancelToken token,
+    BackupProgressSink? onProgress,
+  }) => _run(
+    target: target,
+    password: password,
+    token: token,
+    onProgress: onProgress,
+  );
+
+  Future<BackupDestination> _scheduledDestination(
+    BackupCancelToken token,
+  ) async {
+    final destinationIsBeingEdited = switch (savedDestination) {
+      BackupDestination.webdav => settings.savingWebDavConfig,
+      BackupDestination.s3 => settings.savingS3Config,
+      BackupDestination.local => false,
+      null => settings.savingWebDavConfig || settings.savingS3Config,
+    };
+    if (destinationIsBeingEdited) await preferences.flushPendingWrites();
+    token.throwIfCancelled();
+    final target = destination;
+    if (target == null || !available.contains(target)) {
+      if (target == BackupDestination.local && desktop) {
+        throw BackupDestinationError.folder;
+      }
+      throw desktop
+          ? BackupDestinationError.destination
+          : BackupDestinationError.remote;
+    }
+    return target;
+  }
+
+  Future<void> _run({
+    BackupDestination? target,
     required Future<String?> Function() password,
     required BackupCancelToken token,
     BackupProgressSink? onProgress,
@@ -201,12 +238,14 @@ class ExternalBackupAutoProvider extends ChangeNotifier {
     }
 
     try {
+      final selected = target ?? await _scheduledDestination(token);
+      token.throwIfCancelled();
       final secret = await password();
       token.throwIfCancelled();
-      switch (target) {
+      switch (selected) {
         case BackupDestination.webdav:
-          webdav.updateConfig(settings.webDavConfig);
           if (!await webdav.backup(
+            settings.webDavConfig,
             password: secret,
             onProgress: report,
             cancelToken: token,
@@ -214,8 +253,8 @@ class ExternalBackupAutoProvider extends ChangeNotifier {
             throw Exception(webdav.message ?? 'WebDAV backup failed');
           }
         case BackupDestination.s3:
-          s3.updateConfig(settings.s3Config);
           if (!await s3.backup(
+            settings.s3Config,
             password: secret,
             onProgress: report,
             cancelToken: token,
@@ -225,10 +264,10 @@ class ExternalBackupAutoProvider extends ChangeNotifier {
         case BackupDestination.local:
           await _folderCleanup;
           await _withFolder((local) async {
-            webdav.updateConfig(settings.webDavConfig);
             File? file;
             try {
               file = await webdav.exportToFile(
+                settings.webDavConfig,
                 password: secret,
                 onProgress: report,
                 cancelToken: token,
@@ -245,7 +284,7 @@ class ExternalBackupAutoProvider extends ChangeNotifier {
           });
       }
       await reminder.recordBackupCompleted(now: clock());
-      await preferences.setString(_lastKey, target.name);
+      await preferences.setString(_lastKey, selected.name);
       resetAttempt();
     } finally {
       _active = null;
@@ -270,20 +309,7 @@ class ExternalBackupAutoProvider extends ChangeNotifier {
     final token = BackupCancelToken();
     BackupActivity.begin();
     try {
-      final target = destination;
-      if (target == null || !available.contains(target)) {
-        if (target == BackupDestination.local && desktop) {
-          throw BackupDestinationError.folder;
-        }
-        throw desktop
-            ? BackupDestinationError.destination
-            : BackupDestinationError.remote;
-      }
-      await run(
-        target,
-        password: settings.automaticBackupPassword,
-        token: token,
-      );
+      await _run(password: settings.automaticBackupPassword, token: token);
       return true;
     } catch (error) {
       failure = error;

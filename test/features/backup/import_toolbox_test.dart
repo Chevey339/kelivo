@@ -76,7 +76,8 @@ class _RecordingBackup extends BackupProvider {
 
   @override
   Future<void> restoreFromLocalFile(
-    File file, {
+    File file,
+    WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,

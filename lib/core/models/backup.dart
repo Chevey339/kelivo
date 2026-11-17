@@ -3,6 +3,10 @@ import 'dart:convert';
 import 'backup_scope.dart';
 export 'backup_scope.dart';
 
+class BackupSettingsSaveException implements Exception {
+  const BackupSettingsSaveException();
+}
+
 enum RestoreMode {
   overwrite, // 覆盖所选内容，保留未选内容
   merge, // 增量合并：智能去重

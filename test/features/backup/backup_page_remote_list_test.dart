@@ -35,7 +35,8 @@ class _HangingBackupProvider extends BackupProvider {
   var started = false;
 
   @override
-  Future<List<BackupFileItem>> listRemote({
+  Future<List<BackupFileItem>> listRemote(
+    WebDavConfig cfg, {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) {
@@ -56,7 +57,8 @@ class _HangingS3BackupProvider extends S3BackupProvider {
   var started = false;
 
   @override
-  Future<List<BackupFileItem>> listRemote({
+  Future<List<BackupFileItem>> listRemote(
+    S3Config cfg, {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) {

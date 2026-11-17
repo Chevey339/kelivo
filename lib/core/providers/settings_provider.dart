@@ -1514,24 +1514,6 @@ class SettingsProvider extends ChangeNotifier {
     }
     _backupEncryptionEnabled =
         prefs.getBool(_backupEncryptionEnabledKey) ?? false;
-    // webdav config
-    final webdavStr = prefs.getString(_webDavConfigKey);
-    if (webdavStr != null && webdavStr.isNotEmpty) {
-      try {
-        _webDavConfig = WebDavConfig.fromJson(
-          jsonDecode(webdavStr) as Map<String, dynamic>,
-        );
-      } catch (_) {}
-    }
-    // s3 config
-    final s3Str = prefs.getString(_s3ConfigKey);
-    if (s3Str != null && s3Str.isNotEmpty) {
-      try {
-        _s3Config = S3Config.fromJson(
-          jsonDecode(s3Str) as Map<String, dynamic>,
-        );
-      } catch (_) {}
-    }
     if (_providerConfigs.isEmpty) {
       // Seed a couple of sensible defaults on first launch, but do not recreate
       // providers implicitly during later reads (e.g., when switching chats).
@@ -2465,22 +2447,60 @@ class SettingsProvider extends ChangeNotifier {
     });
   }
 
-  WebDavConfig _webDavConfig = const WebDavConfig();
-  WebDavConfig get webDavConfig => _webDavConfig;
-  Future<void> setWebDavConfig(WebDavConfig cfg) async {
-    _webDavConfig = cfg;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setString(_webDavConfigKey, jsonEncode(cfg.toJson()));
+  int _webDavWrites = 0;
+  int _s3Writes = 0;
+  bool get savingWebDavConfig => _webDavWrites > 0;
+  bool get savingS3Config => _s3Writes > 0;
+
+  // BusinessStartupGate loads these preferences before the first frame.
+  WebDavConfig get webDavConfig {
+    final value = _preferences.get(_webDavConfigKey);
+    return value is String
+        ? WebDavConfig.fromJsonString(value)
+        : const WebDavConfig();
   }
 
-  S3Config _s3Config = const S3Config();
-  S3Config get s3Config => _s3Config;
-  Future<void> setS3Config(S3Config cfg) async {
-    _s3Config = cfg;
+  S3Config get s3Config {
+    final value = _preferences.get(_s3ConfigKey);
+    return value is String ? S3Config.fromJsonString(value) : const S3Config();
+  }
+
+  Future<void> updateWebDavConfig(WebDavConfig Function(WebDavConfig) edit) =>
+      _updateBackupConfigs(webDav: edit);
+
+  Future<void> updateS3Config(S3Config Function(S3Config) edit) =>
+      _updateBackupConfigs(s3: edit);
+
+  Future<void> setBackupScope(BackupScope scope) => _updateBackupConfigs(
+    webDav: (cfg) => cfg.copyWith(scope: scope),
+    s3: (cfg) => cfg.copyWith(scope: scope),
+  );
+
+  Future<void> _updateBackupConfigs({
+    WebDavConfig Function(WebDavConfig)? webDav,
+    S3Config Function(S3Config)? s3,
+  }) async {
+    if (webDav != null) _webDavWrites++;
+    if (s3 != null) _s3Writes++;
+    final write = _preferences.runExclusiveMutation(() async {
+      await _preferences.load();
+      await _preferences.setMany({
+        if (webDav != null)
+          _webDavConfigKey: webDav(webDavConfig).toJsonString(),
+        if (s3 != null) _s3ConfigKey: s3(s3Config).toJsonString(),
+      });
+    });
     notifyListeners();
-    final prefs = _preferences;
-    await prefs.setString(_s3ConfigKey, jsonEncode(cfg.toJson()));
+    try {
+      await write;
+    } catch (_) {
+      // SQLite errors can contain the bound server credentials.
+      throw const BackupSettingsSaveException();
+    } finally {
+      if (webDav != null) _webDavWrites--;
+      if (s3 != null) _s3Writes--;
+      notifyListeners();
+    }
   }
 
   Future<void> _initSearchConnectivityTests() async {

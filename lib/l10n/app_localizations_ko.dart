@@ -1688,6 +1688,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupPageFilesLabel => '파일 및 이미지';
 
   @override
+  String get backupPageSettingsSaveFailed => '백업 설정을 저장하지 못했습니다. 다시 시도해 주세요.';
+
+  @override
   String get backupPageScopeTitle => '백업 및 가져오기 내용';
 
   @override

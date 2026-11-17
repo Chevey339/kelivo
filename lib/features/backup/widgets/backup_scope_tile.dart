@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/models/backup_scope.dart';
+import '../../../core/models/backup.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
@@ -8,6 +8,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'backup_category_labels.dart';
@@ -33,18 +34,18 @@ class BackupScopeTile extends StatelessWidget {
       onTap: onChanged == null
           ? null
           : () async {
-              final selected = desktop
-                  ? await showDialog<BackupScope>(
-                      context: context,
-                      builder: (_) =>
-                          _BackupScopeEditor(scope: scope, desktop: true),
-                    )
-                  : await showFormSheet<BackupScope>(
-                      context,
-                      builder: (_) => _BackupScopeEditor(scope: scope),
-                    );
-              if (selected != null && context.mounted) {
-                await onChanged!(selected);
+              final editor = _BackupScopeEditor(
+                scope: scope,
+                desktop: desktop,
+                onSave: onChanged!,
+              );
+              if (desktop) {
+                await showDialog<void>(
+                  context: context,
+                  builder: (_) => editor,
+                );
+              } else {
+                await showFormSheet<void>(context, builder: (_) => editor);
               }
             },
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
@@ -93,10 +94,15 @@ class BackupScopeTile extends StatelessWidget {
 }
 
 class _BackupScopeEditor extends StatefulWidget {
-  const _BackupScopeEditor({required this.scope, this.desktop = false});
+  const _BackupScopeEditor({
+    required this.scope,
+    required this.desktop,
+    required this.onSave,
+  });
 
   final BackupScope scope;
   final bool desktop;
+  final Future<void> Function(BackupScope) onSave;
 
   @override
   State<_BackupScopeEditor> createState() => _BackupScopeEditorState();
@@ -109,6 +115,26 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
   ];
 
   late BackupScope _scope = widget.scope;
+  bool _saving = false;
+
+  Future<void> _save() async {
+    if (_saving) return;
+    final route = ModalRoute.of(context);
+    FocusScope.of(context).unfocus();
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(_scope);
+      if (mounted && route?.isCurrent == true) Navigator.of(context).pop();
+    } on BackupSettingsSaveException {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.backupPageSettingsSaveFailed,
+        type: NotificationType.error,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,7 +177,7 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
                   key: const ValueKey('backup-scope-save'),
                   label: l10n.backupPageSave,
                   fontSize: 15,
-                  onPressed: () => Navigator.of(context).pop(_scope),
+                  onPressed: _saving ? null : _save,
                 ),
                 IosIconButton(
                   key: const ValueKey('backup-scope-cancel'),
@@ -159,7 +185,7 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
                   minSize: 44,
                   color: cs.onSurfaceVariant,
                   semanticLabel: l10n.backupPageCancel,
-                  onTap: () => Navigator.of(context).pop(),
+                  onTap: _saving ? null : () => Navigator.of(context).pop(),
                 ),
               ],
             ),
@@ -247,8 +273,20 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
         ],
       ),
     );
+    final content = PopScope(
+      canPop: !_saving,
+      child: ExcludeFocus(
+        excluding: _saving,
+        child: AbsorbPointer(absorbing: _saving, child: body),
+      ),
+    );
     if (!widget.desktop) {
-      return body;
+      // The bottom sheet's drag recognizer sits outside the editor and pops
+      // its route directly. Claim the drag here only while Save is pending.
+      return GestureDetector(
+        onVerticalDragUpdate: _saving ? (_) {} : null,
+        child: content,
+      );
     }
     return Dialog(
       backgroundColor: context.overlaySurface,
@@ -259,7 +297,7 @@ class _BackupScopeEditorState extends State<_BackupScopeEditor> {
           maxWidth: 480,
           maxHeight: MediaQuery.sizeOf(context).height * 0.85,
         ),
-        child: body,
+        child: content,
       ),
     );
   }
