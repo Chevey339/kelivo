@@ -178,23 +178,27 @@ class GoogleProvider extends BaseProvider {
           final arr = (obj['models'] as List?) ?? [];
           for (final e in arr) {
             if (e is Map) {
-              final name = (e['name'] as String?) ?? '';
+              final name = e['name'];
+              if (name is! String) continue;
               final id = name.startsWith('models/')
                   ? name.substring('models/'.length)
                   : name;
-              final displayName = (e['displayName'] as String?) ?? id;
-              final methods =
-                  (e['supportedGenerationMethods'] as List?)
-                      ?.map((m) => m.toString())
-                      .toSet() ??
-                  {};
-              if (!(methods.contains('generateContent') ||
-                  methods.contains('embedContent'))) {
+              if (id.trim().isEmpty) continue;
+              final methods = e['supportedGenerationMethods'];
+              if (methods != null &&
+                  (methods is! List ||
+                      !(methods.contains('generateContent') ||
+                          methods.contains('embedContent')))) {
                 continue;
               }
+              final displayName = e['displayName'];
               out.add(
                 ModelSpecResolver.instance
-                    .resolve(cfg, id, displayName: displayName)
+                    .resolve(
+                      cfg,
+                      id,
+                      displayName: displayName is String ? displayName : id,
+                    )
                     .spec,
               );
             }

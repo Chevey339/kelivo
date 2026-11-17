@@ -88,6 +88,12 @@ class ToolHandlerService {
   // Tool Schema Sanitization
   // ============================================================================
 
+  // Match the model segment, including names such as databricks-gemini-3-pro.
+  static final _geminiRelayId = RegExp(
+    r'^gemini-|[-_:]gemini-\d',
+    caseSensitive: false,
+  );
+
   /// Sanitize/translate JSON Schema to each provider's accepted subset.
   ///
   /// Different providers (Google, OpenAI, Claude) have different requirements
@@ -95,25 +101,85 @@ class ToolHandlerService {
   /// all providers.
   static Map<String, dynamic> sanitizeToolParametersForProvider(
     Map<String, dynamic> schema,
-    ProviderKind kind,
-  ) {
-    Map<String, dynamic> clone = _deepCloneMap(schema);
-    // Inline local references before translating provider-specific schema fields.
-    clone = resolveJsonSchemaRefs(
-      clone,
-      preserveJsonSchema: kind != ProviderKind.google,
-    );
-    if (kind != ProviderKind.google) return clone;
-    return _sanitizeGoogleNode(clone) as Map<String, dynamic>;
+    ProviderKind kind, {
+    String? upstreamModelId,
+    String? upstreamModelFamily,
+  }) {
+    final native = kind == ProviderKind.google;
+    final input = _deepCloneMap(schema);
+    final resolved = resolveJsonSchemaRefs(input, preserveJsonSchema: !native);
+    final family = upstreamModelFamily?.toLowerCase();
+    final geminiRelay =
+        kind == ProviderKind.openai &&
+        (family == 'gemini' ||
+            (family?.startsWith('gemini-') ?? false) ||
+            _geminiRelayId.hasMatch(upstreamModelId?.split('/').last ?? ''));
+    if (!native && !geminiRelay) return resolved;
+    if (geminiRelay &&
+        identical(input, resolved) &&
+        hasJsonSchemaReferences(resolved)) {
+      return resolved;
+    }
+    return _sanitizeGoogleNode(resolved, native: native, parameterRoot: true)
+        as Map<String, dynamic>;
   }
 
-  static dynamic _sanitizeGoogleNode(dynamic node) {
+  static dynamic _sanitizeGoogleNode(
+    dynamic node, {
+    required bool native,
+    bool parameterRoot = false,
+  }) {
     if (node is List) {
-      return node.map(_sanitizeGoogleNode).toList();
+      return [
+        for (final child in node) _sanitizeGoogleNode(child, native: native),
+      ];
     }
     if (node is! Map) return node;
 
     final m = Map<String, dynamic>.from(node);
+    // Function parameters themselves must remain an object on both transports.
+    if (!parameterRoot) {
+      final alternatives = geminiRequiredObjectAlternatives(m, native: native);
+      if (alternatives != null) {
+        return {
+          'anyOf': [
+            for (final option in alternatives)
+              _sanitizeGoogleNode(option, native: native),
+          ],
+        };
+      }
+    }
+    if (native) {
+      // A wrapper can delegate to its selected branch. When other validation
+      // keywords are present, they must be processed in their own scope.
+      final selected = firstStandaloneGoogleBranch(m);
+      if (selected != null) {
+        return _sanitizeGoogleNode(
+          selected,
+          native: true,
+          parameterRoot: parameterRoot,
+        );
+      }
+      _simplifyNativeGoogleNode(m);
+    }
+    if (m['items'] is Map || m['items'] is List) {
+      m['items'] = _sanitizeGoogleNode(m['items'], native: native);
+    }
+    if (m['properties'] is Map) {
+      m['properties'] = <String, dynamic>{
+        for (final entry in (m['properties'] as Map).entries)
+          entry.key as String: _sanitizeGoogleNode(entry.value, native: native),
+      };
+    }
+    if (!native) {
+      for (final key in ['anyOf', 'oneOf', 'allOf']) {
+        if (m[key] is List) m[key] = _sanitizeGoogleNode(m[key], native: false);
+      }
+    }
+    return m;
+  }
+
+  static void _simplifyNativeGoogleNode(Map<String, dynamic> m) {
     // Remove $schema as it's not needed for tool definitions
     m.remove(r'$schema');
 
@@ -139,29 +205,18 @@ class ToolHandlerService {
       m.remove('const');
     }
 
-    // Keep Google's existing conversion to the native Schema subset.
-    for (final key in [
-      'anyOf',
-      'oneOf',
-      'allOf',
-      'any_of',
-      'one_of',
-      'all_of',
-    ]) {
-      final variants = m[key];
-      if (variants is! List) continue;
-      if (variants.isNotEmpty) {
-        final first = variants.first;
-        final flattened = _sanitizeGoogleNode(first);
-        m.remove(key);
-        if (flattened is Map<String, dynamic>) {
-          m
-            ..remove('type')
-            ..remove('properties')
-            ..remove('items');
-          m.addAll(flattened);
-        }
+    for (final key in jsonSchemaCompositionKeywords) {
+      final variants = m.remove(key);
+      if (variants is! List || variants.isEmpty || variants.first is! Map) {
+        continue;
       }
+      final first = Map<String, dynamic>.from(variants.first as Map);
+      _simplifyNativeGoogleNode(first);
+      m
+        ..remove('type')
+        ..remove('properties')
+        ..remove('items')
+        ..addAll(first);
     }
 
     // Google's native Schema needs a single type.
@@ -175,19 +230,6 @@ class ToolHandlerService {
     if (items is List && items.isNotEmpty) {
       m['items'] = items.first;
     }
-    if (m['items'] is Map || m['items'] is List) {
-      m['items'] = _sanitizeGoogleNode(m['items']);
-    }
-
-    if (m['properties'] is Map) {
-      final props = Map<String, dynamic>.from(m['properties']);
-      final norm = <String, dynamic>{};
-      props.forEach((k, v) {
-        norm[k] = _sanitizeGoogleNode(v);
-      });
-      m['properties'] = norm;
-    }
-
     const allowed = {
       'type',
       'description',
@@ -195,9 +237,10 @@ class ToolHandlerService {
       'required',
       'items',
       'enum',
+      'pattern',
     };
+    if (m['type'] != 'string' || m['pattern'] is! String) m.remove('pattern');
     m.removeWhere((k, v) => !allowed.contains(k));
-    return m;
   }
 
   static Map<String, dynamic> _deepCloneMap(Map<String, dynamic> input) {
@@ -271,9 +314,11 @@ class ToolHandlerService {
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
-    final canImageInput = ModelSpecResolver.instance
-        .spec(settings.getProviderConfig(providerKey), modelId)
-        .supportsImageInput;
+    final model = ModelSpecResolver.instance.resolve(
+      settings.getProviderConfig(providerKey),
+      modelId,
+    );
+    final canImageInput = model.spec.supportsImageInput;
 
     // Search tool (skip when Gemini built-in search is active)
     if (assistant?.searchEnabled == true &&
@@ -326,6 +371,7 @@ class ToolHandlerService {
       settings: settings,
       assistant: assistant,
       providerKey: providerKey,
+      model: model,
       supportsTools: supportsTools,
       mcpRouteSnapshot: mcpRouteSnapshot,
       conversationId: conversationId,
@@ -367,6 +413,7 @@ class ToolHandlerService {
     required SettingsProvider settings,
     required Assistant? assistant,
     required String providerKey,
+    required ResolvedModelSpec model,
     required bool supportsTools,
     McpToolRouteSnapshot? mcpRouteSnapshot,
     String? conversationId,
@@ -393,6 +440,16 @@ class ToolHandlerService {
       providerCfg.id,
       explicitType: providerCfg.providerType,
     );
+    final upstreamId = model.spec.upstreamId;
+    final catalog = model.catalog?.model;
+    // A lookup can fall back to the display alias. Only use family metadata
+    // from the model that will actually receive the tool declaration.
+    final family =
+        catalog != null &&
+            catalog.id.split('/').last.toLowerCase() ==
+                upstreamId.split('/').last.toLowerCase()
+        ? catalog.family
+        : null;
 
     return tools.map((t) {
       Map<String, dynamic> baseSchema;
@@ -414,6 +471,8 @@ class ToolHandlerService {
       final sanitized = sanitizeToolParametersForProvider(
         baseSchema,
         providerKind,
+        upstreamModelId: upstreamId,
+        upstreamModelFamily: family,
       );
       return {
         'type': 'function',

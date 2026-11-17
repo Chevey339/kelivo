@@ -13,6 +13,42 @@ import 'package:Kelivo/features/home/services/local_tools_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('Vertex removes regex constraints from nested function parameters', () {
+    const schema = <String, dynamic>{
+      'type': 'object',
+      'properties': {
+        'ids': {
+          'type': 'array',
+          'items': {
+            'anyOf': [
+              {
+                'type': 'object',
+                'properties': {
+                  'pattern': {'type': 'string', 'pattern': r'\S'},
+                },
+                'required': ['pattern'],
+              },
+            ],
+          },
+        },
+      },
+    };
+    expect(cleanSchemaForGemini(schema, stringEnumOnly: true), schema);
+    final cleaned = cleanSchemaForGemini(
+      schema,
+      stringEnumOnly: true,
+      vertexAI: true,
+    );
+    final option = cleaned['properties']['ids']['items']['anyOf'][0];
+    expect(option, {
+      'type': 'object',
+      'properties': {
+        'pattern': {'type': 'string'},
+      },
+      'required': ['pattern'],
+    });
+  });
+
   test('removes additionalProperties only from Gemini schema nodes', () {
     final schema = <String, dynamic>{
       'type': 'object',

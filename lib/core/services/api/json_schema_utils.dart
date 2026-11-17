@@ -7,13 +7,188 @@
 /// the original document, including its definitions and reference scopes.
 library;
 
+/// Some MCPs declare a record once, then use `anyOf` to require different
+/// sets of its fields. Gemini expects each alternative to be a standalone
+/// typed schema. Distribute the record only when the refinements can be
+/// combined without overwriting an existing constraint.
+List<Map<String, dynamic>>? geminiRequiredObjectAlternatives(
+  Map<String, dynamic> record, {
+  bool native = false,
+}) {
+  // A nullable record can be expressed as anyOf/oneOf [record, null]. Its
+  // alternatives are disjoint from null, so the outer union can be flattened.
+  if (record['type'] == null) {
+    final key = record.containsKey('anyOf') ? 'anyOf' : 'oneOf';
+    final branches = record[key];
+    if (branches is! List) return null;
+    final nullIndex = _nullableBranchIndex(record, key, branches);
+    if (nullIndex < 0) return null;
+    final other = branches[1 - nullIndex];
+    if (other is! Map<String, dynamic> ||
+        !_nonNullTypes.contains(other['type'])) {
+      return null;
+    }
+    final options = other['type'] == 'object'
+        ? geminiRequiredObjectAlternatives(other)
+        : null;
+    if (options == null && !native) return null;
+    final annotations = Map<String, dynamic>.of(record)..remove(key);
+    final nullBranch = <String, dynamic>{
+      ...annotations,
+      ...branches[nullIndex] as Map,
+    };
+    return [
+      if (nullIndex == 0) nullBranch,
+      for (final option in options ?? [other]) {...annotations, ...option},
+      if (nullIndex == 1) nullBranch,
+    ];
+  }
+  final options = record['anyOf'];
+  final fields = record['properties'];
+  final required = record['required'] ?? const [];
+  if (options is! List || options.isEmpty) return null;
+  if (record['type'] != 'object' ||
+      fields is! Map ||
+      fields.isEmpty ||
+      required is! List ||
+      !required.every(fields.containsKey)) {
+    return null;
+  }
+  // A shared field can itself be an object or an array. Count its subschemas
+  // before repeating it, and avoid duplicating resource IDs or nested unions.
+  var remaining = _maxSchemaExpansions ~/ options.length;
+  if (fields.values.any(
+    (field) =>
+        field is! Map ||
+        field['type'] is! String ||
+        _anySchemaNode(
+          field,
+          (node) =>
+              --remaining < 0 ||
+              node.containsKey(_refKey) ||
+              _referenceContextKeywords.any(node.containsKey) ||
+              _definitionKeywords.any(node.containsKey) ||
+              _schemaListKeywords.any((k) => node[k] is List),
+        ),
+  )) {
+    return null;
+  }
+  const recordKeys = {
+    'type',
+    'properties',
+    'required',
+    'anyOf',
+    'additionalProperties',
+    'minProperties',
+    'maxProperties',
+    'propertyOrdering',
+  };
+  if (record.keys.any(
+        (key) =>
+            !recordKeys.contains(key) && !_annotationKeywords.contains(key),
+      ) ||
+      record['additionalProperties'] is Map) {
+    return null;
+  }
+
+  final shared = Map<String, dynamic>.of(record)..remove('anyOf');
+  final alternatives = <Map<String, dynamic>>[];
+  for (final option in options) {
+    if (option is! Map ||
+        option.keys.any((k) => k != 'required' && k != 'properties')) {
+      return null;
+    }
+    final keys = option['required'];
+    final refinements = option['properties'] ?? const {};
+    if (keys is! List ||
+        keys.isEmpty ||
+        !keys.every(fields.containsKey) ||
+        refinements is! Map) {
+      return null;
+    }
+    final properties = Map<String, dynamic>.from(fields);
+    for (final entry in refinements.entries) {
+      final field = fields[entry.key];
+      final rawConstraint = entry.value;
+      if (field is! Map ||
+          rawConstraint is! Map ||
+          rawConstraint.keys.any(
+            (k) =>
+                !_fieldRefinementKeywords.contains(k) &&
+                !_annotationKeywords.contains(k),
+          )) {
+        return null;
+      }
+      // These keywords only constrain a sibling `contains` in the same
+      // schema. Moving them next to the shared field's contains changes it.
+      final constraint = Map<String, dynamic>.from(rawConstraint)
+        ..remove('minContains')
+        ..remove('maxContains');
+      if (constraint.keys.any(
+        (k) => field.containsKey(k) && field[k] != constraint[k],
+      )) {
+        return null;
+      }
+      properties[entry.key] = <String, dynamic>{...field, ...constraint};
+    }
+    alternatives.add({
+      ...shared,
+      'properties': properties,
+      'required': {...required, ...keys}.toList(),
+    });
+  }
+  return alternatives;
+}
+
+const _nonNullTypes = {
+  'object',
+  'array',
+  'string',
+  'number',
+  'integer',
+  'boolean',
+};
+const _fieldRefinementKeywords = {
+  'type',
+  'const',
+  'enum',
+  'pattern',
+  'format',
+  'minLength',
+  'maxLength',
+  'minimum',
+  'maximum',
+  'multipleOf',
+  'minItems',
+  'maxItems',
+  'uniqueItems',
+  'minProperties',
+  'maxProperties',
+  'minContains',
+  'maxContains',
+};
+
+int _nullableBranchIndex(Map schema, String key, List branches) {
+  if ((key != 'anyOf' && key != 'oneOf') ||
+      branches.length != 2 ||
+      schema.keys.any((k) => k != key && !_annotationKeywords.contains(k))) {
+    return -1;
+  }
+  return branches.indexWhere(
+    (branch) =>
+        branch is Map &&
+        branch['type'] == 'null' &&
+        branch.keys.every(
+          (k) => k == 'type' || _annotationKeywords.contains(k),
+        ),
+  );
+}
+
 /// Maximum `$ref` nesting depth to expand.
 const int _maxRefDepth = 12;
 
-/// Maximum number of `$ref` expansions per schema. Schemas where each level
-/// fans out into several references grow exponentially when inlined; past this
-/// budget the remaining references are passed through instead.
-const int _maxRefExpansions = 512;
+/// Limit on inlined references per schema or property copies per object union.
+const int _maxSchemaExpansions = 512;
 
 const String _refKey = r'$ref';
 
@@ -39,14 +214,19 @@ const Set<String> _schemaMapKeywords = {
 };
 
 /// Combinators and tuple entries the sanitizer preserves for JSON Schema
-/// providers. Google's native conversion uses only the first variant.
-const Set<String> _schemaListKeywords = {
+/// providers. Google's native conversion keeps nullable pairs and otherwise
+/// only expands refs in the first variant.
+const jsonSchemaCompositionKeywords = [
   'anyOf',
   'oneOf',
   'allOf',
   'any_of',
   'one_of',
   'all_of',
+];
+
+const Set<String> _schemaListKeywords = {
+  ...jsonSchemaCompositionKeywords,
   'items',
   'prefixItems',
 };
@@ -72,6 +252,38 @@ const Set<String> _subSchemaKeywords = {
 /// be inlined, the whole original document is retained instead.
 const Set<String> _definitionKeywords = {r'$defs', 'definitions'};
 
+/// A retained reference may point to a property that would move into a branch.
+/// Resource identifiers on fields being copied are checked at the copy site.
+bool hasJsonSchemaReferences(Object? node) => _anySchemaNode(
+  node,
+  (schema) =>
+      schema.containsKey(_refKey) ||
+      schema.containsKey(r'$dynamicRef') ||
+      schema.containsKey(r'$recursiveRef'),
+);
+
+bool _anySchemaNode(Object? node, bool Function(Map) matches) {
+  if (node is! Map) return false;
+  if (matches(node)) return true;
+  bool visit(Object? child) => _anySchemaNode(child, matches);
+  for (final entry in node.entries) {
+    final child = entry.value;
+    if ((_schemaMapKeywords.contains(entry.key) ||
+            _definitionKeywords.contains(entry.key)) &&
+        child is Map &&
+        child.values.any(visit)) {
+      return true;
+    }
+    if (_schemaListKeywords.contains(entry.key) ||
+        _subSchemaKeywords.contains(entry.key)) {
+      if (child is List ? child.any(visit) : visit(child)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Keywords that describe rather than constrain. A sibling of `$ref` may
 /// restate these; they do not change which values are valid.
 const Set<String> _annotationKeywords = {
@@ -84,6 +296,25 @@ const Set<String> _annotationKeywords = {
   'writeOnly',
   r'$comment',
 };
+
+/// A wrapper with no sibling validation can delegate to its first branch on
+/// the native Gemini transport. Only description is a native tool annotation.
+Map<String, dynamic>? firstStandaloneGoogleBranch(Map<String, dynamic> schema) {
+  final keyword = schema.keys
+      .where((key) => !_annotationKeywords.contains(key))
+      .singleOrNull;
+  final branches = schema[keyword];
+  if (!jsonSchemaCompositionKeywords.contains(keyword) ||
+      branches is! List ||
+      branches.isEmpty ||
+      branches.first is! Map) {
+    return null;
+  }
+  return {
+    if (schema.containsKey('description')) 'description': schema['description'],
+    ...Map<String, dynamic>.from(branches.first as Map),
+  };
+}
 
 class _RefBudget {
   _RefBudget({required this.preserveJsonSchema});
@@ -115,8 +346,8 @@ class _RefBudget {
 /// for JSON Schema providers.
 ///
 /// [preserveJsonSchema] should be false only for Google's native conversion,
-/// which drops validation keywords and keeps only the first composition/tuple
-/// entry. Do not spend the expansion budget on those discarded schemas.
+/// which expands refs in retained nullable pairs and the first composition/tuple
+/// entry. The required-field alternatives it distributes are otherwise ref-free.
 Map<String, dynamic> resolveJsonSchemaRefs(
   Map<String, dynamic> schema, {
   bool preserveJsonSchema = true,
@@ -160,7 +391,7 @@ dynamic _resolveSchema(
     final exhausted =
         active.contains(pointer) ||
         depth >= _maxRefDepth ||
-        budget.expansions >= _maxRefExpansions;
+        budget.expansions >= _maxSchemaExpansions;
     m.remove(_refKey);
     if (!exhausted) {
       final target = _lookupRef(
@@ -262,6 +493,14 @@ Map<String, dynamic> _walkKeywords(
         value is List) {
       if (!budget.preserveJsonSchema) {
         // Do not spend the expansion budget on branches the sanitizer drops.
+        if (_nullableBranchIndex(node, key, value) == 0 &&
+            _hasNonNullTarget(value[1], root, active, depth, budget)) {
+          final other = _resolveSchema(value[1], root, active, depth, budget);
+          if (other is Map && _nonNullTypes.contains(other['type'])) {
+            out[outputKey] = [value.first, other];
+            return;
+          }
+        }
         out[outputKey] = [
           if (value.isNotEmpty)
             _resolveSchema(value.first, root, active, depth, budget),
@@ -292,6 +531,33 @@ Map<String, dynamic> _walkKeywords(
     out[outputKey] = value;
   });
   return out;
+}
+
+/// Inspect the target's type before spending the shared budget expanding its
+/// children. A nullable branch can be an alias chain, including a cycle.
+bool _hasNonNullTarget(
+  dynamic node,
+  Map<String, dynamic> root,
+  Set<String> active,
+  int depth,
+  _RefBudget budget,
+) {
+  final seen = {...active};
+  var remaining = _maxSchemaExpansions - budget.expansions;
+  while (node is Map) {
+    final ref = node[_refKey];
+    if (ref is! String || ref.trim().isEmpty) {
+      return _nonNullTypes.contains(node['type']);
+    }
+    final pointer = ref.trim();
+    if (remaining <= 0 || depth >= _maxRefDepth || !seen.add(pointer)) {
+      return false;
+    }
+    node = _lookupRef(pointer, root, preserveJsonSchema: false);
+    remaining--;
+    depth++;
+  }
+  return false;
 }
 
 /// Resolve a local JSON Pointer such as `#/$defs/Payload`.
