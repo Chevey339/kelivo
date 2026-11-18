@@ -810,6 +810,12 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
         }
       }
     }
+    final composer = models[grokComposerFastModelId];
+    if (composer != null &&
+        oauthString(composer['display_name']) == null &&
+        oauthString(composer['name']) == null) {
+      composer['display_name'] = 'Grok Composer 2.5 Fast';
+    }
     return models.values.toList();
   }
 

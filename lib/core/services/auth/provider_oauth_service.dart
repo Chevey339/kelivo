@@ -462,13 +462,18 @@ class ProviderOAuthService extends ChangeNotifier {
       displayName:
           oauthString(row['display_name']) ?? oauthString(row['name']) ?? id,
     );
-    return _OAuthModelSpec(
-      row: row,
-      base: resolved.override.applyTo(
-        _oauthDiscoveredSpec(resolved.base, row),
-        applyDisplayName: true,
-      ),
+    var spec = resolved.override.applyTo(
+      _oauthDiscoveredSpec(resolved.base, row),
+      applyDisplayName: true,
     );
+    if (_usesGrokComposerMetadata(config.oauthProvider, spec)) {
+      spec = spec.copyWith(
+        input: const [Modality.text],
+        abilities: {...spec.abilities, ModelAbility.reasoning}.toList(),
+        reasoning: _grokComposerReasoning.applyTo(spec.reasoning),
+      );
+    }
+    return _OAuthModelSpec(row: row, base: spec);
   }
 
   /// Like OMP's versioned Codex cache, refresh each account after a client
@@ -663,11 +668,18 @@ class ProviderOAuthService extends ChangeNotifier {
       final row = model is _OAuthModelSpec
           ? model.row
           : const <String, dynamic>{};
+      // Model edits can land while discovery is in flight.
+      final discovered = model is _OAuthModelSpec
+          ? _modelFromRow(current, row)
+          : model;
+      final composer = _usesGrokComposerMetadata(provider, discovered);
       overrides[model.id] = mergeOAuthModelOverride(
         existing: overrides[model.id],
-        // Model edits can land while discovery is in flight.
-        model: model is _OAuthModelSpec ? _modelFromRow(current, row) : model,
-        reasoning: oauthDiscoveredReasoning(provider, row),
+        model: discovered,
+        reasoning: composer
+            ? _grokComposerReasoning
+            : oauthDiscoveredReasoning(provider, row),
+        refreshCapabilities: composer,
         extra: {
           if (provider == OAuthProvider.chatgpt) ...{
             'oauthServiceTiers': [
@@ -780,6 +792,23 @@ bool? oauthRowReasoningSupport(Map<String, dynamic> row) {
   return null;
 }
 
+bool _usesGrokComposerMetadata(OAuthProvider? provider, ModelSpec model) =>
+    provider == OAuthProvider.grok &&
+    model.id == grokComposerFastModelId &&
+    model.upstreamId == grokComposerFastModelId;
+
+const _grokComposerReasoning = ReasoningSpecOverride(
+  dialect: ReasoningDialect.openaiResponsesReasoning,
+  levels: [
+    ReasoningLevel.minimal,
+    ReasoningLevel.low,
+    ReasoningLevel.medium,
+    ReasoningLevel.high,
+    ReasoningLevel.xhigh,
+  ],
+  canDisable: false,
+);
+
 /// Maps an OAuth catalog row onto [ReasoningSpecOverride].
 ReasoningSpecOverride? oauthDiscoveredReasoning(
   OAuthProvider provider,
@@ -826,6 +855,7 @@ Map<String, dynamic> mergeOAuthModelOverride({
   required Object? existing,
   required ModelSpec model,
   ReasoningSpecOverride? reasoning,
+  bool refreshCapabilities = false,
   Map<String, dynamic> extra = const {},
 }) {
   final current = existing is Map
@@ -837,9 +867,11 @@ Map<String, dynamic> mergeOAuthModelOverride({
       .copyWith(
         displayName: current.displayName ?? model.displayName,
         type: current.type ?? model.type,
-        input: current.input ?? model.input,
+        input: refreshCapabilities ? model.input : current.input ?? model.input,
         output: current.output ?? model.output,
-        abilities: current.abilities ?? model.abilities,
+        abilities: refreshCapabilities
+            ? model.abilities
+            : current.abilities ?? model.abilities,
         reasoning: _mergeReasoningOverride(current.reasoning, reasoning),
         extra: nextExtra,
       )

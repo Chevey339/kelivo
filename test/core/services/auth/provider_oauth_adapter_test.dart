@@ -134,6 +134,7 @@ void main() {
             },
           },
           {'model': 'hidden-model', 'hidden': true},
+          {'model': 'grok-composer-2.5-fast', 'hidden': true},
           {
             'model': 'hidden-meta-model',
             '_meta': {'hidden': true},

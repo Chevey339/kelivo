@@ -9,8 +9,8 @@ import 'package:hashlib/hashlib.dart' show XXHash64;
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
 
-// OMP 2282226655, providers/claude-code-fingerprint.ts and anthropic.ts.
-const defaultClaudeCodeVersion = '2.1.280';
+// OMP v18.22.2, providers/claude-code-fingerprint.ts and anthropic-headers.ts.
+const defaultClaudeCodeVersion = '2.1.326';
 String _claudeCodeVersion = defaultClaudeCodeVersion;
 String get claudeCodeVersion => _claudeCodeVersion;
 
@@ -65,7 +65,7 @@ int _compareClaudeVersions(String a, String b) {
 @visibleForTesting
 void resetClaudeCodeVersion() => _claudeCodeVersion = defaultClaudeCodeVersion;
 
-const claudeCodeSdkVersion = '0.112.1';
+const claudeCodeSdkVersion = '0.128.0';
 const claudeCodeSystemInstruction =
     "You are Claude Code, Anthropic's official CLI for Claude.";
 const claudeOAuthBetas = [
@@ -75,7 +75,6 @@ const claudeOAuthBetas = [
   'thinking-token-count-2026-05-13',
   'context-management-2025-06-27',
   'prompt-caching-scope-2026-01-05',
-  'mid-conversation-system-2026-04-07',
   'effort-2025-11-24',
   'fallback-credit-2026-06-01',
 ];
@@ -102,7 +101,7 @@ Map<String, String> claudeOAuthHeaders(ProviderOAuthCredentials credentials) =>
       'X-Stainless-Package-Version': claudeCodeSdkVersion,
       'X-Stainless-Retry-Count': '0',
       'X-Stainless-Runtime': 'node',
-      'X-Stainless-Runtime-Version': 'v26.3.0',
+      'X-Stainless-Runtime-Version': 'v26.12.1',
       'X-Stainless-Timeout': '600',
       // Let the native HTTP transport use an encoding it can actually decode.
       'Accept-Encoding': 'gzip',

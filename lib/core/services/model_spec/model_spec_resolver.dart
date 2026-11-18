@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../models/model_spec.dart';
+import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
 import '../model_catalog/catalog_entry.dart';
 import '../model_catalog/model_catalog_service.dart';
@@ -230,16 +231,21 @@ class ModelSpecResolver {
       guess: guess,
       sources: sources,
     );
-    final contextWindow = _pick<int>(
-      vendor:
-          upstreamMetadata?.contextWindow ??
-          keyMetadata?.contextWindow ??
-          upstreamMatch?.contextWindowHint ??
-          keyMatch?.contextWindowHint,
-      catalog: match?.model.contextLimit,
-      field: ModelSpecField.contextWindow,
-      sources: sources,
-    );
+    final contextWindow =
+        _pick<int>(
+          vendor:
+              upstreamMetadata?.contextWindow ??
+              keyMetadata?.contextWindow ??
+              upstreamMatch?.contextWindowHint ??
+              keyMatch?.contextWindowHint,
+          catalog: match?.model.contextLimit,
+          field: ModelSpecField.contextWindow,
+          sources: sources,
+        ) ??
+        (cfg.oauthProvider == OAuthProvider.grok &&
+                upstreamId == grokComposerFastModelId
+            ? 200000
+            : null);
     final maxOutput = _pick<int>(
       vendor: upstreamMetadata?.maxOutput ?? keyMetadata?.maxOutput,
       catalog: match?.model.outputLimit,

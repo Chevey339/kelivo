@@ -2,6 +2,8 @@ import 'dart:convert';
 
 enum OAuthProvider { chatgpt, grok, kimi, claude }
 
+const grokComposerFastModelId = 'grok-composer-2.5-fast';
+
 extension OAuthProviderInfo on OAuthProvider {
   String get displayName => switch (this) {
     OAuthProvider.chatgpt => 'ChatGPT',
