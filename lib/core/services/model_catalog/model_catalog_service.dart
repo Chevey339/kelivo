@@ -65,7 +65,7 @@ const Map<String, String> kCatalogVendorPrefixToProviderId = <String, String>{
   'meta-llama': 'meta',
 };
 
-/// First-party ranking for slash-less global fallback.
+/// First-party ranking for global fallback.
 ///
 /// All ids exist in the bundled snapshot.
 const List<String> kCatalogFirstPartyPriority = <String>[
@@ -101,11 +101,15 @@ class CatalogMatch {
     required this.provider,
     required this.model,
     required this.kind,
+    this.inferred = false,
+    this.contextWindowHint,
   });
 
   final CatalogProvider provider;
   final CatalogModel model;
   final CatalogMatchKind kind;
+  final bool inferred;
+  final int? contextWindowHint;
 }
 
 class ModelCatalogService extends ChangeNotifier {
@@ -287,43 +291,120 @@ class ModelCatalogService extends ChangeNotifier {
 
     final index = _ensureIndex();
     final candidates = catalogProviderIdsFor(cfg);
+    return _lookupProvider(index, candidates, trimmed) ??
+        _lookupCleaned(index, candidates, trimmed);
+  }
 
+  CatalogMatch? _lookupProvider(
+    _CatalogIndex index,
+    List<String> candidates,
+    String id,
+  ) =>
+      _lookupProviderKey(
+        index,
+        candidates,
+        index.exactByProvider,
+        id,
+        kind: CatalogMatchKind.providerExact,
+      ) ??
+      _lookupProviderKey(
+        index,
+        candidates,
+        index.lowerByProvider,
+        id.toLowerCase(),
+      ) ??
+      _lookupProviderKey(
+        index,
+        candidates,
+        index.normalizedByProvider,
+        normalizeCatalogModelId(id),
+      );
+
+  CatalogMatch? _lookupProviderKey(
+    _CatalogIndex index,
+    List<String> candidates,
+    Map<String, Map<String, CatalogModel>> byProvider,
+    String key, {
+    CatalogMatchKind kind = CatalogMatchKind.providerNormalized,
+  }) {
     for (final providerId in candidates) {
-      final model = index.exactByProvider[providerId]?[trimmed];
+      final model = byProvider[providerId]?[key];
       if (model != null) {
         return CatalogMatch(
           provider: index.providers[providerId]!,
           model: model,
-          kind: CatalogMatchKind.providerExact,
+          kind: kind,
         );
       }
     }
+    return null;
+  }
 
-    final lower = trimmed.toLowerCase();
-    for (final providerId in candidates) {
-      final model = index.lowerByProvider[providerId]?[lower];
-      if (model != null) {
-        return CatalogMatch(
-          provider: index.providers[providerId]!,
-          model: model,
-          kind: CatalogMatchKind.providerNormalized,
-        );
+  CatalogMatch? _lookupCleaned(
+    _CatalogIndex index,
+    List<String> candidates,
+    String raw,
+  ) {
+    final slash = raw.indexOf('/');
+    final mapped = slash > 0
+        ? kCatalogVendorPrefixToProviderId[raw
+              .substring(0, slash)
+              .toLowerCase()]
+        : null;
+    final providers = mapped == null ? candidates : [mapped];
+    var id = _bareCatalogModelId(raw);
+    if (id.isEmpty) return null;
+
+    int? contextWindowHint;
+    CatalogMatch asCleaned(CatalogMatch match) => CatalogMatch(
+      provider: match.provider,
+      model: match.model,
+      kind: CatalogMatchKind.global,
+      inferred: mapped == null,
+      contextWindowHint: contextWindowHint,
+    );
+
+    while (true) {
+      final match =
+          _lookupProvider(index, providers, id) ??
+          (mapped == null
+              ? _lookupGlobal(
+                  index,
+                  index.globalByNormalized,
+                  normalizeCatalogModelId(id),
+                )
+              : null);
+      if (match != null) return asCleaned(match);
+
+      final marker = _windowMarker(id);
+      if (marker != null) {
+        if (contextWindowHint != null) break;
+        contextWindowHint = marker.tokens;
+        id = marker.id;
+        continue;
       }
+      final untagged = _stripChannelTag(id);
+      if (untagged == null) break;
+      id = untagged;
     }
 
-    final normalized = normalizeCatalogModelId(trimmed);
-    for (final providerId in candidates) {
-      final model = index.normalizedByProvider[providerId]?[normalized];
-      if (model != null) {
-        return CatalogMatch(
-          provider: index.providers[providerId]!,
-          model: model,
-          kind: CatalogMatchKind.providerNormalized,
-        );
-      }
+    final folded = _foldCatalogModelId(id);
+    final match =
+        _lookupProviderKey(index, providers, index.foldedByProvider, folded) ??
+        (mapped == null
+            ? _lookupGlobal(index, index.globalByFolded, folded)
+            : null);
+    if (match != null) return asCleaned(match);
+    if (mapped != null ||
+        _catalogRouteNames.contains(normalizeCatalogModelId(id)) ||
+        _catalogRouteNames.contains(folded)) {
+      return null;
     }
-
-    return _lookupGlobal(index, trimmed, normalized);
+    return _lookupGlobal(
+      index,
+      index.globalByNormalized,
+      normalizeCatalogModelId(raw),
+    );
   }
 
   @visibleForTesting
@@ -333,50 +414,12 @@ class ModelCatalogService extends ChangeNotifier {
 
   CatalogMatch? _lookupGlobal(
     _CatalogIndex index,
-    String modelId,
-    String normalized,
+    Map<String, List<_IndexedModel>> byKey,
+    String key,
   ) {
-    final slash = modelId.indexOf('/');
-    if (slash > 0) {
-      final prefix = modelId.substring(0, slash).toLowerCase();
-      final suffix = modelId.substring(slash + 1);
-      final mapped = kCatalogVendorPrefixToProviderId[prefix];
-      if (mapped != null) {
-        final provider = index.providers[mapped];
-        if (provider != null) {
-          final exact = index.exactByProvider[mapped]?[suffix];
-          if (exact != null) {
-            return CatalogMatch(
-              provider: provider,
-              model: exact,
-              kind: CatalogMatchKind.global,
-            );
-          }
-          final lower = index.lowerByProvider[mapped]?[suffix.toLowerCase()];
-          if (lower != null) {
-            return CatalogMatch(
-              provider: provider,
-              model: lower,
-              kind: CatalogMatchKind.global,
-            );
-          }
-          final norm = index
-              .normalizedByProvider[mapped]?[normalizeCatalogModelId(suffix)];
-          if (norm != null) {
-            return CatalogMatch(
-              provider: provider,
-              model: norm,
-              kind: CatalogMatchKind.global,
-            );
-          }
-        }
-      }
-    }
-
-    final matches = index.globalByNormalized[normalized];
-    if (matches == null || matches.isEmpty) {
-      return null;
-    }
+    if (_catalogRouteNames.contains(key)) return null;
+    final matches = byKey[key];
+    if (matches == null) return null;
 
     var best = matches.first;
     for (var i = 1; i < matches.length; i++) {
@@ -388,6 +431,7 @@ class ModelCatalogService extends ChangeNotifier {
       provider: best.provider,
       model: best.model,
       kind: CatalogMatchKind.global,
+      inferred: true,
     );
   }
 
@@ -561,18 +605,29 @@ class _CatalogIndex {
       final exact = <String, CatalogModel>{};
       final lower = <String, CatalogModel>{};
       final normalized = <String, CatalogModel>{};
+      final folded = <String, CatalogModel>{};
       for (final model in provider.models.values) {
         exact[model.id] = model;
         lower.putIfAbsent(model.id.toLowerCase(), () => model);
         final norm = normalizeCatalogModelId(model.id);
         normalized.putIfAbsent(norm, () => model);
+        final spelling = _foldCatalogModelId(_bareCatalogModelId(model.id));
+        if (spelling.isNotEmpty) folded.putIfAbsent(spelling, () => model);
+      }
+      for (final entry in normalized.entries) {
         globalByNormalized
-            .putIfAbsent(norm, () => <_IndexedModel>[])
-            .add(_IndexedModel(provider: provider, model: model));
+            .putIfAbsent(entry.key, () => <_IndexedModel>[])
+            .add(_IndexedModel(provider: provider, model: entry.value));
+      }
+      for (final entry in folded.entries) {
+        globalByFolded
+            .putIfAbsent(entry.key, () => <_IndexedModel>[])
+            .add(_IndexedModel(provider: provider, model: entry.value));
       }
       exactByProvider[provider.id] = exact;
       lowerByProvider[provider.id] = lower;
       normalizedByProvider[provider.id] = normalized;
+      foldedByProvider[provider.id] = folded;
     }
   }
 
@@ -585,7 +640,11 @@ class _CatalogIndex {
       <String, Map<String, CatalogModel>>{};
   final Map<String, Map<String, CatalogModel>> normalizedByProvider =
       <String, Map<String, CatalogModel>>{};
+  final Map<String, Map<String, CatalogModel>> foldedByProvider =
+      <String, Map<String, CatalogModel>>{};
   final Map<String, List<_IndexedModel>> globalByNormalized =
+      <String, List<_IndexedModel>>{};
+  final Map<String, List<_IndexedModel>> globalByFolded =
       <String, List<_IndexedModel>>{};
 }
 
@@ -649,6 +708,87 @@ bool _isProviderPrefixMatch(_IndexedModel entry) {
   final family = entry.model.family;
   return family != null && family.toLowerCase().startsWith(providerId);
 }
+
+const _catalogRouteNames = {'auto', 'default', 'free'};
+
+String _bareCatalogModelId(String id) {
+  final path = id.split('/');
+  // When a slash is present, the first segment identifies the relay/vendor.
+  for (var i = path.length - 1; i >= (path.length == 1 ? 0 : 1); i--) {
+    final segment = path[i].trim();
+    if (segment.isNotEmpty) return segment.toLowerCase();
+  }
+  return '';
+}
+
+final _tagEdges = RegExp(r'^[\s_.·-]+|[\s_.·-]+$');
+final _letter = RegExp(r'\p{L}', unicode: true);
+const _tagPairs = [('(', ')'), ('[', ']'), ('（', '）'), ('【', '】'), ('「', '」')];
+const _parenthesizedVariants = {
+  'preview',
+  'thinking',
+  'beta',
+  'free',
+  'experimental',
+};
+
+String? _stripChannelTag(String id) {
+  for (final (open, close) in _tagPairs) {
+    if (id.endsWith(close)) {
+      final start = id.lastIndexOf(open);
+      if (start > 0 && (open != '[' || id[start - 1].trim().isEmpty)) {
+        final tag = id.substring(start + 1, id.length - 1).trim();
+        if ((open != '(' && open != '（') ||
+            !_parenthesizedVariants.contains(tag)) {
+          final base = id.substring(0, start).replaceAll(_tagEdges, '');
+          return _letter.hasMatch(base) ? base : null;
+        }
+      }
+    }
+    if (id.startsWith(open)) {
+      final end = id.indexOf(close);
+      if (end > 0 && end < id.length - 1) {
+        final tag = id.substring(1, end).trim();
+        if ((open != '(' && open != '（') ||
+            !_parenthesizedVariants.contains(tag)) {
+          final base = id.substring(end + 1).replaceAll(_tagEdges, '');
+          return _letter.hasMatch(base) ? base : null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+final _windowSuffix = RegExp(r'\[(\d+(?:\.\d*)?|\.\d+)([km])\]$');
+
+({String id, int tokens})? _windowMarker(String id) {
+  final match = _windowSuffix.firstMatch(id);
+  if (match == null || match.start == 0) return null;
+  final base = id.substring(0, match.start);
+  if (_tagEdges.allMatches(base).any((edge) => edge.end == base.length)) {
+    return null;
+  }
+  final parts = match[1]!.split('.');
+  final precision = match[2] == 'm' ? 6 : 3;
+  final fraction = parts.length > 1 ? parts[1] : '';
+  final scaled = fraction.padRight(precision, '0').substring(0, precision);
+  final tokens = int.tryParse('${parts[0]}$scaled');
+  return tokens == null || tokens <= 0 ? null : (id: base, tokens: tokens);
+}
+
+final _modelGaps = RegExp(r'[\s_-]+');
+final _edgeDashes = RegExp(r'^-+|-+$');
+final _versionSeparator = RegExp(r'(?<=\d)[.p](?=\d)');
+final _snapshotSuffix = RegExp(
+  r'[-@](?:20\d{6}|(?:2[3-9]|3\d)(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))$',
+);
+
+String _foldCatalogModelId(String bareId) => normalizeCatalogModelId(bareId)
+    .replaceAll(_modelGaps, '-')
+    .replaceAll(_edgeDashes, '')
+    .replaceAll(_versionSeparator, '-')
+    .replaceFirst(_snapshotSuffix, '');
 
 String normalizeCatalogModelId(String id) {
   var value = id.trim().toLowerCase();

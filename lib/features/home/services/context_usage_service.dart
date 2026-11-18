@@ -22,6 +22,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/memory/memory_snapshot.dart';
 import '../../../core/services/model_catalog/model_catalog_service.dart';
+import '../../../core/services/model_spec/model_list_metadata_cache.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../utils/model_display_helper.dart';
 import 'context_assembly.dart';
@@ -348,6 +349,7 @@ class ContextUsageService extends ChangeNotifier {
     _worldBooks.addListener(_onSettingsOrAssistantChanged);
     _memories?.addListener(_onMemoryChanged);
     ModelCatalogService.instance.addListener(_onSettingsOrAssistantChanged);
+    ModelListMetadataCache.instance.addListener(_onSettingsOrAssistantChanged);
   }
 
   final ChatService _chatService;
@@ -746,6 +748,9 @@ class ContextUsageService extends ChangeNotifier {
     _worldBooks.removeListener(_onSettingsOrAssistantChanged);
     _memories?.removeListener(_onMemoryChanged);
     ModelCatalogService.instance.removeListener(_onSettingsOrAssistantChanged);
+    ModelListMetadataCache.instance.removeListener(
+      _onSettingsOrAssistantChanged,
+    );
     _unlistenRevision();
     for (final timer in _debounce.values) {
       timer.cancel();

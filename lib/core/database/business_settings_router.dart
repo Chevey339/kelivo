@@ -20,6 +20,7 @@ final class BusinessKeyRegistry {
 
   static const balanceRefreshIntervalKey = 'balance_refresh_interval_v1';
   static const balanceRefreshOnReplyKey = 'balance_refresh_on_reply_v1';
+  static const modelListMetadataCacheKey = 'model_list_metadata_v1';
 
   static const localOnlyKeys = <String>{
     'window_width_v1',
@@ -38,6 +39,7 @@ final class BusinessKeyRegistry {
     'flutter_log_enabled_v1',
     'model_catalog_auto_update_v1',
     'ollama_model_metadata_v1',
+    modelListMetadataCacheKey,
   };
 
   static const discardedKeys = <String>{

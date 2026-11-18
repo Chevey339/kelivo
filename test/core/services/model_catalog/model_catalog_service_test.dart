@@ -198,10 +198,174 @@ void main() {
       },
     );
 
+    test('path and channel labels find exact model IDs', () {
+      final svc = service()..debugSetData(_matchingCatalog());
+      final custom = _cfg(baseUrl: 'https://proxy.example.com');
+
+      for (final id in [
+        'loomy/GLM-5.3-Flash',
+        'GLM-5.3-Flash',
+        'glm-5.3-flash',
+        'zai-org/GLM-5.3-Flash',
+        'aimlapi/z-ai/glm-5.3-flash',
+        'loomy/ GLM-5.3-Flash // ',
+      ]) {
+        final match = svc.lookup(custom, id);
+        expect(match?.model.id, 'glm-5.3-flash', reason: id);
+        expect(match?.provider.id, 'zhipuai', reason: id);
+        expect(match?.inferred, isTrue, reason: id);
+      }
+
+      for (final id in [
+        '[times] gemini-3.8-flash',
+        '【times】 gemini-3.8-flash',
+        '[times]gemini-3.8-flash',
+        'loomy/[times] gemini-3.8-flash',
+        '[times] loomy/gemini-3.8-flash',
+        '[Times] Gemini-3.8-Flash',
+        'gemini-3.8-flash (WB)',
+        'gemini-3.8-flash(wb)',
+        'gemini-3.8-flash(high)',
+        '（team）-.gemini-3.8-flash ·_「WB」',
+        'gemini-3.8-flash [relay] (2)',
+      ]) {
+        expect(
+          svc.lookup(custom, id)?.model.id,
+          'gemini-3.8-flash',
+          reason: id,
+        );
+      }
+      expect(svc.lookup(custom, '[times] glm-5')?.model.id, 'glm-5');
+      expect(svc.lookup(custom, 'glm-5.3')?.model.id, 'glm-5.3');
+    });
+
+    test('provider full ID wins before a scoped vendor prefix match', () {
+      final svc = service()..debugSetData(_matchingCatalog());
+      final custom = _cfg(baseUrl: 'https://proxy.example.com');
+      final openrouter = _cfg(baseUrl: 'https://openrouter.ai/api/v1');
+
+      final exact = svc.lookup(openrouter, 'z-ai/glm-5.3-flash');
+      expect(exact?.provider.id, 'openrouter');
+      expect(exact?.kind, CatalogMatchKind.providerExact);
+      expect(exact?.inferred, isFalse);
+      final mapped = svc.lookup(custom, 'z-ai/nested/[relay] GLM-5-3-Flash/');
+      expect(mapped?.provider.id, 'zai');
+      expect(mapped?.model.id, 'glm-5.3-flash');
+      expect(mapped?.inferred, isFalse);
+      expect(svc.lookup(custom, 'z-ai/glm-5'), isNull);
+      expect(svc.lookup(openrouter, 'z-ai/glm-5')?.provider.id, 'openrouter');
+    });
+
+    test('window hints require a catalog match for the marked base ID', () {
+      final svc = service()..debugSetData(_matchingCatalog());
+      final custom = _cfg(baseUrl: 'https://proxy.example.com');
+      final marked = svc.lookup(custom, 'gemini-3.8-flash[1m]');
+      expect(marked?.model.id, 'gemini-3.8-flash');
+      expect(marked?.model.contextLimit, 262144);
+      expect(marked?.contextWindowHint, 1000000);
+      expect(
+        svc
+            .lookup(custom, '[relay] Gemini-3-8-Flash[1.5M](WB)')
+            ?.contextWindowHint,
+        1500000,
+      );
+      expect(
+        svc.lookup(custom, 'gemini-3.8-flash [1m]')?.contextWindowHint,
+        isNull,
+      );
+      expect(
+        svc.lookup(custom, 'gemini-3.8-flash[200K]')?.contextWindowHint,
+        200000,
+      );
+      expect(
+        svc.lookup(custom, 'gemini-3.8-flash[1.001m]')?.contextWindowHint,
+        1001000,
+      );
+
+      for (final id in [
+        'unlisted[1m]',
+        '[1m]',
+        'claude-[1m]',
+        'gemini-3.8-flash[infm]',
+        'gemini-3.8-flash[1M]x',
+        'gemini-3.8-flash[0k]',
+      ]) {
+        expect(svc.lookup(custom, id), isNull, reason: id);
+      }
+    });
+
+    test('folds only spelling separators and recognized snapshot dates', () {
+      final svc = service()..debugSetData(_matchingCatalog());
+      final custom = _cfg(baseUrl: 'https://proxy.example.com');
+      for (final (id, canonical) in [
+        ('glm-5-3-flash', 'glm-5.3-flash'),
+        ('loomy/GLM-5-3-Flash:free', 'glm-5.3-flash'),
+        ('loomy/GLM-5-3-Flash@20250915', 'glm-5.3-flash'),
+        ('glm-5.3-flash-260828', 'glm-5.3-flash'),
+        ('【WB】DeepSeek\u00a0V4.1_Flash', 'deepseek-v4.1-flash'),
+        ('deepseek-v4p1-flash', 'deepseek-v4.1-flash'),
+        ('kimi-k3-1-pro-261024', 'kimi-k3.1-pro'),
+        ('Kimi-K3.1-Pro-20261024', 'kimi-k3.1-pro'),
+        ('kimi-k3-1-pro@20261024', 'kimi-k3.1-pro'),
+        ('snapshots/model-3-1', 'model-3.1-20261024'),
+      ]) {
+        expect(svc.lookup(custom, id)?.model.id, canonical, reason: id);
+      }
+      final first = svc.lookup(custom, 'GLM 5 3 FLASH');
+      expect(first?.provider.id, 'zhipuai');
+      expect(first?.model.id, 'glm-5.3-flash');
+      expect(first?.inferred, isTrue);
+    });
+
+    test('does not infer variants, partial IDs or router aliases', () {
+      final svc = service()..debugSetData(_matchingCatalog());
+      final custom = _cfg(baseUrl: 'https://proxy.example.com');
+      for (final id in [
+        'foo/glm-5.3-flash-uncensored',
+        'foo/gpt-4o-custom',
+        'totally-unknown-model',
+        'foo/totally-unknown-model',
+        'loomy/',
+        '/',
+        'ds.4.1(WB)',
+        'deepseek-v4.1-flashy (WB)',
+        'deepseek-v4.1 (WB) flash',
+        'gemini-3.8-flash[fast]',
+        'gemini-3.8-flash(preview)',
+        'gemini-3.8-flash (thinking)',
+        'gemini-3.8-flash（beta）',
+        'gemini-3.8-flash(free)',
+        'gemini-3.8-flash(experimental)',
+        'cn:glm-5.3-flash',
+        'gemini-3.8-flash:thinking',
+        'gemini-3.8-flash:nitro',
+        'gemini-3.8-flash:beta',
+        'gemini-3.8-flash:extended',
+        'nyro-gpt-4o',
+        'claude-deepseek-v4.1-flash',
+        'kimi-k3-1-pro-2610',
+        'kimi-k3.1-pro-261324',
+        'kimi-k3.1-pro-max',
+        'gpt-4o-2024-08-06',
+        'openrouter/auto',
+        'auto',
+        '[relay] default',
+        'proxy/free:free',
+      ]) {
+        expect(svc.lookup(custom, id), isNull, reason: id);
+      }
+      final openrouter = _cfg(baseUrl: 'https://openrouter.ai/api/v1');
+      expect(
+        svc.lookup(openrouter, 'openrouter/auto')?.kind,
+        CatalogMatchKind.providerExact,
+      );
+    });
+
     test('rebuilds index after debugSetData version bump', () {
       final svc = service()..debugSetData(_matchingCatalog());
       expect(svc.version, 1);
       expect(svc.lookup(_cfg(), 'gpt-4o')?.provider.id, 'openai');
+      expect(svc.lookup(_cfg(), 'gpt 4o')?.provider.id, 'openai');
 
       svc.debugSetData(
         ModelCatalogData(
@@ -218,6 +382,8 @@ void main() {
       );
       expect(svc.version, 2);
       expect(svc.lookup(_cfg(), 'gpt-4o'), isNull);
+      expect(svc.lookup(_cfg(), 'gpt 4o'), isNull);
+      expect(svc.lookup(_cfg(), 'deepseek chat')?.provider.id, 'deepseek');
       expect(svc.lookup(_cfg(), 'deepseek-chat')?.provider.id, 'deepseek');
     });
 
@@ -415,8 +581,8 @@ ProviderConfig _cfg({
   );
 }
 
-CatalogModel _model(String id, {String? family}) {
-  return CatalogModel(id: id, name: id, family: family);
+CatalogModel _model(String id, {String? family, int? context}) {
+  return CatalogModel(id: id, name: id, family: family, contextLimit: context);
 }
 
 CatalogProvider _provider(
@@ -443,17 +609,29 @@ ModelCatalogData _matchingCatalog({DateTime? generatedAt}) {
       ),
       'anthropic': _provider(
         'anthropic',
-        models: [_model('claude-sonnet-4.6')],
+        models: [_model('claude-sonnet-4.6'), _model('claude')],
       ),
       'deepseek': _provider(
         'deepseek',
         api: 'https://api.deepseek.com/v1',
-        models: [_model('deepseek-chat')],
+        models: [_model('deepseek-chat'), _model('deepseek-v4.1-flash')],
+      ),
+      'zai': _provider('zai', models: [_model('glm-5.3-flash')]),
+      'moonshotai': _provider('moonshotai', models: [_model('kimi-k3.1-pro')]),
+      'google': _provider(
+        'google',
+        models: [_model('gemini-3.8-flash', context: 262144)],
       ),
       'zhipuai': _provider(
         'zhipuai',
         api: 'https://open.bigmodel.cn/api/paas/v4',
-        models: [_model('glm-4')],
+        models: [
+          _model('glm-4'),
+          _model('glm-5'),
+          _model('glm-5.3'),
+          _model('glm-5.3-flash'),
+          _model('glm-5-3-flash-20261024'),
+        ],
       ),
       'zhipuai-coding-plan': _provider(
         'zhipuai-coding-plan',
@@ -467,6 +645,14 @@ ModelCatalogData _matchingCatalog({DateTime? generatedAt}) {
           _model('anthropic/claude-sonnet-4.6'),
           _model('deepseek/deepseek-chat:free'),
           _model('gpt-4o'),
+          _model('z-ai/glm-5.3-flash'),
+          _model('z-ai/glm-5'),
+          _model('openrouter/auto'),
+          _model('auto'),
+          _model('default'),
+          _model('free'),
+          _model('loomy'),
+          _model('model-3.1-20261024'),
         ],
       ),
       'google-vertex': _provider(

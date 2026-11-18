@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/provider_oauth.dart';
 import '../logging/log_redactor.dart';
+import '../model_spec/model_list_metadata_cache.dart';
 import 'codex_client_version.dart';
 import 'oauth_callback.dart';
 import 'oauth_cancellation.dart';
@@ -784,10 +785,10 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
             row['reasoning_efforts'] ??
             meta['reasoningEfforts'];
         final contextWindow =
-            row['contextWindow'] ??
-            row['context_window'] ??
-            meta['contextWindow'] ??
-            meta['totalContextTokens'];
+            parseModelListTokenLimit(row['context_window']) ??
+            parseModelListTokenLimit(row['contextWindow']) ??
+            parseModelListTokenLimit(meta['contextWindow']) ??
+            parseModelListTokenLimit(meta['totalContextTokens']);
         final levels = <String>[
           if (efforts is List)
             for (final effort in efforts)
@@ -795,19 +796,45 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
                   case final value?)
                 value,
         ];
-        // Prefer Grok Build metadata for models present in both catalogs.
-        models.putIfAbsent(
-          id,
-          () => {
-            ...row.cast<String, dynamic>(),
-            'id': id,
-            if (contextWindow != null) 'context_window': contextWindow,
-            if (levels.isNotEmpty) 'supported_reasoning_levels': levels,
-          },
-        );
+        final model = <String, dynamic>{
+          ...row.cast<String, dynamic>(),
+          'id': id,
+          if (contextWindow != null) 'context_window': contextWindow,
+          if (levels.isNotEmpty) 'supported_reasoning_levels': levels,
+        };
+        final preferred = models[id];
+        if (preferred == null) {
+          models[id] = model;
+        } else {
+          _fillMissingNumbers(preferred, model);
+        }
       }
     }
     return models.values.toList();
+  }
+
+  // Build owns the model row. The API list can fill gaps in its numeric data.
+  static void _fillMissingNumbers(
+    Map<String, dynamic> preferred,
+    Map<String, dynamic> candidate,
+  ) {
+    final fallback = parseModelListMetadata(candidate);
+    if (fallback == null) return;
+    final current = parseModelListMetadata(preferred);
+    if (current?.contextWindow == null && fallback.contextWindow != null) {
+      preferred['context_window'] = fallback.contextWindow;
+    }
+    if (current?.maxOutput == null && fallback.maxOutput != null) {
+      preferred['max_output'] = fallback.maxOutput;
+    }
+    final price = fallback.pricing;
+    if (price != null) {
+      preferred['cost'] = {
+        if (preferred['cost'] case final Map cost) ...cost,
+        'input': current?.pricing?.input ?? price.input,
+        'output': current?.pricing?.output ?? price.output,
+      };
+    }
   }
 
   @override

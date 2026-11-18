@@ -1658,6 +1658,9 @@ void main() {
                 {
                   'id': 'grok-4.7',
                   'supported_reasoning_levels': ['low', 'medium', 'high'],
+                  'context_length': 262144,
+                  'max_output': 32768,
+                  'cost': {'input': 0.25},
                 },
                 {'id': 'grok-build', 'supports_reasoning': false},
                 {'id': 'grok-4.20-0309-reasoning'},
@@ -1694,6 +1697,12 @@ void main() {
       final original = config(provider: OAuthProvider.grok, expired: false);
       await settings.setProviderConfig(original.id, original);
       final discovered = await service.models(original);
+      final standard = discovered.singleWhere(
+        (model) => model.id == 'grok-4.7',
+      );
+      expect(standard.contextWindow, 262144);
+      expect(standard.maxOutput, 32768);
+      expect(standard.pricing, const ModelPricing(input: 0.25));
       expect(
         discovered
             .singleWhere((m) => m.id == 'grok-4.7-build-fast')
@@ -1722,7 +1731,7 @@ void main() {
       });
       expect(
         synced.modelOverrides['grok-4.7-build-fast']['contextWindow'],
-        500000,
+        isNull,
       );
       final fastSpec = ModelSpecResolver.instance.spec(
         synced,
@@ -1767,6 +1776,72 @@ void main() {
       expect(body['reasoning'], {'effort': 'xhigh'});
       expect(body['store'], false);
       expect(body['include'], contains('reasoning.encrypted_content'));
+    },
+  );
+
+  test(
+    'OAuth numeric metadata survives a failed refresh and user edits stay in charge',
+    () async {
+      const id = 'relay/[tag] ExampleModel';
+      var status = 200;
+      final service = ProviderOAuthService(
+        clientFactory: (_) => MockClient(
+          (request) async => jsonResponse({
+            'data': [
+              {
+                'id': id,
+                'context_length': 262144,
+                'max_output': 32768,
+                'cost': {'input': 1},
+                'supports_image_in': true,
+                'supports_reasoning': true,
+              },
+            ],
+          }, status),
+        ),
+      )..bind(settings);
+      addTearDown(service.dispose);
+      final original = config(expired: false).copyWith(
+        modelOverrides: {
+          id: {
+            'contextWindow': 128000,
+            'input': ['text'],
+            'abilities': [],
+          },
+        },
+      );
+      await settings.setProviderConfig(original.id, original);
+      final discovered = (await service.models(original)).single;
+      expect(discovered.contextWindow, 128000);
+      expect(discovered.maxOutput, 32768);
+      expect(discovered.pricing, const ModelPricing(input: 1));
+      expect(discovered.input, [Modality.text]);
+      expect(discovered.abilities, isEmpty);
+
+      await service.syncModels(original.id);
+      final synced = settings.providerConfigs[original.id]!;
+      final saved = synced.modelOverrides[id] as Map;
+      expect(saved['contextWindow'], 128000);
+      expect(saved['input'], ['text']);
+      expect(saved['abilities'], isEmpty);
+      expect(saved, isNot(contains('maxOutput')));
+      expect(saved, isNot(contains('pricing')));
+
+      final reset = synced.copyWith(
+        modelOverrides: {
+          id: Map<String, dynamic>.from(saved)..remove('contextWindow'),
+        },
+      );
+      await settings.setProviderConfig(original.id, reset);
+      status = 503;
+      await expectLater(
+        service.models(reset),
+        throwsA(isA<ProviderOAuthException>()),
+      );
+      expect(ModelSpecResolver.instance.spec(reset, id).contextWindow, 262144);
+
+      await settings.removeProviderConfig(original.id);
+      expect(ModelSpecResolver.instance.spec(reset, id).contextWindow, isNull);
     },
   );
 

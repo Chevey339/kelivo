@@ -5,6 +5,7 @@ import '../../providers/settings_provider.dart';
 import '../model_catalog/catalog_entry.dart';
 import '../model_catalog/model_catalog_service.dart';
 import 'model_defaults_guesser.dart';
+import 'model_list_metadata_cache.dart';
 import 'ollama_model_service.dart';
 import 'vendor_defaults.dart';
 
@@ -62,9 +63,13 @@ class _MemoEntry {
 }
 
 class ModelSpecResolver {
-  ModelSpecResolver({ModelCatalogService? catalog, OllamaModelService? ollama})
-    : _catalog = catalog ?? ModelCatalogService.instance,
-      _ollama = ollama ?? OllamaModelService.instance {
+  ModelSpecResolver({
+    ModelCatalogService? catalog,
+    OllamaModelService? ollama,
+    ModelListMetadataCache? modelLists,
+  }) : _catalog = catalog ?? ModelCatalogService.instance,
+       _ollama = ollama ?? OllamaModelService.instance,
+       _modelLists = modelLists ?? ModelListMetadataCache.instance {
     _catalog.addListener(_onCatalogChanged);
   }
 
@@ -109,11 +114,15 @@ class ModelSpecResolver {
 
   final ModelCatalogService _catalog;
   final OllamaModelService _ollama;
+  final ModelListMetadataCache _modelLists;
   final Map<(String, String), _MemoEntry> _memo = {};
   int _seenCatalogVersion = -1;
 
   ModelSpec spec(ProviderConfig cfg, String modelKey, {String? displayName}) =>
       resolve(cfg, modelKey, displayName: displayName).spec;
+
+  Future<ModelListRefresh> startModelListRefresh(ProviderConfig cfg) =>
+      _modelLists.startRefresh(cfg);
 
   ResolvedModelSpec resolve(
     ProviderConfig cfg,
@@ -127,6 +136,7 @@ class ModelSpecResolver {
       _fingerprint(cfg, displayName),
       _ollama.version,
       _ollama.cacheScope(cfg),
+      _modelLists.version,
     );
     final key = (cfg.id, modelKey);
     final cached = _memo[key];
@@ -177,9 +187,15 @@ class ModelSpecResolver {
         ? ModelSpecOverride.fromJson(rawOverride)
         : const ModelSpecOverride();
     final upstreamId = ov.apiModelId ?? modelKey;
-    final match =
-        _catalog.lookup(cfg, upstreamId) ??
-        (upstreamId != modelKey ? _catalog.lookup(cfg, modelKey) : null);
+    final upstreamMatch = _catalog.lookup(cfg, upstreamId);
+    final keyMatch = upstreamId != modelKey
+        ? _catalog.lookup(cfg, modelKey)
+        : null;
+    final match = upstreamMatch ?? keyMatch;
+    final upstreamMetadata = _modelLists.lookup(cfg, upstreamId);
+    final keyMetadata = upstreamId != modelKey
+        ? _modelLists.lookup(cfg, modelKey)
+        : null;
     final guess = ModelDefaultsGuesser.guess(upstreamId);
     final vendor = VendorDefaults.forProvider(cfg, modelId: upstreamId);
     final sources = <ModelSpecField, SpecSource>{};
@@ -214,20 +230,29 @@ class ModelSpecResolver {
       guess: guess,
       sources: sources,
     );
-    final contextWindow = _pick<int?>(
+    final contextWindow = _pick<int>(
+      vendor:
+          upstreamMetadata?.contextWindow ??
+          keyMetadata?.contextWindow ??
+          upstreamMatch?.contextWindowHint ??
+          keyMatch?.contextWindowHint,
       catalog: match?.model.contextLimit,
-      fallback: null,
       field: ModelSpecField.contextWindow,
       sources: sources,
     );
-    final maxOutput = _pick<int?>(
+    final maxOutput = _pick<int>(
+      vendor: upstreamMetadata?.maxOutput ?? keyMetadata?.maxOutput,
       catalog: match?.model.outputLimit,
       guess: guess.maxOutput,
-      fallback: null,
       field: ModelSpecField.maxOutput,
       sources: sources,
     );
-    final pricing = _resolvePricing(match: match, sources: sources);
+    final pricing = _pick<ModelPricing>(
+      vendor: upstreamMetadata?.pricing ?? keyMetadata?.pricing,
+      catalog: _catalogPricing(match),
+      field: ModelSpecField.pricing,
+      sources: sources,
+    );
 
     var base = ModelSpec(
       id: modelKey,
@@ -329,8 +354,11 @@ class ModelSpecResolver {
       cfg.baseUrl,
       cfg.providerType,
       cfg.vertexAI,
+      cfg.projectId,
+      cfg.location,
       cfg.useResponseApi,
       cfg.oauthProvider,
+      cfg.oauthCredentials?.sessionId,
       cfg.chatPath,
       displayName,
     );
@@ -698,13 +726,17 @@ class ModelSpecResolver {
     return SamplingPolicy.always;
   }
 
-  static T _pick<T>({
-    required T catalog,
+  static T? _pick<T>({
+    T? vendor,
+    T? catalog,
     T? guess,
-    required T fallback,
     required ModelSpecField field,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
+    if (vendor != null) {
+      sources[field] = SpecSource.vendor;
+      return vendor;
+    }
     if (catalog != null) {
       sources[field] = SpecSource.catalog;
       return catalog;
@@ -714,27 +746,21 @@ class ModelSpecResolver {
       return guess;
     }
     sources[field] = SpecSource.fallback;
-    return fallback;
+    return null;
   }
 
-  static ModelPricing? _resolvePricing({
-    required CatalogMatch? match,
-    required Map<ModelSpecField, SpecSource> sources,
-  }) {
-    final model = match?.model;
-    if (model != null &&
-        (model.costInput != null || model.costOutput != null)) {
-      sources[ModelSpecField.pricing] = SpecSource.catalog;
-      return ModelPricing(
-        input: model.costInput,
-        output: model.costOutput,
-        cacheRead: model.costCacheRead,
-        cacheWrite: model.costCacheWrite,
-        currency: 'USD',
-      );
+  static ModelPricing? _catalogPricing(CatalogMatch? match) {
+    if (match == null || match.inferred) return null;
+    final model = match.model;
+    if (model.costInput == null && model.costOutput == null) {
+      return null;
     }
-    sources[ModelSpecField.pricing] = SpecSource.fallback;
-    return null;
+    return ModelPricing(
+      input: model.costInput,
+      output: model.costOutput,
+      cacheRead: model.costCacheRead,
+      cacheWrite: model.costCacheWrite,
+    );
   }
 
   static void _markOverrideSources(

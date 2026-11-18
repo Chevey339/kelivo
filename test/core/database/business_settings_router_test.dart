@@ -104,6 +104,7 @@ void main() {
           'plugin_future_key_v1': <String>['one', 'two'],
           'flutter_log_enabled_v1': true,
           'ollama_model_metadata_v1': '{"local-model":{}}',
+          BusinessKeyRegistry.modelListMetadataCacheKey: '{"relay":{}}',
           'desktop_autostart_hidden_v1': true,
           'window_physical_pos_x_v1': -3600.0,
           'window_physical_pos_y_v1': 200.0,
@@ -126,6 +127,10 @@ void main() {
         expect(exported['plugin_future_key_v1'], <String>['one', 'two']);
         expect(exported['flutter_log_enabled_v1'], isNull);
         expect(exported, isNot(contains('ollama_model_metadata_v1')));
+        expect(
+          exported,
+          isNot(contains(BusinessKeyRegistry.modelListMetadataCacheKey)),
+        );
         expect(exported, isNot(contains('desktop_autostart_hidden_v1')));
         expect(exported['window_physical_pos_x_v1'], isNull);
         expect(exported['window_physical_pos_y_v1'], isNull);
