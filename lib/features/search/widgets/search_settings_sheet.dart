@@ -523,6 +523,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is ParallelOptions) return 'parallel';
     if (s is KimiOptions) return 'kimi';
     if (s is YouSearchOptions) return 'you';
+    if (s is KeenableOptions) return 'keenable';
     if (s is KelivoOptions) return 'kelivo';
     return 'search';
   }

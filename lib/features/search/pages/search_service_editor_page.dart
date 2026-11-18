@@ -670,6 +670,16 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is KeenableOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+        ),
+        _buildMultiKeyEntry(context),
+      ];
+    }
     if (service is YouSearchOptions) {
       return [
         field(
@@ -1483,6 +1493,8 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     } else if (service is YouSearchOptions) {
       _putController('apiKey', service.apiKey);
       _putController('contentMode', service.contentMode);
+    } else if (service is KeenableOptions) {
+      _putController('apiKey', service.apiKey);
     }
   }
 
@@ -1707,6 +1719,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           contentMode: YouSearchOptions.normalizeContentMode(
             _text('contentMode'),
           ),
+        );
+      case 'keenable':
+        return KeenableOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
         );
       case 'kelivo':
         return KelivoOptions(id: _serviceId);
@@ -2750,6 +2768,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is ParallelOptions) return 'parallel';
   if (service is KimiOptions) return 'kimi';
   if (service is YouSearchOptions) return 'you';
+  if (service is KeenableOptions) return 'keenable';
   if (service is KelivoOptions) return 'kelivo';
   return 'bing_local';
 }
@@ -2815,6 +2834,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return KimiOptions(id: id, apiKey: '');
     case 'you':
       return YouSearchOptions(id: id, apiKey: '');
+    case 'keenable':
+      return KeenableOptions(id: id, apiKey: '');
     case 'kelivo':
       return KelivoOptions(id: id);
     default:
@@ -2879,6 +2900,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameKimi;
     case 'you':
       return l10n.searchServiceNameYou;
+    case 'keenable':
+      return l10n.searchServiceNameKeenable;
     case 'kelivo':
       return l10n.searchServiceNameKelivo;
     default:
@@ -2914,6 +2937,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'parallel', brand: 'parallel'),
   (type: 'kimi', brand: 'kimi'),
   (type: 'you', brand: 'you'),
+  (type: 'keenable', brand: 'keenable'),
 ];
 
 @Preview(

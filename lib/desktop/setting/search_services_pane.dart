@@ -705,6 +705,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is ParallelOptions) return 'parallel';
     if (s is KimiOptions) return 'kimi';
     if (s is YouSearchOptions) return 'you';
+    if (s is KeenableOptions) return 'keenable';
     if (s is KelivoOptions) return 'kelivo';
     return 'search';
   }
@@ -1393,6 +1394,13 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             }),
           ),
         ];
+      case 'keenable':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+        ];
       case 'bing_local':
       default:
         return [];
@@ -1558,6 +1566,11 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             _controllers['contentMode']!.text,
           ),
         );
+      case 'keenable':
+        return KeenableOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+        );
       case 'bing_local':
       default:
         return BingLocalOptions(id: id);
@@ -1695,6 +1708,8 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     } else if (s is YouSearchOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['contentMode'] = TextEditingController(text: s.contentMode);
+    } else if (s is KeenableOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     }
   }
 
@@ -2195,6 +2210,15 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           }),
         ),
       ];
+    } else if (s is KeenableOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+      ];
     }
     return [];
   }
@@ -2507,6 +2531,13 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         extraApiKeys: _extraApiKeys,
       );
     }
+    if (s is KeenableOptions) {
+      return KeenableOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        extraApiKeys: _extraApiKeys,
+      );
+    }
     if (s is DoubaoOptions) {
       return DoubaoOptions(
         id: s.id,
@@ -2800,6 +2831,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'parallel', brand: 'parallel'),
     (type: 'kimi', brand: 'kimi'),
     (type: 'you', brand: 'you'),
+    (type: 'keenable', brand: 'keenable'),
   ];
   @override
   Widget build(BuildContext context) {
@@ -2906,6 +2938,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameKimi;
     case 'you':
       return l10n.searchServiceNameYou;
+    case 'keenable':
+      return l10n.searchServiceNameKeenable;
     case 'kelivo':
       return l10n.searchServiceNameKelivo;
     default:
