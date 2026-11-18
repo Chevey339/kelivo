@@ -186,7 +186,7 @@ void main() {
           width: 390,
           child: MarkdownWithCodeHighlight(
             text:
-                '| A | B | C | D | E | F |\n| --- | --- | --- | --- | --- | --- |\n| 1 | 2 | 3 | 4 | 5 | 6 |',
+                '| Checkpoint | Distance | Duration | Elevation | Supplies | Instructions |\n| --- | --- | --- | --- | --- | --- |\n| 1 | 2 | 3 | 4 | 5 | 6 |',
           ),
         ),
         (value) => selected = value?.plainText,

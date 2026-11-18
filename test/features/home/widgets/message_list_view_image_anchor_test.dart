@@ -224,7 +224,7 @@ void main() {
       String paragraphs(String label, int count) =>
           List.generate(count, (i) => '$label paragraph $i.').join('\n\n');
       final above = inTable
-          ? '| Screenshot | A | B | C | D |\n'
+          ? '| Screenshot attachment | Estimated distance | Expected duration | Trail difficulty | Supplies available |\n'
                 '| --- | --- | --- | --- | --- |\n'
                 '| ![above](${source('above.png')}) | a | b | c | d |'
           : 'Image above the reader.\n\n![above](${source('above.png')})';

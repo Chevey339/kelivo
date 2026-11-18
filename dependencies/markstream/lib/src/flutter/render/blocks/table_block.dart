@@ -19,6 +19,8 @@ import '../chrome.dart';
 import '../prose_direction.dart';
 import '../../performance_limits.dart';
 
+typedef _CellWidthContent = ({String text, bool hasImage});
+
 class MarkstreamTableBlock extends StatefulWidget {
   const MarkstreamTableBlock({
     super.key,
@@ -46,6 +48,10 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
   final _selection = TableSelectionDelegate();
   final _boundary = GlobalKey();
   final _scroll = ScrollController();
+  Object? _columnMeasureKey;
+  List<double> _preferredWidths = const [];
+  List<_CellWidthContent>? _measuredHeader;
+  int _measuredRows = 0;
   int _visibleRows = PerformanceLimits.initialTableRows;
   int _revealedRows = 0;
   bool _capturing = false;
@@ -180,6 +186,112 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
     );
   }
 
+  List<double> _measureColumns(BuildContext context, int columns, int count) {
+    final theme = widget.theme.table;
+    final rows = widget.node.children;
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    final padding = theme.cellPadding.resolve(direction).horizontal;
+    final defaults = DefaultTextStyle.of(context).style;
+    final bold = MediaQuery.boldTextOf(context);
+    final letterSpacing = MediaQuery.maybeLetterSpacingOverrideOf(context);
+    final wordSpacing = MediaQuery.maybeWordSpacingOverrideOf(context);
+    TextStyle measureStyle(TextStyle style) => defaults
+        .merge(style)
+        .copyWith(
+          fontWeight: bold ? FontWeight.bold : null,
+          letterSpacing: letterSpacing,
+          wordSpacing: wordSpacing,
+        );
+
+    final heading = measureStyle(theme.heading);
+    final body = measureStyle(theme.body);
+    final headerOnly = widget.streaming && !_capturing && !widget.exporting;
+    // The open table is reparsed on append, including its unchanged header.
+    // Match its rendered content so body updates don't reshape the labels.
+    final header = headerOnly
+        ? rows.first.children.map(_cellWidthContent).toList()
+        : null;
+    final key = (
+      headerOnly ? rows.first.header : widget.node,
+      widget.exporting,
+      columns,
+      heading,
+      body,
+      scaler,
+      direction,
+      locale,
+      padding,
+    );
+    final cached =
+        _columnMeasureKey == key && listEquals(_measuredHeader, header);
+    final measuredRows = cached ? _measuredRows : 0;
+    final sampleRows = headerOnly ? 1 : count;
+    if (measuredRows >= sampleRows) return _preferredWidths;
+
+    final minimum = math.max(1.0, padding + scaler.scale(24));
+    final maximum = math.max(minimum, padding + scaler.scale(640));
+    final preferred = cached
+        ? List<double>.of(_preferredWidths)
+        : List.filled(columns, minimum);
+    final painter = TextPainter(
+      textDirection: direction,
+      textScaler: scaler,
+      locale: locale,
+    );
+    try {
+      for (var rowIndex = measuredRows; rowIndex < sampleRows; rowIndex++) {
+        final row = rows[rowIndex];
+        final style = row.header ? heading : body;
+        for (
+          var column = 0;
+          column < math.min(columns, row.children.length);
+          column++
+        ) {
+          if (preferred[column] >= maximum) continue;
+          final (:text, :hasImage) =
+              header?[column] ?? _cellWidthContent(row.children[column]);
+          if (text.length > PerformanceLimits.staticNativeCharacters) {
+            preferred[column] = maximum;
+            continue;
+          }
+          painter.text = TextSpan(text: text, style: style);
+          painter.layout();
+          final textWidth = painter.maxIntrinsicWidth;
+          // Images can have empty alt text but still need room in the cell.
+          final contentWidth = hasImage ? math.max(textWidth, 240) : textWidth;
+          preferred[column] = math.max(
+            preferred[column],
+            math.min(maximum, padding + contentWidth),
+          );
+        }
+      }
+    } finally {
+      painter.dispose();
+    }
+    // A standalone PNG temporarily lays out hidden rows. Their widths do not
+    // persist in the interactive table unless the user reveals those rows.
+    if (!_capturing) {
+      _columnMeasureKey = key;
+      _preferredWidths = preferred;
+      _measuredHeader = header;
+      _measuredRows = sampleRows;
+    }
+    return preferred;
+  }
+
+  _CellWidthContent _cellWidthContent(TableCellNode cell) =>
+      switch (cell.children) {
+        [TextNode(:final text)] => (text: text, hasImage: false),
+        _ => (text: toPlainText(cell), hasImage: _hasImage(cell)),
+      };
+
+  bool _hasImage(MarkdownNode node) =>
+      node is ImageNode ||
+      (node is HtmlElementNode && node.tag == 'img') ||
+      node.children.any(_hasImage);
+
   @override
   Widget build(BuildContext context) {
     final theme = widget.theme.table;
@@ -210,20 +322,42 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
             defaultTargetPlatform == TargetPlatform.windows;
         final mobile = !desktop;
         final compact = mobile || width < theme.compactBreakpoint;
-        final columnWidth = columns == 1
-            ? width.clamp(
-                theme.singleColumnMinWidth,
-                theme.singleColumnMaxWidth,
-              )
-            : (width / theme.visibleColumns).clamp(
-                theme.columnMinWidth,
-                theme.columnMaxWidth,
-              );
-        final scroll =
-            !widget.exporting &&
-            compact &&
-            columns >= 4 &&
-            columnWidth * columns > width;
+        final preferred = columns == 1
+            ? [width]
+            : _measureColumns(context, columns, count);
+        final preferredTotal = preferred.fold(0.0, (sum, value) => sum + value);
+        final wrapWidth = MediaQuery.textScalerOf(
+          context,
+        ).scale(theme.columnWrapWidth);
+        final minimums = [
+          for (final value in preferred) math.min(value, wrapWidth),
+        ];
+        final minimumTotal = minimums.fold(0.0, (sum, value) => sum + value);
+        final scroll = !widget.exporting && minimumTotal > width;
+        final tableWidth = scroll ? minimumTotal : width;
+        // A message export has a fixed canvas. Give each cell a common share
+        // before squeezing the rest so a short label keeps room after padding.
+        final exportFloor = tableWidth < minimumTotal
+            ? math.min(tableWidth / columns, minimums.reduce(math.min))
+            : 0.0;
+        final exportFloorTotal = exportFloor * columns;
+        double columnWidth(int column) {
+          if (columns == 1) return width;
+          if (tableWidth >= preferredTotal) {
+            return preferred[column] * (tableWidth / preferredTotal);
+          }
+          if (tableWidth < minimumTotal) {
+            final fraction =
+                math.max(0.0, tableWidth - exportFloorTotal) /
+                (minimumTotal - exportFloorTotal);
+            return exportFloor + (minimums[column] - exportFloor) * fraction;
+          }
+          final fraction =
+              (tableWidth - minimumTotal) / (preferredTotal - minimumTotal);
+          return minimums[column] +
+              (preferred[column] - minimums[column]) * fraction;
+        }
+
         final radius = compact ? theme.compactRadius : theme.wideRadius;
         final header = _capturing
             ? Color.alphaBlend(
@@ -234,10 +368,11 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
         final body = _capturing
             ? widget.theme.colors.fillBlockOpaque
             : theme.bodyBackgroundColor;
-        Widget table = Table(
-          defaultColumnWidth: scroll
-              ? FixedColumnWidth(columnWidth)
-              : const FlexColumnWidth(),
+        final table = Table(
+          columnWidths: {
+            for (var column = 0; column < columns; column++)
+              column: FixedColumnWidth(columnWidth(column)),
+          },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: TableBorder(
             horizontalInside: BorderSide(
@@ -267,19 +402,14 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
               ),
           ],
         );
-        // Capture lays out every row and disables descendant viewport culling.
-        if (all) {
-          final completeTable = table;
-          table = BlockList(
-            blocks: [completeTable],
-            signature: completeTable,
-            cullToViewport: false,
-            itemBuilder: (_, index) => completeTable,
-          );
-        }
         Widget clipped = ColoredBox(
           color: mobile && !_capturing ? Colors.transparent : body,
-          child: table,
+          // Disable culling for capture while keeping the cells mounted. A
+          // resized image can keep its previously decoded frame this way.
+          child: BlockCullScope(
+            enabled: !all && BlockCullScope.of(context),
+            child: table,
+          ),
         );
         if (!mobile) {
           clipped = DecoratedBox(
@@ -388,7 +518,7 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                 physics: const ClampingScrollPhysics(),
                 primary: false,
                 scrollDirection: Axis.horizontal,
-                child: SizedBox(width: columnWidth * columns, child: surface),
+                child: SizedBox(width: tableWidth, child: surface),
               )
             else
               surface,
@@ -454,7 +584,7 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
         }
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: result,
+          child: SizedBox(width: width, child: result),
         );
       },
     );

@@ -245,7 +245,7 @@ void main() {
                     id: 'table-scroll',
                     role: 'assistant',
                     content:
-                        '| A | B | C | D | E |\n'
+                        '| First checkpoint | Estimated distance | Expected duration | Trail difficulty | Supplies available |\n'
                         '| --- | --- | --- | --- | --- |\n'
                         '| apple | banana | cherry | date | elderberry |',
                     conversationId: 'conversation-1',

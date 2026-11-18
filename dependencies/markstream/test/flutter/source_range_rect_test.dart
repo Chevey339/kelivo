@@ -202,7 +202,7 @@ void main() {
       final controller = MarkstreamSelectionController();
       addTearDown(controller.dispose);
       final source =
-          '| one | two | three | four | five |\n| --- | --- | --- | --- | --- |\n${List.generate(65, (i) => '| A $i | B $i | C $i | D $i | target $i |').join('\n')}';
+          '| First column | Second column | Third column | Fourth column | Fifth column |\n| --- | --- | --- | --- | --- |\n${List.generate(65, (i) => '| A $i | B $i | C $i | D $i | target $i |').join('\n')}';
       final start = source.indexOf('target 55');
       final range = SourceSpan(start, start + 'target 55'.length);
       await tester.pumpWidget(

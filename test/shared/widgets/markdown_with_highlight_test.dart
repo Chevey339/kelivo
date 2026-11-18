@@ -29,6 +29,10 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 import 'package:provider/provider.dart';
 
+const _wideTableHeader =
+    '| First checkpoint | Estimated distance | Expected duration | Trail difficulty | Supplies available |\n'
+    '| --- | --- | --- | --- | --- |\n';
+
 TableNode _tableFromRows(List<List<String>> values) {
   var offset = 0;
   final rows = <TableRowNode>[];
@@ -1227,8 +1231,10 @@ Inline ***strong emphasis*** text.
 
       final body = find.byType(Table);
       expect(body, findsOneWidget);
-      final bodyRect = tester.getRect(body);
-      final expectedSecondColumnCenter = bodyRect.left + bodyRect.width * 0.75;
+      final cell = tester.widget<Table>(body).children[1].children[1];
+      final expectedSecondColumnCenter = tester
+          .getCenter(find.byWidget(cell))
+          .dx;
       final centeredCellText = find.descendant(
         of: body,
         matching: find.byWidgetPredicate(
@@ -1500,10 +1506,7 @@ Inline ***strong emphasis*** text.
           await tester.binding.setSurfaceSize(const Size(800, 1600));
           addTearDown(() => tester.binding.setSurfaceSize(null));
           final prefix = longReply ? '${'Intro text. ' * 50}\n\n' : '';
-          final text = ValueNotifier(
-            '$prefix| A | B | C | D | E |\n'
-            '| --- | --- | --- | --- | --- |\n| apple',
-          );
+          final text = ValueNotifier('$prefix$_wideTableHeader| apple');
           addTearDown(text.dispose);
           await tester.pumpWidget(_streamingMarkdownHarness(text, width: 320));
           await tester.pump();
@@ -1552,9 +1555,7 @@ Inline ***strong emphasis*** text.
       final previousPlatform = debugDefaultTargetPlatformOverride;
       try {
         _overrideMarkdownTablePlatform(TargetPlatform.iOS);
-        var text =
-            '| A | B | C | D | E |\n'
-            '| --- | --- | --- | --- | --- |\n| apple';
+        var text = '$_wideTableHeader| apple';
         Future<void> render({bool streaming = true}) async {
           await tester.pumpWidget(
             _markdownHarness(text, width: 320, streaming: streaming),
@@ -1610,11 +1611,8 @@ Inline ***strong emphasis*** text.
     final previousPlatform = debugDefaultTargetPlatformOverride;
     try {
       _overrideMarkdownTablePlatform(TargetPlatform.iOS);
-      const header =
-          '| A | B | C | D | E |\n'
-          '| --- | --- | --- | --- | --- |\n';
       final text = ValueNotifier(
-        '$header| apple | B | C | D | E |\n\n$header| banana',
+        '$_wideTableHeader| apple | B | C | D | E |\n\n$_wideTableHeader| banana',
       );
       addTearDown(text.dispose);
       await tester.pumpWidget(_streamingMarkdownHarness(text, width: 320));

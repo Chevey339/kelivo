@@ -13,6 +13,14 @@ const _source =
 | :--- | :---: | ---: |
 | Left content that wraps onto several lines<br>l | Center content that wraps onto several lines<br>c | Right content that wraps onto several lines<br>r |''';
 
+class _TableImageBuilder implements ImageBuilder {
+  const _TableImageBuilder();
+
+  @override
+  Widget build(BuildContext context, ImageNode image, MarkstreamTheme theme) =>
+      const SizedBox(key: ValueKey('table-image'), width: 240, height: 40);
+}
+
 Rect _lastLine(RenderParagraph p) => p
     .getBoxesForSelection(
       TextSelection(baseOffset: 0, extentOffset: p.text.toPlainText().length),
@@ -22,7 +30,130 @@ Rect _lastLine(RenderParagraph p) => p
     .toRect()
     .shift(p.localToGlobal(Offset.zero));
 
+Rect _cellRect(WidgetTester tester, int row, int column) {
+  final table = tester.widget<Table>(find.byType(Table));
+  return tester.getRect(find.byWidget(table.children[row].children[column]));
+}
+
 void main() {
+  testWidgets('short columns leave room for long descriptions', (tester) async {
+    await tester.pumpWidget(
+      host(
+        const MarkstreamView(
+          source:
+              '| ID | Details |\n| --- | --- |\n| 1 | A long description that should receive most of the table width. |',
+        ),
+        width: 390,
+      ),
+    );
+    final table = tester.getRect(find.byType(Table));
+    expect(table.width, 390);
+    expect(_cellRect(tester, 0, 0).width, lessThan(table.width / 4));
+    expect(_cellRect(tester, 1, 1).width, greaterThan(table.width * .75));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('short columns fit and wide tables can scroll or export', (
+    tester,
+  ) async {
+    const compact = '| A | B | C | D | E | F |\n| - | - | - | - | - | - |';
+    const wide =
+        '| Checkpoint | Distance | Duration | Elevation | Supplies | Instructions |\n| - | - | - | - | - | - |';
+    final scroll = find.byKey(const ValueKey('markstream-table-scroll'));
+
+    await tester.pumpWidget(
+      host(const MarkstreamView(source: compact), width: 390),
+    );
+    expect(scroll, findsNothing);
+    await tester.pumpWidget(
+      host(const MarkstreamView(source: wide), width: 390),
+    );
+    expect(scroll, findsOneWidget);
+    expect(tester.getSize(find.byType(Table)).width, greaterThan(390));
+    await tester.pumpWidget(
+      host(const MarkstreamView(source: wide, exporting: true), width: 390),
+    );
+    expect(scroll, findsNothing);
+    expect(tester.getSize(find.byType(Table)).width, 390);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('narrow export keeps room for short labels after padding', (
+    tester,
+  ) async {
+    final headers = List.filled(9, 'Long column heading').join(' | ');
+    final divider = List.filled(10, '---').join(' | ');
+    await tester.pumpWidget(
+      host(
+        MarkstreamView(
+          source: '| ID | $headers |\n| $divider |',
+          exporting: true,
+        ),
+        width: 416,
+      ),
+    );
+    expect(paragraph('ID').size.width, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('revealed and exported rows can widen a column for an image', (
+    tester,
+  ) async {
+    final source =
+        '| ID | Notes |\n| --- | --- |\n'
+        '${'| A | A longer description that needs several words of space. |\n' * 39}'
+        '| ![](photo.png) | The last row |';
+    Future<void> render({bool exporting = false}) async {
+      await tester.pumpWidget(
+        host(
+          MarkstreamView(
+            source: source,
+            imageBuilder: const _TableImageBuilder(),
+            exporting: exporting,
+          ),
+          width: 416,
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await render();
+    final initialWidth = _cellRect(tester, 0, 0).width;
+    final more = find.text('Show 1 more rows');
+    await tester.ensureVisible(more);
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    final image = find.byKey(const ValueKey('table-image'));
+    final revealedWidth = tester.getSize(image).width;
+    expect(revealedWidth, greaterThan(initialWidth));
+
+    await render(exporting: true);
+    expect(tester.getSize(image).width, closeTo(revealedWidth, .1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('streaming rows keep their column widths until completion', (
+    tester,
+  ) async {
+    const prefix = '| A | B |\n| - | - |\n| 1 | Short |\n';
+    const complete =
+        '$prefix| 2 | Later cells can contain a much longer description. |';
+    await tester.pumpWidget(
+      host(const MarkstreamView(source: prefix, streaming: true), width: 390),
+    );
+    final header = _cellRect(tester, 0, 0);
+    await tester.pumpWidget(
+      host(const MarkstreamView(source: complete, streaming: true), width: 390),
+    );
+    expect(_cellRect(tester, 0, 0), header);
+
+    await tester.pumpWidget(
+      host(const MarkstreamView(source: complete), width: 390),
+    );
+    expect(_cellRect(tester, 0, 0).width, lessThan(header.width));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [390.0, 720.0]) {
     for (final streaming in [false, true]) {
       testWidgets(
@@ -36,18 +167,18 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          final table = tester.getRect(find.byType(Table));
-          for (final row in ['heading', 'content']) {
+          for (final (rowIndex, row) in ['heading', 'content'].indexed) {
             for (var col = 0; col < 3; col++) {
               final p = paragraph('${['Left', 'Center', 'Right'][col]} $row');
               final line = _lastLine(p);
+              final cell = _cellRect(tester, rowIndex, col);
               switch (col) {
                 case 0:
-                  expect(line.left, closeTo(table.left + 12, .1));
+                  expect(line.left, closeTo(cell.left + 12, .1));
                 case 1:
-                  expect(line.center.dx, closeTo(table.center.dx, .1));
+                  expect(line.center.dx, closeTo(cell.center.dx, .1));
                 case 2:
-                  expect(line.right, closeTo(table.right - 12, .1));
+                  expect(line.right, closeTo(cell.right - 12, .1));
               }
             }
           }
@@ -78,7 +209,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final table = tester.getRect(find.byType(Table));
+      final centerCell = _cellRect(tester, 1, 0);
+      final rightCell = _cellRect(tester, 1, 1);
       final prose = find
           .byType(RichText)
           .evaluate()
@@ -87,18 +219,15 @@ void main() {
           .where((p) => p.text.toPlainText() == text)
           .toList();
       expect(prose, hasLength(2));
-      expect(
-        _lastLine(prose[0]).center.dx,
-        closeTo(table.left + table.width / 4, .1),
-      );
-      expect(_lastLine(prose[1]).right, closeTo(table.right - 12, .1));
+      expect(_lastLine(prose[0]).center.dx, closeTo(centerCell.center.dx, .1));
+      expect(_lastLine(prose[1]).right, closeTo(rightCell.right - 12, .1));
       expect(
         _lastLine(paragraph('\uFFFC\nc')).center.dx,
-        closeTo(table.left + table.width / 4, .1),
+        closeTo(_cellRect(tester, 2, 0).center.dx, .1),
       );
       expect(
         _lastLine(paragraph('\uFFFC\nr')).right,
-        closeTo(table.right - 12, .1),
+        closeTo(_cellRect(tester, 2, 1).right - 12, .1),
       );
       expect(tester.takeException(), isNull);
     },
@@ -116,15 +245,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final table = tester.getRect(find.byType(Table));
-    for (final row in ['heading', 'content']) {
+    for (final (index, row) in ['heading', 'content'].indexed) {
       expect(
         _lastLine(paragraph('Center $row')).center.dx,
-        closeTo(table.left + table.width / 4, .1),
+        closeTo(_cellRect(tester, index, 0).center.dx, .1),
       );
       expect(
         _lastLine(paragraph('Right $row')).right,
-        closeTo(table.right - 12, .1),
+        closeTo(_cellRect(tester, index, 1).right - 12, .1),
       );
     }
     expect(tester.takeException(), isNull);

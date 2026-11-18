@@ -18,7 +18,7 @@ abstract interface class ViewportClipParticipant {
 
 class BlockList extends StatefulWidget {
   static bool cullingEnabled(BuildContext context) =>
-      _BlockCullScope.of(context);
+      BlockCullScope.of(context);
   const BlockList({
     super.key,
     required this.blocks,
@@ -108,8 +108,8 @@ class _BlockListState extends State<BlockList> {
             positions: positions,
             child: _ViewportPaintObserver(child: layout),
           );
-    return _BlockCullScope(
-      enabled: widget.cullToViewport && _BlockCullScope.of(context),
+    return BlockCullScope(
+      enabled: widget.cullToViewport && BlockCullScope.of(context),
       child: _BlockSelectionScope(
         separator: widget.selectionSeparator,
         child: observed,
@@ -166,14 +166,14 @@ class _BlockSelectionScope extends InheritedWidget {
       oldWidget.separator != separator;
 }
 
-class _BlockCullScope extends InheritedWidget {
-  const _BlockCullScope({required this.enabled, required super.child});
+class BlockCullScope extends InheritedWidget {
+  const BlockCullScope({required this.enabled, required super.child});
   final bool enabled;
   static bool of(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<_BlockCullScope>()?.enabled ??
+      context.dependOnInheritedWidgetOfExactType<BlockCullScope>()?.enabled ??
       true;
   @override
-  bool updateShouldNotify(_BlockCullScope oldWidget) =>
+  bool updateShouldNotify(BlockCullScope oldWidget) =>
       oldWidget.enabled != enabled;
 }
 
@@ -356,7 +356,7 @@ class _BlockFlex extends MultiChildRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) => _RenderBlockColumn(
-    _BlockCullScope.of(context),
+    BlockCullScope.of(context),
     Directionality.of(context),
     alignment,
   );
@@ -366,7 +366,7 @@ class _BlockFlex extends MultiChildRenderObjectWidget {
     BuildContext context,
     _RenderBlockColumn renderObject,
   ) {
-    renderObject.cullToViewport = _BlockCullScope.of(context);
+    renderObject.cullToViewport = BlockCullScope.of(context);
     renderObject.textDirection = Directionality.of(context);
     renderObject.crossAxisAlignment = alignment;
   }

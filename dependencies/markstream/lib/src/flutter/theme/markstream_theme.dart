@@ -421,11 +421,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     required this.compactRadius,
     required this.wideRadius,
     required this.toolbarHeight,
-    required this.singleColumnMinWidth,
-    required this.singleColumnMaxWidth,
-    required this.columnMinWidth,
-    required this.columnMaxWidth,
-    required this.visibleColumns,
+    required this.columnWrapWidth,
   });
   final Color outerBorderColor;
   final TextStyle heading;
@@ -438,11 +434,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
   final double compactRadius;
   final double wideRadius;
   final double toolbarHeight;
-  final double singleColumnMinWidth;
-  final double singleColumnMaxWidth;
-  final double columnMinWidth;
-  final double columnMaxWidth;
-  final double visibleColumns;
+  final double columnWrapWidth;
   MarkdownTableTheme copyWith({
     Color? outerBorderColor,
     TextStyle? heading,
@@ -455,11 +447,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     double? compactRadius,
     double? wideRadius,
     double? toolbarHeight,
-    double? singleColumnMinWidth,
-    double? singleColumnMaxWidth,
-    double? columnMinWidth,
-    double? columnMaxWidth,
-    double? visibleColumns,
+    double? columnWrapWidth,
   }) => MarkdownTableTheme(
     outerBorderColor: outerBorderColor ?? this.outerBorderColor,
     heading: heading ?? this.heading,
@@ -472,11 +460,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     compactRadius: compactRadius ?? this.compactRadius,
     wideRadius: wideRadius ?? this.wideRadius,
     toolbarHeight: toolbarHeight ?? this.toolbarHeight,
-    singleColumnMinWidth: singleColumnMinWidth ?? this.singleColumnMinWidth,
-    singleColumnMaxWidth: singleColumnMaxWidth ?? this.singleColumnMaxWidth,
-    columnMinWidth: columnMinWidth ?? this.columnMinWidth,
-    columnMaxWidth: columnMaxWidth ?? this.columnMaxWidth,
-    visibleColumns: visibleColumns ?? this.visibleColumns,
+    columnWrapWidth: columnWrapWidth ?? this.columnWrapWidth,
   );
   @override
   List<Object?> get _values => [
@@ -491,11 +475,7 @@ final class MarkdownTableTheme extends _ThemeTokens {
     compactRadius,
     wideRadius,
     toolbarHeight,
-    singleColumnMinWidth,
-    singleColumnMaxWidth,
-    columnMinWidth,
-    columnMaxWidth,
-    visibleColumns,
+    columnWrapWidth,
   ];
 }
 
@@ -985,11 +965,7 @@ final class MarkstreamTheme extends _ThemeTokens {
         compactRadius: radiusMd,
         wideRadius: radiusMd,
         toolbarHeight: chrome.height,
-        singleColumnMinWidth: 220,
-        singleColumnMaxWidth: 360,
-        columnMinWidth: 112,
-        columnMaxWidth: 178,
-        visibleColumns: 2.45,
+        columnWrapWidth: 104,
       ),
       rulePadding: const EdgeInsets.symmetric(vertical: 12),
       ruleThickness: stroke,
