@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/provider_oauth.dart';
 import '../logging/log_redactor.dart';
+import 'codex_client_version.dart';
 import 'oauth_callback.dart';
 import 'oauth_cancellation.dart';
 import 'oauth_failure.dart';
@@ -15,10 +16,6 @@ import 'oauth_pkce.dart';
 import 'claude_oauth_request.dart';
 
 part 'claude_oauth_adapter.dart';
-
-// OMP 37bb80e3: the backend hides GPT-6.1 Sol from older client versions,
-// independently of the model's advertised minimal_client_version.
-const codexClientVersion = '0.159.0';
 
 class OAuthLoginPrompt {
   const OAuthLoginPrompt({
@@ -186,13 +183,17 @@ abstract class ProviderOAuthAdapter {
   OAuthProvider get provider;
   Duration get tokenRequestTimeout => const Duration(seconds: 30);
 
-  static ProviderOAuthAdapter forProvider(OAuthProvider provider) =>
-      switch (provider) {
-        OAuthProvider.chatgpt => ChatGptOAuthAdapter(),
-        OAuthProvider.grok => GrokOAuthAdapter(),
-        OAuthProvider.kimi => KimiOAuthAdapter(),
-        OAuthProvider.claude => ClaudeOAuthAdapter(),
-      };
+  static ProviderOAuthAdapter forProvider(
+    OAuthProvider provider, {
+    String? codexVersion,
+  }) => switch (provider) {
+    OAuthProvider.chatgpt => ChatGptOAuthAdapter(
+      clientVersion: codexVersion ?? defaultCodexClientVersion,
+    ),
+    OAuthProvider.grok => GrokOAuthAdapter(),
+    OAuthProvider.kimi => KimiOAuthAdapter(),
+    OAuthProvider.claude => ClaudeOAuthAdapter(),
+  };
 
   Map<String, String> headers(ProviderOAuthCredentials credentials) => {
     'Authorization': 'Bearer ${credentials.accessToken}',
@@ -423,6 +424,10 @@ abstract class ProviderOAuthAdapter {
 }
 
 class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
+  ChatGptOAuthAdapter({this.clientVersion = defaultCodexClientVersion});
+
+  final String clientVersion;
+
   @override
   OAuthProvider get provider => OAuthProvider.chatgpt;
 
@@ -435,7 +440,7 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
     if (credentials.accountId case final accountId?)
       'chatgpt-account-id': accountId,
     'originator': 'kelivo',
-    'version': codexClientVersion,
+    'version': clientVersion,
     'User-Agent': 'Kelivo',
   };
 
@@ -615,7 +620,7 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
   ) async {
     final data = await get(
       wire,
-      '${provider.baseUrl}/models?client_version=$codexClientVersion',
+      '${provider.baseUrl}/models?client_version=$clientVersion',
       credentials,
     );
     final entries = data['models'] ?? data['data'];

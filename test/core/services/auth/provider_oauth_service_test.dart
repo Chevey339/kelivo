@@ -12,6 +12,7 @@ import 'dart:io';
 
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/auth/codex_client_version.dart';
 import 'package:Kelivo/core/services/auth/provider_oauth_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_provider.dart';
 import 'package:Kelivo/core/services/api/providers/claude_official.dart';
@@ -545,7 +546,7 @@ void main() {
         final sent = requests.single;
         expect(sent.headers['Authorization'], 'Bearer access');
         expect(sent.headers['chatgpt-account-id'], 'workspace');
-        expect(sent.headers['version'], '0.159.0');
+        expect(sent.headers['version'], defaultCodexClientVersion);
         expect(sent.headers, isNot(contains('openai-beta')));
         expect(
           sent.url.toString(),

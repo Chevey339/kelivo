@@ -104,7 +104,10 @@ class _DetailService extends ProviderOAuthService {
   @override
   ProviderUsageSnapshot? cachedUsage(ProviderConfig config) => usage;
   @override
-  Future<void> syncModels(String id) async {
+  Future<void> syncModels(
+    String id, {
+    bool checkLatestCodexVersion = false,
+  }) async {
     syncCalls++;
     await syncGate?.future;
   }
