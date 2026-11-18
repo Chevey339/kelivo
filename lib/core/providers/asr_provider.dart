@@ -180,7 +180,10 @@ class AsrProvider extends ChangeNotifier {
           localeId: options.localeId.trim().isEmpty ? null : options.localeId,
           onTranscript: (text, _) {
             if (!_isCurrent(session)) return;
-            _transcript = text.trim();
+            final transcript = text.trim();
+            // Keep previously recognized words when a result comes back blank.
+            if (transcript.isEmpty) return;
+            _transcript = transcript;
             notifyListeners();
           },
           onSoundLevel: (level) {

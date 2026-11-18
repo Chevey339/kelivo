@@ -658,6 +658,31 @@ void main() {
     expect(provider.state, AsrSessionState.listening);
   });
 
+  test('system auto-stop keeps the last non-empty transcript', () async {
+    final backend = _FakeSystemAsrBackend()..initialization.complete(true);
+    final provider = AsrProvider(
+      systemService: SystemAsrService(backend: backend),
+    );
+    addTearDown(provider.dispose);
+    final options = SystemAsrOptions();
+
+    await provider.start(options);
+    backend.emitTranscript('partial transcript', false);
+    backend.emitStatus('notListening');
+    backend.emitTranscript('  ', true);
+    backend.emitStatus('done');
+
+    expect(provider.state, AsrSessionState.idle);
+    expect(provider.transcript, 'partial transcript');
+
+    await provider.start(options);
+    backend.emitTranscript('  ', true);
+    backend.emitStatus('done');
+
+    expect(provider.state, AsrSessionState.idle);
+    expect(provider.transcript, isEmpty);
+  });
+
   test(
     'system finish cancels a native session that never reports done',
     () async {
