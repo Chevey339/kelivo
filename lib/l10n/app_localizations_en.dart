@@ -4504,6 +4504,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 hour';
 
   @override
+  String get providerBalanceAutoRefresh => 'Automatic balance refresh';
+
+  @override
+  String get providerBalanceScopeProvider => 'This provider';
+
+  @override
+  String get providerBalanceScopeGlobal => 'Global defaults';
+
+  @override
   String get providerBalanceDefaultInterval =>
       'Default balance refresh interval';
 

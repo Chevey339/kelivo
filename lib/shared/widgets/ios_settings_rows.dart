@@ -28,6 +28,7 @@ class IosNavRow extends StatelessWidget {
     this.labelMaxLines = 1,
     this.iconColor,
     this.haptics = true,
+    this.focusable = false,
   });
 
   final IconData? icon;
@@ -55,6 +56,7 @@ class IosNavRow extends StatelessWidget {
   final int? labelMaxLines;
   final Color? iconColor;
   final bool haptics;
+  final bool focusable;
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +70,8 @@ class IosNavRow extends StatelessWidget {
     return IosCardPress(
       baseColor: Colors.transparent,
       borderRadius: BorderRadius.zero,
-      pressedBlendStrength: 0,
+      pressedBlendStrength: focusable ? null : 0,
+      focusable: focusable,
       pressedScale: 1.0,
       haptics: interactive && haptics,
       onTap: onTap,
@@ -179,6 +182,7 @@ class IosSwitchRow extends StatelessWidget {
     this.iconColor,
     this.subtitle,
     this.labelTrailing,
+    this.focusable = false,
   });
 
   final IconData? icon;
@@ -190,6 +194,7 @@ class IosSwitchRow extends StatelessWidget {
   final VoidCallback? onLongPress;
   final bool destructive;
   final Color? iconColor;
+  final bool focusable;
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +208,8 @@ class IosSwitchRow extends StatelessWidget {
     return IosCardPress(
       baseColor: Colors.transparent,
       borderRadius: BorderRadius.zero,
-      pressedBlendStrength: 0,
+      pressedBlendStrength: focusable ? null : 0,
+      focusable: focusable,
       pressedScale: 1.0,
       haptics: true,
       onTap: () => onChanged(!value),

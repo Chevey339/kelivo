@@ -82,7 +82,8 @@ void main() {
       await _openSelection(tester, models: false);
       await tester.tap(find.byTooltip('Done'));
       await tester.pumpAndSettle();
-      expect(find.text('Default balance refresh interval'), findsOneWidget);
+      expect(find.text('Automatic balance refresh'), findsNothing);
+      expect(find.text('Default balance refresh interval'), findsNothing);
 
       tester.view.physicalSize = const Size(780, 390);
       await tester.pumpAndSettle();
@@ -91,7 +92,6 @@ void main() {
       tester.view.viewInsets = const FakeViewPadding(bottom: 240);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('Default balance refresh interval'), findsNothing);
 
       await tester.enterText(search, 'Test Provider');
       await tester.pumpAndSettle();

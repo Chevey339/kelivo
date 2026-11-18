@@ -4530,6 +4530,15 @@ class AppLocalizationsTr extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 saat';
 
   @override
+  String get providerBalanceAutoRefresh => 'Otomatik bakiye yenileme';
+
+  @override
+  String get providerBalanceScopeProvider => 'Bu sağlayıcı';
+
+  @override
+  String get providerBalanceScopeGlobal => 'Genel varsayılanlar';
+
+  @override
   String get providerBalanceDefaultInterval =>
       'Varsayılan bakiye yenileme aralığı';
 

@@ -377,6 +377,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
         (widget.initialSelectedKey ??
         (ordered.isNotEmpty ? ordered.first.key : null));
     final selectedKey = _selectedKey;
+    final selectedName = cfgs[selectedKey]?.name;
     final rightPane = selectedKey == null
         ? const SizedBox()
         : settings.getProviderConfig(selectedKey).isOAuth
@@ -389,9 +390,13 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
         : DesktopProviderDetailPane(
             key: _detailKey,
             providerKey: selectedKey,
-            displayName: settings.getProviderConfig(selectedKey).name.isNotEmpty
-                ? settings.getProviderConfig(selectedKey).name
-                : selectedKey,
+            displayName: selectedName != null && selectedName.isNotEmpty
+                ? selectedName
+                : ordered
+                          .where((p) => p.key == selectedKey)
+                          .firstOrNull
+                          ?.name ??
+                      selectedKey,
           );
 
     return Container(
@@ -468,8 +473,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const ProviderBalanceRefreshSettings(),
                   const SizedBox(height: 8),
                   Expanded(
                     child: groupingActive
@@ -2267,11 +2270,17 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _IconBtn(
+                    IosIconButton(
                       key: ValueKey(
                         'desktop-provider-settings-${widget.providerKey}',
                       ),
                       icon: lucide.Lucide.Settings,
+                      size: 18,
+                      minSize: 28,
+                      padding: const EdgeInsets.all(5),
+                      tooltip: AppLocalizations.of(
+                        context,
+                      )!.providerDetailPageEditTooltip,
                       onTap: () => _showProviderSettingsDialog(context),
                     ),
                     if (cfg.balanceEnabled == true) ...[
@@ -3159,6 +3168,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                   ),
                                 ),
                               ),
+                              ProviderBalanceRefreshSettings(
+                                providerKey: widget.providerKey,
+                                providerDisplayName: widget.displayName,
+                              ),
                               AnimatedCrossFade(
                                 firstChild: const SizedBox.shrink(),
                                 secondChild: Padding(
@@ -3167,10 +3180,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
-                                      ProviderBalanceRefreshSettings(
-                                        providerKey: widget.providerKey,
-                                      ),
-                                      const SizedBox(height: 12),
                                       row(
                                         l10n.providerDetailPageBalanceApiPathLabel,
                                         TextField(
@@ -6447,7 +6456,7 @@ class _DialogActionButtonState extends State<_DialogActionButton> {
   }
 }
 
-class _ProviderListRow extends StatefulWidget {
+class _ProviderListRow extends StatelessWidget {
   const _ProviderListRow({
     required this.name,
     required this.keyName,
@@ -6470,25 +6479,13 @@ class _ProviderListRow extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onShare;
   final Future<void> Function()? onDelete;
-  @override
-  State<_ProviderListRow> createState() => _ProviderListRowState();
-}
 
-class _ProviderListRowState extends State<_ProviderListRow> {
-  bool _hover = false;
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hoverBg = _hover && !widget.selected
-        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
-        : Colors.transparent;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
+    return Semantics(
+      button: true,
+      selected: selected,
       child: GestureDetector(
-        onTap: widget.onTap,
         onSecondaryTapDown: (details) async {
           final items = <DesktopContextMenuItem>[
             DesktopContextMenuItem(
@@ -6496,23 +6493,23 @@ class _ProviderListRowState extends State<_ProviderListRow> {
               label: AppLocalizations.of(
                 context,
               )!.desktopProviderContextMenuShare,
-              onTap: widget.onShare,
+              onTap: onShare,
             ),
             DesktopContextMenuItem(
               icon: lucide.Lucide.Pencil,
               label: AppLocalizations.of(
                 context,
               )!.providerDetailPageEditTooltip,
-              onTap: widget.onEdit,
+              onTap: onEdit,
             ),
-            if (widget.onDelete != null)
+            if (onDelete != null)
               DesktopContextMenuItem(
                 icon: lucide.Lucide.Trash2,
                 label: AppLocalizations.of(
                   context,
                 )!.providerDetailPageDeleteProviderTooltip,
                 danger: true,
-                onTap: () => widget.onDelete?.call(),
+                onTap: () => onDelete?.call(),
               ),
           ];
           await showDesktopContextMenuAt(
@@ -6521,25 +6518,21 @@ class _ProviderListRowState extends State<_ProviderListRow> {
             items: items,
           );
         },
-        child: AnimatedContainer(
+        child: IosCardPress(
+          focusable: true,
+          haptics: false,
+          onTap: onTap,
           duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: Color.alphaBlend(hoverBg, widget.background),
-            borderRadius: BorderRadius.circular(10),
-          ),
+          baseColor: background,
+          borderRadius: BorderRadius.circular(10),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(
             children: [
-              ProviderAvatar(
-                providerKey: widget.keyName,
-                displayName: widget.name,
-                size: 22,
-              ),
+              ProviderAvatar(providerKey: keyName, displayName: name, size: 22),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  widget.name,
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -6553,9 +6546,9 @@ class _ProviderListRowState extends State<_ProviderListRow> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color:
-                      (widget.needsLogin
+                      (needsLogin
                               ? Theme.of(context).colorScheme.error
-                              : widget.enabled
+                              : enabled
                               ? context.appColors.success
                               : context.appColors.warning)
                           .withValues(alpha: 0.12),
@@ -6563,18 +6556,18 @@ class _ProviderListRowState extends State<_ProviderListRow> {
                   // No border for left list status
                 ),
                 child: Text(
-                  widget.needsLogin
+                  needsLogin
                       ? AppLocalizations.of(context)!.oauthNeedsLogin
-                      : widget.enabled
+                      : enabled
                       ? AppLocalizations.of(context)!.providersPageEnabledStatus
                       : AppLocalizations.of(
                           context,
                         )!.providersPageDisabledStatus,
                   style: TextStyle(
                     fontSize: 11,
-                    color: widget.needsLogin
+                    color: needsLogin
                         ? Theme.of(context).colorScheme.error
-                        : widget.enabled
+                        : enabled
                         ? context.appColors.success
                         : context.appColors.warning,
                     fontWeight: AppFontWeights.emphasis,

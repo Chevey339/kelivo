@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
 import '../../theme/app_font_weights.dart';
 import '../../theme/app_semantic_colors.dart';
+import 'ios_tactile.dart';
 
 class SegmentedTab {
   const SegmentedTab({required this.label, this.icon});
@@ -125,32 +126,25 @@ class SegmentedTabs extends StatelessWidget {
       ],
     );
 
-    return Semantics(
-      button: !radioGroup,
-      selected: radioGroup ? null : selected,
-      checked: radioGroup ? selected : null,
-      inMutuallyExclusiveGroup: radioGroup,
-      enabled: enabled,
-      label: tab.label,
+    return IosCardPress(
+      focusable: true,
+      haptics: false,
       onTap: enabled ? onTap : null,
-      child: ExcludeSemantics(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: enabled ? onTap : null,
-          child: AnimatedContainer(
-            duration: reducedMotion ? Duration.zero : _animDuration,
-            curve: Curves.easeOutCubic,
-            decoration: BoxDecoration(
-              color: selected
-                  ? (selectedColor ?? cs.primary.withValues(alpha: 0.14))
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(innerRadius),
-            ),
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Center(child: content),
-          ),
-        ),
+      duration: reducedMotion ? Duration.zero : _animDuration,
+      baseColor: selected
+          ? (selectedColor ?? cs.primary.withValues(alpha: 0.14))
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(innerRadius),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Semantics(
+        button: !radioGroup,
+        selected: radioGroup ? null : selected,
+        checked: radioGroup ? selected : null,
+        inMutuallyExclusiveGroup: radioGroup,
+        enabled: enabled,
+        label: tab.label,
+        excludeSemantics: true,
+        child: Center(child: content),
       ),
     );
   }

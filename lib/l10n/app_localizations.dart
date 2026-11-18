@@ -8209,7 +8209,25 @@ abstract class AppLocalizations {
   /// **'1 hour'**
   String get providerDetailPageClaudePromptCachingTtl1h;
 
-  /// Providers settings row for the global default interval between automatic account balance queries.
+  /// Expandable row in a provider’s account balance settings that reveals the automatic refresh controls.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic balance refresh'**
+  String get providerBalanceAutoRefresh;
+
+  /// Tab in the automatic balance refresh settings for editing overrides that apply only to the current provider.
+  ///
+  /// In en, this message translates to:
+  /// **'This provider'**
+  String get providerBalanceScopeProvider;
+
+  /// Tab in the automatic balance refresh settings for editing defaults shared across providers.
+  ///
+  /// In en, this message translates to:
+  /// **'Global defaults'**
+  String get providerBalanceScopeGlobal;
+
+  /// Interval row in the Global defaults tab of the account balance settings. Sets the time between automatic queries for providers that inherit this interval.
   ///
   /// In en, this message translates to:
   /// **'Default balance refresh interval'**

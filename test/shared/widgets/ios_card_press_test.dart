@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -137,6 +139,40 @@ void main() {
     await tester.pump();
 
     expect(taps, 1);
+  });
+
+  testWidgets('card exposes only its configured accessibility actions', (
+    tester,
+  ) async {
+    final row = find.semantics.byLabel('row');
+    var taps = 0;
+    var longPresses = 0;
+
+    Future<void> pumpCard({VoidCallback? tap, VoidCallback? longPress}) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: IosCardPress(
+              haptics: false,
+              onTap: tap,
+              onLongPress: longPress,
+              child: const Text('row'),
+            ),
+          ),
+        ),
+      );
+      final data = row.evaluate().single.getSemanticsData();
+      expect(data.hasAction(SemanticsAction.tap), tap != null);
+      expect(data.hasAction(SemanticsAction.longPress), longPress != null);
+    }
+
+    await pumpCard(tap: () => taps++);
+    tester.semantics.tap(row);
+    await pumpCard(longPress: () => longPresses++);
+    tester.semantics.longPress(row);
+    await pumpCard();
+    expect(taps, 1);
+    expect(longPresses, 1);
   });
 
   testWidgets('non-interactive IosCardPress does not swallow a child tap', (

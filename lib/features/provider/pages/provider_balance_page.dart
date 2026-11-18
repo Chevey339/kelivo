@@ -90,9 +90,12 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
               _saveBalance();
             },
           ),
+          const SizedBox(height: 12),
+          ProviderBalanceRefreshSettings(
+            providerKey: widget.providerKey,
+            providerDisplayName: widget.providerDisplayName,
+          ),
           if (_balanceEnabled) ...[
-            const SizedBox(height: 12),
-            ProviderBalanceRefreshSettings(providerKey: widget.providerKey),
             const SizedBox(height: 12),
             _inputRow(
               context,

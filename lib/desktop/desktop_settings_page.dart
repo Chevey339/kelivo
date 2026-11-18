@@ -40,6 +40,7 @@ import 'widgets/desktop_select_dropdown.dart';
 import 'widgets/desktop_adaptive_panes.dart';
 import 'widgets/desktop_labeled_control.dart';
 import '../shared/widgets/ios_switch.dart';
+import '../shared/widgets/ios_tactile.dart' show IosCardPress, IosIconButton;
 import '../shared/widgets/ios_checkbox.dart';
 // Desktop assistants panel dependencies
 import '../features/assistant/pages/assistant_settings_edit_page.dart'

@@ -4561,6 +4561,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 час';
 
   @override
+  String get providerBalanceAutoRefresh => 'Автоматическое обновление баланса';
+
+  @override
+  String get providerBalanceScopeProvider => 'Этот провайдер';
+
+  @override
+  String get providerBalanceScopeGlobal => 'Глобальные значения по умолчанию';
+
+  @override
   String get providerBalanceDefaultInterval =>
       'Интервал обновления баланса по умолчанию';
 

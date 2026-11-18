@@ -14,6 +14,45 @@ import 'package:provider/provider.dart';
 import '../../support/business_test_harness.dart';
 
 void main() {
+  testWidgets('first mobile refresh override preserves a preset display name', (
+    tester,
+  ) async {
+    late SettingsProvider settings;
+    await tester.runAsync(() async {
+      settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+    });
+    addTearDown(settings.dispose);
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: settings,
+        child: const MaterialApp(
+          locale: Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ProviderBalancePage(
+            providerKey: 'Aliyun',
+            providerDisplayName: '阿里云千问',
+          ),
+        ),
+      ),
+    );
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(ProviderBalancePage)),
+    )!;
+    expect(settings.providerConfigs.containsKey('Aliyun'), isFalse);
+    await tester.tap(find.text(l10n.providerBalanceAutoRefresh));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.providerBalanceRefreshOnReply));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.providerBalanceRefreshOn));
+    await tester.pumpAndSettle();
+    final config = settings.providerConfigs['Aliyun']!;
+    expect(config.name, l10n.providersPageAliyunName);
+    expect(config.balanceRefreshOnReply, isTrue);
+    expect(config.balanceEnabled, isNot(true));
+  });
+
   for (final desktop in [false, true]) {
     for (final kind in ProviderKind.values) {
       testWidgets(
@@ -103,7 +142,12 @@ void main() {
           expect(find.byType(ProviderBalanceBadge), findsOneWidget);
           await openSettings();
 
+          final refresh = find.text('Automatic balance refresh');
+          expect(refresh, findsOneWidget);
+          expect(find.text('Balance refresh interval'), findsNothing);
+          expect(find.text('Global defaults'), findsNothing);
           if (kind == ProviderKind.openai) {
+            await tap(refresh);
             await tap(find.text('Balance refresh interval'));
             await tap(find.text('Custom interval…'));
             await enter(
@@ -139,6 +183,8 @@ void main() {
               settings.getProviderConfig('BalanceTest').balanceRefreshOnReply,
               isTrue,
             );
+            expect(settings.balanceRefreshOnReply, isFalse);
+            await tap(refresh);
           }
 
           final editor = find.byType(ProviderBalanceRequestEditor);
@@ -248,6 +294,28 @@ void main() {
           expect(config.customHeaders, [
             {'name': 'X-Chat', 'value': 'chat-only'},
           ]);
+          if (kind == ProviderKind.openai) {
+            await tap(refresh);
+            await tap(find.text('Global defaults'));
+            await tap(find.text('Default balance refresh interval'));
+            await tap(find.text('5 minutes'));
+            await tap(find.text('Refresh balance after each reply'));
+            expect(settings.balanceRefreshInterval, 5);
+            expect(settings.balanceRefreshOnReply, isTrue);
+            config = settings.getProviderConfig('BalanceTest');
+            expect(config.balanceEnabled, isFalse);
+            expect(config.balanceRefreshInterval, isNull);
+            expect(config.balanceRefreshOnReply, isNull);
+
+            await tap(refresh);
+            await tap(refresh);
+            expect(
+              find.text('Follow global setting (5 minutes)'),
+              findsOneWidget,
+            );
+            expect(find.text('Follow global setting (On)'), findsOneWidget);
+            await tap(refresh);
+          }
           await tap(find.byKey(const ValueKey('provider-balance-enabled')));
           expect(tester.widget<SegmentedTabs>(method).index, 0);
           expect(headerName, findsNothing);

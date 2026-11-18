@@ -4,20 +4,101 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/provider_balance_refresh_interval.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/option_sheet.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/segmented_tabs.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
+
+enum _RefreshScope { provider, global }
 
 enum _ReplySetting { inherit, on, off }
 
-class ProviderBalanceRefreshSettings extends StatelessWidget {
-  const ProviderBalanceRefreshSettings({super.key, this.providerKey});
+class ProviderBalanceRefreshSettings extends StatefulWidget {
+  const ProviderBalanceRefreshSettings({
+    super.key,
+    required this.providerKey,
+    required this.providerDisplayName,
+  });
+
+  final String providerKey;
+  final String providerDisplayName;
+
+  @override
+  State<ProviderBalanceRefreshSettings> createState() =>
+      _ProviderBalanceRefreshSettingsState();
+}
+
+class _ProviderBalanceRefreshSettingsState
+    extends State<ProviderBalanceRefreshSettings> {
+  _RefreshScope? _scope;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scope = _scope;
+    return SectionCard(
+      children: [
+        Semantics(
+          button: true,
+          expanded: scope != null,
+          child: IosNavRow(
+            focusable: true,
+            label: l10n.providerBalanceAutoRefresh,
+            labelMaxLines: null,
+            trailing: Icon(
+              scope == null ? Lucide.ChevronDown : Lucide.ChevronUp,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            onTap: () => setState(() {
+              _scope = scope == null ? _RefreshScope.provider : null;
+            }),
+          ),
+        ),
+        if (scope != null) ...[
+          const IosRowDivider(indent: 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+            child: SegmentedTabs(
+              tabs: [
+                SegmentedTab(label: l10n.providerBalanceScopeProvider),
+                SegmentedTab(label: l10n.providerBalanceScopeGlobal),
+              ],
+              index: scope.index,
+              height: 36,
+              radioGroup: true,
+              backgroundColor: context.appColors.surfaceFill,
+              onChanged: (index) => setState(() {
+                _scope = _RefreshScope.values[index];
+              }),
+            ),
+          ),
+          _RefreshOptions(
+            providerKey: scope == _RefreshScope.provider
+                ? widget.providerKey
+                : null,
+            providerDisplayName: widget.providerDisplayName,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _RefreshOptions extends StatelessWidget {
+  const _RefreshOptions({
+    required this.providerKey,
+    required this.providerDisplayName,
+  });
 
   final String? providerKey;
+  final String providerDisplayName;
 
   static const _presets = [0, 1, 5, 15, 30, 60];
   static const _inherit = -1;
@@ -38,7 +119,9 @@ class ProviderBalanceRefreshSettings extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
     final key = providerKey;
-    final config = key == null ? null : settings.getProviderConfig(key);
+    ProviderConfig configFor(String key) =>
+        settings.getProviderConfig(key, defaultName: providerDisplayName);
+    final config = key == null ? null : configFor(key);
     final interval = config == null
         ? settings.balanceRefreshInterval
         : config.balanceRefreshInterval;
@@ -52,9 +135,10 @@ class ProviderBalanceRefreshSettings extends StatelessWidget {
       _replyLabel(l10n, settings.balanceRefreshOnReply),
     );
 
-    return SectionCard(
+    return Column(
       children: [
         IosNavRow(
+          focusable: true,
           label: intervalTitle,
           labelMaxLines: null,
           subtitle: interval == null
@@ -99,7 +183,7 @@ class ProviderBalanceRefreshSettings extends StatelessWidget {
             if (key == null) {
               await settings.setBalanceRefreshInterval(minutes!);
             } else {
-              final current = settings.getProviderConfig(key);
+              final current = configFor(key);
               await settings.setProviderConfig(
                 key,
                 current.copyWith(balanceRefreshInterval: minutes),
@@ -110,12 +194,14 @@ class ProviderBalanceRefreshSettings extends StatelessWidget {
         const IosRowDivider(indent: 12),
         if (key == null)
           IosSwitchRow(
+            focusable: true,
             label: l10n.providerBalanceRefreshOnReply,
             value: settings.balanceRefreshOnReply,
             onChanged: settings.setBalanceRefreshOnReply,
           )
         else
           IosNavRow(
+            focusable: true,
             label: l10n.providerBalanceRefreshOnReply,
             labelMaxLines: null,
             subtitle: switch (config!.balanceRefreshOnReply) {
@@ -148,7 +234,7 @@ class ProviderBalanceRefreshSettings extends StatelessWidget {
                 ],
               );
               if (choice == null || !context.mounted) return;
-              final current = settings.getProviderConfig(key);
+              final current = configFor(key);
               await settings.setProviderConfig(
                 key,
                 current.copyWith(

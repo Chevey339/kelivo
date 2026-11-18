@@ -2131,9 +2131,21 @@
   "providerDetailPageClaudePromptCachingTtlHelp": "5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.",
   "providerDetailPageClaudePromptCachingTtl5m": "5 min",
   "providerDetailPageClaudePromptCachingTtl1h": "1 hour",
+  "providerBalanceAutoRefresh": "Automatic balance refresh",
+  "@providerBalanceAutoRefresh": {
+    "description": "Expandable row in a provider’s account balance settings that reveals the automatic refresh controls."
+  },
+  "providerBalanceScopeProvider": "This provider",
+  "@providerBalanceScopeProvider": {
+    "description": "Tab in the automatic balance refresh settings for editing overrides that apply only to the current provider."
+  },
+  "providerBalanceScopeGlobal": "Global defaults",
+  "@providerBalanceScopeGlobal": {
+    "description": "Tab in the automatic balance refresh settings for editing defaults shared across providers."
+  },
   "providerBalanceDefaultInterval": "Default balance refresh interval",
   "@providerBalanceDefaultInterval": {
-    "description": "Providers settings row for the global default interval between automatic account balance queries."
+    "description": "Interval row in the Global defaults tab of the account balance settings. Sets the time between automatic queries for providers that inherit this interval."
   },
   "providerBalanceInterval": "Balance refresh interval",
   "@providerBalanceInterval": {

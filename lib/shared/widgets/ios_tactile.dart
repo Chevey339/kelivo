@@ -427,10 +427,15 @@ class _IosCardPressState extends State<IosCardPress> {
         if (!_hovered) return;
         setState(() => _hovered = false);
       },
-      child: RawGestureDetector(
-        behavior: HitTestBehavior.opaque,
-        gestures: _gestures,
-        child: painted,
+      child: Semantics(
+        onTap: widget.onTap == null ? null : _handleTap,
+        onLongPress: widget.onLongPress,
+        child: RawGestureDetector(
+          excludeFromSemantics: true,
+          behavior: HitTestBehavior.opaque,
+          gestures: _gestures,
+          child: painted,
+        ),
       ),
     );
     if (!widget.focusable) return interactiveContent;
