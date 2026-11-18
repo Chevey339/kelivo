@@ -318,6 +318,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'Gemini', key: 'Gemini'),
       (name: 'STA1N API', key: 'STA1N API'),
       (name: 'OpenRouter', key: 'OpenRouter'),
+      (name: 'Requesty', key: 'Requesty'),
       (name: 'KelivoIN', key: 'KelivoIN'),
       (name: '10dian-API', key: '10dian-API'),
       (name: 'DeepSeek', key: 'DeepSeek'),

@@ -6,6 +6,8 @@ import '../../providers/settings_provider.dart';
 const String _openRouterAppReferer = 'https://github.com/Chevey339/kelivo';
 const String _openRouterAppTitle = 'Kelivo';
 const String _openRouterAppCategories = 'general-chat';
+const String _requestyAppReferer = 'https://github.com/Chevey339/kelivo';
+const String _requestyAppTitle = 'Kelivo';
 
 /// Resolve once per generation, before retries and tool follow-up rounds.
 Map<String, String>? providerSessionHeaders(
@@ -42,7 +44,19 @@ bool isOpenRouterProvider(ProviderConfig config) {
   return host.contains('openrouter.ai');
 }
 
+bool isRequestyProvider(ProviderConfig config) {
+  final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
+  return host.contains('requesty.ai') ||
+      config.id.toLowerCase().contains('requesty');
+}
+
 Map<String, String> providerDefaultHeaders(ProviderConfig config) {
+  if (isRequestyProvider(config)) {
+    return const <String, String>{
+      'HTTP-Referer': _requestyAppReferer,
+      'X-Title': _requestyAppTitle,
+    };
+  }
   if (!isOpenRouterProvider(config)) return const <String, String>{};
   return const <String, String>{
     'HTTP-Referer': _openRouterAppReferer,

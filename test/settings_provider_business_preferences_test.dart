@@ -207,6 +207,7 @@ void main() {
       const migratedOrder = <String>[
         ...legacyOrder,
         'STA1N API',
+        'Requesty',
         '10dian-API',
         '随想AI中转站',
         'MaruCode',
@@ -241,6 +242,11 @@ void main() {
       expect(maruCode.enabled, isFalse);
       expect(maruCode.providerType, ProviderKind.openai);
       expect(maruCode.baseUrl, 'https://api.muteki.site/v1');
+
+      final requesty = settings.getProviderConfig('Requesty');
+      expect(requesty.enabled, isFalse);
+      expect(requesty.providerType, ProviderKind.openai);
+      expect(requesty.baseUrl, 'https://router.requesty.ai/v1');
 
       final reloaded = SettingsProvider(BusinessPreferences(repository));
       await reloaded.loaded;
