@@ -368,6 +368,7 @@ class ChatApiService {
     RequestImageContext? imageContext,
     RequestHistoryContext? historyContext,
     Duration? requestTimeout,
+    void Function()? onRequestDispatched,
   }) async* {
     final sessionToken = CancelToken();
     final toolCancellation = ToolCallCancellation(
@@ -542,6 +543,7 @@ class ChatApiService {
               useOpenAIImagesApi: useOpenAIImagesApi,
               useZhipuLayoutParsing: useZhipuLayoutParsing,
               sessionToken: sessionToken,
+              onRequestDispatched: onRequestDispatched,
               codexTurnState: codexTurnState,
               retryRound: retryRound,
             ),
@@ -622,6 +624,7 @@ class ChatApiService {
     required bool useOpenAIImagesApi,
     required bool useZhipuLayoutParsing,
     required CancelToken sessionToken,
+    required void Function()? onRequestDispatched,
     required CodexTurnState? codexTurnState,
     required StreamRoundRunner retryRound,
   }) async* {
@@ -632,7 +635,26 @@ class ChatApiService {
     _bridgeCancel(sessionToken, cancelToken);
     final client = ProviderOAuthService.instance.authenticatedClient(
       ModelRequestAttempts.wrap(
-        providerHttpClient(config, cancelToken: cancelToken),
+        providerHttpClient(
+          config,
+          cancelToken: cancelToken,
+          onRequestDispatched: onRequestDispatched == null
+              ? null
+              : (request) {
+                  // Claude can upload code-execution attachments before the
+                  // first Messages request. Only count the model attempt.
+                  final claudeUpload =
+                      kind == ProviderKind.claude &&
+                      request.url.pathSegments.lastOrNull == 'files' &&
+                      request.headers['content-type']?.startsWith(
+                            'multipart/form-data',
+                          ) ==
+                          true;
+                  if (request.method == 'POST' && !claudeUpload) {
+                    onRequestDispatched();
+                  }
+                },
+        ),
       ),
       config,
       codexTurnState: codexTurnState,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../models/assistant.dart';
+import '../models/provider_balance_refresh_interval.dart';
 import 'business_data.dart';
 
 enum BusinessKeyDisposition {
@@ -16,6 +17,9 @@ enum BusinessKeyDisposition {
 
 final class BusinessKeyRegistry {
   BusinessKeyRegistry._();
+
+  static const balanceRefreshIntervalKey = 'balance_refresh_interval_v1';
+  static const balanceRefreshOnReplyKey = 'balance_refresh_on_reply_v1';
 
   static const localOnlyKeys = <String>{
     'window_width_v1',
@@ -57,6 +61,8 @@ final class BusinessKeyRegistry {
     'provider_group_map_v1',
     'provider_group_collapsed_v1',
     'provider_ungrouped_position_v1',
+    balanceRefreshIntervalKey,
+    balanceRefreshOnReplyKey,
     'assistant_tag_map_v1',
     'assistant_tag_collapsed_v1',
     'instruction_injections_active_ids_by_assistant_v1',
@@ -625,6 +631,7 @@ final class BusinessSettingsRouter {
             'multiKeyEnabled',
             'aihubmixAppCodeEnabled',
             'balanceEnabled',
+            'balanceRefreshOnReply',
             'claudePromptCachingEnabled',
           },
           lists: const {'models', 'apiKeys', 'customHeaders', 'customBody'},
@@ -636,6 +643,10 @@ final class BusinessSettingsRouter {
             'requestBudget',
           },
         );
+        final interval = payload['balanceRefreshInterval'];
+        if (interval != null && !isBalanceRefreshInterval(interval)) {
+          throw FormatException(kind.sourceKey);
+        }
         _validateProviderChildren(kind, payload);
         return;
       case BusinessEntityKind.providerGroup:
@@ -1272,6 +1283,11 @@ final class BusinessSettingsRouter {
   }
 
   static Object _validatePreferenceValue(String key, Object value) {
+    if (key == BusinessKeyRegistry.balanceRefreshIntervalKey &&
+            !isBalanceRefreshInterval(value) ||
+        key == BusinessKeyRegistry.balanceRefreshOnReplyKey && value is! bool) {
+      throw FormatException(key);
+    }
     if (value is bool || value is int || value is double || value is String) {
       return value;
     }

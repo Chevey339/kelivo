@@ -4530,6 +4530,56 @@ class AppLocalizationsTr extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 saat';
 
   @override
+  String get providerBalanceDefaultInterval =>
+      'Varsayılan bakiye yenileme aralığı';
+
+  @override
+  String get providerBalanceInterval => 'Bakiye yenileme aralığı';
+
+  @override
+  String get providerBalanceRefreshOnReply =>
+      'Her yanıttan sonra bakiyeyi yenile';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return 'Genel ayarı takip et ($value)';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => 'Kapalı';
+
+  @override
+  String get providerBalanceRefreshOn => 'Açık';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dakika',
+      one: '1 dakika',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 saat';
+
+  @override
+  String get providerBalanceCustomInterval => 'Özel aralık…';
+
+  @override
+  String get providerBalanceIntervalMinutes => 'Dakika cinsinden aralık';
+
+  @override
+  String get providerBalanceRefreshNow => 'Bakiyeyi şimdi yenile';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return 'Son güncelleme: $date $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => 'Hesap Bakiyesi';
 
   @override

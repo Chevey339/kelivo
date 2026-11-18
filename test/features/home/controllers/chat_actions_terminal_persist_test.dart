@@ -30,6 +30,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../support/business_test_harness.dart';
 
+class _BalanceRecordingSettings extends SettingsProvider {
+  _BalanceRecordingSettings() : super(createBusinessTestPreferences());
+
+  final balanceReplies = <String>[];
+
+  @override
+  void refreshBalanceAfterReply(String providerKey) =>
+      balanceReplies.add(providerKey);
+}
+
 class _ThrowingFinalizeChatService extends ChatService {
   _ThrowingFinalizeChatService({this.failCompletion = true});
   final bool failCompletion;
@@ -177,12 +187,17 @@ void main() {
     expect(closed, isTrue);
   });
 
-  for (final terminal in ['complete', 'error', 'cancel']) {
+  for (final terminal in [
+    'complete',
+    'error',
+    'cancel',
+    'cancel before request',
+  ]) {
     testWidgets('empty reasoning stops on $terminal without an end event', (
       tester,
     ) async {
       final service = _ThrowingFinalizeChatService(failCompletion: false);
-      final settings = SettingsProvider(createBusinessTestPreferences());
+      final settings = _BalanceRecordingSettings();
       final background = MobileBackgroundCoordinator(
         platform: TargetPlatform.linux,
       );
@@ -210,35 +225,38 @@ void main() {
         ),
       );
       addTearDown(actions.streamController.dispose);
-      final state = StreamingState(
-        GenerationContext(
-          assistantMessage: ChatMessage(
-            id: 'empty-reasoning',
-            role: 'assistant',
-            conversationId: 'conversation-1',
-            isStreaming: true,
-          ),
-          apiMessages: const [],
-          userImagePaths: const [],
-          allowImagesApiRouting: false,
-          providerKey: 'test',
-          modelId: 'test',
-          assistant: null,
-          settings: settings,
-          config: ProviderConfig(
-            id: 'test',
-            enabled: true,
-            name: 'test',
-            apiKey: '',
-            baseUrl: '',
-          ),
-          toolDefs: const [],
-          supportsReasoning: true,
-          enableReasoning: true,
-          streamOutput: true,
-          generateTitleOnFinish: false,
-        ),
-      )..requestStartedAt = DateTime.now();
+      final state =
+          StreamingState(
+              GenerationContext(
+                assistantMessage: ChatMessage(
+                  id: 'empty-reasoning',
+                  role: 'assistant',
+                  conversationId: 'conversation-1',
+                  isStreaming: true,
+                ),
+                apiMessages: const [],
+                userImagePaths: const [],
+                allowImagesApiRouting: false,
+                providerKey: 'test',
+                modelId: 'test',
+                assistant: null,
+                settings: settings,
+                config: ProviderConfig(
+                  id: 'test',
+                  enabled: true,
+                  name: 'test',
+                  apiKey: '',
+                  baseUrl: '',
+                ),
+                toolDefs: const [],
+                supportsReasoning: true,
+                enableReasoning: true,
+                streamOutput: true,
+                generateTitleOnFinish: false,
+              ),
+            )
+            ..requestStartedAt = DateTime.now()
+            ..requestDispatched = terminal != 'cancel before request';
       actions.streamController.markStreamingStarted(state.messageId);
       // Exercise multiple open items so terminal cleanup cannot leave an older
       // item active just because the last one was closed.
@@ -261,15 +279,22 @@ void main() {
             StateError('stream failed'),
             state,
           );
-        case 'cancel':
+        case 'cancel' || 'cancel before request':
           actions.debugTrackActiveMessage(
             state.ctx.assistantMessage.copyWith(
               parts: state.partsHandler.parts,
             ),
             state: state,
           );
-          await actions.cancelStreamingById(state.conversationId);
+          await actions.cancelStreamingById(
+            state.conversationId,
+            userRequested: true,
+          );
       }
+      expect(
+        settings.balanceReplies,
+        terminal == 'complete' || terminal == 'cancel' ? ['test'] : isEmpty,
+      );
       expect(segments.every((segment) => segment.finishedAt != null), isTrue);
       final saved = service.lastMessage!;
       expect(saved.isStreaming, isFalse);

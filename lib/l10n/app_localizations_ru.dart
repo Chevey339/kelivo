@@ -4561,6 +4561,58 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 час';
 
   @override
+  String get providerBalanceDefaultInterval =>
+      'Интервал обновления баланса по умолчанию';
+
+  @override
+  String get providerBalanceInterval => 'Интервал обновления баланса';
+
+  @override
+  String get providerBalanceRefreshOnReply =>
+      'Обновлять баланс после каждого ответа';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return 'Как в глобальных настройках ($value)';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => 'Выкл.';
+
+  @override
+  String get providerBalanceRefreshOn => 'Вкл.';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count минуты',
+      many: '$count минут',
+      few: '$count минуты',
+      one: '$count минута',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 час';
+
+  @override
+  String get providerBalanceCustomInterval => 'Свой интервал…';
+
+  @override
+  String get providerBalanceIntervalMinutes => 'Интервал в минутах';
+
+  @override
+  String get providerBalanceRefreshNow => 'Обновить баланс сейчас';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return 'Последнее обновление: $date в $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => 'Баланс аккаунта';
 
   @override

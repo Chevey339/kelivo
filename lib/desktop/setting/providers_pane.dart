@@ -469,6 +469,8 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  const ProviderBalanceRefreshSettings(),
+                  const SizedBox(height: 8),
                   Expanded(
                     child: groupingActive
                         ? ReorderableListView.builder(
@@ -2504,12 +2506,13 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     if (_balanceLoading) return;
     final sp = context.read<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
+    final providerKey = widget.providerKey;
     setState(() {
       _balanceLoading = true;
     });
     try {
       final old = sp.getProviderConfig(
-        widget.providerKey,
+        providerKey,
         defaultName: widget.displayName,
       );
       final updated = old.copyWith(
@@ -2517,10 +2520,12 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
         balanceResultPath: _balanceResultPathCtrl.text.trim(),
         balanceBody: _balanceBodyCtrl.text,
       );
-      await sp.setProviderConfig(widget.providerKey, updated);
-      ProviderBalanceBadge.clearCacheFor(widget.providerKey);
-      final value = await ProviderBalanceService.fetchBalance(updated);
-      if (!mounted) return;
+      await sp.setProviderConfig(providerKey, updated);
+      if (!mounted || !context.mounted || providerKey != widget.providerKey) {
+        return;
+      }
+      final value = await sp.balanceRefresh.forProvider(providerKey).query();
+      if (!mounted || providerKey != widget.providerKey) return;
       if (context.mounted) {
         showAppSnackBar(
           context,
@@ -2529,7 +2534,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
         );
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || providerKey != widget.providerKey) return;
       if (context.mounted) {
         showAppSnackBar(
           context,
@@ -3149,9 +3154,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                         widget.providerKey,
                                         old.copyWith(balanceEnabled: v),
                                       );
-                                      ProviderBalanceBadge.clearCacheFor(
-                                        widget.providerKey,
-                                      );
                                       if (mounted) setState(() {});
                                     },
                                   ),
@@ -3165,6 +3167,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
+                                      ProviderBalanceRefreshSettings(
+                                        providerKey: widget.providerKey,
+                                      ),
+                                      const SizedBox(height: 12),
                                       row(
                                         l10n.providerDetailPageBalanceApiPathLabel,
                                         TextField(
@@ -3197,9 +3203,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                         .trim(),
                                               ),
                                             );
-                                            ProviderBalanceBadge.clearCacheFor(
-                                              widget.providerKey,
-                                            );
                                           },
                                         ),
                                       ),
@@ -3216,9 +3219,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                             widget.providerKey,
                                             old.copyWith(balanceMethod: value),
                                           );
-                                          ProviderBalanceBadge.clearCacheFor(
-                                            widget.providerKey,
-                                          );
                                         },
                                         onHeadersChanged: (headers) async {
                                           final old = spWatch.getProviderConfig(
@@ -3229,9 +3229,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                             old.copyWith(
                                               balanceHeaders: headers,
                                             ),
-                                          );
-                                          ProviderBalanceBadge.clearCacheFor(
-                                            widget.providerKey,
                                           );
                                         },
                                         onBodyChanged: (_) async {
@@ -3244,9 +3241,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                               balanceBody:
                                                   _balanceBodyCtrl.text,
                                             ),
-                                          );
-                                          ProviderBalanceBadge.clearCacheFor(
-                                            widget.providerKey,
                                           );
                                         },
                                       ),
@@ -3283,9 +3277,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                         .trim(),
                                               ),
                                             );
-                                            ProviderBalanceBadge.clearCacheFor(
-                                              widget.providerKey,
-                                            );
                                           },
                                         ),
                                       ),
@@ -3312,6 +3303,8 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                     displayName:
                                                         widget.displayName,
                                                     color: cs.primary,
+                                                    showManualResultWhenDisabled:
+                                                        true,
                                                   ),
                                                 ),
                                               ),
@@ -3372,10 +3365,11 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                           _balanceResultPathCtrl
                                                               .text
                                                               .trim(),
+                                                      balanceRefreshInterval:
+                                                          null,
+                                                      balanceRefreshOnReply:
+                                                          null,
                                                     ),
-                                                  );
-                                                  ProviderBalanceBadge.clearCacheFor(
-                                                    widget.providerKey,
                                                   );
                                                   if (mounted) {
                                                     setState(() {});

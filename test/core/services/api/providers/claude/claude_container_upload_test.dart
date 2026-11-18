@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_container.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_files.dart';
 import 'package:Kelivo/core/services/api/providers/claude_official.dart';
@@ -174,6 +175,44 @@ void main() {
       'file_sales.csv',
     ]);
   });
+
+  test(
+    'Claude data uploads do not count as dispatching a model request',
+    () async {
+      final paths = <String>[];
+      final dispatchedAfter = <int>[];
+      final proxy = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => proxy.close(force: true));
+      proxy.listen((request) async {
+        await request.drain<void>();
+        final path = request.uri.path;
+        paths.add(path);
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          path == '/v1/files'
+              ? '{"id":"file_${paths.length}"}'
+              : _messagesResponse(),
+        );
+        await request.response.close();
+      });
+      final config = _officialClaude().copyWith(
+        baseUrl: 'http://api.anthropic.com/v1',
+        proxyEnabled: true,
+        proxyHost: proxy.address.address,
+        proxyPort: proxy.port.toString(),
+      );
+      await ChatApiService.sendMessageStream(
+        config: config,
+        modelId: _model,
+        messages: conversation(),
+        stream: false,
+        onRequestDispatched: () => dispatchedAfter.add(paths.length),
+      ).toList();
+
+      expect(paths, ['/v1/files', '/v1/files', '/v1/messages']);
+      expect(dispatchedAfter, [2]);
+    },
+  );
 
   test('a client tool named code_execution keeps the files out', () async {
     final api = fakeApi();

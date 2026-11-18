@@ -15,6 +15,7 @@ import 'features/migration/hive_to_sqlite_migration_page.dart';
 import 'features/migration/hive_to_sqlite_migration_service.dart';
 import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
 import 'desktop/desktop_startup_service.dart';
@@ -231,6 +232,8 @@ Future<void> main(List<String> arguments) async {
     () async {
       try {
         WidgetsFlutterBinding.ensureInitialized();
+        // Balance polling follows the badge's visibility after each frame.
+        VisibilityDetectorController.instance.updateInterval = Duration.zero;
         await DesktopStartupService.prepareLaunch(arguments);
         WindowsPasteFix.instance.install();
         AndroidImeSelection.instance.install();

@@ -5,6 +5,7 @@ import 'package:Kelivo/features/provider/pages/provider_detail_page.dart';
 import 'package:Kelivo/features/provider/widgets/provider_balance_badge.dart';
 import 'package:Kelivo/features/provider/widgets/provider_balance_request_editor.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -101,6 +102,44 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.byType(ProviderBalanceBadge), findsOneWidget);
           await openSettings();
+
+          if (kind == ProviderKind.openai) {
+            await tap(find.text('Balance refresh interval'));
+            await tap(find.text('Custom interval…'));
+            await enter(
+              find.descendant(
+                of: find.byKey(
+                  const ValueKey('provider-balance-custom-interval'),
+                ),
+                matching: find.byType(TextField),
+              ),
+              '10',
+            );
+            await tap(find.widgetWithText(IosTextButton, 'Save'));
+            expect(
+              settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
+              10,
+            );
+            await tap(find.text('Balance refresh interval'));
+            await tap(find.text('Off'));
+            expect(
+              settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
+              0,
+            );
+            await tap(find.text('Balance refresh interval'));
+            await tap(find.text('Follow global setting (Off)').hitTestable());
+            expect(
+              settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
+              isNull,
+            );
+
+            await tap(find.text('Refresh balance after each reply'));
+            await tap(find.text('On'));
+            expect(
+              settings.getProviderConfig('BalanceTest').balanceRefreshOnReply,
+              isTrue,
+            );
+          }
 
           final editor = find.byType(ProviderBalanceRequestEditor);
           Finder inEditor(String key) =>
@@ -204,6 +243,7 @@ void main() {
           expect(config.balanceMethod, 'GET');
           expect(config.balanceHeaders, isEmpty);
           expect(config.balanceBody, isEmpty);
+          expect(config.balanceRefreshOnReply, isNull);
           expect(config.providerType, kind);
           expect(config.customHeaders, [
             {'name': 'X-Chat', 'value': 'chat-only'},
@@ -217,6 +257,9 @@ void main() {
           await tester.pumpWidget(const SizedBox());
           await tester.runAsync(() async => await settings.loaded);
         },
+        variant: TargetPlatformVariant({
+          desktop ? TargetPlatform.macOS : TargetPlatform.android,
+        }),
       );
     }
   }

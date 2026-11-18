@@ -4326,6 +4326,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 小时';
 
   @override
+  String get providerBalanceDefaultInterval => '余额默认刷新间隔';
+
+  @override
+  String get providerBalanceInterval => '余额刷新间隔';
+
+  @override
+  String get providerBalanceRefreshOnReply => '模型每次回复后刷新余额';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return '跟随全局设置（当前：$value）';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => '关闭';
+
+  @override
+  String get providerBalanceRefreshOn => '开启';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 小时';
+
+  @override
+  String get providerBalanceCustomInterval => '自定义间隔…';
+
+  @override
+  String get providerBalanceIntervalMinutes => '间隔分钟数';
+
+  @override
+  String get providerBalanceRefreshNow => '立即刷新余额';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return '最后更新于 $date $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => '账户余额';
 
   @override
@@ -20825,6 +20867,48 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageClaudePromptCachingTtl1h => '1 小时';
+
+  @override
+  String get providerBalanceDefaultInterval => '余额默认刷新间隔';
+
+  @override
+  String get providerBalanceInterval => '余额刷新间隔';
+
+  @override
+  String get providerBalanceRefreshOnReply => '模型每次回复后刷新余额';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return '跟随全局设置（当前：$value）';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => '关闭';
+
+  @override
+  String get providerBalanceRefreshOn => '开启';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 小时';
+
+  @override
+  String get providerBalanceCustomInterval => '自定义间隔…';
+
+  @override
+  String get providerBalanceIntervalMinutes => '间隔分钟数';
+
+  @override
+  String get providerBalanceRefreshNow => '立即刷新余额';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return '最后更新于 $date $time';
+  }
 
   @override
   String get providerDetailPageBalanceTitle => '账户余额';
@@ -37331,6 +37415,48 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageClaudePromptCachingTtl1h => '1 小時';
+
+  @override
+  String get providerBalanceDefaultInterval => '餘額預設重新整理間隔';
+
+  @override
+  String get providerBalanceInterval => '餘額重新整理間隔';
+
+  @override
+  String get providerBalanceRefreshOnReply => '模型每次回覆後重新整理餘額';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return '跟隨全域設定（$value）';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => '關閉';
+
+  @override
+  String get providerBalanceRefreshOn => '開啟';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    return '$count 分鐘';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 小時';
+
+  @override
+  String get providerBalanceCustomInterval => '自訂間隔…';
+
+  @override
+  String get providerBalanceIntervalMinutes => '間隔分鐘數';
+
+  @override
+  String get providerBalanceRefreshNow => '立即重新整理餘額';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return '最後更新於 $date $time';
+  }
 
   @override
   String get providerDetailPageBalanceTitle => '帳戶餘額';

@@ -25,12 +25,18 @@ void main() {
     });
 
     final token = CancelToken();
-    final client = DioHttpClient(cancelToken: token, logRequests: false);
+    var dispatches = 0;
+    final client = DioHttpClient(
+      cancelToken: token,
+      logRequests: false,
+      onRequestDispatched: (_) => dispatches++,
+    );
     addTearDown(client.close);
     final response = client.get(
       Uri.parse('https://127.0.0.1:${server.port}/stalled'),
     );
     await clientHello.future.timeout(const Duration(seconds: 3));
+    expect(dispatches, 1);
     token.cancel('stop during TLS');
     await expectLater(
       response.timeout(const Duration(seconds: 1)),
@@ -42,6 +48,28 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('cancellation during request body preparation skips dispatch', () async {
+    final token = CancelToken();
+    var dispatches = 0;
+    final client = DioHttpClient(
+      cancelToken: token,
+      logRequests: false,
+      onRequestDispatched: (_) => dispatches++,
+    );
+    addTearDown(client.close);
+    final request = http.StreamedRequest(
+      'POST',
+      Uri.http('127.0.0.1:1', '/chat'),
+    );
+    final response = client.send(request);
+    expect(dispatches, 0);
+    token.cancel('stop during preparation');
+    final failed = expectLater(response, throwsA(isA<http.ClientException>()));
+    await request.sink.close();
+    await failed;
+    expect(dispatches, 0);
   });
 
   test('a terminated TLS handshake reports one client exception', () async {

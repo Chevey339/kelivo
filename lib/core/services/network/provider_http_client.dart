@@ -10,6 +10,7 @@ http.Client providerHttpClient(
   ProviderConfig config, {
   CancelToken? cancelToken,
   bool logRequests = true,
+  void Function(http.BaseRequest)? onRequestDispatched,
 }) {
   final host = (config.proxyHost ?? '').trim();
   final port = (config.proxyPort ?? '').trim();
@@ -27,7 +28,12 @@ http.Client providerHttpClient(
       ),
       cancelToken: cancelToken,
       logRequests: logRequests,
+      onRequestDispatched: onRequestDispatched,
     );
   }
-  return DioHttpClient(cancelToken: cancelToken, logRequests: logRequests);
+  return DioHttpClient(
+    cancelToken: cancelToken,
+    logRequests: logRequests,
+    onRequestDispatched: onRequestDispatched,
+  );
 }

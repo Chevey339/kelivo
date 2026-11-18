@@ -4504,6 +4504,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 hour';
 
   @override
+  String get providerBalanceDefaultInterval =>
+      'Default balance refresh interval';
+
+  @override
+  String get providerBalanceInterval => 'Balance refresh interval';
+
+  @override
+  String get providerBalanceRefreshOnReply =>
+      'Refresh balance after each reply';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return 'Follow global setting ($value)';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => 'Off';
+
+  @override
+  String get providerBalanceRefreshOn => 'On';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes',
+      one: '1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1 hour';
+
+  @override
+  String get providerBalanceCustomInterval => 'Custom interval…';
+
+  @override
+  String get providerBalanceIntervalMinutes => 'Interval in minutes';
+
+  @override
+  String get providerBalanceRefreshNow => 'Refresh balance now';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return 'Last updated $date at $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => 'Account Balance';
 
   @override

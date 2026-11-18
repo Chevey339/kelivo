@@ -25,6 +25,7 @@ class IosNavRow extends StatelessWidget {
     this.onLongPress,
     this.destructive = false,
     this.labelWeight,
+    this.labelMaxLines = 1,
     this.iconColor,
     this.haptics = true,
   });
@@ -51,6 +52,7 @@ class IosNavRow extends StatelessWidget {
   /// `null` matches Backup (no weight). World Book rows pass
   /// [AppFontWeights.medium].
   final FontWeight? labelWeight;
+  final int? labelMaxLines;
   final Color? iconColor;
   final bool haptics;
 
@@ -93,7 +95,7 @@ class IosNavRow extends StatelessWidget {
                         color: baseColor,
                         fontWeight: labelWeight,
                       ),
-                      maxLines: labelTrailing == null ? 1 : null,
+                      maxLines: labelTrailing == null ? labelMaxLines : null,
                       overflow: labelTrailing == null
                           ? TextOverflow.ellipsis
                           : TextOverflow.visible,
@@ -109,7 +111,9 @@ class IosNavRow extends StatelessWidget {
                             color: baseColor,
                             fontWeight: labelWeight,
                           ),
-                          maxLines: labelTrailing == null ? 1 : null,
+                          maxLines: labelTrailing == null
+                              ? labelMaxLines
+                              : null,
                           overflow: labelTrailing == null
                               ? TextOverflow.ellipsis
                               : TextOverflow.visible,

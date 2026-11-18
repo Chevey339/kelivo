@@ -24,6 +24,7 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/selection_back_scope.dart';
 import '../widgets/provider_avatar.dart';
+import '../widgets/provider_balance_refresh_settings.dart';
 import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
 import '../../../theme/app_font_weights.dart';
@@ -248,6 +249,16 @@ class _ProvidersPageState extends State<ProvidersPage> {
                   _searchController.clear();
                   setState(() => _searchQuery = '');
                 },
+              ),
+              Visibility(
+                visible:
+                    _searchQuery.isEmpty &&
+                    MediaQuery.viewInsetsOf(context).bottom == 0,
+                maintainState: true,
+                child: const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: ProviderBalanceRefreshSettings(),
+                ),
               ),
               Expanded(
                 child: !groupingActive

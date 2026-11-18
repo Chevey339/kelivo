@@ -35,7 +35,6 @@ import '../core/services/logging/flutter_logger.dart';
 import '../core/services/model_catalog/model_catalog_service.dart';
 import '../core/services/model_spec/model_spec_resolver.dart';
 import '../core/services/linux_window_service.dart';
-import '../core/services/provider_balance_service.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';
 import 'widgets/desktop_adaptive_panes.dart';
@@ -99,6 +98,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../features/provider/widgets/provider_avatar.dart';
 import '../features/provider/widgets/provider_balance_badge.dart';
+import '../features/provider/widgets/provider_balance_refresh_settings.dart';
 import '../features/provider/widgets/provider_balance_request_editor.dart';
 import '../features/provider/widgets/provider_custom_request_editor.dart';
 import '../features/provider/widgets/share_provider_sheet.dart'

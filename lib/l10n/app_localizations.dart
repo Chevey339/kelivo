@@ -8209,6 +8209,78 @@ abstract class AppLocalizations {
   /// **'1 hour'**
   String get providerDetailPageClaudePromptCachingTtl1h;
 
+  /// Providers settings row for the global default interval between automatic account balance queries.
+  ///
+  /// In en, this message translates to:
+  /// **'Default balance refresh interval'**
+  String get providerBalanceDefaultInterval;
+
+  /// Row in a provider account balance editor for overriding its periodic refresh interval.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance refresh interval'**
+  String get providerBalanceInterval;
+
+  /// Global and provider settings label. An account balance query becomes due after a final model reply.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh balance after each reply'**
+  String get providerBalanceRefreshOnReply;
+
+  /// Provider override option that inherits the global setting. The value is the currently effective interval or the localized on/off state.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow global setting ({value})'**
+  String providerBalanceFollowDefault(String value);
+
+  /// Option disabling the selected balance refresh trigger, either the periodic interval or refresh after replies.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get providerBalanceRefreshOff;
+
+  /// Provider override option that enables refreshing the account balance after replies.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get providerBalanceRefreshOn;
+
+  /// Account balance refresh interval displayed as a number of whole minutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
+  String providerBalanceRefreshMinutes(int count);
+
+  /// Preset selection for querying the account balance every one hour.
+  ///
+  /// In en, this message translates to:
+  /// **'1 hour'**
+  String get providerBalanceRefreshHour;
+
+  /// Option that opens the dialog for entering a custom balance refresh interval.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom interval…'**
+  String get providerBalanceCustomInterval;
+
+  /// Numeric field label in the custom account balance refresh interval dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Interval in minutes'**
+  String get providerBalanceIntervalMinutes;
+
+  /// Action in the account balance badge context menu to query the provider immediately.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh balance now'**
+  String get providerBalanceRefreshNow;
+
+  /// Balance badge tooltip showing the date and time of the most recent successful query. Both placeholders are already localized.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated {date} at {time}'**
+  String providerBalanceLastUpdated(String date, String time);
+
   /// Title of the account balance page and a row label opening balance settings.
   ///
   /// In en, this message translates to:

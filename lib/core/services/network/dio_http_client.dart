@@ -90,6 +90,7 @@ class DioHttpClient extends http.BaseClient {
     CancelToken? cancelToken,
     Duration? timeout,
     this.logRequests = true,
+    this.onRequestDispatched,
     HttpClientAdapter? adapter,
   }) : _cancelToken = cancelToken ?? CancelToken(),
        _options = BaseOptions(
@@ -162,6 +163,7 @@ class DioHttpClient extends http.BaseClient {
   }
 
   final bool logRequests;
+  final void Function(http.BaseRequest)? onRequestDispatched;
   final BaseOptions _options;
   late final HttpClientAdapter _adapter;
   final NetworkProxyConfig? _proxy;
@@ -234,6 +236,7 @@ class DioHttpClient extends http.BaseClient {
       // Dio's high-level response handler eagerly drains the socket into an
       // unbounded controller. Its public adapter preserves the transport and
       // proxy/timeout implementation while letting our consumer own demand.
+      onRequestDispatched?.call(request);
       final resp = await _awaitResponseOrCancel(
         _adapter.fetch(
           options,

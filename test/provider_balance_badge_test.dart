@@ -5,8 +5,10 @@ import 'package:Kelivo/core/models/api_keys.dart';
 import 'package:Kelivo/features/provider/widgets/provider_balance_badge.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 import 'support/business_test_harness.dart';
 
@@ -23,10 +25,29 @@ class _CountingHttpOverrides extends HttpOverrides {
 Future<void> _settleBalance(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 600));
+  // Business preference writes run in a real async zone, where their balance
+  // configuration listeners also arm the debounce timer.
+  await tester.runAsync(
+    () => Future<void>.delayed(const Duration(milliseconds: 550)),
+  );
   await tester.pumpAndSettle();
 }
 
 void main() {
+  setUp(() {
+    const channel = MethodChannel('dev.fluttercommunity.plus/connectivity');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async => ['wifi']);
+    final controller = VisibilityDetectorController.instance;
+    final interval = controller.updateInterval;
+    controller.updateInterval = Duration.zero;
+    addTearDown(() => controller.updateInterval = interval);
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+  });
+
   for (final kind in ProviderKind.values) {
     testWidgets(
       '${kind.name} only automatically queries balance while provider is enabled',
@@ -35,8 +56,6 @@ void main() {
         final previousOverrides = HttpOverrides.current;
         HttpOverrides.global = overrides;
         addTearDown(() => HttpOverrides.global = previousOverrides);
-        ProviderBalanceBadge.clearCacheFor('MaruCode');
-        addTearDown(() => ProviderBalanceBadge.clearCacheFor('MaruCode'));
 
         late SettingsProvider settings;
         await tester.runAsync(() async {
@@ -105,6 +124,80 @@ void main() {
     );
   }
 
+  testWidgets('mounted badges pause while their pane is offstage', (
+    tester,
+  ) async {
+    final overrides = _CountingHttpOverrides();
+    final previousOverrides = HttpOverrides.current;
+    HttpOverrides.global = overrides;
+    addTearDown(() => HttpOverrides.global = previousOverrides);
+    final visible = ValueNotifier(true);
+    addTearDown(visible.dispose);
+    const providerKey = 'VisibleBalance';
+
+    late SettingsProvider settings;
+    await tester.runAsync(() async {
+      final harness = await createBusinessTestHarness();
+      settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      await settings.setProviderConfig(
+        providerKey,
+        ProviderConfig(
+          id: providerKey,
+          name: providerKey,
+          enabled: true,
+          apiKey: 'key',
+          baseUrl: 'https://example.test',
+          balanceEnabled: true,
+          balanceRefreshOnReply: true,
+        ),
+      );
+    });
+    addTearDown(settings.dispose);
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: settings,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ValueListenableBuilder(
+              valueListenable: visible,
+              child: const Row(
+                children: [
+                  ProviderBalanceBadge(
+                    providerKey: providerKey,
+                    displayName: providerKey,
+                  ),
+                  ProviderBalanceBadge(
+                    providerKey: providerKey,
+                    displayName: providerKey,
+                  ),
+                ],
+              ),
+              builder: (context, visible, child) =>
+                  Offstage(offstage: !visible, child: child),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(overrides.attempts, 1);
+    visible.value = false;
+    await tester.pump();
+    settings.refreshBalanceAfterReply(providerKey);
+    await tester.pump(const Duration(minutes: 1));
+    expect(overrides.attempts, 1);
+
+    visible.value = true;
+    await tester.pump();
+    await tester.pump(Duration.zero);
+    expect(overrides.attempts, 2);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'refreshes for request edits, coalesces typing and cancels on dispose',
     (tester) async {
@@ -112,8 +205,6 @@ void main() {
       final previousOverrides = HttpOverrides.current;
       HttpOverrides.global = overrides;
       addTearDown(() => HttpOverrides.global = previousOverrides);
-      ProviderBalanceBadge.clearCacheFor('BalanceRefresh');
-      addTearDown(() => ProviderBalanceBadge.clearCacheFor('BalanceRefresh'));
 
       late SettingsProvider settings;
       await tester.runAsync(() async {

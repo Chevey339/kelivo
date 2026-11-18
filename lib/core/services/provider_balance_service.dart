@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io' show HttpException;
 
+import 'package:collection/collection.dart';
+import 'package:dio/dio.dart' show CancelToken;
 import 'package:http/http.dart' as http;
 
+import '../models/api_keys.dart';
 import '../providers/settings_provider.dart';
 import 'api/provider_request_headers.dart';
-import 'api_key_manager.dart';
 import 'network/provider_http_client.dart';
 
 class ProviderBalanceException implements Exception {
@@ -99,14 +101,42 @@ class ProviderBalanceValueParser {
 class ProviderBalanceService {
   const ProviderBalanceService._();
 
-  static Future<String> fetchBalance(ProviderConfig config) async {
+  static bool sameRequest(ProviderConfig previous, ProviderConfig current) =>
+      const DeepCollectionEquality().equals(
+        _requestSettings(previous),
+        _requestSettings(current),
+      );
+
+  static List<Object?> _requestSettings(ProviderConfig config) => [
+    config.baseUrl,
+    config.balanceApiPath,
+    config.balanceResultPath,
+    config.balanceMethod,
+    config.balanceHeaders,
+    config.balanceBody,
+    _effectiveApiKey(config),
+    providerDefaultHeaders(config),
+    config.proxyEnabled,
+    config.proxyType,
+    config.proxyHost,
+    config.proxyPort,
+    config.proxyUsername,
+    config.proxyPassword,
+  ];
+
+  static Uri balanceUri(ProviderConfig config) =>
+      _balanceUri(config.baseUrl, (config.balanceApiPath ?? '/credits').trim());
+
+  static Future<String> fetchBalance(
+    ProviderConfig config, {
+    CancelToken? cancelToken,
+  }) async {
     if (config.balanceEnabled != true) {
       throw const ProviderBalanceException('Balance query is disabled');
     }
 
-    final apiPath = (config.balanceApiPath ?? '/credits').trim();
     final resultPath = (config.balanceResultPath ?? 'data.total_usage').trim();
-    final uri = _balanceUri(config.baseUrl, apiPath);
+    final uri = balanceUri(config);
     final method = config.balanceMethod;
     if (method != 'GET' && method != 'POST') {
       throw ProviderBalanceException(
@@ -114,7 +144,11 @@ class ProviderBalanceService {
       );
     }
     // Custom balance payloads can contain credentials under arbitrary names.
-    final client = providerHttpClient(config, logRequests: false);
+    final client = providerHttpClient(
+      config,
+      cancelToken: cancelToken,
+      logRequests: false,
+    );
     try {
       final apiKey = _effectiveApiKey(config);
       final request = http.Request(method, uri);
@@ -180,10 +214,18 @@ class ProviderBalanceService {
   }
 
   static String _effectiveApiKey(ProviderConfig config) {
-    if (config.multiKeyEnabled == true &&
-        (config.apiKeys?.isNotEmpty == true)) {
-      final selected = ApiKeyManager().selectForProvider(config);
-      if (selected.key != null) return selected.key!.key;
+    if (config.multiKeyEnabled == true) {
+      // Polling should show one account consistently and leave chat key
+      // rotation alone. Prefer the first active key at the highest priority.
+      ApiKeyConfig? selected;
+      for (final key in config.apiKeys ?? const <ApiKeyConfig>[]) {
+        if (key.isEnabled &&
+            key.status == ApiKeyStatus.active &&
+            (selected == null || key.priority < selected.priority)) {
+          selected = key;
+        }
+      }
+      if (selected != null) return selected.key;
     }
     return config.apiKey;
   }

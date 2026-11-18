@@ -34,6 +34,7 @@ import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/auto_retry_options.dart';
 import '../models/provider_group.dart';
+import '../models/provider_balance_refresh_interval.dart';
 import '../services/haptics.dart';
 import '../services/api/retry_policy.dart';
 import '../services/screen_wakelock.dart';
@@ -49,6 +50,7 @@ import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
 import '../../utils/image_compressor.dart';
 import '../database/business_preferences.dart';
+import '../database/business_settings_router.dart';
 import '../services/backup/backup_secure_password_store.dart';
 import '../services/backup/backup_encryption.dart';
 import '../services/backup/backup_cancel_token.dart';
@@ -60,6 +62,7 @@ import '../../theme/chat_bubble_style.dart';
 import '../models/tool_schema_override.dart';
 import '../services/app_exit_flush.dart';
 import '../services/linux_window_service.dart';
+import '../services/provider_balance_refresh.dart';
 import '../../desktop/desktop_startup_service.dart';
 
 // Desktop: topic list position
@@ -596,6 +599,29 @@ class SettingsProvider extends ChangeNotifier {
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs =>
       Map.unmodifiable(_providerConfigs);
+  int _balanceRefreshInterval = 0;
+  bool _balanceRefreshOnReply = false;
+  int get balanceRefreshInterval => _balanceRefreshInterval;
+  bool get balanceRefreshOnReply => _balanceRefreshOnReply;
+  ProviderBalanceRefresh? _balanceRefresh;
+  ProviderBalanceRefresh get balanceRefresh =>
+      _balanceRefresh ??= ProviderBalanceRefresh(this);
+
+  int balanceRefreshIntervalFor(ProviderConfig config) =>
+      config.balanceRefreshInterval ?? _balanceRefreshInterval;
+
+  bool balanceRefreshOnReplyFor(ProviderConfig config) =>
+      config.balanceRefreshOnReply ?? _balanceRefreshOnReply;
+
+  void refreshBalanceAfterReply(String providerKey) {
+    final config = getProviderConfig(providerKey);
+    if (config.enabled &&
+        config.balanceEnabled == true &&
+        balanceRefreshOnReplyFor(config)) {
+      balanceRefresh.replyFinished(providerKey);
+    }
+  }
+
   bool get hasAnyActiveModel => _providerConfigs.values.any(
     (c) => c.enabled && c.enabledModels.isNotEmpty,
   );
@@ -722,6 +748,10 @@ class SettingsProvider extends ChangeNotifier {
     _useDynamicColor = prefs.getBool(_useDynamicColorKey) ?? true;
     _loadCustomThemes(prefs);
     final cfgStr = prefs.getString(_providerConfigsKey);
+    _balanceRefreshInterval =
+        prefs.getInt(BusinessKeyRegistry.balanceRefreshIntervalKey) ?? 0;
+    _balanceRefreshOnReply =
+        prefs.getBool(BusinessKeyRegistry.balanceRefreshOnReplyKey) ?? false;
     if (cfgStr != null && cfgStr.isNotEmpty) {
       try {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
@@ -3311,6 +3341,7 @@ class SettingsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _balanceRefresh?.dispose();
     _backupEncryptionPassword = null;
     ProviderOAuthService.instance.unbind(this);
     _toolSchemaOverridePersistTimer?.cancel();
@@ -3415,6 +3446,29 @@ class SettingsProvider extends ChangeNotifier {
     final prefs = _preferences;
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
+  }
+
+  Future<void> setBalanceRefreshInterval(int minutes) async {
+    if (!isBalanceRefreshInterval(minutes)) {
+      throw ArgumentError.value(minutes, 'minutes');
+    }
+    if (_balanceRefreshInterval == minutes) return;
+    _balanceRefreshInterval = minutes;
+    notifyListeners();
+    await _preferences.setInt(
+      BusinessKeyRegistry.balanceRefreshIntervalKey,
+      minutes,
+    );
+  }
+
+  Future<void> setBalanceRefreshOnReply(bool enabled) async {
+    if (_balanceRefreshOnReply == enabled) return;
+    _balanceRefreshOnReply = enabled;
+    notifyListeners();
+    await _preferences.setBool(
+      BusinessKeyRegistry.balanceRefreshOnReplyKey,
+      enabled,
+    );
   }
 
   Future<void> setModelEnabled(
@@ -6231,6 +6285,8 @@ Requirements:
     copy._customThemes = _customThemes;
     copy._selectedCustomThemeId = _selectedCustomThemeId;
     copy._providerConfigs = _providerConfigs;
+    copy._balanceRefreshInterval = _balanceRefreshInterval;
+    copy._balanceRefreshOnReply = _balanceRefreshOnReply;
     copy._pinnedModels.addAll(_pinnedModels);
     copy._currentModelProvider = _currentModelProvider;
     copy._currentModelId = _currentModelId;
@@ -6708,6 +6764,8 @@ class ProviderConfig {
   final String balanceMethod;
   final List<Map<String, String>> balanceHeaders;
   final String balanceBody;
+  final int? balanceRefreshInterval;
+  final bool? balanceRefreshOnReply;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
@@ -6797,6 +6855,8 @@ class ProviderConfig {
     this.balanceMethod = 'GET',
     this.balanceHeaders = const [],
     this.balanceBody = '',
+    this.balanceRefreshInterval,
+    this.balanceRefreshOnReply,
     this.claudePromptCachingEnabled = false,
     this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
@@ -6858,6 +6918,8 @@ class ProviderConfig {
     String? balanceMethod,
     List<Map<String, String>>? balanceHeaders,
     String? balanceBody,
+    Object? balanceRefreshInterval = _sentinel,
+    Object? balanceRefreshOnReply = _sentinel,
     bool? claudePromptCachingEnabled,
     String? claudePromptCachingTtl,
   }) => ProviderConfig(
@@ -6913,6 +6975,12 @@ class ProviderConfig {
     balanceMethod: balanceMethod ?? this.balanceMethod,
     balanceHeaders: balanceHeaders ?? this.balanceHeaders,
     balanceBody: balanceBody ?? this.balanceBody,
+    balanceRefreshInterval: identical(balanceRefreshInterval, _sentinel)
+        ? this.balanceRefreshInterval
+        : balanceRefreshInterval as int?,
+    balanceRefreshOnReply: identical(balanceRefreshOnReply, _sentinel)
+        ? this.balanceRefreshOnReply
+        : balanceRefreshOnReply as bool?,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
     claudePromptCachingTtl:
@@ -6966,6 +7034,10 @@ class ProviderConfig {
     'balanceMethod': balanceMethod,
     'balanceHeaders': balanceHeaders,
     'balanceBody': balanceBody,
+    if (balanceRefreshInterval != null)
+      'balanceRefreshInterval': balanceRefreshInterval,
+    if (balanceRefreshOnReply != null)
+      'balanceRefreshOnReply': balanceRefreshOnReply,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
     'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
       claudePromptCachingTtl,
@@ -7053,6 +7125,11 @@ class ProviderConfig {
             .toList() ??
         const [],
     balanceBody: json['balanceBody'] as String? ?? '',
+    balanceRefreshInterval:
+        isBalanceRefreshInterval(json['balanceRefreshInterval'])
+        ? json['balanceRefreshInterval'] as int
+        : null,
+    balanceRefreshOnReply: json['balanceRefreshOnReply'] as bool?,
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
     claudePromptCachingTtl: resolveClaudePromptCachingTtl(

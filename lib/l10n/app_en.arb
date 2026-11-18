@@ -2131,6 +2131,72 @@
   "providerDetailPageClaudePromptCachingTtlHelp": "5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.",
   "providerDetailPageClaudePromptCachingTtl5m": "5 min",
   "providerDetailPageClaudePromptCachingTtl1h": "1 hour",
+  "providerBalanceDefaultInterval": "Default balance refresh interval",
+  "@providerBalanceDefaultInterval": {
+    "description": "Providers settings row for the global default interval between automatic account balance queries."
+  },
+  "providerBalanceInterval": "Balance refresh interval",
+  "@providerBalanceInterval": {
+    "description": "Row in a provider account balance editor for overriding its periodic refresh interval."
+  },
+  "providerBalanceRefreshOnReply": "Refresh balance after each reply",
+  "@providerBalanceRefreshOnReply": {
+    "description": "Global and provider settings label. An account balance query becomes due after a final model reply."
+  },
+  "providerBalanceFollowDefault": "Follow global setting ({value})",
+  "@providerBalanceFollowDefault": {
+    "description": "Provider override option that inherits the global setting. The value is the currently effective interval or the localized on/off state.",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "providerBalanceRefreshOff": "Off",
+  "@providerBalanceRefreshOff": {
+    "description": "Option disabling the selected balance refresh trigger, either the periodic interval or refresh after replies."
+  },
+  "providerBalanceRefreshOn": "On",
+  "@providerBalanceRefreshOn": {
+    "description": "Provider override option that enables refreshing the account balance after replies."
+  },
+  "providerBalanceRefreshMinutes": "{count, plural, =1{1 minute} other{{count} minutes}}",
+  "@providerBalanceRefreshMinutes": {
+    "description": "Account balance refresh interval displayed as a number of whole minutes.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerBalanceRefreshHour": "1 hour",
+  "@providerBalanceRefreshHour": {
+    "description": "Preset selection for querying the account balance every one hour."
+  },
+  "providerBalanceCustomInterval": "Custom interval…",
+  "@providerBalanceCustomInterval": {
+    "description": "Option that opens the dialog for entering a custom balance refresh interval."
+  },
+  "providerBalanceIntervalMinutes": "Interval in minutes",
+  "@providerBalanceIntervalMinutes": {
+    "description": "Numeric field label in the custom account balance refresh interval dialog."
+  },
+  "providerBalanceRefreshNow": "Refresh balance now",
+  "@providerBalanceRefreshNow": {
+    "description": "Action in the account balance badge context menu to query the provider immediately."
+  },
+  "providerBalanceLastUpdated": "Last updated {date} at {time}",
+  "@providerBalanceLastUpdated": {
+    "description": "Balance badge tooltip showing the date and time of the most recent successful query. Both placeholders are already localized.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "providerDetailPageBalanceTitle": "Account Balance",
   "providerDetailPageBalanceInfo": "Get account balance",
   "providerDetailPageBalanceApiPathLabel": "Balance API Path or URL",

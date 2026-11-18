@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/services/provider_balance_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../widgets/provider_balance_badge.dart';
+import '../widgets/provider_balance_refresh_settings.dart';
 import '../widgets/provider_balance_request_editor.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -36,8 +36,6 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
 
   bool _balanceEnabled = false;
   bool _balanceLoading = false;
-  String? _balanceValue;
-  String? _balanceError;
 
   @override
   void initState() {
@@ -88,15 +86,13 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
             title: l10n.providerDetailPageBalanceInfo,
             value: _balanceEnabled,
             onChanged: (v) {
-              setState(() {
-                _balanceEnabled = v;
-                _balanceValue = null;
-                _balanceError = null;
-              });
+              setState(() => _balanceEnabled = v);
               _saveBalance();
             },
           ),
           if (_balanceEnabled) ...[
+            const SizedBox(height: 12),
+            ProviderBalanceRefreshSettings(providerKey: widget.providerKey),
             const SizedBox(height: 12),
             _inputRow(
               context,
@@ -104,13 +100,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
               child: TextField(
                 key: const ValueKey('provider-balance-api-path'),
                 controller: _balanceApiPathCtrl,
-                onChanged: (_) {
-                  setState(() {
-                    _balanceValue = null;
-                    _balanceError = null;
-                  });
-                  _saveBalance();
-                },
+                onChanged: (_) => _saveBalance(),
                 decoration: _balanceInputDecoration(context),
               ),
             ),
@@ -120,28 +110,14 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
               headers: _balanceHeaders,
               bodyController: _balanceBodyCtrl,
               onMethodChanged: (value) {
-                setState(() {
-                  _balanceMethod = value;
-                  _balanceValue = null;
-                  _balanceError = null;
-                });
+                setState(() => _balanceMethod = value);
                 _saveBalance();
               },
               onHeadersChanged: (headers) async {
-                setState(() {
-                  _balanceHeaders = headers;
-                  _balanceValue = null;
-                  _balanceError = null;
-                });
+                setState(() => _balanceHeaders = headers);
                 await _saveBalance();
               },
-              onBodyChanged: (_) {
-                setState(() {
-                  _balanceValue = null;
-                  _balanceError = null;
-                });
-                _saveBalance();
-              },
+              onBodyChanged: (_) => _saveBalance(),
             ),
             const SizedBox(height: 12),
             _inputRow(
@@ -150,13 +126,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
               child: TextField(
                 key: const ValueKey('provider-balance-result-path'),
                 controller: _balanceResultPathCtrl,
-                onChanged: (_) {
-                  setState(() {
-                    _balanceValue = null;
-                    _balanceError = null;
-                  });
-                  _saveBalance();
-                },
+                onChanged: (_) => _saveBalance(),
                 decoration: _balanceInputDecoration(context),
               ),
             ),
@@ -164,9 +134,11 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
             Row(
               children: [
                 Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: _balanceStatus(context),
+                  child: ProviderBalanceBadge(
+                    providerKey: widget.providerKey,
+                    displayName: widget.providerDisplayName,
+                    color: cs.primary,
+                    showManualResultWhenDisabled: true,
                   ),
                 ),
                 Tooltip(
@@ -192,32 +164,6 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
           ],
         ],
       ),
-    );
-  }
-
-  Widget _balanceStatus(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final status = _balanceError ?? _balanceValue;
-    if (status == null) {
-      return ProviderBalanceBadge(
-        key: const ValueKey('balance-badge'),
-        providerKey: widget.providerKey,
-        displayName: widget.providerDisplayName,
-        color: cs.primary,
-      );
-    }
-    return Text(
-      status,
-      key: ValueKey(status),
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: AppFontWeights.semibold,
-        color: _balanceError != null
-            ? cs.error
-            : cs.onSurface.withValues(alpha: 0.72),
-      ),
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
     );
   }
 
@@ -260,7 +206,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
     );
   }
 
-  Future<void> _saveBalance() async {
+  Future<void> _saveBalance({bool resetRefresh = false}) async {
     final settings = context.read<SettingsProvider>();
     final old = settings.getProviderConfig(
       widget.providerKey,
@@ -275,33 +221,27 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
         balanceMethod: _balanceMethod,
         balanceHeaders: _balanceHeaders,
         balanceBody: _balanceBodyCtrl.text,
+        balanceRefreshInterval: resetRefresh
+            ? null
+            : old.balanceRefreshInterval,
+        balanceRefreshOnReply: resetRefresh ? null : old.balanceRefreshOnReply,
       ),
     );
-    ProviderBalanceBadge.clearCacheFor(widget.providerKey);
   }
 
   Future<void> _queryBalance() async {
     if (_balanceLoading) return;
     final pageContext = context;
-    setState(() {
-      _balanceLoading = true;
-      _balanceValue = null;
-      _balanceError = null;
-    });
+    final settings = context.read<SettingsProvider>();
+    setState(() => _balanceLoading = true);
     try {
       await _saveBalance();
       if (!pageContext.mounted) return;
-      final settings = pageContext.read<SettingsProvider>();
-      final cfg = settings.getProviderConfig(
-        widget.providerKey,
-        defaultName: widget.providerDisplayName,
-      );
-      final value = await ProviderBalanceService.fetchBalance(cfg);
+      final value = await settings.balanceRefresh
+          .forProvider(widget.providerKey)
+          .query();
       if (!pageContext.mounted) return;
       final l10n = AppLocalizations.of(pageContext)!;
-      setState(
-        () => _balanceValue = l10n.providerDetailPageBalanceResult(value),
-      );
       showAppSnackBar(
         pageContext,
         message: l10n.providerDetailPageBalanceResult(value),
@@ -310,9 +250,6 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
     } catch (e) {
       if (!pageContext.mounted) return;
       final l10n = AppLocalizations.of(pageContext)!;
-      setState(
-        () => _balanceError = l10n.providerDetailPageBalanceError(e.toString()),
-      );
       showAppSnackBar(
         pageContext,
         message: l10n.providerDetailPageBalanceError(e.toString()),
@@ -335,10 +272,8 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
       _balanceMethod = defaults.balanceMethod;
       _balanceHeaders = defaults.balanceHeaders;
       _balanceBodyCtrl.text = defaults.balanceBody;
-      _balanceValue = null;
-      _balanceError = null;
     });
-    _saveBalance();
+    _saveBalance(resetRefresh: true);
   }
 }
 

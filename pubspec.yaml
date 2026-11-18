@@ -47,6 +47,9 @@ dependencies:
     sdk: flutter
   provider: ^6.0.5
   collection: ^1.19.1
+  clock: ^1.1.2
+  connectivity_plus: ^6.1.5
+  visibility_detector: ^0.4.0+2
   dynamic_color: ^1.8.1
   material_color_utilities: ^0.13.0
   lucide_icons_flutter: ^3.1.13

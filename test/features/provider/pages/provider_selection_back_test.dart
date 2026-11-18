@@ -76,6 +76,35 @@ Future<void> _openSelection(WidgetTester tester, {required bool models}) async {
 }
 
 void main() {
+  testWidgets(
+    'landscape provider search leaves room for results with the keyboard open',
+    (tester) async {
+      await _openSelection(tester, models: false);
+      await tester.tap(find.byTooltip('Done'));
+      await tester.pumpAndSettle();
+      expect(find.text('Default balance refresh interval'), findsOneWidget);
+
+      tester.view.physicalSize = const Size(780, 390);
+      await tester.pumpAndSettle();
+      final search = find.byType(TextField);
+      await tester.showKeyboard(search);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Default balance refresh interval'), findsNothing);
+
+      await tester.enterText(search, 'Test Provider');
+      await tester.pumpAndSettle();
+      final results = find.byType(ReorderableListView);
+      expect(
+        find.descendant(of: results, matching: find.text('Test Provider')),
+        findsOneWidget,
+      );
+      expect(tester.getSize(results).height, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('deleting a provider still dismisses its selected models page', (
     tester,
   ) async {

@@ -4397,6 +4397,54 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1시간';
 
   @override
+  String get providerBalanceDefaultInterval => '기본 잔액 새로 고침 간격';
+
+  @override
+  String get providerBalanceInterval => '잔액 새로 고침 간격';
+
+  @override
+  String get providerBalanceRefreshOnReply => '모델이 답변할 때마다 잔액 새로 고침';
+
+  @override
+  String providerBalanceFollowDefault(String value) {
+    return '전역 설정 따르기($value)';
+  }
+
+  @override
+  String get providerBalanceRefreshOff => '끔';
+
+  @override
+  String get providerBalanceRefreshOn => '켬';
+
+  @override
+  String providerBalanceRefreshMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count분',
+      one: '1분',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get providerBalanceRefreshHour => '1시간';
+
+  @override
+  String get providerBalanceCustomInterval => '사용자 지정 간격…';
+
+  @override
+  String get providerBalanceIntervalMinutes => '간격(분)';
+
+  @override
+  String get providerBalanceRefreshNow => '지금 잔액 새로 고침';
+
+  @override
+  String providerBalanceLastUpdated(String date, String time) {
+    return '마지막 업데이트: $date $time';
+  }
+
+  @override
   String get providerDetailPageBalanceTitle => '계정 잔액';
 
   @override

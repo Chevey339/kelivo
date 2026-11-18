@@ -824,7 +824,10 @@ class HomeViewModel extends ChangeNotifier {
   /// Cancel the active streaming.
   Future<void> cancelStreaming() async {
     final id = currentConversation?.id;
-    await _chatActions.cancelStreaming(currentConversation);
+    await _chatActions.cancelStreaming(
+      currentConversation,
+      userRequested: true,
+    );
     if (id != null) {
       _chatService.contextCompression.resumeIfReady(id);
       unawaited(_drainQueuedInputIfReady(id));

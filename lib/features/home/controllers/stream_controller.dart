@@ -1660,6 +1660,7 @@ class StreamingState {
   bool finishHandled = false;
   bool terminalPersisted = false;
   bool titleQueued = false;
+  bool requestDispatched = false;
   DateTime? requestStartedAt;
   DateTime? requestFinishedAt;
   int? firstResponseMs;
