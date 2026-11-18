@@ -78,6 +78,8 @@ class ResponseSpeedCapabilities {
         ).hasMatch(model);
     // Official Fast pricing table: https://developers.openai.com/api/docs/pricing
     final fast = const [
+      'gpt-6.2-astra',
+      'gpt-6.2-sol',
       'gpt-6-astra',
       'gpt-6-sol',
       'gpt-6-luna',
@@ -100,7 +102,12 @@ class ResponseSpeedCapabilities {
       'gpt-4o-mini',
       'o3',
     ].any(matches);
-    final ultraModel = matches('gpt-6-astra') || matches('gpt-6.1-sol');
+    final ultraModel = const [
+      'gpt-6.2-astra',
+      'gpt-6.2-sol',
+      'gpt-6-astra',
+      'gpt-6.1-sol',
+    ].any(matches);
     return ResponseSpeedCapabilities(
       {
         if (fast) ResponseSpeed.fast: providerDependent ? 'priority' : 'fast',

@@ -152,6 +152,37 @@ void main() {
     },
   );
 
+  for (final modelId in ['gpt-6.2-astra', 'gpt-6.2-sol']) {
+    test(
+      '$modelId offers Fast on both APIs and UltraFast only on Responses',
+      () {
+        final official = _config();
+        final relay = official.copyWith(
+          baseUrl: 'https://gateway.example/v1',
+          modelOverrides: {
+            'alias': {'apiModelId': 'openai/$modelId'},
+          },
+        );
+        for (final (config, model, fastTier) in [
+          (official, modelId, 'fast'),
+          (relay, 'alias', 'priority'),
+        ]) {
+          final responses = ResponseSpeedCapabilities.resolve(config, model);
+          expect(responses.tiers, {
+            ResponseSpeed.fast: fastTier,
+            ResponseSpeed.ultrafast: 'ultrafast',
+          });
+          final completions = ResponseSpeedCapabilities.resolve(
+            config.copyWith(useResponseApi: false),
+            model,
+          );
+          expect(completions.tiers, {ResponseSpeed.fast: fastTier});
+          expect(completions.ultrafastRequiresResponses, isTrue);
+        }
+      },
+    );
+  }
+
   test('Codex uses current account discovery, never a plan-name guess', () {
     final credentials = ProviderOAuthCredentials(
       accessToken: 'test',
