@@ -8,23 +8,28 @@ import 'selection_edge_initialization.dart';
 import 'selection_rect_collection.dart';
 
 /// Preserves inline widget identity while the paragraph's selectable fragments
-/// change. Plain text keeps Flutter's ordinary Text rendering path.
-Widget buildSelectableText(Text text) {
-  if (text.textSpan == null) return text;
+/// change. An inline container can include its padding and decoration in the
+/// selection hit test.
+Widget buildSelectableText(
+  Text text, {
+  Widget Function(Widget child)? inlineContainer,
+}) {
+  if (text.textSpan == null) return inlineContainer?.call(text) ?? text;
   var embedded = false;
   text.textSpan?.visitChildren((span) {
     if (span is WidgetSpan) embedded = true;
     return !embedded;
   });
   return Builder(
-    builder: (context) => embedded || MediaQuery.boldTextOf(context)
-        ? _SelectableRichText(text)
+    builder: (context) =>
+        inlineContainer != null || embedded || MediaQuery.boldTextOf(context)
+        ? _SelectableRichText(text, inlineContainer: inlineContainer)
         : text,
   );
 }
 
 class _SelectableRichText extends Text {
-  _SelectableRichText(Text text)
+  _SelectableRichText(Text text, {required this.inlineContainer})
     : super.rich(
         text.textSpan!,
         key: text.key,
@@ -44,13 +49,15 @@ class _SelectableRichText extends Text {
         selectionColor: text.selectionColor,
       );
 
+  final Widget Function(Widget child)? inlineContainer;
+
   @override
   Widget build(BuildContext context) => _SelectableParagraph(text: this);
 }
 
 class _SelectableParagraph extends StatefulWidget {
   const _SelectableParagraph({required this.text});
-  final Text text;
+  final _SelectableRichText text;
 
   @override
   State<_SelectableParagraph> createState() => _SelectableParagraphState();
@@ -78,6 +85,9 @@ class _SelectableParagraphState extends State<_SelectableParagraph> {
   @override
   Widget build(BuildContext context) {
     final text = widget.text;
+    _delegate.keepContent =
+        text.inlineContainer != null &&
+        text.textSpan!.toPlainText(includeSemanticsLabels: false).isNotEmpty;
     final selectable = SelectionContainer.maybeOf(context) != null;
     final defaults = DefaultTextStyle.of(context);
     var style = text.style == null || text.style!.inherit
@@ -145,6 +155,7 @@ class _SelectableParagraphState extends State<_SelectableParagraph> {
             : paragraph;
       },
     );
+    result = text.inlineContainer?.call(result) ?? result;
     if (selectable) {
       result = SelectionContainer(delegate: _delegate, child: result);
     }
@@ -159,6 +170,7 @@ class _SelectableParagraphState extends State<_SelectableParagraph> {
         ),
       );
     }
+    if (text.inlineContainer != null) return result;
     return Directionality(
       textDirection: text.textDirection ?? Directionality.of(context),
       child: result,
@@ -195,12 +207,52 @@ class _ParagraphSelectionDelegate
   }
   final RenderParagraph Function() _paragraph;
 
+  bool keepContent = false;
+  final _registered = <Selectable>{};
+  Map<Selectable, int>? _fragmentOffsets;
+  Map<RenderObject, int>? _placeholderOffsets;
+
+  @override
+  void add(Selectable child) {
+    _registered.add(child);
+    _fragmentOffsets = null;
+    _placeholderOffsets = null;
+    super.add(child);
+  }
+
+  @override
+  void remove(Selectable child) {
+    _registered.remove(child);
+    _fragmentOffsets = null;
+    _placeholderOffsets = null;
+    super.remove(child);
+  }
+
+  @override
+  SelectionGeometry getSelectionGeometry() {
+    final geometry = super.getSelectionGeometry();
+    // A nested paragraph stays registered while its text fragments are being
+    // replaced by a streaming update.
+    return keepContent && !geometry.hasContent
+        ? const SelectionGeometry(
+            hasContent: true,
+            status: SelectionStatus.none,
+          )
+        : geometry;
+  }
+
   SelectionEdgeUpdateEvent? _startEvent;
   SelectionEdgeUpdateEvent? _endEvent;
 
   // Route outside-fragment edges by logical offsets. Flutter's rectangle
   // clamping treats the left side as preceding even inside RTL paragraphs.
   SelectionResult _send(Selectable child, SelectionEvent event) {
+    if (event is GranularlyExtendSelectionEvent &&
+        event.granularity == TextGranularity.character &&
+        _paragraph().selectableBelongsToParagraph(child)) {
+      final start = _fragmentStart(child);
+      if (start > 0) return _extendCharacter(child, event, start);
+    }
     if (event is! SelectionEdgeUpdateEvent) {
       return child.dispatchSelectionEvent(event);
     }
@@ -212,7 +264,7 @@ class _ParagraphSelectionDelegate
         ? paragraph.text.toPlainText(includeSemanticsLabels: false).length
         : paragraph.getPositionForOffset(localPosition).offset;
     if (!paragraph.selectableBelongsToParagraph(child)) {
-      return child.dispatchSelectionEvent(event);
+      return _sendToPlaceholder(child, event, localPosition, offset);
     }
     final start = _fragmentStart(child);
     final end = start + child.contentLength;
@@ -276,6 +328,98 @@ class _ParagraphSelectionDelegate
     return child.dispatchSelectionEvent(event);
   }
 
+  SelectionResult _extendCharacter(
+    Selectable child,
+    GranularlyExtendSelectionEvent event,
+    int start,
+  ) {
+    final end = start + child.contentLength;
+    final selection = child.getSelection();
+    final offset =
+        (event.isEnd ? selection?.endOffset : selection?.startOffset) ??
+        (event.forward ? start : end);
+    if (event.forward && offset >= end) return SelectionResult.next;
+    if (!event.forward && offset <= start) return SelectionResult.previous;
+
+    // Flutter's character boundary is relative to the fragment while its
+    // selection offsets are relative to the paragraph.
+    final paragraph = _paragraph();
+    final text = paragraph.text.toPlainText(includeSemanticsLabels: false);
+    final cluster = CharacterBoundary(text).getTextBoundaryAt(
+      event.forward ? offset : offset - 1,
+    );
+    final boxes = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: cluster.start, extentOffset: cluster.end),
+    );
+    Offset point(bool atEnd) {
+      final box = atEnd ? boxes.lastOrNull : boxes.firstOrNull;
+      if (box == null || box.left == box.right) {
+        return _caretPosition(atEnd ? cluster.end : cluster.start);
+      }
+      final right = atEnd == (box.direction == TextDirection.ltr);
+      final inset = math.min(0.001, (box.right - box.left) / 2);
+      return paragraph.localToGlobal(
+        Offset(
+          right ? box.right - inset : box.left + inset,
+          (box.top + box.bottom) / 2,
+        ),
+      );
+    }
+
+    void moveEdge(bool isEnd, Offset position) {
+      child.dispatchSelectionEvent(
+        isEnd
+            ? SelectionEdgeUpdateEvent.forEnd(globalPosition: position)
+            : SelectionEdgeUpdateEvent.forStart(globalPosition: position),
+      );
+    }
+
+    if (selection == null) moveEdge(!event.isEnd, point(!event.forward));
+    moveEdge(event.isEnd, point(event.forward));
+    return SelectionResult.end;
+  }
+
+  SelectionResult _sendToPlaceholder(
+    Selectable child,
+    SelectionEdgeUpdateEvent event,
+    Offset localPosition,
+    int offset,
+  ) {
+    final boxes = child.boundingBoxes;
+    if (boxes.isEmpty) return child.dispatchSelectionEvent(event);
+    final paragraph = _paragraph();
+    final transform = child.getTransformTo(paragraph);
+    final bounds = MatrixUtils.transformRect(
+      transform,
+      boxes.reduce((a, b) => a.expandToInclude(b)),
+    );
+    if (bounds.contains(localPosition))
+      return child.dispatchSelectionEvent(event);
+
+    // A placeholder occupies one offset in the parent paragraph, even when
+    // its child renders text in a different direction.
+    final forward = offset > _placeholderOffset(child);
+    final point = paragraph.localToGlobal(
+      Offset(
+        bounds.center.dx,
+        forward ? bounds.bottom + 1 : bounds.top - 1,
+      ),
+    );
+    final result = child.dispatchSelectionEvent(
+      event.type == SelectionEventType.endEdgeUpdate
+          ? SelectionEdgeUpdateEvent.forEnd(
+              globalPosition: point,
+              granularity: event.granularity,
+            )
+          : SelectionEdgeUpdateEvent.forStart(
+              globalPosition: point,
+              granularity: event.granularity,
+            ),
+    );
+    if (result == SelectionResult.pending) return result;
+    return forward ? SelectionResult.next : SelectionResult.previous;
+  }
+
   @override
   void ensureChildUpdated(Selectable child) {
     // This runs during the framework's additions merge. Dispatch directly to
@@ -326,6 +470,16 @@ class _ParagraphSelectionDelegate
   }
 
   @override
+  SelectionResult dispatchSelectionEvent(SelectionEvent event) {
+    final result = super.dispatchSelectionEvent(event);
+    if (event is GranularlyExtendSelectionEvent ||
+        event is DirectionallyExtendSelectionEvent) {
+      _rememberBoundary();
+    }
+    return result;
+  }
+
+  @override
   SelectionResult handleSelectAll(SelectAllSelectionEvent event) {
     final result = super.handleSelectAll(event);
     _rememberBoundary();
@@ -361,29 +515,42 @@ class _ParagraphSelectionDelegate
     return (a, b) => offset(a).compareTo(offset(b));
   }
 
-  int _fragmentStart(Selectable selectable) {
+  int _fragmentStart(Selectable selectable) =>
+      (_fragmentOffsets ??= _collectFragmentOffsets())[selectable]!;
+
+  Map<Selectable, int> _collectFragmentOffsets() {
     final paragraph = _paragraph();
-    final boxes = selectable.boundingBoxes;
-    var start = paragraph.getPositionForOffset(boxes.first.centerLeft).offset;
-    // Zero is already the minimum possible offset. Long leading fragments
-    // otherwise hit-test every line even when only their color has changed.
-    if (start == 0) return start;
-    for (final box in boxes) {
-      start = math.min(
-        start,
-        paragraph.getPositionForOffset(box.centerLeft).offset,
-      );
-      start = math.min(
-        start,
-        paragraph.getPositionForOffset(box.centerRight).offset,
-      );
-      if (start == 0) break;
+    final text = paragraph.text.toPlainText(includeSemanticsLabels: false);
+    // RenderParagraph registers its text fragments in source order, split
+    // at placeholder characters. Their screen order can differ in bidi text.
+    final offsets = Map<Selectable, int>.identity();
+    var offset = 0;
+    for (final fragment in _registered) {
+      if (!paragraph.selectableBelongsToParagraph(fragment)) continue;
+      while (offset < text.length && text.codeUnitAt(offset) == 0xfffc) {
+        offset++;
+      }
+      offsets[fragment] = offset;
+      offset += fragment.contentLength;
     }
-    return start;
+    return offsets;
   }
 
   int _placeholderOffset(Selectable selectable) {
     final paragraph = _paragraph();
+    RenderObject? render = switch (selectable) {
+      final RenderObject box => box,
+      final State<StatefulWidget> state => state.context.findRenderObject(),
+      _ => null,
+    };
+    while (render != null && render.parent != paragraph) {
+      render = render.parent;
+    }
+    if (render != null) {
+      final offsets = _placeholderOffsets ??= _collectPlaceholderOffsets();
+      if (offsets[render] case final offset?) return offset;
+    }
+
     final transform = selectable.getTransformTo(paragraph);
     final box = MatrixUtils.transformRect(
       transform,
@@ -393,6 +560,26 @@ class _ParagraphSelectionDelegate
       paragraph.getPositionForOffset(box.centerLeft).offset,
       paragraph.getPositionForOffset(box.centerRight).offset,
     );
+  }
+
+  Map<RenderObject, int> _collectPlaceholderOffsets() {
+    final paragraph = _paragraph();
+    final offsets = Map<RenderObject, int>.identity();
+    var child = paragraph.firstChild;
+    var offset = 0;
+    paragraph.text.visitChildren((span) {
+      if (span is PlaceholderSpan) {
+        if (child case final box?) {
+          offsets[box] = offset;
+          child = paragraph.childAfter(box);
+        }
+        offset++;
+      } else if (span is TextSpan) {
+        offset += span.text?.length ?? 0;
+      }
+      return true;
+    });
+    return offsets;
   }
 
   @override

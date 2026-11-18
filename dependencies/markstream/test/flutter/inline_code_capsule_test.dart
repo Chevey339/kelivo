@@ -98,6 +98,33 @@ Offset point(RenderParagraph p, int offset, {bool end = false}) {
   );
 }
 
+Future<void> _dragEndHandleTo(
+  WidgetTester tester,
+  RenderParagraph paragraph,
+  int character,
+) async {
+  final overlay = tester
+      .state<SelectableRegionState>(find.byType(SelectableRegion))
+      .selectionOverlay;
+  final controls = overlay!.selectionControls!;
+  final size = controls.getHandleSize(overlay.lineHeightAtEnd);
+  final center =
+      Offset(size.width / 2, size.height / 2) -
+      controls.getHandleAnchor(overlay.endHandleType, overlay.lineHeightAtEnd);
+  final handle = overlay.endHandleLayerLink.leader!.offset;
+  final gesture = await tester.startGesture(handle + center);
+  final target = box(paragraph, character);
+  final leading = (overlay.lineHeightAtEnd - (target.bottom - target.top)) / 2;
+  await gesture.moveTo(
+    paragraph.localToGlobal(Offset(target.right, target.bottom + leading)) +
+        center,
+  );
+  await tester.pump();
+  await gesture.up();
+  await gesture.removePointer();
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets(
     'desktop drag crosses code and math atoms in both directions',
@@ -161,31 +188,47 @@ void main() {
       await tester.longPressAt(point(p, 2));
       await tester.pumpAndSettle();
       expect(selected, 'Before');
-      final overlay = tester
-          .state<SelectableRegionState>(find.byType(SelectableRegion))
-          .selectionOverlay;
-      final controls = overlay!.selectionControls!;
-      final size = controls.getHandleSize(overlay.lineHeightAtEnd);
-      final center =
-          Offset(size.width / 2, size.height / 2) -
-          controls.getHandleAnchor(
-            overlay.endHandleType,
-            overlay.lineHeightAtEnd,
-          );
-      final handle = overlay.endHandleLayerLink.leader!.offset;
-      final gesture = await tester.startGesture(handle + center);
-      final target = box(p, 22);
-      final leading =
-          (overlay.lineHeightAtEnd - (target.bottom - target.top)) / 2;
-      await gesture.moveTo(
-        p.localToGlobal(Offset(target.right, target.bottom + leading)) + center,
-      );
-      await tester.pump();
-      await gesture.up();
-      await gesture.removePointer();
-      await tester.pumpAndSettle();
+      await _dragEndHandleTo(tester, p, 22);
       expect(selected, r'Before code middle $x+y$ After');
       expect(listener.selection.range!.endOffset, 30);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets(
+    'Android long press and handle drag select part of an inline capsule',
+    (tester) async {
+      final listener = SelectionListenerNotifier();
+      addTearDown(listener.dispose);
+      String? selected;
+      await tester.pumpWidget(
+        harness(
+          code: 'archived: true',
+          listener: listener,
+          platform: TargetPlatform.android,
+          onSelection: (value) => selected = value?.plainText,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final code = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.byType(InlineCodeCapsule),
+          matching: find.byType(RichText),
+        ),
+      );
+
+      final capsuleRect = tester.getRect(find.byType(InlineCodeCapsule));
+      await tester.longPressAt(
+        Offset(capsuleRect.left + 1, capsuleRect.center.dy),
+      );
+      await tester.pumpAndSettle();
+      expect(selected, 'archived');
+
+      await _dragEndHandleTo(tester, code, 2);
+      expect(selected, 'arc');
+      final range = listener.selection.range!;
+      expect((range.startOffset, range.endOffset), (7, 10));
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),
