@@ -33,7 +33,10 @@ class ConversationFindController extends ChangeNotifier {
   static const _maximumStreamDelay = Duration(milliseconds: 650);
   final _streamWait = Stopwatch();
   final _byMessage = <String, List<ConversationFindHit>>{};
+  ConversationFindHit? _preview;
   ConversationFindHit? get current => index < 0 ? null : hits[index];
+  ConversationFindHit? get activeHit => _preview ?? current;
+  bool get hasPreview => _preview != null;
   bool get canNavigate => opened && !searching && hits.isNotEmpty;
 
   void setConversation(String? id) {
@@ -77,12 +80,17 @@ class ConversationFindController extends ChangeNotifier {
       _schedule(
         immediate: true,
         preserve: preserve && (!searching || _preservePendingPosition),
+        keepPreview: preserve,
       );
     }
   }
 
-  void _schedule({bool immediate = false, bool preserve = false}) {
-    _cancel();
+  void _schedule({
+    bool immediate = false,
+    bool preserve = false,
+    bool keepPreview = false,
+  }) {
+    _cancel(keepPreview: keepPreview);
     if (!opened || query.trim().isEmpty) {
       _clearHits();
       notifyListeners();
@@ -217,7 +225,7 @@ class ConversationFindController extends ChangeNotifier {
         }
       }
     }
-    if (!preserve || old != current) {
+    if (_preview == null && (!preserve || old != current)) {
       _reveal();
     } else {
       notifyListeners();
@@ -230,11 +238,18 @@ class ConversationFindController extends ChangeNotifier {
     _reveal();
   }
 
-  void _reveal() {
+  /// Reveal the selected minimap result with the same message expansion and
+  /// source highlight as the find bar, leaving the bar's query and index alone.
+  void revealPreview(ConversationFindHit hit) => _reveal(preview: hit);
+
+  void _reveal({ConversationFindHit? preview}) {
+    _preview = preview;
     final serial = ++_navigation;
-    final hit = current;
+    final hit = activeHit;
     notifyListeners();
-    if (hit != null) onReveal(hit, () => serial == _navigation && opened);
+    if (hit != null) {
+      onReveal(hit, () => serial == _navigation && (opened || preview != null));
+    }
   }
 
   List<ConversationFindHit> hitsFor(String id) => _byMessage[id] ?? const [];
@@ -246,9 +261,12 @@ class ConversationFindController extends ChangeNotifier {
     searching = false;
   }
 
-  void _cancel() {
+  void _cancel({bool keepPreview = false}) {
     _generation++;
-    _navigation++;
+    if (!keepPreview || _preview == null) {
+      _navigation++;
+      _preview = null;
+    }
     _timer?.cancel();
     _streamTimer?.cancel();
     _streamGeneration = null;

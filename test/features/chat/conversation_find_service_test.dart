@@ -275,4 +275,71 @@ void main() {
     expect(hits, hasLength(18000));
     expect(hits.last.range.start, 17999);
   });
+
+  test(
+    'minimap previews stream in order and keep the first visible hit',
+    () async {
+      const service = ConversationFindService();
+      final user = ConversationFindCandidate(message('先说 **知豆**，再说知豆。'));
+      final assistant = ConversationFindCandidate(
+        ChatMessage(
+          id: 'reply',
+          role: 'assistant',
+          conversationId: 'c',
+          content: '${'开头' * 110}\n\n然后提到 **知豆** 的价格。',
+        ),
+      );
+      final batches = await service
+          .searchPreviews(
+            Stream.fromIterable([
+              [user],
+              [assistant],
+            ]),
+            '知豆',
+          )
+          .toList();
+      expect(batches.map((batch) => batch.single.role), ['user', 'assistant']);
+      expect(batches.first.single.match, '知豆');
+      expect(batches.last.single.before, '然后提到 ');
+      expect(batches.last.single.after, ' 的价格。');
+      final matches = await service.search(
+        Stream.value([user, assistant]),
+        '知豆',
+        defaultFindOptions,
+      );
+      expect(batches.first.single.hit, matches['m']!.first);
+      expect(batches.last.single.hit, matches['reply']!.single);
+    },
+  );
+
+  test(
+    'cached rendered text follows edits and presentation settings',
+    () async {
+      const markdown = ConversationFindService();
+      const plain = ConversationFindService(userMarkdown: false);
+      final cache = ConversationFindCache();
+      Future<List<ConversationFindHit>> query(
+        ChatMessage row,
+        String word, [
+        ConversationFindService service = markdown,
+      ]) async {
+        final result = await service.search(
+          Stream.value([ConversationFindCandidate(row)]),
+          word,
+          defaultFindOptions,
+          cache: cache,
+        );
+        return result['m']!;
+      }
+
+      final first = message('**old** [label](https://hidden.invalid)');
+      expect(await query(first, 'missing'), isEmpty);
+      expect(await query(first, 'hidden.invalid'), isEmpty);
+      expect(await query(first, 'old'), hasLength(1));
+      expect(await query(first, 'hidden.invalid', plain), hasLength(1));
+      final edited = message('**new**');
+      expect(await query(edited, 'NEW', plain), hasLength(1));
+      expect(await query(edited, 'old', plain), isEmpty);
+    },
+  );
 }

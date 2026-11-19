@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../features/home/widgets/mini_map_search.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../shared/widgets/ios_tactile.dart';
@@ -11,12 +12,13 @@ import '../core/models/message_part.dart';
 import '../theme/design_tokens.dart';
 import 'desktop_overlay_backdrop.dart';
 
-Future<String?> showDesktopMiniMapPopover(
+Future<MiniMapSelection?> showDesktopMiniMapPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
   required List<ChatMessage> messages,
   bool selecting = false,
   VoidCallback? onOpenConversationFind,
+  MiniMapSearch? onSearch,
   Set<String>? selectedMessageIds,
   Listenable? selectionListenable,
   ValueChanged<String>? onToggleSelection,
@@ -41,7 +43,7 @@ Future<String?> showDesktopMiniMapPopover(
     size.height,
   );
 
-  final completer = Completer<String?>();
+  final completer = Completer<MiniMapSelection?>();
 
   late OverlayEntry entry;
   entry = OverlayEntry(
@@ -55,13 +57,14 @@ Future<String?> showDesktopMiniMapPopover(
       onToggleSelection: onToggleSelection,
       onSelect: selecting
           ? null
-          : (id) {
+          : (selection) {
               try {
                 entry.remove();
               } catch (_) {}
-              if (!completer.isCompleted) completer.complete(id);
+              if (!completer.isCompleted) completer.complete(selection);
             },
       onOpenConversationFind: onOpenConversationFind,
+      onSearch: onSearch,
       onClose: () {
         try {
           entry.remove();
@@ -86,18 +89,20 @@ class _MiniMapPopover extends StatefulWidget {
     required this.onToggleSelection,
     required this.onClose,
     this.onOpenConversationFind,
+    this.onSearch,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
   final List<ChatMessage> messages;
-  final ValueChanged<String>? onSelect;
+  final ValueChanged<MiniMapSelection>? onSelect;
   final bool selecting;
   final Set<String>? selectedMessageIds;
   final Listenable? selectionListenable;
   final ValueChanged<String>? onToggleSelection;
   final VoidCallback onClose;
   final VoidCallback? onOpenConversationFind;
+  final MiniMapSearch? onSearch;
 
   @override
   State<_MiniMapPopover> createState() => _MiniMapPopoverState();
@@ -109,6 +114,7 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
   late final Animation<double> _fadeIn;
   late final Animation<double> _slideY; // px translateY
   bool _closing = false;
+  bool _searchOpen = false;
 
   @override
   void initState() {
@@ -144,6 +150,36 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
     } catch (_) {}
     if (mounted) widget.onClose();
   }
+
+  Widget _browseList() => _MiniMapList(
+    messages: widget.messages,
+    selecting: widget.selecting,
+    selectedMessageIds: widget.selectedMessageIds,
+    selectionListenable: widget.selectionListenable,
+    onTapMessage: (id) {
+      if (_closing) return;
+      if (widget.selecting) {
+        widget.onToggleSelection?.call(id);
+      } else {
+        widget.onSelect?.call((messageId: id, match: null));
+      }
+    },
+  );
+
+  Widget _searchPanel(double height) => SizedBox(
+    height: height,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 8, 4),
+      child: MiniMapSearchPanel(
+        onSearch: widget.onSearch!,
+        onClose: () => setState(() => _searchOpen = false),
+        onSelect: (selection) {
+          if (!_closing) widget.onSelect?.call(selection);
+        },
+        browseList: _browseList(),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -191,72 +227,85 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(14),
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 6, 8, 0),
-                              child: Row(
+                        child: _searchOpen
+                            ? _searchPanel(math.min(clipHeight, 420))
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
-                                    Lucide.Map,
-                                    size: 17,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.miniMapTitle,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      6,
+                                      8,
+                                      0,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Lucide.Map,
+                                          size: 17,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            AppLocalizations.of(
+                                              context,
+                                            )!.miniMapTitle,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.titleSmall,
+                                          ),
+                                        ),
+                                        if (!widget.selecting &&
+                                            widget.onSearch != null)
+                                          IosIconButton(
+                                            key: const ValueKey(
+                                              'miniMapPreviewSearchButton',
+                                            ),
+                                            icon: Lucide.Search,
+                                            size: 17,
+                                            minSize: 32,
+                                            tooltip: AppLocalizations.of(
+                                              context,
+                                            )!.miniMapSearchHint,
+                                            onTap: () {
+                                              if (!_closing) {
+                                                setState(
+                                                  () => _searchOpen = true,
+                                                );
+                                              }
+                                            },
+                                          ),
+                                        if (!widget.selecting &&
+                                            widget.onOpenConversationFind !=
+                                                null)
+                                          IosIconButton(
+                                            key: const ValueKey(
+                                              'miniMapSearchButton',
+                                            ),
+                                            icon: Lucide.TextSearch,
+                                            size: 17,
+                                            minSize: 32,
+                                            tooltip: AppLocalizations.of(
+                                              context,
+                                            )!.conversationFindOpenTooltip,
+                                            onTap: () async {
+                                              if (_closing) return;
+                                              final open = widget
+                                                  .onOpenConversationFind!;
+                                              await _close();
+                                              open();
+                                            },
+                                          ),
+                                      ],
                                     ),
                                   ),
-                                  if (!widget.selecting &&
-                                      widget.onOpenConversationFind != null)
-                                    IosIconButton(
-                                      key: const ValueKey(
-                                        'miniMapSearchButton',
-                                      ),
-                                      icon: Lucide.Search,
-                                      size: 17,
-                                      minSize: 32,
-                                      tooltip: AppLocalizations.of(
-                                        context,
-                                      )!.conversationFindOpenTooltip,
-                                      onTap: () async {
-                                        if (_closing) return;
-                                        final open =
-                                            widget.onOpenConversationFind!;
-                                        await _close();
-                                        open();
-                                      },
-                                    ),
+                                  Flexible(child: _browseList()),
                                 ],
                               ),
-                            ),
-                            Flexible(
-                              child: _MiniMapList(
-                                messages: widget.messages,
-                                selecting: widget.selecting,
-                                selectedMessageIds: widget.selectedMessageIds,
-                                selectionListenable: widget.selectionListenable,
-                                onTapMessage: (id) {
-                                  if (_closing) return;
-                                  if (widget.selecting) {
-                                    widget.onToggleSelection?.call(id);
-                                  } else {
-                                    widget.onSelect?.call(id);
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                   ),

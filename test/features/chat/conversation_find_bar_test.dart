@@ -20,6 +20,49 @@ ConversationFindHit _hit(int i) => (
   surfaceKey: null,
 );
 void main() {
+  test('an older find request does not replace a minimap jump', () async {
+    final pending = <Completer<Map<String, List<ConversationFindHit>>>>[];
+    final reveals = <ConversationFindHit>[];
+    late bool Function() current;
+    final find = ConversationFindController(
+      search: (_, _, _) {
+        final request = Completer<Map<String, List<ConversationFindHit>>>();
+        pending.add(request);
+        return request.future;
+      },
+      onReveal: (hit, isCurrent) {
+        reveals.add(hit);
+        current = isCurrent;
+      },
+    );
+    addTearDown(find.dispose);
+    final bar = _hit(1);
+    final preview = _hit(8);
+    find.open(selection: 'bar query');
+    find.revealPreview(preview);
+    final previewIsCurrent = current;
+    pending.single.complete({
+      'm': [bar],
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(find.current, bar);
+    expect(find.activeHit, preview);
+    expect(reveals, [preview]);
+    expect(previewIsCurrent(), isTrue);
+
+    find.refresh();
+    expect(previewIsCurrent(), isTrue);
+    pending.last.complete({
+      'm': [bar],
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(reveals, [preview]);
+
+    find.move(1);
+    expect(reveals, [preview, bar]);
+    expect(previewIsCurrent(), isFalse);
+  });
+
   test(
     'the active occurrence is painted beyond the per-row decoration budget',
     () {

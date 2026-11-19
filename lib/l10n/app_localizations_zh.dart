@@ -4889,6 +4889,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => '滚动到底部';
 
   @override
+  String get miniMapSearchHint => '在小地图中搜索';
+
+  @override
+  String get miniMapSearchNoResults => '没有匹配的消息';
+
+  @override
+  String get miniMapSearchFailed => '搜索消息失败';
+
+  @override
   String get conversationFindHint => '查找';
 
   @override
@@ -21436,6 +21445,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get miniMapScrollToBottomTooltip => '滚动到底部';
+
+  @override
+  String get miniMapSearchHint => '在小地图中搜索';
+
+  @override
+  String get miniMapSearchNoResults => '没有匹配的消息';
+
+  @override
+  String get miniMapSearchFailed => '搜索消息失败';
 
   @override
   String get conversationFindHint => '查找';
@@ -37989,6 +38007,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get miniMapScrollToBottomTooltip => '捲動到底部';
+
+  @override
+  String get miniMapSearchHint => '搜尋小地圖';
+
+  @override
+  String get miniMapSearchNoResults => '沒有符合的訊息';
+
+  @override
+  String get miniMapSearchFailed => '無法搜尋訊息';
 
   @override
   String get conversationFindHint => '查找';

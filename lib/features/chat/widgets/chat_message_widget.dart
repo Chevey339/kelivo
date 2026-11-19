@@ -3531,7 +3531,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     _resolveAttachmentImageUri(block.imageUri!),
               ];
               final findBodyIndices = <int, int>{};
-              if (find?.hits.isNotEmpty == true) {
+              if (target != null || find?.hits.isNotEmpty == true) {
                 for (var i = 0; i < visibleBlocks.length; i++) {
                   if (visibleBlocks[i].isText) {
                     findBodyIndices[i] = findBodyIndices.length;

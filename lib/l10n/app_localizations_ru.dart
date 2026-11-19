@@ -5150,6 +5150,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => 'Прокрутить вниз';
 
   @override
+  String get miniMapSearchHint => 'Поиск по миникарте';
+
+  @override
+  String get miniMapSearchNoResults => 'Нет подходящих сообщений';
+
+  @override
+  String get miniMapSearchFailed => 'Не удалось выполнить поиск сообщений';
+
+  @override
   String get conversationFindHint => 'Найти';
 
   @override

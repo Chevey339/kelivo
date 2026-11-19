@@ -4970,6 +4970,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => '맨 아래로 스크롤';
 
   @override
+  String get miniMapSearchHint => '미니맵 검색';
+
+  @override
+  String get miniMapSearchNoResults => '일치하는 메시지가 없습니다';
+
+  @override
+  String get miniMapSearchFailed => '메시지를 검색하지 못했습니다';
+
+  @override
   String get conversationFindHint => '찾기';
 
   @override

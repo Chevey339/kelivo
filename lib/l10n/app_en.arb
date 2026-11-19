@@ -2463,6 +2463,18 @@
   "miniMapTitle": "Minimap",
   "miniMapTooltip": "Minimap",
   "miniMapScrollToBottomTooltip": "Scroll to bottom",
+  "miniMapSearchHint": "Search minimap",
+  "@miniMapSearchHint": {
+    "description": "Tooltip for the magnifying glass in the minimap and placeholder in its search field. Searches the current conversation and shows matching message previews inside the minimap."
+  },
+  "miniMapSearchNoResults": "No matching messages",
+  "@miniMapSearchNoResults": {
+    "description": "Empty state in the minimap after a completed query matches no user messages or assistant replies."
+  },
+  "miniMapSearchFailed": "Couldn’t search messages",
+  "@miniMapSearchFailed": {
+    "description": "Status inside the minimap if searching the current conversation for matching messages fails."
+  },
   "conversationFindHint": "Find",
   "@conversationFindHint": {
     "description": "Placeholder in the search field of the current conversation’s find bar."

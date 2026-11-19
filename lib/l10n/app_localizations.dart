@@ -9265,6 +9265,24 @@ abstract class AppLocalizations {
   /// **'Scroll to bottom'**
   String get miniMapScrollToBottomTooltip;
 
+  /// Tooltip for the magnifying glass in the minimap and placeholder in its search field. Searches the current conversation and shows matching message previews inside the minimap.
+  ///
+  /// In en, this message translates to:
+  /// **'Search minimap'**
+  String get miniMapSearchHint;
+
+  /// Empty state in the minimap after a completed query matches no user messages or assistant replies.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching messages'**
+  String get miniMapSearchNoResults;
+
+  /// Status inside the minimap if searching the current conversation for matching messages fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t search messages'**
+  String get miniMapSearchFailed;
+
   /// Placeholder in the search field of the current conversation’s find bar.
   ///
   /// In en, this message translates to:

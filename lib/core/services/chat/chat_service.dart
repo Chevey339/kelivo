@@ -1950,11 +1950,16 @@ class ChatService extends ChangeNotifier {
         _messagesCache[conversationId] ?? [],
         getVersionSelections(conversationId),
       );
-      yield [
-        for (final message in selected)
-          if (message.role == 'assistant' || message.role == 'user')
-            ConversationFindCandidate(message),
-      ];
+      var batch = <ConversationFindCandidate>[];
+      for (final message in selected) {
+        if (message.role != 'assistant' && message.role != 'user') continue;
+        batch.add(ConversationFindCandidate(message));
+        if (batch.length == ConversationFindCandidate.batchSize) {
+          yield batch;
+          batch = [];
+        }
+      }
+      if (batch.isNotEmpty) yield batch;
     } else {
       yield* _repo.conversationFindCandidates(conversationId);
     }

@@ -2364,7 +2364,7 @@ class _MessageListViewState extends State<MessageListView> {
     );
     final find = widget.conversationFind;
     Widget highlightedMessage() {
-      final current = find?.current;
+      final current = find?.activeHit;
       return ConversationFindHighlights(
         hits: find?.hitsFor(message.id) ?? const [],
         current: current?.messageId == message.id ? current : null,

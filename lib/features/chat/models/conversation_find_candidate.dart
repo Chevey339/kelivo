@@ -6,6 +6,8 @@ import '../../intelligent_ui/text/ui_search_text.dart';
 /// Only fields needed by the timeline projection cross the worker boundary.
 /// A live MessagePartSnapshot itself can retain an unsendable WeakReference.
 final class ConversationFindCandidate {
+  static const batchSize = 48;
+
   ConversationFindCandidate(ChatMessage message, {this.surfaces = const {}})
     : id = message.id,
       conversationId = message.conversationId,

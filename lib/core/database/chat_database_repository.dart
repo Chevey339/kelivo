@@ -3176,7 +3176,7 @@ ORDER BY m.message_order DESC LIMIT 20
   ) async* {
     await _timelineIndex.ensureConversation(conversationId);
     await _genUiSearch.ensure();
-    const batchSize = 48;
+    const batchSize = ConversationFindCandidate.batchSize;
     (int, String)? cursor;
     while (true) {
       final after = cursor;

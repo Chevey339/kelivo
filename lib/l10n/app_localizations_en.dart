@@ -5084,6 +5084,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => 'Scroll to bottom';
 
   @override
+  String get miniMapSearchHint => 'Search minimap';
+
+  @override
+  String get miniMapSearchNoResults => 'No matching messages';
+
+  @override
+  String get miniMapSearchFailed => 'Couldn’t search messages';
+
+  @override
   String get conversationFindHint => 'Find';
 
   @override

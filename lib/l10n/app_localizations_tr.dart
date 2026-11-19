@@ -5113,6 +5113,15 @@ class AppLocalizationsTr extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => 'En alta kaydır';
 
   @override
+  String get miniMapSearchHint => 'Mini haritada ara';
+
+  @override
+  String get miniMapSearchNoResults => 'Eşleşen mesaj yok';
+
+  @override
+  String get miniMapSearchFailed => 'Mesajlar aranamadı';
+
+  @override
   String get conversationFindHint => 'Bul';
 
   @override

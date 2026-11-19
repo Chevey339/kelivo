@@ -33,13 +33,15 @@ class ConversationFindHighlights extends InheritedWidget {
       }
     }
 
+    final active = current;
+    var includedActive = false;
     for (final hit in hits) {
       if (hit.part != part || hit.block != block) continue;
       add(hit);
+      if (hit == active) includedActive = true;
       if (result.length >= paintLimit) break;
     }
-    final active = current;
-    if (result.length >= paintLimit &&
+    if (!includedActive &&
         active != null &&
         active.part == part &&
         active.block == block) {

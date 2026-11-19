@@ -88,6 +88,79 @@ void main() {
   );
 
   testWidgets(
+    'selecting a minimap hit expands a collapsed user message with find closed',
+    (tester) async {
+      final content = 'Long user message.\n\n' * 40 + 'keyword';
+      final hit = (
+        messageId: 'message-1',
+        part: FindPart.body,
+        block: 0,
+        segment: null,
+        range: SourceSpan(content.length - 'keyword'.length, content.length),
+        surfaceKey: null,
+      );
+      final reveals = <ConversationFindHit>[];
+      final barHit = (
+        messageId: hit.messageId,
+        part: FindPart.body,
+        block: 0,
+        segment: null,
+        range: const SourceSpan(0, 4),
+        surfaceKey: null,
+      );
+      late bool Function() isCurrent;
+      final controller = ConversationFindController(
+        search: (_, _, _) async => {
+          hit.messageId: [barHit],
+        },
+        onReveal: (hit, current) {
+          reveals.add(hit);
+          isCurrent = current;
+        },
+      );
+      addTearDown(controller.dispose);
+      await _pumpTimeline(
+        tester,
+        conversationFind: controller,
+        role: 'user',
+        content: content,
+        collapseLongUserText: true,
+      );
+      final clip = find.byKey(const ValueKey('collapsible-user-text-clip'));
+      expect(clip, findsOneWidget);
+
+      controller.revealPreview(hit);
+      await tester.pumpAndSettle();
+      expect(reveals, [hit]);
+      expect(isCurrent(), isTrue);
+      expect(controller.opened, isFalse);
+      expect(clip, findsNothing);
+      expect(
+        tester
+            .widget<ConversationFindHighlights>(
+              find.byType(ConversationFindHighlights),
+            )
+            .current,
+        hit,
+      );
+      controller.open(selection: 'Long');
+      await tester.pumpAndSettle();
+      controller.revealPreview(hit);
+      await tester.pumpAndSettle();
+      final highlights = tester.widget<ConversationFindHighlights>(
+        find.byType(ConversationFindHighlights),
+      );
+      expect(controller.current, barHit);
+      expect(highlights.current, hit);
+      expect(highlights.ranges(FindPart.body, 0), [barHit.range, hit.range]);
+      controller.setConversation('another-chat');
+      await tester.pump();
+      expect(isCurrent(), isFalse);
+      expect(controller.activeHit, isNull);
+    },
+  );
+
+  testWidgets(
     'selection edge scroll expresses user intent before auto-follow can pin the page',
     (tester) async {
       tester.view.physicalSize = const Size(400, 700);
@@ -262,6 +335,7 @@ Future<FocusNode> _pumpTimeline(
   ScrollController? controller,
   VoidCallback? onUserScrollIntent,
   ConversationFindController? conversationFind,
+  bool collapseLongUserText = false,
 }) async {
   final scrollController = controller ?? ScrollController();
   final listController = ListController();
@@ -276,13 +350,13 @@ Future<FocusNode> _pumpTimeline(
     inputFocus.dispose();
   });
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+  final settings = SettingsProvider(createBusinessTestPreferences());
+  if (collapseLongUserText) await settings.setCollapseLongUserMessages(true);
 
   await tester.pumpWidget(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => SettingsProvider(createBusinessTestPreferences()),
-        ),
+        ChangeNotifierProvider(create: (_) => settings),
         ChangeNotifierProvider(
           create: (_) =>
               AssistantProvider(preferences: createBusinessTestPreferences()),
