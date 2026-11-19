@@ -4843,6 +4843,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerDetailPageModelsTitle => '모델';
 
   @override
+  String get providerDetailPageReorderModels => '모델 순서 변경';
+
+  @override
   String get providerModelsGetButton => '가져오기';
 
   @override

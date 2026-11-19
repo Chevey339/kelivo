@@ -1484,6 +1484,7 @@
   "desktopProviderShareCopyQr": "QR 복사",
   "providerDetailPageApiBaseUrlLabel": "API Base URL",
   "providerDetailPageModelsTitle": "모델",
+  "providerDetailPageReorderModels": "모델 순서 변경",
   "providerModelsGetButton": "가져오기",
   "providerDetailPageCapsVision": "비전",
   "providerDetailPageCapsImage": "이미지",

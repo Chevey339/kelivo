@@ -1484,6 +1484,7 @@
   "desktopProviderShareCopyQr": "複製 QR 碼",
   "providerDetailPageApiBaseUrlLabel": "API Base URL",
   "providerDetailPageModelsTitle": "模型",
+  "providerDetailPageReorderModels": "重新排序模型",
   "providerModelsGetButton": "取得",
   "providerDetailPageCapsVision": "視覺",
   "providerDetailPageCapsImage": "生圖",

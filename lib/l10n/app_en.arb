@@ -2407,6 +2407,7 @@
   "desktopProviderShareCopyQr": "Copy QR",
   "providerDetailPageApiBaseUrlLabel": "API Base URL",
   "providerDetailPageModelsTitle": "Models",
+  "providerDetailPageReorderModels": "Reorder models",
   "providerModelsGetButton": "Get",
   "providerDetailPageCapsVision": "Vision",
   "providerDetailPageCapsImage": "Image",
@@ -12716,6 +12717,9 @@
   },
   "@providerDetailPageModelsTitle": {
     "description": "Section heading for the provider's model list."
+  },
+  "@providerDetailPageReorderModels": {
+    "description": "Tooltip in the desktop provider's model toolbar and title of the dialog where users drag models into their preferred order for the chat model picker."
   },
   "@providerModelsGetButton": {
     "description": "Button label that fetches/refreshes the provider's available models."

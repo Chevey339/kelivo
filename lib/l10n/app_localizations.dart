@@ -9025,6 +9025,12 @@ abstract class AppLocalizations {
   /// **'Models'**
   String get providerDetailPageModelsTitle;
 
+  /// Tooltip in the desktop provider's model toolbar and title of the dialog where users drag models into their preferred order for the chat model picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder models'**
+  String get providerDetailPageReorderModels;
+
   /// Button label that fetches/refreshes the provider's available models.
   ///
   /// In en, this message translates to:

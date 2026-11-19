@@ -1315,7 +1315,8 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     final allSelected =
         _selectedModels.length == models.length && models.isNotEmpty;
     final hasFailedDetectedModels = _failedDetectedModels(models).isNotEmpty;
-    final filtered = _applyFilter(models, _filterCtrl.text.trim());
+    final filter = _filterCtrl.text.trim();
+    final filtered = _applyFilter(models, filter);
     final groups = _groupModels(filtered);
 
     if (cfg.isOAuth) return _buildOAuthDetails(context, cfg, groups);
@@ -2145,6 +2146,24 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                           ),
                         ),
                       const SizedBox(width: 6),
+                      if (models.length > 1 && filter.isEmpty) ...[
+                        Tooltip(
+                          message: l10n.providerDetailPageReorderModels,
+                          child: _IconBtn(
+                            icon: lucide.Lucide.ListOrdered,
+                            onTap: () {
+                              final providerKey = widget.providerKey;
+                              showDialog<void>(
+                                context: context,
+                                builder: (_) => _DesktopModelOrderDialog(
+                                  providerKey: providerKey,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       Tooltip(
                         message: l10n.providerDetailPageAddNewModelButton,
                         child: _IconBtn(
@@ -6782,6 +6801,113 @@ class _DesktopKeyRow extends StatelessWidget {
   }
 }
 
+class _DesktopModelOrderDialog extends StatefulWidget {
+  const _DesktopModelOrderDialog({required this.providerKey});
+
+  final String providerKey;
+
+  @override
+  State<_DesktopModelOrderDialog> createState() =>
+      _DesktopModelOrderDialogState();
+}
+
+class _DesktopModelOrderDialogState extends State<_DesktopModelOrderDialog> {
+  final _listKey = GlobalKey<ReorderableListState>();
+  // The original index keeps row keys stable even when a config has duplicate IDs.
+  late List<(int, String)> _rows = context
+      .read<SettingsProvider>()
+      .getProviderConfig(widget.providerKey)
+      .models
+      .indexed
+      .toList();
+  int? _draggedIndex;
+
+  void _finishDrag(int insertIndex) {
+    final oldIndex = _draggedIndex;
+    _draggedIndex = null;
+    if (oldIndex == null) return;
+
+    // The drop position still includes the original row.
+    final newIndex = insertIndex > oldIndex ? insertIndex - 1 : insertIndex;
+    if (oldIndex == newIndex) return;
+
+    // Let Flutter finish handling pointer-up before ending the drop animation.
+    // Otherwise dismissing the dialog can dispose the list before it saves.
+    scheduleMicrotask(() {
+      if (!mounted) return;
+      _listKey.currentState?.cancelReorder();
+      unawaited(_reorder(oldIndex, newIndex));
+    });
+  }
+
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    _draggedIndex = null;
+    final settings = context.read<SettingsProvider>();
+    final provider = settings.getProviderConfig(widget.providerKey);
+    if (!listEquals(provider.models, [for (final (_, id) in _rows) id])) {
+      setState(() => _rows = provider.models.indexed.toList());
+      return;
+    }
+
+    setState(() => _rows.insert(newIndex, _rows.removeAt(oldIndex)));
+    await settings.setProviderConfig(
+      widget.providerKey,
+      provider.copyWith(models: [for (final (_, id) in _rows) id]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return DesktopFormDialog(
+      constraints: const BoxConstraints(maxWidth: 560, maxHeight: 520),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DesktopFormDialogHeader(
+            title: l10n.providerDetailPageReorderModels,
+            closeTooltip: l10n.commonClose,
+            onClose: () => Navigator.of(context).pop(),
+          ),
+          Flexible(
+            child: ReorderableList(
+              key: _listKey,
+              shrinkWrap: true,
+              itemCount: _rows.length,
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+              onReorderStart: (index) => _draggedIndex = index,
+              onReorderEnd: _finishDrag,
+              onReorderItem: _reorder,
+              proxyDecorator: (child, _, animation) => ScaleTransition(
+                scale: Tween<double>(begin: 1, end: 1.02).animate(animation),
+                child: Material(
+                  color: context.overlaySurface,
+                  elevation: 3,
+                  borderRadius: BorderRadius.circular(8),
+                  child: child,
+                ),
+              ),
+              itemBuilder: (context, index) {
+                final (originalIndex, modelId) = _rows[index];
+                return _ModelRow(
+                  key: ValueKey((originalIndex, modelId)),
+                  modelId: modelId,
+                  providerKey: widget.providerKey,
+                  dragHandle: ReorderableDragStartListener(
+                    index: index,
+                    child: const _DesktopDragHandle(),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ModelGroupAccordion extends StatefulWidget {
   const _ModelGroupAccordion({
     required this.group,
@@ -6917,8 +7043,10 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
 
 class _ModelRow extends StatelessWidget {
   const _ModelRow({
+    super.key,
     required this.modelId,
     required this.providerKey,
+    this.dragHandle,
     this.isSelectionMode = false,
     this.isSelected = false,
     this.detectionErrorMessage,
@@ -6929,6 +7057,7 @@ class _ModelRow extends StatelessWidget {
   });
   final String modelId;
   final String providerKey;
+  final Widget? dragHandle;
   final bool isSelectionMode;
   final bool isSelected;
   final String? detectionErrorMessage;
@@ -6961,6 +7090,10 @@ class _ModelRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
+            if (dragHandle case final handle?) ...[
+              handle,
+              const SizedBox(width: 6),
+            ],
             if (isSelectionMode) ...[
               IosCheckbox(
                 value: isSelected,
@@ -7051,7 +7184,7 @@ class _ModelRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
-            if (!isSelectionMode)
+            if (!isSelectionMode && dragHandle == null)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

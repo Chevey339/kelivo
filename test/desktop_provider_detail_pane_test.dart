@@ -1,10 +1,13 @@
-import 'dart:ui' show Tristate;
+import 'dart:convert';
+import 'dart:ui' show PointerDeviceKind, Tristate;
 
+import 'package:Kelivo/core/database/business_data.dart';
 import 'package:Kelivo/core/models/provider_oauth.dart';
 import "support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/desktop/widgets/desktop_form_dialog.dart';
 import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/features/provider/widgets/provider_custom_request_editor.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -337,6 +340,114 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(IosCheckbox), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'desktop saves a cross-group drop even when the sort dialog closes immediately',
+    (tester) async {
+      final storage = (await tester.runAsync(createBusinessTestHarness))!;
+      final models = [
+        'zeta/regular',
+        'alpha/vision',
+        'beta/fast',
+        for (var i = 0; i < 697; i++) 'bulk/model-$i',
+      ];
+      const disabledModel = 'alpha/vision';
+      final settings = (await tester.runAsync(() async {
+        final settings = SettingsProvider(storage.preferences);
+        await settings.loaded;
+        await settings.setProviderConfig(
+          'ProviderA',
+          _providerConfig(
+            'ProviderA',
+          ).copyWith(models: models, disabledModels: const {disabledModel}),
+        );
+        await settings.setProvidersOrder(const ['ProviderA']);
+        return settings;
+      }))!;
+      addTearDown(settings.dispose);
+      await _pumpProviderSettings(tester, settings);
+
+      final reorderButton = find.byTooltip('Reorder models');
+      await tester.ensureVisible(reorderButton);
+      await tester.tap(reorderButton);
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(DesktopFormDialog);
+      final handles = find.descendant(
+        of: dialog,
+        matching: find.byType(ReorderableDragStartListener),
+      );
+      expect(handles.evaluate().length, lessThan(models.length));
+      final first = tester.getCenter(handles.at(0));
+      final destination = tester.getCenter(handles.at(2)) + const Offset(0, 18);
+      final mouse = await tester.startGesture(
+        first,
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var step = 1; step <= 12; step++) {
+        await mouse.moveTo(Offset.lerp(first, destination, step / 12)!);
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      await tester.pump(const Duration(milliseconds: 300));
+      final expected = [models[1], models[2], models[0], ...models.skip(3)];
+      final saved = await tester.runAsync(() async {
+        await mouse.up();
+        await tester.pump();
+        await tester.tap(
+          find.descendant(of: dialog, matching: find.byTooltip('Close')),
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 180));
+        await tester.pumpAndSettle();
+        await storage.preferences.flushPendingWrites();
+        final providers = await storage.repository.readEntities(
+          BusinessEntityKind.provider,
+        );
+        final row = providers.singleWhere((row) => row.id == 'ProviderA');
+        return ProviderConfig.fromJson(
+          jsonDecode(row.payload) as Map<String, dynamic>,
+        );
+      });
+      expect(settings.getProviderConfig('ProviderA').models, expected);
+      expect(saved!.models, expected);
+      expect(saved.disabledModels, {disabledModel});
+
+      expect(dialog, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'desktop model reorder is unavailable during filtering or selection',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await settings.setProviderConfig(
+        'ProviderA',
+        _providerConfig(
+          'ProviderA',
+        ).copyWith(models: ['alpha-one', 'beta-two']),
+      );
+      await _pumpProviderSettings(tester, settings);
+
+      final reorderButton = find.byTooltip('Reorder models');
+      expect(reorderButton, findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('search-icon')));
+      await tester.pumpAndSettle();
+      final search = find.byKey(const ValueKey('search-field'));
+      await tester.enterText(search, 'alpha');
+      await tester.pumpAndSettle();
+      expect(reorderButton, findsNothing);
+
+      await tester.enterText(search, '');
+      await tester.pumpAndSettle();
+      expect(reorderButton, findsOneWidget);
+      await tester.tap(find.byTooltip('Multi-select').first);
+      await tester.pumpAndSettle();
+      expect(reorderButton, findsNothing);
     },
   );
 

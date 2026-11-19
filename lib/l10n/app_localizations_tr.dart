@@ -4984,6 +4984,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get providerDetailPageModelsTitle => 'Modeller';
 
   @override
+  String get providerDetailPageReorderModels => 'Modelleri yeniden sırala';
+
+  @override
   String get providerModelsGetButton => 'Getir';
 
   @override

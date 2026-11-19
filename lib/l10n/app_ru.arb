@@ -1484,6 +1484,7 @@
   "desktopProviderShareCopyQr": "Копировать QR",
   "providerDetailPageApiBaseUrlLabel": "Базовый URL API",
   "providerDetailPageModelsTitle": "Модели",
+  "providerDetailPageReorderModels": "Изменить порядок моделей",
   "providerModelsGetButton": "Получить",
   "providerDetailPageCapsVision": "Зрение",
   "providerDetailPageCapsImage": "Изображения",

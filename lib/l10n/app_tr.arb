@@ -1484,6 +1484,7 @@
   "desktopProviderShareCopyQr": "QR kodu kopyala",
   "providerDetailPageApiBaseUrlLabel": "API Temel URL'si",
   "providerDetailPageModelsTitle": "Modeller",
+  "providerDetailPageReorderModels": "Modelleri yeniden sırala",
   "providerModelsGetButton": "Getir",
   "providerDetailPageCapsVision": "Görüntü",
   "providerDetailPageCapsImage": "Görsel",

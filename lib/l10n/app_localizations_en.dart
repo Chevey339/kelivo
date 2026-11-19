@@ -4955,6 +4955,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageModelsTitle => 'Models';
 
   @override
+  String get providerDetailPageReorderModels => 'Reorder models';
+
+  @override
   String get providerModelsGetButton => 'Get';
 
   @override

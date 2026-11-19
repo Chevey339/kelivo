@@ -5022,6 +5022,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerDetailPageModelsTitle => 'Модели';
 
   @override
+  String get providerDetailPageReorderModels => 'Изменить порядок моделей';
+
+  @override
   String get providerModelsGetButton => 'Получить';
 
   @override

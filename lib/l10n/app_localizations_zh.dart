@@ -4764,6 +4764,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageModelsTitle => '模型';
 
   @override
+  String get providerDetailPageReorderModels => '模型排序';
+
+  @override
   String get providerModelsGetButton => '获取';
 
   @override
@@ -21349,6 +21352,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageModelsTitle => '模型';
+
+  @override
+  String get providerDetailPageReorderModels => '模型排序';
 
   @override
   String get providerModelsGetButton => '获取';
@@ -37940,6 +37946,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageModelsTitle => '模型';
+
+  @override
+  String get providerDetailPageReorderModels => '重新排序模型';
 
   @override
   String get providerModelsGetButton => '取得';

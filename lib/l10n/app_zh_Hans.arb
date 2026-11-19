@@ -1679,6 +1679,7 @@
   "desktopProviderShareCopyQr": "复制二维码",
   "providerDetailPageApiBaseUrlLabel": "API Base URL",
   "providerDetailPageModelsTitle": "模型",
+  "providerDetailPageReorderModels": "模型排序",
   "providerModelsGetButton": "获取",
   "providerDetailPageCapsVision": "视觉",
   "providerDetailPageCapsImage": "生图",
