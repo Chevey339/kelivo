@@ -2133,19 +2133,19 @@
   "providerDetailPageClaudePromptCachingTtl1h": "1 hour",
   "providerBalanceAutoRefresh": "Automatic balance refresh",
   "@providerBalanceAutoRefresh": {
-    "description": "Expandable row in a provider’s account balance settings that reveals the automatic refresh controls."
+    "description": "Label for selecting whether to edit this provider's automatic balance refresh settings or the global defaults."
   },
   "providerBalanceScopeProvider": "This provider",
   "@providerBalanceScopeProvider": {
-    "description": "Tab in the automatic balance refresh settings for editing overrides that apply only to the current provider."
+    "description": "Scope choice in the automatic balance refresh settings for editing overrides that apply only to the current provider."
   },
   "providerBalanceScopeGlobal": "Global defaults",
   "@providerBalanceScopeGlobal": {
-    "description": "Tab in the automatic balance refresh settings for editing defaults shared across providers."
+    "description": "Scope choice in the automatic balance refresh settings for editing defaults shared across providers."
   },
   "providerBalanceDefaultInterval": "Default balance refresh interval",
   "@providerBalanceDefaultInterval": {
-    "description": "Interval row in the Global defaults tab of the account balance settings. Sets the time between automatic queries for providers that inherit this interval."
+    "description": "Interval row shown when editing the global automatic balance refresh settings. Sets the time between automatic queries for providers that inherit this interval."
   },
   "providerBalanceInterval": "Balance refresh interval",
   "@providerBalanceInterval": {

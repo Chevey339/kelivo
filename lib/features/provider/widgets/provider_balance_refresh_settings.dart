@@ -1,17 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/provider_balance_refresh_interval.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../desktop/widgets/desktop_select_dropdown.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import '../../../shared/widgets/option_sheet.dart';
-import '../../../shared/widgets/section_card.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
 
@@ -24,10 +25,12 @@ class ProviderBalanceRefreshSettings extends StatefulWidget {
     super.key,
     required this.providerKey,
     required this.providerDisplayName,
+    this.desktopRow,
   });
 
   final String providerKey;
   final String providerDisplayName;
+  final Widget Function(String label, Widget control)? desktopRow;
 
   @override
   State<ProviderBalanceRefreshSettings> createState() =>
@@ -36,69 +39,7 @@ class ProviderBalanceRefreshSettings extends StatefulWidget {
 
 class _ProviderBalanceRefreshSettingsState
     extends State<ProviderBalanceRefreshSettings> {
-  _RefreshScope? _scope;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final scope = _scope;
-    return SectionCard(
-      children: [
-        Semantics(
-          button: true,
-          expanded: scope != null,
-          child: IosNavRow(
-            focusable: true,
-            label: l10n.providerBalanceAutoRefresh,
-            labelMaxLines: null,
-            trailing: Icon(
-              scope == null ? Lucide.ChevronDown : Lucide.ChevronUp,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            onTap: () => setState(() {
-              _scope = scope == null ? _RefreshScope.provider : null;
-            }),
-          ),
-        ),
-        if (scope != null) ...[
-          const IosRowDivider(indent: 12),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
-            child: SegmentedTabs(
-              tabs: [
-                SegmentedTab(label: l10n.providerBalanceScopeProvider),
-                SegmentedTab(label: l10n.providerBalanceScopeGlobal),
-              ],
-              index: scope.index,
-              height: 36,
-              radioGroup: true,
-              backgroundColor: context.appColors.surfaceFill,
-              onChanged: (index) => setState(() {
-                _scope = _RefreshScope.values[index];
-              }),
-            ),
-          ),
-          _RefreshOptions(
-            providerKey: scope == _RefreshScope.provider
-                ? widget.providerKey
-                : null,
-            providerDisplayName: widget.providerDisplayName,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _RefreshOptions extends StatelessWidget {
-  const _RefreshOptions({
-    required this.providerKey,
-    required this.providerDisplayName,
-  });
-
-  final String? providerKey;
-  final String providerDisplayName;
+  _RefreshScope _scope = _RefreshScope.provider;
 
   static const _presets = [0, 1, 5, 15, 30, 60];
   static const _inherit = -1;
@@ -111,63 +52,71 @@ class _RefreshOptions extends StatelessWidget {
         _ => l10n.providerBalanceRefreshMinutes(minutes),
       };
 
-  static String _replyLabel(AppLocalizations l10n, bool enabled) =>
-      enabled ? l10n.providerBalanceRefreshOn : l10n.providerBalanceRefreshOff;
-
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
-    final key = providerKey;
-    ProviderConfig configFor(String key) =>
-        settings.getProviderConfig(key, defaultName: providerDisplayName);
-    final config = key == null ? null : configFor(key);
-    final interval = config == null
+    final global = _scope == _RefreshScope.global;
+    final key = widget.providerKey;
+    ProviderConfig currentConfig() => settings.getProviderConfig(
+      key,
+      defaultName: widget.providerDisplayName,
+    );
+    final config = currentConfig();
+    final interval = global
         ? settings.balanceRefreshInterval
         : config.balanceRefreshInterval;
-    final intervalTitle = config == null
-        ? l10n.providerBalanceDefaultInterval
-        : l10n.providerBalanceInterval;
-    final inheritedInterval = l10n.providerBalanceFollowDefault(
-      _intervalLabel(l10n, settings.balanceRefreshInterval),
-    );
-    final inheritedReply = l10n.providerBalanceFollowDefault(
-      _replyLabel(l10n, settings.balanceRefreshOnReply),
-    );
+    final replyTitle = l10n.providerBalanceRefreshOnReply;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        IosNavRow(
-          focusable: true,
-          label: intervalTitle,
-          labelMaxLines: null,
-          subtitle: interval == null
-              ? inheritedInterval
-              : _intervalLabel(l10n, interval),
-          subtitleMaxLines: null,
-          onTap: () async {
-            final custom = interval != null && !_presets.contains(interval);
-            final choice = await showOptionSheet<int>(
-              context,
-              title: intervalTitle,
-              selected: custom ? _custom : interval ?? _inherit,
-              items: [
-                if (config != null)
-                  OptionSheetItem(value: _inherit, label: inheritedInterval),
-                for (final minutes in _presets)
-                  OptionSheetItem(
-                    value: minutes,
-                    label: _intervalLabel(l10n, minutes),
-                  ),
-                OptionSheetItem(
-                  value: _custom,
-                  label: l10n.providerBalanceCustomInterval,
-                  subtitle: custom ? _intervalLabel(l10n, interval) : null,
+        _choice(
+          context,
+          label: l10n.providerBalanceAutoRefresh,
+          value: _scope,
+          options: [
+            OptionSheetItem(
+              value: _RefreshScope.provider,
+              label: l10n.providerBalanceScopeProvider,
+            ),
+            OptionSheetItem(
+              value: _RefreshScope.global,
+              label: l10n.providerBalanceScopeGlobal,
+            ),
+          ],
+          onSelected: (value) => setState(() => _scope = value),
+        ),
+        _choice(
+          context,
+          label: global
+              ? l10n.providerBalanceDefaultInterval
+              : l10n.providerBalanceInterval,
+          value: interval ?? _inherit,
+          options: [
+            if (!global)
+              OptionSheetItem(
+                value: _inherit,
+                label: l10n.providerBalanceFollowDefault(
+                  _intervalLabel(l10n, settings.balanceRefreshInterval),
                 ),
-              ],
-            );
-            if (!context.mounted || choice == null) return;
-
+              ),
+            for (final minutes in _presets)
+              OptionSheetItem(
+                value: minutes,
+                label: _intervalLabel(l10n, minutes),
+              ),
+            if (interval != null && !_presets.contains(interval))
+              OptionSheetItem(
+                value: interval,
+                label: _intervalLabel(l10n, interval),
+              ),
+            OptionSheetItem(
+              value: _custom,
+              label: l10n.providerBalanceCustomInterval,
+            ),
+          ],
+          onSelected: (choice) async {
             int? minutes = choice == _inherit ? null : choice;
             if (choice == _custom) {
               final initial = interval ?? settings.balanceRefreshInterval;
@@ -180,74 +129,129 @@ class _RefreshOptions extends StatelessWidget {
               );
               if (!context.mounted || minutes == null) return;
             }
-            if (key == null) {
+            if (minutes == interval) return;
+            if (global) {
               await settings.setBalanceRefreshInterval(minutes!);
             } else {
-              final current = configFor(key);
               await settings.setProviderConfig(
                 key,
-                current.copyWith(balanceRefreshInterval: minutes),
+                currentConfig().copyWith(balanceRefreshInterval: minutes),
               );
             }
           },
         ),
-        const IosRowDivider(indent: 12),
-        if (key == null)
+        if (global)
           IosSwitchRow(
+            padding: EdgeInsets.symmetric(
+              vertical: widget.desktopRow == null ? 2 : 6,
+            ),
             focusable: true,
-            label: l10n.providerBalanceRefreshOnReply,
+            label: replyTitle,
             value: settings.balanceRefreshOnReply,
             onChanged: settings.setBalanceRefreshOnReply,
           )
         else
-          IosNavRow(
-            focusable: true,
-            label: l10n.providerBalanceRefreshOnReply,
-            labelMaxLines: null,
-            subtitle: switch (config!.balanceRefreshOnReply) {
-              final bool enabled => _replyLabel(l10n, enabled),
-              null => inheritedReply,
+          _choice(
+            context,
+            label: replyTitle,
+            value: switch (config.balanceRefreshOnReply) {
+              true => _ReplySetting.on,
+              false => _ReplySetting.off,
+              null => _ReplySetting.inherit,
             },
-            subtitleMaxLines: null,
-            onTap: () async {
-              final choice = await showOptionSheet<_ReplySetting>(
-                context,
-                title: l10n.providerBalanceRefreshOnReply,
-                selected: switch (config.balanceRefreshOnReply) {
-                  true => _ReplySetting.on,
-                  false => _ReplySetting.off,
-                  null => _ReplySetting.inherit,
-                },
-                items: [
-                  OptionSheetItem(
-                    value: _ReplySetting.inherit,
-                    label: inheritedReply,
-                  ),
-                  OptionSheetItem(
-                    value: _ReplySetting.on,
-                    label: l10n.providerBalanceRefreshOn,
-                  ),
-                  OptionSheetItem(
-                    value: _ReplySetting.off,
-                    label: l10n.providerBalanceRefreshOff,
-                  ),
-                ],
-              );
-              if (choice == null || !context.mounted) return;
-              final current = configFor(key);
-              await settings.setProviderConfig(
-                key,
-                current.copyWith(
-                  balanceRefreshOnReply: switch (choice) {
-                    _ReplySetting.inherit => null,
-                    _ReplySetting.on => true,
-                    _ReplySetting.off => false,
-                  },
+            options: [
+              OptionSheetItem(
+                value: _ReplySetting.inherit,
+                label: l10n.providerBalanceFollowDefault(
+                  settings.balanceRefreshOnReply
+                      ? l10n.providerBalanceRefreshOn
+                      : l10n.providerBalanceRefreshOff,
                 ),
-              );
-            },
+              ),
+              OptionSheetItem(
+                value: _ReplySetting.on,
+                label: l10n.providerBalanceRefreshOn,
+              ),
+              OptionSheetItem(
+                value: _ReplySetting.off,
+                label: l10n.providerBalanceRefreshOff,
+              ),
+            ],
+            onSelected: (choice) => settings.setProviderConfig(
+              key,
+              currentConfig().copyWith(
+                balanceRefreshOnReply: switch (choice) {
+                  _ReplySetting.inherit => null,
+                  _ReplySetting.on => true,
+                  _ReplySetting.off => false,
+                },
+              ),
+            ),
           ),
       ],
+    );
+  }
+
+  Widget _choice<T>(
+    BuildContext context, {
+    required String label,
+    required T value,
+    required List<OptionSheetItem<T>> options,
+    required FutureOr<void> Function(T) onSelected,
+  }) {
+    final desktopRow = widget.desktopRow;
+    if (desktopRow != null) {
+      return desktopRow(
+        label,
+        SizedBox(
+          width: double.infinity,
+          child: DesktopSelectDropdown<T>(
+            value: value,
+            options: [
+              for (final option in options)
+                DesktopSelectOption(value: option.value, label: option.label),
+            ],
+            semanticLabel: label,
+            wrapTriggerLabel: true,
+            triggerFillColor: context.appColors.surfaceFill,
+            onSelected: onSelected,
+          ),
+        ),
+      );
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    return IosNavRow(
+      label: label,
+      labelMaxLines: null,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      focusable: true,
+      trailing: Flexible(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Flexible(
+              child: Text(
+                options.firstWhere((option) => option.value == value).label,
+                textAlign: TextAlign.end,
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Lucide.ChevronRight, size: 16, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
+      onTap: () async {
+        final choice = await showOptionSheet(
+          context,
+          title: label,
+          selected: value,
+          items: options,
+        );
+        if (choice == null || !context.mounted) return;
+        await onSelected(choice);
+      },
     );
   }
 }

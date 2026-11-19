@@ -5,6 +5,7 @@ import "support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/features/provider/widgets/provider_custom_request_editor.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
@@ -141,9 +142,9 @@ void main() {
         ),
       );
       await press(LogicalKeyboardKey.enter);
-      await focus(find.text('Automatic balance refresh'));
+      await focus(find.text('This provider'));
       await press(LogicalKeyboardKey.enter);
-      await focus(find.text('Global defaults'));
+      await press(LogicalKeyboardKey.arrowDown);
       expect(
         tester
             .getSemantics(find.bySemanticsLabel('Global defaults'))
@@ -152,14 +153,16 @@ void main() {
         Tristate.isTrue,
       );
       await press(LogicalKeyboardKey.space);
-      await focus(find.text('Default balance refresh interval'));
+      await focus(find.text('Off'));
       await press(LogicalKeyboardKey.enter);
-      await focus(find.text('5 minutes'));
+      await press(LogicalKeyboardKey.arrowDown);
+      await press(LogicalKeyboardKey.arrowDown);
       await press(LogicalKeyboardKey.enter);
       await focus(find.text('Refresh balance after each reply'));
+      expect(settings.balanceRefreshOnReply, isTrue);
       await press(LogicalKeyboardKey.space);
       expect(settings.balanceRefreshInterval, 5);
-      expect(settings.balanceRefreshOnReply, isTrue);
+      expect(settings.balanceRefreshOnReply, isFalse);
       final config = settings.getProviderConfig('ProviderB');
       expect(config.balanceRefreshInterval, isNull);
       expect(config.balanceRefreshOnReply, isNull);
@@ -178,6 +181,7 @@ void main() {
         tester,
         settings,
         initialProviderKey: 'Aliyun',
+        textScaler: const TextScaler.linear(2),
       );
       final detail = find.byType(DesktopProviderDetailPane);
       final l10n = AppLocalizations.of(tester.element(detail))!;
@@ -195,8 +199,20 @@ void main() {
       }
 
       await tap(find.byKey(const ValueKey('desktop-provider-settings-Aliyun')));
-      await tap(find.text(l10n.providerBalanceAutoRefresh));
-      await tap(find.text(l10n.providerBalanceInterval));
+      final inheritedReply = find.text(
+        l10n.providerBalanceFollowDefault(l10n.providerBalanceRefreshOn),
+      );
+      expect(
+        tester.renderObject<RenderParagraph>(inheritedReply).didExceedMaxLines,
+        isFalse,
+      );
+      await tap(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is DesktopSelectDropdown &&
+              widget.semanticLabel == l10n.providerBalanceInterval,
+        ),
+      );
       await tap(find.text(l10n.providerBalanceRefreshMinutes(5)));
       final config = settings.providerConfigs['Aliyun']!;
       expect(config.name, l10n.providersPageAliyunName);

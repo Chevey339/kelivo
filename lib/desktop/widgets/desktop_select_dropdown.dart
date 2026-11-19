@@ -38,6 +38,7 @@ class DesktopSelectDropdown<T> extends StatefulWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
     this.borderRadius = 10,
     this.maxLabelWidth = 240,
+    this.wrapTriggerLabel = false,
     this.triggerFillColor,
     this.triggerForegroundColor,
     this.menuBackgroundColor,
@@ -58,6 +59,7 @@ class DesktopSelectDropdown<T> extends StatefulWidget {
   final EdgeInsets padding;
   final double borderRadius;
   final double maxLabelWidth;
+  final bool wrapTriggerLabel;
   final Color? triggerFillColor;
   final Color? triggerForegroundColor;
   final Color? menuBackgroundColor;
@@ -336,8 +338,10 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
                                 ),
                                 child: Text(
                                   label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: widget.wrapTriggerLabel ? null : 1,
+                                  overflow: widget.wrapTriggerLabel
+                                      ? TextOverflow.visible
+                                      : TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 14,
                                     color:

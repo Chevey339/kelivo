@@ -1,5 +1,6 @@
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/desktop/widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/features/provider/pages/provider_balance_page.dart';
 import 'package:Kelivo/features/provider/pages/provider_detail_page.dart';
 import 'package:Kelivo/features/provider/widgets/provider_balance_badge.dart';
@@ -41,15 +42,13 @@ void main() {
       tester.element(find.byType(ProviderBalancePage)),
     )!;
     expect(settings.providerConfigs.containsKey('Aliyun'), isFalse);
-    await tester.tap(find.text(l10n.providerBalanceAutoRefresh));
-    await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.providerBalanceRefreshOnReply));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(l10n.providerBalanceRefreshOn));
+    await tester.tap(find.text(l10n.providerBalanceRefreshOff));
     await tester.pumpAndSettle();
     final config = settings.providerConfigs['Aliyun']!;
     expect(config.name, l10n.providersPageAliyunName);
-    expect(config.balanceRefreshOnReply, isTrue);
+    expect(config.balanceRefreshOnReply, isFalse);
     expect(config.balanceEnabled, isNot(true));
   });
 
@@ -120,6 +119,14 @@ void main() {
             await tester.pumpAndSettle();
           }
 
+          Finder refreshChoice(String label) => desktop
+              ? find.byWidgetPredicate(
+                  (widget) =>
+                      widget is DesktopSelectDropdown &&
+                      widget.semanticLabel == label,
+                )
+              : find.text(label);
+
           final settingsButton = find.byKey(
             const ValueKey('desktop-provider-settings-BalanceTest'),
           );
@@ -142,13 +149,16 @@ void main() {
           expect(find.byType(ProviderBalanceBadge), findsOneWidget);
           await openSettings();
 
-          final refresh = find.text('Automatic balance refresh');
-          expect(refresh, findsOneWidget);
-          expect(find.text('Balance refresh interval'), findsNothing);
+          final scope = refreshChoice('Automatic balance refresh');
+          final interval = refreshChoice('Balance refresh interval');
+          final reply = refreshChoice('Refresh balance after each reply');
+          expect(scope, findsOneWidget);
+          expect(interval, findsOneWidget);
+          expect(find.text('This provider'), findsOneWidget);
+          expect(find.text('Follow global setting (On)'), findsOneWidget);
           expect(find.text('Global defaults'), findsNothing);
           if (kind == ProviderKind.openai) {
-            await tap(refresh);
-            await tap(find.text('Balance refresh interval'));
+            await tap(interval);
             await tap(find.text('Custom interval…'));
             await enter(
               find.descendant(
@@ -164,27 +174,27 @@ void main() {
               settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
               10,
             );
-            await tap(find.text('Balance refresh interval'));
+            expect(find.text('10 minutes'), findsOneWidget);
+            await tap(interval);
             await tap(find.text('Off'));
             expect(
               settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
               0,
             );
-            await tap(find.text('Balance refresh interval'));
+            await tap(interval);
             await tap(find.text('Follow global setting (Off)').hitTestable());
             expect(
               settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
               isNull,
             );
 
-            await tap(find.text('Refresh balance after each reply'));
-            await tap(find.text('On'));
+            await tap(reply);
+            await tap(find.text('Off'));
             expect(
               settings.getProviderConfig('BalanceTest').balanceRefreshOnReply,
-              isTrue,
+              isFalse,
             );
-            expect(settings.balanceRefreshOnReply, isFalse);
-            await tap(refresh);
+            expect(settings.balanceRefreshOnReply, isTrue);
           }
 
           final editor = find.byType(ProviderBalanceRequestEditor);
@@ -295,26 +305,26 @@ void main() {
             {'name': 'X-Chat', 'value': 'chat-only'},
           ]);
           if (kind == ProviderKind.openai) {
-            await tap(refresh);
+            await tap(scope);
             await tap(find.text('Global defaults'));
-            await tap(find.text('Default balance refresh interval'));
+            await tap(refreshChoice('Default balance refresh interval'));
             await tap(find.text('5 minutes'));
+            expect(settings.balanceRefreshOnReply, isTrue);
             await tap(find.text('Refresh balance after each reply'));
             expect(settings.balanceRefreshInterval, 5);
-            expect(settings.balanceRefreshOnReply, isTrue);
+            expect(settings.balanceRefreshOnReply, isFalse);
             config = settings.getProviderConfig('BalanceTest');
             expect(config.balanceEnabled, isFalse);
             expect(config.balanceRefreshInterval, isNull);
             expect(config.balanceRefreshOnReply, isNull);
 
-            await tap(refresh);
-            await tap(refresh);
+            await tap(scope);
+            await tap(find.text('This provider'));
             expect(
               find.text('Follow global setting (5 minutes)'),
               findsOneWidget,
             );
-            expect(find.text('Follow global setting (On)'), findsOneWidget);
-            await tap(refresh);
+            expect(find.text('Follow global setting (Off)'), findsOneWidget);
           }
           await tap(find.byKey(const ValueKey('provider-balance-enabled')));
           expect(tester.widget<SegmentedTabs>(method).index, 0);

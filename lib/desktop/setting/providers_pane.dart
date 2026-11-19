@@ -3171,6 +3171,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                               ProviderBalanceRefreshSettings(
                                 providerKey: widget.providerKey,
                                 providerDisplayName: widget.displayName,
+                                desktopRow: row,
                               ),
                               AnimatedCrossFade(
                                 firstChild: const SizedBox.shrink(),

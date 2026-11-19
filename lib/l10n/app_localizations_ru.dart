@@ -4567,7 +4567,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerBalanceScopeProvider => 'Этот провайдер';
 
   @override
-  String get providerBalanceScopeGlobal => 'Глобальные значения по умолчанию';
+  String get providerBalanceScopeGlobal => 'Глобальные настройки по умолчанию';
 
   @override
   String get providerBalanceDefaultInterval =>

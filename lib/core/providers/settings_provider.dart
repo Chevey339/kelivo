@@ -600,8 +600,9 @@ class SettingsProvider extends ChangeNotifier {
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs =>
       Map.unmodifiable(_providerConfigs);
+  static const _defaultBalanceRefreshOnReply = true;
   int _balanceRefreshInterval = 0;
-  bool _balanceRefreshOnReply = false;
+  bool _balanceRefreshOnReply = _defaultBalanceRefreshOnReply;
   int get balanceRefreshInterval => _balanceRefreshInterval;
   bool get balanceRefreshOnReply => _balanceRefreshOnReply;
   ProviderBalanceRefresh? _balanceRefresh;
@@ -753,7 +754,8 @@ class SettingsProvider extends ChangeNotifier {
     _balanceRefreshInterval =
         prefs.getInt(BusinessKeyRegistry.balanceRefreshIntervalKey) ?? 0;
     _balanceRefreshOnReply =
-        prefs.getBool(BusinessKeyRegistry.balanceRefreshOnReplyKey) ?? false;
+        prefs.getBool(BusinessKeyRegistry.balanceRefreshOnReplyKey) ??
+        _defaultBalanceRefreshOnReply;
     if (cfgStr != null && cfgStr.isNotEmpty) {
       try {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;

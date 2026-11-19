@@ -1350,7 +1350,7 @@
   "providerDetailPageClaudePromptCachingTtl1h": "1 час",
   "providerBalanceAutoRefresh": "Автоматическое обновление баланса",
   "providerBalanceScopeProvider": "Этот провайдер",
-  "providerBalanceScopeGlobal": "Глобальные значения по умолчанию",
+  "providerBalanceScopeGlobal": "Глобальные настройки по умолчанию",
   "providerBalanceDefaultInterval": "Интервал обновления баланса по умолчанию",
   "providerBalanceInterval": "Интервал обновления баланса",
   "providerBalanceRefreshOnReply": "Обновлять баланс после каждого ответа",

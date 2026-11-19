@@ -149,7 +149,6 @@ void main() {
           apiKey: 'key',
           baseUrl: 'https://example.test',
           balanceEnabled: true,
-          balanceRefreshOnReply: true,
         ),
       );
     });

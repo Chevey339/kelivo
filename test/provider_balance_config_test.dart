@@ -158,9 +158,8 @@ void main() {
       addTearDown(settings.dispose);
       await settings.loaded;
       expect(settings.balanceRefreshInterval, 0);
-      expect(settings.balanceRefreshOnReply, isFalse);
+      expect(settings.balanceRefreshOnReply, isTrue);
       await settings.setBalanceRefreshInterval(10);
-      await settings.setBalanceRefreshOnReply(true);
       final config = settings
           .getProviderConfig('OpenAI')
           .copyWith(balanceRefreshInterval: 0, balanceRefreshOnReply: false);
@@ -182,4 +181,25 @@ void main() {
       expect(reloaded.balanceRefreshOnReplyFor(inherit), isTrue);
     },
   );
+
+  test('explicitly disabling reply refresh survives reload', () async {
+    final harness = await createBusinessTestHarness();
+    final settings = SettingsProvider(harness.preferences);
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setBalanceRefreshOnReply(false);
+
+    final reloaded = SettingsProvider(BusinessPreferences(harness.repository));
+    addTearDown(reloaded.dispose);
+    await reloaded.loaded;
+    expect(reloaded.balanceRefreshOnReply, isFalse);
+    final config = reloaded.getProviderConfig('OpenAI');
+    expect(reloaded.balanceRefreshOnReplyFor(config), isFalse);
+    expect(
+      reloaded.balanceRefreshOnReplyFor(
+        config.copyWith(balanceRefreshOnReply: true),
+      ),
+      isTrue,
+    );
+  });
 }
