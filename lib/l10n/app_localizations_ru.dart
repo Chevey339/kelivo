@@ -4570,19 +4570,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerBalanceScopeGlobal => 'Глобальные настройки по умолчанию';
 
   @override
-  String get providerBalanceDefaultInterval =>
-      'Интервал обновления баланса по умолчанию';
+  String get providerBalanceInterval => 'Обновление по таймеру';
 
   @override
-  String get providerBalanceInterval => 'Интервал обновления баланса';
-
-  @override
-  String get providerBalanceRefreshOnReply =>
-      'Обновлять баланс после каждого ответа';
+  String get providerBalanceRefreshOnReply => 'Обновлять после ответов';
 
   @override
   String providerBalanceFollowDefault(String value) {
-    return 'Как в глобальных настройках ($value)';
+    return 'По умолчанию · $value';
   }
 
   @override

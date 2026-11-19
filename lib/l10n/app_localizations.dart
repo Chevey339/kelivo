@@ -8227,28 +8227,22 @@ abstract class AppLocalizations {
   /// **'Global defaults'**
   String get providerBalanceScopeGlobal;
 
-  /// Interval row shown when editing the global automatic balance refresh settings. Sets the time between automatic queries for providers that inherit this interval.
+  /// Short row label in automatic balance refresh settings for choosing how often to update the balance on a timer. Shown for both the global default and the provider override.
   ///
   /// In en, this message translates to:
-  /// **'Default balance refresh interval'**
-  String get providerBalanceDefaultInterval;
-
-  /// Row in a provider account balance editor for overriding its periodic refresh interval.
-  ///
-  /// In en, this message translates to:
-  /// **'Balance refresh interval'**
+  /// **'Timed refresh'**
   String get providerBalanceInterval;
 
-  /// Global and provider settings label. An account balance query becomes due after a final model reply.
+  /// Short row label in automatic balance refresh settings. Updates the balance after each completed model reply. Shown for both the global default and the provider override.
   ///
   /// In en, this message translates to:
-  /// **'Refresh balance after each reply'**
+  /// **'Refresh after replies'**
   String get providerBalanceRefreshOnReply;
 
-  /// Provider override option that inherits the global setting. The value is the currently effective interval or the localized on/off state.
+  /// Compact current value and picker option that uses the global automatic balance refresh setting. Keep the wording short so it fits beside the row label. The value is the currently effective interval or localized on/off state.
   ///
   /// In en, this message translates to:
-  /// **'Follow global setting ({value})'**
+  /// **'Default · {value}'**
   String providerBalanceFollowDefault(String value);
 
   /// Option disabling the selected balance refresh trigger, either the periodic interval or refresh after replies.

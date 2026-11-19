@@ -42,6 +42,7 @@ void main() {
       tester.element(find.byType(ProviderBalancePage)),
     )!;
     expect(settings.providerConfigs.containsKey('Aliyun'), isFalse);
+    expect(find.text('默认 · 开启'), findsOneWidget);
     await tester.tap(find.text(l10n.providerBalanceRefreshOnReply));
     await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.providerBalanceRefreshOff));
@@ -150,12 +151,12 @@ void main() {
           await openSettings();
 
           final scope = refreshChoice('Automatic balance refresh');
-          final interval = refreshChoice('Balance refresh interval');
-          final reply = refreshChoice('Refresh balance after each reply');
+          final interval = refreshChoice('Timed refresh');
+          final reply = refreshChoice('Refresh after replies');
           expect(scope, findsOneWidget);
           expect(interval, findsOneWidget);
           expect(find.text('This provider'), findsOneWidget);
-          expect(find.text('Follow global setting (On)'), findsOneWidget);
+          expect(find.text('Default · On'), findsOneWidget);
           expect(find.text('Global defaults'), findsNothing);
           if (kind == ProviderKind.openai) {
             await tap(interval);
@@ -182,7 +183,7 @@ void main() {
               0,
             );
             await tap(interval);
-            await tap(find.text('Follow global setting (Off)').hitTestable());
+            await tap(find.text('Default · Off').hitTestable());
             expect(
               settings.getProviderConfig('BalanceTest').balanceRefreshInterval,
               isNull,
@@ -307,10 +308,10 @@ void main() {
           if (kind == ProviderKind.openai) {
             await tap(scope);
             await tap(find.text('Global defaults'));
-            await tap(refreshChoice('Default balance refresh interval'));
+            await tap(interval);
             await tap(find.text('5 minutes'));
             expect(settings.balanceRefreshOnReply, isTrue);
-            await tap(find.text('Refresh balance after each reply'));
+            await tap(find.text('Refresh after replies'));
             expect(settings.balanceRefreshInterval, 5);
             expect(settings.balanceRefreshOnReply, isFalse);
             config = settings.getProviderConfig('BalanceTest');
@@ -320,11 +321,8 @@ void main() {
 
             await tap(scope);
             await tap(find.text('This provider'));
-            expect(
-              find.text('Follow global setting (5 minutes)'),
-              findsOneWidget,
-            );
-            expect(find.text('Follow global setting (Off)'), findsOneWidget);
+            expect(find.text('Default · 5 minutes'), findsOneWidget);
+            expect(find.text('Default · Off'), findsOneWidget);
           }
           await tap(find.byKey(const ValueKey('provider-balance-enabled')));
           expect(tester.widget<SegmentedTabs>(method).index, 0);

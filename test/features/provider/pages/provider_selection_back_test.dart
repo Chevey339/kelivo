@@ -83,7 +83,7 @@ void main() {
       await tester.tap(find.byTooltip('Done'));
       await tester.pumpAndSettle();
       expect(find.text('Automatic balance refresh'), findsNothing);
-      expect(find.text('Default balance refresh interval'), findsNothing);
+      expect(find.text('Timed refresh'), findsNothing);
 
       tester.view.physicalSize = const Size(780, 390);
       await tester.pumpAndSettle();

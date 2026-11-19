@@ -158,7 +158,7 @@ void main() {
       await press(LogicalKeyboardKey.arrowDown);
       await press(LogicalKeyboardKey.arrowDown);
       await press(LogicalKeyboardKey.enter);
-      await focus(find.text('Refresh balance after each reply'));
+      await focus(find.text('Refresh after replies'));
       expect(settings.balanceRefreshOnReply, isTrue);
       await press(LogicalKeyboardKey.space);
       expect(settings.balanceRefreshInterval, 5);
@@ -249,7 +249,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(DesktopProviderDetailPane), findsNothing);
       expect(find.text('Automatic balance refresh'), findsNothing);
-      expect(find.text('Default balance refresh interval'), findsNothing);
+      expect(find.text('Timed refresh'), findsNothing);
       await tester.tap(find.text('ProviderB').first);
       await tester.pumpAndSettle();
       expect(

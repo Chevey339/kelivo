@@ -4513,19 +4513,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerBalanceScopeGlobal => 'Global defaults';
 
   @override
-  String get providerBalanceDefaultInterval =>
-      'Default balance refresh interval';
+  String get providerBalanceInterval => 'Timed refresh';
 
   @override
-  String get providerBalanceInterval => 'Balance refresh interval';
-
-  @override
-  String get providerBalanceRefreshOnReply =>
-      'Refresh balance after each reply';
+  String get providerBalanceRefreshOnReply => 'Refresh after replies';
 
   @override
   String providerBalanceFollowDefault(String value) {
-    return 'Follow global setting ($value)';
+    return 'Default · $value';
   }
 
   @override

@@ -4335,17 +4335,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerBalanceScopeGlobal => '全局默认';
 
   @override
-  String get providerBalanceDefaultInterval => '余额默认刷新间隔';
+  String get providerBalanceInterval => '定时刷新';
 
   @override
-  String get providerBalanceInterval => '余额刷新间隔';
-
-  @override
-  String get providerBalanceRefreshOnReply => '模型每次回复后刷新余额';
+  String get providerBalanceRefreshOnReply => '回复后刷新';
 
   @override
   String providerBalanceFollowDefault(String value) {
-    return '跟随全局设置（当前：$value）';
+    return '默认 · $value';
   }
 
   @override
@@ -20887,17 +20884,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerBalanceScopeGlobal => '全局默认';
 
   @override
-  String get providerBalanceDefaultInterval => '余额默认刷新间隔';
+  String get providerBalanceInterval => '定时刷新';
 
   @override
-  String get providerBalanceInterval => '余额刷新间隔';
-
-  @override
-  String get providerBalanceRefreshOnReply => '模型每次回复后刷新余额';
+  String get providerBalanceRefreshOnReply => '回复后刷新';
 
   @override
   String providerBalanceFollowDefault(String value) {
-    return '跟随全局设置（当前：$value）';
+    return '默认 · $value';
   }
 
   @override
@@ -37444,17 +37438,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerBalanceScopeGlobal => '全域預設';
 
   @override
-  String get providerBalanceDefaultInterval => '餘額預設重新整理間隔';
+  String get providerBalanceInterval => '定時重新整理';
 
   @override
-  String get providerBalanceInterval => '餘額重新整理間隔';
-
-  @override
-  String get providerBalanceRefreshOnReply => '模型每次回覆後重新整理餘額';
+  String get providerBalanceRefreshOnReply => '回覆後重新整理';
 
   @override
   String providerBalanceFollowDefault(String value) {
-    return '跟隨全域設定（$value）';
+    return '預設 · $value';
   }
 
   @override

@@ -2143,21 +2143,17 @@
   "@providerBalanceScopeGlobal": {
     "description": "Scope choice in the automatic balance refresh settings for editing defaults shared across providers."
   },
-  "providerBalanceDefaultInterval": "Default balance refresh interval",
-  "@providerBalanceDefaultInterval": {
-    "description": "Interval row shown when editing the global automatic balance refresh settings. Sets the time between automatic queries for providers that inherit this interval."
-  },
-  "providerBalanceInterval": "Balance refresh interval",
+  "providerBalanceInterval": "Timed refresh",
   "@providerBalanceInterval": {
-    "description": "Row in a provider account balance editor for overriding its periodic refresh interval."
+    "description": "Short row label in automatic balance refresh settings for choosing how often to update the balance on a timer. Shown for both the global default and the provider override."
   },
-  "providerBalanceRefreshOnReply": "Refresh balance after each reply",
+  "providerBalanceRefreshOnReply": "Refresh after replies",
   "@providerBalanceRefreshOnReply": {
-    "description": "Global and provider settings label. An account balance query becomes due after a final model reply."
+    "description": "Short row label in automatic balance refresh settings. Updates the balance after each completed model reply. Shown for both the global default and the provider override."
   },
-  "providerBalanceFollowDefault": "Follow global setting ({value})",
+  "providerBalanceFollowDefault": "Default · {value}",
   "@providerBalanceFollowDefault": {
-    "description": "Provider override option that inherits the global setting. The value is the currently effective interval or the localized on/off state.",
+    "description": "Compact current value and picker option that uses the global automatic balance refresh setting. Keep the wording short so it fits beside the row label. The value is the currently effective interval or localized on/off state.",
     "placeholders": {
       "value": {
         "type": "String"

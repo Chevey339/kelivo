@@ -89,9 +89,7 @@ class _ProviderBalanceRefreshSettingsState
         ),
         _choice(
           context,
-          label: global
-              ? l10n.providerBalanceDefaultInterval
-              : l10n.providerBalanceInterval,
+          label: l10n.providerBalanceInterval,
           value: interval ?? _inherit,
           options: [
             if (!global)
