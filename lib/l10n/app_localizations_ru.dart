@@ -4653,11 +4653,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => 'Проверка...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => 'Сбросить';
+  String get providerDetailPageBalanceResetDefaultsButton =>
+      'Восстановить настройки баланса по умолчанию';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip =>
-      'Сбросить настройки баланса';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      'Это заменит пользовательские настройки запроса баланса этого провайдера, восстановит состояние его переключателя баланса по умолчанию и настроит автоматическое обновление в соответствии с глобальными настройками.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton =>
+      'Восстановить по умолчанию';
 
   @override
   String providerDetailPageBalanceResult(String value) {

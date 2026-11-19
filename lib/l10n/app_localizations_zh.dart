@@ -4407,10 +4407,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => '查询中...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => '重置';
+  String get providerDetailPageBalanceResetDefaultsButton => '恢复默认余额设置';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip => '重置余额设置';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      '这会覆盖当前供应商自定义的余额查询配置，将余额查询开关恢复为默认状态，并让自动刷新跟随全局设置。';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => '恢复默认';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -20990,10 +20994,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageBalanceQuerying => '查询中...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => '重置';
+  String get providerDetailPageBalanceResetDefaultsButton => '恢复默认余额设置';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip => '重置余额设置';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      '这会覆盖当前供应商自定义的余额查询配置，将余额查询开关恢复为默认状态，并让自动刷新跟随全局设置。';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => '恢复默认';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -37578,10 +37586,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageBalanceQuerying => '查詢中...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => '重設';
+  String get providerDetailPageBalanceResetDefaultsButton => '恢復預設餘額設定';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip => '重設餘額設定';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      '這會覆寫此供應商自訂的餘額查詢設定，將餘額查詢開關恢復為預設狀態，並讓自動重新整理跟隨全域設定。';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => '恢復預設';
 
   @override
   String providerDetailPageBalanceResult(String value) {

@@ -2511,6 +2511,38 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     );
   }
 
+  Future<void> _resetProviderBalance(String providerKey) async {
+    if (!mounted || providerKey != widget.providerKey) return;
+
+    final defaults = ProviderConfig.defaultsFor(
+      providerKey,
+      displayName: widget.displayName,
+    );
+    final apiPath = defaults.balanceApiPath ?? '';
+    final resultPath = defaults.balanceResultPath ?? '';
+    _syncControllerText(_balanceBodyCtrl, defaults.balanceBody);
+    _syncControllerText(_balanceApiPathCtrl, apiPath);
+    _syncControllerText(_balanceResultPathCtrl, resultPath);
+    final settings = context.read<SettingsProvider>();
+    final old = settings.getProviderConfig(
+      providerKey,
+      defaultName: widget.displayName,
+    );
+    await settings.setProviderConfig(
+      providerKey,
+      old.copyWith(
+        balanceEnabled: defaults.balanceEnabled ?? false,
+        balanceApiPath: apiPath.trim(),
+        balanceResultPath: resultPath.trim(),
+        balanceMethod: defaults.balanceMethod,
+        balanceHeaders: defaults.balanceHeaders,
+        balanceBody: defaults.balanceBody,
+        balanceRefreshInterval: null,
+        balanceRefreshOnReply: null,
+      ),
+    );
+  }
+
   Future<void> _queryProviderBalance(BuildContext context) async {
     if (_balanceLoading) return;
     final sp = context.read<SettingsProvider>();
@@ -2619,9 +2651,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
               maxHeight: MediaQuery.of(ctx).size.height * 0.82,
             ),
             child: Consumer<SettingsProvider>(
-              builder: (c, spWatch, _) {
+              builder: (_, spWatch, _) {
+                final providerKey = widget.providerKey;
                 final cfgNow = spWatch.getProviderConfig(
-                  widget.providerKey,
+                  providerKey,
                   defaultName: widget.displayName,
                 );
                 // IME-friendly sync: avoid overwriting while composing
@@ -3319,74 +3352,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 6),
-                                            Tooltip(
-                                              message: l10n
-                                                  .providerDetailPageBalanceResetDefaultsTooltip,
-                                              child: _IconBtn(
-                                                icon: lucide.Lucide.RotateCcw,
-                                                color: cs.onSurface.withValues(
-                                                  alpha: 0.78,
-                                                ),
-                                                onTap: () async {
-                                                  _syncControllerText(
-                                                    _balanceBodyCtrl,
-                                                    balanceDefaults.balanceBody,
-                                                  );
-                                                  _syncControllerText(
-                                                    _balanceApiPathCtrl,
-                                                    balanceDefaults
-                                                            .balanceApiPath ??
-                                                        '',
-                                                  );
-                                                  _syncControllerText(
-                                                    _balanceResultPathCtrl,
-                                                    balanceDefaults
-                                                            .balanceResultPath ??
-                                                        '',
-                                                  );
-                                                  final old = spWatch
-                                                      .getProviderConfig(
-                                                        widget.providerKey,
-                                                        defaultName:
-                                                            widget.displayName,
-                                                      );
-                                                  await spWatch.setProviderConfig(
-                                                    widget.providerKey,
-                                                    old.copyWith(
-                                                      balanceMethod:
-                                                          balanceDefaults
-                                                              .balanceMethod,
-                                                      balanceHeaders:
-                                                          balanceDefaults
-                                                              .balanceHeaders,
-                                                      balanceBody:
-                                                          balanceDefaults
-                                                              .balanceBody,
-                                                      balanceEnabled:
-                                                          balanceDefaults
-                                                              .balanceEnabled ??
-                                                          false,
-                                                      balanceApiPath:
-                                                          _balanceApiPathCtrl
-                                                              .text
-                                                              .trim(),
-                                                      balanceResultPath:
-                                                          _balanceResultPathCtrl
-                                                              .text
-                                                              .trim(),
-                                                      balanceRefreshInterval:
-                                                          null,
-                                                      balanceRefreshOnReply:
-                                                          null,
-                                                    ),
-                                                  );
-                                                  if (mounted) {
-                                                    setState(() {});
-                                                  }
-                                                },
-                                              ),
-                                            ),
                                             const SizedBox(width: 4),
                                             Tooltip(
                                               message: _balanceLoading
@@ -3395,9 +3360,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                               child: _IconBtn(
                                                 icon: _balanceLoading
                                                     ? lucide.Lucide.Loader
-                                                    : lucide
-                                                          .Lucide
-                                                          .RefreshCcwDot,
+                                                    : lucide.Lucide.RefreshCw,
                                                 color: cs.primary,
                                                 onTap: () =>
                                                     _queryProviderBalance(
@@ -3407,6 +3370,11 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                             ),
                                           ],
                                         ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ProviderBalanceResetButton(
+                                        onConfirmed: () =>
+                                            _resetProviderBalance(providerKey),
                                       ),
                                     ],
                                   ),

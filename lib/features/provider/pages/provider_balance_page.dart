@@ -5,11 +5,11 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../widgets/provider_balance_badge.dart';
 import '../widgets/provider_balance_refresh_settings.dart';
 import '../widgets/provider_balance_request_editor.dart';
+import '../widgets/provider_balance_reset_button.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -144,16 +144,6 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
                     showManualResultWhenDisabled: true,
                   ),
                 ),
-                Tooltip(
-                  message: l10n.providerDetailPageBalanceResetDefaultsTooltip,
-                  child: IosIconButton(
-                    icon: Lucide.RefreshCw,
-                    size: 18,
-                    color: cs.onSurface.withValues(alpha: 0.72),
-                    minSize: 36,
-                    onTap: _resetBalanceDefaults,
-                  ),
-                ),
                 const SizedBox(width: 8),
                 _BalanceQueryButton(
                   label: _balanceLoading
@@ -164,6 +154,8 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            ProviderBalanceResetButton(onConfirmed: _resetBalanceDefaults),
           ],
         ],
       ),
@@ -263,7 +255,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
     }
   }
 
-  void _resetBalanceDefaults() {
+  Future<void> _resetBalanceDefaults() async {
     final defaults = ProviderConfig.defaultsFor(
       widget.providerKey,
       displayName: widget.providerDisplayName,
@@ -276,7 +268,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
       _balanceHeaders = defaults.balanceHeaders;
       _balanceBodyCtrl.text = defaults.balanceBody;
     });
-    _saveBalance(resetRefresh: true);
+    await _saveBalance(resetRefresh: true);
   }
 }
 
@@ -367,7 +359,7 @@ class _BalanceQueryButtonState extends State<_BalanceQueryButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Lucide.Coins, size: 16, color: base),
+              Icon(Lucide.RefreshCw, size: 16, color: base),
               const SizedBox(width: 6),
               Text(
                 widget.label,

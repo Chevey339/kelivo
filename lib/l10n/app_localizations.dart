@@ -8353,17 +8353,23 @@ abstract class AppLocalizations {
   /// **'Checking...'**
   String get providerDetailPageBalanceQuerying;
 
-  /// Button label that resets balance settings to their defaults.
+  /// Visible action below the provider's balance settings that opens a confirmation dialog, also used as the dialog title.
   ///
   /// In en, this message translates to:
-  /// **'Reset'**
+  /// **'Restore default balance settings'**
   String get providerDetailPageBalanceResetDefaultsButton;
 
-  /// Tooltip on the reset icon button that restores default balance settings.
+  /// Warning in the provider balance reset dialog. It replaces custom request fields with the provider preset, resets whether balance queries are enabled, and makes automatic refresh inherit the global settings.
   ///
   /// In en, this message translates to:
-  /// **'Reset balance settings'**
-  String get providerDetailPageBalanceResetDefaultsTooltip;
+  /// **'This will replace this provider’s custom balance request settings, restore the default state of its balance switch, and make automatic refresh follow the global settings.'**
+  String get providerDetailPageBalanceResetConfirmMessage;
+
+  /// Confirmation button in the provider balance reset dialog. Activating it restores default balance settings for the current provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore defaults'**
+  String get providerDetailPageBalanceResetConfirmButton;
 
   /// Success message and displayed value showing the queried balance, with {value} substituted by the balance amount.
   ///

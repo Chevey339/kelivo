@@ -101,6 +101,7 @@ import '../features/provider/widgets/provider_avatar.dart';
 import '../features/provider/widgets/provider_balance_badge.dart';
 import '../features/provider/widgets/provider_balance_refresh_settings.dart';
 import '../features/provider/widgets/provider_balance_request_editor.dart';
+import '../features/provider/widgets/provider_balance_reset_button.dart';
 import '../features/provider/widgets/provider_custom_request_editor.dart';
 import '../features/provider/widgets/share_provider_sheet.dart'
     show encodeProviderConfig;

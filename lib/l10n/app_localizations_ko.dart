@@ -4484,10 +4484,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => '확인 중...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => '초기화';
+  String get providerDetailPageBalanceResetDefaultsButton => '기본 잔액 설정 복원';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip => '잔액 설정 초기화';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      '이 공급자의 사용자 지정 잔액 요청 설정을 대체하고, 잔액 조회 스위치를 기본 상태로 복원하며, 자동 새로 고침이 전역 설정을 따르도록 합니다.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => '기본값 복원';
 
   @override
   String providerDetailPageBalanceResult(String value) {

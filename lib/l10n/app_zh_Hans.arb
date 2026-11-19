@@ -1553,8 +1553,9 @@
   "providerDetailPageBalanceResultPathLabel": "结果 JSON 路径",
   "providerDetailPageBalanceQueryButton": "查询余额",
   "providerDetailPageBalanceQuerying": "查询中...",
-  "providerDetailPageBalanceResetDefaultsButton": "重置",
-  "providerDetailPageBalanceResetDefaultsTooltip": "重置余额设置",
+  "providerDetailPageBalanceResetDefaultsButton": "恢复默认余额设置",
+  "providerDetailPageBalanceResetConfirmMessage": "这会覆盖当前供应商自定义的余额查询配置，将余额查询开关恢复为默认状态，并让自动刷新跟随全局设置。",
+  "providerDetailPageBalanceResetConfirmButton": "恢复默认",
   "providerDetailPageBalanceResult": "余额：{value}",
   "@providerDetailPageBalanceResult": {
     "placeholders": {

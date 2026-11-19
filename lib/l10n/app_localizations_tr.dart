@@ -4619,11 +4619,16 @@ class AppLocalizationsTr extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => 'Kontrol ediliyor...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => 'Sıfırla';
+  String get providerDetailPageBalanceResetDefaultsButton =>
+      'Varsayılan bakiye ayarlarını geri yükle';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip =>
-      'Bakiye ayarlarını sıfırla';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      'Bu işlem, bu sağlayıcının özel bakiye isteği ayarlarını değiştirecek, bakiye anahtarını varsayılan durumuna döndürecek ve otomatik yenilemenin genel ayarları izlemesini sağlayacaktır.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton =>
+      'Varsayılanları geri yükle';
 
   @override
   String providerDetailPageBalanceResult(String value) {

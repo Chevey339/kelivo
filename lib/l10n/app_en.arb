@@ -2223,8 +2223,9 @@
   "providerDetailPageBalanceResultPathLabel": "Result JSON Path",
   "providerDetailPageBalanceQueryButton": "Check Balance",
   "providerDetailPageBalanceQuerying": "Checking...",
-  "providerDetailPageBalanceResetDefaultsButton": "Reset",
-  "providerDetailPageBalanceResetDefaultsTooltip": "Reset balance settings",
+  "providerDetailPageBalanceResetDefaultsButton": "Restore default balance settings",
+  "providerDetailPageBalanceResetConfirmMessage": "This will replace this provider’s custom balance request settings, restore the default state of its balance switch, and make automatic refresh follow the global settings.",
+  "providerDetailPageBalanceResetConfirmButton": "Restore defaults",
   "providerDetailPageBalanceResult": "Balance: {value}",
   "@providerDetailPageBalanceResult": {
     "placeholders": {
@@ -12408,10 +12409,13 @@
     "description": "Loading label shown on the balance query button while a request is in progress."
   },
   "@providerDetailPageBalanceResetDefaultsButton": {
-    "description": "Button label that resets balance settings to their defaults."
+    "description": "Visible action below the provider's balance settings that opens a confirmation dialog, also used as the dialog title."
   },
-  "@providerDetailPageBalanceResetDefaultsTooltip": {
-    "description": "Tooltip on the reset icon button that restores default balance settings."
+  "@providerDetailPageBalanceResetConfirmMessage": {
+    "description": "Warning in the provider balance reset dialog. It replaces custom request fields with the provider preset, resets whether balance queries are enabled, and makes automatic refresh inherit the global settings."
+  },
+  "@providerDetailPageBalanceResetConfirmButton": {
+    "description": "Confirmation button in the provider balance reset dialog. Activating it restores default balance settings for the current provider."
   },
   "@providerDetailPageVertexAiTitle": {
     "description": "Row label with a switch enabling Vertex AI mode for the provider."

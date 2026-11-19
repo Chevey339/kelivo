@@ -5,6 +5,7 @@ import 'package:Kelivo/features/provider/pages/provider_balance_page.dart';
 import 'package:Kelivo/features/provider/pages/provider_detail_page.dart';
 import 'package:Kelivo/features/provider/widgets/provider_balance_badge.dart';
 import 'package:Kelivo/features/provider/widgets/provider_balance_request_editor.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
@@ -196,6 +197,8 @@ void main() {
               isFalse,
             );
             expect(settings.balanceRefreshOnReply, isTrue);
+            await tap(interval);
+            await tap(find.text('15 minutes'));
           }
 
           final editor = find.byType(ProviderBalanceRequestEditor);
@@ -239,6 +242,15 @@ void main() {
           expect(config.customHeaders, [
             {'name': 'X-Chat', 'value': 'chat-only'},
           ]);
+
+          await tap(inEditor('provider-custom-header-delete-0'));
+          expect(
+            settings.getProviderConfig('BalanceTest').balanceHeaders,
+            isEmpty,
+          );
+          await tap(inEditor('provider-custom-header-add'));
+          await enter(headerName, 'x-api-key');
+          await enter(headerValue, '{{apiKey}}');
 
           // Some IMEs commit by clearing composing without changing the text.
           const imeBody = '{"api_key":"{{apiKey}}","account":"中文"}';
@@ -289,17 +301,95 @@ void main() {
             tester.widget<TextField>(body).controller!.text,
             config.balanceBody,
           );
-          await tap(inEditor('provider-custom-header-delete-0'));
-          expect(
-            settings.getProviderConfig('BalanceTest').balanceHeaders,
-            isEmpty,
+          final reset = find.widgetWithText(
+            IosTextButton,
+            'Restore default balance settings',
           );
-          await tap(find.byTooltip('Reset balance settings'));
+          if (!desktop) {
+            await tester.scrollUntilVisible(
+              reset,
+              150,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(ProviderBalancePage),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+          }
+          final queryIcon = find.byIcon(Lucide.RefreshCw);
+          final query = desktop
+              ? find.byTooltip('Check Balance')
+              : find
+                    .ancestor(
+                      of: find.text('Check Balance'),
+                      matching: find.byType(Row),
+                    )
+                    .first;
+          expect(
+            find.descendant(of: query, matching: queryIcon),
+            findsOneWidget,
+          );
+
+          final beforeReset = settings
+              .getProviderConfig('BalanceTest')
+              .toJson();
+          final confirm = find.widgetWithText(
+            IosTextButton,
+            'Restore defaults',
+          );
+          final composingPath = desktop && kind == ProviderKind.openai
+              ? '/custom/路径'
+              : null;
+          if (composingPath != null) {
+            await tester.ensureVisible(apiPath);
+            await tester.showKeyboard(apiPath);
+            final draft = TextEditingValue(
+              text: composingPath,
+              selection: TextSelection.collapsed(offset: composingPath.length),
+              composing: TextRange(
+                start: '/custom/'.length,
+                end: composingPath.length,
+              ),
+            );
+            tester.testTextInput.updateEditingValue(draft);
+            await tester.pump();
+            expect(tester.widget<TextField>(apiPath).controller!.value, draft);
+            expect(
+              settings.getProviderConfig('BalanceTest').toJson(),
+              beforeReset,
+            );
+          }
+          await tap(reset);
+          expect(confirm, findsOneWidget);
+          expect(
+            settings.getProviderConfig('BalanceTest').toJson(),
+            beforeReset,
+          );
+          await tap(find.widgetWithText(IosTextButton, 'Cancel'));
+          expect(confirm, findsNothing);
+          expect(
+            settings.getProviderConfig('BalanceTest').toJson(),
+            beforeReset,
+          );
+          if (composingPath != null) {
+            expect(
+              tester.widget<TextField>(apiPath).controller!.text,
+              composingPath,
+            );
+          }
+
+          await tap(reset);
+          await tap(confirm);
           config = settings.getProviderConfig('BalanceTest');
+          final defaults = ProviderConfig.defaultsFor('BalanceTest');
           expect(config.balanceEnabled, isFalse);
+          expect(config.balanceApiPath, defaults.balanceApiPath);
+          expect(config.balanceResultPath, defaults.balanceResultPath);
           expect(config.balanceMethod, 'GET');
           expect(config.balanceHeaders, isEmpty);
           expect(config.balanceBody, isEmpty);
+          expect(config.balanceRefreshInterval, isNull);
           expect(config.balanceRefreshOnReply, isNull);
           expect(config.providerType, kind);
           expect(config.customHeaders, [

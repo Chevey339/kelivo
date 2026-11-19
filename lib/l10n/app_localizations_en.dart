@@ -4591,11 +4591,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => 'Checking...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => 'Reset';
+  String get providerDetailPageBalanceResetDefaultsButton =>
+      'Restore default balance settings';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip =>
-      'Reset balance settings';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      'This will replace this provider’s custom balance request settings, restore the default state of its balance switch, and make automatic refresh follow the global settings.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => 'Restore defaults';
 
   @override
   String providerDetailPageBalanceResult(String value) {
