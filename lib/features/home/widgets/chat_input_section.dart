@@ -11,6 +11,7 @@ import '../../../core/models/conversation_mcp_settings.dart';
 import '../../../core/services/api/reasoning/reasoning_level_options.dart';
 import '../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../core/services/api/reasoning/reasoning_selection.dart';
+import '../../../core/services/api/response_speed.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/skills_binding.dart';
@@ -177,10 +178,18 @@ class ChatInputSection extends StatelessWidget {
     final mid = chatModelId;
     final supportsModelTools =
         pk != null && mid != null && isToolModel(pk, mid);
+    final supportsReasoning =
+        pk != null && mid != null && isReasoningModel(pk, mid);
+    final config = pk == null ? null : settings.getProviderConfig(pk);
     final selectedReasoning = _selectedReasoning(settings, a, pk, mid);
-    final reasoningSpec = (pk != null && mid != null)
-        ? ModelSpecResolver.instance.spec(settings.getProviderConfig(pk), mid)
+    final reasoningSpec = (config != null && mid != null)
+        ? ModelSpecResolver.instance.spec(config, mid)
         : null;
+    final showResponseSpeedAction =
+        !supportsReasoning &&
+        config != null &&
+        mid != null &&
+        ResponseSpeedCapabilities.resolve(config, mid).tiers.isNotEmpty;
     final effectiveReasoning = reasoningSpec == null
         ? selectedReasoning
         : ReasoningRequest(
@@ -246,9 +255,8 @@ class ChatInputSection extends StatelessWidget {
       reasoningCustomBudget: reasoningSpec != null
           ? isCustomBudgetSelection(reasoningSpec, selectedReasoning)
           : false,
-      supportsReasoning: (pk != null && mid != null)
-          ? isReasoningModel(pk, mid)
-          : false,
+      supportsReasoning: supportsReasoning,
+      showResponseSpeedAction: showResponseSpeedAction,
       onOpenSearch: onOpenSearch,
       onSend: onSend,
       loading: isLoading,

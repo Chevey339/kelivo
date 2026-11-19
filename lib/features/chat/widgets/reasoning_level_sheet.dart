@@ -18,6 +18,7 @@ import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/dialogs/reasoning_budget_custom_dialog.dart';
 import '../../../shared/widgets/effort_slider.dart';
+import '../../../shared/widgets/ios_settings_rows.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -179,21 +180,23 @@ class ReasoningLevelPicker extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final config = settings.providerConfigs[this.config.id] ?? this.config;
     final spec = ModelSpecResolver.instance.spec(config, modelId);
-    if (!spec.supportsReasoning) {
+    final snapshot = spec.supportsReasoning
+        ? buildReasoningLevelPickerSnapshot(
+            settings: settings,
+            config: config,
+            modelId: modelId,
+            spec: spec,
+            assistant: assistant,
+          )
+        : null;
+    final hasSlider = snapshot != null && snapshot.sliderStops.isNotEmpty;
+    final capabilities = ResponseSpeedCapabilities.resolve(config, modelId);
+    if (!hasSlider && (conversationId == null || capabilities.tiers.isEmpty)) {
       return const _UnsupportedState();
     }
-    final snapshot = buildReasoningLevelPickerSnapshot(
-      settings: settings,
-      config: config,
-      modelId: modelId,
-      spec: spec,
-      assistant: assistant,
-    );
-    if (snapshot.sliderStops.isEmpty) {
-      return const _UnsupportedState();
-    }
-    return _SliderPicker(
-      snapshot: snapshot,
+    return _ChatModelPicker(
+      snapshot: hasSlider ? snapshot : null,
+      capabilities: capabilities,
       config: config,
       modelId: modelId,
       assistant: assistant,
@@ -224,9 +227,10 @@ class _UnsupportedState extends StatelessWidget {
   }
 }
 
-class _SliderPicker extends StatefulWidget {
-  const _SliderPicker({
+class _ChatModelPicker extends StatefulWidget {
+  const _ChatModelPicker({
     required this.snapshot,
+    required this.capabilities,
     required this.config,
     required this.modelId,
     this.assistant,
@@ -234,7 +238,8 @@ class _SliderPicker extends StatefulWidget {
     this.compact = false,
   });
 
-  final ReasoningLevelPickerSnapshot snapshot;
+  final ReasoningLevelPickerSnapshot? snapshot;
+  final ResponseSpeedCapabilities capabilities;
   final ProviderConfig config;
   final String modelId;
   final Assistant? assistant;
@@ -242,10 +247,10 @@ class _SliderPicker extends StatefulWidget {
   final bool compact;
 
   @override
-  State<_SliderPicker> createState() => _SliderPickerState();
+  State<_ChatModelPicker> createState() => _ChatModelPickerState();
 }
 
-class _SliderPickerState extends State<_SliderPicker> {
+class _ChatModelPickerState extends State<_ChatModelPicker> {
   bool _saving = false;
   bool _loadingTiers = false;
 
@@ -287,15 +292,11 @@ class _SliderPickerState extends State<_SliderPicker> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final snapshot = widget.snapshot;
-    final stops = snapshot.sliderStops;
     final chat = widget.conversationId == null
         ? null
         : context.watch<ChatService>();
     final conversation = chat?.getConversation(widget.conversationId!);
-    final capabilities = ResponseSpeedCapabilities.resolve(
-      widget.config,
-      widget.modelId,
-    );
+    final capabilities = widget.capabilities;
     final speed = ConversationResponseSpeed.effective(
       conversation,
       widget.config,
@@ -326,12 +327,36 @@ class _SliderPickerState extends State<_SliderPicker> {
         : l10n.responseSpeedUnavailable;
     final speedTooltip = [
       '${_speedLabel(l10n, speed)} · $speedHint',
-      if (speed == ResponseSpeed.fast &&
-          capabilities.ultrafastRequiresResponses)
+      if (capabilities.ultrafastRequiresResponses)
         l10n.responseSpeedUltrafastNeedsResponses,
       if (savedSpeed != null && !capabilities.supports(savedSpeed))
         l10n.responseSpeedSelectionUnavailable,
     ].join('\n');
+    final speedButton = speedVisible
+        ? IosIconButton(
+            key: const ValueKey('response-speed-toggle'),
+            icon: Lucide.Zap,
+            size: widget.compact ? 14 : 16,
+            minSize: 32,
+            visualSize: widget.compact ? 26 : 28,
+            padding: const EdgeInsets.all(6),
+            color: speedColor,
+            tooltip: speedTooltip,
+            semanticLabel:
+                '${l10n.responseSpeedLabel}: ${_speedLabel(l10n, speed)}',
+            enabled: !_saving && !_loadingTiers && nextSpeed != speed,
+            onTap: _toggleSpeed,
+          )
+        : null;
+    if (snapshot == null) {
+      return IosNavRow(
+        label: l10n.responseSpeedLabel,
+        subtitle: _speedLabel(l10n, speed),
+        padding: const EdgeInsets.fromLTRB(20, 0, 16, 12),
+        trailing: speedButton,
+      );
+    }
+    final stops = snapshot.sliderStops;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -350,22 +375,7 @@ class _SliderPickerState extends State<_SliderPicker> {
           headerSpacing: widget.compact ? 6 : 10,
           padding: EdgeInsets.symmetric(horizontal: widget.compact ? 14 : 28),
           animatedTrack: speedVisible && speed != ResponseSpeed.standard,
-          headerAction: speedVisible
-              ? IosIconButton(
-                  key: const ValueKey('response-speed-toggle'),
-                  icon: Lucide.Zap,
-                  size: widget.compact ? 14 : 16,
-                  minSize: 32,
-                  visualSize: widget.compact ? 26 : 28,
-                  padding: const EdgeInsets.all(6),
-                  color: speedColor,
-                  tooltip: speedTooltip,
-                  semanticLabel:
-                      '${l10n.responseSpeedLabel}: ${_speedLabel(l10n, speed)}',
-                  enabled: !_saving && !_loadingTiers && nextSpeed != speed,
-                  onTap: _toggleSpeed,
-                )
-              : null,
+          headerAction: speedButton,
           onCommit: (index) => _commitStop(stops[index]),
           stops: [
             for (final stop in stops)
@@ -392,7 +402,7 @@ class _SliderPickerState extends State<_SliderPicker> {
             budget: snapshot.customSelected
                 ? snapshot.selected.budgetTokens
                 : null,
-            onTap: _pickCustomBudget,
+            onTap: () => _pickCustomBudget(snapshot),
           ),
         ],
         SizedBox(height: widget.compact ? 4 : 12),
@@ -462,9 +472,8 @@ class _SliderPickerState extends State<_SliderPicker> {
     );
   }
 
-  Future<void> _pickCustomBudget() async {
+  Future<void> _pickCustomBudget(ReasoningLevelPickerSnapshot snapshot) async {
     Haptics.light();
-    final snapshot = widget.snapshot;
 
     final chosen = await ReasoningBudgetCustomDialog.show(
       context,

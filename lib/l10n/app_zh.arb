@@ -1463,6 +1463,8 @@
   "modelSpecFormDynamicWebSearchSubtitle": "开启动态过滤时，使用 2026-03-18 版网页搜索与抓取工具",
   "modelSpecFormRemoteImageUrls": "远程图片链接",
   "modelSpecFormRemoteImageUrlsSubtitle": "直接发送 http(s) 图片链接；关闭后丢弃远程链接，只发送本地图片",
+  "modelSpecFormResponseSpeedTiers": "响应速度档位",
+  "modelSpecFormResponseSpeedTiersSubtitle": "自定义聊天中可为此模型选择的加速档位。两档均不勾选时，只提供标准档。",
   "modelSpecFormPromptCacheControl": "提示缓存标记",
   "modelSpecFormPromptCacheControlSubtitle": "开启提示缓存时，在 OpenRouter 请求中加入 cache_control",
   "modelSpecFormSamplingAlways": "始终保留",

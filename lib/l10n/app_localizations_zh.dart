@@ -4121,6 +4121,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '直接发送 http(s) 图片链接；关闭后丢弃远程链接，只发送本地图片';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => '响应速度档位';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      '自定义聊天中可为此模型选择的加速档位。两档均不勾选时，只提供标准档。';
+
+  @override
   String get modelSpecFormPromptCacheControl => '提示缓存标记';
 
   @override
@@ -20709,6 +20716,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get modelSpecFormRemoteImageUrlsSubtitle =>
       '直接发送 http(s) 图片链接；关闭后丢弃远程链接，只发送本地图片';
+
+  @override
+  String get modelSpecFormResponseSpeedTiers => '响应速度档位';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      '自定义聊天中可为此模型选择的加速档位。两档均不勾选时，只提供标准档。';
 
   @override
   String get modelSpecFormPromptCacheControl => '提示缓存标记';
@@ -37304,6 +37318,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get modelSpecFormRemoteImageUrlsSubtitle =>
       '直接傳送 http(s) 圖片連結；關閉後捨棄遠端連結，只傳送本機圖片';
+
+  @override
+  String get modelSpecFormResponseSpeedTiers => '回應速度等級';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      '自訂此模型在聊天中可提供的加速等級。兩者皆不勾選時，僅提供標準等級。';
 
   @override
   String get modelSpecFormPromptCacheControl => '提示快取標記';

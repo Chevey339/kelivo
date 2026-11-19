@@ -746,6 +746,7 @@ class ChatInputBar extends StatefulWidget {
     this.reasoning,
     this.reasoningCustomBudget = false,
     this.supportsReasoning = true,
+    this.showResponseSpeedAction = false,
     this.showToolsButton = false,
     this.toolsActive = false,
     this.toolsConnectionIssue = false,
@@ -817,6 +818,7 @@ class ChatInputBar extends StatefulWidget {
   final ReasoningRequest? reasoning;
   final bool reasoningCustomBudget;
   final bool supportsReasoning;
+  final bool showResponseSpeedAction;
   final bool showToolsButton;
   final bool toolsActive;
   final bool toolsConnectionIssue;
@@ -3509,9 +3511,13 @@ class _ChatInputBarState extends State<ChatInputBar>
           ),
         );
 
-        if (widget.supportsReasoning) {
+        if (widget.supportsReasoning || widget.showResponseSpeedAction) {
+          final reasoning = widget.supportsReasoning;
           final request = widget.reasoning ?? ReasoningRequest.auto;
-          final compactLabel = settings.showReasoningLevelBadge
+          final tooltip = reasoning
+              ? l10n.chatInputBarReasoningStrengthTooltip
+              : l10n.responseSpeedLabel;
+          final compactLabel = reasoning && settings.showReasoningLevelBadge
               ? _reasoningCompactLabel(
                   l10n,
                   request,
@@ -3526,19 +3532,27 @@ class _ChatInputBarState extends State<ChatInputBar>
                   : _reasoningButtonWidth(compactLabel),
               builder: () => _CompactIconButton(
                 key: widget.reasoningButtonKey,
-                tooltip: l10n.chatInputBarReasoningStrengthTooltip,
-                icon: Lucide.Brain,
-                active: widget.reasoningActive,
+                tooltip: tooltip,
+                icon: reasoning ? Lucide.Brain : Lucide.Zap,
+                active: reasoning && widget.reasoningActive,
                 badge: compactLabel,
                 onTap: lockTap(widget.onConfigureReasoning),
-                childBuilder: (c) =>
-                    ReasoningIcons.levelIcon(request.level, size: 20, color: c),
+                childBuilder: reasoning
+                    ? (c) => ReasoningIcons.levelIcon(
+                        request.level,
+                        size: 20,
+                        color: c,
+                      )
+                    : null,
               ),
               menu: DesktopContextMenuItem(
-                svgAsset: ReasoningIcons.assetForLevel(request.level),
+                icon: reasoning ? null : Lucide.Zap,
+                svgAsset: reasoning
+                    ? ReasoningIcons.assetForLevel(request.level)
+                    : null,
                 label: compactLabel == null
-                    ? l10n.chatInputBarReasoningStrengthTooltip
-                    : '${l10n.chatInputBarReasoningStrengthTooltip} · $compactLabel',
+                    ? tooltip
+                    : '$tooltip · $compactLabel',
                 onTap: lockTap(widget.onConfigureReasoning),
               ),
             ),

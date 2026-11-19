@@ -183,6 +183,153 @@ void main() {
     );
   }
 
+  test('manual tiers cover renamed chat models on compatible routes', () {
+    const alias = 'mychat-gpt62';
+    final config = _config().copyWith(
+      baseUrl: 'https://gateway.example/v1',
+      modelOverrides: const {
+        alias: {
+          'responseSpeedTiers': ['ultrafast'],
+        },
+        'gpt-6-astra': {'responseSpeedTiers': []},
+        'image': {
+          'type': 'image',
+          'responseSpeedTiers': ['fast'],
+        },
+      },
+    );
+    expect(ResponseSpeedCapabilities.resolve(config, alias).tiers, {
+      ResponseSpeed.ultrafast: 'ultrafast',
+    });
+    final completions = ResponseSpeedCapabilities.resolve(
+      config.copyWith(useResponseApi: false),
+      alias,
+    );
+    expect(completions.tiers, isEmpty);
+    expect(completions.ultrafastRequiresResponses, isTrue);
+    expect(
+      ResponseSpeedCapabilities.resolve(config, 'gpt-6-astra').tiers,
+      isEmpty,
+    );
+    expect(
+      ResponseSpeedCapabilities.resolve(
+        config,
+        'gpt-6.2-sol',
+      ).supports(ResponseSpeed.fast),
+      isTrue,
+    );
+    expect(
+      ResponseSpeedCapabilities.resolve(config, 'image').supportedProvider,
+      isFalse,
+    );
+    for (final kind in [ProviderKind.claude, ProviderKind.google]) {
+      expect(
+        ResponseSpeedCapabilities.resolve(
+          config.copyWith(providerType: kind),
+          alias,
+        ).supportedProvider,
+        isFalse,
+      );
+    }
+  });
+
+  test('official GLM-OCR uses layout parsing even under a local alias', () {
+    const alias = 'ocr';
+    final config = _config().copyWith(
+      baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+      modelOverrides: const {
+        alias: {
+          'apiModelId': 'glm-ocr',
+          'responseSpeedTiers': ['fast'],
+        },
+      },
+    );
+    final chat = Conversation(title: 'one');
+    final selected = chat.copyWith(
+      extras: ConversationResponseSpeed.updateExtras(
+        chat.extras,
+        config.id,
+        alias,
+        ResponseSpeed.fast,
+      ),
+    );
+    expect(
+      ResponseSpeedCapabilities.resolve(config, alias).supportedProvider,
+      isFalse,
+    );
+    expect(
+      ConversationResponseSpeed.requestTier(selected, config, alias),
+      isNull,
+    );
+    final compatibleRelay = config.copyWith(
+      baseUrl: 'https://relay.example/v1',
+    );
+    expect(
+      ConversationResponseSpeed.requestTier(selected, compatibleRelay, alias),
+      'priority',
+    );
+  });
+
+  test(
+    'alias declarations only affect requests after a conversation selection',
+    () {
+      const alias = 'mychat-gpt62';
+      final config = _config().copyWith(
+        baseUrl: 'https://gateway.example/v1',
+        modelOverrides: const {
+          alias: {
+            'responseSpeedTiers': ['fast', 'ultrafast'],
+          },
+        },
+      );
+      final chat = Conversation(title: 'one');
+      expect(
+        ConversationResponseSpeed.requestTier(chat, config, alias),
+        isNull,
+      );
+      final selected = chat.copyWith(
+        extras: ConversationResponseSpeed.updateExtras(
+          chat.extras,
+          config.id,
+          alias,
+          ResponseSpeed.fast,
+        ),
+      );
+      expect(
+        ConversationResponseSpeed.requestTier(selected, config, alias),
+        'priority',
+      );
+      final disabled = config.copyWith(
+        modelOverrides: const {
+          alias: {'responseSpeedTiers': []},
+        },
+      );
+      final inherited = config.copyWith(modelOverrides: const {});
+      for (final updated in [disabled, inherited]) {
+        expect(
+          ConversationResponseSpeed.effective(selected, updated, alias),
+          ResponseSpeed.standard,
+        );
+        expect(
+          ConversationResponseSpeed.requestTier(selected, updated, alias),
+          'default',
+        );
+        expect(
+          ConversationResponseSpeed.requestTier(chat, updated, alias),
+          isNull,
+        );
+      }
+      expect(
+        ConversationResponseSpeed.requestTier(
+          selected,
+          config.copyWith(providerType: ProviderKind.claude),
+          alias,
+        ),
+        isNull,
+      );
+    },
+  );
+
   test('Codex uses current account discovery, never a plan-name guess', () {
     final credentials = ProviderOAuthCredentials(
       accessToken: 'test',
@@ -198,6 +345,7 @@ void main() {
         'model': {
           'oauthServiceTierSessionId': 'account-a',
           'oauthServiceTiers': ['priority'],
+          'responseSpeedTiers': ['ultrafast'],
         },
       },
     );

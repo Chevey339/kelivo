@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/model/widgets/model_spec_form/model_spec_form_controller.dart';
 import 'package:Kelivo/features/model/widgets/model_spec_form/request_quirks_section.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 ProviderConfig _cfg({
   required String id,
@@ -35,6 +37,47 @@ Future<void> _pump(WidgetTester tester, ModelSpecFormController c) {
 }
 
 void main() {
+  testWidgets('response speed tiers can be selected separately and reset', (
+    tester,
+  ) async {
+    final controller = ModelSpecFormController(
+      config: _cfg(
+        id: 'Relay',
+        kind: ProviderKind.openai,
+        baseUrl: 'https://relay.example/v1',
+      ),
+      modelKey: 'mychat-gpt62',
+      isNew: false,
+    );
+    addTearDown(controller.dispose);
+    await _pump(tester, controller);
+    final custom = find.byKey(
+      const ValueKey('model-spec-response-speed-tiers'),
+    );
+    final fast = find.byKey(const ValueKey('model-spec-response-speed-fast'));
+    final ultra = find.byKey(
+      const ValueKey('model-spec-response-speed-ultrafast'),
+    );
+    expect(tester.widget<IosSwitch>(custom).value, isFalse);
+    expect(fast, findsNothing);
+    await tester.tap(custom);
+    await tester.pumpAndSettle();
+    expect(controller.draft.responseSpeedTiers, isEmpty);
+    await tester.tap(fast);
+    await tester.pumpAndSettle();
+    expect(controller.draft.responseSpeedTiers, [ResponseSpeed.fast]);
+    await tester.tap(ultra);
+    await tester.pumpAndSettle();
+    await tester.tap(fast);
+    await tester.pumpAndSettle();
+    expect(controller.draft.responseSpeedTiers, [ResponseSpeed.ultrafast]);
+    expect(find.text('UltraFast requires the Responses API.'), findsOneWidget);
+    await tester.tap(find.byType(IosIconButton));
+    await tester.pumpAndSettle();
+    expect(controller.draft.responseSpeedTiers, isNull);
+    expect(tester.widget<IosSwitch>(custom).value, isFalse);
+  });
+
   testWidgets('non-reasoning image model still gets the remote image switch', (
     tester,
   ) async {

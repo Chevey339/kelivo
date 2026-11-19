@@ -4346,6 +4346,13 @@ class AppLocalizationsRu extends AppLocalizations {
       'Отправлять ссылки на изображения http(s) как есть; при выключении удалённые ссылки отбрасываются и отправляются только локальные изображения';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => 'Уровни скорости ответа';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      'Настройте, какие уровни ускорения доступны для этой модели в чатах. Снимите оба флажка, чтобы оставить только «Стандартный».';
+
+  @override
   String get modelSpecFormPromptCacheControl => 'Маркер кэша промпта';
 
   @override

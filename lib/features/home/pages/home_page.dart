@@ -43,6 +43,7 @@ import '../../../theme/design_tokens.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/hotkey_provider.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../core/services/api/response_speed.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
@@ -2094,7 +2095,8 @@ class _HomePageState extends State<HomePage>
     if (providerKey == null || modelId == null) return;
     final settings = context.read<SettingsProvider>();
     final config = settings.getProviderConfig(providerKey);
-    if (!ModelSpecResolver.instance.spec(config, modelId).supportsReasoning) {
+    if (!ModelSpecResolver.instance.spec(config, modelId).supportsReasoning &&
+        ResponseSpeedCapabilities.resolve(config, modelId).tiers.isEmpty) {
       return;
     }
     final assistant = context.read<AssistantProvider>().currentAssistant;

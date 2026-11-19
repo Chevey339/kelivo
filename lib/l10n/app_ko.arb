@@ -1282,6 +1282,8 @@
   "modelSpecFormDynamicWebSearchSubtitle": "동적 필터링이 켜져 있으면 2026-03-18 웹 검색 및 가져오기 도구를 사용합니다",
   "modelSpecFormRemoteImageUrls": "원격 이미지 링크",
   "modelSpecFormRemoteImageUrlsSubtitle": "http(s) 이미지 링크를 그대로 전송합니다. 끄면 원격 링크는 제외되고 로컬 이미지만 전송됩니다",
+  "modelSpecFormResponseSpeedTiers": "응답 속도 등급",
+  "modelSpecFormResponseSpeedTiersSubtitle": "채팅에서 이 모델이 제공할 가속 등급을 사용자 지정합니다. 둘 다 선택하지 않으면 표준만 제공됩니다.",
   "modelSpecFormPromptCacheControl": "프롬프트 캐시 마커",
   "modelSpecFormPromptCacheControlSubtitle": "프롬프트 캐싱이 켜져 있으면 OpenRouter 요청에 cache_control을 추가합니다",
   "modelSpecFormSamplingAlways": "항상",

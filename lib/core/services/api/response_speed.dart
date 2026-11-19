@@ -1,14 +1,19 @@
 import '../../models/conversation.dart';
+import '../../models/model_spec.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
 import '../model_spec/model_spec_resolver.dart';
 import 'chat_api_helpers.dart';
+import 'providers/zhipu_layout_parsing.dart';
 
-enum ResponseSpeed { standard, fast, ultrafast }
+export '../../models/model_spec.dart' show ResponseSpeed;
 
-/// Codex uses account discovery. OpenAI-compatible GPT endpoints can request
-/// documented tiers too; a relay decides whether it honors them.
+/// Codex uses account discovery. OpenAI-compatible chat endpoints can request
+/// public API tiers; a relay decides whether it honors them.
 class ResponseSpeedCapabilities {
+  static final _openAIModel = RegExp(r'^(gpt-|o[134](?:-|$))');
+  static final _snapshotSuffix = RegExp(r'-\d{4}-\d{2}-\d{2}$');
+
   const ResponseSpeedCapabilities(
     this.tiers, {
     this.supportedProvider = true,
@@ -34,6 +39,18 @@ class ResponseSpeedCapabilities {
     return options[(index + 1) % options.length];
   }
 
+  static bool allowsManualTiers(ProviderConfig config, ModelSpec spec) =>
+      _isPublicOpenAIProvider(config) && _usesChatRequest(config, spec);
+
+  static bool _isPublicOpenAIProvider(ProviderConfig config) =>
+      !config.isOAuth &&
+      ProviderConfig.classify(config.id, explicitType: config.providerType) ==
+          ProviderKind.openai;
+
+  static bool _usesChatRequest(ProviderConfig config, ModelSpec spec) =>
+      spec.type == ModelType.chat &&
+      !(isOfficialZhipuHost(config) && isOfficialGlmOcrModel(spec.upstreamId));
+
   static ResponseSpeedCapabilities resolve(
     ProviderConfig config,
     String modelId,
@@ -55,27 +72,39 @@ class ResponseSpeedCapabilities {
         if (ids.contains('ultrafast')) ResponseSpeed.ultrafast: 'ultrafast',
       });
     }
-    if (config.isOAuth ||
-        ProviderConfig.classify(config.id, explicitType: config.providerType) !=
-            ProviderKind.openai) {
+    if (!_isPublicOpenAIProvider(config)) {
       return const ResponseSpeedCapabilities({}, supportedProvider: false);
     }
-    final model =
-        (ModelSpecResolver.instance.spec(config, modelId).apiModelId ?? modelId)
-            .split('/')
-            .last
-            .toLowerCase();
-    final openAIModel = RegExp(r'^(gpt-|o[134](?:-|$))').hasMatch(model);
-    if (!openAIModel) {
+    final resolved = ModelSpecResolver.instance.resolve(config, modelId);
+    final override = resolved.override.responseSpeedTiers;
+    final model = _modelName(resolved.spec.upstreamId);
+    if (!_usesChatRequest(config, resolved.spec) ||
+        (override == null && !_openAIModel.hasMatch(model))) {
       return const ResponseSpeedCapabilities({}, supportedProvider: false);
     }
+    final declared = override ?? _defaultTiers(model);
+    final ultra = declared.contains(ResponseSpeed.ultrafast);
     final providerDependent =
         Uri.tryParse(config.baseUrl)?.host != 'api.openai.com';
-    bool matches(String name) =>
-        model == name ||
-        RegExp(
-          '^${RegExp.escape(name)}-\\d{4}-\\d{2}-\\d{2}\$',
-        ).hasMatch(model);
+    return ResponseSpeedCapabilities(
+      {
+        if (declared.contains(ResponseSpeed.fast))
+          ResponseSpeed.fast: providerDependent ? 'priority' : 'fast',
+        if (config.useResponseApi == true && ultra)
+          ResponseSpeed.ultrafast: 'ultrafast',
+      },
+      providerDependent: providerDependent,
+      ultrafastRequiresResponses: ultra && config.useResponseApi != true,
+    );
+  }
+
+  static List<ResponseSpeed> defaultTiersFor(String upstreamModelId) =>
+      _defaultTiers(_modelName(upstreamModelId));
+
+  static String _modelName(String id) => id.split('/').last.toLowerCase();
+
+  static List<ResponseSpeed> _defaultTiers(String model) {
+    final family = model.replaceFirst(_snapshotSuffix, '');
     // Official Fast pricing table: https://developers.openai.com/api/docs/pricing
     final fast = const [
       'gpt-6.2-astra',
@@ -101,22 +130,14 @@ class ResponseSpeedCapabilities {
       'gpt-4o',
       'gpt-4o-mini',
       'o3',
-    ].any(matches);
-    final ultraModel = const [
+    ].contains(family);
+    final ultra = const [
       'gpt-6.2-astra',
       'gpt-6.2-sol',
       'gpt-6-astra',
       'gpt-6.1-sol',
-    ].any(matches);
-    return ResponseSpeedCapabilities(
-      {
-        if (fast) ResponseSpeed.fast: providerDependent ? 'priority' : 'fast',
-        if (config.useResponseApi == true && ultraModel)
-          ResponseSpeed.ultrafast: 'ultrafast',
-      },
-      providerDependent: providerDependent,
-      ultrafastRequiresResponses: ultraModel && config.useResponseApi != true,
-    );
+    ].contains(family);
+    return [if (fast) ResponseSpeed.fast, if (ultra) ResponseSpeed.ultrafast];
   }
 }
 
@@ -194,7 +215,16 @@ class ConversationResponseSpeed {
     final speed = selected(conversation, config.id, modelId);
     if (speed == null) return null;
     final capabilities = ResponseSpeedCapabilities.resolve(config, modelId);
-    if (!capabilities.supportedProvider) return null;
+    // A relay alias can lose all tiers when its declaration is reset to
+    // inherited. Its saved choice still needs to fall back to Standard.
+    if (!capabilities.supportedProvider &&
+        !(ResponseSpeedCapabilities._isPublicOpenAIProvider(config) &&
+            ResponseSpeedCapabilities._usesChatRequest(
+              config,
+              ModelSpecResolver.instance.spec(config, modelId),
+            ))) {
+      return null;
+    }
     return capabilities.tiers[speed] ?? 'default';
   }
 }

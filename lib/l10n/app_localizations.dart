@@ -7813,6 +7813,18 @@ abstract class AppLocalizations {
   /// **'Send http(s) image links as-is; when off, remote links are dropped and only local images are sent'**
   String get modelSpecFormRemoteImageUrlsSubtitle;
 
+  /// Label for a switch in the model editor's request compatibility section that overrides the model's default list of available response speed tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Response speed tiers'**
+  String get modelSpecFormResponseSpeedTiers;
+
+  /// Help under the model editor's response speed tier switch. Fast and UltraFast can be enabled independently, and neither checked leaves Standard as the only available chat option. Users select the actual speed in each chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize which acceleration tiers this model offers in chats. Clear both to offer only Standard.'**
+  String get modelSpecFormResponseSpeedTiersSubtitle;
+
   /// Toggle label in request quirks controlling whether a cache_control marker is added to OpenRouter requests.
   ///
   /// In en, this message translates to:

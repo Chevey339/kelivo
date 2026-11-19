@@ -4190,6 +4190,13 @@ class AppLocalizationsKo extends AppLocalizations {
       'http(s) 이미지 링크를 그대로 전송합니다. 끄면 원격 링크는 제외되고 로컬 이미지만 전송됩니다';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => '응답 속도 등급';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      '채팅에서 이 모델이 제공할 가속 등급을 사용자 지정합니다. 둘 다 선택하지 않으면 표준만 제공됩니다.';
+
+  @override
   String get modelSpecFormPromptCacheControl => '프롬프트 캐시 마커';
 
   @override

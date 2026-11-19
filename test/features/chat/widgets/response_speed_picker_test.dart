@@ -40,6 +40,78 @@ class _Chat extends ChatService {
 }
 
 void main() {
+  testWidgets(
+    'a declared relay alias can choose speed without a reasoning slider',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      addTearDown(settings.dispose);
+      const alias = 'mychat-gpt62';
+      final config = ProviderConfig(
+        id: 'relay',
+        name: 'Relay',
+        enabled: true,
+        apiKey: 'test-key',
+        baseUrl: 'https://gateway.example/v1',
+        providerType: ProviderKind.openai,
+        useResponseApi: true,
+        models: [alias],
+        modelOverrides: {
+          alias: {
+            'responseSpeedTiers': ['ultrafast'],
+          },
+        },
+      );
+      await settings.setProviderConfig(config.id, config);
+      final chat = _Chat();
+      addTearDown(chat.dispose);
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ReasoningLevelPicker(
+                config: config,
+                modelId: alias,
+                conversationId: 'one',
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(find.byType(EffortSlider), findsNothing);
+      expect(find.text('Standard'), findsOneWidget);
+      final toggle = find.byKey(const ValueKey('response-speed-toggle'));
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(find.text('UltraFast'), findsOneWidget);
+      expect(
+        ConversationResponseSpeed.requestTier(
+          chat.getConversation('one'),
+          config,
+          alias,
+        ),
+        'ultrafast',
+      );
+      expect(
+        ConversationResponseSpeed.requestTier(
+          chat.getConversation('two'),
+          config,
+          alias,
+        ),
+        isNull,
+      );
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(find.text('Standard'), findsOneWidget);
+    },
+  );
+
   for (final desktop in [false, true]) {
     for (final oauth in [false, true]) {
       testWidgets(

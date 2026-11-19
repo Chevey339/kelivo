@@ -46,6 +46,51 @@ void main() {
   });
 
   test(
+    'speed tiers persist as a model override and reset to inheritance',
+    () async {
+      final cfg = _cfg(
+        overrides: const {
+          'plain-model': {
+            'body': [
+              {'key': 'other', 'value': 'true'},
+            ],
+          },
+        },
+      );
+      final settings = await _settings(cfg);
+      addTearDown(settings.dispose);
+      final controller = ModelSpecFormController(
+        config: cfg,
+        modelKey: 'plain-model',
+        isNew: false,
+      );
+      addTearDown(controller.dispose);
+      controller.setResponseSpeedTiers(const [ResponseSpeed.fast]);
+      expect(await controller.save(settings), isTrue);
+      Map override() =>
+          settings.getProviderConfig(cfg.id).modelOverrides['plain-model']
+              as Map;
+      expect(override()['responseSpeedTiers'], ['fast']);
+      final reopened = ModelSpecFormController(
+        config: settings.getProviderConfig(cfg.id),
+        modelKey: 'plain-model',
+        isNew: false,
+      );
+      addTearDown(reopened.dispose);
+      expect(reopened.draft.responseSpeedTiers, [ResponseSpeed.fast]);
+      reopened.setResponseSpeedTier(ResponseSpeed.fast, false);
+      expect(await reopened.save(settings), isTrue);
+      expect(override()['responseSpeedTiers'], isEmpty);
+      reopened.setResponseSpeedTiers(null);
+      expect(await reopened.save(settings), isTrue);
+      expect(override(), isNot(contains('responseSpeedTiers')));
+      expect(override()['body'], [
+        {'key': 'other', 'value': 'true'},
+      ]);
+    },
+  );
+
+  test(
     'image tool options persist independently and reset without stale complexity',
     () async {
       final cfg = _cfg();

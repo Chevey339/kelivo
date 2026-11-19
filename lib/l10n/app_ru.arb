@@ -1282,6 +1282,8 @@
   "modelSpecFormDynamicWebSearchSubtitle": "При включённой динамической фильтрации используются инструменты веб-поиска и загрузки версии 2026-03-18",
   "modelSpecFormRemoteImageUrls": "Удалённые ссылки на изображения",
   "modelSpecFormRemoteImageUrlsSubtitle": "Отправлять ссылки на изображения http(s) как есть; при выключении удалённые ссылки отбрасываются и отправляются только локальные изображения",
+  "modelSpecFormResponseSpeedTiers": "Уровни скорости ответа",
+  "modelSpecFormResponseSpeedTiersSubtitle": "Настройте, какие уровни ускорения доступны для этой модели в чатах. Снимите оба флажка, чтобы оставить только «Стандартный».",
   "modelSpecFormPromptCacheControl": "Маркер кэша промпта",
   "modelSpecFormPromptCacheControlSubtitle": "При включённом кэшировании промпта добавлять cache_control в запросы OpenRouter",
   "modelSpecFormSamplingAlways": "Всегда",

@@ -1282,6 +1282,8 @@
   "modelSpecFormDynamicWebSearchSubtitle": "Dinamik filtreleme açıkken 2026-03-18 web arama ve getirme araçlarını gönder",
   "modelSpecFormRemoteImageUrls": "Uzak görsel bağlantıları",
   "modelSpecFormRemoteImageUrlsSubtitle": "http(s) görsel bağlantılarını olduğu gibi gönder; kapalıyken uzak bağlantılar atlanır ve yalnızca yerel görseller gönderilir",
+  "modelSpecFormResponseSpeedTiers": "Yanıt hızı kademeleri",
+  "modelSpecFormResponseSpeedTiersSubtitle": "Bu modelin sohbetlerde sunduğu hızlandırma kademelerini özelleştirin. Yalnızca Standart sunmak için ikisini de temizleyin.",
   "modelSpecFormPromptCacheControl": "İstem önbellek işaretçisi",
   "modelSpecFormPromptCacheControlSubtitle": "İstem önbellekleme açıkken OpenRouter isteklerine cache_control ekle",
   "modelSpecFormSamplingAlways": "Her zaman",

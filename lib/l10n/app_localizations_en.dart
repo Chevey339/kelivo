@@ -4290,6 +4290,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Send http(s) image links as-is; when off, remote links are dropped and only local images are sent';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => 'Response speed tiers';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      'Customize which acceleration tiers this model offers in chats. Clear both to offer only Standard.';
+
+  @override
   String get modelSpecFormPromptCacheControl => 'Prompt cache marker';
 
   @override

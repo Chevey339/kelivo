@@ -4315,6 +4315,13 @@ class AppLocalizationsTr extends AppLocalizations {
       'http(s) görsel bağlantılarını olduğu gibi gönder; kapalıyken uzak bağlantılar atlanır ve yalnızca yerel görseller gönderilir';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => 'Yanıt hızı kademeleri';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      'Bu modelin sohbetlerde sunduğu hızlandırma kademelerini özelleştirin. Yalnızca Standart sunmak için ikisini de temizleyin.';
+
+  @override
   String get modelSpecFormPromptCacheControl => 'İstem önbellek işaretçisi';
 
   @override
