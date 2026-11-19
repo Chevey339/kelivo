@@ -383,6 +383,16 @@ class BrandAssets {
       label: 'Codex',
       asset: 'assets/icons/codex.svg',
     ),
+    BrandIconOption(
+      id: 'devin',
+      label: 'Devin',
+      asset: 'assets/icons/devin-color.svg',
+    ),
+    BrandIconOption(
+      id: 'pangu',
+      label: 'Pangu',
+      asset: 'assets/icons/huawei-color.svg',
+    ),
   ];
 
   static String? selectableAssetOrNull(String asset) {

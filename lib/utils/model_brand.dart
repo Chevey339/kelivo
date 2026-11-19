@@ -86,5 +86,7 @@ class ModelBrand {
       r'kat(?=$|[^a-z0-9])|kwaipilot',
     ),
     ModelBrand('Sora', 'sora-color.svg', r'sora'),
+    ModelBrand('Devin', 'devin-color.svg', r'swe-[12](?=$|[^a-z0-9])'),
+    ModelBrand('Pangu', 'huawei-color.svg', r'(?:open)?pangu(?=$|[^a-z0-9])'),
   ];
 }
