@@ -262,6 +262,17 @@ class LongMessageEditorState extends State<LongMessageEditor>
     if (usesLineEditor) _lineController?.makeCursorVisible();
   }
 
+  void requestFocus() {
+    if (widget.readOnly || _inputPaused || _focus.hasFocus) return;
+    _focus.requestFocus();
+    if (!usesLineEditor) return;
+
+    // Initial focus can put the caret at the end of a restored draft.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _focus.hasFocus) ensureCaretVisible();
+    });
+  }
+
   void hideToolbar() => _toolbar.hide(context);
 
   CodeScrollController _makeScrollController() => CodeScrollController(

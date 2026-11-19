@@ -4597,6 +4597,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     _supportsImagesApiRouting(context);
     final bool isMobileLayout =
         MediaQuery.sizeOf(context).width < AppBreakpoints.tablet;
+    final isDesktop = PlatformUtils.isDesktopTarget;
+    final editorFontSize = isDesktop ? 14 * settings.chatFontScale : 15.0;
     final expandedLayout = _expandedLayout;
     if (!expandedLayout) _scheduleExpandCheck();
     _hostDrawer = InteractiveDrawer.maybeControllerOf(context);
@@ -4853,15 +4855,19 @@ class _ChatInputBarState extends State<ChatInputBar>
                                         ? StackFit.expand
                                         : StackFit.loose,
                                     children: [
-                                      Padding(
+                                      _buildPaddedEditor(
                                         padding: EdgeInsetsDirectional.fromSTEB(
                                           AppSpacing.md,
-                                          AppSpacing.xxs,
+                                          isDesktop
+                                              ? AppSpacing.xs
+                                              : AppSpacing.xxs,
                                           expandedLayout || _canExpand
                                               ? _expandButtonExtent +
                                                     AppSpacing.xs
                                               : AppSpacing.md,
-                                          AppSpacing.xs,
+                                          isDesktop
+                                              ? AppSpacing.sm
+                                              : AppSpacing.xs,
                                         ),
                                         child: Focus(
                                           onKeyEvent: _handleKeyEvent,
@@ -5009,12 +5015,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     color: theme
                                                         .colorScheme
                                                         .onSurface,
-                                                    fontSize:
-                                                        (Platform.isWindows ||
-                                                            Platform.isLinux ||
-                                                            Platform.isMacOS)
-                                                        ? 14
-                                                        : 15,
+                                                    fontSize: editorFontSize,
                                                   ),
                                                   cursorColor:
                                                       theme.colorScheme.primary,
@@ -5239,6 +5240,29 @@ class _ChatInputBarState extends State<ChatInputBar>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaddedEditor({
+    required EdgeInsetsGeometry padding,
+    required Widget child,
+  }) {
+    final editor = Padding(padding: padding, child: child);
+    if (!PlatformUtils.isDesktopTarget) return editor;
+
+    // Keep a click on the padding inside both editors' focus regions.
+    return CodeEditorTapRegion(
+      child: TextFieldTapRegion(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          onTap: () {
+            ContextMenuController.removeAny();
+            _longEditorKey.currentState?.requestFocus();
+          },
+          child: editor,
         ),
       ),
     );
