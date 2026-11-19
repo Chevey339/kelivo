@@ -1525,6 +1525,7 @@
   "miniMapTooltip": "Mini harita",
   "miniMapScrollToBottomTooltip": "En alta kaydır",
   "miniMapSearchHint": "Mini haritada ara",
+  "miniMapSearchMatchCount": "{count, plural, one{1 eşleşme} other{{count} eşleşme}}",
   "miniMapSearchNoResults": "Eşleşen mesaj yok",
   "miniMapSearchFailed": "Mesajlar aranamadı",
   "conversationFindHint": "Bul",

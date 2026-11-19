@@ -1525,6 +1525,7 @@
   "miniMapTooltip": "迷你地圖",
   "miniMapScrollToBottomTooltip": "捲動到底部",
   "miniMapSearchHint": "搜尋小地圖",
+  "miniMapSearchMatchCount": "{count, plural, other{{count} 處}}",
   "miniMapSearchNoResults": "沒有符合的訊息",
   "miniMapSearchFailed": "無法搜尋訊息",
   "conversationFindHint": "查找",

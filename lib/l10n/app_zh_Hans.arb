@@ -1734,6 +1734,7 @@
   "miniMapTooltip": "迷你地图",
   "miniMapScrollToBottomTooltip": "滚动到底部",
   "miniMapSearchHint": "在小地图中搜索",
+  "miniMapSearchMatchCount": "{count} 处",
   "miniMapSearchNoResults": "没有匹配的消息",
   "miniMapSearchFailed": "搜索消息失败",
   "conversationFindHint": "查找",

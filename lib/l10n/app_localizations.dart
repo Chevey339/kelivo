@@ -9271,6 +9271,12 @@ abstract class AppLocalizations {
   /// **'Search minimap'**
   String get miniMapSearchHint;
 
+  /// Compact label beside a minimap search preview. The count is the total number of keyword occurrences in that single message, including occurrences outside the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 match} other{{count} matches}}'**
+  String miniMapSearchMatchCount(int count);
+
   /// Empty state in the minimap after a completed query matches no user messages or assistant replies.
   ///
   /// In en, this message translates to:

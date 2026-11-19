@@ -81,7 +81,11 @@ Future<void> _openMap(
   await tester.pumpAndSettle();
 }
 
-ConversationFindPreview _preview(int index, String word) => (
+ConversationFindPreview _preview(
+  int index,
+  String word, {
+  int matchCount = 1,
+}) => (
   hit: (
     messageId: 'm$index',
     part: FindPart.body,
@@ -91,9 +95,12 @@ ConversationFindPreview _preview(int index, String word) => (
     surfaceKey: null,
   ),
   role: index.isEven ? 'user' : 'assistant',
-  before: 'Message $index ',
-  match: word,
-  after: ' context',
+  matchCount: matchCount,
+  before: 'M$index ',
+  segments: [
+    (text: word, highlighted: true),
+    (text: ' context', highlighted: false),
+  ],
 );
 
 void main() {
@@ -184,20 +191,22 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
         expect(isOldSearchCurrent!(), isFalse);
         expect(searched, ['old', '知豆']);
-        latest.add([_preview(0, '知豆'), _preview(1, '知豆')]);
+        latest.add([_preview(0, '知豆', matchCount: 3), _preview(1, '知豆')]);
         stale.add([_preview(0, 'old')]);
         unawaited(stale.close());
         await tester.pump();
-        expect(find.text('Message 0 old context'), findsNothing);
-        expect(find.text('Message 0 知豆 context'), findsOneWidget);
-        expect(find.text('Message 1 知豆 context'), findsOneWidget);
+        expect(find.text('M0 old context'), findsNothing);
+        expect(find.text('M0 知豆 context'), findsOneWidget);
+        expect(find.text('M1 知豆 context'), findsOneWidget);
+        expect(find.text('3 matches').hitTestable(), findsOneWidget);
+        expect(find.text('1 match').hitTestable(), findsOneWidget);
         expect(picks, isEmpty);
 
         latest.add([for (var i = 2; i < 40; i++) _preview(i, '知豆')]);
         unawaited(latest.close());
         if (!desktop) tester.view.resetViewInsets();
         await tester.pumpAndSettle();
-        final result = find.text('Message 39 知豆 context');
+        final result = find.text('M39 知豆 context');
         await tester.scrollUntilVisible(
           result,
           120,
@@ -215,6 +224,36 @@ void main() {
     );
   }
 
+  testWidgets('fully expanded minimap search stays below the status bar', (
+    tester,
+  ) async {
+    const statusBar = 59.0;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.padding = const FakeViewPadding(top: statusBar, bottom: 34);
+    tester.view.viewPadding = tester.view.padding;
+    addTearDown(tester.view.reset);
+    await _openMap(
+      tester,
+      desktop: false,
+      onSearch: (query, _) =>
+          Stream.value([for (var i = 0; i < 60; i++) _preview(i, query)]),
+    );
+    await tester.tap(_filterButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'e');
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    await tester.timedDrag(
+      find.byKey(const ValueKey('miniMapSearchResults')),
+      const Offset(0, -650),
+      const Duration(milliseconds: 600),
+    );
+    await tester.pumpAndSettle();
+    final sheetTop = tester.getTopLeft(find.byType(BottomSheet)).dy;
+    expect(sheetTop, closeTo(statusBar, 1));
+  });
+
   testWidgets('landscape minimap scrolls above the keyboard', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(812, 375);
@@ -231,7 +270,7 @@ void main() {
     await tester.enterText(find.byType(EditableText), '知豆');
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
-    expect(find.text('Message 0 知豆 context').hitTestable(), findsOneWidget);
+    expect(find.text('M0 知豆 context').hitTestable(), findsOneWidget);
     final scrollable = find.descendant(
       of: find.byKey(const ValueKey('miniMapSearchResults')),
       matching: find.byType(Scrollable),
@@ -258,9 +297,14 @@ void main() {
           (
             hit: preview.hit,
             role: preview.role,
+            matchCount: 7,
             before: '…${'前' * 16}',
-            match: query,
-            after: '后' * 42,
+            segments: [
+              (text: query, highlighted: true),
+              (text: '、', highlighted: false),
+              (text: query, highlighted: true),
+              (text: '后' * 42, highlighted: false),
+            ],
           ),
         ]);
       },
@@ -272,7 +316,10 @@ void main() {
     await tester.pumpAndSettle();
     final result = find.descendant(
       of: find.byKey(const ValueKey('miniMapSearchResults')),
-      matching: find.byType(RichText),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is RichText && widget.text.toPlainText().contains('知豆'),
+      ),
     );
     final paragraph = tester.renderObject<RenderParagraph>(result);
     final start = paragraph.text.toPlainText().indexOf('知豆');
@@ -283,5 +330,16 @@ void main() {
       ),
       isNotEmpty,
     );
+    final highlighted = <String>[];
+    paragraph.text.visitChildren((span) {
+      if (span.style?.backgroundColor != null) {
+        highlighted.add(span.toPlainText());
+      }
+      return true;
+    });
+    expect(highlighted, ['知豆', '知豆']);
+    final count = find.text('7 matches').hitTestable();
+    expect(count, findsOneWidget);
+    expect(tester.getRect(count).height, greaterThanOrEqualTo(24));
   });
 }

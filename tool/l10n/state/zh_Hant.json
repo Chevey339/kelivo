@@ -1525,6 +1525,7 @@
   "miniMapTooltip": "630a7983c425fd2e2f9f8c987c80873132269d6595e047aa5fe8ce6d2a64a91a",
   "miniMapScrollToBottomTooltip": "83b087df7b5f757d2cbf03794cc1f895c8508912efa00979f138c398fc32ae7e",
   "miniMapSearchHint": "e7eb6e712ca8c04798614357052e883e4be24cddb5055ddcd371c50b610f8872",
+  "miniMapSearchMatchCount": "9f337e707ef0d647e3d73e432c89df984f68ec5bc2e7efcfbff7677175cb5f76",
   "miniMapSearchNoResults": "f728ea914f9d1a853c473b7a1022839c4a794ad75877613b27d009e2122996b9",
   "miniMapSearchFailed": "0f5eb59a248564d1832fc27c404f06bbab00396fc8bf060160639f8097a5596e",
   "conversationFindHint": "4f9a759ec646f72a20d19f64d893b7928a6cb6f37e1b51f805dcee8cb545e26f",

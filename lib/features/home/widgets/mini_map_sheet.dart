@@ -25,6 +25,7 @@ Future<MiniMapSelection?> showMiniMapSheet(
   return await showModalBottomSheet<MiniMapSelection>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),

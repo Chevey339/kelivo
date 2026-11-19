@@ -4973,6 +4973,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get miniMapSearchHint => '미니맵 검색';
 
   @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 일치',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get miniMapSearchNoResults => '일치하는 메시지가 없습니다';
 
   @override

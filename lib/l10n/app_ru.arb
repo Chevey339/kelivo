@@ -1525,6 +1525,7 @@
   "miniMapTooltip": "Мини-карта",
   "miniMapScrollToBottomTooltip": "Прокрутить вниз",
   "miniMapSearchHint": "Поиск по миникарте",
+  "miniMapSearchMatchCount": "{count, plural, one{{count} совпадение} few{{count} совпадения} many{{count} совпадений} other{{count} совпадения}}",
   "miniMapSearchNoResults": "Нет подходящих сообщений",
   "miniMapSearchFailed": "Не удалось выполнить поиск сообщений",
   "conversationFindHint": "Найти",

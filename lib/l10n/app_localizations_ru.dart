@@ -5153,6 +5153,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get miniMapSearchHint => 'Поиск по миникарте';
 
   @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count совпадения',
+      many: '$count совпадений',
+      few: '$count совпадения',
+      one: '$count совпадение',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get miniMapSearchNoResults => 'Нет подходящих сообщений';
 
   @override

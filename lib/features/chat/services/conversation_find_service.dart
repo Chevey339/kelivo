@@ -40,9 +40,9 @@ typedef ConversationFindHit = ({
 typedef ConversationFindPreview = ({
   ConversationFindHit hit,
   String role,
+  int matchCount,
   String before,
-  String match,
-  String after,
+  List<({String text, bool highlighted})> segments,
 });
 
 typedef FindOptions = ({bool matchCase, bool wholeWord, bool thinking});
@@ -525,20 +525,29 @@ _FindBatch _matchBatch(_FindWork work) {
     final visible = remaining > 256 && !row.streaming && cachedText == null
         ? StringBuffer()
         : null;
-    var complete = true;
-    fragments:
+    _FindText? previewSource;
+    List<SourceSpan>? previewSpans;
+    var matchCount = 0;
     for (final fragment in service._project(row, options.thinking)) {
       for (final span in pattern.ranges(fragment.text, visible: visible)) {
-        final hit = fragment.hit(row.id, span);
-        if (rowHits == null) {
-          previews.add(_preview(row.role, hit, fragment.text, span));
-          complete = false;
-          break fragments;
+        if (rowHits != null) {
+          rowHits.add(fragment.hit(row.id, span));
+          continue;
         }
-        rowHits.add(hit);
+        matchCount++;
+        if (previewSource == null) {
+          previewSource = fragment;
+          previewSpans = [span];
+        } else if (identical(fragment, previewSource) &&
+            span.start < previewSpans!.first.end + _snippetAfter) {
+          previewSpans.add(span);
+        }
       }
     }
-    if (visible != null && complete && 2 * visible.length <= remaining) {
+    if (previewSource != null) {
+      previews.add(_preview(row, previewSource, previewSpans!, matchCount));
+    }
+    if (visible != null && 2 * visible.length <= remaining) {
       // Include retained snapshot strings as well as the rendered text.
       final bytes =
           256 +
@@ -571,27 +580,51 @@ _FindBatch _matchBatch(_FindWork work) {
 }
 
 final _snippetWhitespace = RegExp(r'\s+');
+const _snippetAfter = 84;
 
 ConversationFindPreview _preview(
-  String role,
-  ConversationFindHit hit,
-  String source,
-  SourceSpan span,
+  ConversationFindCandidate row,
+  _FindText fragment,
+  List<SourceSpan> spans,
+  int matchCount,
 ) {
   String oneLine(String text) => text.replaceAll(_snippetWhitespace, ' ');
+  final source = fragment.text;
+  final first = spans.first;
   final start = utf16SafeTailStart(
     source,
-    (span.start - 16).clamp(0, source.length),
+    (first.start - 16).clamp(0, source.length),
   );
-  final end = utf16SafeHeadEnd(source, (span.end + 84).clamp(0, source.length));
+  final end = utf16SafeHeadEnd(
+    source,
+    (first.end + _snippetAfter).clamp(0, source.length),
+  );
+  final segments = <({String text, bool highlighted})>[];
+  var from = first.start;
+  for (final span in spans) {
+    if (span.start >= end) break;
+    if (from < span.start) {
+      segments.add((
+        text: oneLine(source.substring(from, span.start)),
+        highlighted: false,
+      ));
+    }
+    from = span.end.clamp(0, end);
+    segments.add((
+      text: oneLine(source.substring(span.start, from)),
+      highlighted: true,
+    ));
+  }
+  final tail =
+      '${oneLine(source.substring(from, end))}${end < source.length ? '…' : ''}';
+  if (tail.isNotEmpty) segments.add((text: tail, highlighted: false));
   return (
-    hit: hit,
-    role: role,
+    hit: fragment.hit(row.id, first),
+    role: row.role,
+    matchCount: matchCount,
     before:
-        '${start > 0 ? '…' : ''}${oneLine(source.substring(start, span.start))}',
-    match: oneLine(source.substring(span.start, span.end)),
-    after:
-        '${oneLine(source.substring(span.end, end))}${end < source.length ? '…' : ''}',
+        '${start > 0 ? '…' : ''}${oneLine(source.substring(start, first.start))}',
+    segments: segments,
   );
 }
 

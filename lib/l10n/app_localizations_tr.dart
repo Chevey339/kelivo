@@ -5116,6 +5116,17 @@ class AppLocalizationsTr extends AppLocalizations {
   String get miniMapSearchHint => 'Mini haritada ara';
 
   @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count eşleşme',
+      one: '1 eşleşme',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get miniMapSearchNoResults => 'Eşleşen mesaj yok';
 
   @override

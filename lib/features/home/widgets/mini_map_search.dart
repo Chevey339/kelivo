@@ -221,6 +221,7 @@ class _MiniMapPreviewRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final isUser = preview.role == 'user';
     final tint = isUser ? colors.primary : colors.onSurface;
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -246,29 +247,53 @@ class _MiniMapPreviewRow extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 const fontSize = 15.0;
-                final scaledSize = MediaQuery.textScalerOf(
-                  context,
-                ).scale(fontSize);
+                final textScaler = MediaQuery.textScalerOf(context);
+                final countText = l10n.miniMapSearchMatchCount(
+                  preview.matchCount,
+                );
+                final countStyle = TextStyle(
+                  fontSize: 12,
+                  color: colors.onSurfaceVariant,
+                  fontWeight: MediaQuery.boldTextOf(context)
+                      ? FontWeight.bold
+                      : null,
+                );
+                final countWidth = TextPainter.computeWidth(
+                  text: TextSpan(
+                    text: countText,
+                    style: DefaultTextStyle.of(context).style.merge(countStyle),
+                  ),
+                  textDirection: Directionality.of(context),
+                  textScaler: textScaler,
+                  locale: Localizations.maybeLocaleOf(context),
+                  maxLines: 1,
+                );
+                final countBelow = countWidth > constraints.maxWidth * .28;
+                const gap = 8.0;
+                final textWidth =
+                    constraints.maxWidth - (countBelow ? 0 : countWidth + gap);
                 // Reserve space for the match at large text sizes and narrow
                 // widths by trimming the leading context first.
-                final room = (constraints.maxWidth * .75 / scaledSize).floor();
+                final room = (textWidth * .75 / textScaler.scale(fontSize))
+                    .floor();
                 var before = preview.before;
                 if (before.length > room) {
                   before = room < 2
                       ? ''
                       : '…${before.substring(utf16SafeTailStart(before, before.length - room + 1))}';
                 }
-                return Text.rich(
+                final highlight = TextStyle(
+                  backgroundColor: context.appColors.searchHighlight,
+                );
+                final snippet = Text.rich(
                   TextSpan(
                     children: [
                       TextSpan(text: before),
-                      TextSpan(
-                        text: preview.match,
-                        style: TextStyle(
-                          backgroundColor: context.appColors.searchHighlight,
+                      for (final segment in preview.segments)
+                        TextSpan(
+                          text: segment.text,
+                          style: segment.highlighted ? highlight : null,
                         ),
-                      ),
-                      TextSpan(text: preview.after),
                     ],
                   ),
                   style: TextStyle(
@@ -278,6 +303,33 @@ class _MiniMapPreviewRow extends StatelessWidget {
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                );
+                final count = Text(
+                  countText,
+                  textAlign: TextAlign.end,
+                  style: countStyle,
+                );
+                if (countBelow) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      snippet,
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: count,
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: snippet),
+                    const SizedBox(width: gap),
+                    count,
+                  ],
                 );
               },
             ),

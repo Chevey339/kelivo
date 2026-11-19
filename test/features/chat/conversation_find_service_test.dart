@@ -277,16 +277,19 @@ void main() {
   });
 
   test(
-    'minimap previews stream in order and keep the first visible hit',
+    'minimap previews count the whole message and highlight nearby hits',
     () async {
       const service = ConversationFindService();
-      final user = ConversationFindCandidate(message('先说 **知豆**，再说知豆。'));
+      final user = ConversationFindCandidate(
+        message('先说 **知豆**，再说知豆。${'前文' * 50}知豆。\n\n然后说知豆。'),
+      );
       final assistant = ConversationFindCandidate(
         ChatMessage(
           id: 'reply',
           role: 'assistant',
           conversationId: 'c',
           content: '${'开头' * 110}\n\n然后提到 **知豆** 的价格。',
+          translation: '译文也提到知豆。',
         ),
       );
       final batches = await service
@@ -299,16 +302,30 @@ void main() {
           )
           .toList();
       expect(batches.map((batch) => batch.single.role), ['user', 'assistant']);
-      expect(batches.first.single.match, '知豆');
-      expect(batches.last.single.before, '然后提到 ');
-      expect(batches.last.single.after, ' 的价格。');
+      final userPreview = batches.first.single;
+      final assistantPreview = batches.last.single;
+      expect(userPreview.matchCount, 4);
+      expect(
+        userPreview.segments
+            .where((segment) => segment.highlighted)
+            .map((segment) => segment.text),
+        ['知豆', '知豆'],
+      );
+      expect(assistantPreview.matchCount, 2);
+      expect(assistantPreview.before, '然后提到 ');
+      expect(
+        assistantPreview.segments.map((segment) => segment.text).join(),
+        '知豆 的价格。',
+      );
       final matches = await service.search(
         Stream.value([user, assistant]),
         '知豆',
         defaultFindOptions,
       );
-      expect(batches.first.single.hit, matches['m']!.first);
-      expect(batches.last.single.hit, matches['reply']!.single);
+      expect(userPreview.hit, matches['m']!.first);
+      expect(userPreview.matchCount, matches['m']!.length);
+      expect(assistantPreview.hit, matches['reply']!.first);
+      expect(assistantPreview.matchCount, matches['reply']!.length);
     },
   );
 

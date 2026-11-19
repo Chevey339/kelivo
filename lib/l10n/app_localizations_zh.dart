@@ -4892,6 +4892,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get miniMapSearchHint => '在小地图中搜索';
 
   @override
+  String miniMapSearchMatchCount(int count) {
+    return '$count 处';
+  }
+
+  @override
   String get miniMapSearchNoResults => '没有匹配的消息';
 
   @override
@@ -21448,6 +21453,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get miniMapSearchHint => '在小地图中搜索';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    return '$count 处';
+  }
 
   @override
   String get miniMapSearchNoResults => '没有匹配的消息';
@@ -38010,6 +38020,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get miniMapSearchHint => '搜尋小地圖';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 處',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get miniMapSearchNoResults => '沒有符合的訊息';

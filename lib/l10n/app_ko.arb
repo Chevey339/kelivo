@@ -1525,6 +1525,7 @@
   "miniMapTooltip": "미니맵",
   "miniMapScrollToBottomTooltip": "맨 아래로 스크롤",
   "miniMapSearchHint": "미니맵 검색",
+  "miniMapSearchMatchCount": "{count, plural, other{{count}개 일치}}",
   "miniMapSearchNoResults": "일치하는 메시지가 없습니다",
   "miniMapSearchFailed": "메시지를 검색하지 못했습니다",
   "conversationFindHint": "찾기",
