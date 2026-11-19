@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "util/string_converter.h"
 #include "webview_bridge.h"
@@ -33,6 +34,15 @@ constexpr auto kErrorCodeEnvironmentAlreadyInitialized =
 constexpr auto kErrorCodeWebviewCreationFailed = "webview_creation_failed";
 constexpr auto kErrorUnsupportedPlatform = "unsupported_platform";
 
+using MethodResult = flutter::MethodResult<flutter::EncodableValue>;
+
+enum class InitializationKind { kEnvironment, kWebview, kRestrictedWebview };
+
+struct PendingInitialization {
+  InitializationKind kind;
+  std::unique_ptr<MethodResult> result;
+};
+
 template <typename T>
 std::optional<T> GetOptionalValue(const flutter::EncodableMap& map,
                                   const std::string& key) {
@@ -48,9 +58,11 @@ std::optional<T> GetOptionalValue(const flutter::EncodableMap& map,
 
 class WebviewWindowsPlugin : public flutter::Plugin {
  public:
-  static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar);
+  static void RegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar);
+  static void PrepareForShutdown(FlutterDesktopPluginRegistrarRef registrar);
 
-  WebviewWindowsPlugin(flutter::TextureRegistrar* textures,
+  WebviewWindowsPlugin(FlutterDesktopPluginRegistrarRef registrar,
+                       flutter::TextureRegistrar* textures,
                        flutter::BinaryMessenger* messenger);
 
   virtual ~WebviewWindowsPlugin();
@@ -59,67 +71,97 @@ class WebviewWindowsPlugin : public flutter::Plugin {
   std::unique_ptr<WebviewPlatform> platform_;
   std::shared_ptr<WebviewHost> webview_host_;
   std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
+  std::vector<PendingInitialization> pending_initializations_;
   std::unordered_map<int64_t, std::unique_ptr<WebviewBridge>> instances_;
 
+  FlutterDesktopPluginRegistrarRef registrar_;
   WNDCLASS window_class_ = {};
   flutter::TextureRegistrar* textures_;
   flutter::BinaryMessenger* messenger_;
 
   bool InitPlatform();
+  void Dispose();
 
-  void CreateWebviewInstance(
-      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>, bool restricted);
+  void Initialize(
+      PendingInitialization request,
+      std::optional<std::wstring> user_data_path = std::nullopt,
+      const std::optional<std::wstring>& browser_exe_path = std::nullopt,
+      const std::optional<std::string>& additional_args = std::nullopt);
+  void CompleteInitialization(PendingInitialization request);
+  void CreateWebviewInstance(std::unique_ptr<MethodResult> result, bool restricted);
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue>& method_call,
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 };
 
+// Instances are registered and torn down on their Windows platform thread.
+thread_local std::unordered_map<FlutterDesktopPluginRegistrarRef,
+                                WebviewWindowsPlugin*> registered_plugins;
+
 // static
 void WebviewWindowsPlugin::RegisterWithRegistrar(
-    flutter::PluginRegistrarWindows* registrar) {
+    FlutterDesktopPluginRegistrarRef native_registrar) {
+  auto* registrar = flutter::PluginRegistrarManager::GetInstance()
+                        ->GetRegistrar<flutter::PluginRegistrarWindows>(
+                            native_registrar);
   auto channel =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           registrar->messenger(), "io.jns.webview.win",
           &flutter::StandardMethodCodec::GetInstance());
 
   auto plugin = std::make_unique<WebviewWindowsPlugin>(
-      registrar->texture_registrar(), registrar->messenger());
+      native_registrar, registrar->texture_registrar(), registrar->messenger());
 
   channel->SetMethodCallHandler(
       [plugin_pointer = plugin.get()](const auto& call, auto result) {
         plugin_pointer->HandleMethodCall(call, std::move(result));
       });
 
+  registered_plugins.emplace(native_registrar, plugin.get());
   registrar->AddPlugin(std::move(plugin));
 }
 
-WebviewWindowsPlugin::WebviewWindowsPlugin(flutter::TextureRegistrar* textures,
-                                           flutter::BinaryMessenger* messenger)
-    : textures_(textures), messenger_(messenger) {
+void WebviewWindowsPlugin::PrepareForShutdown(
+    FlutterDesktopPluginRegistrarRef registrar) {
+  const auto plugin = registered_plugins.find(registrar);
+  if (plugin != registered_plugins.end()) plugin->second->Dispose();
+}
+
+WebviewWindowsPlugin::WebviewWindowsPlugin(
+    FlutterDesktopPluginRegistrarRef registrar, flutter::TextureRegistrar* textures,
+    flutter::BinaryMessenger* messenger)
+    : registrar_(registrar), textures_(textures), messenger_(messenger) {
   window_class_.lpszClassName = L"FlutterWebviewMessage";
   window_class_.lpfnWndProc = &DefWindowProc;
   RegisterClass(&window_class_);
 }
 
 WebviewWindowsPlugin::~WebviewWindowsPlugin() {
-  alive_.reset();
-  instances_.clear();
+  Dispose();
+  registered_plugins.erase(registrar_);
   UnregisterClass(window_class_.lpszClassName, nullptr);
+}
+
+void WebviewWindowsPlugin::Dispose() {
+  if (!alive_) return;
+  alive_.reset();
+  pending_initializations_.clear();
+  instances_.clear();
+  webview_host_.reset();
 }
 
 void WebviewWindowsPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  if (!alive_) {
+    return result->Error("webview_closed", "The WebView plugin is shutting down");
+  }
+
   if (method_call.method_name().compare(kMethodInitializeEnvironment) == 0) {
-    if (webview_host_) {
+    if (webview_host_ || !pending_initializations_.empty()) {
       return result->Error(kErrorCodeEnvironmentAlreadyInitialized,
                            "The webview environment is already initialized");
-    }
-
-    if (!InitPlatform()) {
-      return result->Error(kErrorUnsupportedPlatform,
-                           "The platform is not supported");
     }
 
     const auto& map = std::get<flutter::EncodableMap>(*method_call.arguments());
@@ -136,20 +178,14 @@ void WebviewWindowsPlugin::HandleMethodCall(
         GetOptionalValue<std::string>(map, "userDataPath");
     if (user_data_path) {
       user_data_wpath = util::Utf16FromUtf8(*user_data_path);
-    } else {
-      user_data_wpath = platform_->GetDefaultDataDirectory();
     }
 
     std::optional<std::string> additional_args =
         GetOptionalValue<std::string>(map, "additionalArguments");
 
-    webview_host_ = std::move(WebviewHost::Create(
-        platform_.get(), user_data_wpath, browser_exe_wpath, additional_args));
-    if (!webview_host_) {
-      return result->Error(kErrorCodeEnvironmentCreationFailed);
-    }
-
-    return result->Success();
+    return Initialize({InitializationKind::kEnvironment, std::move(result)},
+                      std::move(user_data_wpath), browser_exe_wpath,
+                      additional_args);
   }
 
   if (method_call.method_name().compare(kMethodGetWebViewVersion) == 0) {
@@ -166,8 +202,10 @@ void WebviewWindowsPlugin::HandleMethodCall(
 
   if (method_call.method_name() == kMethodInitialize ||
       method_call.method_name() == kMethodInitializeRestricted) {
-    return CreateWebviewInstance(std::move(result),
-        method_call.method_name() == kMethodInitializeRestricted);
+    const auto kind = method_call.method_name() == kMethodInitializeRestricted
+                          ? InitializationKind::kRestrictedWebview
+                          : InitializationKind::kWebview;
+    return Initialize({kind, std::move(result)});
   }
 
   if (method_call.method_name().compare(kMethodDispose) == 0) {
@@ -184,30 +222,63 @@ void WebviewWindowsPlugin::HandleMethodCall(
   }
 }
 
-void WebviewWindowsPlugin::CreateWebviewInstance(
-    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result,
-    bool restricted) {
+void WebviewWindowsPlugin::Initialize(
+    PendingInitialization request, std::optional<std::wstring> user_data_path,
+    const std::optional<std::wstring>& browser_exe_path,
+    const std::optional<std::string>& additional_args) {
   if (!InitPlatform()) {
-    return result->Error(kErrorUnsupportedPlatform,
-                         "The platform is not supported");
+    return request.result->Error(kErrorUnsupportedPlatform,
+                                 "The platform is not supported");
   }
 
+  if (webview_host_) {
+    return CompleteInitialization(std::move(request));
+  }
+
+  // All first-use requests share the same in-flight environment creation.
+  pending_initializations_.push_back(std::move(request));
+  if (pending_initializations_.size() != 1) return;
+  if (!user_data_path) user_data_path = platform_->GetDefaultDataDirectory();
+  WebviewHost::CreateEnvironment(
+      user_data_path, browser_exe_path, additional_args,
+      [this, alive = std::weak_ptr<bool>(alive_)](
+          wil::com_ptr<ICoreWebView2Environment3> environment) {
+        if (alive.expired()) return;
+        if (environment) {
+          auto host = std::make_shared<WebviewHost>(platform_.get(),
+                                                    std::move(environment));
+          if (host->compositor()) webview_host_ = std::move(host);
+        }
+        std::vector<PendingInitialization> requests;
+        requests.swap(pending_initializations_);
+        for (auto& pending : requests) {
+          if (alive.expired()) return;
+          CompleteInitialization(std::move(pending));
+        }
+      });
+}
+
+void WebviewWindowsPlugin::CompleteInitialization(PendingInitialization request) {
   if (!webview_host_) {
-    webview_host_ = std::move(WebviewHost::Create(
-        platform_.get(), platform_->GetDefaultDataDirectory()));
-    if (!webview_host_) {
-      return result->Error(kErrorCodeEnvironmentCreationFailed);
-    }
+    return request.result->Error(kErrorCodeEnvironmentCreationFailed);
   }
+  if (request.kind == InitializationKind::kEnvironment) {
+    return request.result->Success();
+  }
+  CreateWebviewInstance(std::move(request.result),
+                        request.kind == InitializationKind::kRestrictedWebview);
+}
 
+void WebviewWindowsPlugin::CreateWebviewInstance(
+    std::unique_ptr<MethodResult> result, bool restricted) {
   auto hwnd =
       CreateWindowEx(0, window_class_.lpszClassName, L"", 0, 0, 0, 0, 0,
                      HWND_MESSAGE, nullptr, window_class_.hInstance, nullptr);
 
   if (!hwnd) return result->Error(kErrorCodeWebviewCreationFailed, "Creating preview window failed.");
-  std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
-      shared_result = std::move(result);
-  webview_host_->CreateWebview(
+  std::shared_ptr<MethodResult> shared_result = std::move(result);
+  const auto host = webview_host_;
+  host->CreateWebview(
       hwnd, true, true, restricted,
       [shared_result, this, alive = std::weak_ptr<bool>(alive_)](std::unique_ptr<Webview> webview,
                             std::unique_ptr<WebviewCreationError> error) {
@@ -250,7 +321,10 @@ bool WebviewWindowsPlugin::InitPlatform() {
 
 void WebviewWindowsPluginRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar) {
-  WebviewWindowsPlugin::RegisterWithRegistrar(
-      flutter::PluginRegistrarManager::GetInstance()
-          ->GetRegistrar<flutter::PluginRegistrarWindows>(registrar));
+  WebviewWindowsPlugin::RegisterWithRegistrar(registrar);
+}
+
+void WebviewWindowsPluginPrepareForShutdown(
+    FlutterDesktopPluginRegistrarRef registrar) {
+  WebviewWindowsPlugin::PrepareForShutdown(registrar);
 }

@@ -10,6 +10,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:markstream/markstream.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+import 'package:webview_windows/webview_windows.dart' as windows;
 
 class _SlowAndroidWebViewPlatform extends AndroidWebViewPlatform {
   @override
@@ -122,6 +123,31 @@ Future<void> _expectDiagramPixels(WidgetTester tester, Image widget) async {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final supportsNativeDiagrams =
+      Platform.isAndroid ||
+      Platform.isIOS ||
+      Platform.isMacOS ||
+      Platform.isWindows;
+  testWidgets('Windows creates two first-use WebViews concurrently', (
+    tester,
+  ) async {
+    final controllers = [
+      windows.WebviewController(),
+      windows.WebviewController(),
+    ];
+    addTearDown(() async {
+      await Future.wait(
+        controllers.map((controller) => controller.dispose()),
+      ).timeout(const Duration(seconds: 5));
+    });
+    await Future.wait(
+      controllers.map((controller) => controller.initialize()),
+    ).timeout(const Duration(seconds: 20));
+    for (final controller in controllers) {
+      expect(controller.value.isInitialized, isTrue);
+    }
+  }, skip: !Platform.isWindows);
+
   final cases = {
     for (final example in _examples.entries) example.key: [example.value],
     'all three in one message': _examples.values.toList(),
@@ -153,7 +179,7 @@ void main() {
         }
         expect(tester.takeException(), isNull);
       },
-      skip: !(Platform.isAndroid || Platform.isIOS || Platform.isMacOS),
+      skip: !supportsNativeDiagrams,
     );
   }
   testWidgets('invalid Mermaid reports failure without waiting for a PNG', (
@@ -169,7 +195,7 @@ void main() {
     expect(error, findsOneWidget);
     expect(find.byType(Image), findsNothing);
     expect(tester.takeException(), isNull);
-  }, skip: !(Platform.isAndroid || Platform.isIOS || Platform.isMacOS));
+  }, skip: !supportsNativeDiagrams);
 
   testWidgets('SVG export still paints through the shared native bridge', (
     tester,
@@ -194,5 +220,5 @@ void main() {
       tester.widget<Image>(find.byType(Image)),
     );
     expect(tester.takeException(), isNull);
-  }, skip: !(Platform.isAndroid || Platform.isIOS || Platform.isMacOS));
+  }, skip: !supportsNativeDiagrams);
 }
