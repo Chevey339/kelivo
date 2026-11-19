@@ -1120,6 +1120,13 @@ final class BusinessSettingsRouter {
           requiredStrings: const {'url'},
           strings: const {'engines', 'language', 'username', 'password'},
         );
+      case '4get':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'url'},
+          strings: const {'scraper', 'passToken'},
+        );
       case 'duckduckgo':
         _validateKnownFields(kind, payload, strings: const {'region'});
       case 'perplexity':

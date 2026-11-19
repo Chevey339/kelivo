@@ -5119,6 +5119,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get searchServicesEditDialogRegionOptional => '지역(선택 사항, 기본값: us-en)';
 
   @override
+  String get searchServicesFourGetUrlInvalid => 'HTTP 또는 HTTPS 기본 URL을 입력하세요.';
+
+  @override
+  String get searchServicesFourGetScraperOptional => '업스트림 엔진 (선택 사항)';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'pass 쿠키 (선택 사항)';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      '인스턴스에서 CAPTCHA를 요구하는 경우, CAPTCHA를 완료한 후 pass 쿠키의 값을 붙여넣으세요.';
+
+  @override
   String get searchServiceEditorProviderTypeTitle => '검색 공급자';
 
   @override
@@ -6460,6 +6473,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '개인정보를 존중하는 메타 검색 엔진입니다. 자체 호스팅 인스턴스가 필요하며 추적하지 않습니다.';
 
   @override
+  String get searchProviderFourGetDescription =>
+      'API가 활성화된 공개 또는 자체 호스팅 4get 인스턴스를 통해 웹을 검색합니다.';
+
+  @override
   String get searchProviderTavilyDescription =>
       'LLM에 최적화된 AI 검색 API입니다. 고품질의 관련성 높은 결과를 제공합니다.';
 
@@ -6499,6 +6516,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';

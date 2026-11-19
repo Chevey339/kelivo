@@ -354,6 +354,64 @@ void main() {
     expect(saved.extraApiKeys, ['extra-key']);
   }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
 
+  testWidgets('desktop adds 4get and scopes its masked pass to the instance', (
+    tester,
+  ) async {
+    SearchServiceOptions? configured;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        final existing = configured;
+        if (existing == null) {
+          configured = await showDesktopAddSearchServiceDialog(context);
+        } else {
+          configured = await showDesktopEditSearchServiceDialog(
+            context,
+            existing,
+          );
+        }
+      },
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await _selectServiceType(tester, '4get');
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), 'https://search.example/4get');
+    await tester.enterText(fields.at(1), 'brave');
+    await tester.enterText(fields.at(2), 'old-pass');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    final created = configured! as FourGetOptions;
+    expect(created.passToken, 'old-pass');
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(fields.at(2)).obscureText, isTrue);
+    await tester.enterText(fields.at(0), 'https://search.example/search');
+    expect(tester.widget<TextField>(fields.at(2)).controller!.text, 'old-pass');
+    await tester.enterText(fields.at(2), 'updated-pass');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final saved = configured! as FourGetOptions;
+    expect(saved.id, created.id);
+    expect(saved.url, 'https://search.example/search');
+    expect(saved.scraper, 'brave');
+    expect(saved.passToken, 'updated-pass');
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(fields.at(0), 'https://other.example/4get');
+    expect(tester.widget<TextField>(fields.at(2)).controller!.text, isEmpty);
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final moved = configured! as FourGetOptions;
+    expect(moved.url, 'https://other.example/4get');
+    expect(moved.passToken, isEmpty);
+  });
+
   testWidgets('desktop edit dialog saves You.com content mode', (tester) async {
     SearchServiceOptions? updated;
     await _pumpDialogHost(

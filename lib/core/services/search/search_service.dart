@@ -10,6 +10,7 @@ import 'providers/exa_search_service.dart';
 import 'providers/exa_mcp_search_service.dart';
 import 'providers/zhipu_search_service.dart';
 import 'providers/searxng_search_service.dart';
+import 'providers/four_get_search_service.dart';
 import 'providers/linkup_search_service.dart';
 import 'providers/brave_search_service.dart';
 import 'providers/metaso_search_service.dart';
@@ -81,6 +82,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return ZhipuSearchService() as SearchService;
       case SearXNGOptions _:
         return SearXNGSearchService() as SearchService;
+      case FourGetOptions _:
+        return FourGetSearchService() as SearchService;
       case LinkUpOptions _:
         return LinkUpSearchService() as SearchService;
       case BraveOptions _:
@@ -246,6 +249,8 @@ abstract class SearchServiceOptions {
         return ZhipuOptions.fromJson(json);
       case 'searxng':
         return SearXNGOptions.fromJson(json);
+      case '4get':
+        return FourGetOptions.fromJson(json);
       case 'linkup':
         return LinkUpOptions.fromJson(json);
       case 'brave':
@@ -468,6 +473,48 @@ class SearXNGOptions extends SearchServiceOptions {
     language: json['language'] ?? '',
     username: json['username'] ?? '',
     password: json['password'] ?? '',
+  );
+}
+
+class FourGetOptions extends SearchServiceOptions {
+  const FourGetOptions({
+    required super.id,
+    required this.url,
+    this.scraper = '',
+    this.passToken = '',
+  });
+
+  final String url;
+  final String scraper;
+  final String passToken;
+
+  static Uri? parseInstanceUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      return null;
+    }
+    return uri;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': '4get',
+    'id': id,
+    'url': url,
+    'scraper': scraper,
+    'passToken': passToken,
+  };
+
+  factory FourGetOptions.fromJson(Map<String, dynamic> json) => FourGetOptions(
+    id: json['id'] as String,
+    url: json['url'] as String,
+    scraper: json['scraper'] as String? ?? '',
+    passToken: json['passToken'] as String? ?? '',
   );
 }
 

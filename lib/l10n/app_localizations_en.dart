@@ -5236,6 +5236,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Region (optional, default: us-en)';
 
   @override
+  String get searchServicesFourGetUrlInvalid =>
+      'Enter an HTTP or HTTPS base URL.';
+
+  @override
+  String get searchServicesFourGetScraperOptional =>
+      'Upstream engine (optional)';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'Pass cookie (optional)';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      'If the instance requires a CAPTCHA, complete it and paste the value of the pass cookie.';
+
+  @override
   String get searchServiceEditorProviderTypeTitle => 'Search provider';
 
   @override
@@ -6637,6 +6652,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Privacy-respecting metasearch engine. Self-hosted instance required; no tracking.';
 
   @override
+  String get searchProviderFourGetDescription =>
+      'Web search through a public or self-hosted 4get instance with the API enabled.';
+
+  @override
   String get searchProviderTavilyDescription =>
       'AI search API optimized for LLMs. Provides high-quality, relevant results.';
 
@@ -6676,6 +6695,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';

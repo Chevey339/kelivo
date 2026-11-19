@@ -17,6 +17,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/theme_factory.dart';
 import '../../../utils/brand_assets.dart';
+import '../utils/four_get_credentials.dart';
 import 'search_api_keys_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
@@ -433,6 +434,33 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           key: 'password',
           label: l10n.searchServicesEditDialogPasswordOptional,
           obscure: true,
+        ),
+      ];
+    }
+    if (service is FourGetOptions) {
+      return [
+        field(
+          key: 'url',
+          label: l10n.searchServicesEditDialogInstanceUrl,
+          keyboardType: TextInputType.url,
+          validator: (value) =>
+              FourGetOptions.parseInstanceUrl(value ?? '') == null
+              ? l10n.searchServicesFourGetUrlInvalid
+              : null,
+        ),
+        field(
+          key: 'scraper',
+          label: l10n.searchServicesFourGetScraperOptional,
+          hint: 'ddg',
+        ),
+        field(
+          key: 'passToken',
+          label: l10n.searchServicesFourGetPassOptional,
+          obscure: true,
+        ),
+        Text(
+          l10n.searchServicesFourGetPassHelp,
+          style: Theme.of(context).textTheme.bodySmall,
         ),
       ];
     }
@@ -1411,6 +1439,14 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('language', service.language);
       _putController('username', service.username);
       _putController('password', service.password);
+    } else if (service is FourGetOptions) {
+      _putController('url', service.url);
+      _putController('scraper', service.scraper);
+      _putController('passToken', service.passToken);
+      clearFourGetPassOnOriginChange(
+        urlController: _controller('url'),
+        passController: _controller('passToken'),
+      );
     } else if (service is LinkUpOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is BraveOptions) {
@@ -1540,6 +1576,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           language: _text('language'),
           username: _text('username'),
           password: _controller('password').text,
+        );
+      case '4get':
+        return FourGetOptions(
+          id: _serviceId,
+          url: _text('url'),
+          scraper: _text('scraper'),
+          passToken: _text('passToken'),
         );
       case 'linkup':
         return LinkUpOptions(
@@ -2730,6 +2773,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is ExaMcpOptions) return 'exa_mcp';
   if (service is ZhipuOptions) return 'zhipu';
   if (service is SearXNGOptions) return 'searxng';
+  if (service is FourGetOptions) return '4get';
   if (service is LinkUpOptions) return 'linkup';
   if (service is BraveOptions) return 'brave';
   if (service is MetasoOptions) return 'metaso';
@@ -2775,6 +2819,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return ZhipuOptions(id: id, apiKey: '');
     case 'searxng':
       return SearXNGOptions(id: id, url: '');
+    case '4get':
+      return FourGetOptions(id: id, url: '');
     case 'linkup':
       return LinkUpOptions(id: id, apiKey: '');
     case 'brave':
@@ -2839,6 +2885,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameZhipu;
     case 'searxng':
       return l10n.searchServiceNameSearXNG;
+    case '4get':
+      return l10n.searchServiceNameFourGet;
     case 'linkup':
       return l10n.searchServiceNameLinkUp;
     case 'brave':
@@ -2894,6 +2942,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'exa_mcp', brand: 'exa'),
   (type: 'zhipu', brand: 'zhipu'),
   (type: 'searxng', brand: 'searxng'),
+  (type: '4get', brand: '4get'),
   (type: 'linkup', brand: 'linkup'),
   (type: 'brave', brand: 'brave'),
   (type: 'metaso', brand: 'metaso'),

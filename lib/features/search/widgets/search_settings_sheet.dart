@@ -504,6 +504,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is ExaMcpOptions) return 'exa';
     if (s is ZhipuOptions) return 'zhipu';
     if (s is SearXNGOptions) return 'searxng';
+    if (s is FourGetOptions) return '4get';
     if (s is LinkUpOptions) return 'linkup';
     if (s is BraveOptions) return 'brave';
     if (s is MetasoOptions) return 'metaso';

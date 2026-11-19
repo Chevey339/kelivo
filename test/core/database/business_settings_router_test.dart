@@ -858,6 +858,30 @@ void main() {
       }
     });
 
+    test('preserves 4get settings and validates the pass value', () {
+      final service = {
+        'id': '4get-1',
+        'type': '4get',
+        'url': 'https://search.example/4get',
+        'scraper': 'brave',
+        'passToken': 'test-pass',
+      };
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'search_services_v1': jsonEncode([service]),
+      });
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      expect(jsonDecode(exported['search_services_v1']! as String), [service]);
+
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'search_services_v1': jsonEncode([
+            {...service, 'passToken': 123},
+          ]),
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
     test('accepts and preserves Kagi search credentials', () {
       final snapshot = BusinessSettingsRouter.normalizeAndRoute({
         'search_services_v1': jsonEncode([

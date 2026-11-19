@@ -5310,6 +5310,21 @@ class AppLocalizationsRu extends AppLocalizations {
       'Регион (необязательно, по умолчанию: us-en)';
 
   @override
+  String get searchServicesFourGetUrlInvalid =>
+      'Введите базовый URL HTTP или HTTPS.';
+
+  @override
+  String get searchServicesFourGetScraperOptional =>
+      'Вышестоящий движок (необязательно)';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'Cookie pass (необязательно)';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      'Если экземпляр требует CAPTCHA, пройдите её и вставьте значение cookie pass.';
+
+  @override
   String get searchServiceEditorProviderTypeTitle => 'Поисковый провайдер';
 
   @override
@@ -6740,6 +6755,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Метапоисковик, уважающий приватность. Требуется собственный экземпляр; без отслеживания.';
 
   @override
+  String get searchProviderFourGetDescription =>
+      'Веб-поиск через публичный или самостоятельно размещённый экземпляр 4get с включённым API.';
+
+  @override
   String get searchProviderTavilyDescription =>
       'Поисковый API на базе ИИ, оптимизированный для LLM. Предоставляет качественные релевантные результаты.';
 
@@ -6779,6 +6798,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';

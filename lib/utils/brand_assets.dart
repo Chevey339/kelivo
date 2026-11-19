@@ -75,6 +75,7 @@ class BrandAssets {
         MapEntry(RegExp(r'brave'), 'brave-color.svg'),
         MapEntry(RegExp(r'jina'), 'jina-color.svg'),
         MapEntry(RegExp(r'searxng'), 'searxng-color.svg'),
+        MapEntry(RegExp(r'^4get$'), '4get-color.svg'),
         MapEntry(RegExp(r'serper'), 'serper.svg'),
         MapEntry(RegExp(r'querit'), 'querit-color.svg'),
         MapEntry(RegExp(r'bocha|博查'), 'bocha-color.svg'),
@@ -344,6 +345,11 @@ class BrandAssets {
       id: 'searxng',
       label: 'SearXNG',
       asset: 'assets/icons/searxng-color.svg',
+    ),
+    BrandIconOption(
+      id: '4get',
+      label: '4get',
+      asset: 'assets/icons/4get-color.svg',
     ),
     BrandIconOption(
       id: 'serper',

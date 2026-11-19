@@ -6,12 +6,14 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/search/search_service.dart';
 import '../../core/services/search/search_api_key_rotator.dart';
 import '../../core/services/search/web_fetch_service.dart';
+import '../../features/search/utils/four_get_credentials.dart';
 import '../../features/search/widgets/web_fetch_mode.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/ios_form_text_field.dart';
+import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -685,6 +687,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is ExaMcpOptions) return 'exa';
     if (s is ZhipuOptions) return 'zhipu';
     if (s is SearXNGOptions) return 'searxng';
+    if (s is FourGetOptions) return '4get';
     if (s is LinkUpOptions) return 'linkup';
     if (s is BraveOptions) return 'brave';
     if (s is MetasoOptions) return 'metaso';
@@ -862,6 +865,9 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'exaUrl': TextEditingController(),
     'exaMcpUrl': TextEditingController(),
     'engines': TextEditingController(),
+    'fourGetUrl': TextEditingController(),
+    'scraper': TextEditingController(),
+    'passToken': TextEditingController(),
     'language': TextEditingController(),
     'username': TextEditingController(),
     'password': TextEditingController(),
@@ -896,6 +902,15 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
       text: '${BraveOptions.defaultMaximumNumberOfTokens}',
     ),
   };
+
+  @override
+  void initState() {
+    super.initState();
+    clearFourGetPassOnOriginChange(
+      urlController: _controllers['fourGetUrl']!,
+      passController: _controllers['passToken']!,
+    );
+  }
 
   @override
   void dispose() {
@@ -974,6 +989,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                 onTap: () {
                   if (!_acceptBraveMaximumTokens()) return;
                   final created = _createService();
+                  if (!_acceptFourGetInstanceUrl(context, created)) return;
                   Navigator.of(context).pop(created);
                 },
               ),
@@ -1226,6 +1242,8 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             obscureText: true,
           ),
         ];
+      case '4get':
+        return _fourGetFields(context, _controllers);
       case 'stepfun':
         return [
           TextField(
@@ -1451,6 +1469,8 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           username: _controllers['username']!.text,
           password: _controllers['password']!.text,
         );
+      case '4get':
+        return _fourGetOptions(id, _controllers);
       case 'linkup':
         return LinkUpOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'brave':
@@ -1610,6 +1630,16 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['language'] = TextEditingController(text: s.language);
       _controllers['username'] = TextEditingController(text: s.username);
       _controllers['password'] = TextEditingController(text: s.password);
+    } else if (s is FourGetOptions) {
+      final urlController = TextEditingController(text: s.url);
+      final passController = TextEditingController(text: s.passToken);
+      _controllers['fourGetUrl'] = urlController;
+      _controllers['scraper'] = TextEditingController(text: s.scraper);
+      _controllers['passToken'] = passController;
+      clearFourGetPassOnOriginChange(
+        urlController: urlController,
+        passController: passController,
+      );
     } else if (s is LinkUpOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is BraveOptions) {
@@ -1757,6 +1787,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
                 onTap: () {
                   if (!_acceptBraveMaximumTokens()) return;
                   final updated = _updateService();
+                  if (!_acceptFourGetInstanceUrl(context, updated)) return;
                   Navigator.of(context).pop(updated);
                 },
               ),
@@ -2023,6 +2054,8 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           obscureText: true,
         ),
       ];
+    } else if (s is FourGetOptions) {
+      return _fourGetFields(context, _controllers);
     } else if (s is StepFunOptions) {
       return [
         TextField(
@@ -2337,6 +2370,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         username: _controllers['username']!.text,
         password: _controllers['password']!.text,
       );
+    }
+    if (s is FourGetOptions) {
+      return _fourGetOptions(s.id, _controllers);
     }
     if (s is LinkUpOptions) {
       return LinkUpOptions(
@@ -2780,6 +2816,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'exa_mcp', brand: 'exa'),
     (type: 'zhipu', brand: 'zhipu'),
     (type: 'searxng', brand: 'searxng'),
+    (type: '4get', brand: '4get'),
     (type: 'linkup', brand: 'linkup'),
     (type: 'brave', brand: 'brave'),
     (type: 'metaso', brand: 'metaso'),
@@ -2866,6 +2903,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameZhipu;
     case 'searxng':
       return l10n.searchServiceNameSearXNG;
+    case '4get':
+      return l10n.searchServiceNameFourGet;
     case 'linkup':
       return l10n.searchServiceNameLinkUp;
     case 'brave':
@@ -3248,6 +3287,74 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
       ),
     );
   }
+}
+
+List<Widget> _fourGetFields(
+  BuildContext context,
+  Map<String, TextEditingController> controllers,
+) {
+  final l10n = AppLocalizations.of(context)!;
+  return [
+    IosFormTextField(
+      label: l10n.searchServicesEditDialogInstanceUrl,
+      controller: controllers['fourGetUrl']!,
+      keyboardType: TextInputType.url,
+      inlineLabel: false,
+      outerPadding: EdgeInsets.zero,
+      compact: true,
+    ),
+    const SizedBox(height: 8),
+    IosFormTextField(
+      label: l10n.searchServicesFourGetScraperOptional,
+      controller: controllers['scraper']!,
+      hintText: 'ddg',
+      inlineLabel: false,
+      outerPadding: EdgeInsets.zero,
+      compact: true,
+    ),
+    const SizedBox(height: 8),
+    IosFormTextField(
+      label: l10n.searchServicesFourGetPassOptional,
+      controller: controllers['passToken']!,
+      obscureText: true,
+      autocorrect: false,
+      enableSuggestions: false,
+      inlineLabel: false,
+      outerPadding: EdgeInsets.zero,
+      compact: true,
+    ),
+    const SizedBox(height: 6),
+    Text(
+      l10n.searchServicesFourGetPassHelp,
+      style: Theme.of(context).textTheme.bodySmall,
+    ),
+  ];
+}
+
+FourGetOptions _fourGetOptions(
+  String id,
+  Map<String, TextEditingController> controllers,
+) => FourGetOptions(
+  id: id,
+  url: controllers['fourGetUrl']!.text.trim(),
+  scraper: controllers['scraper']!.text.trim(),
+  passToken: controllers['passToken']!.text.trim(),
+);
+
+bool _acceptFourGetInstanceUrl(
+  BuildContext context,
+  SearchServiceOptions options,
+) {
+  if (options is! FourGetOptions ||
+      FourGetOptions.parseInstanceUrl(options.url) != null) {
+    return true;
+  }
+  showAppSnackBar(
+    context,
+    message: AppLocalizations.of(context)!.searchServicesFourGetUrlInvalid,
+    type: NotificationType.error,
+  );
+  return false;
 }
 
 Widget _deskModeDropdown({
