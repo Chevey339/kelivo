@@ -46,12 +46,15 @@ class _StatusAnimationState extends State<StatusAnimation> {
   }
 
   void _syncPlayback() {
+    // On Android, querying the UI through an accessibility service can set
+    // accessibleNavigation independently of the system's "Remove animations".
     final active =
         !widget.paused &&
         TickerMode.valuesOf(context).enabled &&
         Visibility.of(context) &&
         !(MediaQuery.maybeDisableAnimationsOf(context) ?? false) &&
-        !(MediaQuery.maybeAccessibleNavigationOf(context) ?? false);
+        (defaultTargetPlatform == TargetPlatform.android ||
+            !(MediaQuery.maybeAccessibleNavigationOf(context) ?? false));
     if (active == _listening) return;
     _listening = active;
     if (active) {
@@ -115,9 +118,13 @@ class _StatusAnimationClock extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) => _syncPlayback();
 
   void _syncPlayback() {
-    final lifecycle = WidgetsBinding.instance.lifecycleState;
-    if (!hasListeners ||
-        (lifecycle != null && lifecycle != AppLifecycleState.resumed)) {
+    final binding = WidgetsBinding.instance;
+    final lifecycle = binding.lifecycleState;
+    // On Android the chat can remain visible while the window loses focus.
+    final canAnimate = defaultTargetPlatform == TargetPlatform.android
+        ? binding.framesEnabled
+        : lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    if (!hasListeners || !canAnimate) {
       _stop();
     } else {
       _timer ??= Timer.periodic(_interval, (_) => _scheduleFrame());
