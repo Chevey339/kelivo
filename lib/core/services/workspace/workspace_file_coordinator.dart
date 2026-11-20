@@ -23,16 +23,21 @@ class WorkspaceFileCoordinator {
 
   /// Acquires all scopes together so overlapping workspace/session roots cannot
   /// deadlock. Queued operations participate too, preserving their ordering.
+  /// Shared scopes only conflict with overlapping exclusive scopes.
   static Future<T> runAll<T>(
-    Iterable<String> paths,
+    Iterable<String> exclusivePaths,
     Future<T> Function() operation, {
+    Iterable<String> sharedPaths = const [],
     Duration? waitTimeout,
   }) async {
     final cancellation = ToolCallCancellation.current;
     cancellation?.throwIfCancelled();
-    final keys = await Future.wait(paths.map(WorkspacePaths.resolveHostPath));
+    final [exclusiveKeys, sharedKeys] = await Future.wait([
+      _resolveKeys(exclusivePaths),
+      _resolveKeys(sharedPaths),
+    ]);
     cancellation?.throwIfCancelled();
-    final current = _FileOperation(keys.map(_key).toSet());
+    final current = _FileOperation(exclusiveKeys, sharedKeys);
     final previous = Future.wait([
       for (final pending in _pending)
         if (current.overlaps(pending)) pending.released.future,
@@ -66,6 +71,13 @@ class WorkspaceFileCoordinator {
     }
   }
 
+  static Future<Set<String>> _resolveKeys(Iterable<String> paths) async {
+    final resolved = await Future.wait(
+      paths.map(WorkspacePaths.resolveHostPath),
+    );
+    return resolved.map(_key).toSet();
+  }
+
   static String _key(String path) {
     final key = p.normalize(path);
     // Case-insensitive volumes must not get independent locks for aliases.
@@ -77,13 +89,19 @@ class WorkspaceFileCoordinator {
 }
 
 class _FileOperation {
-  _FileOperation(this.paths);
+  _FileOperation(this.exclusivePaths, this.sharedPaths);
 
-  final Set<String> paths;
+  final Set<String> exclusivePaths;
+  final Set<String> sharedPaths;
   final released = Completer<void>();
 
-  bool overlaps(_FileOperation other) => paths.any(
-    (path) => other.paths.any(
+  bool overlaps(_FileOperation other) =>
+      _pathsOverlap(exclusivePaths, other.exclusivePaths) ||
+      _pathsOverlap(exclusivePaths, other.sharedPaths) ||
+      _pathsOverlap(sharedPaths, other.exclusivePaths);
+
+  static bool _pathsOverlap(Set<String> first, Set<String> second) => first.any(
+    (path) => second.any(
       (candidate) =>
           path == candidate ||
           p.isWithin(path, candidate) ||

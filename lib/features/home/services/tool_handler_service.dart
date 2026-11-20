@@ -57,13 +57,7 @@ class ToolHandlerService {
     try {
       final chat = contextProvider.read<ChatService>();
       final workspaces = contextProvider.read<WorkspaceProvider>();
-      Future<void> Function(String skillId)? onSkillRead;
-      Future<void> Function()? onShellCompleted;
-      try {
-        final skills = contextProvider.read<SkillsService>();
-        onSkillRead = skills.incrementUseCount;
-        onShellCompleted = skills.rescan;
-      } catch (_) {}
+      final skills = contextProvider.read<SkillsService?>();
       return WorkspaceToolsService(
         registry: contextProvider.read<ToolRunRegistry>(),
         runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
@@ -71,8 +65,9 @@ class ToolHandlerService {
         readPermissionState: ConversationToolPermissions.forChat(chat).read,
         permissionChanges: chat,
         touchLastUsed: workspaces.touchLastUsed,
-        onSkillRead: onSkillRead,
-        onShellCompleted: onShellCompleted,
+        onSkillRead: skills?.incrementUseCount,
+        refreshSkills: skills?.rescan,
+        isLinkedSkillEntrypoint: skills?.isLinkedEntrypointTarget,
         loadEnvironment: contextProvider
             .read<EnvironmentProvider?>()
             ?.loadExecutionConfig,

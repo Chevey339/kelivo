@@ -63,18 +63,17 @@ Use the tools and path zones shown in the current conversation. Kelivo supports
 SKILL.md instructions and supporting files; Codex/Claude-specific CLI commands,
 plugin manifests, subagents, and evaluation runners are not prerequisites.
 
-- **Workspace with a working shell:** install directly into Kelivo's skills
-  directory using the skills path provided in the workspace context (`/skills`
-  in a sandbox, the supplied host path in native mode). For skill creation and
-  updates, use `shell`: `write_file` and `edit_file` treat this directory as
-  read-only. For a new skill, choose an unused directory matching its name;
-  for an update, use the existing directory and preserve unrelated files.
-  Write supporting files there with their relative paths intact, then write
-  the complete SKILL.md last. Kelivo rescans installed skills after shell
-  commands, so saving here installs the skill without a separate import.
-- **No workspace or no working shell:** installed skills remain read-only.
-  Return the complete SKILL.md in a fenced Markdown block as a draft. Explain
-  that direct installation requires a bound workspace with a working shell.
+- **Workspace with writing tools enabled.** Install directly into Kelivo's
+  skills directory using the path in the workspace context (`/skills` in a
+  sandbox, the supplied host path in native mode). Use `write_file` to create
+  files and `edit_file` to update them. Shell can also install skill files when
+  available. Choose an unused directory for a new skill. For an update, use
+  the existing directory and preserve unrelated files. Save supporting files
+  at their relative paths, then write the complete SKILL.md last. Kelivo
+  refreshes the skill list after writing, so saving here installs the skill.
+- **When writing tools are unavailable.** Return the complete SKILL.md in a
+  fenced Markdown block as a draft. Direct installation requires a bound
+  workspace and an enabled writing tool.
 
 After installation, read back SKILL.md and its referenced files. Link the saved
 entrypoint as `kelivo://skills/<skill-directory>/SKILL.md`, using the actual

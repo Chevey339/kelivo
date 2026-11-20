@@ -189,15 +189,14 @@ void main() {
               ),
             ),
           )!;
-      final installed = Directory(
-        p.join(skills.skillsDirectory.path, 'agent-installed'),
-      );
-      Future<void> run(Future<void> Function() action) async {
-        runtime.action = action;
+      const skillId = 'agent-installed';
+      final installed = Directory(p.join(skills.skillsDirectory.path, skillId));
+      final skillPath = sandboxed
+          ? '/skills/$skillId/SKILL.md'
+          : p.join(installed.path, 'SKILL.md');
+      Future<void> run(String name, Map<String, dynamic> arguments) async {
         await tester.runAsync(() async {
-          final result = await handler('shell', {
-            'command': 'install or update a skill',
-          }, toolCallId: 'run');
+          final result = await handler(name, arguments, toolCallId: name);
           expect(
             WorkspaceToolMetadata.fromJson(
               ClientToolResult.fromHandler(result).metadata!,
@@ -210,17 +209,13 @@ void main() {
       }
 
       expect(find.text('Agent skill'), findsNothing);
-      await run(() async {
-        await installed.create();
-        await File(p.join(installed.path, 'SKILL.md')).writeAsString(
-          '---\nname: Agent skill\ndescription: Installed by a command\n---\n',
-        );
+      await run('write_file', {
+        'path': skillPath,
+        'content':
+            '---\nname: Agent skill\ndescription: Installed by the agent\n---\n',
       });
       expect(find.text('Agent skill'), findsNWidgets(2));
-      expect(
-        skills.resolveForAssistant(null).single.record.id,
-        'agent-installed',
-      );
+      expect(skills.resolveForAssistant(null).single.record.id, skillId);
       expect(
         skills.skills
             .firstWhere((s) => s.record.id == 'existing')
@@ -236,15 +231,32 @@ void main() {
         1,
       );
 
-      await run(
-        () => File(p.join(installed.path, 'SKILL.md')).writeAsString(
-          '---\nname: Renamed skill\ndescription: Updated by a command\n---\n',
-        ),
-      );
+      await run('edit_file', {
+        'path': skillPath,
+        'old_string': 'name: Agent skill',
+        'new_string': 'name: Renamed skill',
+      });
       expect(find.text('Agent skill'), findsNothing);
       expect(find.text('Renamed skill'), findsNWidgets(2));
-      await run(() => installed.delete(recursive: true));
+
+      final entrypoint = p.join(installed.path, 'SKILL.md');
+      final bodyFile = p.join(installed.path, 'body.md');
+      runtime.action = () async {
+        await File(entrypoint).rename(bodyFile);
+        await Link(entrypoint).create(bodyFile);
+      };
+      await run('shell', {'command': 'link the test skill entrypoint'});
+      await run('edit_file', {
+        'path': sandboxed ? '/skills/$skillId/body.md' : bodyFile,
+        'old_string': 'name: Renamed skill',
+        'new_string': 'name: Linked skill',
+      });
       expect(find.text('Renamed skill'), findsNothing);
+      expect(find.text('Linked skill'), findsNWidgets(2));
+
+      runtime.action = () => installed.delete(recursive: true);
+      await run('shell', {'command': 'remove the installed test skill'});
+      expect(find.text('Linked skill'), findsNothing);
       expect(skills.resolveForAssistant(null), isEmpty);
     }, variant: TargetPlatformVariant.only(platform));
   }

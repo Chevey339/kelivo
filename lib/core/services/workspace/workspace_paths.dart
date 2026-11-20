@@ -100,10 +100,10 @@ class WorkspacePaths {
     switch (zone) {
       case WorkspaceZone.workspace:
       case WorkspaceZone.chat:
+      case WorkspaceZone.skills:
       case WorkspaceZone.tmp:
       case WorkspaceZone.external:
         return true;
-      case WorkspaceZone.skills:
       case WorkspaceZone.outside:
         return false;
     }
@@ -298,7 +298,7 @@ class WorkspacePaths {
   }
 
   WorkspaceZone _classifyHost(String hostPath) {
-    // A broad workspace or external mount must not make skills writable.
+    // Keep skill links and metadata consistent when a workspace overlaps skills.
     if (_hostInside(skillsHostDir, hostPath)) return WorkspaceZone.skills;
     if (_hostInside(tmpHostRoot, hostPath)) return WorkspaceZone.tmp;
     if (_externalMounts.any((mount) => _hostInside(mount.host, hostPath))) {

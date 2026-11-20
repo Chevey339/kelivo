@@ -71,6 +71,9 @@ class _InterruptedWriter extends FakeWorkspaceRuntime {
 }
 
 class _PausedShellRuntime extends FakeWorkspaceRuntime {
+  _PausedShellRuntime({this.finishFirst});
+
+  final Future<void> Function()? finishFirst;
   final firstStarted = Completer<void>();
   final secondStarted = Completer<void>();
   final releaseFirst = Completer<void>();
@@ -82,6 +85,7 @@ class _PausedShellRuntime extends FakeWorkspaceRuntime {
     if (request.command == 'first') {
       firstStarted.complete();
       await releaseFirst.future;
+      await finishFirst?.call();
     } else {
       secondStarted.complete();
     }
@@ -193,7 +197,7 @@ void main() {
   WorkspaceToolsService service({
     WorkspaceRuntime? runtime,
     bool registerRuntime = true,
-    Future<void> Function()? onShellCompleted,
+    Future<void> Function()? refreshSkills,
     Future<EnvironmentExecutionConfig> Function()? loadEnvironment,
     ToolPermissionState? Function(String)? readPermissionState,
   }) {
@@ -204,7 +208,7 @@ void main() {
     return WorkspaceToolsService(
       registry: registry,
       runtimeProvider: provider,
-      onShellCompleted: onShellCompleted,
+      refreshSkills: refreshSkills,
       loadEnvironment: loadEnvironment,
       readPermissionState: readPermissionState,
       updateConversationExtras: (id, update) async {
@@ -278,7 +282,7 @@ void main() {
       final tools = service(
         runtime: FakeWorkspaceRuntime(useRealProcess: true),
         loadEnvironment: () async => config,
-        onShellCompleted: () async {
+        refreshSkills: () async {
           config = EnvironmentExecutionConfig(
             variables: {'TOKEN': 'new-secret'},
           );
@@ -467,7 +471,7 @@ void main() {
     var refreshes = 0;
     final tools = service(
       runtime: runtime,
-      onShellCompleted: () async {
+      refreshSkills: () async {
         refreshes++;
       },
     );
@@ -497,6 +501,10 @@ void main() {
     await tools.handle(ctx(), 'read_file', {
       'path': 'missing',
     }, toolCallId: 'read');
+    await tools.handle(ctx(), 'write_file', {
+      'path': 'workspace.txt',
+      'content': 'project file',
+    }, toolCallId: 'write-workspace');
     await tools.handle(ctx(), 'shell', {}, toolCallId: 'invalid');
     await tools.handle(ctx(disabledTools: {'shell'}), 'shell', {
       'command': 'install',
@@ -514,7 +522,7 @@ void main() {
   test('refresh failures do not change a successful command result', () async {
     final tools = service(
       runtime: FakeWorkspaceRuntime(),
-      onShellCompleted: () async {
+      refreshSkills: () async {
         throw const FileSystemException('unavailable');
       },
     );
@@ -876,6 +884,34 @@ void main() {
         },
       );
     }
+
+    test('skill edits wait for shell changes to the shared library', () async {
+      final entrypoint = File(p.join(skillsDir.path, 'demo', 'SKILL.md'));
+      await entrypoint.parent.create();
+      await entrypoint.writeAsString('original\n');
+      final runtime = _PausedShellRuntime(
+        finishFirst: () => entrypoint.writeAsString('original\nshell note\n'),
+      );
+      final tools = service(runtime: runtime);
+      final first = tools.handle(ctx(), 'shell', {
+        'command': 'first',
+      }, toolCallId: 'first');
+      await runtime.firstStarted.future.timeout(const Duration(seconds: 3));
+      final edit = tools.handle(ctx(conversationId: 'conv-2'), 'edit_file', {
+        'path': entrypoint.path,
+        'old_string': 'original',
+        'new_string': 'edited',
+      }, toolCallId: 'edit-skill');
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(await entrypoint.readAsString(), 'original\n');
+      } finally {
+        runtime.releaseFirst.complete();
+        await Future.wait([first, edit]);
+      }
+      expect(metaOf(await edit).status, 'ok');
+      expect(await entrypoint.readAsString(), 'edited\nshell note\n');
+    });
 
     test('shell snapshot waits for in-flight web app storage writes', () async {
       final entered = Completer<void>();
@@ -1245,19 +1281,86 @@ void main() {
       expect(grep, contains('needle'));
     });
 
-    test('skills write is denied', () async {
-      final skillFile = p.join(skillsDir.path, 's1', 'SKILL.md');
-      Directory(p.dirname(skillFile)).createSync(recursive: true);
-      File(skillFile).writeAsStringSync('old');
+    test('skills writes cannot follow a link outside the sandbox', () async {
+      final outside = File(p.join(tmp.path, 'outside.txt'))
+        ..writeAsStringSync('old');
+      Link(p.join(skillsDir.path, 'link.txt')).createSync(outside.path);
       final result = await service().handle(
         ctx(sandboxed: true, fullAccess: true),
         'write_file',
-        {'path': '/skills/s1/SKILL.md', 'content': 'new'},
+        {'path': '/skills/link.txt', 'content': 'new'},
         toolCallId: 'skill-write',
       );
-      expect(jsonOf(result)['error'], 'skills_readonly');
+      expect(jsonOf(result)['error'], 'path_outside');
       expect(metaOf(result).status, 'denied');
-      expect(File(skillFile).readAsStringSync(), 'old');
+      expect(outside.readAsStringSync(), 'old');
+    });
+
+    test('skill writes protect bundle receipts and staging paths', () async {
+      final receipt = File(p.join(skillsDir.path, '.bundled-skill-creator'))
+        ..writeAsStringSync('1\n');
+      Link(p.join(skillsDir.path, 'receipt.txt')).createSync(receipt.path);
+      final tools = service();
+      for (final path in [
+        '/skills/.bundled-skill-creator',
+        '/skills/receipt.txt',
+        '/skills/.bundled-visualize/SKILL.md',
+      ]) {
+        final result = await tools.handle(ctx(sandboxed: true), 'write_file', {
+          'path': path,
+          'content': 'overwritten',
+        }, toolCallId: 'metadata-write');
+        expect(metaOf(result).status, 'denied');
+        expect(jsonOf(result)['message'], contains('skill library metadata'));
+      }
+      expect(receipt.readAsStringSync(), '1\n');
+      expect(
+        Directory(p.join(skillsDir.path, '.bundled-visualize')).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('only skill entrypoint writes rescan the library', () async {
+      var refreshes = 0;
+      final tools = service(
+        refreshSkills: () async {
+          refreshes++;
+        },
+      );
+      final context = ctx(sandboxed: true);
+      const resource = '/skills/demo/references/example.md';
+      final writeResource = await tools.handle(context, 'write_file', {
+        'path': resource,
+        'content': 'example',
+      }, toolCallId: 'resource');
+      expect(metaOf(writeResource).status, 'ok');
+      expect(refreshes, 0);
+
+      final writeEntrypoint = await tools.handle(context, 'write_file', {
+        'path': '/skills/demo/SKILL.md',
+        'content': 'original',
+      }, toolCallId: 'entrypoint');
+      expect(metaOf(writeEntrypoint).status, 'ok');
+      expect(refreshes, 1);
+
+      final editResource = await tools.handle(context, 'edit_file', {
+        'path': resource,
+        'old_string': 'example',
+        'new_string': 'changed',
+      }, toolCallId: 'edit-resource');
+      expect(metaOf(editResource).status, 'ok');
+      expect(refreshes, 1);
+
+      Link(
+        p.join(workspaceDir.path, 'skill-alias.md'),
+      ).createSync(p.join(skillsDir.path, 'demo', 'SKILL.md'));
+      final editEntrypoint = await tools.handle(context, 'edit_file', {
+        'path': '/workspace/skill-alias.md',
+        'old_string': 'original',
+        'new_string': 'changed',
+      }, toolCallId: 'edit-entrypoint');
+      expect(metaOf(editEntrypoint).status, 'ok');
+      expect(refreshes, 2);
     });
   });
 
@@ -1777,13 +1880,14 @@ void main() {
     });
 
     test('does not mark tools used on denial', () async {
-      await service().handle(
-        ctx(sandboxed: true, fullAccess: true, toolsUsed: false),
+      final result = await service().handle(
+        ctx(fullAccess: false, toolsUsed: false),
         'write_file',
-        {'path': '/skills/x.txt', 'content': 'no'},
+        {'path': p.join(tmp.path, 'outside.txt'), 'content': 'no'},
         toolCallId: 'lock-deny',
         conversationId: 'conv-1',
       );
+      expect(metaOf(result).status, 'denied');
       expect(extrasById, isEmpty);
       expect(touched, isEmpty);
     });

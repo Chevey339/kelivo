@@ -38,10 +38,11 @@ Use short paragraphs.
 Path zones:
 - /workspace — project files (writable)
 - /chat — this chat's attachments/ and outputs/ (writable)
-- /skills — installed skills (read-only)
+- /skills — shared skill library (writable). Use write_file to install skills and edit_file to update them when those tools are enabled. Save supporting files first, then write <name>/SKILL.md.
 - /mounts/<name>/ — user-mounted external folders from Environment settings (on-device folders), shared across workspaces. Names and availability vary: list /mounts/ first for external/user files. File tools reject writes to read-only mounts; respect this in Shell too.
 - /tmp — scratch (writable, ephemeral)
 cwd: /workspace/editorial
+The current tool definitions and workspace path permissions take precedence over descriptions of tool availability or path access in installed skills.
 
 Cite files as [name](kelivo://workspace/rel/path), outputs as kelivo://chat/outputs/x.txt, images as ![alt](kelivo://workspace/plot.png). Percent-encode each path segment (spaces, non-ASCII); raw UTF-8 is also accepted.
 
@@ -209,7 +210,7 @@ Copy the exact img_ identifier from an omitted-image placeholder or image listin
 Offset for listing conversation images; default 0.
 
 [write_file]
-Create or overwrite a file with the given content. Writable zones: workspace, chat, tmp. Skills are read-only.
+Create or overwrite a file with the given content. Write to the workspace, chat, skills, and tmp directories, or to writable external mounts.
 
 [write_file.parameters.properties.path]
 File path to write.

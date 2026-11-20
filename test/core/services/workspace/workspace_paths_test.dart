@@ -64,11 +64,11 @@ void main() {
       final skill = paths.resolve('/skills/foo', cwd: '/workspace');
       expect(skill.zone, WorkspaceZone.skills);
       expect(skill.modelPath, '/skills/foo');
+      expect(WorkspacePaths.isWritableZone(skill.zone), isTrue);
 
       final tmpPath = paths.resolve('/tmp/scratch', cwd: '/workspace');
       expect(tmpPath.zone, WorkspaceZone.tmp);
       expect(WorkspacePaths.isWritableZone(tmpPath.zone), isTrue);
-      expect(WorkspacePaths.isWritableZone(WorkspaceZone.skills), isFalse);
 
       expect(
         paths.toModelPath(p.join(workspace.path, 'src', 'main.dart')),
