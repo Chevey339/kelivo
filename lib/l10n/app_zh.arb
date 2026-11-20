@@ -473,6 +473,8 @@
   "hotkeysResetDefault": "重置为默认",
   "hotkeysClearShortcut": "清除快捷键",
   "hotkeysResetAll": "重置所有快捷键为默认",
+  "hotkeysShortcutInUse": "此快捷键已分配给「{action}」。",
+  "hotkeysTextEditing": "文本编辑与焦点导航",
   "assistantEditTemperatureTitle": "温度",
   "assistantEditTopPTitle": "Top-p",
   "assistantSettingsDeleteDialogTitle": "删除助手",

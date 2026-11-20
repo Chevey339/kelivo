@@ -1663,6 +1663,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get hotkeysResetAll => 'Сбросить все по умолчанию';
 
   @override
+  String hotkeysShortcutInUse(String action) {
+    return 'Это сочетание клавиш уже назначено действию «$action».';
+  }
+
+  @override
+  String get hotkeysTextEditing => 'Редактирование текста и перемещение фокуса';
+
+  @override
   String get assistantEditTemperatureTitle => 'Температура';
 
   @override

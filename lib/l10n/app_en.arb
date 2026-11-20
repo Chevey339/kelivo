@@ -701,6 +701,19 @@
   "hotkeysResetDefault": "Reset to default",
   "hotkeysClearShortcut": "Clear shortcut",
   "hotkeysResetAll": "Reset all to defaults",
+  "hotkeysShortcutInUse": "This shortcut is already assigned to {action}.",
+  "@hotkeysShortcutInUse": {
+    "description": "Conflict message in desktop shortcut settings when a keyboard combination is shared by two actions that can be active at the same time. The action placeholder is the localized name shown for the other action in those settings.",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "hotkeysTextEditing": "Text editing and focus navigation",
+  "@hotkeysTextEditing": {
+    "description": "Action name substituted into the desktop shortcut conflict message for built-in keyboard behavior that types, edits text, or moves focus in a conversation."
+  },
   "assistantEditTemperatureTitle": "Temperature",
   "assistantEditTopPTitle": "Top-p",
   "assistantSettingsDeleteDialogTitle": "Delete Assistant",
@@ -2536,7 +2549,7 @@
   },
   "conversationFindOpenTooltip": "Find in conversation",
   "@conversationFindOpenTooltip": {
-    "description": "Tooltip for the message map button that opens the find bar in the current conversation."
+    "description": "Tooltip for the message map button and label in desktop shortcut settings for opening the find bar in the current conversation."
   },
   "searchServicesPageApiKeyRequiredStatus": "API Key Required",
   "searchServicesPageUrlRequiredStatus": "URL Required",

@@ -496,6 +496,8 @@
   "hotkeysResetDefault": "Varsayılana sıfırla",
   "hotkeysClearShortcut": "Kısayolu temizle",
   "hotkeysResetAll": "Tümünü varsayılana sıfırla",
+  "hotkeysShortcutInUse": "Bu kısayol zaten “{action}” eylemine atanmış.",
+  "hotkeysTextEditing": "Metin düzenleme ve odaklar arasında gezinme",
   "assistantEditTemperatureTitle": "Sıcaklık",
   "assistantEditTopPTitle": "Top-p",
   "assistantSettingsDeleteDialogTitle": "Asistanı Sil",

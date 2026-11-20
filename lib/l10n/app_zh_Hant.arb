@@ -496,6 +496,8 @@
   "hotkeysResetDefault": "重置為預設",
   "hotkeysClearShortcut": "清除快捷鍵",
   "hotkeysResetAll": "重置所有快捷鍵為預設",
+  "hotkeysShortcutInUse": "此快捷鍵已指派給「{action}」。",
+  "hotkeysTextEditing": "文字編輯與焦點導覽",
   "assistantEditTemperatureTitle": "溫度",
   "assistantEditTopPTitle": "Top-p",
   "assistantSettingsDeleteDialogTitle": "刪除助理",

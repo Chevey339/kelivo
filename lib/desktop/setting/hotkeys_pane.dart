@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/snackbar.dart';
 import '../../core/providers/hotkey_provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
@@ -132,53 +133,56 @@ class _HotkeyRowState extends State<_HotkeyRow> {
     super.dispose();
   }
 
+  String _displayLabel(AppLocalizations l10n, String key) => switch (key) {
+    'hotkeyToggleSidePanel' => l10n.hotkeyToggleSidePanel,
+    'hotkeySidePanelNewWeb' => l10n.hotkeySidePanelNewWeb,
+    'hotkeySidePanelFiles' => l10n.hotkeySidePanelFiles,
+    'hotkeySidePanelExpand' => l10n.hotkeySidePanelExpand,
+    'hotkeySidePanelReopenTab' => l10n.hotkeySidePanelReopenTab,
+    'hotkeySidePanelNextTab' => l10n.hotkeySidePanelNextTab,
+    'hotkeySidePanelPreviousTab' => l10n.hotkeySidePanelPreviousTab,
+    'hotkeySidePanelAddress' => l10n.hotkeySidePanelAddress,
+    'hotkeySidePanelFocus' => l10n.hotkeySidePanelFocus,
+    'hotkeyToggleAppVisibility' => l10n.hotkeyToggleAppVisibility,
+    'hotkeyCloseWindow' => l10n.hotkeyCloseWindow,
+    'hotkeyOpenSettings' => l10n.hotkeyOpenSettings,
+    'hotkeyNewTopic' => l10n.hotkeyNewTopic,
+    'conversationFindOpenTooltip' => l10n.conversationFindOpenTooltip,
+    'hotkeySwitchModel' => l10n.hotkeySwitchModel,
+    'hotkeyToggleAssistantPanel' => l10n.hotkeyToggleAssistantPanel,
+    'hotkeyToggleTopicPanel' => l10n.hotkeyToggleTopicPanel,
+    'browserFind' => l10n.browserFind,
+    'browserReload' => l10n.browserReload,
+    'selectionQuote' => l10n.selectionQuote,
+    'hotkeysTextEditing' => l10n.hotkeysTextEditing,
+    'selectAll' => MaterialLocalizations.of(context).selectAllButtonLabel,
+    'copy' => MaterialLocalizations.of(context).copyButtonLabel,
+    'cut' => MaterialLocalizations.of(context).cutButtonLabel,
+    'paste' => MaterialLocalizations.of(context).pasteButtonLabel,
+    _ => key,
+  };
+
+  Future<void> _applyChange(Future<String?> change) async {
+    final conflict = await change;
+    if (!mounted) return;
+    if (_recording) _setRecording(false);
+    if (conflict == null) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    showAppSnackBar(
+      context,
+      message: l10n.hotkeysShortcutInUse(_displayLabel(l10n, conflict)),
+      type: NotificationType.warning,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final hotkeys = context.read<HotkeyProvider>();
     final item = widget.item;
-
-    String displayLabel() {
-      // Use l10n by key
-      final loc = AppLocalizations.of(context)!;
-      switch (item.l10nLabelKey) {
-        case 'hotkeyToggleSidePanel':
-          return loc.hotkeyToggleSidePanel;
-        case 'hotkeySidePanelNewWeb':
-          return loc.hotkeySidePanelNewWeb;
-        case 'hotkeySidePanelFiles':
-          return loc.hotkeySidePanelFiles;
-        case 'hotkeySidePanelExpand':
-          return loc.hotkeySidePanelExpand;
-        case 'hotkeySidePanelReopenTab':
-          return loc.hotkeySidePanelReopenTab;
-        case 'hotkeySidePanelNextTab':
-          return loc.hotkeySidePanelNextTab;
-        case 'hotkeySidePanelPreviousTab':
-          return loc.hotkeySidePanelPreviousTab;
-        case 'hotkeySidePanelAddress':
-          return loc.hotkeySidePanelAddress;
-        case 'hotkeySidePanelFocus':
-          return loc.hotkeySidePanelFocus;
-        case 'hotkeyToggleAppVisibility':
-          return loc.hotkeyToggleAppVisibility;
-        case 'hotkeyCloseWindow':
-          return loc.hotkeyCloseWindow;
-        case 'hotkeyOpenSettings':
-          return loc.hotkeyOpenSettings;
-        case 'hotkeyNewTopic':
-          return loc.hotkeyNewTopic;
-        case 'hotkeySwitchModel':
-          return loc.hotkeySwitchModel;
-        case 'hotkeyToggleAssistantPanel':
-          return loc.hotkeyToggleAssistantPanel;
-        case 'hotkeyToggleTopicPanel':
-          return loc.hotkeyToggleTopicPanel;
-        default:
-          return item.l10nLabelKey;
-      }
-    }
-
+    final conflict = hotkeys.conflictingActionLabelKey(item);
     final current = HotkeyProvider.formatCommandForDisplay(item.command);
     final placeholder = l10n.hotkeysPressShortcut;
 
@@ -186,13 +190,27 @@ class _HotkeyRowState extends State<_HotkeyRow> {
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       child: DesktopLabeledControl(
         controlWidth: 400,
-        label: Text(
-          displayLabel(),
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: AppFontWeights.medium,
-            color: cs.onSurface.withValues(alpha: 0.92),
-          ),
+        label: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _displayLabel(l10n, item.l10nLabelKey),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.medium,
+                color: cs.onSurface.withValues(alpha: 0.92),
+              ),
+            ),
+            if (conflict != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  l10n.hotkeysShortcutInUse(_displayLabel(l10n, conflict)),
+                  style: TextStyle(fontSize: 12, color: cs.error),
+                ),
+              ),
+          ],
         ),
         control: Wrap(
           runSpacing: 8,
@@ -212,14 +230,8 @@ class _HotkeyRowState extends State<_HotkeyRow> {
                       _focusNode.requestFocus();
                     },
                     onCancel: () => _setRecording(false),
-                    onSubmit: (cmd) async {
-                      // Require at least one modifier; _ShortcutEditor guarantees
-                      await context.read<HotkeyProvider>().setCommand(
-                        item.id,
-                        cmd,
-                      );
-                      if (mounted) _setRecording(false);
-                    },
+                    onSubmit: (cmd) =>
+                        _applyChange(hotkeys.setCommand(item.id, cmd)),
                   ),
                   if (_recording)
                     // Tap outside cancel overlay
@@ -238,8 +250,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
               message: l10n.hotkeysResetDefault,
               child: _SmallIconBtn(
                 icon: lucide.Lucide.RotateCcw,
-                onTap: () async =>
-                    context.read<HotkeyProvider>().resetToDefault(item.id),
+                onTap: () => _applyChange(hotkeys.resetToDefault(item.id)),
               ),
             ),
             const SizedBox(width: 8),
@@ -247,15 +258,13 @@ class _HotkeyRowState extends State<_HotkeyRow> {
               message: l10n.hotkeysClearShortcut,
               child: _SmallIconBtn(
                 icon: lucide.Lucide.Eraser,
-                onTap: () async =>
-                    context.read<HotkeyProvider>().clearCommand(item.id),
+                onTap: () => hotkeys.clearCommand(item.id),
               ),
             ),
             const SizedBox(width: 12),
             IosSwitch(
               value: item.enabled,
-              onChanged: (v) =>
-                  context.read<HotkeyProvider>().setEnabled(item.id, v),
+              onChanged: (v) => _applyChange(hotkeys.setEnabled(item.id, v)),
             ),
           ],
         ),

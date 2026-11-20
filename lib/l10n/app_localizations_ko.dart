@@ -1599,6 +1599,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get hotkeysResetAll => '모든 단축키를 기본값으로 재설정';
 
   @override
+  String hotkeysShortcutInUse(String action) {
+    return '이 단축키는 이미 $action에 할당되어 있습니다.';
+  }
+
+  @override
+  String get hotkeysTextEditing => '텍스트 편집 및 포커스 탐색';
+
+  @override
   String get assistantEditTemperatureTitle => '온도';
 
   @override

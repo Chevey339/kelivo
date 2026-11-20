@@ -3088,6 +3088,18 @@ abstract class AppLocalizations {
   /// **'Reset all to defaults'**
   String get hotkeysResetAll;
 
+  /// Conflict message in desktop shortcut settings when a keyboard combination is shared by two actions that can be active at the same time. The action placeholder is the localized name shown for the other action in those settings.
+  ///
+  /// In en, this message translates to:
+  /// **'This shortcut is already assigned to {action}.'**
+  String hotkeysShortcutInUse(String action);
+
+  /// Action name substituted into the desktop shortcut conflict message for built-in keyboard behavior that types, edits text, or moves focus in a conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Text editing and focus navigation'**
+  String get hotkeysTextEditing;
+
   /// Label for the temperature sampling parameter control in assistant edit settings.
   ///
   /// In en, this message translates to:
@@ -9367,7 +9379,7 @@ abstract class AppLocalizations {
   /// **'Include thinking'**
   String get conversationFindIncludeThinking;
 
-  /// Tooltip for the message map button that opens the find bar in the current conversation.
+  /// Tooltip for the message map button and label in desktop shortcut settings for opening the find bar in the current conversation.
   ///
   /// In en, this message translates to:
   /// **'Find in conversation'**

@@ -1,3 +1,4 @@
+import 'dart:async' show Completer;
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,6 +6,18 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 
 import '../../desktop/hotkeys/hotkey_event_bus.dart';
+
+enum AppHotkeyScope {
+  application,
+  system,
+  conversation,
+  sidePanel;
+
+  bool get isAppWide => this == application || this == system;
+
+  bool overlaps(AppHotkeyScope other) =>
+      this == other || isAppWide || other.isAppWide;
+}
 
 /// A single hotkey item definition and state.
 class AppHotkey {
@@ -14,6 +27,7 @@ class AppHotkey {
     this.defaultWinLinux,
     this.defaultMac,
     this.enabledByDefault = true,
+    this.scope = AppHotkeyScope.application,
   });
 
   final String id;
@@ -21,6 +35,10 @@ class AppHotkey {
   final String? defaultWinLinux; // e.g., 'ctrl+comma'
   final String? defaultMac; // e.g., 'cmd+comma'
   final bool enabledByDefault;
+  final AppHotkeyScope scope;
+
+  String get defaultCommand =>
+      (Platform.isMacOS ? defaultMac : defaultWinLinux) ?? '';
 
   // runtime state
   String? command; // normalized key string, platform-independent
@@ -29,6 +47,8 @@ class AppHotkey {
 
 /// Provider that stores hotkey assignments and registers them via hotkey_manager.
 class HotkeyProvider extends ChangeNotifier {
+  static const conversationFindId = 'conversation_find';
+
   static const _prefsKeyCommands =
       'desktop_hotkeys_commands_v1'; // id -> command
   static const _prefsKeyEnabled = 'desktop_hotkeys_enabled_v1'; // id -> bool
@@ -81,6 +101,7 @@ class HotkeyProvider extends ChangeNotifier {
       l10nLabelKey: 'hotkeySidePanelAddress',
       defaultWinLinux: 'ctrl+l',
       defaultMac: 'cmd+l',
+      scope: AppHotkeyScope.sidePanel,
     ),
     'side_panel_focus': AppHotkey(
       id: 'side_panel_focus',
@@ -95,6 +116,7 @@ class HotkeyProvider extends ChangeNotifier {
       defaultWinLinux: '',
       defaultMac: '',
       enabledByDefault: true,
+      scope: AppHotkeyScope.system,
     ),
     // Close window (in-app scope)
     'close_window': AppHotkey(
@@ -119,6 +141,13 @@ class HotkeyProvider extends ChangeNotifier {
       defaultWinLinux: 'ctrl+n',
       defaultMac: 'cmd+n',
       enabledByDefault: true,
+    ),
+    conversationFindId: AppHotkey(
+      id: conversationFindId,
+      l10nLabelKey: 'conversationFindOpenTooltip',
+      defaultWinLinux: 'ctrl+f',
+      defaultMac: 'cmd+f',
+      scope: AppHotkeyScope.conversation,
     ),
     // Switch model (chat; no default)
     'switch_model': AppHotkey(
@@ -147,6 +176,7 @@ class HotkeyProvider extends ChangeNotifier {
   };
 
   final Map<String, HotKey> _registered = <String, HotKey>{};
+  Future<void>? _mutationTail;
 
   final _recordingOwners = <Object>{};
   void beginRecording(Object owner) => _recordingOwners.add(owner);
@@ -169,7 +199,23 @@ class HotkeyProvider extends ChangeNotifier {
             modifiers.contains(HotKeyModifier.shift) == shortcut.shift;
       });
 
-  Future<void> initialize() async {
+  Future<T> _serializeMutation<T>(Future<T> Function() operation) async {
+    final pending = _mutationTail;
+    final completion = Completer<void>();
+    _mutationTail = completion.future;
+    try {
+      if (pending != null) await pending;
+      return await operation();
+    } finally {
+      if (_mutationTail == completion.future) _mutationTail = null;
+      completion.complete();
+    }
+  }
+
+  Future<void> initialize() =>
+      _initialized ? Future<void>.value() : _serializeMutation(_initialize);
+
+  Future<void> _initialize() async {
     if (_initialized) return;
     final prefs = await SharedPreferences.getInstance();
     // Load enabled map
@@ -188,16 +234,14 @@ class HotkeyProvider extends ChangeNotifier {
     final commands = <String, String>{for (final e in cmdList) e.key: e.value};
 
     // Seed defaults
-    final isMac = Platform.isMacOS;
     for (final e in _items.values) {
       e.enabled = enabled[e.id] ?? e.enabledByDefault;
-      final def = (isMac ? e.defaultMac : e.defaultWinLinux) ?? '';
-      final raw = commands[e.id] ?? def;
-      e.command = (raw.trim().isEmpty) ? null : raw.trim();
+      final command = (commands[e.id] ?? e.defaultCommand).trim();
+      e.command = command.isEmpty ? null : command;
     }
 
-    _initialized = true;
     await _rebindAll();
+    _initialized = true;
     notifyListeners();
   }
 
@@ -213,49 +257,117 @@ class HotkeyProvider extends ChangeNotifier {
     await prefs.setStringList(_prefsKeyCommands, cmdList);
   }
 
-  Future<void> resetAllToDefaults() async {
-    final isMac = Platform.isMacOS;
+  Future<void> resetAllToDefaults() => _serializeMutation(() async {
     for (final e in _items.values) {
-      final def = (isMac ? e.defaultMac : e.defaultWinLinux) ?? '';
+      final def = e.defaultCommand;
       e.command = def.isEmpty ? null : def;
       e.enabled = e.enabledByDefault;
     }
-    await _persist();
-    await _rebindAll();
-    notifyListeners();
-  }
+    await _saveChanges(rebind: true);
+  });
 
-  Future<void> resetToDefault(String id) async {
-    final item = _items[id]!;
-    final def =
-        (Platform.isMacOS ? item.defaultMac : item.defaultWinLinux) ?? '';
-    item.command = def.isEmpty ? null : def;
-    await _persist();
-    await _rebindAll();
-    notifyListeners();
-  }
+  Future<String?> resetToDefault(String id) =>
+      setCommand(id, _items[id]!.defaultCommand);
 
   Future<void> clearCommand(String id) async {
-    final item = _items[id]!;
-    item.command = null;
-    await _persist();
-    await _rebindAll();
-    notifyListeners();
+    await setCommand(id, '');
   }
 
-  Future<void> setCommand(String id, String command) async {
+  Future<String?> setCommand(String id, String command) =>
+      _serializeMutation(() {
+        final item = _items[id]!;
+        final trimmed = command.trim();
+        return _update(item, trimmed.isEmpty ? null : trimmed, item.enabled);
+      });
+
+  Future<String?> setEnabled(String id, bool value) => _serializeMutation(() {
     final item = _items[id]!;
-    item.command = command.trim().isEmpty ? null : command.trim();
-    await _persist();
-    await _rebindAll();
-    notifyListeners();
+    return _update(item, item.command, value);
+  });
+
+  String? conflictingActionLabelKey(AppHotkey item) {
+    final command = item.command;
+    return item.enabled && command != null
+        ? _findConflict(item, command)
+        : null;
   }
 
-  Future<void> setEnabled(String id, bool value) async {
-    final item = _items[id]!;
-    item.enabled = value;
+  String? _findConflict(AppHotkey item, String command) {
+    final normalized = canonicalCommand(command);
+    return _builtInConflict(item.scope, normalized) ??
+        _items.values
+            .where((other) {
+              final otherCommand = other.command;
+              return other != item &&
+                  other.enabled &&
+                  otherCommand != null &&
+                  item.scope.overlaps(other.scope) &&
+                  canonicalCommand(otherCommand) == normalized;
+            })
+            .firstOrNull
+            ?.l10nLabelKey;
+  }
+
+  static String? _builtInConflict(AppHotkeyScope scope, String command) {
+    final parts = command.split('+');
+    final key = parts.last;
+    final ctrl = parts.contains('ctrl');
+    final cmd = parts.contains('cmd');
+    final mac = Platform.isMacOS;
+    final primary = mac ? cmd : ctrl;
+    final plainPrimary = primary && parts.length == 2;
+
+    if (scope.overlaps(AppHotkeyScope.sidePanel) && plainPrimary) {
+      if (key == 'f') return 'browserFind';
+      if (key == 'r') return 'browserReload';
+    }
+
+    if (scope.overlaps(AppHotkeyScope.conversation)) {
+      // The selection and composer handlers also accept extra modifiers.
+      if (key == 'l' && primary) return 'selectionQuote';
+      if (key == 'v' && (ctrl || cmd)) return 'paste';
+    }
+
+    if (scope != AppHotkeyScope.conversation) return null;
+    if (!ctrl && !cmd && key != 'f6') return 'hotkeysTextEditing';
+    if (plainPrimary) {
+      return switch (key) {
+        'a' => 'selectAll',
+        'c' => 'copy',
+        'x' => 'cut',
+        'z' => 'hotkeysTextEditing',
+        _ => null,
+      };
+    }
+    if (primary && parts.length == 3 && parts.contains('shift') && key == 'z') {
+      return 'hotkeysTextEditing';
+    }
+    // Flutter's macOS text editing shortcuts also use the Control key.
+    if (mac &&
+        ctrl &&
+        parts.length == 2 &&
+        const {'a', 'b', 'e', 'f', 'n', 'p', 't'}.contains(key)) {
+      return 'hotkeysTextEditing';
+    }
+    return null;
+  }
+
+  /// Returns the conflicting action's label key and leaves the current settings intact.
+  Future<String?> _update(AppHotkey item, String? command, bool enabled) async {
+    if (enabled && command != null) {
+      final conflict = _findConflict(item, command);
+      if (conflict != null) return conflict;
+    }
+    // A repeated choice can retry a preference write that failed on disk.
+    item.command = command;
+    item.enabled = enabled;
+    await _saveChanges(rebind: item.scope.isAppWide);
+    return null;
+  }
+
+  Future<void> _saveChanges({required bool rebind}) async {
     await _persist();
-    await _rebindAll();
+    if (rebind) await _rebindAll();
     notifyListeners();
   }
 
@@ -277,13 +389,10 @@ class HotkeyProvider extends ChangeNotifier {
 
     // Register each enabled app-wide item with a valid command.
     for (final e in _items.values) {
-      if (!e.enabled) continue;
-      // Address focus belongs to the side panel's focus subtree. Registering
-      // it here also claims Ctrl/Cmd+L while the chat selection owns focus.
-      if (e.id == 'side_panel_address') continue;
+      if (!e.enabled || !e.scope.isAppWide) continue;
       final cmd = e.command;
       if (cmd == null || cmd.trim().isEmpty) continue;
-      final scope = (e.id == 'toggle_app_visibility')
+      final scope = e.scope == AppHotkeyScope.system
           ? HotKeyScope.system
           : HotKeyScope.inapp;
       final hk = _parseCommandToHotKey(cmd, scope: scope);
@@ -364,6 +473,9 @@ class HotkeyProvider extends ChangeNotifier {
             'control' => 'ctrl',
             'meta' => 'cmd',
             'option' => 'alt',
+            ',' => 'comma',
+            '[' => 'bracketleft',
+            ']' => 'bracketright',
             final value =>
               value.startsWith('key') && value.length == 4
                   ? value.substring(3)
@@ -379,7 +491,8 @@ class HotkeyProvider extends ChangeNotifier {
 
   Map<String, String> get nativeCommands => {
     for (final item in _items.values)
-      if (item.id != 'toggle_app_visibility' &&
+      if ((item.scope == AppHotkeyScope.application ||
+              item.scope == AppHotkeyScope.sidePanel) &&
           item.enabled &&
           (item.command ?? '').isNotEmpty)
         canonicalCommand(item.command!): item.id,
@@ -388,13 +501,18 @@ class HotkeyProvider extends ChangeNotifier {
   void invoke(String id) => _invoke(id);
 
   /// Uses the same configured command for a focus-scoped Flutter handler.
-  ShortcutActivator? shortcutFor(String id) {
+  SingleActivator? shortcutFor(String id) {
     final item = _items[id]!;
-    if (!item.enabled || item.command == null) return null;
-    final hotkey = _parseCommandToHotKey(item.command!);
+    final command = item.command;
+    if (!item.enabled || command == null) return null;
+    if (item.scope == AppHotkeyScope.conversation &&
+        _builtInConflict(item.scope, canonicalCommand(command)) != null) {
+      return null;
+    }
+    final hotkey = _parseCommandToHotKey(command);
     if (hotkey == null) return null;
     final modifiers = hotkey.modifiers ?? const [];
-    return SingleActivator(
+    final shortcut = SingleActivator(
       hotkey.logicalKey,
       control: modifiers.contains(HotKeyModifier.control),
       meta: modifiers.contains(HotKeyModifier.meta),
@@ -402,6 +520,12 @@ class HotkeyProvider extends ChangeNotifier {
       shift: modifiers.contains(HotKeyModifier.shift),
       includeRepeats: false,
     );
+    // An existing app-wide assignment can already own the new find default.
+    if (item.scope == AppHotkeyScope.conversation &&
+        handlesShortcut(shortcut)) {
+      return null;
+    }
+    return shortcut;
   }
 
   // ===== Helpers for parsing/displaying hotkey strings =====
@@ -457,10 +581,12 @@ class HotkeyProvider extends ChangeNotifier {
           break;
         default:
           if (p.length == 1) {
-            final ch = p[0];
-            if (ch.codeUnitAt(0) >= 97 && ch.codeUnitAt(0) <= 122) {
+            final code = p.codeUnitAt(0);
+            if (code >= 97 && code <= 122) {
               // a-z -> keyA ... keyZ
-              keyboardKey = _letterToLogicalKey(ch);
+              keyboardKey = _letterToLogicalKey(p);
+            } else if (code >= 48 && code <= 57) {
+              keyboardKey = LogicalKeyboardKey.findKeyByKeyId(code);
             }
           } else if (p.startsWith('key') && p.length == 4) {
             keyboardKey = _letterToLogicalKey(p.substring(3));

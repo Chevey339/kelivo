@@ -1,16 +1,72 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/providers/hotkey_provider.dart';
 import '../../../desktop/widgets/desktop_menu.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/design_tokens.dart';
+import '../../../utils/platform_utils.dart';
 import '../../browser/widgets/browser_text_field.dart';
 import '../controllers/conversation_find_controller.dart';
+
+class ConversationFindShortcut extends StatelessWidget {
+  const ConversationFindShortcut({
+    super.key,
+    required this.onOpen,
+    required this.child,
+  });
+
+  final VoidCallback onOpen;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final hotkeys = PlatformUtils.isDesktop
+        ? context.watch<HotkeyProvider?>()
+        : null;
+    final apple = PlatformUtils.isMacOS || PlatformUtils.isIOS;
+    final shortcut = hotkeys != null
+        ? hotkeys.shortcutFor(HotkeyProvider.conversationFindId)
+        : SingleActivator(
+            LogicalKeyboardKey.keyF,
+            meta: apple,
+            control: !apple,
+          );
+    final usesAltGraph =
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: shortcut == null
+          ? null
+          : (_, event) {
+              final keyboard = HardwareKeyboard.instance;
+              if (!shortcut.accepts(event, keyboard)) {
+                return KeyEventResult.ignored;
+              }
+              // AltGr can arrive as Ctrl plus Right Alt with a character to insert.
+              if (usesAltGraph &&
+                  shortcut.control &&
+                  shortcut.alt &&
+                  keyboard.isPhysicalKeyPressed(PhysicalKeyboardKey.altRight) &&
+                  event.character?.isNotEmpty == true) {
+                return KeyEventResult.ignored;
+              }
+              onOpen();
+              return KeyEventResult.handled;
+            },
+      child: child,
+    );
+  }
+}
 
 class ConversationFindBar extends StatelessWidget {
   const ConversationFindBar({

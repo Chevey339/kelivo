@@ -496,6 +496,8 @@
   "hotkeysResetDefault": "기본값으로 재설정",
   "hotkeysClearShortcut": "단축키 지우기",
   "hotkeysResetAll": "모든 단축키를 기본값으로 재설정",
+  "hotkeysShortcutInUse": "이 단축키는 이미 {action}에 할당되어 있습니다.",
+  "hotkeysTextEditing": "텍스트 편집 및 포커스 탐색",
   "assistantEditTemperatureTitle": "온도",
   "assistantEditTopPTitle": "Top-p",
   "assistantSettingsDeleteDialogTitle": "어시스턴트 삭제",

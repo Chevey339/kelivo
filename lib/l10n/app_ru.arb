@@ -496,6 +496,8 @@
   "hotkeysResetDefault": "Сбросить по умолчанию",
   "hotkeysClearShortcut": "Очистить сочетание",
   "hotkeysResetAll": "Сбросить все по умолчанию",
+  "hotkeysShortcutInUse": "Это сочетание клавиш уже назначено действию «{action}».",
+  "hotkeysTextEditing": "Редактирование текста и перемещение фокуса",
   "assistantEditTemperatureTitle": "Температура",
   "assistantEditTopPTitle": "Top-p",
   "assistantSettingsDeleteDialogTitle": "Удалить ассистента",
