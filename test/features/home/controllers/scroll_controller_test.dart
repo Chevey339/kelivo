@@ -1,10 +1,58 @@
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
+import 'package:Kelivo/shared/widgets/scroll_layout_anchor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:Kelivo/shared/widgets/visible_route_theme.dart';
 
 void main() {
+  testWidgets('an image resize before the first paint honors a direct jump', (
+    tester,
+  ) async {
+    final scroll = ChatAutoFollowScrollController();
+    final imageHeight = ValueNotifier(120.0);
+    const imageKey = ValueKey('resized-image');
+    final target = find.text('Target before the image');
+    addTearDown(scroll.dispose);
+    addTearDown(imageHeight.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CustomScrollView(
+            controller: scroll,
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 400),
+                    const Text('Target before the image'),
+                    ValueListenableBuilder<double>(
+                      valueListenable: imageHeight,
+                      builder: (_, height, _) =>
+                          SizedBox(key: imageKey, height: height),
+                    ),
+                    for (var i = 0; i < 80; i++)
+                      Text('Reading below the image $i'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    scroll.jumpTo(560);
+    await tester.pump();
+    expect(tester.getTopLeft(target).dy, closeTo(-160, .5));
+
+    scroll.jumpTo(400);
+    preserveScrollLayoutAnchor(tester.element(find.byKey(imageKey)));
+    imageHeight.value = 60;
+    await tester.pump();
+    expect(tester.getTopLeft(target).dy, closeTo(0, .5));
+  });
+
   group('ChatScrollController streaming auto-follow', () {
     testWidgets('disabled follow tolerates overlapping layout positions', (
       tester,

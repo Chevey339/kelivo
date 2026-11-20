@@ -156,7 +156,7 @@ Uri? _tryNormalizeExternalUri(String raw) {
 @visibleForTesting
 const double kToolImageTimelineHeight = timelineToolImageHeight;
 @visibleForTesting
-const double kToolImageTimelineMaxWidth = 240;
+const double kToolImageTimelineMaxWidth = timelineToolImageMaxWidth;
 const double kBrowserStepImageHeight = 64;
 const double kBrowserStepImageMaxWidth = 120;
 const int _browserStepsFoldThreshold = 6;
@@ -255,6 +255,39 @@ Widget _buildResolvedImage(
   double? maxLogicalWidth,
   BoxFit fit = BoxFit.contain,
 }) {
+  final logicalHeight = height ?? width ?? kToolImageCardHeight;
+  final logicalWidth =
+      maxLogicalWidth ??
+      width ??
+      (height != null ? height * 2 : kToolImageTimelineMaxWidth);
+  final provider = _previewImageProvider(
+    rawPath,
+    logicalWidth: logicalWidth,
+    logicalHeight: logicalHeight,
+    devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    fit: fit,
+  );
+  final image = _buildPreviewImage(
+    context,
+    provider,
+    width: width,
+    height: height,
+    fit: fit,
+  );
+  if (maxLogicalWidth == null || provider == null) return image;
+  return ConstrainedBox(
+    constraints: BoxConstraints(maxWidth: maxLogicalWidth),
+    child: image,
+  );
+}
+
+Widget _buildPreviewImage(
+  BuildContext context,
+  ImageProvider? provider, {
+  required double? width,
+  required double? height,
+  BoxFit fit = BoxFit.contain,
+}) {
   final cs = Theme.of(context).colorScheme;
   Widget errorWidget() => Container(
     width: width ?? (height != null ? height * 0.67 : 120),
@@ -268,20 +301,8 @@ Widget _buildResolvedImage(
     ),
   );
 
-  final logicalHeight = height ?? width ?? kToolImageCardHeight;
-  final logicalWidth =
-      maxLogicalWidth ??
-      width ??
-      (height != null ? height * 2 : kToolImageTimelineMaxWidth);
-  final provider = _previewImageProvider(
-    rawPath,
-    logicalWidth: logicalWidth,
-    logicalHeight: logicalHeight,
-    devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-    fit: fit,
-  );
   if (provider == null) return errorWidget();
-  Widget image = Image(
+  return Image(
     image: provider,
     width: width,
     height: height,
@@ -289,13 +310,6 @@ Widget _buildResolvedImage(
     gaplessPlayback: true,
     errorBuilder: (_, __, ___) => errorWidget(),
   );
-  if (maxLogicalWidth != null) {
-    image = ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxLogicalWidth),
-      child: image,
-    );
-  }
-  return image;
 }
 
 ImageProvider? _previewImageProvider(
@@ -3381,7 +3395,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return ChatSurfaceTheme(
       palette: fg,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+          horizontal: assistantMessageHorizontalPadding,
+          vertical: 12,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -4998,7 +5015,7 @@ enum _ReasoningStepState { collapsed, preview, expanded }
 const double _timelineStepPaddingV = 8;
 const double _timelineIconSize = 18;
 const double _timelineIconColumnWidth = 24;
-const double _timelineGap = 8;
+const double _timelineGap = timelineStepContentInset - _timelineIconColumnWidth;
 const double _timelineLineGap = 3;
 const double _timelineLineX = (_timelineIconColumnWidth - 1) / 2;
 
@@ -5255,14 +5272,15 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
       context,
       target: ChatBubbleStyleTarget.thinkingToolCard,
       borderRadius: BorderRadius.circular(16),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: timelineCardHorizontalPadding,
+        vertical: 4,
+      ),
       defaultColor: cs.primaryContainer.withValues(
         alpha: theme.brightness == Brightness.dark ? 0.25 : 0.30,
       ),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300),
+      child: _TimelineAnimatedSize(
         curve: Curves.easeInOutCubicEmphasized,
-        alignment: Alignment.topLeft,
         child: _RecoveredAskUserAction(
           conversationId: widget.conversationId,
           onSubmit: widget.onRecoveredAnswer,
@@ -5592,7 +5610,7 @@ class _TimelineStepBody extends StatelessWidget {
     final body = visible
         ? Padding(
             padding: EdgeInsets.only(
-              left: _timelineIconColumnWidth + _timelineGap,
+              left: timelineStepContentInset,
               top: 4,
               bottom: bottomPadding,
             ),
@@ -5616,15 +5634,72 @@ class _TimelineStepBody extends StatelessWidget {
             ),
           ),
         if (animate)
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
+          _TimelineAnimatedSize(
             curve: const Cubic(0.2, 0.8, 0.2, 1),
-            alignment: Alignment.topLeft,
             child: body,
           )
         else
           body,
       ],
+    );
+  }
+}
+
+class _TimelineAnimatedSize extends StatefulWidget {
+  const _TimelineAnimatedSize({required this.curve, required this.child});
+
+  final Curve curve;
+  final Widget child;
+
+  static void snapAncestors(BuildContext context, int layoutFrames) {
+    context.visitAncestorElements((element) {
+      if (element case StatefulElement(
+        state: final _TimelineAnimatedSizeState state,
+      )) {
+        state._snap(layoutFrames);
+      }
+      return true;
+    });
+  }
+
+  @override
+  State<_TimelineAnimatedSize> createState() => _TimelineAnimatedSizeState();
+}
+
+class _TimelineAnimatedSizeState extends State<_TimelineAnimatedSize> {
+  final _bodyKey = GlobalKey();
+  int _snapFrames = 0;
+
+  void _snap(int frames) {
+    if (_snapFrames > 0) {
+      _snapFrames = math.max(_snapFrames, frames);
+      return;
+    }
+    setState(() => _snapFrames = frames);
+    WidgetsBinding.instance.addPostFrameCallback(_finishFrame);
+  }
+
+  void _finishFrame(Duration _) {
+    if (!mounted) return;
+    if (_snapFrames > 1) {
+      _snapFrames--;
+      WidgetsBinding.instance.addPostFrameCallback(_finishFrame);
+    } else {
+      setState(() => _snapFrames = 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Apply an asynchronously decoded size within the anchored layouts, while
+    // keeping the interactive subtree mounted when the animation is bypassed.
+    final body = KeyedSubtree(key: _bodyKey, child: widget.child);
+    if (_snapFrames > 0) return body;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: widget.curve,
+      alignment: Alignment.topLeft,
+      child: body,
     );
   }
 }
@@ -6540,6 +6615,121 @@ class _ChainOfThoughtBrowserGroupState
   }
 }
 
+class _SingleToolImageThumbnail extends StatefulWidget {
+  const _SingleToolImageThumbnail({
+    super.key,
+    required this.path,
+    required this.knownAspect,
+  });
+
+  final String path;
+  final double? knownAspect;
+
+  @override
+  State<_SingleToolImageThumbnail> createState() =>
+      _SingleToolImageThumbnailState();
+}
+
+class _SingleToolImageThumbnailState extends State<_SingleToolImageThumbnail> {
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  (ImageProvider, Map<String, double>)? _listenedInput;
+
+  @override
+  void didUpdateWidget(_SingleToolImageThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path ||
+        oldWidget.knownAspect != widget.knownAspect) {
+      _stopListening();
+      _listenedInput = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopListening();
+    super.dispose();
+  }
+
+  void _stopListening() {
+    final listener = _listener;
+    if (listener != null) _stream?.removeListener(listener);
+    _stream = null;
+    _listener = null;
+  }
+
+  void _listenForAspect(ImageProvider provider, Map<String, double> aspects) {
+    final input = (provider, aspects);
+    if (_listenedInput == input) return;
+    _stopListening();
+    _listenedInput = input;
+    final path = widget.path;
+    _stream = provider.resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener((info, synchronous) {
+      final aspect = info.image.width / info.image.height;
+      info.dispose();
+      _stopListening();
+      void applyAspect() {
+        if (!mounted || _listenedInput != input) return;
+        final frames = ViewportBlockList.layoutFramesForChildResize(context);
+        preserveScrollLayoutAnchor(context, layoutFrames: frames);
+        _TimelineAnimatedSize.snapAncestors(context, frames);
+        setState(() => aspects[path] = aspect);
+      }
+
+      // Cached pixels may arrive during build even when a recycled row has
+      // no measured aspect. Wait for its reserved height to be laid out so
+      // we can anchor the same resize as an asynchronously decoded frame.
+      if (synchronous) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => applyAspect());
+      } else {
+        applyAspect();
+      }
+    }, onError: (_, _) => _stopListening());
+    _stream!.addListener(_listener!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final path = widget.path;
+    final provider = _previewImageProvider(
+      path,
+      logicalWidth: kToolImageTimelineMaxWidth,
+      logicalHeight: kToolImageTimelineHeight,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+      fit: BoxFit.contain,
+    );
+    var aspect = widget.knownAspect;
+    if (aspect == null && provider != null) {
+      final storage = PageStorage.of(context);
+      const id = timelineToolImageAspectsStorageId;
+      final cached =
+          storage.readState(context, identifier: id) as Map<String, double>?;
+      final aspects = cached ?? <String, double>{};
+      if (cached == null) storage.writeState(context, aspects, identifier: id);
+      if (!aspects.containsKey(path)) _listenForAspect(provider, aspects);
+      aspect = aspects[path];
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = timelineToolImageSize(constraints.maxWidth, aspect);
+        return GestureDetector(
+          onTap: () => _showToolFullImage(context, path),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: _buildPreviewImage(
+              context,
+              provider,
+              width: size.width,
+              height: size.height,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ChainOfThoughtToolStep extends StatefulWidget {
   const _ChainOfThoughtToolStep({
     required this.part,
@@ -6786,10 +6976,21 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
               color: fg.body,
             ),
           );
-    final Widget? imageThumbnails =
-        (!_isAskUser && !hideToolResultImages && imagePaths.isNotEmpty)
-        ? SizedBox(
-            key: ValueKey('tool-image-thumbnails:${widget.part.id}'),
+    final showImages =
+        !_isAskUser && !hideToolResultImages && imagePaths.isNotEmpty;
+    final useCompactImage =
+        showImages && usesCompactToolImage(widget.part.toolName, imagePaths);
+    final thumbnailsKey = ValueKey('tool-image-thumbnails:${widget.part.id}');
+    final Widget? imageThumbnails = !showImages
+        ? null
+        : useCompactImage
+        ? _SingleToolImageThumbnail(
+            key: thumbnailsKey,
+            path: imagePaths.single,
+            knownAspect: viewImageResultAspect(cleanText),
+          )
+        : SizedBox(
+            key: thumbnailsKey,
             height: kToolImageTimelineHeight,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
@@ -6811,8 +7012,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep>
                 );
               },
             ),
-          )
-        : null;
+          );
     final Widget? content =
         (summaryContent == null &&
             imageThumbnails == null &&

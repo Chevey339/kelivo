@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
 import 'package:markstream/markstream_core.dart';
+import '../../../core/services/tools/view_image_tool.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
@@ -349,6 +350,8 @@ double estimateToolExtraHeight({
   required bool hideToolResultImages,
   required bool pendingApproval,
   required double textWidth,
+  required double imageMaxWidth,
+  required Map<String, double>? imageAspects,
   required double fontScale,
   required double Function(
     String text, {
@@ -417,7 +420,9 @@ double estimateToolExtraHeight({
       wrappedLineCount: wrappedLineCount,
     );
     hasSummary = showToolResultSummary;
-  } else if (showToolResultSummary && !isWorkspace) {
+  } else if (showToolResultSummary &&
+      !isWorkspace &&
+      !(toolName == ViewImageTool.name && imagePaths.isNotEmpty)) {
     final summary = cleanText.trim();
     if (summary.isNotEmpty) {
       final charWidth = summaryFontSize * 0.55;
@@ -435,7 +440,13 @@ double estimateToolExtraHeight({
   }
 
   if (!hideToolResultImages && imagePaths.isNotEmpty) {
-    extra += timelineToolImageHeight;
+    extra += usesCompactToolImage(toolName, imagePaths)
+        ? timelineToolImageSize(
+            imageMaxWidth,
+            viewImageResultAspect(cleanText) ??
+                imageAspects?[imagePaths.single],
+          ).height
+        : timelineToolImageHeight;
     if (hasSummary) extra += _estimateToolImageSummaryGap;
   }
 
@@ -537,6 +548,36 @@ bool _workspaceEstimateEnvNotReady(Map<String, dynamic>? metadata) {
 
 const double _estimateTtsReplayRowHeight = 36;
 const double timelineToolImageHeight = 120;
+const double timelineToolImageMaxWidth = 240;
+const double assistantMessageHorizontalPadding = 20;
+const double timelineCardHorizontalPadding = 8;
+const double timelineStepContentInset = 32;
+const String timelineToolImageAspectsStorageId = 'timeline-tool-image-aspects';
+
+bool usesCompactToolImage(String toolName, List<String> paths) =>
+    paths.length == 1 && toolName == ViewImageTool.name;
+
+final _viewImageSizePattern = RegExp(r'^Image \((\d+) x (\d+)\)\.$');
+
+/// The workspace reader already records the snapshot size in its result.
+double? viewImageResultAspect(String cleanText) {
+  final match = _viewImageSizePattern.firstMatch(cleanText);
+  if (match == null) return null;
+  final width = int.tryParse(match[1]!);
+  final height = int.tryParse(match[2]!);
+  if (width == null || height == null || width <= 0 || height <= 0) return null;
+  return width / height;
+}
+
+Size timelineToolImageSize(double availableWidth, double? aspect) {
+  final width = availableWidth.clamp(0.0, timelineToolImageMaxWidth);
+  if (aspect == null) return Size(width, timelineToolImageHeight);
+  return Size(
+    math.min(width, timelineToolImageHeight * aspect),
+    math.min(timelineToolImageHeight, width / aspect),
+  );
+}
+
 const double _estimateToolImageSummaryGap = 8;
 const double _estimateAskUserOptionHeight = 40;
 const double _estimateAskUserOptionGap = 7;

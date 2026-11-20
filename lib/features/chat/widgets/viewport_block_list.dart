@@ -40,6 +40,22 @@ class ViewportBlockList extends StatefulWidget {
   /// Keep a navigation target mounted while its exact text geometry is read.
   final int? revealIndex;
 
+  /// Each virtualized ancestor applies measured heights in a post-frame
+  /// callback, so an async resize can propagate outward one frame at a time.
+  static int layoutFramesForChildResize(BuildContext context) {
+    var layoutFrames = 1;
+    context.visitAncestorElements((element) {
+      if (element
+          case StatefulElement(state: final _ViewportBlockListState state)
+          when state.widget.itemCount > state.widget.threshold &&
+              state._width != null) {
+        layoutFrames++;
+      }
+      return true;
+    });
+    return layoutFrames;
+  }
+
   @override
   State<ViewportBlockList> createState() => _ViewportBlockListState();
 }

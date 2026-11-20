@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:Kelivo/core/database/extension_entity_store.dart';
@@ -19,6 +20,8 @@ import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart'
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
+import 'package:Kelivo/utils/safe_resize_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -63,7 +66,16 @@ class _DelayedImageResolver extends FileLinkResolver {
   }
 }
 
-enum _ImageSource { workspaceMarkdown, networkMarkdown, assistantPart }
+enum _ImageSource {
+  workspaceMarkdown,
+  networkMarkdown,
+  assistantPart,
+  toolResult;
+
+  bool get isMarkdown => this == workspaceMarkdown || this == networkMarkdown;
+}
+
+enum _ToolChain { short, virtualized, recycledWithCachedImage }
 
 class _DelayedImageClient extends Fake implements HttpClient {
   _DelayedImageClient(this.root);
@@ -127,28 +139,64 @@ class _ImageResponse extends Fake implements HttpClientResponse {
 }
 
 void main() {
-  for (final (imageSource, sameMessage, simultaneous, inTable, wheelDelta) in [
-    for (final imageSource in _ImageSource.values)
-      for (final (sameMessage, simultaneous, inTable) in const [
-        (false, false, false),
-        (false, true, false),
-        (true, false, false),
-        (true, true, false),
-        (false, true, true),
-      ])
-        if (!inTable || imageSource != _ImageSource.assistantPart)
-          for (final wheelDelta in [
-            -120.0,
-            if (simultaneous && !inTable) 120.0,
+  for (final (
+        imageSource,
+        sameMessage,
+        simultaneous,
+        inTable,
+        wheelDelta,
+        toolChain,
+      )
+      in [
+        for (final imageSource in _ImageSource.values)
+          for (final (sameMessage, simultaneous, inTable) in const [
+            (false, false, false),
+            (false, true, false),
+            (true, false, false),
+            (true, true, false),
+            (false, true, true),
           ])
-            (imageSource, sameMessage, simultaneous, inTable, wheelDelta),
-  ]) {
-    final name =
-        '${imageSource.name}: wheel reading anchor survives images loading '
-        '${sameMessage ? 'within one message' : 'in preceding and following messages'} '
-        '${simultaneous ? 'together with wheel input' : 'separately'}'
-        '${inTable ? ' inside a horizontal table' : ''}, wheel=$wheelDelta';
+            if (!inTable || imageSource.isMarkdown)
+              for (final wheelDelta in [
+                -120.0,
+                if (simultaneous && !inTable) 120.0,
+              ])
+                (
+                  imageSource,
+                  sameMessage,
+                  simultaneous,
+                  inTable,
+                  wheelDelta,
+                  _ToolChain.short,
+                ),
+        (
+          _ImageSource.toolResult,
+          true,
+          true,
+          false,
+          -120.0,
+          _ToolChain.virtualized,
+        ),
+        (
+          _ImageSource.toolResult,
+          true,
+          true,
+          false,
+          -120.0,
+          _ToolChain.recycledWithCachedImage,
+        ),
+      ]) {
+    final longToolChain = toolChain != _ToolChain.short;
+    final cachedReentry = toolChain == _ToolChain.recycledWithCachedImage;
+    final name = cachedReentry
+        ? 'a recycled tool chain anchors compaction from a warm pixel cache'
+        : '${imageSource.name}: wheel reading anchor survives images loading '
+              '${sameMessage ? 'within one message' : 'in preceding and following messages'} '
+              '${simultaneous ? 'together with wheel input' : 'separately'}'
+              '${inTable ? ' inside a horizontal table' : ''}'
+              '${longToolChain ? ' with a virtualized tool chain' : ''}, wheel=$wheelDelta';
     testWidgets(name, (tester) async {
+      final toolResult = imageSource == _ImageSource.toolResult;
       PaintingBinding.instance.imageCache
         ..clear()
         ..clearLiveImages();
@@ -181,8 +229,8 @@ void main() {
       final root = Directory.systemTemp.createTempSync('kelivo_image_anchor_');
       addTearDown(() => root.deleteSync(recursive: true));
       for (final entry in {
-        'above.png': (126, 200),
-        'below.png': (120, 240),
+        'above.png': toolResult ? (480, 120) : (126, 200),
+        'below.png': toolResult ? (480, 80) : (120, 240),
       }.entries) {
         File('${root.path}/${entry.key}').writeAsBytesSync(
           image.encodePng(
@@ -214,6 +262,22 @@ void main() {
           imageSource == _ImageSource.workspaceMarkdown
           ? 'kelivo://workspace/$filename'
           : 'https://image.invalid/$filename';
+      MessagePart imagePart(String id) {
+        final uri = source('$id.png');
+        if (!toolResult) return ImagePart(uri: uri, assetId: id);
+        return ToolCallPart(
+          jsonEncode({
+            'id': 'view-$id',
+            'name': 'view_image',
+            'arguments': {'image_id': id},
+            'content': 'Image $id',
+            'metadata': {
+              kMcpResultMetadataKey: mcpResultMetadata([uri]),
+            },
+          }),
+        );
+      }
+
       final controller = ChatAutoFollowScrollController();
       addTearDown(controller.dispose);
       final listController = ListController();
@@ -245,11 +309,16 @@ void main() {
             conversationId: 'image-anchor',
             role: 'assistant',
             parts: [
-              if (imageSource == _ImageSource.assistantPart) ...[
+              if (!imageSource.isMarkdown) ...[
                 const TextPart('Image above the reader.'),
-                ImagePart(uri: source('above.png'), assetId: 'above'),
+                if (longToolChain)
+                  for (var i = 0; i < 24; i++)
+                    ToolCallPart(
+                      '{"id":"tool-$i","name":"search","content":"ok"}',
+                    ),
+                imagePart('above'),
                 TextPart(reading),
-                ImagePart(uri: source('below.png'), assetId: 'below'),
+                imagePart('below'),
                 TextPart(paragraphs('Tail', 30)),
               ] else
                 TextPart(
@@ -267,15 +336,10 @@ void main() {
               id: entry.key,
               conversationId: 'image-anchor',
               role: 'assistant',
-              parts:
-                  imageSource == _ImageSource.assistantPart &&
-                      entry.key != 'reading'
+              parts: !imageSource.isMarkdown && entry.key != 'reading'
                   ? [
                       TextPart('Image ${entry.key} the reader.'),
-                      ImagePart(
-                        uri: source('${entry.key}.png'),
-                        assetId: entry.key,
-                      ),
+                      imagePart(entry.key),
                     ]
                   : [TextPart(entry.value)],
             ),
@@ -286,6 +350,13 @@ void main() {
             parts: [TextPart(paragraphs('Tail', 30))],
           ),
         ],
+        if (cachedReentry)
+          ChatMessage(
+            id: 'far-tail',
+            conversationId: 'image-anchor',
+            role: 'user',
+            parts: [TextPart(paragraphs('Far-away tail', 180))],
+          ),
       ];
 
       await tester.pumpWidget(
@@ -363,9 +434,11 @@ void main() {
       Finder imageFinder(String filename) => find.byWidgetPredicate((widget) {
         if (widget is! Image) return false;
         final provider = widget.image;
-        final source = provider is ResizeImage
-            ? provider.imageProvider
-            : provider;
+        final source = switch (provider) {
+          ResizeImage() => provider.imageProvider,
+          SafeResizeImage() => provider.imageProvider,
+          _ => provider,
+        };
         return (source is FileImage &&
                 source.file.path.endsWith('/$filename')) ||
             (source is NetworkImage && source.url.endsWith('/$filename'));
@@ -383,6 +456,58 @@ void main() {
                     )
                     .image !=
                 null;
+      }
+
+      Future<void> tearDownView() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        debugNetworkImageHttpClientProvider = null;
+        debugDefaultTargetPlatformOverride = null;
+      }
+
+      if (cachedReentry) {
+        final thumbnail = find.byKey(
+          const ValueKey('tool-image-thumbnails:view-above'),
+        );
+        expect(tester.getSize(thumbnail).height, 120);
+        final provider = tester.widget<Image>(imageFinder('above.png')).image;
+        final returnOffset = controller.offset;
+        controller.jumpTo(controller.position.maxScrollExtent);
+        for (var i = 0; i < 7; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        expect(imageFinder('above.png'), findsNothing);
+
+        // A second consumer can warm the decode before the recycled row
+        // returns, while its saved layout still uses the placeholder height.
+        final stream = provider.resolve(ImageConfiguration.empty);
+        var warmed = false;
+        final listener = ImageStreamListener((info, _) {
+          info.dispose();
+          warmed = true;
+        });
+        stream.addListener(listener);
+        try {
+          ready['above.png']!.complete();
+          for (var i = 0; i < 30 && !warmed; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          expect(warmed, isTrue);
+        } finally {
+          stream.removeListener(listener);
+        }
+
+        controller.jumpTo(returnOffset);
+        for (var i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(markdownGlyphCenter(tester, _anchorText).dy, closeTo(300, .5));
+        }
+        expect(tester.getSize(thumbnail).height, 60);
+        expect(tester.takeException(), isNull);
+        await tearDownView();
+        return;
       }
 
       Future<void> finishImages(
@@ -425,12 +550,29 @@ void main() {
       if (!simultaneous) {
         final beforeBelow = controller.offset;
         final extentBeforeBelow = controller.position.maxScrollExtent;
+        double estimateBelow() {
+          final list = find.byType(SuperListView);
+          final index = messages.indexWhere((message) => message.id == 'below');
+          return tester.widget<SuperListView>(list).extentEstimation!(
+            index,
+            tester.getSize(list).width,
+          );
+        }
+
+        final estimatedBefore = toolResult && !sameMessage
+            ? estimateBelow()
+            : null;
         await finishImages(['below.png'], 300);
         expect(controller.offset, closeTo(beforeBelow, .5));
         expect(
           controller.position.maxScrollExtent,
-          greaterThan(extentBeforeBelow + 100),
+          toolResult
+              ? closeTo(extentBeforeBelow - 80, .5)
+              : greaterThan(extentBeforeBelow + 100),
         );
+        if (estimatedBefore != null) {
+          expect(estimateBelow(), closeTo(estimatedBefore - 80, .5));
+        }
       }
 
       await tester.sendEventToBinding(
@@ -474,11 +616,23 @@ void main() {
           );
         }
         await finishImages(['above.png'], 300 - wheelDelta);
+        if (toolResult) {
+          listController.jumpToItem(
+            index: messages.indexWhere((message) => message.id == 'reading'),
+            scrollController: controller,
+            alignment: 0,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .getTopLeft(find.byKey(const ValueKey('timeline-slot:reading')))
+                .dy,
+            closeTo(0, .5),
+          );
+        }
       }
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-      debugNetworkImageHttpClientProvider = null;
-      debugDefaultTargetPlatformOverride = null;
+      await tearDownView();
     });
   }
 }

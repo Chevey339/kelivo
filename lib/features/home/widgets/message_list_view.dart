@@ -747,7 +747,17 @@ class _MessageListViewState extends State<MessageListView> {
       reasoningSegments,
       isStreaming: message.isStreaming,
     );
-    final toolSignature = _toolEstimateSignature(toolParts);
+    final toolImageAspects =
+        _timelineStorage[message.id]?.readState(
+              context,
+              identifier: timelineToolImageAspectsStorageId,
+            )
+            as Map<String, double>?;
+    final toolSignature = Object.hash(
+      _toolEstimateSignature(toolParts),
+      toolImageAspects?.length,
+      widget.selecting,
+    );
     final partsSignature = _partsEstimateSignature(estimateParts);
     final streamingSignature = Object.hash(
       snapshot?.timelineStructureSignature ?? 0,
@@ -817,6 +827,13 @@ class _MessageListViewState extends State<MessageListView> {
     // User bubbles are inset and never span the full width.
     final bubbleWidth = crossAxisExtent * (message.role == 'user' ? 0.85 : 1.0);
     final textWidth = math.max(80.0, bubbleWidth - 28);
+    final toolImageMaxWidth =
+        crossAxisExtent -
+        2 *
+            (assistantMessageHorizontalPadding +
+                timelineCardHorizontalPadding) -
+        timelineStepContentInset -
+        (widget.selecting ? 44 : 0); // Checkbox hit target and its padding.
     // Wide (CJK) glyphs are about twice as wide as Latin ones, so the mix
     // decides how many characters fit on a line.
     final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(body));
@@ -850,6 +867,8 @@ class _MessageListViewState extends State<MessageListView> {
           snapshot?.toolCountAtSplit ??
           widget.contentSplits[message.id]?.toolCounts,
       textWidth: textWidth,
+      toolImageMaxWidth: toolImageMaxWidth,
+      toolImageAspects: toolImageAspects,
       fontScale: fontScale,
     );
     final bodyForLines = message.role == 'assistant'
@@ -910,6 +929,8 @@ class _MessageListViewState extends State<MessageListView> {
     required List<int>? reasoningCountAtSplit,
     required List<int>? toolCountAtSplit,
     required double textWidth,
+    required double toolImageMaxWidth,
+    required Map<String, double>? toolImageAspects,
     required double fontScale,
   }) {
     if (message.role != 'assistant') {
@@ -1042,6 +1063,8 @@ class _MessageListViewState extends State<MessageListView> {
           ),
           conversationId: message.conversationId,
           textWidth: textWidth,
+          toolImageMaxWidth: toolImageMaxWidth,
+          toolImageAspects: toolImageAspects,
           fontScale: fontScale,
         ),
       );
@@ -1053,6 +1076,8 @@ class _MessageListViewState extends State<MessageListView> {
     VisibleTimelineBlock visible, {
     required String conversationId,
     required double textWidth,
+    required double toolImageMaxWidth,
+    required Map<String, double>? toolImageAspects,
     required double fontScale,
   }) {
     final settings = _estimateSettings;
@@ -1086,6 +1111,8 @@ class _MessageListViewState extends State<MessageListView> {
             toolCallId: tool.providerId,
           ),
           textWidth: textWidth,
+          imageMaxWidth: toolImageMaxWidth,
+          imageAspects: toolImageAspects,
           fontScale: fontScale,
           wrappedLineCount: _wrappedLineCount,
         );

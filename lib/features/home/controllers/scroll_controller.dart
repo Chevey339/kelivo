@@ -118,7 +118,9 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
 
   @override
   void jumpTo(double value) {
-    clearScrollLayoutAnchor();
+    // Until the jump is laid out, the render tree still shows the old location.
+    // A newly decoded image must not anchor that content to the new position.
+    clearScrollLayoutAnchor(invalidateLayout: hasPixels && value != pixels);
     super.jumpTo(value);
   }
 
@@ -171,6 +173,10 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
         correctPixels(target);
         return false;
       }
+    }
+    if (activity is _IndexedScrollActivity ||
+        activity is DrivenScrollActivity) {
+      clearScrollLayoutAnchor();
     }
     return result && applyScrollLayoutAnchor();
   }
