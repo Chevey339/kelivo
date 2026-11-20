@@ -5271,6 +5271,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServiceEditorConfigurationTitle => 'Configuration';
 
   @override
+  String get searchServiceEditorChangeIcon => 'Change icon';
+
+  @override
+  String get searchServiceEditorIconFailed =>
+      'Could not use this icon. Choose another image or icon.';
+
+  @override
   String get searchServiceEditorNoConfiguration =>
       'This provider does not require additional configuration.';
 

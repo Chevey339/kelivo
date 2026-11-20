@@ -1580,6 +1580,8 @@
   "searchServicesFourGetPassHelp": "Örnek bir CAPTCHA gerektiriyorsa, CAPTCHA'yı tamamlayın ve pass çerezinin değerini yapıştırın.",
   "searchServiceEditorProviderTypeTitle": "Arama sağlayıcısı",
   "searchServiceEditorConfigurationTitle": "Yapılandırma",
+  "searchServiceEditorChangeIcon": "Simgeyi değiştir",
+  "searchServiceEditorIconFailed": "Bu simge kullanılamadı. Başka bir görsel veya simge seçin.",
   "searchServiceEditorNoConfiguration": "Bu sağlayıcı ek yapılandırma gerektirmez.",
   "searchServiceEditorMultiKeyTitle": "Çoklu anahtar rotasyonu",
   "searchServiceEditorMultiKeyNone": "Yapılandırılmadı",

@@ -8,7 +8,7 @@ import 'package:http/testing.dart';
 import 'package:image/image.dart' as img;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:Kelivo/core/services/mcp/mcp_icon_cache.dart';
+import 'package:Kelivo/utils/icon_cache.dart';
 
 class _Paths extends PathProviderPlatform {
   _Paths(this.root);
@@ -23,7 +23,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
   setUp(() {
-    McpIconCache.clearMemory();
+    IconCache.clearMemory();
     directory = Directory.systemTemp.createTempSync('mcp-icon-test-');
   });
   tearDown(() => directory.deleteSync(recursive: true));
@@ -32,35 +32,35 @@ void main() {
     'favicon URL contains only the server origin and no credentials or query',
     () {
       expect(
-        McpIconCache.faviconFor(
+        IconCache.faviconFor(
           'https://user:secret@example.com:8443/private/mcp?key=secret#fragment',
         ).toString(),
         'https://example.com:8443/favicon.ico',
       );
-      expect(McpIconCache.faviconFor('stdio:command'), isNull);
+      expect(IconCache.faviconFor('stdio:command'), isNull);
       expect(
-        McpIconCache.acceptsDeclaredSource(
+        IconCache.acceptsDeclaredSource(
           'https://elsewhere.example/icon.png',
           'https://mcp.example/sse',
         ),
         isFalse,
       );
       expect(
-        McpIconCache.acceptsDeclaredSource(
+        IconCache.acceptsDeclaredSource(
           'https://mcp.example/icon.png',
           'https://mcp.example/sse',
         ),
         isTrue,
       );
       expect(
-        McpIconCache.acceptsDeclaredSource(
+        IconCache.acceptsDeclaredSource(
           'file:///etc/passwd',
           'https://mcp.example',
         ),
         isFalse,
       );
       expect(
-        McpIconCache.acceptsDeclaredSource('https://mcp.example/icon.png', ''),
+        IconCache.acceptsDeclaredSource('https://mcp.example/icon.png', ''),
         isFalse,
       );
     },
@@ -82,7 +82,7 @@ void main() {
       final paths = await Future.wait(
         List.generate(
           4,
-          (_) => McpIconCache.getPath(
+          (_) => IconCache.getPath(
             'https://icons.example/logo.svg',
             client: client,
             directory: directory,
@@ -93,7 +93,7 @@ void main() {
       expect(paths.toSet().length, 1);
       expect(paths.first, endsWith('.svg'));
       expect(
-        await McpIconCache.getPath(
+        await IconCache.getPath(
           'https://icons.example/logo.svg',
           client: client,
           directory: directory,
@@ -113,17 +113,18 @@ void main() {
         http.Response(
           'x',
           200,
-          headers: {'content-length': '${McpIconCache.maxBytes + 1}'},
+          headers: {'content-length': '${IconCache.maxBytes + 1}'},
         ),
         http.Response(
           '',
           302,
           headers: {'location': 'https://elsewhere.example/secret'},
+          isRedirect: true,
         ),
       ]) {
-        McpIconCache.clearMemory();
+        IconCache.clearMemory();
         expect(
-          await McpIconCache.getPath(
+          await IconCache.getPath(
             'https://mcp.example/icon',
             client: MockClient((_) async => response),
             directory: directory,
@@ -136,6 +137,48 @@ void main() {
   );
 
   test(
+    'explicit redirects are cached separately from discovered icons',
+    () async {
+      const source = 'http://icons.example/logo';
+      const target = 'https://cdn.example/logo';
+      final client = MockClient(
+        (request) async => request.url.toString() == source
+            ? http.Response(
+                '',
+                302,
+                headers: {'location': target},
+                isRedirect: true,
+              )
+            : http.Response(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"></svg>',
+                200,
+              ),
+      );
+      final paths = await Future.wait([
+        IconCache.getPath(source, client: client, directory: directory),
+        IconCache.getPath(
+          source,
+          allowCrossOriginRedirects: true,
+          client: client,
+          directory: directory,
+        ),
+      ]);
+      expect(paths.first, isNull);
+      expect(paths.last, endsWith('.svg'));
+      expect(IconCache.peek(source), isNull);
+      expect(
+        IconCache.peek(source, allowCrossOriginRedirects: true),
+        paths.last,
+      );
+      IconCache.clearMemory();
+      expect(
+        await IconCache.getPath(source, client: client, directory: directory),
+        isNull,
+      );
+    },
+  );
+
+  test(
     'uploaded icons remain usable after the app storage root changes',
     () async {
       final original = PathProviderPlatform.instance;
@@ -144,17 +187,37 @@ void main() {
       final source = File('${directory.path}/upload.png');
       final png = img.encodePng(img.Image(width: 2, height: 2));
       await source.writeAsBytes(png);
-      final name = await McpIconCache.importFile(source.path);
+      final name = await IconCache.importFile(source.path);
       expect(name, isNot(contains('/')));
-      final stored = (await McpIconCache.localPath(name))!;
+      final stored = (await IconCache.localPath(name))!;
       await source.delete();
       final restored = File('${directory.path}/after/avatars/$name');
       await restored.parent.create(recursive: true);
       await File(stored).copy(restored.path);
       PathProviderPlatform.instance = _Paths('${directory.path}/after');
-      expect(await McpIconCache.localPath(name), restored.path);
+      expect(await IconCache.localPath(name), restored.path);
       expect(await restored.readAsBytes(), png);
-      expect(await McpIconCache.localPath('../upload.png'), isNull);
+      expect(await IconCache.localPath('../upload.png'), isNull);
+    },
+  );
+
+  test(
+    'importing the same raster icon does not rewrite the managed file',
+    () async {
+      final original = PathProviderPlatform.instance;
+      addTearDown(() => PathProviderPlatform.instance = original);
+      PathProviderPlatform.instance = _Paths(directory.path);
+      final source = File('${directory.path}/no-extension');
+      final bytes = img.encodePng(img.Image(width: 2, height: 2));
+      await source.writeAsBytes(bytes);
+      final name = await IconCache.importFile(source.path);
+      expect(name, endsWith('.img'));
+      final managed = File((await IconCache.localPath(name))!);
+      final timestamp = DateTime.utc(2001);
+      await managed.setLastModified(timestamp);
+      expect(await IconCache.importFile(source.path), name);
+      expect((await managed.lastModified()).toUtc(), timestamp);
+      expect(await managed.readAsBytes(), bytes);
     },
   );
 
@@ -170,8 +233,8 @@ void main() {
       ..setUint32(14, png.length, Endian.little)
       ..setUint32(18, 22, Endian.little);
     final bytes = Uint8List.fromList([...header.buffer.asUint8List(), ...png]);
-    expect(bytes.length, lessThan(McpIconCache.maxBytes));
-    expect(McpIconCache.normalize(bytes), isNull);
+    expect(bytes.length, lessThan(IconCache.maxBytes));
+    expect(IconCache.normalize(bytes), isNull);
   });
 
   test('classic DIB favicons remain supported with bounded dimensions', () {
@@ -195,16 +258,16 @@ void main() {
       ...header.buffer.asUint8List(),
       ...dib.buffer.asUint8List(),
     ]);
-    final result = McpIconCache.normalize(bytes());
+    final result = IconCache.normalize(bytes());
     expect(result, isNotNull);
     expect(img.decodePng(result!.bytes)!.width, 2);
     dib.setInt32(4, 9000, Endian.little);
-    expect(McpIconCache.normalize(bytes()), isNull);
+    expect(IconCache.normalize(bytes()), isNull);
   });
 
   test('ICO favicons become PNGs supported by Flutter', () {
     final bytes = img.encodeIco(img.Image(width: 16, height: 16));
-    final result = McpIconCache.normalize(bytes);
+    final result = IconCache.normalize(bytes);
     expect(result!.extension, 'png');
     expect(img.decodePng(result.bytes)!.width, 16);
   });
@@ -214,14 +277,14 @@ void main() {
     () async {
       final png = img.encodePng(img.Image(width: 2, height: 2));
       final uri = 'data:image/png;base64,${base64Encode(png)}';
-      final path = await McpIconCache.getPath(uri, directory: directory);
+      final path = await IconCache.getPath(uri, directory: directory);
       expect(path, isNotNull);
       expect(await File(path!).readAsBytes(), png);
       expect(
-        await McpIconCache.getPath('file:///etc/passwd', directory: directory),
+        await IconCache.getPath('file:///etc/passwd', directory: directory),
         isNull,
       );
-      expect(McpIconCache.normalize(Uint8List.fromList([1, 2, 3])), isNull);
+      expect(IconCache.normalize(Uint8List.fromList([1, 2, 3])), isNull);
     },
   );
 }

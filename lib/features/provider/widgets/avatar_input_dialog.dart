@@ -12,6 +12,7 @@ Future<AvatarConfig?> showAvatarInputDialog(
   required AvatarType type,
   required bool desktop,
   AvatarConfig? initial,
+  bool Function(Uri?)? validateImageUrl,
   String keyPrefix = 'avatar-input',
 }) => showDialog<AvatarConfig>(
   context: context,
@@ -19,6 +20,7 @@ Future<AvatarConfig?> showAvatarInputDialog(
     type: type,
     initial: initial,
     desktop: desktop,
+    validateImageUrl: validateImageUrl,
     keyPrefix: keyPrefix,
   ),
 );
@@ -29,11 +31,13 @@ class _AvatarInputDialog extends StatefulWidget {
     required this.desktop,
     required this.keyPrefix,
     this.initial,
+    this.validateImageUrl,
   });
   final AvatarType type;
   final bool desktop;
   final String keyPrefix;
   final AvatarConfig? initial;
+  final bool Function(Uri?)? validateImageUrl;
 
   @override
   State<_AvatarInputDialog> createState() => _AvatarInputDialogState();
@@ -51,9 +55,10 @@ class _AvatarInputDialogState extends State<_AvatarInputDialog> {
     final value = _text.text.trim();
     if (_lobehub) return BrandAssets.lobehubIconUrls(value).isNotEmpty;
     final uri = Uri.tryParse(value);
-    return uri != null &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.host.isNotEmpty;
+    return widget.validateImageUrl?.call(uri) ??
+        (uri != null &&
+            (uri.scheme == 'http' || uri.scheme == 'https') &&
+            uri.host.isNotEmpty);
   }
 
   void _submit() {

@@ -670,6 +670,9 @@ class SettingsProvider extends ChangeNotifier {
   ];
   List<SearchServiceOptions> get searchServices =>
       List.unmodifiable(_searchServices);
+  final _searchServiceAvatars = <String, AvatarConfig>{};
+  AvatarConfig? searchServiceAvatar(String serviceId) =>
+      _searchServiceAvatars[serviceId];
   SearchCommonOptions _searchCommonOptions = const SearchCommonOptions();
   SearchCommonOptions get searchCommonOptions => _searchCommonOptions;
   int _searchServiceSelected = 0;
@@ -1411,13 +1414,19 @@ class SettingsProvider extends ChangeNotifier {
     final searchServicesStr = prefs.getString(_searchServicesKey);
     if (searchServicesStr != null && searchServicesStr.isNotEmpty) {
       try {
-        final list = jsonDecode(searchServicesStr) as List;
-        final decoded = list
-            .map(
-              (e) => SearchServiceOptions.fromJson(e as Map<String, dynamic>),
-            )
-            .toList();
-        if (decoded.isNotEmpty) _searchServices = decoded;
+        final services = <SearchServiceOptions>[];
+        final avatars = <String, AvatarConfig>{};
+        for (final entry in jsonDecode(searchServicesStr) as List) {
+          final json = entry as Map<String, dynamic>;
+          final service = SearchServiceOptions.fromJson(json);
+          services.add(service);
+          final avatar = AvatarConfig.fromJson(json['avatar']);
+          if (avatar != null) avatars[service.id] = avatar;
+        }
+        if (services.isNotEmpty) {
+          _searchServices = services;
+          _searchServiceAvatars.addAll(avatars);
+        }
       } catch (_) {}
     }
     final searchCommonStr = prefs.getString(_searchCommonKey);
@@ -6188,8 +6197,26 @@ Requirements:
     return true;
   }
 
+  Future<void> updateSearchService(
+    SearchServiceOptions service, {
+    required AvatarConfig? avatar,
+  }) async {
+    final index = _searchServices.indexWhere((item) => item.id == service.id);
+    if (index < 0) return;
+    if (avatar == null) {
+      _searchServiceAvatars.remove(service.id);
+    } else {
+      _searchServiceAvatars[service.id] = avatar;
+    }
+    final services = List<SearchServiceOptions>.of(_searchServices);
+    services[index] = service;
+    await setSearchServices(services);
+  }
+
   Future<void> setSearchServices(List<SearchServiceOptions> services) async {
     _searchServices = List.from(services);
+    final serviceIds = _searchServices.map((service) => service.id).toSet();
+    _searchServiceAvatars.removeWhere((id, _) => !serviceIds.contains(id));
     final nextFetchMode = WebFetchService.effectiveMode(
       _webFetchMode,
       _searchServices,
@@ -6205,7 +6232,14 @@ Requirements:
     final prefs = _preferences;
     await prefs.setString(
       _searchServicesKey,
-      jsonEncode(_searchServices.map((e) => e.toJson()).toList()),
+      jsonEncode([
+        for (final service in _searchServices)
+          {
+            ...service.toJson(),
+            if (_searchServiceAvatars[service.id] case final avatar?)
+              'avatar': avatar.toJson(),
+          },
+      ]),
     );
     await prefs.setInt(_searchSelectedKey, _searchServiceSelected);
     if (resetFetchMode) await prefs.setString(_webFetchModeKey, _webFetchMode);

@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/search/web_fetch_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
-import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../theme/app_font_weights.dart';
@@ -15,6 +13,7 @@ import 'search_service_editor_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/option_sheet.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../widgets/search_service_avatar.dart';
 import '../widgets/web_fetch_mode.dart';
 
 class SearchServicesPage extends StatefulWidget {
@@ -56,11 +55,13 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
 
   Future<void> _editService(int index) async {
     final service = _services[index];
+    final settings = context.read<SettingsProvider>();
     final result = await Navigator.of(context).push<SearchServiceEditorResult>(
       MaterialPageRoute(
         builder: (_) => SearchServiceEditorPage(
           initialService: service,
-          commonOptions: context.read<SettingsProvider>().searchCommonOptions,
+          initialAvatar: settings.searchServiceAvatar(service.id),
+          commonOptions: settings.searchCommonOptions,
           canDelete: _services.length > 1,
         ),
       ),
@@ -74,8 +75,12 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     }
     final updated = result.service;
     if (updated == null) return;
-    setState(() => _services[currentIndex] = updated);
-    _saveChanges();
+    await settings.updateSearchService(updated, avatar: result.avatar);
+    if (!mounted) return;
+    setState(() {
+      _services = List.of(settings.searchServices);
+      _selectedIndex = settings.searchServiceSelected;
+    });
   }
 
   void _deleteService(int index) {
@@ -521,7 +526,8 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     // Connection/testing status for capsule
     final l10n = AppLocalizations.of(context)!;
     final testing = _testing[s.id] == true;
-    final conn = context.watch<SettingsProvider>().searchConnection[s.id];
+    final settings = context.watch<SettingsProvider>();
+    final conn = settings.searchConnection[s.id];
     String statusText;
     Color statusBg;
     Color statusFg;
@@ -570,7 +576,13 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                   children: [
                     SizedBox(
                       width: 36,
-                      child: Center(child: _BrandBadge.forService(s, size: 22)),
+                      child: Center(
+                        child: SearchServiceAvatar.forService(
+                          s,
+                          avatar: settings.searchServiceAvatar(s.id),
+                          size: 22,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -673,106 +685,6 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _BrandBadge extends StatelessWidget {
-  const _BrandBadge({required this.name, this.size = 20});
-  final String name;
-  final double size;
-
-  static Widget forService(SearchServiceOptions s, {double size = 24}) {
-    final n = _nameForService(s);
-    return _BrandBadge(name: n, size: size);
-  }
-
-  static String _nameForService(SearchServiceOptions s) {
-    if (s is BingLocalOptions) return 'bing';
-    if (s is DuckDuckGoOptions) return 'duckduckgo';
-    if (s is TavilyOptions) return 'tavily';
-    if (s is ExaOptions) return 'exa';
-    if (s is ExaMcpOptions) return 'exa';
-    if (s is ZhipuOptions) return 'zhipu';
-    if (s is SearXNGOptions) return 'searxng';
-    if (s is FourGetOptions) return '4get';
-    if (s is LinkUpOptions) return 'linkup';
-    if (s is BraveOptions) return 'brave';
-    if (s is MetasoOptions) return 'metaso';
-    if (s is OllamaOptions) return 'ollama';
-    if (s is DeepSeekOptions) return 'deepseek';
-    if (s is JinaOptions) return 'jina';
-    if (s is PerplexityOptions) return 'perplexity';
-    if (s is BochaOptions) return 'bocha';
-    if (s is DoubaoOptions) return 'doubao';
-    if (s is KagiOptions) return 'kagi';
-    if (s is SerperOptions) return 'serper';
-    if (s is QueritOptions) return 'querit';
-    if (s is GrokOptions) return 'grok';
-    if (s is StepFunOptions) return 'stepfun';
-    if (s is FirecrawlOptions) return 'firecrawl';
-    if (s is TinyFishOptions) return 'tinyfish';
-    if (s is AnySearchOptions) return 'anysearch';
-    if (s is ParallelOptions) return 'parallel';
-    if (s is KimiOptions) return 'kimi';
-    if (s is YouSearchOptions) return 'you';
-    if (s is KelivoOptions) return 'kelivo';
-    return 'search';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Use BrandAssets to get the icon path
-    final asset = BrandAssets.assetForName(name);
-    final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.1);
-    if (asset != null) {
-      if (asset.endsWith('.svg')) {
-        final ColorFilter? tint =
-            (isDark && BrandAssets.assetNeedsDarkInvert(asset))
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null;
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: SvgPicture.asset(
-            asset,
-            width: size * 0.62,
-            height: size * 0.62,
-            colorFilter: tint,
-          ),
-        );
-      } else {
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: Image.asset(
-            asset,
-            width: size * 0.62,
-            height: size * 0.62,
-            fit: BoxFit.contain,
-          ),
-        );
-      }
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-      alignment: Alignment.center,
-      child: Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
-        ),
-      ),
     );
   }
 }

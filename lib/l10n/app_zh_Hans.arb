@@ -1789,6 +1789,8 @@
   "searchServicesFourGetPassHelp": "如果实例要求验证码，请完成验证并粘贴 pass Cookie 的值。",
   "searchServiceEditorProviderTypeTitle": "搜索提供商",
   "searchServiceEditorConfigurationTitle": "服务配置",
+  "searchServiceEditorChangeIcon": "更换图标",
+  "searchServiceEditorIconFailed": "无法使用此图标，请另选图片或图标。",
   "searchServiceEditorNoConfiguration": "此提供商无需额外配置。",
   "searchServiceEditorMultiKeyTitle": "多 Key 轮询",
   "searchServiceEditorMultiKeyNone": "未配置",

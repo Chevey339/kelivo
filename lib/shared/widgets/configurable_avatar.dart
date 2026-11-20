@@ -7,10 +7,11 @@ import '../../core/models/avatar_config.dart';
 import '../../theme/app_font_weights.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/brand_assets.dart';
+import '../../utils/icon_cache.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import 'emoji_text.dart';
 
-/// Shared image rendering for provider and model avatars.
+/// Shared image rendering for configurable avatars.
 class ConfigurableAvatar extends StatelessWidget {
   const ConfigurableAvatar({
     super.key,
@@ -21,6 +22,7 @@ class ConfigurableAvatar extends StatelessWidget {
     this.iconScale = .7,
     this.withBackground = true,
     this.backgroundColor,
+    this.normalizeRemoteIcons = false,
   });
 
   final AvatarConfig? avatar;
@@ -30,6 +32,7 @@ class ConfigurableAvatar extends StatelessWidget {
   final double iconScale;
   final bool withBackground;
   final Color? backgroundColor;
+  final bool normalizeRemoteIcons;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +59,7 @@ class ConfigurableAvatar extends StatelessWidget {
         case AvatarType.lobehub:
           content = _RemoteAvatar(
             avatar: config,
+            normalizeIcons: normalizeRemoteIcons,
             builder: (path) => path == null
                 ? fallback
                 : _file(
@@ -152,8 +156,13 @@ class ConfigurableAvatar extends StatelessWidget {
 }
 
 class _RemoteAvatar extends StatefulWidget {
-  const _RemoteAvatar({required this.avatar, required this.builder});
+  const _RemoteAvatar({
+    required this.avatar,
+    required this.normalizeIcons,
+    required this.builder,
+  });
   final AvatarConfig avatar;
+  final bool normalizeIcons;
   final Widget Function(String?) builder;
 
   @override
@@ -170,11 +179,17 @@ class _RemoteAvatarState extends State<_RemoteAvatar> {
         )
       : [widget.avatar.value];
 
+  String? _peek(String url) => widget.normalizeIcons
+      ? IconCache.peek(url, allowCrossOriginRedirects: true)
+      : AvatarCache.peek(url);
+
   Future<String?> _load({bool retryFailed = false}) async {
     for (final url in _urls) {
       final path =
-          AvatarCache.peek(url) ??
-          await AvatarCache.getPath(url, retryFailed: retryFailed);
+          _peek(url) ??
+          (widget.normalizeIcons
+              ? await IconCache.getPath(url, allowCrossOriginRedirects: true)
+              : await AvatarCache.getPath(url, retryFailed: retryFailed));
       if (path != null) return path;
     }
     return null;
@@ -192,7 +207,10 @@ class _RemoteAvatarState extends State<_RemoteAvatar> {
   @override
   void didUpdateWidget(_RemoteAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.avatar != widget.avatar) _path = _load(retryFailed: true);
+    if (oldWidget.avatar != widget.avatar ||
+        oldWidget.normalizeIcons != widget.normalizeIcons) {
+      _path = _load(retryFailed: true);
+    }
   }
 
   @override
@@ -204,9 +222,9 @@ class _RemoteAvatarState extends State<_RemoteAvatar> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String?>(
-      key: ValueKey(widget.avatar),
+      key: ValueKey((widget.avatar, widget.normalizeIcons)),
       future: _path,
-      initialData: _urls.map(AvatarCache.peek).whereType<String>().firstOrNull,
+      initialData: _urls.map(_peek).whereType<String>().firstOrNull,
       builder: (_, snapshot) => widget.builder(snapshot.data),
     );
   }

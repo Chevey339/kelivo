@@ -2576,6 +2576,8 @@
   "searchServicesFourGetPassHelp": "If the instance requires a CAPTCHA, complete it and paste the value of the pass cookie.",
   "searchServiceEditorProviderTypeTitle": "Search provider",
   "searchServiceEditorConfigurationTitle": "Configuration",
+  "searchServiceEditorChangeIcon": "Change icon",
+  "searchServiceEditorIconFailed": "Could not use this icon. Choose another image or icon.",
   "searchServiceEditorNoConfiguration": "This provider does not require additional configuration.",
   "searchServiceEditorMultiKeyTitle": "Multi-key rotation",
   "searchServiceEditorMultiKeyNone": "Not configured",
@@ -12956,6 +12958,12 @@
   },
   "@searchServiceEditorProviderTypeTitle": {
     "description": "Section header for choosing the search provider type in the service editor."
+  },
+  "@searchServiceEditorChangeIcon": {
+    "description": "Tooltip and accessibility label for the button inside the search service editor that opens the icon source menu for this configured service."
+  },
+  "@searchServiceEditorIconFailed": {
+    "description": "Error shown in the search service editor when selecting or importing a custom service icon fails."
   },
   "@searchServiceEditorConfigurationTitle": {
     "description": "Section header for the provider-specific configuration fields in the service editor."

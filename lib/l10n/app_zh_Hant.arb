@@ -1580,6 +1580,8 @@
   "searchServicesFourGetPassHelp": "如果執行個體要求驗證碼，請完成驗證並貼上 pass Cookie 的值。",
   "searchServiceEditorProviderTypeTitle": "搜尋提供商",
   "searchServiceEditorConfigurationTitle": "服務設定",
+  "searchServiceEditorChangeIcon": "更換圖示",
+  "searchServiceEditorIconFailed": "無法使用此圖示，請另選圖片或圖示。",
   "searchServiceEditorNoConfiguration": "此提供商無需額外設定。",
   "searchServiceEditorMultiKeyTitle": "多 Key 輪詢",
   "searchServiceEditorMultiKeyNone": "未設定",

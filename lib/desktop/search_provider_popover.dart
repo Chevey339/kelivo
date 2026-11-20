@@ -8,6 +8,7 @@ import '../core/providers/settings_provider.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/services/api/builtin_tools.dart';
 import '../core/services/search/search_service.dart';
+import '../features/search/widgets/search_service_avatar.dart';
 import '../utils/brand_assets.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_font_weights.dart';
@@ -445,10 +446,18 @@ class _SearchContent extends StatelessWidget {
       final s = services[i];
       final svc = SearchService.getService(s);
       final name = svc.name;
+      final avatar = sp.searchServiceAvatar(s.id);
       final isSelectedActive = enabled && (i == selected);
       rows.add(
         _RowItem(
-          leading: _BrandIcon(name: name),
+          leading: avatar == null
+              ? _BrandIcon(name: name)
+              : SearchServiceAvatar.forService(
+                  s,
+                  avatar: avatar,
+                  size: 16,
+                  compact: true,
+                ),
           label: name,
           selected: isSelectedActive,
           onTap: () async {

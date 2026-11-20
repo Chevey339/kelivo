@@ -9601,6 +9601,18 @@ abstract class AppLocalizations {
   /// **'Configuration'**
   String get searchServiceEditorConfigurationTitle;
 
+  /// Tooltip and accessibility label for the button inside the search service editor that opens the icon source menu for this configured service.
+  ///
+  /// In en, this message translates to:
+  /// **'Change icon'**
+  String get searchServiceEditorChangeIcon;
+
+  /// Error shown in the search service editor when selecting or importing a custom service icon fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not use this icon. Choose another image or icon.'**
+  String get searchServiceEditorIconFailed;
+
   /// Placeholder text shown when the selected provider requires no extra configuration fields.
   ///
   /// In en, this message translates to:

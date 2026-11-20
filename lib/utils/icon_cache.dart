@@ -8,16 +8,19 @@ import 'package:flutter/foundation.dart' show compute;
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 import 'package:xml/xml.dart';
 
-import '../../../utils/app_directories.dart';
+import 'app_directories.dart';
 
-/// Small, bounded icon downloads. No MCP authentication headers are forwarded.
-class McpIconCache {
+typedef _IconRequest = ({String source, bool allowCrossOriginRedirects});
+
+/// Checked image imports and bounded, unauthenticated icon downloads.
+class IconCache {
   static const maxBytes = 2 * 1024 * 1024;
   static const timeout = Duration(seconds: 8);
-  static final _pending = <String, Future<String?>>{};
-  static final _cache = <String, ({String? path, DateTime time})>{};
+  static final _pending = <_IconRequest, Future<String?>>{};
+  static final _cache = <_IconRequest, ({String? path, DateTime time})>{};
 
   static bool isWebUri(Uri? uri) =>
       uri != null &&
@@ -40,17 +43,21 @@ class McpIconCache {
     );
   }
 
-  /// A server may declare inline images or images on its own origin. External
-  /// locations are available through the explicit custom URL choice instead.
-  static bool acceptsDeclaredSource(String source, String serverUrl) {
+  /// An automatically discovered icon must be inline or on its owner's origin.
+  static bool acceptsDeclaredSource(String source, String ownerUrl) {
     final uri = Uri.tryParse(source);
     if (uri?.scheme == 'data') return source.length <= maxBytes * 2;
-    final server = Uri.tryParse(serverUrl);
-    return isWebUri(uri) && isWebUri(server) && uri!.origin == server!.origin;
+    final owner = Uri.tryParse(ownerUrl);
+    return isWebUri(uri) && isWebUri(owner) && uri!.origin == owner!.origin;
   }
 
-  static String? peek(String source) {
-    final cached = _cache[source]?.path;
+  static String? peek(String source, {bool allowCrossOriginRedirects = false}) {
+    final cached =
+        _cache[(
+              source: source,
+              allowCrossOriginRedirects: allowCrossOriginRedirects,
+            )]
+            ?.path;
     return cached != null && File(cached).existsSync() ? cached : null;
   }
 
@@ -60,10 +67,15 @@ class McpIconCache {
 
   static Future<String?> getPath(
     String source, {
+    bool allowCrossOriginRedirects = false,
     http.Client? client,
     Directory? directory,
   }) {
-    final entry = _cache[source];
+    final key = (
+      source: source,
+      allowCrossOriginRedirects: allowCrossOriginRedirects,
+    );
+    final entry = _cache[key];
     if (entry != null &&
         (entry.path != null && File(entry.path!).existsSync() ||
             entry.path == null &&
@@ -71,29 +83,33 @@ class McpIconCache {
                     const Duration(minutes: 5))) {
       return Future.value(entry.path);
     }
-    return _pending.putIfAbsent(source, () async {
+    return _pending.putIfAbsent(key, () async {
       try {
-        final path = await _load(source, client: client, directory: directory);
-        _cache[source] = (path: path, time: DateTime.now());
+        final path = await _load(key, client: client, directory: directory);
+        _cache[key] = (path: path, time: DateTime.now());
         return path;
       } catch (_) {
-        _cache[source] = (path: null, time: DateTime.now());
+        _cache[key] = (path: null, time: DateTime.now());
         return null;
       } finally {
-        _pending.remove(source);
+        _pending.remove(key);
       }
     });
   }
 
   static Future<String?> _load(
-    String source, {
+    _IconRequest key, {
     http.Client? client,
     Directory? directory,
   }) async {
+    final source = key.source;
     final uri = Uri.tryParse(source);
     if (uri == null) return null;
     final dir = directory ?? await AppDirectories.getAvatarCacheDirectory();
-    final name = 'mcp_${sha256.convert(utf8.encode(source))}';
+    // An explicitly chosen URL may redirect to a CDN. Keep its cache separate
+    // so a server-discovered icon still has to satisfy its origin policy.
+    final prefix = key.allowCrossOriginRedirects ? 'remote_icon' : 'mcp';
+    final name = '${prefix}_${sha256.convert(utf8.encode(source))}';
     for (final extension in ['svg', 'png', 'img']) {
       final cached = File(p.join(dir.path, '$name.$extension'));
       if (await cached.exists()) return cached.path;
@@ -109,22 +125,24 @@ class McpIconCache {
       final connection = client ?? http.Client();
       try {
         bytes = await (() async {
-          // Follow only same-origin redirects, without cookies or credentials.
+          // Never forward cookies or credentials across hops.
           var current = uri;
           for (var redirect = 0; redirect < 4; redirect++) {
             final request = http.Request('GET', current)
               ..followRedirects = false;
             final response = await connection.send(request);
             if (response.isRedirect) {
+              await response.stream.listen((_) {}).cancel();
               final location = response.headers['location'];
               if (location == null) {
                 throw const FormatException('Missing redirect');
               }
               final next = current.resolve(location);
-              if (!isWebUri(next) || next.origin != uri.origin) {
-                throw const FormatException('Cross-origin icon redirect');
+              if (!isWebUri(next) ||
+                  (!key.allowCrossOriginRedirects &&
+                      next.origin != uri.origin)) {
+                throw const FormatException('Disallowed icon redirect');
               }
-              await response.stream.listen((_) {}).cancel();
               current = next;
               continue;
             }
@@ -156,7 +174,10 @@ class McpIconCache {
     return file.path;
   }
 
-  static ({Uint8List bytes, String extension})? normalize(Uint8List bytes) {
+  static ({Uint8List bytes, String extension})? normalize(
+    Uint8List bytes, {
+    bool preserveRasterExtension = false,
+  }) {
     if (bytes.length < 4) return null;
     final prefix = utf8
         .decode(bytes.take(512).toList(), allowMalformed: true)
@@ -191,15 +212,15 @@ class McpIconCache {
     // Validate the header without fully decoding potentially large raster data.
     try {
       final decoder = img.findDecoderForData(bytes);
-      if (!{
-        img.ImageFormat.png,
-        img.ImageFormat.jpg,
-        img.ImageFormat.webp,
-        img.ImageFormat.gif,
-        img.ImageFormat.bmp,
-      }.contains(decoder?.format)) {
-        return null;
-      }
+      final extension = switch (decoder?.format) {
+        img.ImageFormat.png => 'png',
+        img.ImageFormat.jpg => 'jpg',
+        img.ImageFormat.webp => 'webp',
+        img.ImageFormat.gif => 'gif',
+        img.ImageFormat.bmp => 'bmp',
+        _ => null,
+      };
+      if (extension == null) return null;
       final info = decoder?.startDecode(bytes);
       if (info == null ||
           info.width <= 0 ||
@@ -208,7 +229,10 @@ class McpIconCache {
           info.height > 8192) {
         return null;
       }
-      return (bytes: bytes, extension: 'img');
+      return (
+        bytes: bytes,
+        extension: preserveRasterExtension ? extension : 'img',
+      );
     } catch (_) {
       return null;
     }
@@ -269,21 +293,62 @@ class McpIconCache {
     return decoder.decodeFrame(0);
   }
 
-  static Future<String> importFile(String path) async {
+  static Future<String> importFile(String path) =>
+      _importFile(path, separateAvatar: false);
+
+  /// Creates a fresh managed path so deletion of a previous avatar cannot
+  /// remove the icon being saved.
+  static Future<String> importAvatarFile(String path) =>
+      _importFile(path, separateAvatar: true);
+
+  static Future<String> _importFile(
+    String path, {
+    required bool separateAvatar,
+  }) async {
     final source = File(path);
     if (await source.length() > 10 * 1024 * 1024) {
       throw const FormatException('Icon too large');
     }
-    final normalized = await compute(normalize, await source.readAsBytes());
+    final normalized = await compute(
+      (bytes) => normalize(bytes, preserveRasterExtension: separateAvatar),
+      await source.readAsBytes(),
+    );
     if (normalized == null) throw const FormatException('Unsupported icon');
     final dir = await AppDirectories.getAvatarsDirectory();
     await dir.create(recursive: true);
-    final name =
-        'mcp_${sha256.convert(normalized.bytes)}.${normalized.extension}';
-    await File(
-      p.join(dir.path, name),
-    ).writeAsBytes(normalized.bytes, flush: true);
+    final hash = sha256.convert(normalized.bytes);
+    final baseName = separateAvatar
+        ? 'avatar_${const Uuid().v4()}'
+        : 'mcp_$hash';
+    final name = '$baseName.${normalized.extension}';
+    final destination = File(p.join(dir.path, name));
+    if (await _matchesHash(destination, hash)) return name;
+
+    // Publish a complete file without truncating an image used by another
+    // configuration. Stage outside the avatars directory scanned by backups.
+    final stagingDir = await dir.parent.createTemp('.icon-');
+    try {
+      final staged = await File(
+        p.join(stagingDir.path, name),
+      ).writeAsBytes(normalized.bytes, flush: true);
+      if (!await _matchesHash(destination, hash)) {
+        await staged.rename(destination.path);
+      }
+    } on FileSystemException {
+      if (!await _matchesHash(destination, hash)) rethrow;
+    } finally {
+      await stagingDir.delete(recursive: true);
+    }
     return name;
+  }
+
+  static Future<bool> _matchesHash(File file, Digest hash) async {
+    try {
+      if (!await file.exists()) return false;
+      return await sha256.bind(file.openRead()).first == hash;
+    } on FileSystemException {
+      return false;
+    }
   }
 
   static Future<String?> localPath(String name) async {

@@ -5152,6 +5152,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get searchServiceEditorConfigurationTitle => '구성';
 
   @override
+  String get searchServiceEditorChangeIcon => '아이콘 변경';
+
+  @override
+  String get searchServiceEditorIconFailed =>
+      '이 아이콘을 사용할 수 없습니다. 다른 이미지나 아이콘을 선택하세요.';
+
+  @override
   String get searchServiceEditorNoConfiguration => '이 공급자는 추가 구성이 필요하지 않습니다.';
 
   @override

@@ -5346,6 +5346,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get searchServiceEditorConfigurationTitle => 'Конфигурация';
 
   @override
+  String get searchServiceEditorChangeIcon => 'Сменить значок';
+
+  @override
+  String get searchServiceEditorIconFailed =>
+      'Не удалось использовать этот значок. Выберите другое изображение или значок.';
+
+  @override
   String get searchServiceEditorNoConfiguration =>
       'Этому провайдеру не требуется дополнительная настройка.';
 

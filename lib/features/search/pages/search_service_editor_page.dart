@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/models/avatar_config.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/search/search_service_usage_service.dart';
@@ -16,8 +16,9 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/theme_factory.dart';
-import '../../../utils/brand_assets.dart';
 import '../utils/four_get_credentials.dart';
+import '../widgets/search_service_avatar.dart';
+import '../widgets/search_service_editor_scope.dart';
 import 'search_api_keys_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
@@ -25,11 +26,16 @@ import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 
 class SearchServiceEditorResult {
-  const SearchServiceEditorResult.saved(this.service) : deleted = false;
+  const SearchServiceEditorResult.saved(this.service, {this.avatar})
+    : deleted = false;
 
-  const SearchServiceEditorResult.deleted() : service = null, deleted = true;
+  const SearchServiceEditorResult.deleted()
+    : service = null,
+      avatar = null,
+      deleted = true;
 
   final SearchServiceOptions? service;
+  final AvatarConfig? avatar;
   final bool deleted;
 }
 
@@ -51,6 +57,7 @@ class SearchServiceEditorPage extends StatefulWidget {
   const SearchServiceEditorPage({
     super.key,
     this.initialService,
+    this.initialAvatar,
     required this.commonOptions,
     this.canDelete = false,
     this.autoQueryUsage = true,
@@ -60,6 +67,7 @@ class SearchServiceEditorPage extends StatefulWidget {
   });
 
   final SearchServiceOptions? initialService;
+  final AvatarConfig? initialAvatar;
   final SearchCommonOptions commonOptions;
   final bool canDelete;
   final bool autoQueryUsage;
@@ -84,7 +92,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
 
   late final String _serviceId;
   late String _selectedType;
+  late AvatarConfig? _avatar = widget.initialAvatar;
   bool _leaving = false;
+  bool _saving = false;
   bool _testing = false;
   bool _usageLoading = false;
   int _testRequestGeneration = 0;
@@ -136,7 +146,8 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ? l10n.searchServicesAddDialogTitle
         : SearchService.getService(current).name;
 
-    return PopScope<SearchServiceEditorResult?>(
+    return SearchServiceEditorScope<SearchServiceEditorResult>(
+      saving: _saving,
       child: Scaffold(
         backgroundColor: cs.surface,
         appBar: AppBar(
@@ -258,7 +269,16 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
               key: const ValueKey('search-service-provider-header'),
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _SearchBrandBadge.forService(service, size: 38),
+                if (_isAdding)
+                  SearchServiceAvatar.forService(service, size: 38)
+                else
+                  SearchServiceAvatarButton(
+                    service: service,
+                    avatar: _avatar,
+                    onChanged: (avatar) => setState(() => _avatar = avatar),
+                    desktop: false,
+                    enabled: !_saving,
+                  ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -841,6 +861,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
   }
 
   void _openApiKeysPage() {
+    if (_saving) return;
     FocusScope.of(context).unfocus();
     Navigator.of(context)
         .push<List<String>>(
@@ -1375,14 +1396,29 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     return null;
   }
 
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _save() async {
+    if (_leaving || _saving || !(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    final service = _currentService();
     FocusScope.of(context).unfocus();
-    _popWithResult(SearchServiceEditorResult.saved(_currentService()));
+    setState(() => _saving = true);
+    try {
+      final avatar = await saveSearchServiceAvatar(
+        _avatar,
+        widget.initialAvatar,
+      );
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      _popWithResult(SearchServiceEditorResult.saved(service, avatar: avatar));
+    } catch (_) {
+      if (mounted && !_leaving) showSearchServiceIconError(context);
+    } finally {
+      if (mounted && !_leaving) setState(() => _saving = false);
+    }
   }
 
   Future<void> _confirmDelete() async {
-    if (!widget.canDelete || _leaving) return;
+    if (!widget.canDelete || _leaving || _saving) return;
     final l10n = AppLocalizations.of(context)!;
     final providerName = SearchService.getService(_currentService()).name;
     final confirmed = await showDialog<bool>(
@@ -1410,7 +1446,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     }
   }
 
-  void _requestClose() => _popWithResult(null);
+  void _requestClose() {
+    if (!_saving) _popWithResult(null);
+  }
 
   void _popWithResult(SearchServiceEditorResult? result) {
     if (_leaving) return;
@@ -2341,7 +2379,7 @@ class _ProviderTypeChipState extends State<_ProviderTypeChip> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _SearchBrandBadge(name: widget.brand, size: 24),
+                SearchServiceAvatar(brand: widget.brand),
                 const SizedBox(width: 7),
                 Text(
                   widget.label,
@@ -2492,59 +2530,6 @@ class _SearchResultRow extends StatelessWidget {
     } catch (_) {
       // The visible URL remains selectable through the platform text menu.
     }
-  }
-}
-
-class _SearchBrandBadge extends StatelessWidget {
-  const _SearchBrandBadge({required this.name, this.size = 24});
-
-  final String name;
-  final double size;
-
-  static Widget forService(SearchServiceOptions service, {double size = 24}) =>
-      _SearchBrandBadge(name: _brandForService(service), size: size);
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.1);
-    final childSize = size * 0.62;
-    Widget child;
-    if (asset == null) {
-      child = Text(
-        name.isEmpty ? '?' : name.characters.first.toUpperCase(),
-        style: TextStyle(
-          color: cs.primary,
-          fontSize: size * 0.42,
-          fontWeight: AppFontWeights.emphasis,
-        ),
-      );
-    } else if (asset.endsWith('.svg')) {
-      child = SvgPicture.asset(
-        asset,
-        width: childSize,
-        height: childSize,
-        colorFilter: isDark && BrandAssets.assetNeedsDarkInvert(asset)
-            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-            : null,
-      );
-    } else {
-      child = Image.asset(
-        asset,
-        width: childSize,
-        height: childSize,
-        fit: BoxFit.contain,
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-      child: child,
-    );
   }
 }
 
@@ -2798,11 +2783,6 @@ String _typeForService(SearchServiceOptions service) {
   return 'bing_local';
 }
 
-String _brandForService(SearchServiceOptions service) {
-  final type = _typeForService(service);
-  return type == 'bing_local' ? 'bing' : type;
-}
-
 SearchServiceOptions _defaultService(String type, String id) {
   switch (type) {
     case 'bing_local':
@@ -3018,6 +2998,10 @@ Widget anySearchServiceEditorPagePreview() {
     themeMode: ThemeMode.system,
     home: SearchServiceEditorPage(
       initialService: AnySearchOptions(id: 'preview-anysearch', apiKey: ''),
+      initialAvatar: const AvatarConfig(
+        type: AvatarType.icon,
+        value: 'assets/icons/brave-color.svg',
+      ),
       commonOptions: const SearchCommonOptions(),
       canDelete: true,
       autoQueryUsage: false,

@@ -1580,6 +1580,8 @@
   "searchServicesFourGetPassHelp": "Если экземпляр требует CAPTCHA, пройдите её и вставьте значение cookie pass.",
   "searchServiceEditorProviderTypeTitle": "Поисковый провайдер",
   "searchServiceEditorConfigurationTitle": "Конфигурация",
+  "searchServiceEditorChangeIcon": "Сменить значок",
+  "searchServiceEditorIconFailed": "Не удалось использовать этот значок. Выберите другое изображение или значок.",
   "searchServiceEditorNoConfiguration": "Этому провайдеру не требуется дополнительная настройка.",
   "searchServiceEditorMultiKeyTitle": "Ротация нескольких ключей",
   "searchServiceEditorMultiKeyNone": "Не настроено",

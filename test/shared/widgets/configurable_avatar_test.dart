@@ -4,6 +4,7 @@ import 'package:Kelivo/core/models/avatar_config.dart';
 import 'package:Kelivo/shared/widgets/configurable_avatar.dart';
 import 'package:Kelivo/utils/avatar_cache.dart';
 import 'package:Kelivo/utils/brand_assets.dart';
+import 'package:Kelivo/utils/icon_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,9 +51,11 @@ void main() {
     paths = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _Paths(directory.path);
     AvatarCache.clearMemory();
+    IconCache.clearMemory();
   });
   tearDown(() async {
     AvatarCache.clearMemory();
+    IconCache.clearMemory();
     PathProviderPlatform.instance = paths;
     await directory.delete(recursive: true);
   });
@@ -63,6 +66,37 @@ void main() {
       body: ConfigurableAvatar(avatar: avatar, name: 'Unknown'),
     ),
   );
+
+  testWidgets('normalizes extensionless remote SVGs for search icons', (
+    tester,
+  ) async {
+    const url = 'https://avatar.test/extensionless-icon';
+    await http.runWithClient(
+      () async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: ConfigurableAvatar(
+              avatar: AvatarConfig(type: AvatarType.url, value: url),
+              name: 'Unknown',
+              normalizeRemoteIcons: true,
+            ),
+          ),
+        );
+        await _finishLoad(tester);
+        final picture = tester.widget<SvgPicture>(find.byType(SvgPicture));
+        expect(
+          (picture.bytesLoader as SvgFileLoader).file.path,
+          endsWith('.svg'),
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+      () => MockClient((request) async {
+        expect(request.url.toString(), url);
+        return http.Response(svg, 200);
+      }),
+    );
+  });
 
   testWidgets(
     'cached color and monochrome SVGs switch without showing the old variant',

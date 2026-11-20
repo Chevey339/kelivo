@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/models/mcp_presentation.dart';
-import '../../../core/services/mcp/mcp_icon_cache.dart';
+import '../../../utils/icon_cache.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../utils/brand_assets.dart';
 
@@ -73,16 +73,16 @@ class _McpResolvedIconState extends State<McpResolvedIcon> {
     }
     // A lower-priority cached source must not bypass a custom/declared icon.
     if (icon?.type != McpIconType.file && sources.isNotEmpty) {
-      final cached = McpIconCache.peek(sources.first);
+      final cached = IconCache.peek(sources.first);
       if (!_failedPaths.contains(cached)) _cached = cached;
     }
     _path = () async {
       if (icon?.type == McpIconType.file) {
-        final file = await McpIconCache.localPath(icon!.value);
+        final file = await IconCache.localPath(icon!.value);
         if (file != null && !_failedPaths.contains(file)) return file;
       }
       for (final source in sources) {
-        final file = await McpIconCache.getPath(source);
+        final file = await IconCache.getPath(source);
         if (file != null && !_failedPaths.contains(file)) return file;
       }
       return null;

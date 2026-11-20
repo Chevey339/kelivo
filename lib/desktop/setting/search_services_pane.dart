@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
+import '../../core/models/avatar_config.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/search/search_service.dart';
 import '../../core/services/search/search_api_key_rotator.dart';
 import '../../core/services/search/web_fetch_service.dart';
 import '../../features/search/utils/four_get_credentials.dart';
+import '../../features/search/widgets/search_service_avatar.dart';
+import '../../features/search/widgets/search_service_editor_scope.dart';
 import '../../features/search/widgets/web_fetch_mode.dart';
-import '../../utils/brand_assets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/ios_form_text_field.dart';
@@ -111,14 +112,15 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                             final updated = await _showEditServiceDialog(
                               context,
                               s,
+                              initialAvatar: settingsProvider
+                                  .searchServiceAvatar(s.id),
                             );
                             if (!context.mounted) return;
                             if (updated != null) {
-                              final list = List<SearchServiceOptions>.from(
-                                settingsProvider.searchServices,
+                              await settingsProvider.updateSearchService(
+                                updated.service,
+                                avatar: updated.avatar,
                               );
-                              list[index] = updated;
-                              await settingsProvider.setSearchServices(list);
                             }
                           },
                           onDelete: () async {
@@ -318,9 +320,8 @@ class _ServiceCardState extends State<_ServiceCard> {
 
     // Connection/testing status capsule
     final l10n = AppLocalizations.of(context)!;
-    final conn = context
-        .watch<SettingsProvider>()
-        .searchConnection[widget.service.id];
+    final settings = context.watch<SettingsProvider>();
+    final conn = settings.searchConnection[widget.service.id];
     String statusText;
     Color statusBg;
     Color statusFg;
@@ -358,7 +359,10 @@ class _ServiceCardState extends State<_ServiceCard> {
           constraints: const BoxConstraints(minHeight: 64),
           child: Row(
             children: [
-              _BrandBadge.forService(widget.service, size: 24),
+              SearchServiceAvatar.forService(
+                widget.service,
+                avatar: settings.searchServiceAvatar(widget.service.id),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Row(
@@ -670,102 +674,6 @@ class _StepperButtonState extends State<_StepperButton> {
   }
 }
 
-class _BrandBadge extends StatelessWidget {
-  const _BrandBadge({required this.name, this.size = 20});
-  final String name;
-  final double size;
-  static Widget forService(SearchServiceOptions s, {double size = 24}) {
-    final n = _nameForService(s);
-    return _BrandBadge(name: n, size: size);
-  }
-
-  static String _nameForService(SearchServiceOptions s) {
-    if (s is BingLocalOptions) return 'bing';
-    if (s is DuckDuckGoOptions) return 'duckduckgo';
-    if (s is TavilyOptions) return 'tavily';
-    if (s is ExaOptions) return 'exa';
-    if (s is ExaMcpOptions) return 'exa';
-    if (s is ZhipuOptions) return 'zhipu';
-    if (s is SearXNGOptions) return 'searxng';
-    if (s is FourGetOptions) return '4get';
-    if (s is LinkUpOptions) return 'linkup';
-    if (s is BraveOptions) return 'brave';
-    if (s is MetasoOptions) return 'metaso';
-    if (s is OllamaOptions) return 'ollama';
-    if (s is DeepSeekOptions) return 'deepseek';
-    if (s is JinaOptions) return 'jina';
-    if (s is PerplexityOptions) return 'perplexity';
-    if (s is BochaOptions) return 'bocha';
-    if (s is DoubaoOptions) return 'doubao';
-    if (s is KagiOptions) return 'kagi';
-    if (s is SerperOptions) return 'serper';
-    if (s is QueritOptions) return 'querit';
-    if (s is GrokOptions) return 'grok';
-    if (s is StepFunOptions) return 'stepfun';
-    if (s is FirecrawlOptions) return 'firecrawl';
-    if (s is TinyFishOptions) return 'tinyfish';
-    if (s is AnySearchOptions) return 'anysearch';
-    if (s is ParallelOptions) return 'parallel';
-    if (s is KimiOptions) return 'kimi';
-    if (s is YouSearchOptions) return 'you';
-    if (s is KelivoOptions) return 'kelivo';
-    return 'search';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.1);
-    if (asset != null) {
-      if (asset.endsWith('.svg')) {
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: SvgPicture.asset(
-            asset,
-            width: size * 0.62,
-            height: size * 0.62,
-            colorFilter: isDark && BrandAssets.assetNeedsDarkInvert(asset)
-                ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
-                : null,
-          ),
-        );
-      } else {
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: Image.asset(
-            asset,
-            width: size * 0.62,
-            height: size * 0.62,
-            fit: BoxFit.contain,
-          ),
-        );
-      }
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-      alignment: Alignment.center,
-      child: Text(
-        name.substring(0, 1).toUpperCase(),
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
-        ),
-      ),
-    );
-  }
-}
-
 class _SmallIconBtn extends StatefulWidget {
   const _SmallIconBtn({required this.icon, required this.onTap});
   final IconData icon;
@@ -822,11 +730,17 @@ Future<SearchServiceOptions?> showDesktopAddSearchServiceDialog(
   BuildContext context,
 ) => _showAddServiceDialog(context);
 
-@visibleForTesting
-Future<SearchServiceOptions?> showDesktopEditSearchServiceDialog(
-  BuildContext context,
+typedef DesktopSearchServiceEdit = ({
   SearchServiceOptions service,
-) => _showEditServiceDialog(context, service);
+  AvatarConfig? avatar,
+});
+
+@visibleForTesting
+Future<DesktopSearchServiceEdit?> showDesktopEditSearchServiceDialog(
+  BuildContext context,
+  SearchServiceOptions service, {
+  AvatarConfig? initialAvatar,
+}) => _showEditServiceDialog(context, service, initialAvatar: initialAvatar);
 
 Future<SearchServiceOptions?> _showAddServiceDialog(
   BuildContext context,
@@ -838,14 +752,16 @@ Future<SearchServiceOptions?> _showAddServiceDialog(
   );
 }
 
-Future<SearchServiceOptions?> _showEditServiceDialog(
+Future<DesktopSearchServiceEdit?> _showEditServiceDialog(
   BuildContext context,
-  SearchServiceOptions s,
-) async {
-  return showDialog<SearchServiceOptions>(
+  SearchServiceOptions s, {
+  required AvatarConfig? initialAvatar,
+}) async {
+  return showDialog<DesktopSearchServiceEdit>(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => _EditServiceDialog(service: s),
+    builder: (ctx) =>
+        _EditServiceDialog(service: s, initialAvatar: initialAvatar),
   );
 }
 
@@ -1586,8 +1502,12 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
 }
 
 class _EditServiceDialog extends StatefulWidget {
-  const _EditServiceDialog({required this.service});
+  const _EditServiceDialog({
+    required this.service,
+    required this.initialAvatar,
+  });
   final SearchServiceOptions service;
+  final AvatarConfig? initialAvatar;
   @override
   State<_EditServiceDialog> createState() => _EditServiceDialogState();
 }
@@ -1595,6 +1515,8 @@ class _EditServiceDialog extends StatefulWidget {
 class _EditServiceDialogState extends State<_EditServiceDialog> {
   final Map<String, TextEditingController> _controllers = {};
   late List<String> _extraApiKeys;
+  late AvatarConfig? _avatar = widget.initialAvatar;
+  bool _saving = false;
   bool _maximumTokensInvalid = false;
   @override
   void initState() {
@@ -1741,61 +1663,89 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final name = SearchService.getService(widget.service).name;
-    return Dialog(
-      backgroundColor: context.overlaySurface,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 58),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: AppFontWeights.emphasis,
+    return SearchServiceEditorScope<DesktopSearchServiceEdit>(
+      saving: _saving,
+      child: Dialog(
+        backgroundColor: context.overlaySurface,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 58),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        SearchServiceAvatarButton(
+                          service: widget.service,
+                          avatar: _avatar,
+                          onChanged: (avatar) =>
+                              setState(() => _avatar = avatar),
+                          desktop: true,
+                          enabled: !_saving,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: AppFontWeights.emphasis,
+                            ),
                           ),
                         ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(context).maybePop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ..._buildFields(),
-                ],
+                        _SmallIconBtn(
+                          icon: lucide.Lucide.X,
+                          onTap: () => Navigator.of(context).maybePop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ..._buildFields(),
+                  ],
+                ),
               ),
-            ),
-            Positioned(
-              right: 12,
-              bottom: 12,
-              child: _DeskIosButton(
-                label: l10n.searchServicesEditDialogSave,
-                filled: true,
-                dense: true,
-                onTap: () {
-                  if (!_acceptBraveMaximumTokens()) return;
-                  final updated = _updateService();
-                  if (!_acceptFourGetInstanceUrl(context, updated)) return;
-                  Navigator.of(context).pop(updated);
-                },
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: _DeskIosButton(
+                  label: l10n.searchServicesEditDialogSave,
+                  filled: true,
+                  dense: true,
+                  onTap: _save,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _save() async {
+    if (_saving || !_acceptBraveMaximumTokens()) return;
+    final service = _updateService();
+    if (!_acceptFourGetInstanceUrl(context, service)) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _saving = true);
+    try {
+      final avatar = await saveSearchServiceAvatar(
+        _avatar,
+        widget.initialAvatar,
+      );
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.of(context).pop((service: service, avatar: avatar));
+        return;
+      }
+    } catch (_) {
+      if (mounted) showSearchServiceIconError(context);
+    }
+    if (mounted) setState(() => _saving = false);
   }
 
   List<Widget> _buildFields() {
@@ -2291,6 +2241,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
   }
 
   Future<void> _openMultiKeyDialog() async {
+    if (_saving) return;
     final current = _updateService();
     final pool = await showDialog<List<String>>(
       context: context,
@@ -2867,7 +2818,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
             ),
             child: Row(
               children: [
-                _BrandBadge(name: it.brand, size: 18),
+                SearchServiceAvatar(brand: it.brand, size: 18),
                 const SizedBox(width: 6),
                 Text(
                   name,
@@ -3039,8 +2990,8 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                             children: [
                               for (int i = 0; i < _types.length; i++) ...[
                                 _DropdownItem(
-                                  leading: _BrandBadge(
-                                    name: _types[i].brand,
+                                  leading: SearchServiceAvatar(
+                                    brand: _types[i].brand,
                                     size: 18,
                                   ),
                                   label: _serviceTypeName(ctx, _types[i].type),
@@ -3121,7 +3072,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _BrandBadge(name: _currentBrand, size: 18),
+                SearchServiceAvatar(brand: _currentBrand, size: 18),
                 const SizedBox(width: 6),
                 Text(
                   _serviceTypeName(context, _currentType),
