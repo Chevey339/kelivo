@@ -236,8 +236,7 @@ void main() {
       await settings.setChatMessageBackgroundStyle(
         ChatMessageBackgroundStyle.solid,
       );
-      await settings.setAssistantBubbleSplitParagraphs(true);
-
+      expect(settings.assistantBubbleSplitParagraphs, isFalse);
       expect(settings.customizeThinkingToolCards, isFalse);
       expect(settings.chatBubbleStyleOverridesFor(target), assistant);
       await settings.setCustomizeThinkingToolCards(true);
@@ -246,9 +245,20 @@ void main() {
       expect(settings.assistantChatBubbleStyleOverrides, assistant);
       expect(settings.chatBubbleStyleOverridesFor(target), cards);
 
-      await settings.setAssistantBubbleSplitParagraphs(false);
-      expect(settings.chatBubbleStyleOverridesFor(target), assistant);
       await settings.setAssistantBubbleSplitParagraphs(true);
+      expect(settings.chatBubbleStyleOverridesFor(target), cards);
+      await settings.setAssistantBubbleSplitParagraphs(false);
+      expect(settings.chatBubbleStyleOverridesFor(target), cards);
+      await settings.setShowAssistantBodyBubble(false);
+      expect(settings.chatBubbleStyleOverridesFor(target), cards);
+
+      await settings.setChatMessageBackgroundStyle(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      expect(settings.chatBubbleStyleOverridesFor(target), assistant);
+      await settings.setChatMessageBackgroundStyle(
+        ChatMessageBackgroundStyle.frosted,
+      );
       expect(settings.chatBubbleStyleOverridesFor(target), cards);
 
       await settings.setCustomizeThinkingToolCards(false);

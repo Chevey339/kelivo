@@ -17395,7 +17395,7 @@ abstract class AppLocalizations {
   /// **'Blank lines break an assistant reply into one bubble per paragraph'**
   String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle;
 
-  /// Switch label in Message Style settings when a customizable style and paragraph bubbles are active. Enables a single independent visual style shared by thinking and tool-call cards.
+  /// Switch label in Message Style settings for the Frosted Glass and Solid styles. Enables a single independent visual style shared by thinking and tool-call cards.
   ///
   /// In en, this message translates to:
   /// **'Customize thinking and tool cards'**

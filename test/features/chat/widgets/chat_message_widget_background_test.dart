@@ -707,7 +707,7 @@ void main() {
         ChatMessageBackgroundStyle.frosted,
       );
       await settings.setEnableAssistantMarkdown(false);
-      await settings.setAssistantBubbleSplitParagraphs(true);
+      const reply = 'First paragraph\n\nSecond paragraph';
       const replyColor = Color(0xFF224466);
       await settings.setChatBubbleStyleOverrides(
         ChatBubbleStyleOverrides(
@@ -724,7 +724,7 @@ void main() {
                 ChatMessageWidget(
                   message: ChatMessage(
                     role: 'assistant',
-                    content: 'First paragraph\n\nSecond paragraph',
+                    content: reply,
                     conversationId: 'independent-card-style',
                   ),
                   showModelIcon: false,
@@ -797,6 +797,12 @@ void main() {
         expect(style.background.a, closeTo(0.4, 0.001));
         expect(textColor(label), cardColor.withValues(alpha: 0.78));
       }
+      expect(surfaceFor(reply).style.radius, 6);
+      expect(textColor(reply), replyColor);
+
+      await settings.setAssistantBubbleSplitParagraphs(true);
+      await tester.pump();
+      expect(surfaceFor(thinking).style.radius, 24);
       for (final label in ['First paragraph', 'Second paragraph']) {
         expect(surfaceFor(label).style.radius, 6);
         expect(textColor(label), replyColor);

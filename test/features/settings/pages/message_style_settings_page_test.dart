@@ -51,6 +51,7 @@ void main() {
       expect(find.text('Message Style'), findsOneWidget);
       expect(find.text('Show assistant reply bubbles'), findsNothing);
       expect(find.text('Split paragraphs into bubbles'), findsOneWidget);
+      expect(find.text('Customize thinking and tool cards'), findsNothing);
       expect(find.text('This is a user message'), findsWidgets);
       expect(
         find.text(
@@ -114,6 +115,7 @@ void main() {
     expect(previewBubble('This is a user message'), findsOneWidget);
     expect(find.text('Fit assistant bubble to content'), findsNothing);
     expect(find.text('Split paragraphs into bubbles'), findsNothing);
+    expect(find.text('Customize thinking and tool cards'), findsOneWidget);
 
     await tester.tap(toggle);
     await tester.pumpAndSettle();
@@ -122,7 +124,7 @@ void main() {
     expect(find.text('Split paragraphs into bubbles'), findsOneWidget);
   });
 
-  testWidgets('split reply settings expose a separate card style preview', (
+  testWidgets('single reply bubble supports a separate card style preview', (
     tester,
   ) async {
     final harness = await createBusinessTestHarness();
@@ -148,8 +150,7 @@ void main() {
     }
 
     final cardSwitch = switchFor('Customize thinking and tool cards');
-    expect(cardSwitch, findsNothing);
-    await toggle(switchFor('Split paragraphs into bubbles'));
+    expect(settings.assistantBubbleSplitParagraphs, isFalse);
     expect(cardSwitch, findsOneWidget);
     expect(find.text('Cards'), findsNothing);
     await toggle(cardSwitch);

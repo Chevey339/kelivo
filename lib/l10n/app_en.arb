@@ -16591,7 +16591,7 @@
     "description": "Subtitle explaining that blank lines in an assistant reply create one bubble per paragraph."
   },
   "@messageStyleSettingsPageCustomizeThinkingToolCards": {
-    "description": "Switch label in Message Style settings when a customizable style and paragraph bubbles are active. Enables a single independent visual style shared by thinking and tool-call cards."
+    "description": "Switch label in Message Style settings for the Frosted Glass and Solid styles. Enables a single independent visual style shared by thinking and tool-call cards."
   },
   "@messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle": {
     "description": "Subtitle below the Message Style switch for editing thinking and tool-call cards independently of the assistant reply bubbles. Both card types share the same appearance settings."
