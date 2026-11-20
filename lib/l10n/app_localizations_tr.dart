@@ -9765,6 +9765,14 @@ class AppLocalizationsTr extends AppLocalizations {
       'Asistan yanıtındaki boş satırlar her paragrafı ayrı bir balona böler';
 
   @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCards =>
+      'Düşünme ve araç kartlarını özelleştir';
+
+  @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle =>
+      'Düşünme ve araç çağrılarına kendi görünümlerini ver';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle =>
       'Yarı saydam buzlu cam';
 
@@ -9817,8 +9825,11 @@ class AppLocalizationsTr extends AppLocalizations {
   String get messageStyleSettingsPageRoleAssistant => 'Asistan';
 
   @override
+  String get messageStyleSettingsPageRoleThinkingTool => 'Kartlar';
+
+  @override
   String get messageStyleSettingsPageRoleAssistantHint =>
-      'Asistan ayarları ayrıca düşünme, araç çağırma ve çeviri kartlarına da uygulanır.';
+      'Çeviri kartları asistan stilini izler. Düşünme ve araç kartları varsayılan olarak onu izler.';
 
   @override
   String get localSnapshotSectionTitle => 'Yerel Kopyalar';

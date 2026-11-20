@@ -370,6 +370,8 @@ class SettingsProvider extends ChangeNotifier {
       'chat_bubble_style_overrides_v1';
   static const String _userChatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_user_v1';
+  static const String _thinkingToolCardStyleKey =
+      'chat_bubble_style_thinking_tool_card_v1';
   static const String _toolSchemaOverridesKey = 'tool_schema_overrides_v1';
   static const String _mobileAssistantEditTabOrderKey =
       'mobile_assistant_edit_tab_order_v1';
@@ -1380,6 +1382,23 @@ class SettingsProvider extends ChangeNotifier {
         }
       } catch (_) {
         // Keep null so a corrupt user key still follows assistant.
+      }
+    }
+    final thinkingToolCardStyleRaw = prefs.getString(_thinkingToolCardStyleKey);
+    _thinkingToolCardStyle = null;
+    if (thinkingToolCardStyleRaw != null) {
+      try {
+        if (jsonDecode(thinkingToolCardStyleRaw) case {
+          'enabled': final bool enabled,
+          'overrides': final Map<String, dynamic> overrides,
+        }) {
+          _thinkingToolCardStyle = (
+            enabled: enabled,
+            overrides: ChatBubbleStyleOverrides.fromJson(overrides),
+          );
+        }
+      } on FormatException {
+        // Malformed data follows the assistant style.
       }
     }
     _toolSchemaOverrides = _decodeToolSchemaOverrides(
@@ -3189,16 +3208,59 @@ class SettingsProvider extends ChangeNotifier {
   ChatBubbleStyleOverrides _chatBubbleStyleOverrides =
       const ChatBubbleStyleOverrides();
   ChatBubbleStyleOverrides? _userChatBubbleStyleOverrides;
+  ({bool enabled, ChatBubbleStyleOverrides overrides})? _thinkingToolCardStyle;
+
+  bool get canCustomizeThinkingToolCards =>
+      _chatMessageBackgroundStyle != ChatMessageBackgroundStyle.defaultStyle &&
+      assistantBubbleSplitParagraphs;
+  bool get customizeThinkingToolCards =>
+      _thinkingToolCardStyle?.enabled ?? false;
+
+  Future<void> setCustomizeThinkingToolCards(bool enabled) async {
+    if (enabled == customizeThinkingToolCards) return;
+    await _setThinkingToolCardStyle((
+      enabled: enabled,
+      overrides: _thinkingToolCardStyle?.overrides ?? _chatBubbleStyleOverrides,
+    ));
+  }
+
+  Future<void> resetThinkingToolCardStyle() => _setThinkingToolCardStyle(null);
+
+  Future<void> _setThinkingToolCardStyle(
+    ({bool enabled, ChatBubbleStyleOverrides overrides})? value,
+  ) async {
+    if (_thinkingToolCardStyle == value) return;
+    _thinkingToolCardStyle = value;
+    final write = value == null
+        ? _preferences.remove(_thinkingToolCardStyleKey)
+        : _preferences.setString(
+            _thinkingToolCardStyleKey,
+            jsonEncode({
+              'enabled': value.enabled,
+              'overrides': value.overrides.toJson(),
+            }),
+          );
+    notifyListeners();
+    await write;
+  }
+
   ChatBubbleStyleOverrides get chatBubbleStyleOverrides =>
       _chatBubbleStyleOverrides;
   ChatBubbleStyleOverrides get assistantChatBubbleStyleOverrides =>
       _chatBubbleStyleOverrides;
   ChatBubbleStyleOverrides get userChatBubbleStyleOverrides =>
       _userChatBubbleStyleOverrides ?? _chatBubbleStyleOverrides;
-  ChatBubbleStyleOverrides chatBubbleStyleOverridesFor({
-    required bool isUser,
-  }) =>
-      isUser ? userChatBubbleStyleOverrides : assistantChatBubbleStyleOverrides;
+  ChatBubbleStyleOverrides chatBubbleStyleOverridesFor(
+    ChatBubbleStyleTarget target,
+  ) => switch (target) {
+    ChatBubbleStyleTarget.user => userChatBubbleStyleOverrides,
+    ChatBubbleStyleTarget.assistant => assistantChatBubbleStyleOverrides,
+    ChatBubbleStyleTarget.thinkingToolCard => switch (_thinkingToolCardStyle) {
+      (enabled: true, :final overrides) when canCustomizeThinkingToolCards =>
+        overrides,
+      _ => assistantChatBubbleStyleOverrides,
+    },
+  };
   Future<void> setChatBubbleStyleOverrides(ChatBubbleStyleOverrides v) async {
     final assistantChanged = _chatBubbleStyleOverrides != v;
     final hadUserSplit = _userChatBubbleStyleOverrides != null;
@@ -3217,11 +3279,16 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> setChatBubbleStyleOverridesForRole({
-    required bool isUser,
-    required ChatBubbleStyleOverrides value,
-  }) async {
-    if (isUser) {
+  Future<void> setChatBubbleStyleOverridesFor(
+    ChatBubbleStyleTarget target,
+    ChatBubbleStyleOverrides value,
+  ) async {
+    if (target == ChatBubbleStyleTarget.thinkingToolCard) {
+      if (!customizeThinkingToolCards) return;
+      await _setThinkingToolCardStyle((enabled: true, overrides: value));
+      return;
+    }
+    if (target == ChatBubbleStyleTarget.user) {
       if (_userChatBubbleStyleOverrides == value) return;
       _userChatBubbleStyleOverrides = value;
       notifyListeners();
@@ -6515,6 +6582,7 @@ Requirements:
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;
+    copy._thinkingToolCardStyle = _thinkingToolCardStyle;
     copy._toolSchemaOverrides = Map<String, ToolSchemaOverride>.from(
       _toolSchemaOverrides,
     );

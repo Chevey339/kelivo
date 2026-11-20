@@ -9838,6 +9838,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Пустые строки разбивают ответ ассистента на отдельные пузыри для каждого абзаца';
 
   @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCards =>
+      'Настроить карточки рассуждений и инструментов';
+
+  @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle =>
+      'Задайте отдельный вид для рассуждений и вызовов инструментов';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle =>
       'Полупрозрачное матовое стекло';
 
@@ -9891,8 +9899,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get messageStyleSettingsPageRoleAssistant => 'Ассистент';
 
   @override
+  String get messageStyleSettingsPageRoleThinkingTool => 'Карточки';
+
+  @override
   String get messageStyleSettingsPageRoleAssistantHint =>
-      'Настройки ассистента также применяются к карточкам рассуждения, вызова инструментов и перевода.';
+      'Карточки перевода используют стиль ассистента. Карточки рассуждений и инструментов по умолчанию также используют его.';
 
   @override
   String get localSnapshotSectionTitle => 'Локальные копии';

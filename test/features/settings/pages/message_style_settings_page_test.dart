@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:syncfusion_flutter_sliders/sliders.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -8,6 +9,7 @@ import 'package:Kelivo/features/chat/widgets/frosted/frosted_surface.dart';
 import 'package:Kelivo/features/settings/pages/message_style_settings_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/theme/chat_bubble_style.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -118,6 +120,58 @@ void main() {
     expect(previewBubble('This is an assistant reply.'), findsOneWidget);
     expect(find.text('Fit assistant bubble to content'), findsOneWidget);
     expect(find.text('Split paragraphs into bubbles'), findsOneWidget);
+  });
+
+  testWidgets('split reply settings expose a separate card style preview', (
+    tester,
+  ) async {
+    final harness = await createBusinessTestHarness();
+    final settings = SettingsProvider(harness.preferences);
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setChatMessageBackgroundStyle(
+      ChatMessageBackgroundStyle.frosted,
+    );
+    await settings.setChatBubbleStyleOverrides(
+      const ChatBubbleStyleOverrides(cornerRadius: 6, blurSigma: 12),
+    );
+    await pumpPage(tester, settings: settings);
+    await tester.pumpAndSettle();
+
+    Finder switchFor(String label) => find.byWidgetPredicate(
+      (widget) => widget is IosSwitch && widget.semanticLabel == label,
+    );
+    Future<void> toggle(Finder finder) async {
+      await tester.ensureVisible(finder);
+      await tester.tap(finder);
+      await tester.pumpAndSettle();
+    }
+
+    final cardSwitch = switchFor('Customize thinking and tool cards');
+    expect(cardSwitch, findsNothing);
+    await toggle(switchFor('Split paragraphs into bubbles'));
+    expect(cardSwitch, findsOneWidget);
+    expect(find.text('Cards'), findsNothing);
+    await toggle(cardSwitch);
+    expect(find.text('Cards'), findsOneWidget);
+
+    final blurSlider = find.byType(SfSlider).first;
+    await tester.ensureVisible(blurSlider);
+    await tester.tapAt(tester.getTopLeft(blurSlider) + const Offset(30, 20));
+    await tester.pumpAndSettle();
+
+    FrostedSurface surfaceFor(String label) => tester.widget<FrostedSurface>(
+      find.ancestor(
+        of: find.text(label),
+        matching: find.byType(FrostedSurface),
+      ),
+    );
+    expect(surfaceFor('Thinking').style.blurSigma, isNot(12));
+    expect(surfaceFor('This is an assistant reply.').style.blurSigma, 12);
+
+    await toggle(cardSwitch);
+    expect(find.text('Cards'), findsNothing);
+    expect(surfaceFor('Thinking').style.blurSigma, 12);
   });
 
   testWidgets('light and dark preview labels stay after switching', (

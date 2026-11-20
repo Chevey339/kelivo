@@ -70,7 +70,9 @@ Future<MarkstreamCodeBlock> _mount(
     child: Builder(
       builder: (context) => buildSharedChatSurface(
         context,
-        isUser: user,
+        target: user
+            ? ChatBubbleStyleTarget.user
+            : ChatBubbleStyleTarget.assistant,
         borderRadius: BorderRadius.circular(16),
         padding: const EdgeInsets.all(12),
         defaultColor: user

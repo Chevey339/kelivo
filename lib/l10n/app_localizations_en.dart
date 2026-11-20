@@ -9697,6 +9697,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Blank lines break an assistant reply into one bubble per paragraph';
 
   @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCards =>
+      'Customize thinking and tool cards';
+
+  @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle =>
+      'Give thinking and tool calls their own appearance';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle =>
       'Translucent frosted glass';
 
@@ -9748,8 +9756,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageStyleSettingsPageRoleAssistant => 'Assistant';
 
   @override
+  String get messageStyleSettingsPageRoleThinkingTool => 'Cards';
+
+  @override
   String get messageStyleSettingsPageRoleAssistantHint =>
-      'Assistant settings also apply to thinking, tool-call, and translation cards.';
+      'Translation cards follow the assistant style. Thinking and tool cards follow it by default.';
 
   @override
   String get localSnapshotSectionTitle => 'Local Copies';

@@ -17395,6 +17395,18 @@ abstract class AppLocalizations {
   /// **'Blank lines break an assistant reply into one bubble per paragraph'**
   String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle;
 
+  /// Switch label in Message Style settings when a customizable style and paragraph bubbles are active. Enables a single independent visual style shared by thinking and tool-call cards.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize thinking and tool cards'**
+  String get messageStyleSettingsPageCustomizeThinkingToolCards;
+
+  /// Subtitle below the Message Style switch for editing thinking and tool-call cards independently of the assistant reply bubbles. Both card types share the same appearance settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Give thinking and tool calls their own appearance'**
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle;
+
   /// Subtitle for the Frosted background style option, describing a translucent frosted-glass look.
   ///
   /// In en, this message translates to:
@@ -17485,16 +17497,22 @@ abstract class AppLocalizations {
   /// **'User'**
   String get messageStyleSettingsPageRoleUser;
 
-  /// Right segment label selecting the Assistant role when editing message style.
+  /// Segment label for editing the visual style of assistant replies in Message Style settings.
   ///
   /// In en, this message translates to:
   /// **'Assistant'**
   String get messageStyleSettingsPageRoleAssistant;
 
-  /// Hint noting assistant style settings also apply to thinking, tool-call, and translation cards.
+  /// Compact segment label for editing the shared style of thinking and tool-call cards in Message Style settings. The switch above already names thinking and tools, so use a short noun equivalent to Cards if the full label would be long.
   ///
   /// In en, this message translates to:
-  /// **'Assistant settings also apply to thinking, tool-call, and translation cards.'**
+  /// **'Cards'**
+  String get messageStyleSettingsPageRoleThinkingTool;
+
+  /// Hint below the Message Style target selector. Translation cards always use the assistant style, and thinking and tool-call cards use it when their own customization is off.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation cards follow the assistant style. Thinking and tool cards follow it by default.'**
   String get messageStyleSettingsPageRoleAssistantHint;
 
   /// Section header for local database snapshot/copy settings on the backup page and desktop backup pane.

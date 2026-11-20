@@ -23,8 +23,8 @@ void main() {
       settings.assistantChatBubbleStyleOverrides,
     );
     expect(
-      settings.chatBubbleStyleOverridesFor(isUser: true),
-      settings.chatBubbleStyleOverridesFor(isUser: false),
+      settings.chatBubbleStyleOverridesFor(ChatBubbleStyleTarget.user),
+      settings.chatBubbleStyleOverridesFor(ChatBubbleStyleTarget.assistant),
     );
   });
 
@@ -80,9 +80,9 @@ void main() {
         textArgbLight: 0xFFAA2200,
         cornerRadius: 20,
       );
-      await settings.setChatBubbleStyleOverridesForRole(
-        isUser: true,
-        value: user,
+      await settings.setChatBubbleStyleOverridesFor(
+        ChatBubbleStyleTarget.user,
+        user,
       );
 
       expect(
@@ -90,9 +90,12 @@ void main() {
         const ChatBubbleStyleOverrides(),
       );
       expect(settings.userChatBubbleStyleOverrides, user);
-      expect(settings.chatBubbleStyleOverridesFor(isUser: true), user);
       expect(
-        settings.chatBubbleStyleOverridesFor(isUser: false),
+        settings.chatBubbleStyleOverridesFor(ChatBubbleStyleTarget.user),
+        user,
+      );
+      expect(
+        settings.chatBubbleStyleOverridesFor(ChatBubbleStyleTarget.assistant),
         const ChatBubbleStyleOverrides(),
       );
       expect(
@@ -129,9 +132,9 @@ void main() {
       );
 
       const assistantNext = ChatBubbleStyleOverrides(cornerRadius: 2);
-      await settings.setChatBubbleStyleOverridesForRole(
-        isUser: false,
-        value: assistantNext,
+      await settings.setChatBubbleStyleOverridesFor(
+        ChatBubbleStyleTarget.assistant,
+        assistantNext,
       );
 
       expect(settings.assistantChatBubbleStyleOverrides, assistantNext);
@@ -167,13 +170,13 @@ void main() {
 
       const assistantA = ChatBubbleStyleOverrides(cornerRadius: 2);
       const assistantB = ChatBubbleStyleOverrides(cornerRadius: 4);
-      final first = settings.setChatBubbleStyleOverridesForRole(
-        isUser: false,
-        value: assistantA,
+      final first = settings.setChatBubbleStyleOverridesFor(
+        ChatBubbleStyleTarget.assistant,
+        assistantA,
       );
-      final second = settings.setChatBubbleStyleOverridesForRole(
-        isUser: false,
-        value: assistantB,
+      final second = settings.setChatBubbleStyleOverridesFor(
+        ChatBubbleStyleTarget.assistant,
+        assistantB,
       );
       await first;
       await second;
@@ -202,9 +205,9 @@ void main() {
       final harness = await createBusinessTestHarness(initial: {});
       final settings = SettingsProvider(harness.preferences);
       await settings.loaded;
-      await settings.setChatBubbleStyleOverridesForRole(
-        isUser: true,
-        value: const ChatBubbleStyleOverrides(cornerRadius: 20),
+      await settings.setChatBubbleStyleOverridesFor(
+        ChatBubbleStyleTarget.user,
+        const ChatBubbleStyleOverrides(cornerRadius: 20),
       );
 
       await settings.setChatBubbleStyleOverrides(
@@ -217,6 +220,52 @@ void main() {
         harness.preferences.getString('chat_bubble_style_overrides_user_v1'),
         isNull,
       );
+    },
+  );
+
+  test(
+    'thinking and tool card style persists through mode changes and reset',
+    () async {
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      const target = ChatBubbleStyleTarget.thinkingToolCard;
+      const assistant = ChatBubbleStyleOverrides(cornerRadius: 4);
+      const cards = ChatBubbleStyleOverrides(cornerRadius: 24);
+      await settings.setChatBubbleStyleOverrides(assistant);
+      await settings.setChatMessageBackgroundStyle(
+        ChatMessageBackgroundStyle.solid,
+      );
+      await settings.setAssistantBubbleSplitParagraphs(true);
+
+      expect(settings.customizeThinkingToolCards, isFalse);
+      expect(settings.chatBubbleStyleOverridesFor(target), assistant);
+      await settings.setCustomizeThinkingToolCards(true);
+      expect(settings.chatBubbleStyleOverridesFor(target), assistant);
+      await settings.setChatBubbleStyleOverridesFor(target, cards);
+      expect(settings.assistantChatBubbleStyleOverrides, assistant);
+      expect(settings.chatBubbleStyleOverridesFor(target), cards);
+
+      await settings.setAssistantBubbleSplitParagraphs(false);
+      expect(settings.chatBubbleStyleOverridesFor(target), assistant);
+      await settings.setAssistantBubbleSplitParagraphs(true);
+      expect(settings.chatBubbleStyleOverridesFor(target), cards);
+
+      await settings.setCustomizeThinkingToolCards(false);
+      final reloaded = SettingsProvider(harness.preferences);
+      await reloaded.loaded;
+      expect(reloaded.customizeThinkingToolCards, isFalse);
+      expect(reloaded.chatBubbleStyleOverridesFor(target), assistant);
+      await reloaded.setCustomizeThinkingToolCards(true);
+      expect(reloaded.chatBubbleStyleOverridesFor(target), cards);
+      expect(reloaded.copyWith().chatBubbleStyleOverridesFor(target), cards);
+
+      await reloaded.resetThinkingToolCardStyle();
+      final afterReset = SettingsProvider(harness.preferences);
+      await afterReset.loaded;
+      expect(afterReset.customizeThinkingToolCards, isFalse);
+      await afterReset.setCustomizeThinkingToolCards(true);
+      expect(afterReset.chatBubbleStyleOverridesFor(target), assistant);
     },
   );
 

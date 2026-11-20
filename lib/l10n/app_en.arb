@@ -4664,6 +4664,8 @@
   "messageStyleSettingsPageAssistantFitContentSubtitle": "Assistant bubbles hug their text instead of filling the row",
   "messageStyleSettingsPageAssistantSplitParagraphs": "Split paragraphs into bubbles",
   "messageStyleSettingsPageAssistantSplitParagraphsSubtitle": "Blank lines break an assistant reply into one bubble per paragraph",
+  "messageStyleSettingsPageCustomizeThinkingToolCards": "Customize thinking and tool cards",
+  "messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle": "Give thinking and tool calls their own appearance",
   "messageStyleSettingsPageStyleFrostedSubtitle": "Translucent frosted glass",
   "messageStyleSettingsPageStyleSolidSubtitle": "Opaque solid fill",
   "messageStyleSettingsPageBlur": "Blur",
@@ -4680,7 +4682,8 @@
   "messageStyleSettingsPagePreviewThinking": "Thinking",
   "messageStyleSettingsPageRoleUser": "User",
   "messageStyleSettingsPageRoleAssistant": "Assistant",
-  "messageStyleSettingsPageRoleAssistantHint": "Assistant settings also apply to thinking, tool-call, and translation cards.",
+  "messageStyleSettingsPageRoleThinkingTool": "Cards",
+  "messageStyleSettingsPageRoleAssistantHint": "Translation cards follow the assistant style. Thinking and tool cards follow it by default.",
   "localSnapshotSectionTitle": "Local Copies",
   "localSnapshotEnabledTitle": "Keep local copies",
   "localSnapshotEnabledSubtitle": "Kelivo periodically saves a copy of its database on this device, so it is never the only one.",
@@ -16587,6 +16590,12 @@
   "@messageStyleSettingsPageAssistantSplitParagraphsSubtitle": {
     "description": "Subtitle explaining that blank lines in an assistant reply create one bubble per paragraph."
   },
+  "@messageStyleSettingsPageCustomizeThinkingToolCards": {
+    "description": "Switch label in Message Style settings when a customizable style and paragraph bubbles are active. Enables a single independent visual style shared by thinking and tool-call cards."
+  },
+  "@messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle": {
+    "description": "Subtitle below the Message Style switch for editing thinking and tool-call cards independently of the assistant reply bubbles. Both card types share the same appearance settings."
+  },
   "@messageStyleSettingsPageStyleFrostedSubtitle": {
     "description": "Subtitle for the Frosted background style option, describing a translucent frosted-glass look."
   },
@@ -16633,10 +16642,13 @@
     "description": "Left segment label selecting the User role when editing message style."
   },
   "@messageStyleSettingsPageRoleAssistant": {
-    "description": "Right segment label selecting the Assistant role when editing message style."
+    "description": "Segment label for editing the visual style of assistant replies in Message Style settings."
+  },
+  "@messageStyleSettingsPageRoleThinkingTool": {
+    "description": "Compact segment label for editing the shared style of thinking and tool-call cards in Message Style settings. The switch above already names thinking and tools, so use a short noun equivalent to Cards if the full label would be long."
   },
   "@messageStyleSettingsPageRoleAssistantHint": {
-    "description": "Hint noting assistant style settings also apply to thinking, tool-call, and translation cards."
+    "description": "Hint below the Message Style target selector. Translation cards always use the assistant style, and thinking and tool-call cards use it when their own customization is off."
   },
   "@localSnapshotSectionTitle": {
     "description": "Section header for local database snapshot/copy settings on the backup page and desktop backup pane."

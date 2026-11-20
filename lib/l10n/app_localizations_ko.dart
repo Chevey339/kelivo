@@ -9434,6 +9434,14 @@ class AppLocalizationsKo extends AppLocalizations {
       '어시스턴트 답변의 빈 줄마다 문단별로 하나의 말풍선으로 나눕니다';
 
   @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCards =>
+      '사고 및 도구 카드 사용자 지정';
+
+  @override
+  String get messageStyleSettingsPageCustomizeThinkingToolCardsSubtitle =>
+      '사고 및 도구 호출에 별도의 모양 적용';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '반투명 프로스트 유리';
 
   @override
@@ -9483,8 +9491,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get messageStyleSettingsPageRoleAssistant => '어시스턴트';
 
   @override
+  String get messageStyleSettingsPageRoleThinkingTool => '카드';
+
+  @override
   String get messageStyleSettingsPageRoleAssistantHint =>
-      '어시스턴트 설정은 생각, 도구 호출, 번역 카드에도 적용됩니다.';
+      '번역 카드는 어시스턴트 스타일을 따르며, 사고 및 도구 카드도 기본적으로 이를 따릅니다.';
 
   @override
   String get localSnapshotSectionTitle => '로컬 사본';

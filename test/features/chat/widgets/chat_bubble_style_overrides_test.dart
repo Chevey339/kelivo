@@ -194,16 +194,16 @@ void main() {
       await settings.loaded;
       await settings.setEnableAssistantMarkdown(false);
       await settings.setEnableUserMarkdown(false);
-      await settings.setChatBubbleStyleOverridesForRole(
-        isUser: false,
-        value: const ChatBubbleStyleOverrides(
+      await settings.setChatBubbleStyleOverridesFor(
+        ChatBubbleStyleTarget.assistant,
+        const ChatBubbleStyleOverrides(
           cornerRadius: 4,
           textArgbLight: 0xFF224466,
         ),
       );
-      await settings.setChatBubbleStyleOverridesForRole(
-        isUser: true,
-        value: const ChatBubbleStyleOverrides(
+      await settings.setChatBubbleStyleOverridesFor(
+        ChatBubbleStyleTarget.user,
+        const ChatBubbleStyleOverrides(
           cornerRadius: 20,
           textArgbLight: 0xFFAA2200,
         ),
