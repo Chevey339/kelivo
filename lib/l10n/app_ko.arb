@@ -3474,7 +3474,7 @@
   "workspaceToolsDescription": "이 작업 공간의 대화에서 사용할 수 있는 도구를 선택하세요. 변경 사항은 자동으로 저장됩니다.",
   "workspaceToolHelpShell": "작업 공간 환경에서 명령을 실행합니다.",
   "workspaceToolHelpRead": "줄 번호와 페이지 넘김으로 파일을 읽습니다.",
-  "workspaceToolHelpViewImage": "모델이 작업 공간의 이미지를 확인할 수 있게 합니다.",
+  "workspaceToolHelpViewImage": "모델이 작업 공간 이미지나 공개 URL의 이미지를 확인할 수 있도록 합니다.",
   "workspaceToolHelpWrite": "파일을 생성하거나 내용을 덮어씁니다.",
   "workspaceToolHelpEdit": "기존 파일의 특정 텍스트를 바꿉니다.",
   "workspaceToolHelpList": "디렉터리와 그 항목을 탐색합니다.",

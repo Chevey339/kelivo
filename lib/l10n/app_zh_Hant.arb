@@ -3474,7 +3474,7 @@
   "workspaceToolsDescription": "選擇此工作區的對話可以使用哪些工具，修改後自動儲存。",
   "workspaceToolHelpShell": "在工作區環境中執行命令。",
   "workspaceToolHelpRead": "按行讀取檔案內容，支援分頁。",
-  "workspaceToolHelpViewImage": "讓模型檢視工作區中的圖片內容。",
+  "workspaceToolHelpViewImage": "讓模型檢視工作區圖片或公開網址中的圖片。",
   "workspaceToolHelpWrite": "建立檔案或覆寫檔案內容。",
   "workspaceToolHelpEdit": "取代現有檔案中的指定文字。",
   "workspaceToolHelpList": "瀏覽目錄及其中的檔案。",

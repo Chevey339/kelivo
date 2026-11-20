@@ -11434,7 +11434,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get workspaceToolHelpRead => '줄 번호와 페이지 넘김으로 파일을 읽습니다.';
 
   @override
-  String get workspaceToolHelpViewImage => '모델이 작업 공간의 이미지를 확인할 수 있게 합니다.';
+  String get workspaceToolHelpViewImage =>
+      '모델이 작업 공간 이미지나 공개 URL의 이미지를 확인할 수 있도록 합니다.';
 
   @override
   String get workspaceToolHelpWrite => '파일을 생성하거나 내용을 덮어씁니다.';

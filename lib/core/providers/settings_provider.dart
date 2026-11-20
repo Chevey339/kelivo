@@ -1666,6 +1666,17 @@ class SettingsProvider extends ChangeNotifier {
 
   // Apply global proxy to Dart IO layer; provider-level proxies take precedence at call sites.
   String _lastProxySignature = '';
+
+  /// Whether the current app proxy routes requests to this destination.
+  static bool routesThroughGlobalProxy(Uri uri) {
+    final bypass = switch (HttpOverrides.current) {
+      _ProxyHttpOverrides(:final bypassRules) ||
+      _SocksProxyHttpOverrides(:final bypassRules) => bypassRules,
+      _ => null,
+    };
+    return bypass != null && !_shouldBypassProxy(uri.host, bypass);
+  }
+
   void applyGlobalProxyOverridesIfNeeded() {
     try {
       final enabled = _globalProxyEnabled;

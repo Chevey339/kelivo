@@ -5831,7 +5831,7 @@
   "workspaceToolsDescription": "Choose which tools conversations can use in this workspace. Changes are saved automatically.",
   "workspaceToolHelpShell": "Run commands in the workspace environment.",
   "workspaceToolHelpRead": "Read files with line numbers and paging.",
-  "workspaceToolHelpViewImage": "Let the model inspect an image from the workspace.",
+  "workspaceToolHelpViewImage": "Let the model inspect workspace images or images at public URLs.",
   "workspaceToolHelpWrite": "Create files or overwrite their contents.",
   "workspaceToolHelpEdit": "Replace specific text in an existing file.",
   "workspaceToolHelpList": "Browse directories and their entries.",
@@ -18168,7 +18168,7 @@
     "description": "Description for the 'read_file' tool: reads file contents by line with paging support."
   },
   "@workspaceToolHelpViewImage": {
-    "description": "Description for the 'view_image' tool: lets the model inspect an image stored in the workspace."
+    "description": "Text in the workspace Tools pane explaining that the view_image tool lets the model inspect workspace images and download images from public HTTP or HTTPS URLs."
   },
   "@workspaceToolHelpWrite": {
     "description": "Description for the 'write_file' tool: creates files or overwrites their contents."

@@ -4280,7 +4280,7 @@
   "workspaceToolsDescription": "选择此工作区的对话可以使用哪些工具，修改后自动保存。",
   "workspaceToolHelpShell": "在工作区环境中执行命令。",
   "workspaceToolHelpRead": "按行读取文件内容，支持分页。",
-  "workspaceToolHelpViewImage": "让模型查看工作区中的图片内容。",
+  "workspaceToolHelpViewImage": "让模型查看工作区图片或公网链接中的图片。",
   "workspaceToolHelpWrite": "创建文件或覆盖文件内容。",
   "workspaceToolHelpEdit": "替换已有文件中的指定文本。",
   "workspaceToolHelpList": "浏览目录及其中的文件。",

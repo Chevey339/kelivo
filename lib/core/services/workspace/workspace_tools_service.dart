@@ -24,6 +24,7 @@ import 'file_link_resolver.dart';
 import 'host_file_tools.dart';
 import 'workspace_file_access.dart';
 import 'workspace_file_coordinator.dart';
+import 'workspace_image_download.dart';
 import '../conversation_tool_permissions.dart';
 import '../../models/tool_permission_mode.dart';
 import 'output_buffer.dart';
@@ -280,14 +281,14 @@ class WorkspaceToolsService {
       _fn(
         'view_image',
         [
-          'View a local image file when visual inspection is needed. Use this for images already on disk.',
-          'Paths: ${vocab.join(', ')}. Supports PNG, JPEG, GIF, WebP, and BMP; animated images use the first frame.',
-          'Returns image content to inspect. Large images are resized to at most 2048 pixels on the longest edge.',
+          'Inspect a local image or a direct public HTTP(S) image URL.',
+          'Local paths: ${vocab.join(', ')}. Supports PNG, JPEG, GIF, WebP, and BMP; animated images use the first frame.',
+          'Returns image content to inspect. Large images are resized to at most ${ToolImage.maxLongEdge} pixels on the longest edge.',
         ],
         {
           'path': {
             'type': 'string',
-            'description': 'Local filesystem path to an image file.',
+            'description': 'Local image file path or public HTTP(S) image URL.',
           },
         },
         ['path'],
@@ -995,12 +996,26 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final resolved = await access.resolve(path, ctx.cwd);
-      ToolCallCancellation.current?.throwIfCancelled();
-      if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
-        throw const PathResolutionException('Path is outside sandbox zones');
+      final url = Uri.tryParse(path.trim());
+      ResolvedPath? resolved;
+      final ToolImage image;
+      if (url != null &&
+          url.hasAuthority &&
+          (url.isScheme('http') || url.isScheme('https'))) {
+        final bytes = await downloadWorkspaceImage(
+          url,
+          checkAccess: access.permission.check,
+        );
+        image = await ToolImage.fromNetworkBytes(bytes);
+        access.permission.check();
+      } else {
+        resolved = await access.resolve(path, ctx.cwd);
+        ToolCallCancellation.current?.throwIfCancelled();
+        if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
+          throw const PathResolutionException('Path is outside sandbox zones');
+        }
+        image = await ToolImage.read(resolved.hostPath);
       }
-      final image = await ToolImage.read(resolved.hostPath);
       ToolCallCancellation.current?.throwIfCancelled();
       final uri = await _snapshotImage(image);
       await _markToolsUsed(
@@ -1014,8 +1029,8 @@ class WorkspaceToolsService {
           ...WorkspaceToolMetadata(
             tool: tool,
             status: 'ok',
-            path: resolved.modelPath,
-            files: [_fileFor(ctx, resolved)],
+            path: resolved?.modelPath ?? path.trim(),
+            files: [if (resolved != null) _fileFor(ctx, resolved)],
           ).toJson(),
           kMcpResultMetadataKey: mcpResultMetadata([uri]),
         },

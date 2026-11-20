@@ -5,9 +5,8 @@ import 'dart:io';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/services/auth/oauth_callback.dart';
 import 'package:Kelivo/core/services/mcp/mcp_oauth_http_client.dart';
-import 'package:Kelivo/core/services/mcp/mcp_oauth_http_client_io.dart'
-    show isPublicMcpOAuthAddress;
 import 'package:Kelivo/core/services/mcp/mcp_oauth_service.dart';
+import 'package:Kelivo/core/services/network/public_internet_address.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -658,9 +657,9 @@ void main() {
   });
 
   test('OAuth discovery rejects non-public resolved addresses', () async {
-    expect(isPublicMcpOAuthAddress(InternetAddress('8.8.8.8')), isTrue);
+    expect(isPublicInternetAddress(InternetAddress('8.8.8.8')), isTrue);
     expect(
-      isPublicMcpOAuthAddress(InternetAddress('2001:4860:4860::8888')),
+      isPublicInternetAddress(InternetAddress('2001:4860:4860::8888')),
       isTrue,
     );
     for (final address in [
@@ -672,15 +671,15 @@ void main() {
       '4000::1',
     ]) {
       expect(
-        isPublicMcpOAuthAddress(InternetAddress(address)),
+        isPublicInternetAddress(InternetAddress(address)),
         isFalse,
         reason: address,
       );
     }
     final proxyFakeIp = InternetAddress('198.18.0.23');
-    expect(isPublicMcpOAuthAddress(proxyFakeIp), isFalse);
+    expect(isPublicInternetAddress(proxyFakeIp), isFalse);
     expect(
-      isPublicMcpOAuthAddress(proxyFakeIp, allowProxyFakeIp: true),
+      isPublicInternetAddress(proxyFakeIp, allowProxyFakeIp: true),
       isTrue,
     );
     await expectLater(

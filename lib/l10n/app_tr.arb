@@ -3474,7 +3474,7 @@
   "workspaceToolsDescription": "Bu çalışma alanında sohbetlerin hangi araçları kullanabileceğini seçin. Değişiklikler otomatik kaydedilir.",
   "workspaceToolHelpShell": "Çalışma alanı ortamında komut çalıştırın.",
   "workspaceToolHelpRead": "Dosyaları satır numaralarıyla ve sayfalama ile okuyun.",
-  "workspaceToolHelpViewImage": "Modelin çalışma alanındaki bir görseli incelemesine izin verin.",
+  "workspaceToolHelpViewImage": "Modelin çalışma alanındaki görselleri veya genel URL'lerdeki görselleri incelemesine izin verin.",
   "workspaceToolHelpWrite": "Dosya oluşturun veya içeriklerinin üzerine yazın.",
   "workspaceToolHelpEdit": "Mevcut bir dosyadaki belirli metni değiştirin.",
   "workspaceToolHelpList": "Dizinlere ve içeriklerine göz atın.",

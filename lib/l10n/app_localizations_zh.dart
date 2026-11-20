@@ -11247,7 +11247,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceToolHelpRead => '按行读取文件内容，支持分页。';
 
   @override
-  String get workspaceToolHelpViewImage => '让模型查看工作区中的图片内容。';
+  String get workspaceToolHelpViewImage => '让模型查看工作区图片或公网链接中的图片。';
 
   @override
   String get workspaceToolHelpWrite => '创建文件或覆盖文件内容。';
@@ -27844,7 +27844,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceToolHelpRead => '按行读取文件内容，支持分页。';
 
   @override
-  String get workspaceToolHelpViewImage => '让模型查看工作区中的图片内容。';
+  String get workspaceToolHelpViewImage => '让模型查看工作区图片或公网链接中的图片。';
 
   @override
   String get workspaceToolHelpWrite => '创建文件或覆盖文件内容。';
@@ -44453,7 +44453,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceToolHelpRead => '按行讀取檔案內容，支援分頁。';
 
   @override
-  String get workspaceToolHelpViewImage => '讓模型檢視工作區中的圖片內容。';
+  String get workspaceToolHelpViewImage => '讓模型檢視工作區圖片或公開網址中的圖片。';
 
   @override
   String get workspaceToolHelpWrite => '建立檔案或覆寫檔案內容。';

@@ -11847,7 +11847,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get workspaceToolHelpViewImage =>
-      'Modelin çalışma alanındaki bir görseli incelemesine izin verin.';
+      'Modelin çalışma alanındaki görselleri veya genel URL\'lerdeki görselleri incelemesine izin verin.';
 
   @override
   String get workspaceToolHelpWrite =>

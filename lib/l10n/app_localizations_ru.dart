@@ -11947,7 +11947,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get workspaceToolHelpViewImage =>
-      'Позволить модели просмотреть изображение из рабочей области.';
+      'Позволяет модели просматривать изображения в рабочей области или изображения по публичным URL.';
 
   @override
   String get workspaceToolHelpWrite =>

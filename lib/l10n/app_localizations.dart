@@ -20973,10 +20973,10 @@ abstract class AppLocalizations {
   /// **'Read files with line numbers and paging.'**
   String get workspaceToolHelpRead;
 
-  /// Description for the 'view_image' tool: lets the model inspect an image stored in the workspace.
+  /// Text in the workspace Tools pane explaining that the view_image tool lets the model inspect workspace images and download images from public HTTP or HTTPS URLs.
   ///
   /// In en, this message translates to:
-  /// **'Let the model inspect an image from the workspace.'**
+  /// **'Let the model inspect workspace images or images at public URLs.'**
   String get workspaceToolHelpViewImage;
 
   /// Description for the 'write_file' tool: creates files or overwrites their contents.

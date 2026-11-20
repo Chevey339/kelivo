@@ -11776,7 +11776,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceToolHelpViewImage =>
-      'Let the model inspect an image from the workspace.';
+      'Let the model inspect workspace images or images at public URLs.';
 
   @override
   String get workspaceToolHelpWrite =>
