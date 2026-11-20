@@ -1,5 +1,8 @@
 import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/core/models/image_context.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/core/services/mcp/mcp_image_snapshot.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -40,6 +43,86 @@ void main() {
       kMcpResultMetadataKey: mcpResultMetadata([image.path]),
     };
   });
+
+  test(
+    'native compaction applies exclusions to replayed tool results',
+    () async {
+      final config = ProviderConfig(
+        id: 'OpenAI',
+        enabled: true,
+        name: 'OpenAI',
+        apiKey: 'fixture',
+        baseUrl: 'https://api.openai.com/v1',
+        providerType: ProviderKind.openai,
+        useResponseApi: true,
+      );
+      const model = 'gpt-4.1';
+      final scope = responsesReplayScope(config, model);
+      final artifact = ResponsesTurnRecorder(scope).record(
+        [
+          {
+            'type': 'function_call',
+            'call_id': 'wire-call',
+            'name': 'draw',
+            'arguments': '{}',
+          },
+        ],
+        [
+          emitToolCall(
+            id: 'local-call',
+            name: 'draw',
+            arguments: {},
+            providerCallId: 'wire-call',
+          ),
+        ],
+      );
+      final history = buildResponsesHistory(
+        payload: artifact.payload,
+        scope: scope,
+        content: '',
+        toolEvents: [
+          {
+            'id': 'local-call',
+            'content': markdown,
+            'metadata': {...metadata, imageContextOwnerKey: 'assistant'},
+          },
+        ],
+      )!;
+      final entry = ChatContextImage(
+        identity: const ContextImageIdentity('assistant', 'tool:local-call'),
+        uri: image.path,
+        source: ContextImageSource.tool,
+        toolCallId: 'local-call',
+        label: 'planning diagram',
+      );
+      for (final exclude in [true, false]) {
+        final context = RequestImageContext(
+          settings: ImageContextSettings(excluded: {if (exclude) entry.key}),
+          images: [entry],
+        );
+        final body = await ChatApiService.prepareNativeCompactionBody(
+          config: config,
+          modelId: model,
+          messages: [
+            {'role': 'user', 'content': 'Draw it'},
+            for (final message in history)
+              {...message, imageContextOwnerKey: 'assistant'},
+          ],
+          imageContext: context,
+        );
+        final tool = (body['input'] as List).singleWhere(
+          (item) => item['type'] == 'function_call_output',
+        );
+        expect(tool['call_id'], 'wire-call');
+        expect(
+          jsonEncode(tool),
+          exclude ? isNot(contains(dataUrl)) : contains(dataUrl),
+        );
+        expect(context.images.map((image) => image.key), [entry.key]);
+        expect(context.lastRequestImageCount, exclude ? 0 : 1);
+      }
+    },
+  );
 
   test(
     'missing sources do not create another empty restoration result',

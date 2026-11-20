@@ -74,7 +74,13 @@ Future<Map<String, dynamic>> buildOpenAIResponsesBody(
     final sourceStart = input.length;
     try {
       if (m[carriedWireKey] case final Map wire) {
-        input.add({...Map<String, dynamic>.from(wire), carriedWireKey: true});
+        input.add({
+          ...Map<String, dynamic>.from(wire),
+          carriedWireKey: true,
+          if (m[historySourceKey] ?? m[imageContextOwnerKey]
+              case final String owner)
+            historySourceKey: owner,
+        });
         continue;
       }
       if (m[nativeCompactionMessageKey] case final Map payload) {

@@ -274,7 +274,7 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
       return _OpenAIImagesInput(prompt: prompt, imageRefs: parsed.images);
     }
 
-    final previousAssistantImage = _lastAssistantImageBefore(messages, i);
+    final previousAssistantImage = await _lastAssistantImageBefore(messages, i);
     if (previousAssistantImage == null) {
       return _OpenAIImagesInput(prompt: prompt);
     }
@@ -287,10 +287,10 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
   return _OpenAIImagesInput(prompt: prompt);
 }
 
-ImageRef? _lastAssistantImageBefore(
+Future<ImageRef?> _lastAssistantImageBefore(
   List<Map<String, dynamic>> messages,
   int beforeIndex,
-) {
+) async {
   for (int i = beforeIndex - 1; i >= 0; i--) {
     if ((messages[i]['role'] ?? '').toString() != 'assistant') continue;
     final message = messages[i];
@@ -302,37 +302,32 @@ ImageRef? _lastAssistantImageBefore(
       if (!isImageMime(mimeForInternalMediaRef(mediaRef))) continue;
       return _imageRefFromSource(mediaRef.uri, mime: mediaRef.mime);
     }
-    final images = _extractOpenAIImageRefs(message['content']);
+    final content = message['content'];
+    final images = content is List
+        ? _extractOpenAIImageRefs(content)
+        : (await parseTextAndImages(
+            (content ?? '').toString(),
+            literalText: internalLiteralText(message),
+            allowRemoteImages: true,
+            allowLocalImages: true,
+            validateRemoteImages: false,
+          )).images;
     if (images.isNotEmpty) return images.last;
   }
   return null;
 }
 
-List<ImageRef> _extractOpenAIImageRefs(dynamic content) {
-  if (content is List) {
-    final refs = <ImageRef>[];
-    for (final part in content) {
-      if (part is! Map) continue;
-      final type = (part['type'] ?? '').toString();
-      if (type == 'image_url') {
-        _addOpenAIStructuredImageRefs(refs, part['image_url']);
-      } else if (type == 'input_image' || type == 'image') {
-        _addOpenAIStructuredImageRefs(refs, part['image_url']);
-        _addOpenAIStructuredImageRefs(refs, part['input_image']);
-      }
-    }
-    return refs;
-  }
-
-  final raw = (content ?? '').toString();
-  if (raw.isEmpty) return const <ImageRef>[];
+List<ImageRef> _extractOpenAIImageRefs(List<dynamic> content) {
   final refs = <ImageRef>[];
-  // Markdown images only. Custom attachment markers are not recognized;
-  // attachments arrive via userImagePaths / multimodalInternalMediaPathsKey.
-  final markdownImage = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
-  for (final match in markdownImage.allMatches(raw)) {
-    final source = (match.group(1) ?? '').trim();
-    if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+  for (final part in content) {
+    if (part is! Map) continue;
+    final type = (part['type'] ?? '').toString();
+    if (type == 'image_url') {
+      _addOpenAIStructuredImageRefs(refs, part['image_url']);
+    } else if (type == 'input_image' || type == 'image') {
+      _addOpenAIStructuredImageRefs(refs, part['image_url']);
+      _addOpenAIStructuredImageRefs(refs, part['input_image']);
+    }
   }
   return refs;
 }

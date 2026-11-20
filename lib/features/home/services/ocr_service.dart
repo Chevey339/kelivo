@@ -23,6 +23,18 @@ class OcrPrepareSession {
   final Set<String> loadedRevisionIds = <String>{};
 
   int get artifactSize => artifactTextsByHash.length;
+
+  String cachedTextForPaths(Iterable<String> paths, String revisionId) {
+    final revision = artifactsByRevision[revisionId];
+    final text = StringBuffer();
+    for (final path in paths) {
+      final hash = hashesByPath[path];
+      if (hash == null) continue;
+      final cached = revision?[hash] ?? artifactTextsByHash[hash];
+      if (cached != null) text.writeln(cached);
+    }
+    return text.toString().trim();
+  }
 }
 
 /// OCR 图片处理服务
@@ -418,15 +430,20 @@ class OcrService {
   /// [ocrText] OCR 识别的原始文本
   ///
   /// 返回包装后的 XML 格式文本
-  String wrapOcrBlock(String ocrText) {
-    final buf = StringBuffer();
-    buf.writeln(
-      "The image_file_ocr tag contains a description of an image that the user uploaded to you, not the user's prompt.",
-    );
-    buf.writeln('<image_file_ocr>');
-    buf.writeln(ocrText.trim());
-    buf.writeln('</image_file_ocr>');
-    buf.writeln();
-    return buf.toString();
-  }
+  String wrapOcrBlock(String ocrText) => formatOcrBlock(ocrText);
+
+  static const _ocrBlockPrefix =
+      "The image_file_ocr tag contains a description of an image that the user uploaded to you, not the user's prompt.\n"
+      '<image_file_ocr>\n';
+  static final _ocrBlockPattern = RegExp(
+    '${RegExp.escape(_ocrBlockPrefix)}[\\s\\S]*?\n</image_file_ocr>',
+  );
+
+  static bool hasOcrBlock(String payload) => _ocrBlockPattern.hasMatch(payload);
+
+  static String replaceOcrBlocks(String payload, String replacement) =>
+      payload.replaceAll(_ocrBlockPattern, replacement);
+
+  static String formatOcrBlock(String text) =>
+      '$_ocrBlockPrefix${text.trim()}\n</image_file_ocr>\n\n';
 }

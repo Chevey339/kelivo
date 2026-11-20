@@ -16306,6 +16306,19 @@ class AppLocalizationsTr extends AppLocalizations {
   String get imageContextOmitted => 'Dahil edilmedi';
 
   @override
+  String get imageContextExclude => 'Bağlamdan hariç tut';
+
+  @override
+  String get imageContextRestore => 'Dışlamayı kaldır';
+
+  @override
+  String get imageContextExcluded => 'Tarafınızdan hariç tutuldu';
+
+  @override
+  String get imageContextExcludedWithOriginal =>
+      'Orijinal görsel hariç tutuldu';
+
+  @override
   String get imageContextPin => 'Görseli sabitle';
 
   @override
@@ -16331,7 +16344,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get imageContextActionsHint =>
-      'Bir görseli önceliklendirmek için sabitleyin veya yazma alanına yeniden ekleyin.';
+      'Görselleri tek tek hariç tutabilir, öncelik için sabitleyebilir veya giriş alanına yeniden ekleyebilirsiniz.';
 
   @override
   String get imageContextEmptyDescription =>

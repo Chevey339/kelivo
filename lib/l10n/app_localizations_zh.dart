@@ -15363,6 +15363,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageContextOmitted => '本轮不发送';
 
   @override
+  String get imageContextExclude => '从上下文排除';
+
+  @override
+  String get imageContextRestore => '取消排除';
+
+  @override
+  String get imageContextExcluded => '已手动排除';
+
+  @override
+  String get imageContextExcludedWithOriginal => '原图已排除';
+
+  @override
   String get imageContextPin => '固定图片';
 
   @override
@@ -15384,7 +15396,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageContextAutomaticDescription => '优先保留你上传的图片，分批收起较早的工具图片。';
 
   @override
-  String get imageContextActionsHint => '固定以优先保留，或再次添加到输入框。';
+  String get imageContextActionsHint => '可逐张排除、固定以优先保留，或再次添加到输入框。';
 
   @override
   String get imageContextEmptyDescription => '发送图片或让工具读取图片后，会显示在这里。';
@@ -31983,6 +31995,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get imageContextOmitted => '本轮不发送';
 
   @override
+  String get imageContextExclude => '从上下文排除';
+
+  @override
+  String get imageContextRestore => '取消排除';
+
+  @override
+  String get imageContextExcluded => '已手动排除';
+
+  @override
+  String get imageContextExcludedWithOriginal => '原图已排除';
+
+  @override
   String get imageContextPin => '固定图片';
 
   @override
@@ -32004,7 +32028,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get imageContextAutomaticDescription => '优先保留你上传的图片，分批收起较早的工具图片。';
 
   @override
-  String get imageContextActionsHint => '固定以优先保留，或再次添加到输入框。';
+  String get imageContextActionsHint => '可逐张排除、固定以优先保留，或再次添加到输入框。';
 
   @override
   String get imageContextEmptyDescription => '发送图片或让工具读取图片后，会显示在这里。';
@@ -48619,6 +48643,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get imageContextOmitted => '本輪不傳送';
 
   @override
+  String get imageContextExclude => '從上下文排除';
+
+  @override
+  String get imageContextRestore => '取消排除';
+
+  @override
+  String get imageContextExcluded => '已手動排除';
+
+  @override
+  String get imageContextExcludedWithOriginal => '已排除原圖';
+
+  @override
   String get imageContextPin => '固定圖片';
 
   @override
@@ -48640,7 +48676,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get imageContextAutomaticDescription => '優先保留你上傳的圖片，分批收起較早的工具圖片。';
 
   @override
-  String get imageContextActionsHint => '固定以優先保留，或再次加入輸入框。';
+  String get imageContextActionsHint => '可逐張排除、固定以優先保留，或再次加入輸入框。';
 
   @override
   String get imageContextEmptyDescription => '傳送圖片或讓工具讀取圖片後，會顯示在這裡。';

@@ -381,6 +381,7 @@ class MessageBuilderService {
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
+    Set<String> imageFilteredRevisions = const {},
     bool includeToolMessages = false,
     bool preserveToolTurns = false,
     ResponsesReplayScope? responsesScope,
@@ -394,11 +395,15 @@ class MessageBuilderService {
     void identify(Map<String, dynamic> message, String id) {
       message[imageContextOwnerKey] = id;
       if (message['role'] == 'tool') {
-        message['metadata'] = <String, dynamic>{
+        final metadata = <String, dynamic>{
           ...?(message['metadata'] as Map?)?.cast<String, dynamic>(),
           imageContextOwnerKey: id,
-          '_kelivo_image_call': message['tool_call_id'],
         };
+        metadata.putIfAbsent(
+          imageContextCallKey,
+          () => message['tool_call_id'],
+        );
+        message['metadata'] = metadata;
       }
     }
 
@@ -660,6 +665,7 @@ class MessageBuilderService {
           (plainClaudeTurn?.isEmpty ?? true) &&
           !hasClaudeToolTurn &&
           mediaRefs.isEmpty &&
+          !imageFilteredRevisions.contains(m.id) &&
           !_hasUsableAttachmentPart(m)) {
         continue;
       }
@@ -1110,6 +1116,7 @@ class MessageBuilderService {
     Assistant? assistant, {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
+    Set<String> imageFilteredRevisions = const {},
     bool sandboxDataFiles = false,
     bool nativePdfInput = false,
     bool previewOnly = false,
@@ -1188,9 +1195,10 @@ class MessageBuilderService {
           if (!nativePdfRevisionIds.contains(entry.key)) entry.key: entry.value,
     };
 
-    // Prefetch OCR only for messages that still need generation (no freeze yet).
+    // Filtered frozen prompts may reuse per-image OCR even in a preview.
     OcrPrepareSession? ocrSession;
-    if (!previewOnly && ocrActive && ocrPrefetch != null) {
+    if (ocrPrefetch != null &&
+        ((!previewOnly && ocrActive) || imageFilteredRevisions.isNotEmpty)) {
       final revisionIds = <String>[];
       final allImagePaths = <String>{};
       for (final message in apiMessages) {
@@ -1198,7 +1206,15 @@ class MessageBuilderService {
         final revisionId = (message[internalRevisionIdKey] ?? '')
             .toString()
             .trim();
-        if (frozenPrompts.containsKey(revisionId)) continue;
+        final frozen = frozenPrompts[revisionId];
+        if (frozen != null) {
+          if (!imageFilteredRevisions.contains(revisionId) ||
+              !OcrService.hasOcrBlock(frozen.payload)) {
+            continue;
+          }
+        } else if (previewOnly || !ocrActive) {
+          continue;
+        }
         final revisionForParse = revisionId;
         final chatForParse = _resolveChatMessage(
           revisionId: revisionForParse,
@@ -1412,17 +1428,51 @@ class MessageBuilderService {
         lastUserImagePaths = List<String>.of(parsedUser.imagePaths);
       }
 
-      // Reuse only the frozen prompts retained for this request.
+      final canRunOcr = !previewOnly && ocrActive && ocrHandler != null;
+      Future<String?> describeImages({bool cacheOnly = false}) async {
+        final targets = {
+          for (final path in parsedUser.imagePaths.map((p) => p.trim()))
+            if (path.isNotEmpty &&
+                !videoPaths.contains(path) &&
+                !audioPaths.contains(path))
+              path,
+        };
+        if (targets.isEmpty) return '';
+        if (cacheOnly) {
+          return ocrSession?.cachedTextForPaths(targets, revisionId);
+        }
+        return ocrHandler!(
+          targets.toList(),
+          revisionId: revisionId.isEmpty ? null : revisionId,
+          session: ocrSession,
+          requestId: conversation?.id,
+        );
+      }
+
+      String wrapOcr(String text) =>
+          (ocrTextWrapper ?? OcrService.formatOcrBlock)(text);
+
+      // Reuse the frozen text and replace only its OCR for filtered requests.
       final existing = frozenPrompts[revisionId];
       if (existing != null) {
-        final sendPayload = _legacyAwareFrozenPayload(
+        var sendPayload = _legacyAwareFrozenPayload(
           payload: existing.payload,
           carriesMemorySnapshot: existing.carriesMemorySnapshot,
           settings: settings,
         );
-        apiMessages[i]['content'] = sendPayload;
         final carriesSnapshot =
             existing.carriesMemorySnapshot && sendPayload == existing.payload;
+        if (imageFilteredRevisions.contains(revisionId) &&
+            OcrService.hasOcrBlock(sendPayload)) {
+          final text = await describeImages(cacheOnly: !canRunOcr);
+          sendPayload = OcrService.replaceOcrBlocks(
+            sendPayload,
+            text == null || text.trim().isEmpty
+                ? ''
+                : wrapOcr(text).trimRight(),
+          );
+        }
+        apiMessages[i]['content'] = sendPayload;
         if (carriesSnapshot) snapshotRevisionIds.add(revisionId);
         _tagFrozenUserPrompt(
           apiMessages[i],
@@ -1500,34 +1550,20 @@ class MessageBuilderService {
       }
 
       String merged = (filePrompts.toString() + cleanedUser).trim();
-      var canFreezePrompt = !previewOnly && canFreezeDocuments && !hasNativePdf;
+      // Image exclusions are reversible. A prompt built from only some of a
+      // revision's images must never replace its original text or OCR.
+      var canFreezePrompt =
+          !previewOnly &&
+          canFreezeDocuments &&
+          !hasNativePdf &&
+          !imageFilteredRevisions.contains(revisionId);
 
-      if (!previewOnly && ocrActive && ocrHandler != null) {
-        final ocrTargets = parsedUser.imagePaths
-            .map((p) => p.trim())
-            .where(
-              (p) =>
-                  p.isNotEmpty &&
-                  !videoPaths.contains(p) &&
-                  !audioPaths.contains(p),
-            )
-            .toSet()
-            .toList();
-        if (ocrTargets.isNotEmpty) {
-          final ocrText = await ocrHandler!(
-            ocrTargets,
-            revisionId: revisionId.isEmpty ? null : revisionId,
-            session: ocrSession,
-            requestId: conversation?.id,
-          );
-          if (ocrText == null) {
-            canFreezePrompt = false;
-          } else if (ocrText.trim().isNotEmpty) {
-            final wrapped = ocrTextWrapper != null
-                ? ocrTextWrapper!(ocrText)
-                : _defaultWrapOcrBlock(ocrText);
-            merged = (wrapped + merged).trim();
-          }
+      if (canRunOcr) {
+        final ocrText = await describeImages();
+        if (ocrText == null) {
+          canFreezePrompt = false;
+        } else if (ocrText.trim().isNotEmpty) {
+          merged = (wrapOcr(ocrText) + merged).trim();
         }
       }
 
@@ -1594,6 +1630,20 @@ class MessageBuilderService {
       message['content'] = body.isEmpty
           ? entry.value
           : '$body\n\n${entry.value}';
+    }
+
+    for (final message in apiMessages) {
+      if (imageFilteredRevisions.contains(message[imageContextOwnerKey]) &&
+          message['content'] == '' &&
+          message[internalMediaPathsKey] == null &&
+          message[multimodalInternalDocumentPathsKey] == null) {
+        message['content'] = excludedImageContextText;
+        ContextSegmentTags.replaceWithSingle(
+          message,
+          source: ContextSource.chatHistory,
+          length: excludedImageContextText.length,
+        );
+      }
     }
 
     return lastUserImagePaths ?? <String>[];
@@ -2030,19 +2080,6 @@ class MessageBuilderService {
       persistHash: true,
       snapshotKind: 'full',
     );
-  }
-
-  /// Default OCR text wrapper
-  String _defaultWrapOcrBlock(String ocrText) {
-    final buf = StringBuffer();
-    buf.writeln(
-      "The image_file_ocr tag contains a description of an image that the user uploaded to you, not the user's prompt.",
-    );
-    buf.writeln('<image_file_ocr>');
-    buf.writeln(ocrText.trim());
-    buf.writeln('</image_file_ocr>');
-    buf.writeln();
-    return buf.toString();
   }
 
   /// Inject system prompt into apiMessages.

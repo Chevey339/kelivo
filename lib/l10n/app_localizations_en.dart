@@ -16208,6 +16208,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imageContextOmitted => 'Not included';
 
   @override
+  String get imageContextExclude => 'Exclude from context';
+
+  @override
+  String get imageContextRestore => 'Remove exclusion';
+
+  @override
+  String get imageContextExcluded => 'Excluded by you';
+
+  @override
+  String get imageContextExcludedWithOriginal => 'Original image excluded';
+
+  @override
   String get imageContextPin => 'Pin image';
 
   @override
@@ -16233,7 +16245,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imageContextActionsHint =>
-      'Pin to prioritize an image, or add it to the composer again.';
+      'Exclude individual images, pin them for priority, or add them to the composer again.';
 
   @override
   String get imageContextEmptyDescription =>

@@ -6665,6 +6665,11 @@ ORDER BY m.message_order DESC LIMIT 20
         )
         .get();
     final partPayloads = <String, Map<String, List<String>>>{};
+    final messageOrdinals = {
+      for (final (index, row) in messageRows.indexed)
+        row.read<String>('id'): '$index',
+    };
+    final retainedImageOrigins = <String>{};
     // Image/file identity payloads in ordinal order (unavailable stripped).
     final attachmentPayloads = <String, List<String>>{};
     for (final part in partRows) {
@@ -6680,7 +6685,15 @@ ORDER BY m.message_order DESC LIMIT 20
       partPayloads
           .putIfAbsent(revisionId, () => {})
           .putIfAbsent(kind, () => [])
-          .add(payload);
+          .add(
+            kind == 'tool_call'
+                ? remapChatImagePayload(
+                    payload,
+                    messageOrdinals,
+                    retainedImageOrigins,
+                  )
+                : payload,
+          );
     }
     final signatureRows = await _db
         .customSelect(
@@ -6754,10 +6767,12 @@ ORDER BY m.message_order DESC LIMIT 20
               mcpRows.map((row) => row.data).toList(),
               messages,
               await _compressionFingerprint(schema, id),
-              await _imageContextFingerprint(schema, id, {
-                for (var i = 0; i < messageRows.length; i++)
-                  messageRows[i].read<String>('id'): '$i',
-              }),
+              await _imageContextFingerprint(
+                schema,
+                id,
+                messageOrdinals,
+                retainedImageOrigins,
+              ),
               await _contextFingerprintData(
                 schema,
                 id,
@@ -7035,6 +7050,8 @@ ORDER BY m.message_order DESC LIMIT 20
         messageIdMap,
         payload: sourceImages.read<String>('payload'),
       );
+    } else {
+      await _remapChatImageSources(targetId, messageIdMap);
     }
     final sourceContext = await _db
         .customSelect(

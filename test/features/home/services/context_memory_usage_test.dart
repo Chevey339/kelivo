@@ -7,6 +7,7 @@ import 'dart:io';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/core/models/context_operation.dart';
+import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/models/instruction_injection.dart';
 import 'package:Kelivo/core/models/world_book.dart';
 import 'package:Kelivo/core/services/memory/memory_prompts.dart';
@@ -41,7 +42,9 @@ import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/api/request_image_context.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
+import 'package:Kelivo/features/home/services/ocr_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -927,6 +930,96 @@ void main() {
         providerKey: 'Test',
         modelId: 'opaque',
       );
+
+  testWidgets('image exclusion replaces OCR without freezing the result', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.runAsync(() async {
+      const first = 'data:image/png;base64,YWJj';
+      const second = 'data:image/png;base64,ZGVm';
+      final message = ChatMessage(
+        id: 'with-ocr',
+        conversationId: 'one',
+        role: 'user',
+        parts: [
+          const TextPart('Describe both pictures'),
+          ImagePart(uri: first),
+          ImagePart(uri: second),
+        ],
+      );
+      await repository.putMessage(message);
+      await settings.setOcrModel('Test', 'opaque');
+      await settings.setOcrEnabled(true);
+      var ocrCalls = 0;
+      builder = MessageBuilderService(
+        chatService: chat,
+        contextProvider: context,
+        ocrHandler: (paths, {revisionId, session, requestId}) async {
+          expect(paths, [second]);
+          ocrCalls++;
+          return 'Text from second image';
+        },
+        ocrPrefetch: ({required revisionIds, required imagePaths}) async {
+          expect(imagePaths, [second]);
+          return OcrPrepareSession()
+            ..hashesByPath.addAll({first: 'first-hash', second: 'second-hash'})
+            ..artifactsByRevision[message.id] = {
+              'first-hash': 'Text from excluded image',
+              'second-hash': 'Text from second image',
+            };
+        },
+      );
+      final filtered = RequestImageContext.withoutExcludedAttachments(
+        [message],
+        {const ContextImageIdentity('with-ocr', 'part:1').key},
+      );
+      final conversation = chat.getConversation('one');
+      Future<String> sendFiltered({bool previewOnly = false}) async {
+        final api = builder.buildApiMessages(
+          messages: filtered.messages,
+          versionSelections: {},
+          currentConversation: conversation,
+          imageFilteredRevisions: filtered.affectedRevisions,
+        );
+        final paths = await builder.processUserMessagesForApi(
+          api,
+          settings,
+          null,
+          conversation: conversation,
+          sourceMessages: filtered.messages,
+          imageFilteredRevisions: filtered.affectedRevisions,
+          previewOnly: previewOnly,
+        );
+        expect(paths, [second]);
+        return api.single['content'] as String;
+      }
+
+      final remainingOcr = OcrService.formatOcrBlock('Text from second image');
+      expect(await sendFiltered(), '${remainingOcr}Describe both pictures');
+      expect(await repository.getMessagePrompt(message.id), isNull);
+
+      final originalOcr = OcrService.formatOcrBlock(
+        'Text from excluded image\nText from second image',
+      );
+      final frozen =
+          'Frozen prefix\n${originalOcr}Frozen user template\n$originalOcr';
+      await repository.putMessagePrompt(
+        revisionId: message.id,
+        conversationId: message.conversationId,
+        payload: frozen,
+        carriesMemorySnapshot: false,
+      );
+      final expected =
+          'Frozen prefix\n${remainingOcr}Frozen user template\n$remainingOcr';
+      expect(await sendFiltered(), expected);
+      expect(await sendFiltered(previewOnly: true), expected);
+      await settings.setOcrEnabled(false);
+      expect(await sendFiltered(), expected);
+      expect(ocrCalls, 2);
+      expect((await repository.getMessagePrompt(message.id))?.payload, frozen);
+    });
+  });
 
   testWidgets('image context respects models that disable remote image URLs', (
     tester,

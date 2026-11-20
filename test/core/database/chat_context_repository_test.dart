@@ -496,17 +496,37 @@ void main() {
   );
 
   test(
-    'image preferences survive fork and backup, remap pins, and delete with their conversation',
+    'image preferences survive fork and backup, remap pins and exclusions, and delete with their conversation',
     () async {
+      final originalKey = const ContextImageIdentity('u1', 'part:1').key;
+      await repo.setToolEvents('a1', [
+        {
+          'id': 'read1',
+          'name': 'view_image',
+          'content': 'Saved observation',
+          'metadata': {
+            kMcpResultMetadataKey: mcpResultMetadata([
+              'data:image/png;base64,YWJj',
+            ]),
+            'chatImage': {
+              'version': 1,
+              'sourceKey': originalKey,
+              'directAsset': true,
+              'mime': 'image/png',
+            },
+          },
+        },
+      ]);
       final settings = ImageContextSettings(
         automatic: false,
         allowRecall: true,
-        pinned: {
-          const ContextImageIdentity('u1', 'part:1').key,
-          const ContextImageIdentity('u3', 'part:0').key,
-        },
+        pinned: {originalKey, const ContextImageIdentity('u3', 'part:0').key},
       );
       await repo.saveImageContextSettings('chat', settings);
+      await repo.updateImageContextSettings(
+        'chat',
+        (current) => current.exclude(settings.pinned, true),
+      );
       final fork = (await repo.forkConversationWithVersions(
         sourceId: 'chat',
         targetRevisionId: 'a1',
@@ -518,6 +538,17 @@ void main() {
       expect(forkSettings.pinned, {
         ContextImageIdentity(forkMessages.first.id, 'part:1').key,
       });
+      expect(forkSettings.excluded, forkSettings.pinned);
+      final forkAlias = RequestImageContext.collect(
+        await repo.readImageContextHistory(fork.id),
+      ).single;
+      expect(forkAlias.materializationKey, originalKey);
+      expect(forkAlias.sourceContextKey, forkSettings.excluded.single);
+      final forkImages = await RequestImageContext(
+        settings: forkSettings,
+        images: [forkAlias],
+      ).preview();
+      expect(forkImages.single.inheritedExclusion, isTrue);
       final snapshot = File('${dir.path}/images.sqlite');
       await ChatDatabaseRepository.createConsistentSnapshot(
         sourceFile: File('${dir.path}/chat.sqlite'),
@@ -545,6 +576,20 @@ void main() {
           ContextImageIdentity(importedMessages.first.id, 'part:1').key,
           ContextImageIdentity(importedMessages[4].id, 'part:0').key,
         });
+        expect(importedSettings.excluded, importedSettings.pinned);
+        final importedAlias = RequestImageContext.collect(
+          await target.readImageContextHistory(importedId),
+        ).single;
+        expect(importedAlias.materializationKey, originalKey);
+        expect(
+          importedAlias.sourceContextKey,
+          ContextImageIdentity(importedMessages.first.id, 'part:1').key,
+        );
+        final importedImages = await RequestImageContext(
+          settings: importedSettings,
+          images: [importedAlias],
+        ).preview();
+        expect(importedImages.single.inheritedExclusion, isTrue);
         expect(
           (await target.mergeBackupSnapshot(snapshot)).importedConversations,
           0,

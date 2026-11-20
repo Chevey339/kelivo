@@ -16490,6 +16490,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get imageContextOmitted => 'Не включено';
 
   @override
+  String get imageContextExclude => 'Исключить из контекста';
+
+  @override
+  String get imageContextRestore => 'Отменить исключение';
+
+  @override
+  String get imageContextExcluded => 'Исключено вами';
+
+  @override
+  String get imageContextExcludedWithOriginal =>
+      'Исходное изображение исключено';
+
+  @override
   String get imageContextPin => 'Закрепить изображение';
 
   @override
@@ -16515,7 +16528,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get imageContextActionsHint =>
-      'Закрепите, чтобы отдать приоритет изображению, или снова добавьте его в поле ввода.';
+      'Исключайте отдельные изображения, закрепляйте их для приоритетного сохранения или снова добавляйте в поле ввода.';
 
   @override
   String get imageContextEmptyDescription =>

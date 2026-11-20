@@ -53,6 +53,28 @@ export 'stream/stream_chunk_emit.dart';
 enum BuiltInToolMode { configured, searchOnly, none }
 
 class ChatApiService {
+  static Future<Map<String, dynamic>> prepareNativeCompactionBody({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<Map<String, dynamic>>? tools,
+    RequestImageContext? imageContext,
+    bool stream = false,
+  }) {
+    Future<Map<String, dynamic>> build() async {
+      final body = await buildOpenAIResponsesBody(
+        nativeResponsesConfig(config),
+        modelId,
+        RequestHistoryContext.identify(messages),
+        tools: tools,
+        stream: stream,
+      );
+      return await imageContext?.project(body, preserveSources: true) ?? body;
+    }
+
+    return imageContext?.runFuture(build) ?? build();
+  }
+
   static Future<NativeCompactionResult> compactHistory({
     required ProviderConfig config,
     required String modelId,
@@ -90,16 +112,14 @@ class ChatApiService {
       check();
       validateNativeCompactionScope(messages, config);
       config = nativeResponsesConfig(config);
-      final body = await buildOpenAIResponsesBody(
-        config,
-        modelId,
-        RequestHistoryContext.identify(messages),
+      final projected = await prepareNativeCompactionBody(
+        config: config,
+        modelId: modelId,
+        messages: messages,
         tools: tools,
+        imageContext: imageContext,
         stream: config.oauthProvider == OAuthProvider.chatgpt,
       );
-      check();
-      final projected =
-          await imageContext?.project(body, preserveSources: true) ?? body;
       check();
       client = ProviderOAuthService.instance.authenticatedClient(
         providerHttpClient(config, cancelToken: token, logRequests: false),
@@ -120,9 +140,8 @@ class ChatApiService {
         ),
         conversationId: conversationId,
       );
-      final result = await (imageContext == null
-          ? sendCompact()
-          : imageContext.run(() => Stream.fromFuture(sendCompact())).first);
+      final result =
+          await (imageContext?.runFuture(sendCompact) ?? sendCompact());
       check();
       return result;
     } catch (_) {

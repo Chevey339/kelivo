@@ -28500,6 +28500,30 @@ abstract class AppLocalizations {
   /// **'Not included'**
   String get imageContextOmitted;
 
+  /// Tooltip on an image row action in the Image context panel. Exclude that image from subsequent model requests and conversation image recall, retaining the original image in chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude from context'**
+  String get imageContextExclude;
+
+  /// Tooltip on the image row action in the Image context panel that removes a manual exclusion. The current conversation and automatic selection rules determine when an eligible image is sent or recalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove exclusion'**
+  String get imageContextRestore;
+
+  /// Status shown beside an image in the Image context panel when the user has explicitly excluded that image from requests and conversation recall.
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded by you'**
+  String get imageContextExcluded;
+
+  /// Status and disabled action tooltip in the Image context panel for a tool-recalled copy that inherits an exclusion from the original image.
+  ///
+  /// In en, this message translates to:
+  /// **'Original image excluded'**
+  String get imageContextExcludedWithOriginal;
+
   /// Tooltip on the pin button for an image; pins it to prioritize retention.
   ///
   /// In en, this message translates to:
@@ -28542,10 +28566,10 @@ abstract class AppLocalizations {
   /// **'Keep your attachments longer and set aside older tool images.'**
   String get imageContextAutomaticDescription;
 
-  /// Hint text in the image context panel explaining pinning prioritizes retention and re-adding sends to composer.
+  /// Hint above the image rows in the Image context panel summarizing the row actions: exclude an image from model requests, pin it to prioritize retention, or add it to the composer again.
   ///
   /// In en, this message translates to:
-  /// **'Pin to prioritize an image, or add it to the composer again.'**
+  /// **'Exclude individual images, pin them for priority, or add them to the composer again.'**
   String get imageContextActionsHint;
 
   /// Empty-state hint in the image context panel telling users that sent images or tool-read images will be listed here.

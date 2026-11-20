@@ -76,6 +76,7 @@ class _PackedGenerationService extends MessageGenerationService {
     required String? assistantId,
     required String providerKey,
     required String modelId,
+    Set<String> imageFilteredRevisions = const {},
     String? requiredAttachmentMessageId,
     bool syncWorkspaceAttachments = true,
     bool persistWorldBookActivation = true,

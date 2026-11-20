@@ -149,6 +149,23 @@ void main() {
         )).allowRecall,
         !temporary,
       );
+      await chat.updateImageContextSettings(
+        conversation.id,
+        (value) => value.exclude({image.key}, true),
+      );
+      final fork = await chat.forkConversationFromMessages(
+        title: 'Selected messages',
+        assistantId: null,
+        sourceMessages: before,
+        activate: false,
+      );
+      final forkImage = RequestImageContext.collect(
+        await chat.imageContextHistory(fork.id),
+      ).single;
+      expect(forkImage.key, isNot(image.key));
+      expect((await chat.imageContextSettings(fork.id)).excluded, {
+        forkImage.key,
+      });
       await chat.clearConversationContext(conversation.id);
       expect(
         (await chat.imageContextSettings(conversation.id)).allowRecall,

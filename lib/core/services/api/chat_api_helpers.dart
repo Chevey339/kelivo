@@ -193,13 +193,14 @@ Future<ParsedTextAndImages> parseTextAndImages(
   // Custom attachment markers are intentionally not recognized here.
   // Attachments arrive via structured parts / media-path keys.
   final images = <ImageRef>[];
-  void addImage(String kind, String source, int offset) {
+  void addImage(String kind, String source, Match match) {
     final reference = imageReferences[source];
     images.add(
       ImageRef(
         reference == null ? kind : 'data',
         reference ?? source,
-        offset: offset,
+        offset: match.start,
+        endOffset: match.end,
       ),
     );
   }
@@ -296,7 +297,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
         }
         if (url.startsWith('data:')) {
           if (allowDataImages) {
-            addImage('data', url, m1.start);
+            addImage('data', url, m1);
           } else if (keepDisallowedImageText) {
             buf.write(full);
           }
@@ -315,7 +316,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
             i = m1.end;
             continue;
           }
-          addImage('url', url, m1.start);
+          addImage('url', url, m1);
           if (keepRemoteMarkdownText) {
             buf.write(full);
           }
@@ -345,7 +346,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
           i = m1.end;
           continue;
         }
-        addImage('path', url, m1.start);
+        addImage('path', url, m1);
         i = m1.end;
         continue;
       }
@@ -630,7 +631,8 @@ class ImageRef {
   final String src;
   final String? mime;
   final int? offset;
-  const ImageRef(this.kind, this.src, {this.mime, this.offset});
+  final int? endOffset;
+  const ImageRef(this.kind, this.src, {this.mime, this.offset, this.endOffset});
 }
 
 class ParsedTextAndImages {

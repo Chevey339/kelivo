@@ -15717,6 +15717,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get imageContextOmitted => '포함되지 않음';
 
   @override
+  String get imageContextExclude => '컨텍스트에서 제외';
+
+  @override
+  String get imageContextRestore => '제외 해제';
+
+  @override
+  String get imageContextExcluded => '사용자가 제외함';
+
+  @override
+  String get imageContextExcludedWithOriginal => '원본 이미지 제외됨';
+
+  @override
   String get imageContextPin => '이미지 고정';
 
   @override
@@ -15739,7 +15751,8 @@ class AppLocalizationsKo extends AppLocalizations {
       '업로드한 첨부 파일을 더 오래 유지하고 오래된 도구 이미지는 따로 보관합니다.';
 
   @override
-  String get imageContextActionsHint => '고정하여 우선 유지하거나 입력창에 다시 추가하세요.';
+  String get imageContextActionsHint =>
+      '개별 이미지를 제외하거나, 우선 유지를 위해 고정하거나, 입력창에 다시 추가할 수 있습니다.';
 
   @override
   String get imageContextEmptyDescription => '보내거나 도구가 읽은 이미지가 여기에 표시됩니다.';

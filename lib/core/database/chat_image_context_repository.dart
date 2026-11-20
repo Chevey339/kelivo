@@ -96,10 +96,20 @@ extension ChatImageContextRepository on ChatDatabaseRepository {
         );
   });
 
+  Future<ImageContextSettings> updateImageContextSettings(
+    String id,
+    ImageContextSettings Function(ImageContextSettings) update,
+  ) => _db.transaction(() async {
+    final settings = update(await readImageContextSettings(id));
+    await saveImageContextSettings(id, settings);
+    return settings;
+  });
+
   Future<Object> _imageContextFingerprint(
     String schema,
     String id,
     Map<String, String> messages,
+    Set<String> retainedOrigins,
   ) async {
     final row = await _db
         .customSelect(
@@ -115,7 +125,7 @@ extension ChatImageContextRepository on ChatDatabaseRepository {
         : ImageContextSettings.fromJson(
             jsonDecode(row.read<String>('payload')) as Map<String, dynamic>,
           );
-    return settings.remap(messages).toJson();
+    return settings.remap(messages, retainedOrigins: retainedOrigins).toJson();
   }
 
   Future<void> _copyImageContext(
@@ -129,6 +139,33 @@ extension ChatImageContextRepository on ChatDatabaseRepository {
         : ImageContextSettings.fromJson(
             jsonDecode(payload) as Map<String, dynamic>,
           );
-    await saveImageContextSettings(target, settings.remap(messages));
+    final retainedOrigins = await _remapChatImageSources(target, messages);
+    await saveImageContextSettings(
+      target,
+      settings.remap(messages, retainedOrigins: retainedOrigins),
+    );
+  }
+
+  Future<Set<String>> _remapChatImageSources(
+    String target,
+    Map<String, String> messages,
+  ) async {
+    final retainedOrigins = <String>{};
+    final observations = await _db
+        .customSelect(
+          "SELECT part_id, payload FROM message_part_rows "
+          "WHERE conversation_id = ? AND kind = 'tool_call' AND payload LIKE '%\"chatImage\"%'",
+          variables: [Variable<String>(target)],
+        )
+        .get();
+    for (final row in observations) {
+      final payload = row.read<String>('payload');
+      final mapped = remapChatImagePayload(payload, messages, retainedOrigins);
+      if (mapped == payload) continue;
+      await (_db.update(_db.messagePartRows)
+            ..where((part) => part.partId.equals(row.read<int>('part_id'))))
+          .write(MessagePartRowsCompanion(payload: Value(mapped)));
+    }
+    return retainedOrigins;
   }
 }

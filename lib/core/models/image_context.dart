@@ -16,6 +16,14 @@ class ContextImageIdentity {
   String get handle =>
       'img_${sha256.convert(utf8.encode(key)).toString().substring(0, 20)}';
 
+  static ContextImageIdentity markdown(
+    String messageId,
+    String normalizedUri,
+  ) => ContextImageIdentity(
+    messageId,
+    'markdown:${base64Url.encode(utf8.encode(normalizedUri))}',
+  );
+
   static String? remapKey(String key, Map<String, String> messages) {
     final separator = key.indexOf('|');
     if (separator < 1) return null;
@@ -31,12 +39,14 @@ class ImageContextSettings {
     this.automatic = true,
     this.allowRecall = false,
     this.pinned = const {},
+    this.excluded = const {},
   });
 
   static const entityKind = 'conversationImageContext';
   final bool automatic;
   final bool allowRecall;
   final Set<String> pinned;
+  final Set<String> excluded;
 
   factory ImageContextSettings.fromJson(Map<String, dynamic> json) =>
       ImageContextSettings(
@@ -45,32 +55,53 @@ class ImageContextSettings {
         pinned: Set.unmodifiable(
           (json['pinned'] as List? ?? const []).whereType<String>(),
         ),
+        excluded: Set.unmodifiable(
+          (json['excluded'] as List? ?? const []).whereType<String>(),
+        ),
       );
 
   Map<String, dynamic> toJson() => {
     'automatic': automatic,
     'allowRecall': allowRecall,
     'pinned': pinned.toList()..sort(),
+    if (excluded.isNotEmpty) 'excluded': excluded.toList()..sort(),
   };
 
-  ImageContextSettings remap(Map<String, String> messages) =>
-      ImageContextSettings(
-        automatic: automatic,
-        allowRecall: allowRecall,
-        pinned: {
-          for (final key in pinned)
-            if (ContextImageIdentity.remapKey(key, messages)
-                case final String mapped)
-              mapped,
-        },
-      );
+  ImageContextSettings remap(
+    Map<String, String> messages, {
+    Set<String> retainedOrigins = const {},
+  }) {
+    Set<String> remapKeys(Set<String> keys) => {
+      for (final key in keys)
+        if (ContextImageIdentity.remapKey(key, messages) case final mapped?)
+          mapped,
+    };
+    return copyWith(
+      pinned: remapKeys(pinned),
+      excluded: {
+        ...remapKeys(excluded),
+        ...excluded.intersection(retainedOrigins),
+      },
+    );
+  }
 
-  ImageContextSettings pin(String key, bool value) => ImageContextSettings(
-    automatic: automatic,
-    allowRecall: allowRecall,
-    pinned: {...pinned}
-      ..removeWhere((item) => item == key)
-      ..addAll(value ? [key] : const []),
+  ImageContextSettings copyWith({
+    bool? automatic,
+    bool? allowRecall,
+    Set<String>? pinned,
+    Set<String>? excluded,
+  }) => ImageContextSettings(
+    automatic: automatic ?? this.automatic,
+    allowRecall: allowRecall ?? this.allowRecall,
+    pinned: pinned ?? this.pinned,
+    excluded: excluded ?? this.excluded,
+  );
+
+  ImageContextSettings pin(String key, bool value) =>
+      copyWith(pinned: value ? {...pinned, key} : pinned.difference({key}));
+
+  ImageContextSettings exclude(Set<String> keys, bool value) => copyWith(
+    excluded: value ? excluded.union(keys) : excluded.difference(keys),
   );
 }
 

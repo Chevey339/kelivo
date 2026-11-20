@@ -9,6 +9,7 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/image_context.dart';
 import 'package:Kelivo/core/models/native_compaction.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/services/api/chat_api_helpers.dart';
 import 'package:Kelivo/core/services/api/request_history_context.dart';
 import 'package:Kelivo/core/services/api/tool_result_content.dart';
 import 'package:Kelivo/core/services/tools/view_image_tool.dart';
@@ -17,6 +18,7 @@ import 'package:Kelivo/core/services/api/native_input_attachments.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:Kelivo/features/home/services/context_assembly.dart';
 
 const pixels = 'data:image/png;base64,YWJj';
@@ -42,6 +44,218 @@ void main() {
       },
     ],
   };
+
+  test('manual exclusion overrides pins, replay and history recall', () async {
+    final a = image(0, source: ContextImageSource.user);
+    final b = image(1, source: ContextImageSource.user);
+    final recalled = ChatContextImage(
+      identity: const ContextImageIdentity('assistant', 'tool:read'),
+      uri: a.uri,
+      source: ContextImageSource.tool,
+      label: 'Recalled copy',
+      materializationKey: a.key,
+    );
+    final settings = ImageContextSettings(
+      automatic: false,
+      allowRecall: true,
+      pinned: {a.key},
+    );
+    final hidden = settings.exclude({a.key}, true);
+    final context = RequestImageContext(
+      settings: hidden,
+      images: [a, b, recalled],
+      latestUserId: a.identity.messageId,
+      loader: (image) async {
+        expect(image, same(b));
+        return pixels;
+      },
+    );
+    context.activeHandles.addAll([a.handle, b.handle, recalled.handle]);
+    final body = bodyFor([a.reference, b.reference, recalled.reference]);
+    final projected = await context.project(body);
+    expect(context.lastRequestImageCount, 1);
+    expect(projected['input'][0]['content'].map((part) => part['type']), [
+      'input_text',
+      'input_image',
+      'input_text',
+    ]);
+    expect(jsonEncode(projected), isNot(contains(a.handle)));
+    expect((await context.preview()).map((item) => item.excluded), [
+      true,
+      false,
+      true,
+    ]);
+    expect(context.readImage(a.handle).metadata, isNull);
+    expect(context.readImage(recalled.handle).metadata, isNull);
+    expect(context.readImage(b.handle).metadata, isNotNull);
+    expect(context.readImage('').content, isNot(contains(a.handle)));
+    expect(context.readImage('').content, isNot(contains(recalled.handle)));
+    expect(context.readImage('').content, contains(b.handle));
+
+    final restored = RequestImageContext(
+      settings: hidden.exclude({a.key}, false),
+      images: [a, b, recalled],
+      loader: (_) async => pixels,
+    );
+    await restored.project(body);
+    expect(restored.lastRequestImageCount, 3);
+    expect(restored.settings.pinned, {a.key});
+    expect(restored.readImage(a.handle).metadata, isNotNull);
+    expect(restored.readImage(a.handle, excluded: {a.key}).metadata, isNull);
+  });
+
+  test(
+    'exclusion masks only the selected attachment and its Markdown link',
+    () async {
+      const selected = 'https://example.test/first.png';
+      const other = 'https://example.test/second.png';
+      const text =
+          'Keep this `![code]($selected)`.\n![first]($selected)\n![second]($other)';
+      final message = ChatMessage(
+        id: 'user',
+        role: 'user',
+        conversationId: 'chat',
+        parts: const [
+          TextPart(text),
+          ImagePart(uri: selected),
+          ImagePart(uri: other),
+        ],
+      );
+      final key = const ContextImageIdentity('user', 'part:1').key;
+      final requestMessages = RequestImageContext.withoutExcludedAttachments(
+        [message],
+        {key},
+      );
+      expect(requestMessages.affectedRevisions, {message.id});
+      expect(requestMessages.messages.single.parts, const [
+        TextPart(text),
+        TextPart(''),
+        ImagePart(uri: other),
+      ]);
+      expect(message.parts[1], const ImagePart(uri: selected));
+      final request = [
+        {imageContextOwnerKey: message.id, 'role': 'user', 'content': text},
+        {imageContextOwnerKey: 'other-owner', 'role': 'user', 'content': text},
+      ];
+      await RequestImageContext.omitExcludedMarkdownImages(
+        request,
+        [message],
+        {key},
+      );
+      expect(
+        request.first['content'],
+        'Keep this `![code]($selected)`.\n[Image excluded from context by the user.]\n![second]($other)',
+      );
+      expect(request.last['content'], text);
+    },
+  );
+
+  test('Markdown exclusion follows the providers’ image scanner', () async {
+    final message = ChatMessage(
+      id: 'markdown',
+      role: 'user',
+      conversationId: 'chat',
+      content: 'Prefix \\![alt]($pixels) keep `![example]($pixels)`',
+    );
+    final images = await RequestImageContext.collectHistory(
+      [message],
+      parseMarkdownImages: true,
+      allowRemoteImages: true,
+    );
+    final request = [
+      {imageContextOwnerKey: message.id, 'content': message.content},
+    ];
+    await RequestImageContext.omitExcludedMarkdownImages(
+      request,
+      [message],
+      {images.single.key},
+    );
+    expect(
+      request.single['content'],
+      'Prefix \\[Image excluded from context by the user.] keep `![example]($pixels)`',
+    );
+    final outgoing = await parseTextAndImages(
+      request.single['content']!,
+      allowRemoteImages: true,
+      allowLocalImages: true,
+    );
+    expect(outgoing.images, isEmpty);
+    final replayCatalog = await RequestImageContext.collectHistory(
+      [message],
+      parseMarkdownImages: false,
+      allowRemoteImages: false,
+      excluded: {images.single.key},
+    );
+    expect(replayCatalog.single.key, images.single.key);
+  });
+
+  test('Markdown exclusion is portable while old handles still work', () async {
+    final directory = await Directory.systemTemp.createTemp('markdown_image_');
+    addTearDown(() async {
+      SandboxPathResolver.debugSetDirs();
+      await directory.delete(recursive: true);
+    });
+    Future<File> imageIn(String container) async {
+      final file = File('${directory.path}/$container/images/photo.png');
+      await file.parent.create(recursive: true);
+      return file.writeAsString('photo');
+    }
+
+    Future<ChatContextImage> observe(String uri) async =>
+        (await RequestImageContext.collectHistory(
+          [
+            ChatMessage(
+              id: 'user',
+              conversationId: 'chat',
+              role: 'user',
+              content: '![]($uri)',
+            ),
+          ],
+          parseMarkdownImages: true,
+          allowRemoteImages: false,
+        )).single;
+
+    final file = await imageIn('original');
+    SandboxPathResolver.debugSetDirs(docsDir: '${directory.path}/original');
+    final original = await observe(file.path);
+    final oldIdentity = ContextImageIdentity.markdown(
+      'user',
+      SandboxPathResolver.dedupeKey(file.path),
+    );
+    expect(original.handle, oldIdentity.handle);
+    expect(original.exclusionKey, isNot(oldIdentity.key));
+    final portable = SandboxPathResolver.canonicalize(file.path);
+    expect(
+      (await RequestImageContext(
+        settings: ImageContextSettings(pinned: {oldIdentity.key}),
+        images: [original],
+      ).preview()).single.pinned,
+      isTrue,
+    );
+
+    await imageIn('restored');
+    SandboxPathResolver.debugSetDirs(docsDir: '${directory.path}/restored');
+    final restored = await observe(portable);
+    final recalled = ChatContextImage(
+      identity: const ContextImageIdentity('assistant', 'tool:view'),
+      uri: portable,
+      source: ContextImageSource.tool,
+      label: 'Old recall result',
+      materializationKey: oldIdentity.key,
+      workspaceSnapshot: true,
+    );
+    final context = RequestImageContext(
+      settings: ImageContextSettings(
+        excluded: {original.exclusionKey},
+        allowRecall: true,
+      ),
+      images: [restored, recalled],
+    );
+    expect(restored.exclusionKey, original.exclusionKey);
+    expect((await context.preview()).last.inheritedExclusion, isTrue);
+    expect(context.readImage(restored.handle).metadata, isNull);
+    expect(context.readImage(recalled.handle).metadata, isNull);
+  });
 
   test(
     'a subsequent carry uses the original handle after editing Markdown',
@@ -261,6 +475,105 @@ void main() {
       final missingHistory = await context([other, local]).project(retained);
       expect(missingHistory['tools'], tools);
       expect(missingHistory['input'], first['input']);
+
+      final samePixels = ChatContextImage(
+        identity: const ContextImageIdentity('another-user', 'part:0'),
+        uri: local.uri,
+        source: ContextImageSource.user,
+        label: 'independent attachment',
+      );
+      final opaque = {'type': 'compaction', 'encrypted_content': 'opaque'};
+      final retainedUser = first['input'][0] as Map;
+      final exclusion = RequestImageContext(
+        settings: ImageContextSettings(excluded: {local.key}),
+        images: [local, samePixels, other],
+      );
+      final projected = await exclusion.project({
+        'input': [
+          {
+            ...retainedUser,
+            carriedWireKey: true,
+            historySourceKey: '${carriedPrefix}op:user',
+          },
+          {
+            ...retainedUser,
+            nativeCompactionWireKey: true,
+            historySourceKey: 'user',
+          },
+          {
+            ...retainedUser,
+            nativeCompactionWireKey: true,
+            historySourceKey: 'another-user',
+          },
+          {...opaque, nativeCompactionWireKey: true},
+        ],
+      });
+      final input = projected['input'] as List;
+      expect(input[0]['content'][0]['type'], 'input_text');
+      expect(input[1]['content'][0]['type'], 'input_text');
+      expect(input[2], retainedUser);
+      expect(input[3], opaque);
+      expect(exclusion.lastRequestImageCount, 1);
+      final unknownOwner = await RequestImageContext(
+        settings: ImageContextSettings(excluded: {local.key}),
+        images: [local, other],
+      ).project(retained);
+      expect(unknownOwner['input'][0]['content'][0]['type'], 'input_text');
+
+      final copy = await file.copy('${directory.path}/copy.png');
+      final duplicate = ChatContextImage(
+        identity: const ContextImageIdentity('user', 'part:1'),
+        uri: copy.path,
+        source: ContextImageSource.user,
+        label: 'same pixels from another attachment',
+      );
+      final part = (retainedUser['content'] as List).single;
+      final duplicateContext = RequestImageContext(
+        settings: ImageContextSettings(excluded: {local.key}),
+        images: [local, duplicate],
+      );
+      await duplicateContext.project({
+        'input': [
+          {
+            ...retainedUser,
+            nativeCompactionWireKey: true,
+            historySourceKey: 'user',
+            'content': [part, part],
+          },
+        ],
+      });
+      expect(duplicateContext.lastRequestImageCount, 1);
+
+      final assistant = ChatContextImage(
+        identity: const ContextImageIdentity('assistant', 'part:0'),
+        uri: file.path,
+        source: ContextImageSource.assistant,
+        label: 'assistant image appended to user turn',
+      );
+      final mixedContext = RequestImageContext(
+        settings: ImageContextSettings(excluded: {assistant.key}),
+        images: [other, assistant],
+      );
+      final userPixels =
+          'data:image/png;base64,${base64Encode(await otherFile.readAsBytes())}';
+      final mixed = await mixedContext.project({
+        'input': [
+          {
+            ...retainedUser,
+            nativeCompactionWireKey: true,
+            historySourceKey: other.identity.messageId,
+            'content': [
+              {'type': 'input_image', 'image_url': userPixels},
+              part,
+            ],
+          },
+        ],
+      });
+      expect(mixed['input'][0]['content'].map((part) => part['type']), [
+        'input_image',
+        'input_text',
+      ]);
+      expect(mixedContext.lastRequestImageCount, 1);
     },
   );
 

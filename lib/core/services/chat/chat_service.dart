@@ -4464,6 +4464,11 @@ class ChatService extends ChangeNotifier {
       active: () => false,
     );
     try {
+      final sourceImageSettings = await Future.wait(
+        {
+          for (final message in sourceMessages) message.conversationId,
+        }.map(imageContextSettings),
+      );
       final uiCopies = await _captureGenUiCopies(sourceMessages);
       final persisted = Conversation(
         title: temporary
@@ -4499,6 +4504,9 @@ class ChatService extends ChangeNotifier {
           uiCopies,
           cachedTools: cachedTools,
           cachedArtifacts: cachedArtifacts,
+          sourceImageExclusions: {
+            for (final settings in sourceImageSettings) ...settings.excluded,
+          },
         );
         await beforePublish?.call(getConversation(persisted.id)!);
       } catch (_) {
@@ -4536,6 +4544,7 @@ class ChatService extends ChangeNotifier {
     Map<String, UiRevisionTransfer> uiCopies, {
     required Map<String, List<Map<String, dynamic>>> cachedTools,
     required Map<String, Map<String, String>> cachedArtifacts,
+    required Set<String> sourceImageExclusions,
   }) async {
     final sourceIds = [
       for (final message in sourceMessages)
@@ -4561,6 +4570,7 @@ class ChatService extends ChangeNotifier {
     final messageIdMap = {
       for (final message in sourceMessages) message.id: const Uuid().v4(),
     };
+    final retainedImageOrigins = <String>{};
     for (final message in sourceMessages) {
       final forked = ChatMessage(
         id: messageIdMap[message.id],
@@ -4571,7 +4581,19 @@ class ChatService extends ChangeNotifier {
             ),
         ],
         role: message.role,
-        parts: message.parts,
+        parts: [
+          for (final part in message.parts)
+            if (part is ToolCallPart)
+              ToolCallPart(
+                remapChatImagePayload(
+                  part.payloadJson,
+                  messageIdMap,
+                  retainedImageOrigins,
+                ),
+              )
+            else
+              part,
+        ],
         timestamp: message.timestamp,
         modelId: message.modelId,
         providerId: message.providerId,
@@ -4613,7 +4635,10 @@ class ChatService extends ChangeNotifier {
           cachedTools[message.id] ??
           const [];
       if (events.isNotEmpty) {
-        await setToolEvents(forked.id, events);
+        await setToolEvents(forked.id, [
+          for (final event in events)
+            remapChatImageEvent(event, messageIdMap, retainedImageOrigins),
+        ]);
       }
       for (final kind in _providerArtifactKinds) {
         final payload =
@@ -4623,6 +4648,12 @@ class ChatService extends ChangeNotifier {
           await setProviderArtifact(forked.id, kind, payload);
         }
       }
+    }
+    final imageSettings = ImageContextSettings(
+      excluded: sourceImageExclusions,
+    ).remap(messageIdMap, retainedOrigins: retainedImageOrigins);
+    if (imageSettings.excluded.isNotEmpty) {
+      await setImageContextSettings(targetConversationId, imageSettings);
     }
     if (isTemporaryConversation(targetConversationId)) {
       _messagesCache[targetConversationId] = cloned;

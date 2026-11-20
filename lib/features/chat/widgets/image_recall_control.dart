@@ -57,14 +57,9 @@ class _ImageRecallControlState extends State<ImageRecallControl>
         assistantId: assistantId,
       );
       if (id == null) return;
-      final current = await chat.imageContextSettings(id);
-      await chat.setImageContextSettings(
+      await chat.updateImageContextSettings(
         id,
-        ImageContextSettings(
-          automatic: current.automatic,
-          allowRecall: enabled,
-          pinned: current.pinned,
-        ),
+        (settings) => settings.copyWith(allowRecall: enabled),
       );
       if (mounted &&
           widget.conversationId == conversationId &&

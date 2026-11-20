@@ -1,8 +1,6 @@
 import '../../../core/models/native_compaction.dart';
 import '../../../core/models/provider_oauth.dart';
 import '../../../core/models/carried_original.dart';
-import '../../../core/services/api/providers/openai/responses_request.dart';
-import '../../../core/services/api/request_history_context.dart';
 import '../../../core/services/api/native_compaction_context.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import '../../../core/models/message_part.dart';
@@ -1472,17 +1470,13 @@ class HomeViewModel extends ChangeNotifier {
         carryBudgetTokens: carryBudgetTokens,
         prepareNative: (selection) async {
           final prepared = await prepare(selection);
-          final body = await buildOpenAIResponsesBody(
-            nativeResponsesConfig(config),
-            model,
-            RequestHistoryContext.identify(prepared.apiMessages),
+          return ChatApiService.prepareNativeCompactionBody(
+            config: config,
+            modelId: model,
+            messages: prepared.apiMessages,
             tools: [...prepared.tools, ...prepared.mcpTools],
+            imageContext: prepared.imageContext,
           );
-          return await prepared.imageContext?.project(
-                body,
-                preserveSources: true,
-              ) ??
-              body;
         },
         automatic: automatic,
         ownsContinuation: ownsContinuation,
