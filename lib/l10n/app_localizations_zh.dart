@@ -5581,6 +5581,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageAutoSwitchTopicsTitle => '自动切换话题';
 
   @override
+  String get desktopDisplaySettingsFullWidthChatTitle => '聊天全宽显示';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      '让消息区和输入框随聊天栏的可用宽度展开。';
+
+  @override
   String get desktopDisplaySettingsTopicPositionTitle => '话题位置';
 
   @override
@@ -22182,6 +22189,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageAutoSwitchTopicsTitle => '自动切换话题';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatTitle => '聊天全宽显示';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      '让消息区和输入框随聊天栏的可用宽度展开。';
 
   @override
   String get desktopDisplaySettingsTopicPositionTitle => '话题位置';
@@ -38794,6 +38808,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageAutoSwitchTopicsTitle => '自動切換話題';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatTitle => '聊天全寬顯示';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      '讓訊息區和輸入框隨聊天欄的可用寬度展開。';
 
   @override
   String get desktopDisplaySettingsTopicPositionTitle => '主題位置';

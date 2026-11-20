@@ -299,6 +299,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayLongPasteAsFileThresholdKey =
       'display_long_paste_as_file_threshold_v1';
   static const String _desktopSendShortcutKey = 'desktop_send_shortcut_v1';
+  static const String _displayDesktopFullWidthChatKey =
+      'display_desktop_full_width_chat_v1';
   static const String _displayChatFontScaleKey = 'display_chat_font_scale_v1';
   static const String _displayAutoScrollEnabledKey =
       'display_auto_scroll_enabled_v1';
@@ -1074,6 +1076,8 @@ class SettingsProvider extends ChangeNotifier {
             .clamp(minMemoryInjectionMaxItems, maxMemoryInjectionMaxItems);
 
     // display settings
+    _desktopFullWidthChat =
+        prefs.getBool(_displayDesktopFullWidthChatKey) ?? false;
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
     _showModelIcon = prefs.getBool(_displayShowModelIconKey) ?? true;
     _showModelNameTimestamp =
@@ -5006,6 +5010,15 @@ Requirements:
     return assistant?.reasoning ?? ReasoningRequest.auto;
   }
 
+  bool _desktopFullWidthChat = false;
+  bool get desktopFullWidthChat => _desktopFullWidthChat;
+  Future<void> setDesktopFullWidthChat(bool value) async {
+    if (_desktopFullWidthChat == value) return;
+    _desktopFullWidthChat = value;
+    notifyListeners();
+    await _preferences.setBool(_displayDesktopFullWidthChatKey, value);
+  }
+
   // Display settings: user avatar and model icon visibility
   bool _showUserAvatar = true;
   bool get showUserAvatar => _showUserAvatar;
@@ -6409,6 +6422,7 @@ Requirements:
     copy._memoryMigratePromptEn = _memoryMigratePromptEn;
     copy._memoryMigrationBatchSize = _memoryMigrationBatchSize;
     copy._memoryInjectionMaxItems = _memoryInjectionMaxItems;
+    copy._desktopFullWidthChat = _desktopFullWidthChat;
     copy._showUserAvatar = _showUserAvatar;
     copy._showModelIcon = _showModelIcon;
     copy._showModelNameTimestamp = _showModelNameTimestamp;

@@ -1736,6 +1736,8 @@
   "displaySettingsPageSendShortcutEnter": "Enter",
   "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
   "displaySettingsPageAutoSwitchTopicsTitle": "주제로 자동 전환",
+  "desktopDisplaySettingsFullWidthChatTitle": "전체 너비 채팅",
+  "desktopDisplaySettingsFullWidthChatSubtitle": "메시지와 입력 상자를 채팅 영역에 맞게 확장합니다.",
   "desktopDisplaySettingsTopicPositionTitle": "주제 위치",
   "desktopDisplaySettingsTopicPositionLeft": "왼쪽",
   "desktopDisplaySettingsTopicPositionRight": "오른쪽",

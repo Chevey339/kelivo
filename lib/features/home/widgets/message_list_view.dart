@@ -120,6 +120,8 @@ class MessageListView extends StatefulWidget {
     required this.selecting,
     required this.selectedItems,
     required this.dividerPadding,
+    this.fullWidth = false,
+    this.rightOverlayWidth = 0,
     this.topContentPadding = 8,
     this.bottomContentPadding = 16,
     this.footer,
@@ -207,6 +209,8 @@ class MessageListView extends StatefulWidget {
   final bool selecting;
   final Set<String> selectedItems;
   final EdgeInsetsGeometry dividerPadding;
+  final bool fullWidth;
+  final double rightOverlayWidth;
   final double topContentPadding;
   final double bottomContentPadding;
   final String? pinnedStreamingMessageId;
@@ -1811,9 +1815,17 @@ class _MessageListViewState extends State<MessageListView> {
       conversationId: widget.messages.firstOrNull?.conversationId,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final horizontalPad =
+          final centeredPadding =
               ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
                   .clamp(0.0, double.infinity);
+          // Reuse the existing gutter for the overlay in full-width mode so
+          // narrow panes never give up any extra space.
+          final horizontalPadding = EdgeInsets.only(
+            left: widget.fullWidth ? 0 : centeredPadding,
+            right: widget.fullWidth
+                ? math.min(centeredPadding, widget.rightOverlayWidth)
+                : centeredPadding,
+          );
 
           return Builder(
             builder: (context) {
@@ -1825,11 +1837,10 @@ class _MessageListViewState extends State<MessageListView> {
                 addRepaintBoundaries: false,
                 findChildIndexCallback: _findMessageIndexByKey,
                 extentEstimation: _estimateItemExtent,
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPad,
-                  widget.topContentPadding,
-                  horizontalPad,
-                  widget.bottomContentPadding +
+                padding: horizontalPadding.copyWith(
+                  top: widget.topContentPadding,
+                  bottom:
+                      widget.bottomContentPadding +
                       (widget.isPinnedIndicatorActive ? 12 : 0),
                 ),
                 itemCount: _effectiveRenderModels.isEmpty && _hasFooter
@@ -1903,7 +1914,7 @@ class _MessageListViewState extends State<MessageListView> {
                       child: IgnorePointer(
                         child: _WindowLoadingSkeleton(
                           key: MessageListView.windowSkeletonKey,
-                          horizontalPadding: horizontalPad,
+                          horizontalPadding: horizontalPadding,
                           topPadding: widget.topContentPadding,
                         ),
                       ),
@@ -3084,7 +3095,7 @@ class _WindowLoadingSkeleton extends StatefulWidget {
     required this.topPadding,
   });
 
-  final double horizontalPadding;
+  final EdgeInsets horizontalPadding;
   final double topPadding;
 
   @override
@@ -3126,11 +3137,8 @@ class _WindowLoadingSkeletonState extends State<_WindowLoadingSkeleton>
     }
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        widget.horizontalPadding + 12,
-        widget.topPadding + 24,
-        widget.horizontalPadding + 12,
-        0,
+      padding: widget.horizontalPadding.add(
+        EdgeInsets.fromLTRB(12, widget.topPadding + 24, 12, 0),
       ),
       child: FadeTransition(
         opacity: _pulse.drive(Tween<double>(begin: 0.45, end: 1.0)),

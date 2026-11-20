@@ -2852,6 +2852,8 @@
   "displaySettingsPageSendShortcutEnter": "Enter",
   "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
   "displaySettingsPageAutoSwitchTopicsTitle": "Auto switch to Topics",
+  "desktopDisplaySettingsFullWidthChatTitle": "Full-width chat",
+  "desktopDisplaySettingsFullWidthChatSubtitle": "Expand messages and the input box to fill the chat area.",
   "desktopDisplaySettingsTopicPositionTitle": "Topic position",
   "desktopDisplaySettingsTopicPositionLeft": "Left",
   "desktopDisplaySettingsTopicPositionRight": "Right",
@@ -13384,6 +13386,12 @@
   },
   "@displaySettingsPageAutoSwitchTopicsTitle": {
     "description": "Desktop toggle label to automatically switch to the Topics view."
+  },
+  "@desktopDisplaySettingsFullWidthChatTitle": {
+    "description": "Label for the switch in desktop Display settings that removes the fixed maximum width for the message list and input box."
+  },
+  "@desktopDisplaySettingsFullWidthChatSubtitle": {
+    "description": "Tooltip beside the full-width chat switch in desktop Display settings. The chat area is the space available between the sidebars."
   },
   "@desktopDisplaySettingsTopicPositionTitle": {
     "description": "Label for choosing whether the topic list sits on the left or right."

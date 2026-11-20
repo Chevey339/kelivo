@@ -133,6 +133,34 @@ void main() {
     },
   );
 
+  test('full-width chat is searchable in desktop Display settings', () {
+    for (final platform in TargetPlatform.values) {
+      final candidate = SettingsSearchIndex(en, platform: platform);
+      final desktop = switch (platform) {
+        TargetPlatform.macOS ||
+        TargetPlatform.windows ||
+        TargetPlatform.linux => true,
+        _ => false,
+      };
+      for (final query in ['full width', '聊天宽度', '全寬']) {
+        final results = candidate
+            .search(query)
+            .where(
+              (item) => item.id == 'desktopDisplaySettingsFullWidthChatTitle',
+            );
+        if (desktop) {
+          expect(results.single.destination, SettingsSearchDestination.display);
+          expect(
+            results.single.targetLabel,
+            en.desktopDisplaySettingsFullWidthChatTitle,
+          );
+        } else {
+          expect(results, isEmpty);
+        }
+      }
+    }
+  });
+
   test(
     'native menu rollback is searchable by its appearance and destination',
     () {

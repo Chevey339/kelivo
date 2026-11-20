@@ -2027,6 +2027,8 @@
   "displaySettingsPageSendShortcutEnter": "Enter",
   "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
   "displaySettingsPageAutoSwitchTopicsTitle": "自动切换话题",
+  "desktopDisplaySettingsFullWidthChatTitle": "聊天全宽显示",
+  "desktopDisplaySettingsFullWidthChatSubtitle": "让消息区和输入框随聊天栏的可用宽度展开。",
   "desktopDisplaySettingsTopicPositionTitle": "话题位置",
   "desktopDisplaySettingsTopicPositionLeft": "左侧",
   "desktopDisplaySettingsTopicPositionRight": "右侧",

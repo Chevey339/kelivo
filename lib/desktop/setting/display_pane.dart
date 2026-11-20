@@ -31,6 +31,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   const _RowDivider(),
                   const _MessageStyleRow(),
                   const _RowDivider(),
+                  const _FullWidthChatRow(),
+                  const _RowDivider(),
                   const _AutoRetryRow(),
                   const _RowDivider(),
                   const _TopicPositionRow(),
@@ -884,6 +886,22 @@ class _MessageStyleRow extends StatelessWidget {
         display: styleLabel,
         onTap: () => showMessageStyleSettingsDialog(context),
       ),
+    );
+  }
+}
+
+class _FullWidthChatRow extends StatelessWidget {
+  const _FullWidthChatRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.desktopDisplaySettingsFullWidthChatTitle,
+      tip: l10n.desktopDisplaySettingsFullWidthChatSubtitle,
+      value: settings.desktopFullWidthChat,
+      onChanged: settings.setDesktopFullWidthChat,
     );
   }
 }

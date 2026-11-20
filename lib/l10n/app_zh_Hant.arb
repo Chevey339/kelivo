@@ -1736,6 +1736,8 @@
   "displaySettingsPageSendShortcutEnter": "Enter",
   "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
   "displaySettingsPageAutoSwitchTopicsTitle": "自動切換話題",
+  "desktopDisplaySettingsFullWidthChatTitle": "聊天全寬顯示",
+  "desktopDisplaySettingsFullWidthChatSubtitle": "讓訊息區和輸入框隨聊天欄的可用寬度展開。",
   "desktopDisplaySettingsTopicPositionTitle": "主題位置",
   "desktopDisplaySettingsTopicPositionLeft": "左側",
   "desktopDisplaySettingsTopicPositionRight": "右側",

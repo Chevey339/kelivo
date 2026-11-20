@@ -5681,6 +5681,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get displaySettingsPageAutoSwitchTopicsTitle => '주제로 자동 전환';
 
   @override
+  String get desktopDisplaySettingsFullWidthChatTitle => '전체 너비 채팅';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      '메시지와 입력 상자를 채팅 영역에 맞게 확장합니다.';
+
+  @override
   String get desktopDisplaySettingsTopicPositionTitle => '주제 위치';
 
   @override

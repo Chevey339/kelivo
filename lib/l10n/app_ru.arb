@@ -1736,6 +1736,8 @@
   "displaySettingsPageSendShortcutEnter": "Enter",
   "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
   "displaySettingsPageAutoSwitchTopicsTitle": "Автопереход к темам",
+  "desktopDisplaySettingsFullWidthChatTitle": "Чат на всю ширину",
+  "desktopDisplaySettingsFullWidthChatSubtitle": "Растянуть сообщения и поле ввода на всю доступную ширину области чата.",
   "desktopDisplaySettingsTopicPositionTitle": "Положение тем",
   "desktopDisplaySettingsTopicPositionLeft": "Слева",
   "desktopDisplaySettingsTopicPositionRight": "Справа",

@@ -22,12 +22,24 @@ class ScrollNavButtonsPanel extends StatelessWidget {
     required this.onNextMessage,
     required this.onScrollToBottom,
     this.bottomOffset = 80,
-    this.iconSize = 16,
-    this.buttonPadding = 6,
+    this.iconSize = _defaultIconSize,
+    this.buttonPadding = _defaultButtonPadding,
     this.buttonSpacing = 8,
     this.hoverEnabled = false,
     this.onHoverChanged,
   });
+
+  static const _defaultIconSize = 16.0;
+  static const _defaultButtonPadding = 6.0;
+  static const _rightMargin = 12.0;
+  static const _hoverExtraWidth = 24.0;
+
+  /// Right-edge space covered by the default panel, including its hover area.
+  static const defaultOverlayWidth =
+      _rightMargin +
+      _defaultIconSize +
+      2 * _defaultButtonPadding +
+      _hoverExtraWidth;
 
   final bool visible;
   final bool hoverEnabled;
@@ -49,7 +61,7 @@ class ScrollNavButtonsPanel extends StatelessWidget {
     ).colorScheme.onSurface.withValues(alpha: isDark ? 1.0 : 0.87);
     final buttonDiameter = iconSize + buttonPadding * 2;
     final hoverHeight = buttonDiameter * 4 + buttonSpacing * 3 + 24;
-    final hoverWidth = buttonDiameter + 24;
+    final hoverWidth = buttonDiameter + _hoverExtraWidth;
 
     return Align(
       alignment: Alignment.bottomRight,
@@ -57,7 +69,7 @@ class ScrollNavButtonsPanel extends StatelessWidget {
         top: false,
         bottom: false,
         child: Padding(
-          padding: EdgeInsets.only(right: 12, bottom: bottomOffset),
+          padding: EdgeInsets.only(right: _rightMargin, bottom: bottomOffset),
           child: MouseRegion(
             key: scrollNavHoverRegionKey,
             opaque: hoverEnabled,

@@ -5924,6 +5924,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get displaySettingsPageAutoSwitchTopicsTitle => 'Автопереход к темам';
 
   @override
+  String get desktopDisplaySettingsFullWidthChatTitle => 'Чат на всю ширину';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      'Растянуть сообщения и поле ввода на всю доступную ширину области чата.';
+
+  @override
   String get desktopDisplaySettingsTopicPositionTitle => 'Положение тем';
 
   @override

@@ -521,6 +521,14 @@ class SettingsSearchIndex {
     }
 
     // Display rows share their localized labels with the navigation anchors.
+    if (desktop) {
+      add(
+        'desktopDisplaySettingsFullWidthChatTitle',
+        SettingsSearchDestination.display,
+        (l) => l.desktopDisplaySettingsFullWidthChatTitle,
+        keywords: 'chat width full width wide layout 聊天宽度 聊天寬度 全宽 全寬 宽屏 寬螢幕',
+      );
+    }
     add(
       'displaySettingsPageLanguageTitle',
       SettingsSearchDestination.display,

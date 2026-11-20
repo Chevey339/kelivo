@@ -1325,6 +1325,13 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
+    final fullWidth =
+        !kIsWeb &&
+        _controller.isDesktopPlatform &&
+        context.watch<SettingsProvider>().desktopFullWidthChat;
+    final maxContentWidth = fullWidth
+        ? double.infinity
+        : ChatLayoutConstants.maxContentWidth;
     final bottomContentPadding = _controller.inputBarHeight + 16;
     final topContentPadding = _chatTopOverlayInset(context) + 8;
     final backgroundImageActive = _assistantBackgroundActive(context);
@@ -1348,6 +1355,7 @@ class _HomePageState extends State<HomePage>
             ),
             child: _buildMessageListView(
               context,
+              fullWidth: fullWidth,
               topContentPadding: topContentPadding,
               bottomContentPadding: bottomContentPadding,
               dividerPadding: const EdgeInsets.symmetric(
@@ -1361,7 +1369,7 @@ class _HomePageState extends State<HomePage>
       bottomOverlay: _controller.selecting
           ? ConstrainedBox(
               constraints: const BoxConstraints(
-                maxWidth: ChatLayoutConstants.maxInputWidth,
+                maxWidth: ChatLayoutConstants.maxContentWidth,
               ),
               child: _buildSelectionActionBar(context),
             )
@@ -1380,9 +1388,7 @@ class _HomePageState extends State<HomePage>
                       alignment: Alignment.bottomCenter,
                       heightFactor: 1,
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: ChatLayoutConstants.maxInputWidth,
-                        ),
+                        constraints: BoxConstraints(maxWidth: maxContentWidth),
                         child: input,
                       ),
                     );
@@ -1416,6 +1422,7 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMessageListView(
     BuildContext context, {
+    bool fullWidth = false,
     required double topContentPadding,
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
@@ -1530,6 +1537,13 @@ class _HomePageState extends State<HomePage>
       selecting: _controller.selecting,
       selectedItems: _controller.selectedItems,
       suggestions: suggestions,
+      fullWidth: fullWidth,
+      rightOverlayWidth:
+          fullWidth &&
+              settings.desktopMessageNavButtonsMode !=
+                  DesktopMessageNavButtonsMode.never
+          ? ScrollNavButtonsPanel.defaultOverlayWidth
+          : 0,
       topContentPadding: topContentPadding,
       bottomContentPadding: bottomContentPadding,
       dividerPadding: dividerPadding,

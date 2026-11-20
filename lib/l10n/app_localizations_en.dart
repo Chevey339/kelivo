@@ -5835,6 +5835,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Auto switch to Topics';
 
   @override
+  String get desktopDisplaySettingsFullWidthChatTitle => 'Full-width chat';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      'Expand messages and the input box to fill the chat area.';
+
+  @override
   String get desktopDisplaySettingsTopicPositionTitle => 'Topic position';
 
   @override
