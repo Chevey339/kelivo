@@ -1331,7 +1331,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
         return [
           TextField(
             controller: _controllers['apiKey'],
-            decoration: deco(l10n.searchServicesDialogApiKey),
+            decoration: deco(l10n.searchServicesDialogApiKeyOptional),
           ),
         ];
       case 'bing_local':
@@ -1502,10 +1502,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           ),
         );
       case 'keenable':
-        return KeenableOptions(
-          id: id,
-          apiKey: _controllers['apiKey']!.text,
-        );
+        return KeenableOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'bing_local':
       default:
         return BingLocalOptions(id: id);
@@ -2196,7 +2193,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       return [
         TextField(
           controller: _controllers['apiKey'],
-          decoration: deco(l10n.searchServicesDialogApiKey),
+          decoration: deco(l10n.searchServicesDialogApiKeyOptional),
         ),
         const SizedBox(height: 12),
         _multiKeyTile(),

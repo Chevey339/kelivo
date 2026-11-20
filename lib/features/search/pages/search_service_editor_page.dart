@@ -722,7 +722,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       return [
         field(
           key: 'apiKey',
-          label: l10n.searchServicesDialogApiKey,
+          label: l10n.searchServicesDialogApiKeyOptional,
           obscure: true,
         ),
         _buildMultiKeyEntry(context),

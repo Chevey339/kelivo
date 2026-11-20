@@ -1090,6 +1090,13 @@ final class BusinessSettingsRouter {
           strings: const {'apiKey', 'url'},
           stringLists: const {'apiKeys'},
         );
+      case 'keenable':
+        _validateKnownFields(
+          kind,
+          payload,
+          strings: const {'apiKey'},
+          stringLists: const {'apiKeys'},
+        );
       case 'zhipu':
       case 'linkup':
       case 'metaso':

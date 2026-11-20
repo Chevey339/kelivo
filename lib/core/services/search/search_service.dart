@@ -1310,11 +1310,7 @@ class YouSearchOptions extends SearchServiceOptions {
 class KeenableOptions extends SearchServiceOptions {
   final String apiKey;
 
-  KeenableOptions({
-    required super.id,
-    this.apiKey = '',
-    super.extraApiKeys,
-  });
+  KeenableOptions({required super.id, this.apiKey = '', super.extraApiKeys});
 
   @override
   Map<String, dynamic> toJson() => {

@@ -299,13 +299,8 @@ void main() {
     expect(page.content, 'Body');
   });
 
-
   test('Keenable fetches public content with the title header', () async {
-    final mock = _respond({
-      'url': _url,
-      'title': 'Post',
-      'content': 'Body',
-    });
+    final mock = _respond({'url': _url, 'title': 'Post', 'content': 'Body'});
     final page = await KeenableSearchService(client: mock.client).fetch(
       url: _url,
       commonOptions: _common,
@@ -318,6 +313,10 @@ void main() {
       startsWith(KeenableSearchService.publicFetchUrl),
     );
     expect(request.url.queryParameters['url'], _url);
+    expect(
+      request.url.queryParameters['max_chars'],
+      '$webFetchMaxContentLength',
+    );
     expect(request.headers['X-Keenable-Title'], KeenableSearchService.appTitle);
     expect(request.headers['X-API-Key'], isNull);
     expect(page.title, 'Post');

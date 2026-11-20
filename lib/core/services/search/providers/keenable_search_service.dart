@@ -30,20 +30,20 @@ class KeenableSearchService extends SearchService<KeenableOptions>
     );
   }
 
-  Map<String, String> _headers(KeenableOptions serviceOptions) {
+  // Resolve the key once per request: effectiveApiKey advances the rotator.
+  String _resolveApiKey(KeenableOptions serviceOptions) =>
+      serviceOptions.effectiveApiKey(serviceOptions.apiKey).trim();
+
+  Map<String, String> _headers(String apiKey) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'X-Keenable-Title': appTitle,
     };
-    final apiKey = serviceOptions.effectiveApiKey(serviceOptions.apiKey).trim();
     if (apiKey.isNotEmpty) {
       headers['X-API-Key'] = apiKey;
     }
     return headers;
   }
-
-  bool _hasKey(KeenableOptions serviceOptions) =>
-      serviceOptions.effectiveApiKey(serviceOptions.apiKey).trim().isNotEmpty;
 
   @override
   Future<SearchResult> search({
@@ -52,13 +52,12 @@ class KeenableSearchService extends SearchService<KeenableOptions>
     required KeenableOptions serviceOptions,
   }) async {
     try {
+      final apiKey = _resolveApiKey(serviceOptions);
       final response = await withHttpClient(
         (client) => client
             .post(
-              Uri.parse(
-                _hasKey(serviceOptions) ? keyedSearchUrl : publicSearchUrl,
-              ),
-              headers: _headers(serviceOptions),
+              Uri.parse(apiKey.isNotEmpty ? keyedSearchUrl : publicSearchUrl),
+              headers: _headers(apiKey),
               body: jsonEncode({
                 'query': query,
                 'max_results': commonOptions.resultSize,
@@ -73,15 +72,22 @@ class KeenableSearchService extends SearchService<KeenableOptions>
 
       final data = jsonDecode(response.body);
       final results = (data['results'] as List?) ?? const [];
-      final items = results.map((item) {
-        final result = (item as Map).cast<String, dynamic>();
-        return SearchResultItem(
-          title: (result['title'] ?? '').toString(),
-          url: (result['url'] ?? result['link'] ?? '').toString(),
-          text: (result['snippet'] ?? result['content'] ?? result['description'] ?? '')
-              .toString(),
-        );
-      }).where((item) => item.url.trim().isNotEmpty).toList();
+      final items = results
+          .map((item) {
+            final result = (item as Map).cast<String, dynamic>();
+            return SearchResultItem(
+              title: (result['title'] ?? '').toString(),
+              url: (result['url'] ?? result['link'] ?? '').toString(),
+              text:
+                  (result['snippet'] ??
+                          result['content'] ??
+                          result['description'] ??
+                          '')
+                      .toString(),
+            );
+          })
+          .where((item) => item.url.trim().isNotEmpty)
+          .toList();
 
       return SearchResult(items: items);
     } catch (e) {
@@ -96,11 +102,17 @@ class KeenableSearchService extends SearchService<KeenableOptions>
     required KeenableOptions serviceOptions,
   }) async {
     try {
-      final endpoint = _hasKey(serviceOptions) ? keyedFetchUrl : publicFetchUrl;
-      final uri = Uri.parse(endpoint).replace(queryParameters: {'url': url});
+      final apiKey = _resolveApiKey(serviceOptions);
+      final endpoint = apiKey.isNotEmpty ? keyedFetchUrl : publicFetchUrl;
+      final uri = Uri.parse(endpoint).replace(
+        queryParameters: {
+          'url': url,
+          'max_chars': webFetchMaxContentLength.toString(),
+        },
+      );
       final response = await withHttpClient(
         (client) => client
-            .get(uri, headers: _headers(serviceOptions))
+            .get(uri, headers: _headers(apiKey))
             .timeout(Duration(milliseconds: commonOptions.timeout)),
       );
       if (response.statusCode != 200) {
