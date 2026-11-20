@@ -1,19 +1,16 @@
 #include "webview_host.h"
 
+#include <windows.foundation.h>
 #include <wrl.h>
-
-#include <future>
-#include <iostream>
-
-#include "util/rohelper.h"
 
 using namespace Microsoft::WRL;
 
 // static
-std::unique_ptr<WebviewHost> WebviewHost::Create(
-    WebviewPlatform* platform, std::optional<std::wstring> user_data_directory,
-    std::optional<std::wstring> browser_exe_path,
-    std::optional<std::string> arguments) {
+void WebviewHost::CreateEnvironment(
+    const std::optional<std::wstring>& user_data_directory,
+    const std::optional<std::wstring>& browser_exe_path,
+    const std::optional<std::string>& arguments,
+    EnvironmentCreationCallback callback) {
   wil::com_ptr<CoreWebView2EnvironmentOptions> opts;
   if (arguments.has_value()) {
     opts = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
@@ -21,48 +18,48 @@ std::unique_ptr<WebviewHost> WebviewHost::Create(
     opts->put_AdditionalBrowserArguments(warguments.c_str());
   }
 
-  std::promise<HRESULT> result_promise;
-  wil::com_ptr<ICoreWebView2Environment> env;
-  auto result = CreateCoreWebView2EnvironmentWithOptions(
+  // WebView2 dispatches completion on the calling STA's message pump.
+  const auto result = CreateCoreWebView2EnvironmentWithOptions(
       browser_exe_path.has_value() ? browser_exe_path->c_str() : nullptr,
-      user_data_directory.has_value() ? user_data_directory->c_str() : nullptr, opts.get(),
+      user_data_directory.has_value() ? user_data_directory->c_str() : nullptr,
+      opts.get(),
       Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-          [&promise = result_promise, &ptr = env](
-              HRESULT r, ICoreWebView2Environment* env) -> HRESULT {
-            promise.set_value(r);
-            ptr.swap(env);
+          [callback](HRESULT hr, ICoreWebView2Environment* environment)
+              -> HRESULT {
+            wil::com_ptr<ICoreWebView2Environment3> environment3;
+            if (SUCCEEDED(hr) && environment) {
+              environment3 = wil::com_ptr<ICoreWebView2Environment>(environment)
+                                 .try_query<ICoreWebView2Environment3>();
+            }
+            callback(std::move(environment3));
             return S_OK;
           })
           .Get());
 
-  if (SUCCEEDED(result)) {
-    result = result_promise.get_future().get();
-    if ((SUCCEEDED(result) || result == RPC_E_CHANGED_MODE) && env) {
-      auto webview_env3 = env.try_query<ICoreWebView2Environment3>();
-      if (webview_env3) {
-        return std::unique_ptr<WebviewHost>(
-            new WebviewHost(platform, std::move(webview_env3)));
-      }
-    }
-  }
-
-  return {};
+  if (FAILED(result)) callback({});
 }
 
 WebviewHost::WebviewHost(WebviewPlatform* platform,
                          wil::com_ptr<ICoreWebView2Environment3> webview_env)
-    : webview_env_(webview_env) {
+    : webview_env_(std::move(webview_env)) {
   compositor_ = platform->graphics_context()->CreateCompositor();
+}
+
+WebviewHost::~WebviewHost() {
+  if (auto closable = compositor_.try_as<ABI::Windows::Foundation::IClosable>()) {
+    closable->Close();
+  }
 }
 
 void WebviewHost::CreateWebview(HWND hwnd, bool offscreen_only,
                                 bool owns_window, bool restricted,
                                 WebviewCreationCallback callback) {
   CreateWebViewCompositionController(
-      hwnd, [=, self = shared_from_this()](
+      hwnd, [=, host = weak_from_this()](
                 wil::com_ptr<ICoreWebView2CompositionController> controller,
                 std::unique_ptr<WebviewCreationError> error) {
-        if (controller) {
+        const auto self = host.lock();
+        if (controller && self) {
           std::unique_ptr<Webview> webview(new Webview(
               std::move(controller), self.get(), hwnd, owns_window, offscreen_only, restricted));
           if (!webview->IsValid()) {
@@ -74,6 +71,13 @@ void WebviewHost::CreateWebview(HWND hwnd, bool offscreen_only,
           }
           callback(std::move(webview), nullptr);
         } else {
+          // A late controller must not use the compositor after shutdown.
+          if (controller) {
+            if (auto view_controller =
+                    controller.try_query<ICoreWebView2Controller>()) {
+              view_controller->Close();
+            }
+          }
           if (owns_window) DestroyWindow(hwnd);
           callback(nullptr, std::move(error));
         }

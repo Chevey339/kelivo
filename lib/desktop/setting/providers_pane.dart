@@ -377,6 +377,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
         (widget.initialSelectedKey ??
         (ordered.isNotEmpty ? ordered.first.key : null));
     final selectedKey = _selectedKey;
+    final selectedName = cfgs[selectedKey]?.name;
     final rightPane = selectedKey == null
         ? const SizedBox()
         : settings.getProviderConfig(selectedKey).isOAuth
@@ -389,9 +390,13 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
         : DesktopProviderDetailPane(
             key: _detailKey,
             providerKey: selectedKey,
-            displayName: settings.getProviderConfig(selectedKey).name.isNotEmpty
-                ? settings.getProviderConfig(selectedKey).name
-                : selectedKey,
+            displayName: selectedName != null && selectedName.isNotEmpty
+                ? selectedName
+                : ordered
+                          .where((p) => p.key == selectedKey)
+                          .firstOrNull
+                          ?.name ??
+                      selectedKey,
           );
 
     return Container(
@@ -468,8 +473,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const ProviderBalanceRefreshSettings(),
                   const SizedBox(height: 8),
                   Expanded(
                     child: groupingActive
@@ -1312,7 +1315,8 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     final allSelected =
         _selectedModels.length == models.length && models.isNotEmpty;
     final hasFailedDetectedModels = _failedDetectedModels(models).isNotEmpty;
-    final filtered = _applyFilter(models, _filterCtrl.text.trim());
+    final filter = _filterCtrl.text.trim();
+    final filtered = _applyFilter(models, filter);
     final groups = _groupModels(filtered);
 
     if (cfg.isOAuth) return _buildOAuthDetails(context, cfg, groups);
@@ -2142,6 +2146,24 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                           ),
                         ),
                       const SizedBox(width: 6),
+                      if (models.length > 1 && filter.isEmpty) ...[
+                        Tooltip(
+                          message: l10n.providerDetailPageReorderModels,
+                          child: _IconBtn(
+                            icon: lucide.Lucide.ListOrdered,
+                            onTap: () {
+                              final providerKey = widget.providerKey;
+                              showDialog<void>(
+                                context: context,
+                                builder: (_) => _DesktopModelOrderDialog(
+                                  providerKey: providerKey,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       Tooltip(
                         message: l10n.providerDetailPageAddNewModelButton,
                         child: _IconBtn(
@@ -2267,11 +2289,17 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _IconBtn(
+                    IosIconButton(
                       key: ValueKey(
                         'desktop-provider-settings-${widget.providerKey}',
                       ),
                       icon: lucide.Lucide.Settings,
+                      size: 18,
+                      minSize: 28,
+                      padding: const EdgeInsets.all(5),
+                      tooltip: AppLocalizations.of(
+                        context,
+                      )!.providerDetailPageEditTooltip,
                       onTap: () => _showProviderSettingsDialog(context),
                     ),
                     if (cfg.balanceEnabled == true) ...[
@@ -2502,6 +2530,38 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
     );
   }
 
+  Future<void> _resetProviderBalance(String providerKey) async {
+    if (!mounted || providerKey != widget.providerKey) return;
+
+    final defaults = ProviderConfig.defaultsFor(
+      providerKey,
+      displayName: widget.displayName,
+    );
+    final apiPath = defaults.balanceApiPath ?? '';
+    final resultPath = defaults.balanceResultPath ?? '';
+    _syncControllerText(_balanceBodyCtrl, defaults.balanceBody);
+    _syncControllerText(_balanceApiPathCtrl, apiPath);
+    _syncControllerText(_balanceResultPathCtrl, resultPath);
+    final settings = context.read<SettingsProvider>();
+    final old = settings.getProviderConfig(
+      providerKey,
+      defaultName: widget.displayName,
+    );
+    await settings.setProviderConfig(
+      providerKey,
+      old.copyWith(
+        balanceEnabled: defaults.balanceEnabled ?? false,
+        balanceApiPath: apiPath.trim(),
+        balanceResultPath: resultPath.trim(),
+        balanceMethod: defaults.balanceMethod,
+        balanceHeaders: defaults.balanceHeaders,
+        balanceBody: defaults.balanceBody,
+        balanceRefreshInterval: null,
+        balanceRefreshOnReply: null,
+      ),
+    );
+  }
+
   Future<void> _queryProviderBalance(BuildContext context) async {
     if (_balanceLoading) return;
     final sp = context.read<SettingsProvider>();
@@ -2610,9 +2670,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
               maxHeight: MediaQuery.of(ctx).size.height * 0.82,
             ),
             child: Consumer<SettingsProvider>(
-              builder: (c, spWatch, _) {
+              builder: (_, spWatch, _) {
+                final providerKey = widget.providerKey;
                 final cfgNow = spWatch.getProviderConfig(
-                  widget.providerKey,
+                  providerKey,
                   defaultName: widget.displayName,
                 );
                 // IME-friendly sync: avoid overwriting while composing
@@ -3159,6 +3220,11 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                   ),
                                 ),
                               ),
+                              ProviderBalanceRefreshSettings(
+                                providerKey: widget.providerKey,
+                                providerDisplayName: widget.displayName,
+                                desktopRow: row,
+                              ),
                               AnimatedCrossFade(
                                 firstChild: const SizedBox.shrink(),
                                 secondChild: Padding(
@@ -3167,10 +3233,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
-                                      ProviderBalanceRefreshSettings(
-                                        providerKey: widget.providerKey,
-                                      ),
-                                      const SizedBox(height: 12),
                                       row(
                                         l10n.providerDetailPageBalanceApiPathLabel,
                                         TextField(
@@ -3309,74 +3371,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 6),
-                                            Tooltip(
-                                              message: l10n
-                                                  .providerDetailPageBalanceResetDefaultsTooltip,
-                                              child: _IconBtn(
-                                                icon: lucide.Lucide.RotateCcw,
-                                                color: cs.onSurface.withValues(
-                                                  alpha: 0.78,
-                                                ),
-                                                onTap: () async {
-                                                  _syncControllerText(
-                                                    _balanceBodyCtrl,
-                                                    balanceDefaults.balanceBody,
-                                                  );
-                                                  _syncControllerText(
-                                                    _balanceApiPathCtrl,
-                                                    balanceDefaults
-                                                            .balanceApiPath ??
-                                                        '',
-                                                  );
-                                                  _syncControllerText(
-                                                    _balanceResultPathCtrl,
-                                                    balanceDefaults
-                                                            .balanceResultPath ??
-                                                        '',
-                                                  );
-                                                  final old = spWatch
-                                                      .getProviderConfig(
-                                                        widget.providerKey,
-                                                        defaultName:
-                                                            widget.displayName,
-                                                      );
-                                                  await spWatch.setProviderConfig(
-                                                    widget.providerKey,
-                                                    old.copyWith(
-                                                      balanceMethod:
-                                                          balanceDefaults
-                                                              .balanceMethod,
-                                                      balanceHeaders:
-                                                          balanceDefaults
-                                                              .balanceHeaders,
-                                                      balanceBody:
-                                                          balanceDefaults
-                                                              .balanceBody,
-                                                      balanceEnabled:
-                                                          balanceDefaults
-                                                              .balanceEnabled ??
-                                                          false,
-                                                      balanceApiPath:
-                                                          _balanceApiPathCtrl
-                                                              .text
-                                                              .trim(),
-                                                      balanceResultPath:
-                                                          _balanceResultPathCtrl
-                                                              .text
-                                                              .trim(),
-                                                      balanceRefreshInterval:
-                                                          null,
-                                                      balanceRefreshOnReply:
-                                                          null,
-                                                    ),
-                                                  );
-                                                  if (mounted) {
-                                                    setState(() {});
-                                                  }
-                                                },
-                                              ),
-                                            ),
                                             const SizedBox(width: 4),
                                             Tooltip(
                                               message: _balanceLoading
@@ -3385,9 +3379,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                               child: _IconBtn(
                                                 icon: _balanceLoading
                                                     ? lucide.Lucide.Loader
-                                                    : lucide
-                                                          .Lucide
-                                                          .RefreshCcwDot,
+                                                    : lucide.Lucide.RefreshCw,
                                                 color: cs.primary,
                                                 onTap: () =>
                                                     _queryProviderBalance(
@@ -3397,6 +3389,11 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                                             ),
                                           ],
                                         ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ProviderBalanceResetButton(
+                                        onConfirmed: () =>
+                                            _resetProviderBalance(providerKey),
                                       ),
                                     ],
                                   ),
@@ -6447,7 +6444,7 @@ class _DialogActionButtonState extends State<_DialogActionButton> {
   }
 }
 
-class _ProviderListRow extends StatefulWidget {
+class _ProviderListRow extends StatelessWidget {
   const _ProviderListRow({
     required this.name,
     required this.keyName,
@@ -6470,25 +6467,13 @@ class _ProviderListRow extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onShare;
   final Future<void> Function()? onDelete;
-  @override
-  State<_ProviderListRow> createState() => _ProviderListRowState();
-}
 
-class _ProviderListRowState extends State<_ProviderListRow> {
-  bool _hover = false;
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hoverBg = _hover && !widget.selected
-        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
-        : Colors.transparent;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
+    return Semantics(
+      button: true,
+      selected: selected,
       child: GestureDetector(
-        onTap: widget.onTap,
         onSecondaryTapDown: (details) async {
           final items = <DesktopContextMenuItem>[
             DesktopContextMenuItem(
@@ -6496,23 +6481,23 @@ class _ProviderListRowState extends State<_ProviderListRow> {
               label: AppLocalizations.of(
                 context,
               )!.desktopProviderContextMenuShare,
-              onTap: widget.onShare,
+              onTap: onShare,
             ),
             DesktopContextMenuItem(
               icon: lucide.Lucide.Pencil,
               label: AppLocalizations.of(
                 context,
               )!.providerDetailPageEditTooltip,
-              onTap: widget.onEdit,
+              onTap: onEdit,
             ),
-            if (widget.onDelete != null)
+            if (onDelete != null)
               DesktopContextMenuItem(
                 icon: lucide.Lucide.Trash2,
                 label: AppLocalizations.of(
                   context,
                 )!.providerDetailPageDeleteProviderTooltip,
                 danger: true,
-                onTap: () => widget.onDelete?.call(),
+                onTap: () => onDelete?.call(),
               ),
           ];
           await showDesktopContextMenuAt(
@@ -6521,25 +6506,21 @@ class _ProviderListRowState extends State<_ProviderListRow> {
             items: items,
           );
         },
-        child: AnimatedContainer(
+        child: IosCardPress(
+          focusable: true,
+          haptics: false,
+          onTap: onTap,
           duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: Color.alphaBlend(hoverBg, widget.background),
-            borderRadius: BorderRadius.circular(10),
-          ),
+          baseColor: background,
+          borderRadius: BorderRadius.circular(10),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(
             children: [
-              ProviderAvatar(
-                providerKey: widget.keyName,
-                displayName: widget.name,
-                size: 22,
-              ),
+              ProviderAvatar(providerKey: keyName, displayName: name, size: 22),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  widget.name,
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -6553,9 +6534,9 @@ class _ProviderListRowState extends State<_ProviderListRow> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color:
-                      (widget.needsLogin
+                      (needsLogin
                               ? Theme.of(context).colorScheme.error
-                              : widget.enabled
+                              : enabled
                               ? context.appColors.success
                               : context.appColors.warning)
                           .withValues(alpha: 0.12),
@@ -6563,18 +6544,18 @@ class _ProviderListRowState extends State<_ProviderListRow> {
                   // No border for left list status
                 ),
                 child: Text(
-                  widget.needsLogin
+                  needsLogin
                       ? AppLocalizations.of(context)!.oauthNeedsLogin
-                      : widget.enabled
+                      : enabled
                       ? AppLocalizations.of(context)!.providersPageEnabledStatus
                       : AppLocalizations.of(
                           context,
                         )!.providersPageDisabledStatus,
                   style: TextStyle(
                     fontSize: 11,
-                    color: widget.needsLogin
+                    color: needsLogin
                         ? Theme.of(context).colorScheme.error
-                        : widget.enabled
+                        : enabled
                         ? context.appColors.success
                         : context.appColors.warning,
                     fontWeight: AppFontWeights.emphasis,
@@ -6820,6 +6801,113 @@ class _DesktopKeyRow extends StatelessWidget {
   }
 }
 
+class _DesktopModelOrderDialog extends StatefulWidget {
+  const _DesktopModelOrderDialog({required this.providerKey});
+
+  final String providerKey;
+
+  @override
+  State<_DesktopModelOrderDialog> createState() =>
+      _DesktopModelOrderDialogState();
+}
+
+class _DesktopModelOrderDialogState extends State<_DesktopModelOrderDialog> {
+  final _listKey = GlobalKey<ReorderableListState>();
+  // The original index keeps row keys stable even when a config has duplicate IDs.
+  late List<(int, String)> _rows = context
+      .read<SettingsProvider>()
+      .getProviderConfig(widget.providerKey)
+      .models
+      .indexed
+      .toList();
+  int? _draggedIndex;
+
+  void _finishDrag(int insertIndex) {
+    final oldIndex = _draggedIndex;
+    _draggedIndex = null;
+    if (oldIndex == null) return;
+
+    // The drop position still includes the original row.
+    final newIndex = insertIndex > oldIndex ? insertIndex - 1 : insertIndex;
+    if (oldIndex == newIndex) return;
+
+    // Let Flutter finish handling pointer-up before ending the drop animation.
+    // Otherwise dismissing the dialog can dispose the list before it saves.
+    scheduleMicrotask(() {
+      if (!mounted) return;
+      _listKey.currentState?.cancelReorder();
+      unawaited(_reorder(oldIndex, newIndex));
+    });
+  }
+
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    _draggedIndex = null;
+    final settings = context.read<SettingsProvider>();
+    final provider = settings.getProviderConfig(widget.providerKey);
+    if (!listEquals(provider.models, [for (final (_, id) in _rows) id])) {
+      setState(() => _rows = provider.models.indexed.toList());
+      return;
+    }
+
+    setState(() => _rows.insert(newIndex, _rows.removeAt(oldIndex)));
+    await settings.setProviderConfig(
+      widget.providerKey,
+      provider.copyWith(models: [for (final (_, id) in _rows) id]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return DesktopFormDialog(
+      constraints: const BoxConstraints(maxWidth: 560, maxHeight: 520),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DesktopFormDialogHeader(
+            title: l10n.providerDetailPageReorderModels,
+            closeTooltip: l10n.commonClose,
+            onClose: () => Navigator.of(context).pop(),
+          ),
+          Flexible(
+            child: ReorderableList(
+              key: _listKey,
+              shrinkWrap: true,
+              itemCount: _rows.length,
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+              onReorderStart: (index) => _draggedIndex = index,
+              onReorderEnd: _finishDrag,
+              onReorderItem: _reorder,
+              proxyDecorator: (child, _, animation) => ScaleTransition(
+                scale: Tween<double>(begin: 1, end: 1.02).animate(animation),
+                child: Material(
+                  color: context.overlaySurface,
+                  elevation: 3,
+                  borderRadius: BorderRadius.circular(8),
+                  child: child,
+                ),
+              ),
+              itemBuilder: (context, index) {
+                final (originalIndex, modelId) = _rows[index];
+                return _ModelRow(
+                  key: ValueKey((originalIndex, modelId)),
+                  modelId: modelId,
+                  providerKey: widget.providerKey,
+                  dragHandle: ReorderableDragStartListener(
+                    index: index,
+                    child: const _DesktopDragHandle(),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ModelGroupAccordion extends StatefulWidget {
   const _ModelGroupAccordion({
     required this.group,
@@ -6955,8 +7043,10 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
 
 class _ModelRow extends StatelessWidget {
   const _ModelRow({
+    super.key,
     required this.modelId,
     required this.providerKey,
+    this.dragHandle,
     this.isSelectionMode = false,
     this.isSelected = false,
     this.detectionErrorMessage,
@@ -6967,6 +7057,7 @@ class _ModelRow extends StatelessWidget {
   });
   final String modelId;
   final String providerKey;
+  final Widget? dragHandle;
   final bool isSelectionMode;
   final bool isSelected;
   final String? detectionErrorMessage;
@@ -6999,6 +7090,10 @@ class _ModelRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
+            if (dragHandle case final handle?) ...[
+              handle,
+              const SizedBox(width: 6),
+            ],
             if (isSelectionMode) ...[
               IosCheckbox(
                 value: isSelected,
@@ -7089,7 +7184,7 @@ class _ModelRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
-            if (!isSelectionMode)
+            if (!isSelectionMode && dragHandle == null)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

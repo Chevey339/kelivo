@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -56,4 +58,34 @@ void main() {
       expect(tester.widget<Text>(find.text('Two')).style?.color, cs.primary);
     },
   );
+
+  testWidgets('screen readers can activate only enabled segments', (
+    tester,
+  ) async {
+    final changed = <int>[];
+    final second = find.semantics.byLabel('Two');
+    for (final enabled in [true, false]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SegmentedTabs(
+              tabs: const [
+                SegmentedTab(label: 'One'),
+                SegmentedTab(label: 'Two'),
+              ],
+              index: 0,
+              enabled: enabled,
+              enableHaptics: false,
+              onChanged: changed.add,
+            ),
+          ),
+        ),
+      );
+      final data = second.evaluate().single.getSemanticsData();
+      expect(data.hasAction(SemanticsAction.tap), enabled);
+      expect(data.hasAction(SemanticsAction.longPress), isFalse);
+      if (enabled) tester.semantics.tap(second);
+    }
+    expect(changed, [1]);
+  });
 }

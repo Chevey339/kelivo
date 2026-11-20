@@ -51,6 +51,7 @@ void main() {
   test(
     'generation captures conversation speed once, and the next turn picks up edits',
     () {
+      const modelId = 'gpt-6.2-astra';
       final chat = _Chat();
       addTearDown(chat.dispose);
       void choose(ResponseSpeed speed) {
@@ -58,7 +59,7 @@ void main() {
           extras: ConversationResponseSpeed.updateExtras(
             chat.conversation.extras,
             'openai',
-            'gpt-6-astra',
+            modelId,
             speed,
           ),
         );
@@ -86,7 +87,7 @@ void main() {
         userImagePaths: const [],
         allowImagesApiRouting: false,
         providerKey: 'openai',
-        modelId: 'gpt-6-astra',
+        modelId: modelId,
         assistant: null,
         settings: _Settings(),
         supportsReasoning: true,

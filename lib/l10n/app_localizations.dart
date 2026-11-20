@@ -7813,6 +7813,18 @@ abstract class AppLocalizations {
   /// **'Send http(s) image links as-is; when off, remote links are dropped and only local images are sent'**
   String get modelSpecFormRemoteImageUrlsSubtitle;
 
+  /// Label for a switch in the model editor's request compatibility section that overrides the model's default list of available response speed tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Response speed tiers'**
+  String get modelSpecFormResponseSpeedTiers;
+
+  /// Help under the model editor's response speed tier switch. Fast and UltraFast can be enabled independently, and neither checked leaves Standard as the only available chat option. Users select the actual speed in each chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize which acceleration tiers this model offers in chats. Clear both to offer only Standard.'**
+  String get modelSpecFormResponseSpeedTiersSubtitle;
+
   /// Toggle label in request quirks controlling whether a cache_control marker is added to OpenRouter requests.
   ///
   /// In en, this message translates to:
@@ -8209,28 +8221,40 @@ abstract class AppLocalizations {
   /// **'1 hour'**
   String get providerDetailPageClaudePromptCachingTtl1h;
 
-  /// Providers settings row for the global default interval between automatic account balance queries.
+  /// Label for selecting whether to edit this provider's automatic balance refresh settings or the global defaults.
   ///
   /// In en, this message translates to:
-  /// **'Default balance refresh interval'**
-  String get providerBalanceDefaultInterval;
+  /// **'Automatic balance refresh'**
+  String get providerBalanceAutoRefresh;
 
-  /// Row in a provider account balance editor for overriding its periodic refresh interval.
+  /// Scope choice in the automatic balance refresh settings for editing overrides that apply only to the current provider.
   ///
   /// In en, this message translates to:
-  /// **'Balance refresh interval'**
+  /// **'This provider'**
+  String get providerBalanceScopeProvider;
+
+  /// Scope choice in the automatic balance refresh settings for editing defaults shared across providers.
+  ///
+  /// In en, this message translates to:
+  /// **'Global defaults'**
+  String get providerBalanceScopeGlobal;
+
+  /// Short row label in automatic balance refresh settings for choosing how often to update the balance on a timer. Shown for both the global default and the provider override.
+  ///
+  /// In en, this message translates to:
+  /// **'Timed refresh'**
   String get providerBalanceInterval;
 
-  /// Global and provider settings label. An account balance query becomes due after a final model reply.
+  /// Short row label in automatic balance refresh settings. Updates the balance after each completed model reply. Shown for both the global default and the provider override.
   ///
   /// In en, this message translates to:
-  /// **'Refresh balance after each reply'**
+  /// **'Refresh after replies'**
   String get providerBalanceRefreshOnReply;
 
-  /// Provider override option that inherits the global setting. The value is the currently effective interval or the localized on/off state.
+  /// Compact current value and picker option that uses the global automatic balance refresh setting. Keep the wording short so it fits beside the row label. The value is the currently effective interval or localized on/off state.
   ///
   /// In en, this message translates to:
-  /// **'Follow global setting ({value})'**
+  /// **'Default · {value}'**
   String providerBalanceFollowDefault(String value);
 
   /// Option disabling the selected balance refresh trigger, either the periodic interval or refresh after replies.
@@ -8341,17 +8365,23 @@ abstract class AppLocalizations {
   /// **'Checking...'**
   String get providerDetailPageBalanceQuerying;
 
-  /// Button label that resets balance settings to their defaults.
+  /// Visible action below the provider's balance settings that opens a confirmation dialog, also used as the dialog title.
   ///
   /// In en, this message translates to:
-  /// **'Reset'**
+  /// **'Restore default balance settings'**
   String get providerDetailPageBalanceResetDefaultsButton;
 
-  /// Tooltip on the reset icon button that restores default balance settings.
+  /// Warning in the provider balance reset dialog. It replaces custom request fields with the provider preset, resets whether balance queries are enabled, and makes automatic refresh inherit the global settings.
   ///
   /// In en, this message translates to:
-  /// **'Reset balance settings'**
-  String get providerDetailPageBalanceResetDefaultsTooltip;
+  /// **'This will replace this provider’s custom balance request settings, restore the default state of its balance switch, and make automatic refresh follow the global settings.'**
+  String get providerDetailPageBalanceResetConfirmMessage;
+
+  /// Confirmation button in the provider balance reset dialog. Activating it restores default balance settings for the current provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore defaults'**
+  String get providerDetailPageBalanceResetConfirmButton;
 
   /// Success message and displayed value showing the queried balance, with {value} substituted by the balance amount.
   ///
@@ -9007,6 +9037,12 @@ abstract class AppLocalizations {
   /// **'Models'**
   String get providerDetailPageModelsTitle;
 
+  /// Tooltip in the desktop provider's model toolbar and title of the dialog where users drag models into their preferred order for the chat model picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder models'**
+  String get providerDetailPageReorderModels;
+
   /// Button label that fetches/refreshes the provider's available models.
   ///
   /// In en, this message translates to:
@@ -9252,6 +9288,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scroll to bottom'**
   String get miniMapScrollToBottomTooltip;
+
+  /// Tooltip for the magnifying glass in the minimap and placeholder in its search field. Searches the current conversation and shows matching message previews inside the minimap.
+  ///
+  /// In en, this message translates to:
+  /// **'Search minimap'**
+  String get miniMapSearchHint;
+
+  /// Compact label beside a minimap search preview. The count is the total number of keyword occurrences in that single message, including occurrences outside the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 match} other{{count} matches}}'**
+  String miniMapSearchMatchCount(int count);
+
+  /// Empty state in the minimap after a completed query matches no user messages or assistant replies.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching messages'**
+  String get miniMapSearchNoResults;
+
+  /// Status inside the minimap if searching the current conversation for matching messages fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t search messages'**
+  String get miniMapSearchFailed;
 
   /// Placeholder in the search field of the current conversation’s find bar.
   ///
@@ -9505,6 +9565,30 @@ abstract class AppLocalizations {
   /// **'Region (optional, default: us-en)'**
   String get searchServicesEditDialogRegionOptional;
 
+  /// Validation error under the 4get instance address or in a desktop notification. The address must be an absolute HTTP or HTTPS base URL without a query or fragment. HTTP and HTTPS are technical terms.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an HTTP or HTTPS base URL.'**
+  String get searchServicesFourGetUrlInvalid;
+
+  /// Label for the optional upstream search engine identifier in the 4get settings form, such as ddg for DuckDuckGo. When empty, the instance chooses its default.
+  ///
+  /// In en, this message translates to:
+  /// **'Upstream engine (optional)'**
+  String get searchServicesFourGetScraperOptional;
+
+  /// Label for the optional masked 4get credential field in search service settings. Pass is the literal cookie name 'pass'. Preserve it as a name.
+  ///
+  /// In en, this message translates to:
+  /// **'Pass cookie (optional)'**
+  String get searchServicesFourGetPassOptional;
+
+  /// Help below the 4get credential field. Tell users to solve the instance's CAPTCHA when required and paste the value of the cookie whose literal name is 'pass'. Keep 'pass' lowercase and untranslated.
+  ///
+  /// In en, this message translates to:
+  /// **'If the instance requires a CAPTCHA, complete it and paste the value of the pass cookie.'**
+  String get searchServicesFourGetPassHelp;
+
   /// Section header for choosing the search provider type in the service editor.
   ///
   /// In en, this message translates to:
@@ -9516,6 +9600,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Configuration'**
   String get searchServiceEditorConfigurationTitle;
+
+  /// Tooltip and accessibility label for the button inside the search service editor that opens the icon source menu for this configured service.
+  ///
+  /// In en, this message translates to:
+  /// **'Change icon'**
+  String get searchServiceEditorChangeIcon;
+
+  /// Error shown in the search service editor when selecting or importing a custom service icon fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not use this icon. Choose another image or icon.'**
+  String get searchServiceEditorIconFailed;
 
   /// Placeholder text shown when the selected provider requires no extra configuration fields.
   ///
@@ -10440,6 +10536,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto switch to Topics'**
   String get displaySettingsPageAutoSwitchTopicsTitle;
+
+  /// Label for the switch in desktop Display settings that removes the fixed maximum width for the message list and input box.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-width chat'**
+  String get desktopDisplaySettingsFullWidthChatTitle;
+
+  /// Tooltip beside the full-width chat switch in desktop Display settings. The chat area is the space available between the sidebars.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand messages and the input box to fill the chat area.'**
+  String get desktopDisplaySettingsFullWidthChatSubtitle;
 
   /// Label for choosing whether the topic list sits on the left or right.
   ///
@@ -11959,6 +12067,12 @@ abstract class AppLocalizations {
   /// **'Privacy-respecting metasearch engine. Self-hosted instance required; no tracking.'**
   String get searchProviderSearXNGDescription;
 
+  /// Description for the 4get search provider option. The user supplies a public or self-hosted 4get instance where its search API is enabled. Preserve the brand name '4get'.
+  ///
+  /// In en, this message translates to:
+  /// **'Web search through a public or self-hosted 4get instance with the API enabled.'**
+  String get searchProviderFourGetDescription;
+
   /// Description under the Tavily search provider option noting it is an AI search API optimized for LLMs.
   ///
   /// In en, this message translates to:
@@ -12030,6 +12144,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'SearXNG'**
   String get searchServiceNameSearXNG;
+
+  /// Display name of the 4get web search provider in the search service pickers. Keep the brand spelling '4get'.
+  ///
+  /// In en, this message translates to:
+  /// **'4get'**
+  String get searchServiceNameFourGet;
 
   /// Display name for the 'linkup' search service type in the search service list and editor.
   ///
@@ -20889,10 +21009,10 @@ abstract class AppLocalizations {
   /// **'Read files with line numbers and paging.'**
   String get workspaceToolHelpRead;
 
-  /// Description for the 'view_image' tool: lets the model inspect an image stored in the workspace.
+  /// Text in the workspace Tools pane explaining that the view_image tool lets the model inspect workspace images and download images from public HTTP or HTTPS URLs.
   ///
   /// In en, this message translates to:
-  /// **'Let the model inspect an image from the workspace.'**
+  /// **'Let the model inspect workspace images or images at public URLs.'**
   String get workspaceToolHelpViewImage;
 
   /// Description for the 'write_file' tool: creates files or overwrites their contents.

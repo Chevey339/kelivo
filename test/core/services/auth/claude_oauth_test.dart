@@ -480,7 +480,7 @@ void main() {
             expect(request.headers['anthropic-beta'], 'oauth-2025-04-20');
             expect(
               request.headers['user-agent'],
-              'anthropic-sdk-typescript/0.112.1 userOAuthProvider',
+              'anthropic-sdk-typescript/0.128.0 userOAuthProvider',
             );
             expect(jsonDecode(request.body), {
               'grant_type': 'refresh_token',
@@ -601,6 +601,10 @@ void main() {
             request.headers['anthropic-beta'],
             contains('redact-thinking-2026-02-12'),
           );
+          expect(
+            request.headers['anthropic-beta'],
+            isNot(contains('mid-conversation-system-2026-04-07')),
+          );
           expect(request.headers, isNot(contains('x-api-key')));
           if (++page == 1) {
             return response({
@@ -719,8 +723,12 @@ void main() {
               isNot(contains('context-1m')),
             );
             expect(
+              request.headers['anthropic-beta'],
+              isNot(contains('mid-conversation-system-2026-04-07')),
+            );
+            expect(
               request.headers['user-agent'],
-              'claude-cli/2.1.280 (external, cli)',
+              'claude-cli/2.1.326 (external, cli)',
             );
             calls++;
             if (calls == 1) {
@@ -796,8 +804,8 @@ void main() {
   // Generated independently with Python hashlib/xxhash, with system before
   // messages, a UTF-16 surrogate at fingerprint index 4 and a Unicode body.
   for (final vector in [
-    ('Hello', '790', 'b8f6c'),
-    ('编码测试🙂cache校验字符串with emoji', '05c', 'a1994'),
+    ('Hello', '8ee', '46bce'),
+    ('编码测试🙂cache校验字符串with emoji', 'b78', 'ddcbb'),
   ]) {
     test(
       'Claude billing fingerprint and cch match independent vectors for ${vector.$1}',
@@ -817,7 +825,7 @@ void main() {
         );
         expect(
           (jsonDecode(encoded)['system'] as List).first['text'],
-          'x-anthropic-billing-header: cc_version=2.1.280.${vector.$2}; cc_entrypoint=cli; cch=${vector.$3};',
+          'x-anthropic-billing-header: cc_version=2.1.326.${vector.$2}; cc_entrypoint=cli; cch=${vector.$3};',
         );
       },
     );
@@ -860,10 +868,10 @@ void main() {
           'hi',
           'https://example.com/image.png',
         ]);
-        // Independent SHA-256 vector from OMP: first text "hi" -> d7b.
+        // Independent SHA-256 vector for first text "hi".
         expect(
           (body['system'] as List).first['text'],
-          contains('cc_version=2.1.280.d7b;'),
+          contains('cc_version=2.1.326.bc0;'),
         );
       },
     );
@@ -946,11 +954,17 @@ void main() {
             expect(request.headers, isNot(contains('x-api-key')));
             expect(
               request.headers['user-agent'],
-              'claude-cli/2.1.280 (external, cli)',
+              'claude-cli/2.1.326 (external, cli)',
             );
+            expect(request.headers['x-stainless-package-version'], '0.128.0');
+            expect(request.headers['x-stainless-runtime-version'], 'v26.12.1');
             expect(
               request.headers['anthropic-beta'],
               contains('extended-cache-ttl-2025-04-11'),
+            );
+            expect(
+              request.headers['anthropic-beta'],
+              isNot(contains('mid-conversation-system-2026-04-07')),
             );
             expect(
               (body['tools'] as List).single['name'],
@@ -1079,6 +1093,9 @@ void main() {
     },
   );
 
+  const retryVersion = '2.1.1001';
+  const newerRetryVersion = '2.1.1002';
+
   String versionError(
     String version, {
     String code = 'claude_code_version_too_old',
@@ -1098,14 +1115,14 @@ void main() {
       for (final body in [
         '{}',
         'not JSON',
-        versionError('2.1.280'),
+        versionError(defaultClaudeCodeVersion),
         versionError('2.1.99'),
         versionError('2.0.999'),
-        versionError('2.1.281-beta'),
-        versionError('2.1.281', code: 'unrelated_error'),
+        versionError('$retryVersion-beta'),
+        versionError(retryVersion, code: 'unrelated_error'),
       ]) {
         expect(adoptRequiredClaudeCodeVersion(body), isFalse, reason: body);
-        expect(claudeCodeVersion, '2.1.280');
+        expect(claudeCodeVersion, defaultClaudeCodeVersion);
       }
       expect(adoptRequiredClaudeCodeVersion(versionError('2.1.1000')), isTrue);
       expect(claudeCodeVersion, '2.1.1000');
@@ -1126,7 +1143,7 @@ void main() {
           MockClient((request) async {
             requests.add(request);
             if (requests.length == 1) {
-              return http.Response(versionError('2.1.281'), 400);
+              return http.Response(versionError(retryVersion), 400);
             }
             return messageResponse(
               [
@@ -1166,19 +1183,19 @@ void main() {
         expect(first['model'], 'claude-opus-5-5');
         expect(
           requests.first.headers['user-agent'],
-          'claude-cli/2.1.280 (external, cli)',
+          'claude-cli/$defaultClaudeCodeVersion (external, cli)',
         );
         expect(
           requests.last.headers['user-agent'],
-          'claude-cli/2.1.281 (external, cli)',
+          'claude-cli/$retryVersion (external, cli)',
         );
         expect(
           (first['system'] as List).first['text'],
-          contains('cc_version=2.1.280.'),
+          contains('cc_version=$defaultClaudeCodeVersion.'),
         );
         expect(
           (last['system'] as List).first['text'],
-          contains('cc_version=2.1.281.'),
+          contains('cc_version=$retryVersion.'),
         );
         expect(
           (first['system'] as List).first,
@@ -1201,7 +1218,7 @@ void main() {
           MockClient((request) async {
             expect(
               request.headers['user-agent'],
-              'claude-cli/2.1.281 (external, cli)',
+              'claude-cli/$retryVersion (external, cli)',
             );
             return response({});
           }),
@@ -1233,7 +1250,7 @@ void main() {
           }
           expect(
             request.headers['user-agent'],
-            'claude-cli/2.1.282 (external, cli)',
+            'claude-cli/$newerRetryVersion (external, cli)',
           );
           return response({});
         }),
@@ -1245,11 +1262,14 @@ void main() {
       );
       await started.future;
       // Another request receives a newer requirement while this one is in flight.
-      expect(adoptRequiredClaudeCodeVersion(versionError('2.1.282')), isTrue);
-      pending.complete(http.Response(versionError('2.1.281'), 400));
+      expect(
+        adoptRequiredClaudeCodeVersion(versionError(newerRetryVersion)),
+        isTrue,
+      );
+      pending.complete(http.Response(versionError(retryVersion), 400));
       expect((await result).statusCode, 200);
       expect(sends, 2);
-      expect(claudeCodeVersion, '2.1.282');
+      expect(claudeCodeVersion, newerRetryVersion);
     },
   );
 
@@ -1272,7 +1292,7 @@ void main() {
             requests.add(request);
             if (requests.length == 3) return response({});
             if ((requests.length == 1) == versionFirst) {
-              return http.Response(versionError('2.1.281'), 400);
+              return http.Response(versionError(retryVersion), 400);
             }
             return response({}, 401);
           }),
@@ -1288,7 +1308,7 @@ void main() {
         expect(requests.last.headers['authorization'], 'Bearer sk-ant-oat-new');
         expect(
           requests.last.headers['user-agent'],
-          'claude-cli/2.1.281 (external, cli)',
+          'claude-cli/$retryVersion (external, cli)',
         );
       },
     );
@@ -1317,8 +1337,8 @@ void main() {
                 ? 'not JSON'
                 : versionError(
                     scenario == 'increasing' && sends > 1
-                        ? '2.1.282'
-                        : '2.1.281',
+                        ? newerRetryVersion
+                        : retryVersion,
                     code: scenario == 'unrelated'
                         ? 'other_error'
                         : 'claude_code_version_too_old',
@@ -1345,7 +1365,9 @@ void main() {
         expect(result.statusCode, scenario == 'rate-limit' ? 429 : 400);
         expect(
           claudeCodeVersion,
-          ['repeated', 'increasing'].contains(scenario) ? '2.1.281' : '2.1.280',
+          ['repeated', 'increasing'].contains(scenario)
+              ? retryVersion
+              : defaultClaudeCodeVersion,
         );
       },
     );

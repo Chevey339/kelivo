@@ -75,6 +75,7 @@ class BrandAssets {
         MapEntry(RegExp(r'brave'), 'brave-color.svg'),
         MapEntry(RegExp(r'jina'), 'jina-color.svg'),
         MapEntry(RegExp(r'searxng'), 'searxng-color.svg'),
+        MapEntry(RegExp(r'^4get$'), '4get-color.svg'),
         MapEntry(RegExp(r'serper'), 'serper.svg'),
         MapEntry(RegExp(r'querit'), 'querit-color.svg'),
         MapEntry(RegExp(r'bocha|博查'), 'bocha-color.svg'),
@@ -346,6 +347,11 @@ class BrandAssets {
       asset: 'assets/icons/searxng-color.svg',
     ),
     BrandIconOption(
+      id: '4get',
+      label: '4get',
+      asset: 'assets/icons/4get-color.svg',
+    ),
+    BrandIconOption(
       id: 'serper',
       label: 'Serper',
       asset: 'assets/icons/serper.svg',
@@ -376,6 +382,16 @@ class BrandAssets {
       id: 'codex',
       label: 'Codex',
       asset: 'assets/icons/codex.svg',
+    ),
+    BrandIconOption(
+      id: 'devin',
+      label: 'Devin',
+      asset: 'assets/icons/devin-color.svg',
+    ),
+    BrandIconOption(
+      id: 'pangu',
+      label: 'Pangu',
+      asset: 'assets/icons/huawei-color.svg',
     ),
   ];
 

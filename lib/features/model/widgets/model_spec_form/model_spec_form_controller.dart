@@ -446,6 +446,23 @@ class ModelSpecFormController extends ChangeNotifier {
     _changed();
   }
 
+  void setResponseSpeedTiers(List<ResponseSpeed>? tiers) {
+    draft = draft.copyWith(
+      responseSpeedTiers: tiers,
+      clearResponseSpeedTiers: tiers == null,
+    );
+    _changed();
+  }
+
+  void setResponseSpeedTier(ResponseSpeed speed, bool enabled) {
+    final tiers = draft.responseSpeedTiers;
+    if (tiers == null) return;
+    setResponseSpeedTiers([
+      for (final tier in ResponseSpeed.values)
+        if (tier == speed ? enabled : tiers.contains(tier)) tier,
+    ]);
+  }
+
   void setSampling(SamplingPolicy sampling) {
     draft = draft.copyWith(sampling: sampling);
     _changed();
@@ -860,6 +877,7 @@ class ModelSpecFormController extends ChangeNotifier {
     'dynamicWebSearch',
     'remoteImageUrls',
     'promptCacheControl',
+    'responseSpeedTiers',
     'headers',
     'body',
     'builtInTools',

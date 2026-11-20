@@ -22,6 +22,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/api/request_image_context.dart';
+import 'package:Kelivo/core/services/model_spec/model_list_metadata_cache.dart';
 import 'package:Kelivo/core/utils/token_estimator.dart';
 import 'package:Kelivo/features/home/services/context_assembly.dart';
 import 'package:Kelivo/features/home/services/context_usage_service.dart';
@@ -129,6 +130,7 @@ void main() {
     WorldBookProvider? worldBooks,
     ContextAssemblyPreviewFn? assemble,
     bool useRealIsolate = false,
+    Duration staleRefreshDelay = const Duration(milliseconds: 800),
   }) {
     final resolvedInstructions =
         instructions ??
@@ -146,6 +148,7 @@ void main() {
       assistants: assistants,
       instructions: resolvedInstructions,
       worldBooks: resolvedWorldBooks,
+      staleRefreshDelay: staleRefreshDelay,
       assemble:
           assemble ??
           ({
@@ -206,6 +209,39 @@ void main() {
   );
 
   String tokenWords(int count) => List.filled(count, 'aa').join(' ');
+
+  test('model list metadata refreshes the active context window', () async {
+    final chat = await createChat();
+    final providers = await createProviders(modelId: 'plain-model');
+    final conversation = await chat.createDraftConversation(
+      title: 'Model limits',
+    );
+    final usage = createUsage(
+      chat: chat,
+      settings: providers.settings,
+      assistants: providers.assistants,
+      staleRefreshDelay: Duration.zero,
+    );
+    usage.setActiveConversation(conversation.id);
+    await usage.refresh(conversation.id, force: true);
+    expect(usage.current!.contextWindow, isNull);
+
+    final cfg = providers.settings.getProviderConfig('TestProvider');
+    final cache = ModelListMetadataCache.instance;
+    addTearDown(() => cache.clearProvider(cfg.id));
+    await (await cache.startRefresh(cfg))([
+      (id: 'plain-model', json: {'context_length': 262144}),
+    ]);
+    await waitUntil(() => usage.current?.contextWindow == 262144);
+    expect(
+      providers.settings
+          .getProviderConfig(cfg.id)
+          .modelOverrides['plain-model'],
+      {
+        'reasoning': {'replay': 'none'},
+      },
+    );
+  });
 
   test(
     'request budget changes invalidate context usage configuration',

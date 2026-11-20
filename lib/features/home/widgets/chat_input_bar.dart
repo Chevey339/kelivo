@@ -746,6 +746,7 @@ class ChatInputBar extends StatefulWidget {
     this.reasoning,
     this.reasoningCustomBudget = false,
     this.supportsReasoning = true,
+    this.showResponseSpeedAction = false,
     this.showToolsButton = false,
     this.toolsActive = false,
     this.toolsConnectionIssue = false,
@@ -817,6 +818,7 @@ class ChatInputBar extends StatefulWidget {
   final ReasoningRequest? reasoning;
   final bool reasoningCustomBudget;
   final bool supportsReasoning;
+  final bool showResponseSpeedAction;
   final bool showToolsButton;
   final bool toolsActive;
   final bool toolsConnectionIssue;
@@ -3509,9 +3511,13 @@ class _ChatInputBarState extends State<ChatInputBar>
           ),
         );
 
-        if (widget.supportsReasoning) {
+        if (widget.supportsReasoning || widget.showResponseSpeedAction) {
+          final reasoning = widget.supportsReasoning;
           final request = widget.reasoning ?? ReasoningRequest.auto;
-          final compactLabel = settings.showReasoningLevelBadge
+          final tooltip = reasoning
+              ? l10n.chatInputBarReasoningStrengthTooltip
+              : l10n.responseSpeedLabel;
+          final compactLabel = reasoning && settings.showReasoningLevelBadge
               ? _reasoningCompactLabel(
                   l10n,
                   request,
@@ -3526,19 +3532,27 @@ class _ChatInputBarState extends State<ChatInputBar>
                   : _reasoningButtonWidth(compactLabel),
               builder: () => _CompactIconButton(
                 key: widget.reasoningButtonKey,
-                tooltip: l10n.chatInputBarReasoningStrengthTooltip,
-                icon: Lucide.Brain,
-                active: widget.reasoningActive,
+                tooltip: tooltip,
+                icon: reasoning ? Lucide.Brain : Lucide.Zap,
+                active: reasoning && widget.reasoningActive,
                 badge: compactLabel,
                 onTap: lockTap(widget.onConfigureReasoning),
-                childBuilder: (c) =>
-                    ReasoningIcons.levelIcon(request.level, size: 20, color: c),
+                childBuilder: reasoning
+                    ? (c) => ReasoningIcons.levelIcon(
+                        request.level,
+                        size: 20,
+                        color: c,
+                      )
+                    : null,
               ),
               menu: DesktopContextMenuItem(
-                svgAsset: ReasoningIcons.assetForLevel(request.level),
+                icon: reasoning ? null : Lucide.Zap,
+                svgAsset: reasoning
+                    ? ReasoningIcons.assetForLevel(request.level)
+                    : null,
                 label: compactLabel == null
-                    ? l10n.chatInputBarReasoningStrengthTooltip
-                    : '${l10n.chatInputBarReasoningStrengthTooltip} · $compactLabel',
+                    ? tooltip
+                    : '$tooltip · $compactLabel',
                 onTap: lockTap(widget.onConfigureReasoning),
               ),
             ),
@@ -4597,6 +4611,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     _supportsImagesApiRouting(context);
     final bool isMobileLayout =
         MediaQuery.sizeOf(context).width < AppBreakpoints.tablet;
+    final isDesktop = PlatformUtils.isDesktopTarget;
+    final editorFontSize = isDesktop ? 14 * settings.chatFontScale : 15.0;
     final expandedLayout = _expandedLayout;
     if (!expandedLayout) _scheduleExpandCheck();
     _hostDrawer = InteractiveDrawer.maybeControllerOf(context);
@@ -4853,15 +4869,19 @@ class _ChatInputBarState extends State<ChatInputBar>
                                         ? StackFit.expand
                                         : StackFit.loose,
                                     children: [
-                                      Padding(
+                                      _buildPaddedEditor(
                                         padding: EdgeInsetsDirectional.fromSTEB(
                                           AppSpacing.md,
-                                          AppSpacing.xxs,
+                                          isDesktop
+                                              ? AppSpacing.xs
+                                              : AppSpacing.xxs,
                                           expandedLayout || _canExpand
                                               ? _expandButtonExtent +
                                                     AppSpacing.xs
                                               : AppSpacing.md,
-                                          AppSpacing.xs,
+                                          isDesktop
+                                              ? AppSpacing.sm
+                                              : AppSpacing.xs,
                                         ),
                                         child: Focus(
                                           onKeyEvent: _handleKeyEvent,
@@ -5009,12 +5029,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     color: theme
                                                         .colorScheme
                                                         .onSurface,
-                                                    fontSize:
-                                                        (Platform.isWindows ||
-                                                            Platform.isLinux ||
-                                                            Platform.isMacOS)
-                                                        ? 14
-                                                        : 15,
+                                                    fontSize: editorFontSize,
                                                   ),
                                                   cursorColor:
                                                       theme.colorScheme.primary,
@@ -5239,6 +5254,29 @@ class _ChatInputBarState extends State<ChatInputBar>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaddedEditor({
+    required EdgeInsetsGeometry padding,
+    required Widget child,
+  }) {
+    final editor = Padding(padding: padding, child: child);
+    if (!PlatformUtils.isDesktopTarget) return editor;
+
+    // Keep a click on the padding inside both editors' focus regions.
+    return CodeEditorTapRegion(
+      child: TextFieldTapRegion(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          onTap: () {
+            ContextMenuController.removeAny();
+            _longEditorKey.currentState?.requestFocus();
+          },
+          child: editor,
         ),
       ),
     );

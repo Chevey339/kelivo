@@ -2,6 +2,7 @@
 
 #include <DispatcherQueue.h>
 #include <shlobj.h>
+#include <windows.system.h>
 #include <windows.graphics.capture.h>
 
 #include <filesystem>
@@ -10,13 +11,30 @@
 WebviewPlatform::WebviewPlatform()
     : rohelper_(std::make_unique<rx::RoHelper>(RO_INIT_SINGLETHREADED)) {
   if (rohelper_->WinRtAvailable()) {
-    DispatcherQueueOptions options{sizeof(DispatcherQueueOptions),
-                                   DQTYPE_THREAD_CURRENT, DQTAT_COM_STA};
-
-    if (FAILED(rohelper_->CreateDispatcherQueueController(
-            options, dispatcher_queue_controller_.put()))) {
-      std::cerr << "Creating DispatcherQueueController failed." << std::endl;
+    HSTRING class_name;
+    HSTRING_HEADER class_name_header;
+    winrt::com_ptr<ABI::Windows::System::IDispatcherQueueStatics> queue_statics;
+    winrt::com_ptr<ABI::Windows::System::IDispatcherQueue> queue;
+    if (FAILED(rohelper_->GetStringReference(
+            RuntimeClass_Windows_System_DispatcherQueue, &class_name,
+            &class_name_header)) ||
+        FAILED(rohelper_->GetActivationFactory(
+            class_name, __uuidof(ABI::Windows::System::IDispatcherQueueStatics),
+            queue_statics.put_void())) ||
+        FAILED(queue_statics->GetForCurrentThread(queue.put()))) {
+      std::cerr << "Getting the current DispatcherQueue failed." << std::endl;
       return;
+    }
+
+    // A queue already installed by the host or another plugin can be shared.
+    if (!queue) {
+      DispatcherQueueOptions options{sizeof(DispatcherQueueOptions),
+                                     DQTYPE_THREAD_CURRENT, DQTAT_COM_STA};
+      if (FAILED(rohelper_->CreateDispatcherQueueController(
+              options, dispatcher_queue_controller_.put()))) {
+        std::cerr << "Creating DispatcherQueueController failed." << std::endl;
+        return;
+      }
     }
 
     if (!IsGraphicsCaptureSessionSupported()) {

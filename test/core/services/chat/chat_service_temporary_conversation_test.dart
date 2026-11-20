@@ -1505,6 +1505,32 @@ void main() {
     );
 
     test(
+      'temporary conversation find yields bounded batches in message order',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = await service.createDraftConversation(
+          temporary: true,
+        );
+        final ids = <String>[];
+        for (var i = 0; i < 53; i++) {
+          final message = await service.addMessage(
+            conversationId: conversation.id,
+            role: i.isEven ? 'user' : 'assistant',
+            content: 'message $i',
+          );
+          ids.add(message.id);
+        }
+
+        final pages = await service
+            .conversationFindCandidates(conversation.id)
+            .toList();
+        expect(pages.map((page) => page.length), [48, 5]);
+        expect(pages.expand((page) => page.map((row) => row.id)), ids);
+      },
+    );
+
+    test(
       'temporary timeline pages stay bounded without evicting memory history',
       () async {
         final service = createService();

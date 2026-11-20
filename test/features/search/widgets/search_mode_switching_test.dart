@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import 'package:Kelivo/core/models/avatar_config.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/search/search_service.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/desktop/search_provider_popover.dart';
+import 'package:Kelivo/features/search/widgets/search_service_avatar.dart';
 import 'package:Kelivo/features/search/widgets/search_settings_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
@@ -13,6 +16,10 @@ import '../../../support/business_test_harness.dart';
 
 const _providerKey = 'Gemini';
 const _modelId = 'gemini-test';
+const _searchIcon = AvatarConfig(
+  type: AvatarType.icon,
+  value: 'assets/icons/brave-color.svg',
+);
 
 class _Fixture {
   const _Fixture({required this.settings, required this.assistants});
@@ -26,6 +33,10 @@ Future<_Fixture> _createFixture() async {
   final settings = SettingsProvider(harness.preferences);
   final assistants = AssistantProvider(preferences: harness.preferences);
   await Future.wait([settings.loaded, assistants.loaded]);
+  await settings.updateSearchService(
+    SearchServiceOptions.defaultOption,
+    avatar: _searchIcon,
+  );
 
   await settings.setProviderConfig(
     _providerKey,
@@ -111,6 +122,12 @@ void main() {
       expect(find.text('Built-in Search'), findsOneWidget);
       expect(find.text('Web Search'), findsOneWidget);
       expect(find.text('Bing (Local)'), findsOneWidget);
+      expect(
+        tester
+            .widget<SearchServiceAvatar>(find.byType(SearchServiceAvatar))
+            .avatar,
+        _searchIcon,
+      );
 
       await tester.tap(find.text('Bing (Local)'));
       await tester.pumpAndSettle();
@@ -155,6 +172,12 @@ void main() {
 
       expect(find.text('Built-in Search'), findsOneWidget);
       expect(find.text('Bing (Local)'), findsOneWidget);
+      expect(
+        tester
+            .widget<SearchServiceAvatar>(find.byType(SearchServiceAvatar))
+            .avatar,
+        _searchIcon,
+      );
 
       await tester.tap(find.text('Bing (Local)'));
       await tester.pumpAndSettle();

@@ -275,4 +275,88 @@ void main() {
     expect(hits, hasLength(18000));
     expect(hits.last.range.start, 17999);
   });
+
+  test(
+    'minimap previews count the whole message and highlight nearby hits',
+    () async {
+      const service = ConversationFindService();
+      final user = ConversationFindCandidate(
+        message('先说 **知豆**，再说知豆。${'前文' * 50}知豆。\n\n然后说知豆。'),
+      );
+      final assistant = ConversationFindCandidate(
+        ChatMessage(
+          id: 'reply',
+          role: 'assistant',
+          conversationId: 'c',
+          content: '${'开头' * 110}\n\n然后提到 **知豆** 的价格。',
+          translation: '译文也提到知豆。',
+        ),
+      );
+      final batches = await service
+          .searchPreviews(
+            Stream.fromIterable([
+              [user],
+              [assistant],
+            ]),
+            '知豆',
+          )
+          .toList();
+      expect(batches.map((batch) => batch.single.role), ['user', 'assistant']);
+      final userPreview = batches.first.single;
+      final assistantPreview = batches.last.single;
+      expect(userPreview.matchCount, 4);
+      expect(
+        userPreview.segments
+            .where((segment) => segment.highlighted)
+            .map((segment) => segment.text),
+        ['知豆', '知豆'],
+      );
+      expect(assistantPreview.matchCount, 2);
+      expect(assistantPreview.before, '然后提到 ');
+      expect(
+        assistantPreview.segments.map((segment) => segment.text).join(),
+        '知豆 的价格。',
+      );
+      final matches = await service.search(
+        Stream.value([user, assistant]),
+        '知豆',
+        defaultFindOptions,
+      );
+      expect(userPreview.hit, matches['m']!.first);
+      expect(userPreview.matchCount, matches['m']!.length);
+      expect(assistantPreview.hit, matches['reply']!.first);
+      expect(assistantPreview.matchCount, matches['reply']!.length);
+    },
+  );
+
+  test(
+    'cached rendered text follows edits and presentation settings',
+    () async {
+      const markdown = ConversationFindService();
+      const plain = ConversationFindService(userMarkdown: false);
+      final cache = ConversationFindCache();
+      Future<List<ConversationFindHit>> query(
+        ChatMessage row,
+        String word, [
+        ConversationFindService service = markdown,
+      ]) async {
+        final result = await service.search(
+          Stream.value([ConversationFindCandidate(row)]),
+          word,
+          defaultFindOptions,
+          cache: cache,
+        );
+        return result['m']!;
+      }
+
+      final first = message('**old** [label](https://hidden.invalid)');
+      expect(await query(first, 'missing'), isEmpty);
+      expect(await query(first, 'hidden.invalid'), isEmpty);
+      expect(await query(first, 'old'), hasLength(1));
+      expect(await query(first, 'hidden.invalid', plain), hasLength(1));
+      final edited = message('**new**');
+      expect(await query(edited, 'NEW', plain), hasLength(1));
+      expect(await query(edited, 'old', plain), isEmpty);
+    },
+  );
 }

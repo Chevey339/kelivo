@@ -4,12 +4,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:Kelivo/core/models/avatar_config.dart';
 import 'package:Kelivo/core/models/message_part.dart';
-import 'package:Kelivo/core/services/mcp/mcp_icon_cache.dart';
+import 'package:Kelivo/utils/icon_cache.dart';
 import 'package:Kelivo/core/services/storage/storage_attachment_usage.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
+import 'package:Kelivo/features/search/widgets/search_service_avatar.dart';
 import 'package:Kelivo/utils/app_directories.dart';
 import 'package:Kelivo/utils/markdown_media_sanitizer.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 import '../../../support/storage_images_test_fixture.dart';
 
@@ -406,8 +409,8 @@ void main() {
               )
             : img.encodePng(img.Image(width: 2, height: 2)),
       );
-      final name = await McpIconCache.importFile(source.path);
-      final path = (await McpIconCache.localPath(name))!;
+      final name = await IconCache.importFile(source.path);
+      final path = (await IconCache.localPath(name))!;
       await fixture.preferences.setString(
         'mcp_presentation_v1',
         jsonEncode({
@@ -435,6 +438,55 @@ void main() {
       );
     });
   }
+
+  test(
+    'reset search icons can be cleaned without losing reimported files',
+    () async {
+      final bytes = img.encodePng(img.Image(width: 2, height: 2));
+      final source = await fixture.file('selected.png', bytes);
+      final avatar = (await saveSearchServiceAvatar(
+        AvatarConfig(type: AvatarType.file, value: source.path),
+        null,
+      ))!;
+      expect(avatar.value, startsWith('kelivo-file:///avatars/'));
+      expect(avatar.value, endsWith('.png'));
+      final path = SandboxPathResolver.fix(avatar.value);
+      expect(path, isNot(source.path));
+      await source.delete();
+      await fixture.preferences.setString(
+        'search_services_v1',
+        jsonEncode([
+          {'id': 'bing', 'type': 'bing_local', 'avatar': avatar.toJson()},
+        ]),
+      );
+      final entries = await StorageUsageService.listUploadEntries(images: true);
+      expect(entries.single.path, path);
+      expect(entries.single.isInUse, isTrue);
+      expect(
+        await StorageUsageService.deleteUploadFiles([path], images: true),
+        0,
+      );
+
+      await fixture.preferences.setString(
+        'search_services_v1',
+        jsonEncode([
+          {'id': 'bing', 'type': 'bing_local'},
+        ]),
+      );
+      await source.writeAsBytes(bytes);
+      final replacement = (await saveSearchServiceAvatar(
+        AvatarConfig(type: AvatarType.file, value: source.path),
+        null,
+      ))!;
+      final replacementPath = SandboxPathResolver.fix(replacement.value);
+      expect(replacementPath, isNot(path));
+      expect(
+        await StorageUsageService.deleteUploadFiles([path], images: true),
+        1,
+      );
+      expect(await File(replacementPath).readAsBytes(), bytes);
+    },
+  );
 
   test('an unreadable reference database cannot authorize deletion', () async {
     final image = await fixture.file('images/keep.png');

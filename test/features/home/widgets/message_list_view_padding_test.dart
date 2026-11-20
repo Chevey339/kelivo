@@ -21,6 +21,7 @@ import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart'
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/utils/chat_layout_constants.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
+import 'package:Kelivo/features/home/widgets/scroll_nav_buttons.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +33,57 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('chat width reflows existing rows within the list viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1500, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final key = GlobalKey<_PrependingMessageListHarnessState>();
+    Future<void> pumpList({
+      bool fullWidth = false,
+      double rightOverlayWidth = 0,
+    }) async {
+      await tester.pumpWidget(
+        _PrependingMessageListHarness(
+          key: key,
+          fullWidth: fullWidth,
+          rightOverlayWidth: rightOverlayWidth,
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    final row = find.byKey(const ValueKey('timeline-slot:window-message-0'));
+    await pumpList();
+    final listState = tester.state(find.byType(MessageListView));
+    expect(tester.getSize(row).width, 860);
+    expect(tester.getTopLeft(row).dx, 320);
+
+    await pumpList(fullWidth: true);
+    expect(tester.getSize(row).width, 1500);
+    expect(tester.getTopLeft(row).dx, 0);
+
+    const overlayWidth = ScrollNavButtonsPanel.defaultOverlayWidth;
+    await pumpList(fullWidth: true, rightOverlayWidth: overlayWidth);
+    expect(tester.getSize(row).width, 1500 - overlayWidth);
+    expect(tester.getTopLeft(row).dx, 0);
+
+    tester.view.physicalSize = const Size(900, 900);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(row).width, 880);
+
+    tester.view.physicalSize = const Size(730, 900);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(row).width, 730);
+
+    tester.view.physicalSize = const Size(1500, 900);
+    await pumpList();
+    expect(tester.getSize(row).width, 860);
+    expect(tester.state(find.byType(MessageListView)), same(listState));
   });
 
   testWidgets(
@@ -1514,11 +1566,15 @@ class _PrependingMessageListHarness extends StatefulWidget {
     this.initialReasoning = const <String, stream_ctrl.ReasoningData>{},
     this.showFooter = false,
     this.hasMoreAfter = false,
+    this.fullWidth = false,
+    this.rightOverlayWidth = 0,
   });
 
   final Map<String, stream_ctrl.ReasoningData> initialReasoning;
   final bool showFooter;
   final bool hasMoreAfter;
+  final bool fullWidth;
+  final double rightOverlayWidth;
 
   @override
   State<_PrependingMessageListHarness> createState() =>
@@ -1666,6 +1722,8 @@ class _PrependingMessageListHarnessState
         home: Scaffold(
           appBar: AppBar(),
           body: MessageListView(
+            fullWidth: widget.fullWidth,
+            rightOverlayWidth: widget.rightOverlayWidth,
             contextTask: contextTask,
             contextTaskRevision:
                 '${contextTask?.phase}:${contextTask?.anchorGroupId}',

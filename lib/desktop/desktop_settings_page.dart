@@ -14,6 +14,7 @@ import 'macos_window_drag_area.dart';
 import '../features/provider/widgets/oauth_connection_info.dart';
 import '../features/provider/widgets/oauth_model_switch.dart';
 import '../features/provider/pages/oauth_provider_detail_page.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
@@ -38,8 +39,10 @@ import '../core/services/linux_window_service.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';
 import 'widgets/desktop_adaptive_panes.dart';
+import 'widgets/desktop_form_dialog.dart';
 import 'widgets/desktop_labeled_control.dart';
 import '../shared/widgets/ios_switch.dart';
+import '../shared/widgets/ios_tactile.dart' show IosCardPress, IosIconButton;
 import '../shared/widgets/ios_checkbox.dart';
 // Desktop assistants panel dependencies
 import '../features/assistant/pages/assistant_settings_edit_page.dart'
@@ -100,6 +103,7 @@ import '../features/provider/widgets/provider_avatar.dart';
 import '../features/provider/widgets/provider_balance_badge.dart';
 import '../features/provider/widgets/provider_balance_refresh_settings.dart';
 import '../features/provider/widgets/provider_balance_request_editor.dart';
+import '../features/provider/widgets/provider_balance_reset_button.dart';
 import '../features/provider/widgets/provider_custom_request_editor.dart';
 import '../features/provider/widgets/share_provider_sheet.dart'
     show encodeProviderConfig;

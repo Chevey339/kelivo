@@ -5,7 +5,7 @@ abstract final class ViewImageTool {
       'Images already included in messages can be inspected directly; do not call this tool for them. '
       'Use image_id only to retrieve a conversation image that is missing from the current context. '
       'Call with no image selected to list available conversation images; pass next_offset as offset to list more. '
-      'When using image_id, do not also supply a file path.';
+      'Omit path when using image_id.';
 
   /// Adds conversation lookup to the existing file viewer, when available.
   static Map<String, dynamic> withHistory([

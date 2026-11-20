@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
+import 'dart:ui' show AppLifecycleState;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
+import 'package:Kelivo/core/services/api/tool_call_cancellation.dart';
 import 'package:Kelivo/core/services/tool_image.dart';
 
 void main() {
@@ -32,6 +37,60 @@ void main() {
       },
     );
   }
+
+  test('remote animated WebP resizes the first frame', () async {
+    final bytes = base64Decode(
+      'UklGRoQAAABXRUJQVlA4WAoAAAACAAAAlwgAAQAAQU5JTQYAAAAAAAAAAABBTk1G'
+      'KAAAAAAAAAAAAJcIAAEAAGQAAAJWUDhMDwAAAC+XSAAABxD9j/4HIqL/AQBBTk1G'
+      'KAAAAAAAAAAAAJcIAAEAAGQAAABWUDhMDwAAAC+XSAAABxDR//4HIqL/AQA=',
+    );
+    expect(img.WebPDecoder().startDecode(bytes)!.numFrames, 2);
+    final image = await ToolImage.fromNetworkBytes(bytes);
+    final decoded = img.decodePng(image.bytes)!;
+    expect((decoded.width, decoded.height), (ToolImage.maxLongEdge, 2));
+    expect(decoded.numFrames, 1);
+    expect(decoded.getPixel(0, 0).r, 255);
+  });
+
+  test('remote image decoding observes generation cancellation', () async {
+    final bytes = img.encodePng(img.Image(width: 2, height: 2));
+    final stop = Completer<void>();
+    final cancellation = ToolCallCancellation(
+      isCancelled: () => stop.isCompleted,
+      cancelled: stop.future,
+    );
+    final decode = cancellation.run(() => ToolImage.fromNetworkBytes(bytes));
+    final rejected = expectLater(decode, throwsStateError);
+    stop.complete();
+    await rejected;
+    expect(cancellation.listenerCount, 0);
+  });
+
+  testWidgets('iOS background state skips native image decoding', (
+    tester,
+  ) async {
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    final previousState =
+        tester.binding.lifecycleState ?? AppLifecycleState.resumed;
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      final bytes = img.encodePng(img.Image(width: 2, height: 2));
+      await expectLater(
+        ToolImage.fromNetworkBytes(bytes),
+        throwsA(
+          isA<ToolImageException>().having(
+            (error) => error.message,
+            'message',
+            contains('Return to Kelivo'),
+          ),
+        ),
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+      tester.binding.handleAppLifecycleStateChanged(previousState);
+    }
+  });
 
   test(
     'detailed images fit the byte budget without losing later replay',

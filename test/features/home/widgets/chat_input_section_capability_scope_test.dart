@@ -78,6 +78,7 @@ void main() {
     bool desktopTools = false,
     double composerWidth = 800,
     VoidCallback? openBrowser,
+    VoidCallback? configureReasoning,
     GlobalKey? reasoningButtonKey,
   }) async {
     final settings = settingsOverride ?? SettingsProvider(preferences);
@@ -131,6 +132,7 @@ void main() {
                   isReasoningModel: (_, _) => supportsReasoning,
                   isReasoningEnabled: (request) =>
                       request.level != ReasoningLevel.off,
+                  onConfigureReasoning: configureReasoning,
                   onOpenBrowser: desktopTools ? openBrowser ?? () {} : null,
                   onOpenTools: desktopTools
                       ? () => showDesktopToolsPopover(
@@ -159,6 +161,50 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
   }
+
+  testWidgets(
+    'a chat model without reasoning can open response speed controls',
+    (tester) async {
+      final assistants = await loadAssistantWithMcp(tester);
+      final config = ProviderConfig(
+        id: 'relay',
+        name: 'Relay',
+        enabled: true,
+        baseUrl: 'https://relay.example/v1',
+        apiKey: 'test-key',
+        providerType: ProviderKind.openai,
+        models: ['mychat-gpt62'],
+        modelOverrides: {
+          'mychat-gpt62': {
+            'responseSpeedTiers': ['fast'],
+          },
+        },
+      );
+      late SettingsProvider settings;
+      await tester.runAsync(() async {
+        settings = SettingsProvider(preferences);
+        await settings.loaded;
+        await settings.setProviderConfig(config.id, config);
+      });
+      addTearDown(settings.dispose);
+      final key = GlobalKey();
+      var opens = 0;
+      await pumpComposer(
+        tester,
+        settingsOverride: settings,
+        assistants: assistants,
+        isConversationOverride: true,
+        providerKey: config.id,
+        modelId: config.models.single,
+        desktopTools: true,
+        reasoningButtonKey: key,
+        configureReasoning: () => opens++,
+      );
+      expect(find.byTooltip('Response speed'), findsOneWidget);
+      await tester.tap(find.byKey(key));
+      expect(opens, 1);
+    },
+  );
 
   for (final scenario in [
     (name: 'no model', providerKey: null, modelId: null, supportsTools: false),

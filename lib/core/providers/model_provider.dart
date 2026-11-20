@@ -16,6 +16,7 @@ import '../services/custom_request_merger.dart';
 import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
+import '../services/model_spec/model_list_metadata_cache.dart';
 import '../services/model_spec/model_spec_resolver.dart';
 import '../services/model_spec/ollama_model_service.dart';
 import '../services/model_catalog/model_catalog_service.dart';
@@ -25,6 +26,12 @@ abstract class BaseProvider {
 }
 
 class _Http {
+  static Iterable<ModelListRow> modelRows(List data) sync* {
+    for (final row in data.whereType<Map>()) {
+      if (row['id'] case final String id) yield (id: id, json: row);
+    }
+  }
+
   static Map<String, String> modelListHeaders(
     ProviderConfig cfg,
     Map<String, String> base,
@@ -48,6 +55,7 @@ class OpenAIProvider extends BaseProvider {
 
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    final replaceMetadata = await _resolver.startModelListRefresh(cfg);
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
@@ -59,21 +67,18 @@ class OpenAIProvider extends BaseProvider {
       final mergedHeaders = _Http.modelListHeaders(cfg, headers);
       final ollamaIds = await _ollama.fetchModels(cfg, mergedHeaders);
       if (ollamaIds != null) {
+        await replaceMetadata(const []);
         return [for (final id in ollamaIds) _resolver.spec(cfg, id)];
       }
       final res = await client.get(uri, headers: mergedHeaders);
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        final data = (jsonDecode(res.body)['data'] as List?) ?? [];
+        final data = jsonDecode(res.body)['data'] as List?;
+        if (data == null) return [];
+        final rows = _Http.modelRows(data);
+        await replaceMetadata(rows);
         return [
-          for (final e in data)
-            if (e is Map && e['id'] is String)
-              _resolver
-                  .resolve(
-                    cfg,
-                    e['id'] as String,
-                    displayName: e['id'] as String,
-                  )
-                  .spec,
+          for (final row in rows)
+            _resolver.spec(cfg, row.id, displayName: row.id),
         ];
       }
       return [];
@@ -87,6 +92,8 @@ class ClaudeProvider extends BaseProvider {
   static const String anthropicVersion = '2023-06-01';
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    final resolver = ModelSpecResolver.instance;
+    final replaceMetadata = await resolver.startModelListRefresh(cfg);
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
@@ -101,18 +108,20 @@ class ClaudeProvider extends BaseProvider {
       );
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final obj = jsonDecode(res.body) as Map<String, dynamic>;
-        final data = (obj['data'] as List?) ?? [];
+        final data = obj['data'] as List?;
+        if (data == null) return [];
+        final rows = _Http.modelRows(data);
+        await replaceMetadata(rows);
         return [
-          for (final e in data)
-            if (e is Map && e['id'] is String)
-              ModelSpecResolver.instance
-                  .resolve(
-                    cfg,
-                    e['id'] as String,
-                    displayName:
-                        (e['display_name'] as String?) ?? (e['id'] as String),
-                  )
-                  .spec,
+          for (final row in rows)
+            resolver.spec(
+              cfg,
+              row.id,
+              displayName: switch (row.json['display_name']) {
+                final String name => name,
+                _ => row.id,
+              },
+            ),
         ];
       }
       return [];
@@ -139,6 +148,8 @@ class GoogleProvider extends BaseProvider {
 
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    final resolver = ModelSpecResolver.instance;
+    final replaceMetadata = await resolver.startModelListRefresh(cfg);
     final client = providerHttpClient(cfg);
     try {
       final url = _buildUrl(cfg);
@@ -175,31 +186,33 @@ class GoogleProvider extends BaseProvider {
         );
         if (res.statusCode >= 200 && res.statusCode < 300) {
           final obj = jsonDecode(res.body) as Map<String, dynamic>;
-          final arr = (obj['models'] as List?) ?? [];
-          for (final e in arr) {
-            if (e is Map) {
-              final name = e['name'];
+          final data = obj['models'] as List?;
+          if (data != null) {
+            final rows = <ModelListRow>[];
+            for (final row in data.whereType<Map>()) {
+              final name = row['name'];
               if (name is! String) continue;
               final id = name.startsWith('models/')
                   ? name.substring('models/'.length)
                   : name;
-              if (id.trim().isEmpty) continue;
-              final methods = e['supportedGenerationMethods'];
+              if (id.trim().isNotEmpty) rows.add((id: id, json: row));
+            }
+            await replaceMetadata(rows);
+            for (final row in rows) {
+              final methods = row.json['supportedGenerationMethods'];
               if (methods != null &&
                   (methods is! List ||
                       !(methods.contains('generateContent') ||
                           methods.contains('embedContent')))) {
                 continue;
               }
-              final displayName = e['displayName'];
+              final displayName = row.json['displayName'];
               out.add(
-                ModelSpecResolver.instance
-                    .resolve(
-                      cfg,
-                      id,
-                      displayName: displayName is String ? displayName : id,
-                    )
-                    .spec,
+                resolver.spec(
+                  cfg,
+                  row.id,
+                  displayName: displayName is String ? displayName : row.id,
+                ),
               );
             }
           }
@@ -216,13 +229,11 @@ class GoogleProvider extends BaseProvider {
         )) {
           if (!out.any((m) => m.id == model.id)) {
             out.add(
-              ModelSpecResolver.instance
-                  .resolve(
-                    cfg,
-                    model.id,
-                    displayName: model.name.isEmpty ? null : model.name,
-                  )
-                  .spec,
+              resolver.spec(
+                cfg,
+                model.id,
+                displayName: model.name.isEmpty ? null : model.name,
+              ),
             );
           }
         }

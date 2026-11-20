@@ -16,6 +16,10 @@ extern "C" {
 FLUTTER_PLUGIN_EXPORT void WebviewWindowsPluginRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
 
+// Call on the platform thread before the shared DispatcherQueue shuts down.
+FLUTTER_PLUGIN_EXPORT void WebviewWindowsPluginPrepareForShutdown(
+    FlutterDesktopPluginRegistrarRef registrar);
+
 #if defined(__cplusplus)
 }  // extern "C"
 #endif

@@ -44,6 +44,7 @@ import '../../utils/avatar_cache.dart';
 import '../models/assistant.dart';
 import '../models/model_spec.dart';
 import '../models/reasoning_request.dart';
+import '../services/model_spec/model_list_metadata_cache.dart';
 import '../services/model_spec/model_spec_resolver.dart';
 import '../services/model_spec/ollama_model_service.dart';
 import '../../utils/provider_grouping_logic.dart';
@@ -298,6 +299,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayLongPasteAsFileThresholdKey =
       'display_long_paste_as_file_threshold_v1';
   static const String _desktopSendShortcutKey = 'desktop_send_shortcut_v1';
+  static const String _displayDesktopFullWidthChatKey =
+      'display_desktop_full_width_chat_v1';
   static const String _displayChatFontScaleKey = 'display_chat_font_scale_v1';
   static const String _displayAutoScrollEnabledKey =
       'display_auto_scroll_enabled_v1';
@@ -599,8 +602,9 @@ class SettingsProvider extends ChangeNotifier {
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs =>
       Map.unmodifiable(_providerConfigs);
+  static const _defaultBalanceRefreshOnReply = true;
   int _balanceRefreshInterval = 0;
-  bool _balanceRefreshOnReply = false;
+  bool _balanceRefreshOnReply = _defaultBalanceRefreshOnReply;
   int get balanceRefreshInterval => _balanceRefreshInterval;
   bool get balanceRefreshOnReply => _balanceRefreshOnReply;
   ProviderBalanceRefresh? _balanceRefresh;
@@ -668,6 +672,9 @@ class SettingsProvider extends ChangeNotifier {
   ];
   List<SearchServiceOptions> get searchServices =>
       List.unmodifiable(_searchServices);
+  final _searchServiceAvatars = <String, AvatarConfig>{};
+  AvatarConfig? searchServiceAvatar(String serviceId) =>
+      _searchServiceAvatars[serviceId];
   SearchCommonOptions _searchCommonOptions = const SearchCommonOptions();
   SearchCommonOptions get searchCommonOptions => _searchCommonOptions;
   int _searchServiceSelected = 0;
@@ -732,6 +739,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.load();
     final localPreferences = await SharedPreferences.getInstance();
     await OllamaModelService.instance.ensureLoaded();
+    await ModelListMetadataCache.instance.ensureLoaded();
     _providersOrder = prefs.getStringList(_providersOrderKey) ?? [];
     final m = prefs.getString(_themeModeKey);
     switch (m) {
@@ -751,7 +759,8 @@ class SettingsProvider extends ChangeNotifier {
     _balanceRefreshInterval =
         prefs.getInt(BusinessKeyRegistry.balanceRefreshIntervalKey) ?? 0;
     _balanceRefreshOnReply =
-        prefs.getBool(BusinessKeyRegistry.balanceRefreshOnReplyKey) ?? false;
+        prefs.getBool(BusinessKeyRegistry.balanceRefreshOnReplyKey) ??
+        _defaultBalanceRefreshOnReply;
     if (cfgStr != null && cfgStr.isNotEmpty) {
       try {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
@@ -1067,6 +1076,8 @@ class SettingsProvider extends ChangeNotifier {
             .clamp(minMemoryInjectionMaxItems, maxMemoryInjectionMaxItems);
 
     // display settings
+    _desktopFullWidthChat =
+        prefs.getBool(_displayDesktopFullWidthChatKey) ?? false;
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
     _showModelIcon = prefs.getBool(_displayShowModelIconKey) ?? true;
     _showModelNameTimestamp =
@@ -1407,13 +1418,19 @@ class SettingsProvider extends ChangeNotifier {
     final searchServicesStr = prefs.getString(_searchServicesKey);
     if (searchServicesStr != null && searchServicesStr.isNotEmpty) {
       try {
-        final list = jsonDecode(searchServicesStr) as List;
-        final decoded = list
-            .map(
-              (e) => SearchServiceOptions.fromJson(e as Map<String, dynamic>),
-            )
-            .toList();
-        if (decoded.isNotEmpty) _searchServices = decoded;
+        final services = <SearchServiceOptions>[];
+        final avatars = <String, AvatarConfig>{};
+        for (final entry in jsonDecode(searchServicesStr) as List) {
+          final json = entry as Map<String, dynamic>;
+          final service = SearchServiceOptions.fromJson(json);
+          services.add(service);
+          final avatar = AvatarConfig.fromJson(json['avatar']);
+          if (avatar != null) avatars[service.id] = avatar;
+        }
+        if (services.isNotEmpty) {
+          _searchServices = services;
+          _searchServiceAvatars.addAll(avatars);
+        }
       } catch (_) {}
     }
     final searchCommonStr = prefs.getString(_searchCommonKey);
@@ -1662,6 +1679,17 @@ class SettingsProvider extends ChangeNotifier {
 
   // Apply global proxy to Dart IO layer; provider-level proxies take precedence at call sites.
   String _lastProxySignature = '';
+
+  /// Whether the current app proxy routes requests to this destination.
+  static bool routesThroughGlobalProxy(Uri uri) {
+    final bypass = switch (HttpOverrides.current) {
+      _ProxyHttpOverrides(:final bypassRules) ||
+      _SocksProxyHttpOverrides(:final bypassRules) => bypassRules,
+      _ => null,
+    };
+    return bypass != null && !_shouldBypassProxy(uri.host, bypass);
+  }
+
   void applyGlobalProxyOverridesIfNeeded() {
     try {
       final enabled = _globalProxyEnabled;
@@ -3809,8 +3837,11 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> removeProviderConfig(String key) async {
-    if (!_providerConfigs.containsKey(key)) return;
-    _providerConfigs.remove(key);
+    final removed = _providerConfigs.remove(key);
+    if (removed == null) return;
+    final clearMetadata = ModelListMetadataCache.instance.clearProvider(
+      removed.id,
+    );
     // Remove from order
     _providersOrder = List<String>.from(_providersOrder.where((k) => k != key));
     // Also remove from grouping map
@@ -3885,6 +3916,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
     await prefs.setStringList(_providersOrderKey, _providersOrder);
     await prefs.setString(_providerGroupMapKey, jsonEncode(_providerGroupMap));
+    await clearMetadata;
     notifyListeners();
   }
 
@@ -4976,6 +5008,15 @@ Requirements:
   ReasoningRequest _backgroundReasoningFor(bool enabled, Assistant? assistant) {
     if (!enabled) return ReasoningRequest.off;
     return assistant?.reasoning ?? ReasoningRequest.auto;
+  }
+
+  bool _desktopFullWidthChat = false;
+  bool get desktopFullWidthChat => _desktopFullWidthChat;
+  Future<void> setDesktopFullWidthChat(bool value) async {
+    if (_desktopFullWidthChat == value) return;
+    _desktopFullWidthChat = value;
+    notifyListeners();
+    await _preferences.setBool(_displayDesktopFullWidthChatKey, value);
   }
 
   // Display settings: user avatar and model icon visibility
@@ -6169,8 +6210,26 @@ Requirements:
     return true;
   }
 
+  Future<void> updateSearchService(
+    SearchServiceOptions service, {
+    required AvatarConfig? avatar,
+  }) async {
+    final index = _searchServices.indexWhere((item) => item.id == service.id);
+    if (index < 0) return;
+    if (avatar == null) {
+      _searchServiceAvatars.remove(service.id);
+    } else {
+      _searchServiceAvatars[service.id] = avatar;
+    }
+    final services = List<SearchServiceOptions>.of(_searchServices);
+    services[index] = service;
+    await setSearchServices(services);
+  }
+
   Future<void> setSearchServices(List<SearchServiceOptions> services) async {
     _searchServices = List.from(services);
+    final serviceIds = _searchServices.map((service) => service.id).toSet();
+    _searchServiceAvatars.removeWhere((id, _) => !serviceIds.contains(id));
     final nextFetchMode = WebFetchService.effectiveMode(
       _webFetchMode,
       _searchServices,
@@ -6186,7 +6245,14 @@ Requirements:
     final prefs = _preferences;
     await prefs.setString(
       _searchServicesKey,
-      jsonEncode(_searchServices.map((e) => e.toJson()).toList()),
+      jsonEncode([
+        for (final service in _searchServices)
+          {
+            ...service.toJson(),
+            if (_searchServiceAvatars[service.id] case final avatar?)
+              'avatar': avatar.toJson(),
+          },
+      ]),
     );
     await prefs.setInt(_searchSelectedKey, _searchServiceSelected);
     if (resetFetchMode) await prefs.setString(_webFetchModeKey, _webFetchMode);
@@ -6356,6 +6422,7 @@ Requirements:
     copy._memoryMigratePromptEn = _memoryMigratePromptEn;
     copy._memoryMigrationBatchSize = _memoryMigrationBatchSize;
     copy._memoryInjectionMaxItems = _memoryInjectionMaxItems;
+    copy._desktopFullWidthChat = _desktopFullWidthChat;
     copy._showUserAvatar = _showUserAvatar;
     copy._showModelIcon = _showModelIcon;
     copy._showModelNameTimestamp = _showModelNameTimestamp;

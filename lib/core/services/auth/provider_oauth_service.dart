@@ -416,41 +416,65 @@ class ProviderOAuthService extends ChangeNotifier {
     ProviderConfig original,
     String? codexVersion, {
     bool Function()? isCurrent,
-  }) => _authenticated(original, (wire, config) async {
-    final rows = await ProviderOAuthAdapter.forProvider(
-      config.oauthProvider!,
-      codexVersion: codexVersion,
-    ).models(wire, config.oauthCredentials!);
-    final ids = <String>{};
-    return [
-      for (final row in rows)
-        if (oauthString(row['id']) != null &&
-            ids.add(row['id'] as String) &&
-            (config.oauthProvider != OAuthProvider.grok ||
-                !RegExp(
-                  r'grok-(?:imagine|stt|voice|tts)',
-                ).hasMatch(row['id'] as String)))
-          _modelFromRow(config, row),
-    ];
-  }, isCurrent: isCurrent);
+  }) async {
+    final settings = _settings;
+    final replaceMetadata = await ModelSpecResolver.instance
+        .startModelListRefresh(original);
+    return _authenticated(original, (wire, config) async {
+      final rows = await ProviderOAuthAdapter.forProvider(
+        config.oauthProvider!,
+        codexVersion: codexVersion,
+      ).models(wire, config.oauthCredentials!);
+      final current = _current(config.id);
+      if (identical(settings, _settings) &&
+          current != null &&
+          current.oauthProvider == config.oauthProvider &&
+          current.oauthCredentials?.sessionId ==
+              config.oauthCredentials?.sessionId &&
+          // A superseded Codex list can still seed the initial catalog.
+          (isCurrent?.call() != false ||
+              current.oauthModelsClientVersion == null && rows.isNotEmpty)) {
+        await replaceMetadata([
+          for (final row in rows)
+            if (oauthString(row['id']) case final id?) (id: id, json: row),
+        ]);
+      }
+      final ids = <String>{};
+      return [
+        for (final row in rows)
+          if (oauthString(row['id']) case final id?)
+            if (ids.add(id) &&
+                (config.oauthProvider != OAuthProvider.grok ||
+                    !RegExp(r'grok-(?:imagine|stt|voice|tts)').hasMatch(id)))
+              _modelFromRow(config, row),
+      ];
+    }, isCurrent: isCurrent);
+  }
 
   _OAuthModelSpec _modelFromRow(
     ProviderConfig config,
     Map<String, dynamic> row,
-  ) => _OAuthModelSpec(
-    row: row,
-    base: _oauthDiscoveredSpec(
-      ModelSpecResolver.instance.spec(
-        config,
-        row['id'] as String,
-        displayName:
-            oauthString(row['display_name']) ??
-            oauthString(row['name']) ??
-            row['id'] as String,
-      ),
-      row,
-    ),
-  );
+  ) {
+    final id = row['id'] as String;
+    final resolved = ModelSpecResolver.instance.resolve(
+      config,
+      id,
+      displayName:
+          oauthString(row['display_name']) ?? oauthString(row['name']) ?? id,
+    );
+    var spec = resolved.override.applyTo(
+      _oauthDiscoveredSpec(resolved.base, row),
+      applyDisplayName: true,
+    );
+    if (_usesGrokComposerMetadata(config.oauthProvider, spec)) {
+      spec = spec.copyWith(
+        input: const [Modality.text],
+        abilities: {...spec.abilities, ModelAbility.reasoning}.toList(),
+        reasoning: _grokComposerReasoning.applyTo(spec.reasoning),
+      );
+    }
+    return _OAuthModelSpec(row: row, base: spec);
+  }
 
   /// Like OMP's versioned Codex cache, refresh each account after a client
   /// version change. Keep its saved models usable if discovery is unavailable.
@@ -644,12 +668,18 @@ class ProviderOAuthService extends ChangeNotifier {
       final row = model is _OAuthModelSpec
           ? model.row
           : const <String, dynamic>{};
+      // Model edits can land while discovery is in flight.
+      final discovered = model is _OAuthModelSpec
+          ? _modelFromRow(current, row)
+          : model;
+      final composer = _usesGrokComposerMetadata(provider, discovered);
       overrides[model.id] = mergeOAuthModelOverride(
         existing: overrides[model.id],
-        // Model edits can land while discovery is in flight.
-        model: model is _OAuthModelSpec ? _modelFromRow(current, row) : model,
-        reasoning: oauthDiscoveredReasoning(provider, row),
-        contextWindow: _oauthContextWindow(row),
+        model: discovered,
+        reasoning: composer
+            ? _grokComposerReasoning
+            : oauthDiscoveredReasoning(provider, row),
+        refreshCapabilities: composer,
         extra: {
           if (provider == OAuthProvider.chatgpt) ...{
             'oauthServiceTiers': [
@@ -762,6 +792,23 @@ bool? oauthRowReasoningSupport(Map<String, dynamic> row) {
   return null;
 }
 
+bool _usesGrokComposerMetadata(OAuthProvider? provider, ModelSpec model) =>
+    provider == OAuthProvider.grok &&
+    model.id == grokComposerFastModelId &&
+    model.upstreamId == grokComposerFastModelId;
+
+const _grokComposerReasoning = ReasoningSpecOverride(
+  dialect: ReasoningDialect.openaiResponsesReasoning,
+  levels: [
+    ReasoningLevel.minimal,
+    ReasoningLevel.low,
+    ReasoningLevel.medium,
+    ReasoningLevel.high,
+    ReasoningLevel.xhigh,
+  ],
+  canDisable: false,
+);
+
 /// Maps an OAuth catalog row onto [ReasoningSpecOverride].
 ReasoningSpecOverride? oauthDiscoveredReasoning(
   OAuthProvider provider,
@@ -808,7 +855,7 @@ Map<String, dynamic> mergeOAuthModelOverride({
   required Object? existing,
   required ModelSpec model,
   ReasoningSpecOverride? reasoning,
-  int? contextWindow,
+  bool refreshCapabilities = false,
   Map<String, dynamic> extra = const {},
 }) {
   final current = existing is Map
@@ -818,13 +865,14 @@ Map<String, dynamic> mergeOAuthModelOverride({
   nextExtra.removeWhere((key, _) => _deletedOAuthThinkingKeys.contains(key));
   return current
       .copyWith(
-        displayName: model.displayName,
-        type: model.type,
-        input: List<Modality>.from(model.input),
-        output: List<Modality>.from(model.output),
-        abilities: List<ModelAbility>.from(model.abilities),
+        displayName: current.displayName ?? model.displayName,
+        type: current.type ?? model.type,
+        input: refreshCapabilities ? model.input : current.input ?? model.input,
+        output: current.output ?? model.output,
+        abilities: refreshCapabilities
+            ? model.abilities
+            : current.abilities ?? model.abilities,
         reasoning: _mergeReasoningOverride(current.reasoning, reasoning),
-        contextWindow: contextWindow,
         extra: nextExtra,
       )
       .toJson();
@@ -896,21 +944,13 @@ String? _oauthDefaultLevel(Map<String, dynamic> row) {
   return null;
 }
 
-int? _oauthContextWindow(Map<String, dynamic> row) {
-  final value = oauthNumber(row['context_window']);
-  if (value == null || value <= 0 || value != value.truncateToDouble()) {
-    return null;
-  }
-  return value.toInt();
-}
-
 ModelSpec _oauthDiscoveredSpec(ModelSpec resolved, Map<String, dynamic> row) {
+  final inputModalities = row['input_modalities'];
   final imageIn =
       row['supports_image_in'] == true ||
-      (row['input_modalities'] as List? ?? const []).contains('image');
+      inputModalities is List && inputModalities.contains('image');
   final support = oauthRowReasoningSupport(row);
   return resolved.copyWith(
-    contextWindow: _oauthContextWindow(row),
     input: <Modality>[...resolved.input, if (imageIn) Modality.image],
     abilities: <ModelAbility>[
       ...resolved.abilities.where(

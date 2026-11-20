@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/auth/codex_client_version.dart';
 import 'package:Kelivo/core/services/auth/provider_oauth_service.dart';
@@ -1658,6 +1659,9 @@ void main() {
                 {
                   'id': 'grok-4.7',
                   'supported_reasoning_levels': ['low', 'medium', 'high'],
+                  'context_length': 262144,
+                  'max_output': 32768,
+                  'cost': {'input': 0.25},
                 },
                 {'id': 'grok-build', 'supports_reasoning': false},
                 {'id': 'grok-4.20-0309-reasoning'},
@@ -1694,6 +1698,12 @@ void main() {
       final original = config(provider: OAuthProvider.grok, expired: false);
       await settings.setProviderConfig(original.id, original);
       final discovered = await service.models(original);
+      final standard = discovered.singleWhere(
+        (model) => model.id == 'grok-4.7',
+      );
+      expect(standard.contextWindow, 262144);
+      expect(standard.maxOutput, 32768);
+      expect(standard.pricing, const ModelPricing(input: 0.25));
       expect(
         discovered
             .singleWhere((m) => m.id == 'grok-4.7-build-fast')
@@ -1722,7 +1732,7 @@ void main() {
       });
       expect(
         synced.modelOverrides['grok-4.7-build-fast']['contextWindow'],
-        500000,
+        isNull,
       );
       final fastSpec = ModelSpecResolver.instance.spec(
         synced,
@@ -1767,6 +1777,211 @@ void main() {
       expect(body['reasoning'], {'effort': 'xhigh'});
       expect(body['store'], false);
       expect(body['include'], contains('reasoning.encrypted_content'));
+    },
+  );
+
+  test(
+    'Grok Composer refreshes stored capabilities and sends supported efforts',
+    () async {
+      const id = 'grok-composer-2.5-fast';
+      const expectedLevels = [
+        ReasoningLevel.minimal,
+        ReasoningLevel.low,
+        ReasoningLevel.medium,
+        ReasoningLevel.high,
+        ReasoningLevel.xhigh,
+      ];
+      int? apiContext;
+      var catalogEfforts = <String>[];
+      final service = ProviderOAuthService(
+        clientFactory: (_) => MockClient((request) async {
+          if (request.url.host == 'api.x.ai') {
+            return jsonResponse({
+              'data': [
+                if (apiContext != null)
+                  {'id': id, 'context_length': apiContext},
+              ],
+            });
+          }
+          return jsonResponse({
+            'data': [
+              {
+                'id': 'composer-picker-key',
+                'model': id,
+                'supports_reasoning': false,
+                'supports_image_in': true,
+                'reasoningEfforts': catalogEfforts,
+              },
+            ],
+          });
+        }),
+      )..bind(settings);
+      addTearDown(service.dispose);
+      final original = config(provider: OAuthProvider.grok, expired: false)
+          .copyWith(
+            models: [id],
+            modelOverrides: {
+              id: {
+                'input': ['text', 'image'],
+                'abilities': ['tool'],
+                'reasoning': {
+                  'levels': ['max'],
+                  'canDisable': true,
+                },
+                'temperature': 0.7,
+              },
+            },
+          );
+      await settings.setProviderConfig(original.id, original);
+
+      final discovered = (await service.models(original)).single;
+      expect(discovered.id, id);
+      expect(discovered.displayName, 'Grok Composer 2.5 Fast');
+      expect(discovered.contextWindow, 200000);
+      expect(discovered.input, [Modality.text]);
+      expect(discovered.supportsReasoning, isTrue);
+      expect(discovered.reasoning.levels, expectedLevels);
+
+      await service.syncModels(original.id);
+      final synced = settings.providerConfigs[original.id]!;
+      final spec = ModelSpecResolver.instance.spec(synced, id);
+      expect(synced.models, [id]);
+      expect(synced.modelOverrides[id]['temperature'], 0.7);
+      expect(spec.contextWindow, 200000);
+      expect(spec.input, [Modality.text]);
+      expect(spec.abilities, [ModelAbility.tool, ModelAbility.reasoning]);
+      expect(spec.reasoning.dialect, ReasoningDialect.openaiResponsesReasoning);
+      expect(spec.reasoning.levels, expectedLevels);
+      expect(spec.reasoning.canDisable, isFalse);
+
+      apiContext = 256000;
+      catalogEfforts = ['max', 'low', 'xhigh'];
+      await service.syncModels(original.id);
+      final refreshed = settings.providerConfigs[original.id]!;
+      final refreshedSpec = ModelSpecResolver.instance.spec(refreshed, id);
+      expect(refreshedSpec.contextWindow, 256000);
+      expect(refreshedSpec.reasoning.levels, expectedLevels);
+
+      final requests = <http.Request>[];
+      final client = service.authenticatedClient(
+        MockClient((request) async {
+          requests.add(request);
+          return http.Response(
+            'data: {"type":"response.output_text.delta","delta":"Hi"}\n\ndata: {"type":"response.completed","response":{"id":"resp","output":[]}}\n\n',
+            200,
+            headers: {'content-type': 'text/event-stream'},
+          );
+        }),
+        refreshed,
+      );
+      addTearDown(client.close);
+      for (final level in [
+        ReasoningLevel.minimal,
+        ReasoningLevel.xhigh,
+        ReasoningLevel.max,
+      ]) {
+        await sendOpenAIStream(client, refreshed, id, [
+          {'role': 'user', 'content': 'Hi'},
+        ], reasoning: ReasoningRequest(level)).drain<void>();
+      }
+      for (final request in requests) {
+        expect(request.url.toString(), 'https://api.x.ai/v1/responses');
+        expect(jsonDecode(request.body)['model'], id);
+      }
+      expect(requests.map((request) => jsonDecode(request.body)['reasoning']), [
+        {'effort': 'minimal'},
+        {'effort': 'xhigh'},
+        {'effort': 'xhigh'},
+      ]);
+
+      apiContext = null;
+      await settings.setProviderConfig(
+        original.id,
+        refreshed.copyWith(
+          modelOverrides: {
+            id: {
+              'apiModelId': 'grok-4.7',
+              'input': ['text', 'image'],
+              'abilities': ['tool'],
+            },
+          },
+        ),
+      );
+      await service.syncModels(original.id);
+      final aliased = ModelSpecResolver.instance.spec(
+        settings.providerConfigs[original.id]!,
+        id,
+      );
+      expect(aliased.upstreamId, 'grok-4.7');
+      expect(aliased.contextWindow, isNull);
+      expect(aliased.input, [Modality.text, Modality.image]);
+      expect(aliased.supportsReasoning, isFalse);
+    },
+  );
+
+  test(
+    'OAuth numeric metadata survives a failed refresh and user edits stay in charge',
+    () async {
+      const id = 'relay/[tag] ExampleModel';
+      var status = 200;
+      final service = ProviderOAuthService(
+        clientFactory: (_) => MockClient(
+          (request) async => jsonResponse({
+            'data': [
+              {
+                'id': id,
+                'context_length': 262144,
+                'max_output': 32768,
+                'cost': {'input': 1},
+                'supports_image_in': true,
+                'supports_reasoning': true,
+              },
+            ],
+          }, status),
+        ),
+      )..bind(settings);
+      addTearDown(service.dispose);
+      final original = config(expired: false).copyWith(
+        modelOverrides: {
+          id: {
+            'contextWindow': 128000,
+            'input': ['text'],
+            'abilities': [],
+          },
+        },
+      );
+      await settings.setProviderConfig(original.id, original);
+      final discovered = (await service.models(original)).single;
+      expect(discovered.contextWindow, 128000);
+      expect(discovered.maxOutput, 32768);
+      expect(discovered.pricing, const ModelPricing(input: 1));
+      expect(discovered.input, [Modality.text]);
+      expect(discovered.abilities, isEmpty);
+
+      await service.syncModels(original.id);
+      final synced = settings.providerConfigs[original.id]!;
+      final saved = synced.modelOverrides[id] as Map;
+      expect(saved['contextWindow'], 128000);
+      expect(saved['input'], ['text']);
+      expect(saved['abilities'], isEmpty);
+      expect(saved, isNot(contains('maxOutput')));
+      expect(saved, isNot(contains('pricing')));
+
+      final reset = synced.copyWith(
+        modelOverrides: {
+          id: Map<String, dynamic>.from(saved)..remove('contextWindow'),
+        },
+      );
+      await settings.setProviderConfig(original.id, reset);
+      status = 503;
+      await expectLater(
+        service.models(reset),
+        throwsA(isA<ProviderOAuthException>()),
+      );
+      expect(ModelSpecResolver.instance.spec(reset, id).contextWindow, 262144);
+
+      await settings.removeProviderConfig(original.id);
+      expect(ModelSpecResolver.instance.spec(reset, id).contextWindow, isNull);
     },
   );
 

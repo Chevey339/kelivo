@@ -55,11 +55,16 @@ Kelivo 保留自己的 `originator` / User-Agent 和界面；手机提供浏览�
 - 使用相同的客户端 ID、scope、PKCE、JSON 令牌交换和续期请求；默认本机回调为 `http://localhost:54545/callback`，端口占用时使用可用端口。手机共用现有系统授权浏览器与本机回调桥接。也可粘贴授权码、`code#state` 或完整回调链接；带有 state 时必须匹配本次授权。
 - 令牌到期前五分钟续期，初次授权的组织信息在续期时保持不变；设备标识随账号凭证持久化。账号配置、TTL、凭证和组织信息一同备份恢复。
 - Messages 使用相同的 Bearer 鉴权、Claude Code 版本、beta 请求头、系统前缀、会话归属和工具名前缀；请求校验值用 XXHash64 计算，英文和 Unicode 样例已与 Bun 独立比对。客户端工具名称在返回时还原，签名思考与服务端工具块保持原样。
-- Claude Code 版本按 [OMP 2282226655](https://github.com/can1357/oh-my-pi/commit/228222665589a144c4592283c5fd919d5bd0caed) 更新为 `2.1.280`，满足 Opus 5.5 的最低版本要求。Messages 收到 HTTP 400 且明确包含 `claude_code_version_too_old` 时，采用服务端要求的更高版本，并从原始内容重建请求头、billing 和 cch；每次请求最多因此重试一次。采用的版本在进程内复用，不写入账号配置；401 续期仍最多一次。
+- Claude Code 默认版本为 `2.1.326`，SDK 版本为 `0.128.0`，Messages 的 Node 运行时请求头为 `v26.12.1`。Messages、模型列表和用量查询的默认 beta 请求头已移除 `mid-conversation-system-2026-04-07`。[OMP v18.22.2](https://github.com/can1357/oh-my-pi/releases/tag/v18.22.2)
+- Messages 收到 HTTP 400 且明确包含 `claude_code_version_too_old` 时，会采用服务端要求的更高版本，并从原始内容重建请求头、billing 和 cch。每次请求最多因此重试一次。采用的版本在进程内复用，401 续期仍最多一次。
 - 缓存默认开启且 TTL 为 **1 小时**，账号详情可选择 **5 分钟 / 1 小时**，也可关闭。两端复用现有缓存控件，关闭后保留所选 TTL。自动缓存断点遵循 OMP 的系统、工具和历史消息分配，最多四处；关闭时移除自动缓存断点。
 - 额度解析兼容旧窗口和新版 `limits` / `spend`；保留 `is_active: false` 的有效窗口，模型专属窗口耗尽不代表整个账号不可用。额外用量按美元展示，无上限时不编造百分比。短暂错误最多请求三次，429 不自动重试，拒绝原因经过脱敏后显示。
 
 HTTP 压缩使用 Dart 原生传输可解码的 gzip，未声明当前传输不能解码的 br/zstd，也未引入 OMP 的 CLI 配置及凭证轮换池。真实 Claude 账号授权、模型权限和额度须按下列步骤人工复测。
+
+### Grok
+
+同步 Grok OAuth 模型列表时，对账号返回的 `grok-composer-2.5-fast` 使用纯文本输入和 Responses 推理。按上游规则提供 `minimal`、`low`、`medium`、`high`、`xhigh` 五档。服务端缺少有效上下文长度时使用 200,000 token。已有账号可在详情页同步模型以刷新能力。[OMP Grok OAuth 模型规则](https://github.com/can1357/oh-my-pi/blob/v18.22.2/packages/catalog/src/compat/rules/providers/xai-oauth.kdl#L98-L105)、[思考档位](https://github.com/can1357/oh-my-pi/blob/v18.22.2/packages/catalog/src/compat/rules/providers/xai-oauth.kdl#L159-L166)
 
 ### 2026-10-30 上游同步
 

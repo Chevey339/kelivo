@@ -4290,6 +4290,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Send http(s) image links as-is; when off, remote links are dropped and only local images are sent';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => 'Response speed tiers';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      'Customize which acceleration tiers this model offers in chats. Clear both to offer only Standard.';
+
+  @override
   String get modelSpecFormPromptCacheControl => 'Prompt cache marker';
 
   @override
@@ -4504,19 +4511,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1 hour';
 
   @override
-  String get providerBalanceDefaultInterval =>
-      'Default balance refresh interval';
+  String get providerBalanceAutoRefresh => 'Automatic balance refresh';
 
   @override
-  String get providerBalanceInterval => 'Balance refresh interval';
+  String get providerBalanceScopeProvider => 'This provider';
 
   @override
-  String get providerBalanceRefreshOnReply =>
-      'Refresh balance after each reply';
+  String get providerBalanceScopeGlobal => 'Global defaults';
+
+  @override
+  String get providerBalanceInterval => 'Timed refresh';
+
+  @override
+  String get providerBalanceRefreshOnReply => 'Refresh after replies';
 
   @override
   String providerBalanceFollowDefault(String value) {
-    return 'Follow global setting ($value)';
+    return 'Default · $value';
   }
 
   @override
@@ -4587,11 +4598,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => 'Checking...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => 'Reset';
+  String get providerDetailPageBalanceResetDefaultsButton =>
+      'Restore default balance settings';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip =>
-      'Reset balance settings';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      'This will replace this provider’s custom balance request settings, restore the default state of its balance switch, and make automatic refresh follow the global settings.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => 'Restore defaults';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -4947,6 +4962,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageModelsTitle => 'Models';
 
   @override
+  String get providerDetailPageReorderModels => 'Reorder models';
+
+  @override
   String get providerModelsGetButton => 'Get';
 
   @override
@@ -5078,6 +5096,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get miniMapScrollToBottomTooltip => 'Scroll to bottom';
+
+  @override
+  String get miniMapSearchHint => 'Search minimap';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matches',
+      one: '1 match',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get miniMapSearchNoResults => 'No matching messages';
+
+  @override
+  String get miniMapSearchFailed => 'Couldn’t search messages';
 
   @override
   String get conversationFindHint => 'Find';
@@ -5212,10 +5250,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'Region (optional, default: us-en)';
 
   @override
+  String get searchServicesFourGetUrlInvalid =>
+      'Enter an HTTP or HTTPS base URL.';
+
+  @override
+  String get searchServicesFourGetScraperOptional =>
+      'Upstream engine (optional)';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'Pass cookie (optional)';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      'If the instance requires a CAPTCHA, complete it and paste the value of the pass cookie.';
+
+  @override
   String get searchServiceEditorProviderTypeTitle => 'Search provider';
 
   @override
   String get searchServiceEditorConfigurationTitle => 'Configuration';
+
+  @override
+  String get searchServiceEditorChangeIcon => 'Change icon';
+
+  @override
+  String get searchServiceEditorIconFailed =>
+      'Could not use this icon. Choose another image or icon.';
 
   @override
   String get searchServiceEditorNoConfiguration =>
@@ -5773,6 +5833,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageAutoSwitchTopicsTitle =>
       'Auto switch to Topics';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatTitle => 'Full-width chat';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      'Expand messages and the input box to fill the chat area.';
 
   @override
   String get desktopDisplaySettingsTopicPositionTitle => 'Topic position';
@@ -6613,6 +6680,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Privacy-respecting metasearch engine. Self-hosted instance required; no tracking.';
 
   @override
+  String get searchProviderFourGetDescription =>
+      'Web search through a public or self-hosted 4get instance with the API enabled.';
+
+  @override
   String get searchProviderTavilyDescription =>
       'AI search API optimized for LLMs. Provides high-quality, relevant results.';
 
@@ -6652,6 +6723,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';
@@ -11723,7 +11797,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceToolHelpViewImage =>
-      'Let the model inspect an image from the workspace.';
+      'Let the model inspect workspace images or images at public URLs.';
 
   @override
   String get workspaceToolHelpWrite =>

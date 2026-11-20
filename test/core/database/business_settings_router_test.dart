@@ -104,6 +104,7 @@ void main() {
           'plugin_future_key_v1': <String>['one', 'two'],
           'flutter_log_enabled_v1': true,
           'ollama_model_metadata_v1': '{"local-model":{}}',
+          BusinessKeyRegistry.modelListMetadataCacheKey: '{"relay":{}}',
           'desktop_autostart_hidden_v1': true,
           'window_physical_pos_x_v1': -3600.0,
           'window_physical_pos_y_v1': 200.0,
@@ -126,6 +127,10 @@ void main() {
         expect(exported['plugin_future_key_v1'], <String>['one', 'two']);
         expect(exported['flutter_log_enabled_v1'], isNull);
         expect(exported, isNot(contains('ollama_model_metadata_v1')));
+        expect(
+          exported,
+          isNot(contains(BusinessKeyRegistry.modelListMetadataCacheKey)),
+        );
         expect(exported, isNot(contains('desktop_autostart_hidden_v1')));
         expect(exported['window_physical_pos_x_v1'], isNull);
         expect(exported['window_physical_pos_y_v1'], isNull);
@@ -851,6 +856,30 @@ void main() {
           throwsA(isA<FormatException>()),
         );
       }
+    });
+
+    test('preserves 4get settings and validates the pass value', () {
+      final service = {
+        'id': '4get-1',
+        'type': '4get',
+        'url': 'https://search.example/4get',
+        'scraper': 'brave',
+        'passToken': 'test-pass',
+      };
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'search_services_v1': jsonEncode([service]),
+      });
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      expect(jsonDecode(exported['search_services_v1']! as String), [service]);
+
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'search_services_v1': jsonEncode([
+            {...service, 'passToken': 123},
+          ]),
+        }),
+        throwsA(isA<FormatException>()),
+      );
     });
 
     test('accepts and preserves Kagi search credentials', () {

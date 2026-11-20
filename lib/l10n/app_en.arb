@@ -2065,6 +2065,8 @@
   "modelSpecFormDynamicWebSearchSubtitle": "When dynamic filtering is on, send the 2026-03-18 web search and fetch tools",
   "modelSpecFormRemoteImageUrls": "Remote image links",
   "modelSpecFormRemoteImageUrlsSubtitle": "Send http(s) image links as-is; when off, remote links are dropped and only local images are sent",
+  "modelSpecFormResponseSpeedTiers": "Response speed tiers",
+  "modelSpecFormResponseSpeedTiersSubtitle": "Customize which acceleration tiers this model offers in chats. Clear both to offer only Standard.",
   "modelSpecFormPromptCacheControl": "Prompt cache marker",
   "modelSpecFormPromptCacheControlSubtitle": "When prompt caching is on, add cache_control to OpenRouter requests",
   "modelSpecFormSamplingAlways": "Always",
@@ -2131,21 +2133,29 @@
   "providerDetailPageClaudePromptCachingTtlHelp": "5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.",
   "providerDetailPageClaudePromptCachingTtl5m": "5 min",
   "providerDetailPageClaudePromptCachingTtl1h": "1 hour",
-  "providerBalanceDefaultInterval": "Default balance refresh interval",
-  "@providerBalanceDefaultInterval": {
-    "description": "Providers settings row for the global default interval between automatic account balance queries."
+  "providerBalanceAutoRefresh": "Automatic balance refresh",
+  "@providerBalanceAutoRefresh": {
+    "description": "Label for selecting whether to edit this provider's automatic balance refresh settings or the global defaults."
   },
-  "providerBalanceInterval": "Balance refresh interval",
+  "providerBalanceScopeProvider": "This provider",
+  "@providerBalanceScopeProvider": {
+    "description": "Scope choice in the automatic balance refresh settings for editing overrides that apply only to the current provider."
+  },
+  "providerBalanceScopeGlobal": "Global defaults",
+  "@providerBalanceScopeGlobal": {
+    "description": "Scope choice in the automatic balance refresh settings for editing defaults shared across providers."
+  },
+  "providerBalanceInterval": "Timed refresh",
   "@providerBalanceInterval": {
-    "description": "Row in a provider account balance editor for overriding its periodic refresh interval."
+    "description": "Short row label in automatic balance refresh settings for choosing how often to update the balance on a timer. Shown for both the global default and the provider override."
   },
-  "providerBalanceRefreshOnReply": "Refresh balance after each reply",
+  "providerBalanceRefreshOnReply": "Refresh after replies",
   "@providerBalanceRefreshOnReply": {
-    "description": "Global and provider settings label. An account balance query becomes due after a final model reply."
+    "description": "Short row label in automatic balance refresh settings. Updates the balance after each completed model reply. Shown for both the global default and the provider override."
   },
-  "providerBalanceFollowDefault": "Follow global setting ({value})",
+  "providerBalanceFollowDefault": "Default · {value}",
   "@providerBalanceFollowDefault": {
-    "description": "Provider override option that inherits the global setting. The value is the currently effective interval or the localized on/off state.",
+    "description": "Compact current value and picker option that uses the global automatic balance refresh setting. Keep the wording short so it fits beside the row label. The value is the currently effective interval or localized on/off state.",
     "placeholders": {
       "value": {
         "type": "String"
@@ -2215,8 +2225,9 @@
   "providerDetailPageBalanceResultPathLabel": "Result JSON Path",
   "providerDetailPageBalanceQueryButton": "Check Balance",
   "providerDetailPageBalanceQuerying": "Checking...",
-  "providerDetailPageBalanceResetDefaultsButton": "Reset",
-  "providerDetailPageBalanceResetDefaultsTooltip": "Reset balance settings",
+  "providerDetailPageBalanceResetDefaultsButton": "Restore default balance settings",
+  "providerDetailPageBalanceResetConfirmMessage": "This will replace this provider’s custom balance request settings, restore the default state of its balance switch, and make automatic refresh follow the global settings.",
+  "providerDetailPageBalanceResetConfirmButton": "Restore defaults",
   "providerDetailPageBalanceResult": "Balance: {value}",
   "@providerDetailPageBalanceResult": {
     "placeholders": {
@@ -2398,6 +2409,7 @@
   "desktopProviderShareCopyQr": "Copy QR",
   "providerDetailPageApiBaseUrlLabel": "API Base URL",
   "providerDetailPageModelsTitle": "Models",
+  "providerDetailPageReorderModels": "Reorder models",
   "providerModelsGetButton": "Get",
   "providerDetailPageCapsVision": "Vision",
   "providerDetailPageCapsImage": "Image",
@@ -2455,6 +2467,27 @@
   "miniMapTitle": "Minimap",
   "miniMapTooltip": "Minimap",
   "miniMapScrollToBottomTooltip": "Scroll to bottom",
+  "miniMapSearchHint": "Search minimap",
+  "@miniMapSearchHint": {
+    "description": "Tooltip for the magnifying glass in the minimap and placeholder in its search field. Searches the current conversation and shows matching message previews inside the minimap."
+  },
+  "miniMapSearchMatchCount": "{count, plural, one{1 match} other{{count} matches}}",
+  "@miniMapSearchMatchCount": {
+    "description": "Compact label beside a minimap search preview. The count is the total number of keyword occurrences in that single message, including occurrences outside the preview.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "miniMapSearchNoResults": "No matching messages",
+  "@miniMapSearchNoResults": {
+    "description": "Empty state in the minimap after a completed query matches no user messages or assistant replies."
+  },
+  "miniMapSearchFailed": "Couldn’t search messages",
+  "@miniMapSearchFailed": {
+    "description": "Status inside the minimap if searching the current conversation for matching messages fails."
+  },
   "conversationFindHint": "Find",
   "@conversationFindHint": {
     "description": "Placeholder in the search field of the current conversation’s find bar."
@@ -2537,8 +2570,14 @@
   "searchServicesEditDialogUsernameOptional": "Username (optional)",
   "searchServicesEditDialogPasswordOptional": "Password (optional)",
   "searchServicesEditDialogRegionOptional": "Region (optional, default: us-en)",
+  "searchServicesFourGetUrlInvalid": "Enter an HTTP or HTTPS base URL.",
+  "searchServicesFourGetScraperOptional": "Upstream engine (optional)",
+  "searchServicesFourGetPassOptional": "Pass cookie (optional)",
+  "searchServicesFourGetPassHelp": "If the instance requires a CAPTCHA, complete it and paste the value of the pass cookie.",
   "searchServiceEditorProviderTypeTitle": "Search provider",
   "searchServiceEditorConfigurationTitle": "Configuration",
+  "searchServiceEditorChangeIcon": "Change icon",
+  "searchServiceEditorIconFailed": "Could not use this icon. Choose another image or icon.",
   "searchServiceEditorNoConfiguration": "This provider does not require additional configuration.",
   "searchServiceEditorMultiKeyTitle": "Multi-key rotation",
   "searchServiceEditorMultiKeyNone": "Not configured",
@@ -2813,6 +2852,8 @@
   "displaySettingsPageSendShortcutEnter": "Enter",
   "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
   "displaySettingsPageAutoSwitchTopicsTitle": "Auto switch to Topics",
+  "desktopDisplaySettingsFullWidthChatTitle": "Full-width chat",
+  "desktopDisplaySettingsFullWidthChatSubtitle": "Expand messages and the input box to fill the chat area.",
   "desktopDisplaySettingsTopicPositionTitle": "Topic position",
   "desktopDisplaySettingsTopicPositionLeft": "Left",
   "desktopDisplaySettingsTopicPositionRight": "Right",
@@ -3155,6 +3196,7 @@
   "searchProviderLinkUpDescription": "Search API with sourced answers. Provides both results and AI-generated summaries.",
   "searchProviderMetasoDescription": "Chinese search by Metaso. Optimized for Chinese content with AI capabilities.",
   "searchProviderSearXNGDescription": "Privacy-respecting metasearch engine. Self-hosted instance required; no tracking.",
+  "searchProviderFourGetDescription": "Web search through a public or self-hosted 4get instance with the API enabled.",
   "searchProviderTavilyDescription": "AI search API optimized for LLMs. Provides high-quality, relevant results.",
   "searchProviderZhipuDescription": "Chinese AI search by Zhipu AI. Optimized for Chinese content and queries.",
   "searchProviderOllamaDescription": "Ollama web search API. Augments models with up-to-date information.",
@@ -3167,6 +3209,7 @@
   "searchServiceNameExaMcp": "Exa MCP",
   "searchServiceNameZhipu": "Zhipu AI",
   "searchServiceNameSearXNG": "SearXNG",
+  "searchServiceNameFourGet": "4get",
   "searchServiceNameLinkUp": "LinkUp",
   "searchServiceNameBrave": "Brave Search",
   "searchServiceNameMetaso": "Metaso",
@@ -5794,7 +5837,7 @@
   "workspaceToolsDescription": "Choose which tools conversations can use in this workspace. Changes are saved automatically.",
   "workspaceToolHelpShell": "Run commands in the workspace environment.",
   "workspaceToolHelpRead": "Read files with line numbers and paging.",
-  "workspaceToolHelpViewImage": "Let the model inspect an image from the workspace.",
+  "workspaceToolHelpViewImage": "Let the model inspect workspace images or images at public URLs.",
   "workspaceToolHelpWrite": "Create files or overwrite their contents.",
   "workspaceToolHelpEdit": "Replace specific text in an existing file.",
   "workspaceToolHelpList": "Browse directories and their entries.",
@@ -12149,6 +12192,12 @@
   "@modelSpecFormRemoteImageUrlsSubtitle": {
     "description": "Subtitle explaining that remote image links are dropped when off, sending only local images."
   },
+  "@modelSpecFormResponseSpeedTiers": {
+    "description": "Label for a switch in the model editor's request compatibility section that overrides the model's default list of available response speed tiers."
+  },
+  "@modelSpecFormResponseSpeedTiersSubtitle": {
+    "description": "Help under the model editor's response speed tier switch. Fast and UltraFast can be enabled independently, and neither checked leaves Standard as the only available chat option. Users select the actual speed in each chat."
+  },
   "@modelSpecFormPromptCacheControl": {
     "description": "Toggle label in request quirks controlling whether a cache_control marker is added to OpenRouter requests."
   },
@@ -12375,10 +12424,13 @@
     "description": "Loading label shown on the balance query button while a request is in progress."
   },
   "@providerDetailPageBalanceResetDefaultsButton": {
-    "description": "Button label that resets balance settings to their defaults."
+    "description": "Visible action below the provider's balance settings that opens a confirmation dialog, also used as the dialog title."
   },
-  "@providerDetailPageBalanceResetDefaultsTooltip": {
-    "description": "Tooltip on the reset icon button that restores default balance settings."
+  "@providerDetailPageBalanceResetConfirmMessage": {
+    "description": "Warning in the provider balance reset dialog. It replaces custom request fields with the provider preset, resets whether balance queries are enabled, and makes automatic refresh inherit the global settings."
+  },
+  "@providerDetailPageBalanceResetConfirmButton": {
+    "description": "Confirmation button in the provider balance reset dialog. Activating it restores default balance settings for the current provider."
   },
   "@providerDetailPageVertexAiTitle": {
     "description": "Row label with a switch enabling Vertex AI mode for the provider."
@@ -12680,6 +12732,9 @@
   "@providerDetailPageModelsTitle": {
     "description": "Section heading for the provider's model list."
   },
+  "@providerDetailPageReorderModels": {
+    "description": "Tooltip in the desktop provider's model toolbar and title of the dialog where users drag models into their preferred order for the chat model picker."
+  },
   "@providerModelsGetButton": {
     "description": "Button label that fetches/refreshes the provider's available models."
   },
@@ -12893,8 +12948,26 @@
   "@searchServicesEditDialogRegionOptional": {
     "description": "Label for an optional region field in the editor, noting default us-en, with hint 'us-en'."
   },
+  "@searchServicesFourGetUrlInvalid": {
+    "description": "Validation error under the 4get instance address or in a desktop notification. The address must be an absolute HTTP or HTTPS base URL without a query or fragment. HTTP and HTTPS are technical terms."
+  },
+  "@searchServicesFourGetScraperOptional": {
+    "description": "Label for the optional upstream search engine identifier in the 4get settings form, such as ddg for DuckDuckGo. When empty, the instance chooses its default."
+  },
+  "@searchServicesFourGetPassOptional": {
+    "description": "Label for the optional masked 4get credential field in search service settings. Pass is the literal cookie name 'pass'. Preserve it as a name."
+  },
+  "@searchServicesFourGetPassHelp": {
+    "description": "Help below the 4get credential field. Tell users to solve the instance's CAPTCHA when required and paste the value of the cookie whose literal name is 'pass'. Keep 'pass' lowercase and untranslated."
+  },
   "@searchServiceEditorProviderTypeTitle": {
     "description": "Section header for choosing the search provider type in the service editor."
+  },
+  "@searchServiceEditorChangeIcon": {
+    "description": "Tooltip and accessibility label for the button inside the search service editor that opens the icon source menu for this configured service."
+  },
+  "@searchServiceEditorIconFailed": {
+    "description": "Error shown in the search service editor when selecting or importing a custom service icon fails."
   },
   "@searchServiceEditorConfigurationTitle": {
     "description": "Section header for the provider-specific configuration fields in the service editor."
@@ -13315,6 +13388,12 @@
   },
   "@displaySettingsPageAutoSwitchTopicsTitle": {
     "description": "Desktop toggle label to automatically switch to the Topics view."
+  },
+  "@desktopDisplaySettingsFullWidthChatTitle": {
+    "description": "Label for the switch in desktop Display settings that removes the fixed maximum width for the message list and input box."
+  },
+  "@desktopDisplaySettingsFullWidthChatSubtitle": {
+    "description": "Tooltip beside the full-width chat switch in desktop Display settings. The chat area is the space available between the sidebars."
   },
   "@desktopDisplaySettingsTopicPositionTitle": {
     "description": "Label for choosing whether the topic list sits on the left or right."
@@ -14050,6 +14129,9 @@
   "@searchProviderSearXNGDescription": {
     "description": "Description under the SearXNG search provider option noting it is a privacy-respecting metasearch engine requiring a self-hosted instance."
   },
+  "@searchProviderFourGetDescription": {
+    "description": "Description for the 4get search provider option. The user supplies a public or self-hosted 4get instance where its search API is enabled. Preserve the brand name '4get'."
+  },
   "@searchProviderTavilyDescription": {
     "description": "Description under the Tavily search provider option noting it is an AI search API optimized for LLMs."
   },
@@ -14085,6 +14167,9 @@
   },
   "@searchServiceNameSearXNG": {
     "description": "Display name for the 'searxng' search service type in the search service list and editor."
+  },
+  "@searchServiceNameFourGet": {
+    "description": "Display name of the 4get web search provider in the search service pickers. Keep the brand spelling '4get'."
   },
   "@searchServiceNameLinkUp": {
     "description": "Display name for the 'linkup' search service type in the search service list and editor."
@@ -18107,7 +18192,7 @@
     "description": "Description for the 'read_file' tool: reads file contents by line with paging support."
   },
   "@workspaceToolHelpViewImage": {
-    "description": "Description for the 'view_image' tool: lets the model inspect an image stored in the workspace."
+    "description": "Text in the workspace Tools pane explaining that the view_image tool lets the model inspect workspace images and download images from public HTTP or HTTPS URLs."
   },
   "@workspaceToolHelpWrite": {
     "description": "Description for the 'write_file' tool: creates files or overwrites their contents."

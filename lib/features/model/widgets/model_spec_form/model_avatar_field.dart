@@ -1,17 +1,12 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
-import '../../../../core/models/avatar_config.dart';
 import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/configurable_avatar.dart';
-import '../../../../shared/widgets/emoji_picker_dialog.dart';
 import '../../../../shared/widgets/ios_tactile.dart';
 import '../../../../shared/widgets/snackbar.dart';
 import '../../../../utils/brand_assets.dart';
-import '../../../provider/widgets/avatar_input_dialog.dart';
-import '../../../provider/widgets/provider_icon_picker.dart';
+import '../../../provider/widgets/avatar_picker.dart';
 import 'model_spec_form_controller.dart';
 
 class ModelAvatarField extends StatefulWidget {
@@ -32,72 +27,16 @@ class _ModelAvatarFieldState extends State<ModelAvatarField> {
 
   Future<void> _pick() async {
     final l10n = AppLocalizations.of(context)!;
-    final choice = await showProviderAvatarSourceMenu(
-      context,
-      desktop: widget.desktop,
-      allowEmoji: true,
-      anchorKey: _anchor,
-    );
-    if (choice == null || !mounted) return;
     try {
-      AvatarConfig? avatar;
-      switch (choice) {
-        case AvatarSource.reset:
-          break;
-        case AvatarSource.builtin:
-          final current = widget.controller.avatar;
-          final value = await showProviderIconPicker(
-            context,
-            desktop: widget.desktop,
-            selectedAsset: current?.type == AvatarType.icon
-                ? current!.value
-                : null,
-          );
-          if (value == null) return;
-          avatar = AvatarConfig(type: AvatarType.icon, value: value);
-        case AvatarSource.emoji:
-          final value = await showEmojiPickerDialog(context);
-          if (value == null) return;
-          avatar = AvatarConfig(type: AvatarType.emoji, value: value);
-        case AvatarSource.image:
-          final String? path;
-          if (widget.desktop) {
-            final result = await FilePicker.platform.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: [
-                'png',
-                'jpg',
-                'jpeg',
-                'webp',
-                'gif',
-                'svg',
-                'bmp',
-                'ico',
-              ],
-            );
-            path = result?.files.single.path;
-          } else {
-            path = (await ImagePicker().pickImage(
-              source: ImageSource.gallery,
-              requestFullMetadata: false,
-            ))?.path;
-          }
-          if (path == null || path.isEmpty) return;
-          avatar = AvatarConfig(type: AvatarType.file, value: path);
-        case AvatarSource.lobehub:
-        case AvatarSource.url:
-          avatar = await showAvatarInputDialog(
-            context,
-            type: choice == AvatarSource.lobehub
-                ? AvatarType.lobehub
-                : AvatarType.url,
-            desktop: widget.desktop,
-            initial: widget.controller.avatar,
-            keyPrefix: 'model-avatar-input',
-          );
-          if (avatar == null) return;
-      }
-      if (mounted) widget.controller.setAvatar(avatar);
+      await showAvatarPicker(
+        context,
+        desktop: widget.desktop,
+        anchorKey: _anchor,
+        current: widget.controller.avatar,
+        onSelected: (avatar) => widget.controller.setAvatar(avatar),
+        usePhotoLibrary: !widget.desktop,
+        keyPrefix: 'model-avatar-input',
+      );
     } catch (_) {
       if (mounted) {
         showAppSnackBar(

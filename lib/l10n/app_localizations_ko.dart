@@ -4190,6 +4190,13 @@ class AppLocalizationsKo extends AppLocalizations {
       'http(s) 이미지 링크를 그대로 전송합니다. 끄면 원격 링크는 제외되고 로컬 이미지만 전송됩니다';
 
   @override
+  String get modelSpecFormResponseSpeedTiers => '응답 속도 등급';
+
+  @override
+  String get modelSpecFormResponseSpeedTiersSubtitle =>
+      '채팅에서 이 모델이 제공할 가속 등급을 사용자 지정합니다. 둘 다 선택하지 않으면 표준만 제공됩니다.';
+
+  @override
   String get modelSpecFormPromptCacheControl => '프롬프트 캐시 마커';
 
   @override
@@ -4397,17 +4404,23 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerDetailPageClaudePromptCachingTtl1h => '1시간';
 
   @override
-  String get providerBalanceDefaultInterval => '기본 잔액 새로 고침 간격';
+  String get providerBalanceAutoRefresh => '자동 잔액 새로고침';
 
   @override
-  String get providerBalanceInterval => '잔액 새로 고침 간격';
+  String get providerBalanceScopeProvider => '이 공급자';
 
   @override
-  String get providerBalanceRefreshOnReply => '모델이 답변할 때마다 잔액 새로 고침';
+  String get providerBalanceScopeGlobal => '전역 기본값';
+
+  @override
+  String get providerBalanceInterval => '정기 새로고침';
+
+  @override
+  String get providerBalanceRefreshOnReply => '응답 후 새로고침';
 
   @override
   String providerBalanceFollowDefault(String value) {
-    return '전역 설정 따르기($value)';
+    return '기본값 · $value';
   }
 
   @override
@@ -4478,10 +4491,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerDetailPageBalanceQuerying => '확인 중...';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsButton => '초기화';
+  String get providerDetailPageBalanceResetDefaultsButton => '기본 잔액 설정 복원';
 
   @override
-  String get providerDetailPageBalanceResetDefaultsTooltip => '잔액 설정 초기화';
+  String get providerDetailPageBalanceResetConfirmMessage =>
+      '이 공급자의 사용자 지정 잔액 요청 설정을 대체하고, 잔액 조회 스위치를 기본 상태로 복원하며, 자동 새로 고침이 전역 설정을 따르도록 합니다.';
+
+  @override
+  String get providerDetailPageBalanceResetConfirmButton => '기본값 복원';
 
   @override
   String providerDetailPageBalanceResult(String value) {
@@ -4833,6 +4850,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get providerDetailPageModelsTitle => '모델';
 
   @override
+  String get providerDetailPageReorderModels => '모델 순서 변경';
+
+  @override
   String get providerModelsGetButton => '가져오기';
 
   @override
@@ -4962,6 +4982,25 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get miniMapScrollToBottomTooltip => '맨 아래로 스크롤';
+
+  @override
+  String get miniMapSearchHint => '미니맵 검색';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 일치',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get miniMapSearchNoResults => '일치하는 메시지가 없습니다';
+
+  @override
+  String get miniMapSearchFailed => '메시지를 검색하지 못했습니다';
 
   @override
   String get conversationFindHint => '찾기';
@@ -5094,10 +5133,30 @@ class AppLocalizationsKo extends AppLocalizations {
   String get searchServicesEditDialogRegionOptional => '지역(선택 사항, 기본값: us-en)';
 
   @override
+  String get searchServicesFourGetUrlInvalid => 'HTTP 또는 HTTPS 기본 URL을 입력하세요.';
+
+  @override
+  String get searchServicesFourGetScraperOptional => '업스트림 엔진 (선택 사항)';
+
+  @override
+  String get searchServicesFourGetPassOptional => 'pass 쿠키 (선택 사항)';
+
+  @override
+  String get searchServicesFourGetPassHelp =>
+      '인스턴스에서 CAPTCHA를 요구하는 경우, CAPTCHA를 완료한 후 pass 쿠키의 값을 붙여넣으세요.';
+
+  @override
   String get searchServiceEditorProviderTypeTitle => '검색 공급자';
 
   @override
   String get searchServiceEditorConfigurationTitle => '구성';
+
+  @override
+  String get searchServiceEditorChangeIcon => '아이콘 변경';
+
+  @override
+  String get searchServiceEditorIconFailed =>
+      '이 아이콘을 사용할 수 없습니다. 다른 이미지나 아이콘을 선택하세요.';
 
   @override
   String get searchServiceEditorNoConfiguration => '이 공급자는 추가 구성이 필요하지 않습니다.';
@@ -5620,6 +5679,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get displaySettingsPageAutoSwitchTopicsTitle => '주제로 자동 전환';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatTitle => '전체 너비 채팅';
+
+  @override
+  String get desktopDisplaySettingsFullWidthChatSubtitle =>
+      '메시지와 입력 상자를 채팅 영역에 맞게 확장합니다.';
 
   @override
   String get desktopDisplaySettingsTopicPositionTitle => '주제 위치';
@@ -6435,6 +6501,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '개인정보를 존중하는 메타 검색 엔진입니다. 자체 호스팅 인스턴스가 필요하며 추적하지 않습니다.';
 
   @override
+  String get searchProviderFourGetDescription =>
+      'API가 활성화된 공개 또는 자체 호스팅 4get 인스턴스를 통해 웹을 검색합니다.';
+
+  @override
   String get searchProviderTavilyDescription =>
       'LLM에 최적화된 AI 검색 API입니다. 고품질의 관련성 높은 결과를 제공합니다.';
 
@@ -6474,6 +6544,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get searchServiceNameSearXNG => 'SearXNG';
+
+  @override
+  String get searchServiceNameFourGet => '4get';
 
   @override
   String get searchServiceNameLinkUp => 'LinkUp';
@@ -11382,7 +11455,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get workspaceToolHelpRead => '줄 번호와 페이지 넘김으로 파일을 읽습니다.';
 
   @override
-  String get workspaceToolHelpViewImage => '모델이 작업 공간의 이미지를 확인할 수 있게 합니다.';
+  String get workspaceToolHelpViewImage =>
+      '모델이 작업 공간 이미지나 공개 URL의 이미지를 확인할 수 있도록 합니다.';
 
   @override
   String get workspaceToolHelpWrite => '파일을 생성하거나 내용을 덮어씁니다.';

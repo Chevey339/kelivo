@@ -65,7 +65,7 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 <td width="180" align="center" valign="middle">
   <a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo"><img src="docs/sponsors/marucode.jpg" alt="MaruCode" width="150"></a>
 </td>
-<td valign="middle"><b><a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">MaruCode</a></b> 是一家偶尔做做慈善的小破站 API，自营号池，主要提供 Codex、Claude Code、GPT Image 等主流模型，支持 Websocket 协议，明码标价(Codex 0.25x, CC 1.5x)，透明汇率(1:1)，<a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">新用户注册送 2 刀</a>。<a href="https://images-2.muteki.site">生图工作台🖼️</a></td>
+<td valign="middle"><b><a href="https://api.muteki.site/register?aff=kelivo&promo=kelivo">MaruCode</a></b> 是一家偶尔做做慈善的小破站 API，自营号池，已运营半年有余。本站不搞充值营销套路，主要提供 Codex（GPT 6.2 Astra Sol 等）、Claude Code（Claude Fable 5.2、Opus 5.5 等）、GPT Image 2.6 等主流模型，独家支持 WebSocket 协议，Cache Hit 90%+，明码标价（Codex 0.3x，CC 1.7x）。站内 3K 人，欢迎学校、企业、工作室和个人对接。<a href="https://images-2.muteki.site">生图工作台🖼️</a></td>
 </tr>
 <tr>
 <td width="180" align="center" valign="middle">

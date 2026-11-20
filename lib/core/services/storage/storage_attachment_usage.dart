@@ -566,6 +566,13 @@ _AttachmentReferences _readReferences(
     }
   }
   for (final row in database.select(
+    'SELECT payload FROM search_service_rows',
+  )) {
+    final payload = jsonDecode(row['payload'] as String) as Map;
+    final avatar = AvatarConfig.fromJson(payload['avatar']);
+    if (avatar?.type == AvatarType.file) add(appearance, avatar!.value);
+  }
+  for (final row in database.select(
     "SELECT key, value FROM preference_rows "
     "WHERE key IN ('avatar_value', 'mcp_presentation_v1')",
   )) {

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:Kelivo/core/models/mcp_presentation.dart';
-import 'package:Kelivo/core/services/mcp/mcp_icon_cache.dart';
+import 'package:Kelivo/utils/icon_cache.dart';
 import 'package:Kelivo/features/mcp/widgets/mcp_resolved_icon.dart';
 
 const _custom = 'https://icons.example/custom.svg';
@@ -20,11 +20,11 @@ void main() {
   late Directory directory;
   setUp(() {
     directory = Directory.systemTemp.createTempSync('mcp-resolved-icon-');
-    McpIconCache.clearMemory();
+    IconCache.clearMemory();
   });
   tearDown(() => directory.deleteSync(recursive: true));
 
-  Future<String?> cache(String source, String? content) => McpIconCache.getPath(
+  Future<String?> cache(String source, String? content) => IconCache.getPath(
     source,
     directory: directory,
     client: MockClient(

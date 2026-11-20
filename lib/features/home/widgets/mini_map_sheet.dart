@@ -6,8 +6,9 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
+import 'mini_map_search.dart';
 
-Future<String?> showMiniMapSheet(
+Future<MiniMapSelection?> showMiniMapSheet(
   BuildContext context,
   List<ChatMessage> messages, {
   bool selecting = false,
@@ -15,14 +16,16 @@ Future<String?> showMiniMapSheet(
   Listenable? selectionListenable,
   ValueChanged<String>? onToggleSelection,
   VoidCallback? onOpenConversationFind,
+  MiniMapSearch? onSearch,
 }) async {
   assert(
     !selecting || (selectedMessageIds != null && onToggleSelection != null),
     'Mini map selection mode requires selectedMessageIds and onToggleSelection.',
   );
-  return await showModalBottomSheet<String>(
+  return await showModalBottomSheet<MiniMapSelection>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -34,6 +37,7 @@ Future<String?> showMiniMapSheet(
       selectionListenable: selectionListenable,
       onToggleSelection: onToggleSelection,
       onOpenConversationFind: onOpenConversationFind,
+      onSearch: onSearch,
     ),
   );
 }
@@ -45,6 +49,7 @@ class _MiniMapSheet extends StatefulWidget {
   final Listenable? selectionListenable;
   final ValueChanged<String>? onToggleSelection;
   final VoidCallback? onOpenConversationFind;
+  final MiniMapSearch? onSearch;
 
   const _MiniMapSheet({
     required this.messages,
@@ -53,6 +58,7 @@ class _MiniMapSheet extends StatefulWidget {
     this.selectionListenable,
     this.onToggleSelection,
     this.onOpenConversationFind,
+    this.onSearch,
   });
 
   @override
@@ -61,6 +67,7 @@ class _MiniMapSheet extends StatefulWidget {
 
 class _MiniMapSheetState extends State<_MiniMapSheet> {
   late List<_QaPair> _pairs = _buildPairs(widget.messages);
+  bool _searchOpen = false;
 
   @override
   void didUpdateWidget(_MiniMapSheet oldWidget) {
@@ -72,119 +79,151 @@ class _MiniMapSheetState extends State<_MiniMapSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return SafeArea(
       top: false,
-      child: DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.55,
-        minChildSize: 0.35,
-        maxChildSize: 0.9,
-        builder: (ctx, controller) {
-          Widget buildList() {
-            final pairs = _pairs;
-            return ListView.builder(
-              controller: controller,
-              itemCount: pairs.length,
-              itemBuilder: (context, index) {
-                final pair = pairs[index];
-                return _MiniMapRow(
-                  pair: pair,
-                  selecting: widget.selecting,
-                  selectedMessageIds: widget.selectedMessageIds,
-                  onToggleSelection: widget.onToggleSelection,
-                );
-              },
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: _searchOpen ? MediaQuery.viewInsetsOf(context).bottom : 0,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Keep room for results even when the keyboard leaves little
+            // vertical space in landscape or split screen.
+            const searchHeight = 160.0;
+            final minimum = _searchOpen
+                ? (searchHeight / constraints.maxHeight).clamp(.35, .98)
+                : .35;
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: minimum.clamp(.55, 1.0),
+              minChildSize: minimum,
+              maxChildSize: _searchOpen ? 1 : .9,
+              builder: (context, controller) => _buildContent(
+                context,
+                controller,
+                compact: constraints.maxHeight < searchHeight,
+              ),
             );
-          }
+          },
+        ),
+      ),
+    );
+  }
 
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Pinned drag handle
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Pinned title
-                Row(
-                  children: [
-                    Icon(Lucide.Map, size: 18, color: cs.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        AppLocalizations.of(context)!.miniMapTitle,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: AppFontWeights.emphasis,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    SizedBox(
-                      height: 36,
-                      width: 36,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          Lucide.ChevronsDown,
-                          size: 18,
-                          color: cs.onSurface,
-                        ),
-                        tooltip: AppLocalizations.of(
-                          context,
-                        )!.miniMapScrollToBottomTooltip,
-                        onPressed: () {
-                          if (controller.hasClients &&
-                              controller.position.maxScrollExtent > 0) {
-                            controller.jumpTo(
-                              controller.position.maxScrollExtent,
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                    if (!widget.selecting &&
-                        widget.onOpenConversationFind != null)
-                      IosIconButton(
-                        key: const ValueKey('miniMapSearchButton'),
-                        icon: Lucide.Search,
-                        minSize: 36,
-                        tooltip: AppLocalizations.of(
-                          context,
-                        )!.conversationFindOpenTooltip,
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          widget.onOpenConversationFind!();
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Scrollable content
-                Expanded(
-                  child: widget.selecting && widget.selectionListenable != null
-                      ? AnimatedBuilder(
-                          animation: widget.selectionListenable!,
-                          builder: (context, child) => buildList(),
-                        )
-                      : buildList(),
-                ),
-              ],
-            ),
+  Widget _buildContent(
+    BuildContext context,
+    ScrollController controller, {
+    required bool compact,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+
+    Widget buildList() {
+      final pairs = _pairs;
+      return ListView.builder(
+        controller: controller,
+        itemCount: pairs.length,
+        itemBuilder: (context, index) {
+          final pair = pairs[index];
+          return _MiniMapRow(
+            pair: pair,
+            selecting: widget.selecting,
+            selectedMessageIds: widget.selectedMessageIds,
+            onToggleSelection: widget.onToggleSelection,
           );
         },
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Pinned drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (_searchOpen)
+            Expanded(
+              child: MiniMapSearchPanel(
+                onSearch: widget.onSearch!,
+                onClose: () => setState(() => _searchOpen = false),
+                onSelect: (selection) => Navigator.of(context).pop(selection),
+                browseList: buildList(),
+                scrollController: compact ? null : controller,
+              ),
+            )
+          else ...[
+            Row(
+              children: [
+                Icon(Lucide.Map, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.miniMapTitle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: AppFontWeights.emphasis,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IosIconButton(
+                  icon: Lucide.ChevronsDown,
+                  size: 18,
+                  minSize: 36,
+                  tooltip: l10n.miniMapScrollToBottomTooltip,
+                  onTap: () {
+                    if (controller.hasClients) {
+                      controller.jumpTo(controller.position.maxScrollExtent);
+                    }
+                  },
+                ),
+                if (!widget.selecting && widget.onSearch != null)
+                  IosIconButton(
+                    key: const ValueKey('miniMapPreviewSearchButton'),
+                    icon: Lucide.Search,
+                    size: 18,
+                    minSize: 36,
+                    tooltip: l10n.miniMapSearchHint,
+                    onTap: () => setState(() => _searchOpen = true),
+                  ),
+                if (!widget.selecting && widget.onOpenConversationFind != null)
+                  IosIconButton(
+                    key: const ValueKey('miniMapSearchButton'),
+                    icon: Lucide.TextSearch,
+                    size: 18,
+                    minSize: 36,
+                    tooltip: l10n.conversationFindOpenTooltip,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      widget.onOpenConversationFind!();
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Scrollable content
+            Expanded(
+              child: widget.selecting && widget.selectionListenable != null
+                  ? AnimatedBuilder(
+                      animation: widget.selectionListenable!,
+                      builder: (context, child) => buildList(),
+                    )
+                  : buildList(),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -355,7 +394,9 @@ class _MiniMapRow extends StatelessWidget {
                     : InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: pair.user != null
-                            ? () => Navigator.of(context).pop(pair.user!.id)
+                            ? () => Navigator.of(context).pop<MiniMapSelection>(
+                                (messageId: pair.user!.id, match: null),
+                              )
                             : null,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -418,8 +459,9 @@ class _MiniMapRow extends StatelessWidget {
                     : InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: pair.assistant != null
-                            ? () =>
-                                  Navigator.of(context).pop(pair.assistant!.id)
+                            ? () => Navigator.of(context).pop<MiniMapSelection>(
+                                (messageId: pair.assistant!.id, match: null),
+                              )
                             : null,
                         child: Container(
                           padding: const EdgeInsets.symmetric(

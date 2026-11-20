@@ -28,6 +28,8 @@ class IosNavRow extends StatelessWidget {
     this.labelMaxLines = 1,
     this.iconColor,
     this.haptics = true,
+    this.focusable = false,
+    this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
   });
 
   final IconData? icon;
@@ -55,6 +57,8 @@ class IosNavRow extends StatelessWidget {
   final int? labelMaxLines;
   final Color? iconColor;
   final bool haptics;
+  final bool focusable;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -68,13 +72,14 @@ class IosNavRow extends StatelessWidget {
     return IosCardPress(
       baseColor: Colors.transparent,
       borderRadius: BorderRadius.zero,
-      pressedBlendStrength: 0,
+      pressedBlendStrength: focusable ? null : 0,
+      focusable: focusable,
       pressedScale: 1.0,
       haptics: interactive && haptics,
       onTap: onTap,
       onLongPress: onLongPress,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        padding: padding,
         child: Row(
           children: [
             if (icon != null || leading != null) ...[
@@ -179,6 +184,8 @@ class IosSwitchRow extends StatelessWidget {
     this.iconColor,
     this.subtitle,
     this.labelTrailing,
+    this.focusable = false,
+    this.padding,
   });
 
   final IconData? icon;
@@ -190,6 +197,8 @@ class IosSwitchRow extends StatelessWidget {
   final VoidCallback? onLongPress;
   final bool destructive;
   final Color? iconColor;
+  final bool focusable;
+  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
@@ -203,16 +212,19 @@ class IosSwitchRow extends StatelessWidget {
     return IosCardPress(
       baseColor: Colors.transparent,
       borderRadius: BorderRadius.zero,
-      pressedBlendStrength: 0,
+      pressedBlendStrength: focusable ? null : 0,
+      focusable: focusable,
       pressedScale: 1.0,
       haptics: true,
       onTap: () => onChanged(!value),
       onLongPress: onLongPress,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: hasSubtitle ? 11 : 2,
-        ),
+        padding:
+            padding ??
+            EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: hasSubtitle ? 11 : 2,
+            ),
         child: Row(
           children: [
             if (icon != null) ...[

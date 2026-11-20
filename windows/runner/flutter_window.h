@@ -29,6 +29,7 @@ class FlutterWindow : public Win32Window {
   bool autostart_;
   EngineShutdown engine_shutdown_;
   FlutterDesktopPluginRegistrarRef webview_registrar_ = nullptr;
+  FlutterDesktopPluginRegistrarRef webview_windows_registrar_ = nullptr;
   bool system_sleeping_ = false;
   int64_t last_system_wake_at_ = 0;
   std::optional<RECT> restoring_bounds_;

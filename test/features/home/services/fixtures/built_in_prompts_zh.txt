@@ -197,10 +197,10 @@ File path to read.
 Maximum number of lines to return.
 
 [view_image]
-View a local image file when visual inspection is needed. Use this for images already on disk. Paths: /workspace, /chat, /skills, /tmp, /mounts. Supports PNG, JPEG, GIF, WebP, and BMP; animated images use the first frame. Returns image content to inspect. Large images are resized to at most 2048 pixels on the longest edge. Images already included in messages can be inspected directly; do not call this tool for them. Use image_id only to retrieve a conversation image that is missing from the current context. Call with no image selected to list available conversation images; pass next_offset as offset to list more. When using image_id, do not also supply a file path.
+Inspect a local image or a direct public HTTP(S) image URL. Local paths: /workspace, /chat, /skills, /tmp, /mounts. Supports PNG, JPEG, GIF, WebP, and BMP; animated images use the first frame. Returns image content to inspect. Large images are resized to at most 2000 pixels on the longest edge. Images already included in messages can be inspected directly; do not call this tool for them. Use image_id only to retrieve a conversation image that is missing from the current context. Call with no image selected to list available conversation images; pass next_offset as offset to list more. Omit path when using image_id.
 
 [view_image.parameters.properties.path]
-Local filesystem path to an image file.
+Local image file path or public HTTP(S) image URL.
 
 [view_image.parameters.properties.image_id]
 Copy the exact img_ identifier from an omitted-image placeholder or image listing. Never invent an ID such as img_1. If the ID is unknown, call with no image selected to list available images first.

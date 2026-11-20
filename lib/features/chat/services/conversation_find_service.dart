@@ -4,11 +4,13 @@ import 'package:markstream/markstream_core.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/database/generation_run.dart';
+import '../../../shared/cache/byte_lru_cache.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/protected_text.dart';
 import '../../../utils/source_text_map.dart';
 import '../../../utils/unicode_case_fold.dart';
 import '../../../utils/unicode_sanitizer.dart';
+import '../../../utils/utf16_safe_cut.dart';
 import '../../../shared/markdown/kelivo_markdown_extensions.dart';
 import '../../../shared/markdown/citation_syntax.dart';
 import '../../intelligent_ui/host/ui_presented_fences.dart';
@@ -35,12 +37,48 @@ typedef ConversationFindHit = ({
   String? surfaceKey,
 });
 
+typedef ConversationFindPreview = ({
+  ConversationFindHit hit,
+  String role,
+  int matchCount,
+  String before,
+  List<({String text, bool highlighted})> segments,
+});
+
 typedef FindOptions = ({bool matchCase, bool wholeWord, bool thinking});
 const defaultFindOptions = (
   matchCase: false,
   wholeWord: false,
   thinking: false,
 );
+const _findCacheBytes = 8 * 1024 * 1024;
+
+/// Keeps text from rendered messages so a later query can skip Markdown
+/// parsing for known misses. The source snapshot and presentation must agree.
+class ConversationFindCache {
+  ConversationFindService? _presentation;
+  late ByteLruCache<_FindCacheKey, _CachedFindText> _entries;
+
+  ByteLruCache<_FindCacheKey, _CachedFindText> _forPresentation(
+    ConversationFindService service,
+  ) {
+    final previous = _presentation;
+    if (previous == null || !service.usesSamePresentation(previous)) {
+      _presentation = service;
+      _entries = ByteLruCache(
+        maxBytes: _findCacheBytes,
+        sizeOf: (_, entry) => entry.projection.bytes,
+      );
+    }
+    return _entries;
+  }
+
+  void clear() {
+    if (_presentation == null) return;
+    _presentation = null;
+    _entries.clear();
+  }
+}
 
 class ConversationFindService {
   const ConversationFindService({
@@ -68,37 +106,102 @@ class ConversationFindService {
       translationPlaceholder == other.translationPlaceholder &&
       listEquals(assistant?.regexRules, other.assistant?.regexRules);
 
-  /// Keep full message snapshots out of the widget tree and release each batch
-  /// as soon as it has been projected. A superseded query stops reading pages.
   Future<Map<String, List<ConversationFindHit>>> search(
     Stream<List<ConversationFindCandidate>> candidates,
     String query,
     FindOptions options, {
+    ConversationFindCache? cache,
     bool Function()? isCurrent,
     ConversationFindCandidate Function(ConversationFindCandidate)?
     liveCandidate,
   }) async {
     final result = <String, List<ConversationFindHit>>{};
-    if (query.trim().isEmpty) return result;
-    await for (final batch in candidates) {
-      if (isCurrent?.call() == false) break;
-      final rows = liveCandidate == null
-          ? batch
-          : batch.map(liveCandidate).toList();
-      final hits = await compute(_matchBatch, (this, rows, query, options));
-      if (isCurrent?.call() == false) break;
-      result.addAll(hits);
+    await for (final hits in _searchBatches(
+      candidates,
+      query,
+      options,
+      cache: cache,
+      previewsOnly: false,
+      isCurrent: isCurrent,
+      liveCandidate: liveCandidate,
+    )) {
+      result.addAll(hits.hits);
     }
     return result;
   }
 
-  List<ConversationFindHit> _match(
+  /// One snippet per matching message, in timeline order.
+  Stream<List<ConversationFindPreview>> searchPreviews(
+    Stream<List<ConversationFindCandidate>> candidates,
+    String query, {
+    ConversationFindCache? cache,
+    bool Function()? isCurrent,
+    ConversationFindCandidate Function(ConversationFindCandidate)?
+    liveCandidate,
+  }) => _searchBatches(
+    candidates,
+    query.trim(),
+    defaultFindOptions,
+    cache: cache,
+    previewsOnly: true,
+    isCurrent: isCurrent,
+    liveCandidate: liveCandidate,
+  ).map((batch) => batch.previews).where((batch) => batch.isNotEmpty);
+
+  /// Release each batch after processing it. Superseded queries stop reading
+  /// pages, and preview callers can display results as soon as a page matches.
+  Stream<_FindBatch> _searchBatches(
+    Stream<List<ConversationFindCandidate>> candidates,
+    String query,
+    FindOptions options, {
+    required ConversationFindCache? cache,
+    required bool previewsOnly,
+    bool Function()? isCurrent,
+    ConversationFindCandidate Function(ConversationFindCandidate)?
+    liveCandidate,
+  }) async* {
+    if (query.trim().isEmpty || isCurrent?.call() == false) return;
+    final entries = cache?._forPresentation(this);
+    _FindCacheKey key(ConversationFindCandidate row) =>
+        (row.id, options.matchCase, options.thinking);
+    await for (final batch in candidates) {
+      if (isCurrent?.call() == false) return;
+      final rows = liveCandidate == null
+          ? batch
+          : batch.map(liveCandidate).toList();
+      final inputs = [
+        for (final row in rows)
+          (row: row, cached: row.streaming ? null : entries?.get(key(row))),
+      ];
+      final matches = await compute(_matchBatch, (
+        service: this,
+        rows: inputs,
+        query: query,
+        options: options,
+        previewsOnly: previewsOnly,
+        projectionBudget: entries == null ? 0 : _findCacheBytes - entries.bytes,
+      ));
+      if (isCurrent?.call() == false) return;
+      if (entries != null) {
+        for (final row in rows) {
+          if (matches.projections[row.id] case final projection?) {
+            // A full timeline scan must not evict every reusable entry on
+            // each keystroke in a conversation larger than the budget.
+            if (entries.bytes + projection.bytes <= _findCacheBytes) {
+              entries.put(key(row), _CachedFindText(row, projection));
+            }
+          }
+        }
+      }
+      yield matches;
+    }
+  }
+
+  Iterable<_FindText> _project(
     ConversationFindCandidate row,
-    _FindPattern pattern,
     bool thinking,
-  ) {
+  ) sync* {
     final message = row.toMessage();
-    final hits = <ConversationFindHit>[];
     List<TimelineToolRef> tools = const [];
     late final citationLookup = citationIndexLookup(
       citationSearchItems(
@@ -108,7 +211,7 @@ class ConversationFindService {
       ),
     );
     String? Function(UiSourceFence)? surfaceText;
-    void add(
+    Iterable<_FindText> project(
       String source,
       FindPart part,
       int block, {
@@ -116,27 +219,24 @@ class ConversationFindService {
       UiTextSlice? uiSource,
       SourceTextMap? blockMap,
       bool markdown = false,
-    }) {
+    }) sync* {
       final text = UnicodeSanitizer.sanitize(source);
-      void match(String visible, {TextIndex? index, String? surfaceKey}) {
-        for (final span in pattern.ranges(visible)) {
-          final local = index?.sourceSpanForRange(span.start, span.end) ?? span;
-          hits.add((
-            messageId: row.id,
-            part: surfaceKey == null ? part : FindPart.surface,
-            block: block,
-            segment: segment,
-            range: surfaceKey == null && blockMap != null
-                ? blockMap.sourceRange(local.start, local.end)
-                : local,
-            surfaceKey: surfaceKey,
-          ));
-        }
-      }
-
+      _FindText fragment(
+        String visible, {
+        TextIndex? index,
+        String? surfaceKey,
+      }) => _FindText(
+        text: visible,
+        part: surfaceKey == null ? part : FindPart.surface,
+        block: block,
+        segment: segment,
+        index: index,
+        blockMap: surfaceKey == null ? blockMap : null,
+        surfaceKey: surfaceKey,
+      );
       if (text.isEmpty) return;
       if (!markdown) {
-        match(text);
+        yield fragment(text);
         return;
       }
       final doc = MarkdownParser(
@@ -146,7 +246,7 @@ class ConversationFindService {
       ).parse(text, streaming: row.streaming);
       // Keep leaf blocks and table cells separate. Concatenating the text of
       // two list items would invent a searchable word across the row break.
-      void matchNode(MarkdownNode node) {
+      Iterable<_FindText> projectNode(MarkdownNode node) sync* {
         if (node is TableCellNode ||
             node is BlockNode &&
                 !node.children.any(
@@ -168,10 +268,10 @@ class ConversationFindService {
               ).map((ref) => ref.label(resolve)).join(' ');
             },
           );
-          match(index.text, index: index);
+          yield fragment(index.text, index: index);
         } else {
           for (final child in node.children) {
-            matchNode(child);
+            yield* projectNode(child);
           }
         }
       }
@@ -195,12 +295,12 @@ class ConversationFindService {
               ordinal < UiBudgets.blocksPerMessage) {
             final label = surfaceText?.call(fence);
             if (label != null) {
-              match(label, surfaceKey: fence.surfaceKey);
+              yield fragment(label, surfaceKey: fence.surfaceKey);
               continue;
             }
           }
         }
-        matchNode(node);
+        yield* projectNode(node);
       }
     }
 
@@ -213,15 +313,15 @@ class ConversationFindService {
         );
     if (row.role == 'user') {
       final text = UiUserContextParts.read(message.parts).bodyText;
-      add(
+      yield* project(
         transform(ProtectedText(text, const []), AssistantRegexScope.user).text,
         FindPart.body,
         0,
         markdown: userMarkdown,
       );
-      return hits;
+      return;
     }
-    if (row.role != 'assistant') return hits;
+    if (row.role != 'assistant') return;
     final source = UiMessageSource.of(message.parts);
     final parsed = messageHasProviderReasoning(message)
         ? ThinkingTagParseResult(
@@ -295,7 +395,7 @@ class ConversationFindService {
           split: splitAssistantParagraphs,
           uiSource: block.uiSource,
         )) {
-          add(
+          yield* project(
             paragraph.text,
             FindPart.body,
             bodyIndex,
@@ -308,7 +408,7 @@ class ConversationFindService {
       } else if (thinking) {
         for (final step in block.steps) {
           if (step.reasoning case final reasoning?) {
-            add(
+            yield* project(
               reasoningDisplayText(reasoning.text),
               FindPart.reasoning,
               step.sourceOrdinal,
@@ -321,7 +421,7 @@ class ConversationFindService {
     }
     final translation = message.translation;
     if (translation != null && translation != translationPlaceholder) {
-      add(
+      yield* project(
         transform(
           ProtectedText(translation, const []),
           AssistantRegexScope.assistant,
@@ -331,27 +431,201 @@ class ConversationFindService {
         markdown: assistantMarkdown,
       );
     }
-    return hits;
   }
 }
 
 String reasoningDisplayText(String text) => text.replaceAll('\r', '').trim();
 
-Map<String, List<ConversationFindHit>> _matchBatch(
-  (
-    ConversationFindService,
-    List<ConversationFindCandidate>,
-    String,
-    FindOptions,
-  )
-  work,
-) {
-  final (service, rows, query, options) = work;
+typedef _FindWork = ({
+  ConversationFindService service,
+  List<({ConversationFindCandidate row, _CachedFindText? cached})> rows,
+  String query,
+  FindOptions options,
+  bool previewsOnly,
+  int projectionBudget,
+});
+
+typedef _FindCacheKey = (String, bool, bool);
+typedef _FindProjection = ({String text, int bytes});
+typedef _FindBatch = ({
+  Map<String, List<ConversationFindHit>> hits,
+  List<ConversationFindPreview> previews,
+  Map<String, _FindProjection> projections,
+});
+
+class _CachedFindText {
+  const _CachedFindText(this.source, this.projection);
+  final ConversationFindCandidate source;
+  final _FindProjection projection;
+
+  String? textFor(ConversationFindCandidate row) =>
+      source.conversationId == row.conversationId &&
+          source.role == row.role &&
+          source.reasoning == row.reasoning &&
+          source.segments == row.segments &&
+          source.translation == row.translation &&
+          source.generation == row.generation &&
+          listEquals(source.parts, row.parts) &&
+          source.surfaces.length == row.surfaces.length &&
+          source.surfaces.entries.every((entry) {
+            final current = row.surfaces[entry.key];
+            return entry.value.sourceHash == current?.sourceHash &&
+                entry.value.text == current?.text;
+          })
+      ? projection.text
+      : null;
+}
+
+class _FindText {
+  const _FindText({
+    required this.text,
+    required this.part,
+    required this.block,
+    this.segment,
+    this.index,
+    this.blockMap,
+    this.surfaceKey,
+  });
+
+  final String text;
+  final FindPart part;
+  final int block;
+  final int? segment;
+  final TextIndex? index;
+  final SourceTextMap? blockMap;
+  final String? surfaceKey;
+
+  ConversationFindHit hit(String messageId, SourceSpan span) {
+    final local = index?.sourceSpanForRange(span.start, span.end) ?? span;
+    return (
+      messageId: messageId,
+      part: part,
+      block: block,
+      segment: segment,
+      range: blockMap?.sourceRange(local.start, local.end) ?? local,
+      surfaceKey: surfaceKey,
+    );
+  }
+}
+
+_FindBatch _matchBatch(_FindWork work) {
+  final (:service, :rows, :query, :options, :previewsOnly, :projectionBudget) =
+      work;
   final pattern = _FindPattern(query, options);
-  return {
-    for (final row in rows)
-      row.id: service._match(row, pattern, options.thinking),
-  };
+  final hits = <String, List<ConversationFindHit>>{};
+  final previews = <ConversationFindPreview>[];
+  final projections = <String, _FindProjection>{};
+  var remaining = projectionBudget;
+  for (final (:row, :cached) in rows) {
+    final rowHits = previewsOnly ? null : <ConversationFindHit>[];
+    if (rowHits != null) hits[row.id] = rowHits;
+    final cachedText = cached?.textFor(row);
+    if (cachedText != null && !cachedText.contains(pattern.needle)) continue;
+
+    final visible = remaining > 256 && !row.streaming && cachedText == null
+        ? StringBuffer()
+        : null;
+    _FindText? previewSource;
+    List<SourceSpan>? previewSpans;
+    var matchCount = 0;
+    for (final fragment in service._project(row, options.thinking)) {
+      for (final span in pattern.ranges(fragment.text, visible: visible)) {
+        if (rowHits != null) {
+          rowHits.add(fragment.hit(row.id, span));
+          continue;
+        }
+        matchCount++;
+        if (previewSource == null) {
+          previewSource = fragment;
+          previewSpans = [span];
+        } else if (identical(fragment, previewSource) &&
+            span.start < previewSpans!.first.end + _snippetAfter) {
+          previewSpans.add(span);
+        }
+      }
+    }
+    if (previewSource != null) {
+      previews.add(_preview(row, previewSource, previewSpans!, matchCount));
+    }
+    if (visible != null && 2 * visible.length <= remaining) {
+      // Include retained snapshot strings as well as the rendered text.
+      final bytes =
+          256 +
+          2 *
+              (visible.length +
+                  (row.reasoning?.length ?? 0) +
+                  (row.segments?.length ?? 0) +
+                  (row.translation?.length ?? 0)) +
+          row.parts.fold<int>(
+            0,
+            (sum, part) => sum + 128 + 2 * part.encodePayload().length,
+          ) +
+          row.surfaces.entries.fold<int>(
+            0,
+            (sum, entry) =>
+                sum +
+                128 +
+                2 *
+                    (entry.key.length +
+                        entry.value.sourceHash.length +
+                        entry.value.text.length),
+          );
+      if (bytes <= remaining) {
+        projections[row.id] = (text: visible.toString(), bytes: bytes);
+        remaining -= bytes;
+      }
+    }
+  }
+  return (hits: hits, previews: previews, projections: projections);
+}
+
+final _snippetWhitespace = RegExp(r'\s+');
+const _snippetAfter = 84;
+
+ConversationFindPreview _preview(
+  ConversationFindCandidate row,
+  _FindText fragment,
+  List<SourceSpan> spans,
+  int matchCount,
+) {
+  String oneLine(String text) => text.replaceAll(_snippetWhitespace, ' ');
+  final source = fragment.text;
+  final first = spans.first;
+  final start = utf16SafeTailStart(
+    source,
+    (first.start - 16).clamp(0, source.length),
+  );
+  final end = utf16SafeHeadEnd(
+    source,
+    (first.end + _snippetAfter).clamp(0, source.length),
+  );
+  final segments = <({String text, bool highlighted})>[];
+  var from = first.start;
+  for (final span in spans) {
+    if (span.start >= end) break;
+    if (from < span.start) {
+      segments.add((
+        text: oneLine(source.substring(from, span.start)),
+        highlighted: false,
+      ));
+    }
+    from = span.end.clamp(0, end);
+    segments.add((
+      text: oneLine(source.substring(span.start, from)),
+      highlighted: true,
+    ));
+  }
+  final tail =
+      '${oneLine(source.substring(from, end))}${end < source.length ? '…' : ''}';
+  if (tail.isNotEmpty) segments.add((text: tail, highlighted: false));
+  return (
+    hit: fragment.hit(row.id, first),
+    role: row.role,
+    matchCount: matchCount,
+    before:
+        '${start > 0 ? '…' : ''}${oneLine(source.substring(start, first.start))}',
+    segments: segments,
+  );
 }
 
 class _FindPattern {
@@ -375,7 +649,7 @@ class _FindPattern {
     return _word.hasMatch(rune.currentAsString);
   }
 
-  Iterable<SourceSpan> ranges(String source) sync* {
+  Iterable<SourceSpan> ranges(String source, {StringBuffer? visible}) sync* {
     var haystack = source;
     // Only expanding folds need an offset table. Its interior boundaries are
     // invalid: searching for a single 's' must not match half of a sharp S.
@@ -413,6 +687,7 @@ class _FindPattern {
         assert(offsets.last == original);
       }
     }
+    visible?.writeln(haystack);
     var from = 0;
     while (from < haystack.length) {
       final i = haystack.indexOf(needle, from);

@@ -6,6 +6,8 @@ enum Modality { text, image, audio, video, pdf }
 
 enum ModelAbility { tool, reasoning, structuredOutput }
 
+enum ResponseSpeed { standard, fast, ultrafast }
+
 enum ReasoningLevel { auto, off, on, minimal, low, medium, high, xhigh, max }
 
 enum ReasoningDialect {
@@ -785,6 +787,7 @@ class ModelSpecOverride {
     'dynamicWebSearch',
     'remoteImageUrls',
     'promptCacheControl',
+    'responseSpeedTiers',
   };
 
   final String? apiModelId;
@@ -804,6 +807,9 @@ class ModelSpecOverride {
   final bool? dynamicWebSearch;
   final bool? remoteImageUrls;
   final bool? promptCacheControl;
+
+  /// Null inherits the provider/model defaults. An empty list is Standard only.
+  final List<ResponseSpeed>? responseSpeedTiers;
   final Map<String, dynamic> extra;
 
   const ModelSpecOverride({
@@ -824,6 +830,7 @@ class ModelSpecOverride {
     this.dynamicWebSearch,
     this.remoteImageUrls,
     this.promptCacheControl,
+    this.responseSpeedTiers,
     this.extra = const {},
   });
 
@@ -845,6 +852,7 @@ class ModelSpecOverride {
       dynamicWebSearch == null &&
       remoteImageUrls == null &&
       promptCacheControl == null &&
+      responseSpeedTiers == null &&
       extra.isEmpty;
 
   ModelSpecOverride copyWith({
@@ -882,6 +890,8 @@ class ModelSpecOverride {
     bool clearRemoteImageUrls = false,
     bool? promptCacheControl,
     bool clearPromptCacheControl = false,
+    List<ResponseSpeed>? responseSpeedTiers,
+    bool clearResponseSpeedTiers = false,
     Map<String, dynamic>? extra,
   }) {
     return ModelSpecOverride(
@@ -912,6 +922,9 @@ class ModelSpecOverride {
       promptCacheControl: clearPromptCacheControl
           ? null
           : (promptCacheControl ?? this.promptCacheControl),
+      responseSpeedTiers: clearResponseSpeedTiers
+          ? null
+          : (responseSpeedTiers ?? this.responseSpeedTiers),
       extra: extra ?? this.extra,
     );
   }
@@ -945,6 +958,7 @@ class ModelSpecOverride {
       dynamicWebSearch: _asBool(map['dynamicWebSearch']),
       remoteImageUrls: _asBool(map['remoteImageUrls']),
       promptCacheControl: _asBool(map['promptCacheControl']),
+      responseSpeedTiers: _parseResponseSpeedTiers(map['responseSpeedTiers']),
       extra: extra,
     );
   }
@@ -969,6 +983,10 @@ class ModelSpecOverride {
       if (dynamicWebSearch != null) 'dynamicWebSearch': dynamicWebSearch,
       if (remoteImageUrls != null) 'remoteImageUrls': remoteImageUrls,
       if (promptCacheControl != null) 'promptCacheControl': promptCacheControl,
+      if (responseSpeedTiers != null)
+        'responseSpeedTiers': [
+          for (final tier in responseSpeedTiers!) tier.name,
+        ],
       ...extra,
     };
   }
@@ -1011,6 +1029,14 @@ class ModelSpecOverride {
     if (s == 'chat') return ModelType.chat;
     if (s == 'image') return ModelType.image;
     return null;
+  }
+
+  static List<ResponseSpeed>? _parseResponseSpeedTiers(Object? raw) {
+    if (raw is! List) return null;
+    return List.unmodifiable([
+      for (final speed in ResponseSpeed.values)
+        if (speed != ResponseSpeed.standard && raw.contains(speed.name)) speed,
+    ]);
   }
 
   static List<Modality>? _parseModalities(dynamic raw) {
@@ -1091,6 +1117,7 @@ class ModelSpecOverride {
             dynamicWebSearch == other.dynamicWebSearch &&
             remoteImageUrls == other.remoteImageUrls &&
             promptCacheControl == other.promptCacheControl &&
+            listEquals(responseSpeedTiers, other.responseSpeedTiers) &&
             _deepEquals(extra, other.extra));
   }
 
@@ -1111,6 +1138,7 @@ class ModelSpecOverride {
     body == null ? null : _rowsHash(body!),
     builtInTools == null ? null : Object.hashAll(builtInTools!),
     Object.hash(dynamicWebSearch, remoteImageUrls, promptCacheControl),
+    responseSpeedTiers == null ? null : Object.hashAll(responseSpeedTiers!),
     _deepHash(extra),
   );
 
