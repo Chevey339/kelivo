@@ -5512,7 +5512,7 @@
   "contextOperationSuperseded": "已被后面的摘要接替",
   "compressIncludeAttachments": "附件文字与工具结果",
   "contextEditCharacters": "{count} 字",
-  "compressOverSnack": "摘要还是太长，发给模型会超限，所以没有采用。可以再压一次，或换一个上下文更大的模型。",
+  "compressOverSnack": "压缩后的上下文可能超过聊天模型的窗口。可以查看摘要并确认采用。",
   "contextSummaryHint": "之后发给模型的是这份摘要。保存只改摘要，不会改已经生成的回复。附件只用已经提取出的文字，不会再去认图。",
   "compressAdvanced": "高级选项",
   "compressTaskWaiting": "等待当前回复完成",
@@ -5961,9 +5961,8 @@
   "compressionKeepHint": "一轮是一条用户消息，加上它后面的回复和工具内容。",
   "compressionLength": "摘要大约多长（tokens）",
   "compressionTrigger": "用量达到",
-  "compressionTarget": "压到",
-  "compressionWindow": "摘要模型容量",
-  "compressionRequests": "最多请求",
+  "compressionTarget": "目标用量",
+  "compressionWindow": "自动压缩估算窗口",
   "compressionReference": "使用背景参考资料",
   "compressionReferenceHint": "摘要可参考助手的系统提示词、与这段历史匹配的世界书和当时保存的记忆。发生过的事和角色知道的事以聊天记录为准。",
   "compressionInstructionInjections": "压缩时参考指令注入",
@@ -5982,11 +5981,10 @@
   "compressionActualUsage": "摘要模型实际用量",
   "compressionUsageValues": "输入 {input} · 输出 {output} tokens",
   "compressionUsageUnknown": "有 {count} 次请求没有返回用量数据，不代表这次是免费的。",
-  "compressionBudgetError": "按现在的设置，压缩要请求的次数超过了上限，上下文没有改动。可以把「最多请求」调高，或换一个上下文更大的模型。",
   "compressionIncomplete": "摘要没写完或被模型拒绝，上下文没有改动。可以调高输出上限，或换一个模型。",
-  "compressionReferenceTooLarge": "用来参考的内容已经占满这个模型的容量，没剩下空间写摘要。减少参考内容，或换一个上下文更大的模型。",
+  "compressionProviderContextRejected": "服务端返回请求过大。可以换一个上下文更大的模型再试。",
   "compressionReferenceChanged": "参考的背景已经变了。请先看一下这份摘要，或重新生成一次。",
-  "compressionTargetNotReached": "压完之后还是会超过自动压缩的起点，所以原文没动。可以再缩短摘要，或把「用量达到」调高。",
+  "compressionTargetNotReached": "压缩后预计没有节省上下文。可以查看并缩短摘要。",
   "compressionTemplateMissing": "当前选的模板不可用，请换一个。",
   "compressionTemplates": "模板",
   "compressionRecipes": "方案",
@@ -6053,13 +6051,10 @@
       }
     }
   },
-  "compressionPlannedCalls": "预计 {count} 次请求 · 本次上限 {limit} 次（含重试）",
+  "compressionPlannedCalls": "预计 {count} 次请求",
   "@compressionPlannedCalls": {
     "placeholders": {
       "count": {
-        "type": "int"
-      },
-      "limit": {
         "type": "int"
       }
     }
@@ -6104,7 +6099,6 @@
   "compressionSearchRecipes": "搜索方案",
   "compressionRecipeCreateHint": "在「更多设置」中将当前配置保存为方案。",
   "compressionTurnUnit": "轮",
-  "compressionCallUnit": "次",
   "compressionRequestTimeout": "压缩请求超时",
   "compressionMinuteUnit": "分钟",
   "compressionRequestTimeoutDefault": "默认",
@@ -6118,8 +6112,9 @@
     }
   },
   "compressionAdvancedOptions": "压缩细节",
-  "compressionAdvancedHint": "参考内容、是否回头看原文，以及请求次数上限",
+  "compressionAdvancedHint": "背景参考、历史原文和窗口估算",
   "compressionAutomaticWindow": "自动",
+  "compressionSummaryWindowEstimate": "摘要模型窗口 · {tokens} token · {source}",
   "compressionAutoOffHint": "需要时可在压缩页手动开始。",
   "compressionAutoNotifyHint": "快到上限时提醒你，由你决定什么时候压缩。",
   "compressionAutoOnHint": "达到设定的比例后，自动把较早的历史收成摘要，会额外消耗一些模型用量。",
@@ -6131,7 +6126,7 @@
   "compressionScopeAllHint": "把当前能看到的历史全部收成摘要，不单独保留最近原文。原来的消息仍然可以查看。",
   "compressionScopeStartHint": "在字数限制内，选较早的完整消息来压缩，没选中的仍保留原文。",
   "compressionScopeRecentHint": "在字数限制内，选较近的完整消息来压缩，没选中的仍保留原文。",
-  "compressionAutoKeepHint": "自动压缩总会保留最近原文，不受这次手动范围的影响。保留轮数和手动压缩是同一个设置。",
+  "compressionAutoKeepHint": "自动压缩会尽量保留最近轮次。空间不足时会多压一些旧轮次，当前请求会保留。",
   "requestBudgetTitle": "图片与请求预算",
   "requestBudgetInherited": "继承默认",
   "requestBudgetCustom": "自定义",

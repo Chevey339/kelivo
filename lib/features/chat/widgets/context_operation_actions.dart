@@ -604,7 +604,9 @@ Future<void> showContextCompressionMenu(
       : failed
       ? compressionStatusLabel(l10n, task)
       : task.totalParts == 0
-      ? compressionDividerLabel(l10n, task)
+      ? task.requestAttempts == 0
+            ? compressionDividerLabel(l10n, task)
+            : l10n.compressionCalls(task.requestAttempts)
       : l10n.compressTaskElapsed(
           (task.completedParts + 1).clamp(1, task.totalParts),
           task.totalParts,

@@ -313,12 +313,17 @@ CompressionRangeSelection selectCompressionRange(
     ? (providerKey: assistantProvider, modelId: assistantModelId)
     : (providerKey: currentProvider, modelId: currentModelId);
 
+const compressionSummarySourcePrefix = '[source summary:';
+
 String? conversationLineForCompression(
   ChatMessage message, {
   required String Function(int) quoteMarker,
 }) {
   final content = message.quotedContent(quoteMarker);
   if (content.trim().isEmpty) return null;
+  if (ContextOperation.isSummary(message)) {
+    return '$compressionSummarySourcePrefix${message.id}]\n$content';
+  }
   return '[source message:${message.id}; role=${message.role}]\n${message.role == 'assistant' ? 'Assistant' : 'User'}: $content';
 }
 
@@ -415,6 +420,9 @@ bool isContextLengthError(Object error) {
   if (phrases.any(lower.contains)) return true;
   return false;
 }
+
+bool isCompressionCapacityError(Object error) =>
+    isContextLengthError(error) || error.toString().contains('HTTP 413:');
 
 /// Estimate the token budget of a keep-recent compression result.
 ///

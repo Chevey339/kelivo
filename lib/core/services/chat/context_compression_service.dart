@@ -23,6 +23,10 @@ import '../../models/token_usage.dart';
 import '../api/chat_api_service.dart';
 import 'chat_service.dart';
 
+Future<int> _estimateMaterials(List<String> materials) => Isolate.run(
+  () => materials.fold<int>(0, (sum, part) => sum + estimateTokens(part)),
+);
+
 /// Owns only compression work. User input stays in HomeViewModel's existing
 /// QueuedChatInput/DraftSubmission path and is never copied into this service.
 class ContextCompressionService extends ChangeNotifier {
@@ -334,14 +338,17 @@ class ContextCompressionService extends ChangeNotifier {
         createdAt: DateTime.now(),
         compressionDetails: const {'envelope': 'history-v1'},
       );
-      final estimate = await estimateCandidate!(
+      final estimate = await _estimate(
         id,
         ContextHistory.resolve(source, [...operations, empty]),
       );
-      if (estimate.contextWindow case final window?) {
+      if (estimate case (
+        contextWindow: final int window,
+        usedTokens: final used,
+      )) {
         budget =
             window -
-            estimate.usedTokens -
+            used -
             (request.options.native ? 0 : request.config.summaryTokens);
       }
     }
@@ -825,7 +832,6 @@ class ContextCompressionService extends ChangeNotifier {
         selection,
       );
       _check(task);
-      if (carry.overBudget) throw StateError('compression_carry_over_budget');
       final setting = _carrySetting(request);
       final automaticWire = request.codex && setting.mode == CarryMode.unset;
       final carried = carry.freeze(
@@ -837,14 +843,10 @@ class ContextCompressionService extends ChangeNotifier {
         await _runNative(task, snapshot, sourceMessages, selection, carried);
         return;
       }
-      try {
-        task.previousBudget = await estimateCandidate?.call(
-          task.conversationId,
-          selection.effective,
-        );
-      } catch (_) {
-        /* An unavailable before-estimate must not fail compression. */
-      }
+      task.previousBudget = await _estimate(
+        task.conversationId,
+        selection.effective,
+      );
       final textMessages = await chat.messagesForCompression(
         selection.input,
         includeAttachmentsAndTools: task.options.includeAttachmentsAndTools,
@@ -852,10 +854,35 @@ class ContextCompressionService extends ChangeNotifier {
       );
       _check(task);
       final background = await request.loadReference?.call(selection) ?? '';
-      task.referenceFingerprint = sha256
-          .convert(utf8.encode(background))
-          .toString();
-      if (request.loadReference != null) {
+      final chunks = buildCompressRequestContents(
+        textMessages,
+        task.options,
+        quoteMarker: request.quoteMarker,
+      );
+      if (chunks.isEmpty) throw StateError('no_messages');
+      final result = await const CompressionEngine().run(
+        task: task,
+        request: request,
+        summaryTokens:
+            request.automatic &&
+                carry.totalTokens > 0 &&
+                request.carryBudgetTokens != null
+            ? (request.carryBudgetTokens! + 128 - carry.totalTokens).clamp(
+                128,
+                request.config.summaryTokens,
+              )
+            : null,
+        materials: chunks,
+        background: background,
+        check: () => _check(task),
+        publish: () => _publish(task),
+      );
+      _check(task);
+      final summary = result.summary;
+      if (result.referenceUsed) {
+        task.referenceFingerprint = sha256
+            .convert(utf8.encode(background))
+            .toString();
         task.validateReferences = () async {
           final latest = await request.loadReference!(selection);
           if (sha256.convert(utf8.encode(latest)).toString() !=
@@ -864,36 +891,7 @@ class ContextCompressionService extends ChangeNotifier {
           }
         };
       }
-      final previousSummary = textMessages
-          .where(ContextOperation.isSummary)
-          .map((m) => m.content)
-          .join('\n\n');
-      final chunks = buildCompressRequestContents(
-        textMessages.where((m) => !ContextOperation.isSummary(m)).toList(),
-        task.options,
-        quoteMarker: request.quoteMarker,
-      );
-      if (chunks.isEmpty && previousSummary.isEmpty) {
-        throw StateError('no_messages');
-      }
-      final inputTokens =
-          estimateTokens(previousSummary) +
-          chunks.fold<int>(0, (sum, part) => sum + estimateTokens(part));
-      final summary = await const CompressionEngine().run(
-        task: task,
-        request: request,
-        summaryTokens: request.automatic && request.carryBudgetTokens != null
-            ? (request.carryBudgetTokens! + 128 - carry.totalTokens).clamp(
-                128,
-                request.config.summaryTokens,
-              )
-            : null,
-        materials: chunks,
-        previousSummary: previousSummary,
-        background: background,
-        check: () => _check(task),
-        publish: () => _publish(task),
-      );
+      final inputTokens = await _estimateMaterials(chunks);
       _check(task);
       task.summary = summary;
       task.sourceFingerprint = ContextHistory.fingerprint(
@@ -942,7 +940,7 @@ class ContextCompressionService extends ChangeNotifier {
           'template': task.templateSnapshot,
           'settings': task.settingsSnapshot,
           'referenceFingerprint': task.referenceFingerprint,
-          'referenceUsed': background.isNotEmpty,
+          'referenceUsed': result.referenceUsed,
           'automatic': task.automatic,
           'requestAttempts': task.requestAttempts,
           'usage': task.usage?.toJson(),
@@ -965,16 +963,7 @@ class ContextCompressionService extends ChangeNotifier {
           task.sourceFingerprint) {
         throw StateError('context_changed');
       }
-      if (request.loadReference != null &&
-          sha256
-                  .convert(utf8.encode(await request.loadReference!(selection)))
-                  .toString() !=
-              task.referenceFingerprint) {
-        task.phase = CompressionPhase.review;
-        task.error = 'compression_reference_changed';
-        await _publish(task);
-        return;
-      }
+      await task.validateReferences?.call();
       final withinWindow = await _checkBudget(task, (
         messages: sourceMessages,
         operations: snapshot.operations,
@@ -1022,11 +1011,12 @@ class ContextCompressionService extends ChangeNotifier {
           ));
         }
       }
-      // In-turn acceptance uses the full provider request, including its live
-      // suffix and image projection. The generic UI estimate is informational.
-      final fitsBudget =
-          (request.automatic && request.acceptCandidate != null) ||
-          withinWindow;
+      // An actual overflow recovery can try the rebuilt request on the server.
+      // Direct manual runs let the user review a result with a high estimate.
+      final needsBudgetReview =
+          !request.automatic && !request.ownsContinuation && !withinWindow;
+      final summaryNotSmaller =
+          !request.ownsContinuation && estimateTokens(summary) >= inputTokens;
       _check(task);
       task.candidate = task.candidate!.copyWith(
         compressionDetails: {
@@ -1035,17 +1025,17 @@ class ContextCompressionService extends ChangeNotifier {
         },
       );
       if (task.options.previewOnly ||
-          estimateTokens(summary) >= inputTokens ||
-          !fitsBudget ||
+          summaryNotSmaller ||
+          needsBudgetReview ||
           !accepted) {
         task.phase = CompressionPhase.review;
         task.error = task.options.previewOnly
             ? null
             : !accepted
             ? 'compression_target_not_reached'
-            : fitsBudget
-            ? 'summary_not_smaller'
-            : 'context_budget_exceeded';
+            : needsBudgetReview
+            ? 'context_budget_exceeded'
+            : 'summary_not_smaller';
         await _publish(task);
         return;
       }
@@ -1267,9 +1257,8 @@ class ContextCompressionService extends ChangeNotifier {
             task.sourceFingerprint) {
           throw StateError('context_changed');
         }
-        final withinWindow = await _checkBudget(task, snapshot);
+        await _checkBudget(task, snapshot);
         _check(task);
-        if (!withinWindow) throw StateError('context_budget_exceeded');
         task.error = null;
         final selection = selectCompressionHistory(
           sourceMessages,
@@ -1348,15 +1337,29 @@ class ContextCompressionService extends ChangeNotifier {
     ConversationContextSnapshot snapshot,
   ) async {
     if (task.options.newConversation) return true;
-    final estimate = estimateCandidate;
-    if (estimate == null) return false;
     final projected = ContextHistory.resolve(snapshot.messages, [
       ...snapshot.operations,
       task.candidate!,
     ]);
-    task.budget = await estimate(task.conversationId, projected);
-    final limit = task.budget!.contextWindow;
-    return limit == null || task.budget!.usedTokens <= limit;
+    final budget = task.budget = await _estimate(
+      task.conversationId,
+      projected,
+    );
+    return budget == null ||
+        budget.contextWindow == null ||
+        budget.usedTokens <= budget.contextWindow!;
+  }
+
+  Future<CompressionBudget?> _estimate(
+    String id,
+    List<ChatMessage> history,
+  ) async {
+    try {
+      return await estimateCandidate?.call(id, history);
+    } catch (_) {
+      // This estimate is advisory. It may be unavailable for gateway models.
+      return null;
+    }
   }
 
   Future<void> dismiss(String id) async {

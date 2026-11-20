@@ -7,11 +7,7 @@ import 'native_compaction.dart';
 import '../services/api/generation/text_generation_result.dart';
 import '../services/chat/compression_templates.dart';
 
-typedef CompressionRequestPreview = ({
-  String prompt,
-  int estimatedRequests,
-  int maxRequestAttempts,
-});
+typedef CompressionRequestPreview = ({String prompt, int estimatedRequests});
 
 typedef CompressionBudget = ({int usedTokens, int? contextWindow});
 

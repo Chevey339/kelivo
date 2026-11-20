@@ -119,11 +119,8 @@ void main() {
                           context: context,
                           builder: (sheet) => CompressContextOptionsDialog(
                             sheet: sheet,
-                            previewRequest: (options, config) async => (
-                              prompt: 'Preview',
-                              estimatedRequests: 1,
-                              maxRequestAttempts: config.maxRequestAttempts,
-                            ),
+                            previewRequest: (options, config) async =>
+                                (prompt: 'Preview', estimatedRequests: 1),
                             loadHistory: () async =>
                                 CompressionHistory.fromMessages([
                                   for (var i = 0; i < 10; i++)

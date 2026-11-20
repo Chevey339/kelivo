@@ -15371,7 +15371,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressOverSnack =>
-      'Сводка всё ещё слишком длинная и превысит лимит, поэтому она не была использована. Сожмите ещё раз или переключитесь на модель с большим контекстом.';
+      'Результат может превысить контекстное окно модели чата. Вы можете просмотреть и применить сводку.';
 
   @override
   String get contextSummaryHint =>
@@ -16725,13 +16725,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionTrigger => 'Начинать при';
 
   @override
-  String get compressionTarget => 'Сжимать до';
+  String get compressionTarget => 'Целевой расход';
 
   @override
-  String get compressionWindow => 'Ёмкость модели сводки';
-
-  @override
-  String get compressionRequests => 'Максимум запросов';
+  String get compressionWindow => 'Окно планирования автосжатия';
 
   @override
   String get compressionReference => 'Использовать справочные материалы';
@@ -16805,16 +16802,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get compressionBudgetError =>
-      'Для этого потребуется больше запросов к модели, чем позволяет текущий лимит, поэтому контекст не изменён. Увеличьте «Максимум запросов» или переключитесь на модель с большим контекстом.';
-
-  @override
   String get compressionIncomplete =>
       'Сводка была обрезана или отклонена, контекст не изменён. Увеличьте лимит вывода или попробуйте другую модель.';
 
   @override
-  String get compressionReferenceTooLarge =>
-      'Справочные материалы уже занимают всю ёмкость этой модели, и для сводки не остаётся места. Используйте меньше справочных материалов или переключитесь на модель с большим контекстом.';
+  String get compressionProviderContextRejected =>
+      'Провайдер сообщил, что запрос слишком большой. Попробуйте модель с большим контекстом.';
 
   @override
   String get compressionReferenceChanged =>
@@ -16822,7 +16815,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionTargetNotReached =>
-      'Даже после сжатия использование всё ещё будет выше порога автоматического запуска, поэтому исходный контекст сохранён. Сократите сводку или увеличьте «Запускать при».';
+      'По оценке, результат займёт не меньше контекста, чем исходный. Вы можете просмотреть и сократить сводку.';
 
   @override
   String get compressionTemplateMissing =>
@@ -16911,8 +16904,16 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сжать один раз, затем повторить неудачный ответ';
 
   @override
-  String compressionPlannedCalls(int count, int limit) {
-    return 'Ожидается запросов: $count · лимит $limit, включая повторы';
+  String compressionPlannedCalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Около $count запроса',
+      many: 'Около $count запросов',
+      few: 'Около $count запросов',
+      one: 'Около $count запроса',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -17006,9 +17007,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get compressionTurnUnit => 'ходов';
 
   @override
-  String get compressionCallUnit => 'вызовов';
-
-  @override
   String get compressionRequestTimeout => 'Тайм-аут запроса сжатия';
 
   @override
@@ -17031,10 +17029,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionAdvancedHint =>
-      'Справочные материалы, повторное обращение к оригиналам и лимит запросов';
+      'Фоновые ссылки, исходная история и оценки окна';
 
   @override
   String get compressionAutomaticWindow => 'Авто';
+
+  @override
+  String compressionSummaryWindowEstimate(String tokens, String source) {
+    return 'Окно модели сводки · $tokens токенов · $source';
+  }
 
   @override
   String get compressionAutoOffHint => 'Сжимайте вручную, когда потребуется.';
@@ -17078,7 +17081,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get compressionAutoKeepHint =>
-      'Автоматическое сжатие всегда сохраняет недавние оригиналы независимо от диапазона, выбранного для ручного запуска. Число ходов общее с ручным сжатием.';
+      'Автоматическое сжатие сохраняет последние ходы, пока есть место. При необходимости оно может суммировать дополнительные старые ходы и всегда защищает текущий запрос.';
 
   @override
   String get requestBudgetTitle => 'Лимиты изображений и запросов';

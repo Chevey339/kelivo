@@ -352,8 +352,8 @@ class RequestHistoryContext {
       await for (final item in sendRound()) {
         yield item;
       }
-    } catch (error) {
-      if (!isContextLengthError(error) ||
+    } catch (error, stack) {
+      if (!isCompressionCapacityError(error) ||
           _recoveryAttempted ||
           isCancelled() ||
           _lastBody == null) {
@@ -364,11 +364,17 @@ class RequestHistoryContext {
       final body = _replacement == null
           ? original
           : projectCandidate(original, _replacement!);
-      final replacement = await beforeRequest(
-        body,
-        (messages) => projectCandidate(original, messages),
-        true,
-      );
+      List<Map<String, dynamic>>? replacement;
+      try {
+        replacement = await beforeRequest(
+          body,
+          (messages) => projectCandidate(original, messages),
+          true,
+        );
+      } catch (_) {
+        if (isCancelled()) rethrow;
+        Error.throwWithStackTrace(error, stack);
+      }
       if (replacement == null || isCancelled()) rethrow;
       _replacement = replacement;
       yield* sendRound();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/models/compress_context_options.dart';
 import '../../../core/models/context_compression_task.dart';
 import '../../../l10n/app_localizations.dart';
 
@@ -78,14 +79,8 @@ String compressionErrorLabel(AppLocalizations l10n, String error) {
   if (error.contains('compression_near_limit')) {
     return l10n.compressionNearLimit;
   }
-  if (error.contains('compression_request_budget')) {
-    return l10n.compressionBudgetError;
-  }
   if (error.contains('compression_incomplete')) {
     return l10n.compressionIncomplete;
-  }
-  if (error.contains('compression_reference_too_large')) {
-    return l10n.compressionReferenceTooLarge;
   }
   if (error.contains('compression_reference_changed')) {
     return l10n.compressionReferenceChanged;
@@ -95,9 +90,6 @@ String compressionErrorLabel(AppLocalizations l10n, String error) {
   }
   if (error.contains('compression_template_missing')) {
     return l10n.compressionTemplateMissing;
-  }
-  if (error.contains('compression_carry_over_budget')) {
-    return l10n.compressionCarryOverBudget;
   }
   if (error.contains('context_budget_exceeded')) return l10n.compressOverSnack;
   if (error.contains('summary_not_smaller')) {
@@ -113,6 +105,9 @@ String compressionErrorLabel(AppLocalizations l10n, String error) {
   }
   if (error.contains('in_flight')) return l10n.contextTaskWait;
   if (error.contains('interrupted')) return l10n.contextTaskInterrupted;
+  if (isCompressionCapacityError(error)) {
+    return l10n.compressionProviderContextRejected;
+  }
   final lower = error.toLowerCase();
   if (lower.contains('timeoutexception') || lower.contains('timed out')) {
     return l10n.oauthRequestTimeout;
@@ -130,7 +125,6 @@ String compressionErrorLabel(AppLocalizations l10n, String error) {
 /// separate from the displayed copy so all entry points offer the same action.
 enum CompressionRecoveryTarget {
   outputBudget,
-  requestLimit,
   model,
   reference,
   template,
@@ -141,7 +135,6 @@ enum CompressionRecoveryTarget {
 
   String label(AppLocalizations l10n) => switch (this) {
     outputBudget => l10n.compressionOutputBudget,
-    requestLimit => l10n.compressionRequests,
     model => l10n.compressContextModelLabel,
     reference => l10n.compressionSourceSettings,
     template => l10n.compressionTemplate,
@@ -152,15 +145,11 @@ enum CompressionRecoveryTarget {
   };
 
   bool get advanced => switch (this) {
-    outputBudget ||
-    requestLimit ||
-    reference ||
-    summaryLength ||
-    timeout => true,
+    outputBudget || reference || summaryLength || timeout => true,
     _ => false,
   };
 
-  bool get details => this == requestLimit || this == reference;
+  bool get details => this == reference;
 }
 
 CompressionRecoveryTarget? compressionRecoveryTarget(
@@ -190,18 +179,16 @@ CompressionRecoveryTarget? compressionRecoveryTarget(
   ).hasMatch(error)) {
     return CompressionRecoveryTarget.outputBudget;
   }
-  if (error.contains('compression_request_budget')) {
-    return CompressionRecoveryTarget.requestLimit;
-  }
-  if (error.contains('compression_reference_too_large')) {
-    return CompressionRecoveryTarget.reference;
-  }
   if (error.contains('compression_template_missing')) {
     return CompressionRecoveryTarget.template;
   }
+  if (error.contains('compression_reference_changed')) {
+    return CompressionRecoveryTarget.reference;
+  }
   if (error.contains('compression_incomplete') ||
       error.contains('empty_summary') ||
-      error.contains('no_model')) {
+      error.contains('no_model') ||
+      isCompressionCapacityError(error)) {
     return CompressionRecoveryTarget.model;
   }
   return null;

@@ -20,11 +20,13 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/compression_templates.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../model/widgets/model_select_sheet.dart';
+import '../../model/widgets/model_spec_form/spec_field_header.dart';
 import 'context_dialog.dart';
 import 'compression_controls.dart';
 import 'compression_template_library.dart';
@@ -123,7 +125,6 @@ class _CompressContextOptionsDialogState
   final _nativeTrigger = TextEditingController();
   final _target = TextEditingController();
   final _window = TextEditingController();
-  final _attempts = TextEditingController();
   final _requestTimeout = TextEditingController();
   final _maxChars = TextEditingController();
   String? _planKey;
@@ -345,7 +346,6 @@ class _CompressContextOptionsDialogState
     _nativeTrigger.text = '${(_config.nativeTriggerInputRatio * 100).round()}';
     _target.text = '${(_config.targetInputRatio * 100).round()}';
     _window.text = _config.planningWindow?.toString() ?? '';
-    _attempts.text = '${_config.maxRequestAttempts}';
     _requestTimeout.text = _config.requestTimeoutMinutes?.toString() ?? '';
   }
 
@@ -417,7 +417,6 @@ class _CompressContextOptionsDialogState
       _nativeTrigger,
       _target,
       _window,
-      _attempts,
       _requestTimeout,
       _maxChars,
     ]) {
@@ -437,7 +436,6 @@ class _CompressContextOptionsDialogState
     'planningWindow': _window.text.trim().isEmpty
         ? null
         : int.parse(_window.text),
-    'maxRequestAttempts': int.parse(_attempts.text),
     'requestTimeoutMinutes': _timeoutMinutes(),
   });
 
@@ -716,11 +714,7 @@ class _CompressContextOptionsDialogState
   }
 
   Future<void> _submit({bool trial = false, bool regenerate = false}) async {
-    if (_saving ||
-        _carryLoading ||
-        _carryError != null ||
-        !_carryCountValid ||
-        (_carryPreview?.overBudget ?? false)) {
+    if (_saving || _carryLoading || _carryError != null || !_carryCountValid) {
       return;
     }
     setState(() => _saving = true);
@@ -957,8 +951,6 @@ class _CompressContextOptionsDialogState
     );
     final target = controller == _outputBudget
         ? CompressionRecoveryTarget.outputBudget
-        : controller == _attempts
-        ? CompressionRecoveryTarget.requestLimit
         : controller == _length
         ? CompressionRecoveryTarget.summaryLength
         : controller == _requestTimeout
@@ -1166,6 +1158,14 @@ class _CompressContextOptionsDialogState
     final provider = resolved.providerKey == null
         ? null
         : settings.getProviderConfig(resolved.providerKey!);
+    final summarySpec =
+        _advanced &&
+            !_native &&
+            _detailsExpanded &&
+            provider != null &&
+            resolved.modelId != null
+        ? ModelSpecResolver.instance.resolve(provider, resolved.modelId!)
+        : null;
     final codex = provider?.oauthProvider == OAuthProvider.chatgpt;
     _ensureCarryPreview(codex, chatModel.providerKey, chatModel.modelId);
     final selectedTemplate = _templates
@@ -1431,7 +1431,6 @@ class _CompressContextOptionsDialogState
                               return Text(
                                 l10n.compressionPlannedCalls(
                                   plan.estimatedRequests,
-                                  plan.maxRequestAttempts,
                                 ),
                                 style: hintStyle,
                               );
@@ -1595,11 +1594,31 @@ class _CompressContextOptionsDialogState
                                 _window,
                                 hint: l10n.compressionAutomaticWindow,
                               ),
-                              _number(
-                                l10n.compressionRequests,
-                                _attempts,
-                                unit: l10n.compressionCallUnit,
-                              ),
+                              if (summarySpec != null)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    2,
+                                    14,
+                                    8,
+                                  ),
+                                  child: Text(
+                                    l10n.compressionSummaryWindowEstimate(
+                                      contextTokenValue(
+                                        summarySpec.spec.contextWindow ??
+                                            CompressContextOptions
+                                                .defaultContextWindowTokens,
+                                      ),
+                                      specSourceLabel(
+                                        l10n,
+                                        summarySpec.sources[ModelSpecField
+                                                .contextWindow] ??
+                                            SpecSource.fallback,
+                                      ),
+                                    ),
+                                    style: hintStyle,
+                                  ),
+                                ),
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(
                                   14,
@@ -1791,8 +1810,7 @@ class _CompressContextOptionsDialogState
                 _saving ||
                     !_carryCountValid ||
                     _carryLoading ||
-                    _carryError != null ||
-                    (_carryPreview?.overBudget ?? false)
+                    _carryError != null
                 ? null
                 : _advanced
                 ? () async {

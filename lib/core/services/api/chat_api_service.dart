@@ -3,7 +3,8 @@ import 'providers/openai/responses_request.dart';
 import '../../models/native_compaction.dart';
 import 'native_compaction_context.dart';
 import 'generation/model_request_attempts.dart';
-import '../../models/compress_context_options.dart' show isContextLengthError;
+import '../../models/compress_context_options.dart'
+    show isCompressionCapacityError;
 import 'request_history_context.dart';
 import 'request_image_context.dart';
 import 'request_timeout.dart';
@@ -476,7 +477,7 @@ class ChatApiService {
           isCancelled: () => sessionToken.isCancelled,
           cancelled: _whenCancelled(sessionToken),
           shouldRetry: (error) =>
-              !isContextLengthError(error) &&
+              !isCompressionCapacityError(error) &&
               shouldRetryError(
                 error,
                 options,

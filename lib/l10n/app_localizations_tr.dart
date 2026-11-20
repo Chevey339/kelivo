@@ -15212,7 +15212,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressOverSnack =>
-      'Özet hâlâ çok uzun ve sınırı aşacak, bu nedenle kullanılmadı. Tekrar sıkıştırın veya daha büyük bağlamı olan bir modele geçin.';
+      'Sonuç sohbet modelinin penceresini aşabilir. Özeti inceleyip uygulayabilirsiniz.';
 
   @override
   String get contextSummaryHint =>
@@ -16536,13 +16536,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get compressionTrigger => 'Başlangıç';
 
   @override
-  String get compressionTarget => 'Sıkıştır';
+  String get compressionTarget => 'Hedef';
 
   @override
-  String get compressionWindow => 'Özet modeli kapasitesi';
-
-  @override
-  String get compressionRequests => 'Maksimum istek';
+  String get compressionWindow => 'Otomatik sıkıştırma planlama penceresi';
 
   @override
   String get compressionReference => 'Arka plan referanslarını kullan';
@@ -16615,16 +16612,12 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get compressionBudgetError =>
-      'Bu işlem, mevcut sınırın izin verdiğinden daha fazla model isteği gerektirir, bu nedenle bağlam değişmedi. Maksimum istek sayısını artırın veya daha büyük bağlamı olan bir modele geçin.';
-
-  @override
   String get compressionIncomplete =>
       'Özet kesildi veya reddedildi ve bağlam değişmedi. Çıktı sınırını artırın veya farklı bir model deneyin.';
 
   @override
-  String get compressionReferenceTooLarge =>
-      'Referans materyali bu modelin kapasitesini zaten dolduruyor ve özet için yer kalmıyor. Daha az referans kullanın veya daha büyük bağlamı olan bir modele geçin.';
+  String get compressionProviderContextRejected =>
+      'Sağlayıcı isteğin çok büyük olduğunu bildirdi. Daha büyük bağlam penceresine sahip bir model deneyin.';
 
   @override
   String get compressionReferenceChanged =>
@@ -16632,7 +16625,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressionTargetNotReached =>
-      'Sıkıştırmadan sonra bile kullanım otomatik başlangıç noktasının üzerinde kalacaktı, bu nedenle orijinal bağlam korundu. Özeti kısaltın veya Başlangıç değerini artırın.';
+      'Sonucun en az orijinal kadar bağlam kullandığı tahmin ediliyor. Özeti inceleyip kısaltabilirsiniz.';
 
   @override
   String get compressionTemplateMissing =>
@@ -16719,8 +16712,14 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bir kez sıkıştır, sonra başarısız olan yanıtı yeniden dene';
 
   @override
-  String compressionPlannedCalls(int count, int limit) {
-    return 'Tahmini $count istek · sınır $limit, yeniden denemeler dahil';
+  String compressionPlannedCalls(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Yaklaşık $count istek',
+      one: 'Yaklaşık 1 istek',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -16814,9 +16813,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get compressionTurnUnit => 'tur';
 
   @override
-  String get compressionCallUnit => 'çağrı';
-
-  @override
   String get compressionRequestTimeout => 'Sıkıştırma isteği zaman aşımı';
 
   @override
@@ -16839,10 +16835,15 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressionAdvancedHint =>
-      'Referanslar, orijinallere geri bakılıp bakılmayacağı ve istek sınırı';
+      'Arka plan referansları, orijinal geçmiş ve pencere tahminleri';
 
   @override
   String get compressionAutomaticWindow => 'Otomatik';
+
+  @override
+  String compressionSummaryWindowEstimate(String tokens, String source) {
+    return 'Özet modeli penceresi · $tokens token · $source';
+  }
 
   @override
   String get compressionAutoOffHint =>
@@ -16887,7 +16888,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get compressionAutoKeepHint =>
-      'Otomatik sıkıştırma, manuel çalıştırma için seçtiğiniz aralıktan bağımsız olarak her zaman son orijinalleri tutar. Tur sayısı manuel sıkıştırmayla paylaşılır.';
+      'Otomatik sıkıştırma, yer olduğunda son turları korur. Gerektiğinde daha eski turları da özetleyebilir ve geçerli isteği her zaman korur.';
 
   @override
   String get requestBudgetTitle => 'Görsel ve istek bütçeleri';

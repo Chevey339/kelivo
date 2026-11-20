@@ -2235,19 +2235,6 @@ void main() {
             service.contextCompression.estimateCandidate =
                 (_, _, {bool? fixedContextStart}) async =>
                     (usedTokens: 5000, contextWindow: 4000);
-            await expectLater(
-              service.contextCompression.applyReviewed(
-                conversation.id,
-                task.summary,
-              ),
-              throwsStateError,
-            );
-            expect(task.phase, CompressionPhase.review);
-            expect(controller.currentQueuedInputPaused, isTrue);
-            expect(streamRequestCount, 0);
-            service.contextCompression.estimateCandidate =
-                (_, _, {bool? fixedContextStart}) async =>
-                    (usedTokens: 100, contextWindow: 4000);
           }
           await service.contextCompression.applyReviewed(
             conversation.id,
@@ -2263,6 +2250,7 @@ void main() {
             );
             expect(streamRequestCount, 0);
           } else {
+            expect(task.budget!.usedTokens, 5000);
             await waitFor(
               () =>
                   streamRequestCount == 1 &&
@@ -4646,6 +4634,7 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
   Future<void> compressionReply(
     HttpRequest request, {
     bool summary = false,
+    String summaryText = 'COMPACT_HANDOFF',
   }) async {
     if (summary) {
       request.response.headers.contentType = ContentType.json;
@@ -4653,7 +4642,7 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
         jsonEncode({
           'choices': [
             {
-              'message': {'role': 'assistant', 'content': 'COMPACT_HANDOFF'},
+              'message': {'role': 'assistant', 'content': summaryText},
               'finish_reason': 'stop',
             },
           ],
@@ -5691,6 +5680,117 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
     expect(tester.takeException(), isNull);
   });
 
+  for (final (providerOverflow, needsReview) in [
+    (false, false),
+    (true, false),
+    (true, true),
+  ]) {
+    testWidgets('automatic compression treats its target as advisory: '
+        'providerOverflow=$providerOverflow, needsReview=$needsReview', (
+      tester,
+    ) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        await settings.disableTitleGeneration();
+        await settings.disableSuggestionGeneration();
+        await assistantProvider.updateAssistant(
+          assistantProvider.currentAssistant!.copyWith(maxTokens: 512),
+        );
+        await settings.setCompressionDefaults(
+          const CompressionConfig(
+            mode: AutoCompressionMode.auto,
+            keepRecentUserTurns: 2,
+            summaryTokens: 512,
+            planningWindow: 5000,
+            includeReference: false,
+          ),
+        );
+        final conversation = await openConversation(controller);
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'OLD_HISTORY ${'history ' * (needsReview ? 300 : 2000)}',
+        );
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'Old answer',
+        );
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'RECENT_TURN ${'keep ' * (needsReview ? 3250 : 2750)}',
+        );
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'Recent answer',
+        );
+        final summaries = <String>[];
+        final chats = <String>[];
+        apiOverride = (request, body) async {
+          final wire = jsonEncode(body);
+          if (wire.contains('Target length:')) {
+            summaries.add(wire);
+            await compressionReply(
+              request,
+              summary: true,
+              summaryText: needsReview && summaries.length == 1
+                  ? 'long ' * 480
+                  : 'COMPACT_HANDOFF',
+            );
+          } else {
+            chats.add(wire);
+            if (providerOverflow && chats.length == 1) {
+              if (needsReview) {
+                expect(
+                  service.contextCompression.taskFor(conversation.id)?.phase,
+                  CompressionPhase.review,
+                );
+              }
+              request.response.statusCode = needsReview ? 413 : 400;
+              request.response.write(
+                needsReview
+                    ? 'Request Entity Too Large'
+                    : '{"error":{"code":"context_length_exceeded"}}',
+              );
+              await request.response.close();
+            } else {
+              await compressionReply(request);
+            }
+          }
+        };
+        await controller.sendMessage(ChatInputData(text: 'CURRENT_QUESTION'));
+        await waitFor(
+          () =>
+              chats.isNotEmpty &&
+              !controller.chatController.isConversationLoading(conversation.id),
+          'advisory window compression completes',
+        );
+        expect(summaries, hasLength(providerOverflow ? 2 : 1));
+        expect(summaries.first, contains('OLD_HISTORY'));
+        expect(summaries.first, isNot(contains('RECENT_TURN')));
+        expect(chats.first, contains('RECENT_TURN'));
+        expect(chats, hasLength(providerOverflow ? 2 : 1));
+        expect(chats.last, contains('CURRENT_QUESTION'));
+        expect(chats.last, contains('COMPACT_HANDOFF'));
+        expect(chats.last, isNot(contains('OLD_HISTORY')));
+        if (providerOverflow) {
+          expect(summaries.last, contains('RECENT_TURN'));
+          expect(
+            summaries.last,
+            contains(needsReview ? 'OLD_HISTORY' : 'COMPACT_HANDOFF'),
+          );
+          expect(summaries.last, isNot(contains('CURRENT_QUESTION')));
+          expect(chats.last, isNot(contains('RECENT_TURN')));
+        }
+      });
+      AppSnackBarManager().dismissAll();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final retryAfterRestore in [false, true]) {
     testWidgets(
       'automatic compression stays inside the finite context window: retryAfterRestore=$retryAfterRestore',
@@ -5946,9 +6046,11 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
                   );
                   await assistantProvider.setCurrentAssistant(other);
                 }
-                request.response.statusCode = 400;
+                request.response.statusCode = enabled ? 400 : 413;
                 request.response.write(
-                  '{"error":{"code":"context_length_exceeded"}}',
+                  enabled
+                      ? '{"error":{"code":"context_length_exceeded"}}'
+                      : 'Request Entity Too Large',
                 );
                 await request.response.close();
               } else {
@@ -5968,6 +6070,12 @@ WHEN NEW.state = 'failed' BEGIN SELECT RAISE(ABORT, 'terminal write failed'); EN
           expect(summaries, hasLength(enabled ? 1 : 0));
           expect(chats, hasLength(enabled ? 2 : 1));
           if (!enabled) {
+            expect(
+              AppSnackBarManager().activeToasts.map(
+                (toast) => toast.notification.actionLabel,
+              ),
+              contains(AppLocalizationsEn().compressionOverflowAction),
+            );
             final failed = (await service.loadContextSnapshot(
               conversation.id,
             )).messages.last;

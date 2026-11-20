@@ -650,4 +650,26 @@ void main() {
       expect(recoveries, 1);
     },
   );
+
+  test('failed overflow preparation preserves the provider error', () async {
+    final failure = StateError('context_length_exceeded from provider');
+    final history = RequestHistoryContext(
+      currentUserId: 'u',
+      targetMessageId: 'a',
+      isCancelled: () => false,
+      beforeRequest: (_, _, overflow) async {
+        if (overflow) throw StateError('context preparation failed');
+        return null;
+      },
+    );
+    await history.prepare({
+      'messages': [
+        {'role': 'user', 'content': 'question', historySourceKey: 'u'},
+      ],
+    });
+    await expectLater(
+      history.recoverOverflow(() => Stream<void>.error(failure)).drain<void>(),
+      throwsA(same(failure)),
+    );
+  });
 }

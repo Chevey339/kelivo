@@ -115,31 +115,35 @@ void main() {
     );
   }
 
-  test('carried preflight rejects before making a summary request', () async {
-    var calls = 0;
-    await compression.start(
-      id,
-      request(
-        (_, _) async {
-          calls++;
-          return 'summary';
-        },
-        options: const CompressContextOptions(
-          mode: CompressContextLimitMode.keepRecent,
-          keepUserMessages: 6,
-          carry: CarrySetting(mode: CarryMode.count, count: 2),
+  test(
+    'carried estimate allows a summary request and retains selected copies',
+    () async {
+      var calls = 0;
+      await compression.start(
+        id,
+        request(
+          (_, _) async {
+            calls++;
+            return 'summary';
+          },
+          options: const CompressContextOptions(
+            mode: CompressContextLimitMode.keepRecent,
+            keepUserMessages: 6,
+            carry: CarrySetting(mode: CarryMode.count, count: 2),
+          ),
         ),
-      ),
-    );
-    await until(
-      () => compression.taskFor(id)!.phase == CompressionPhase.failed,
-    );
-    expect(calls, 0);
-    expect(
-      compression.taskFor(id)!.error,
-      contains('compression_carry_over_budget'),
-    );
-  });
+      );
+      await until(
+        () => compression.taskFor(id)!.phase == CompressionPhase.completed,
+      );
+      expect(calls, 1);
+      final operation = (await chat.loadContextOperations(
+        id,
+        refresh: true,
+      )).single;
+      expect(operation.carried!.items, hasLength(2));
+    },
+  );
 
   test(
     'persisted carried copies edit, remove and undo without changing source',
@@ -1884,7 +1888,7 @@ void main() {
   );
 
   test(
-    'oversized summary is editable review; double save applies only once',
+    'review can apply despite its estimate; double save applies only once',
     () async {
       compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
           (usedTokens: 9000, contextWindow: 1000);
@@ -1893,21 +1897,7 @@ void main() {
         () => compression.taskFor(id)!.phase == CompressionPhase.review,
       );
       expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
-      await expectLater(
-        compression.applyReviewed(id, 'still too large'),
-        throwsA(
-          predicate(
-            (Object error) =>
-                error.toString().contains('context_budget_exceeded'),
-          ),
-        ),
-      );
-      expect(compression.taskFor(id)!.phase, CompressionPhase.review);
-      expect(compression.taskFor(id)!.summary, 'still too large');
       expect(compression.taskFor(id)!.budget!.usedTokens, 9000);
-      expect(await chat.loadContextOperations(id, refresh: true), isEmpty);
-      compression.estimateCandidate = (_, _, {bool? fixedContextStart}) async =>
-          (usedTokens: 1000, contextWindow: 1000);
       await Future.wait([
         compression.applyReviewed(id, 'edited'),
         compression.applyReviewed(id, 'double click'),

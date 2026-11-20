@@ -1,23 +1,20 @@
-import '../api/generation/model_request_attempts.dart';
 import 'dart:isolate';
-import 'dart:math' as math;
 
 import '../../models/compress_context_options.dart';
 import '../../models/context_compression_task.dart';
 import '../../models/token_usage.dart';
-import '../../utils/token_estimator.dart';
+import '../api/generation/model_request_attempts.dart';
 import 'compression_planner.dart';
 
 /// A chronological fold. Only the final, complete summary can be installed.
-/// Every API attempt (including overflow retries) belongs to the task budget.
+/// Every API attempt (including overflow retries) is recorded.
 class CompressionEngine {
   const CompressionEngine();
 
-  Future<String> run({
+  Future<({String summary, bool referenceUsed})> run({
     required ContextCompressionTask task,
     required CompressionRequest request,
     required List<String> materials,
-    required String previousSummary,
     required String background,
     required void Function() check,
     required Future<void> Function() publish,
@@ -27,23 +24,14 @@ class CompressionEngine {
       request: request,
       summaryTokens: summaryTokens,
       materials: materials,
-      previousSummary: previousSummary,
       background: background,
     );
-    task.totalParts = await Isolate.run(planner.estimateRequests);
     check();
-    if (task.totalParts > request.config.maxRequestAttempts) {
-      throw StateError('compression_request_budget');
-    }
     task.phase = CompressionPhase.summarizing;
     await publish();
-    // A previous-summary-only rebuild is still one explicit call.
-    var pending = materials.isEmpty;
-    while (planner.index < materials.length || pending) {
+    var referenceUsed = false;
+    while (planner.index < materials.length) {
       check();
-      if (task.requestAttempts >= request.config.maxRequestAttempts) {
-        throw StateError('compression_request_budget');
-      }
       final segment = await Isolate.run(planner.next);
       check();
       task.requestAttempts++;
@@ -58,9 +46,6 @@ class CompressionEngine {
           ),
           onAdditionalAttempt: () async {
             check();
-            if (task.requestAttempts >= request.config.maxRequestAttempts) {
-              throw StateError('compression_request_budget');
-            }
             task.requestAttempts++;
             task.finishReasons.add(null);
             if (!(reported?.hasReportedTokens ?? false)) {
@@ -100,22 +85,13 @@ class CompressionEngine {
         }
         final summary = result.text.trim();
         if (summary.isEmpty) throw StateError('empty_summary');
-        planner.previousSummary = summary;
-        planner.index = segment.nextIndex;
-        planner.offset = segment.nextOffset;
-        pending = false;
+        planner.accept(segment, summary);
+        referenceUsed = referenceUsed || planner.hasReference;
         task.summary = summary;
         task.completedParts++;
-        task.totalParts = math.max(
-          task.totalParts,
-          task.completedParts + (planner.index < materials.length ? 1 : 0),
-        );
       } catch (error) {
         check();
-        if (!isContextLengthError(error)) rethrow;
-        // Replan only unread material with the same complete working summary.
-        planner.inputLimit = (planner.inputLimit * .65).floor();
-        if (planner.inputLimit <= estimateTokens(planner.render('')) + 32) {
+        if (!isCompressionCapacityError(error) || !planner.backOff(segment)) {
           rethrow;
         }
       } finally {
@@ -131,6 +107,6 @@ class CompressionEngine {
       }
     }
     task.totalParts = task.completedParts;
-    return planner.previousSummary;
+    return (summary: planner.previousSummary, referenceUsed: referenceUsed);
   }
 }

@@ -14336,7 +14336,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get compressOverSnack => '摘要还是太长，发给模型会超限，所以没有采用。可以再压一次，或换一个上下文更大的模型。';
+  String get compressOverSnack => '压缩后的上下文可能超过聊天模型的窗口。可以查看摘要并确认采用。';
 
   @override
   String get contextSummaryHint =>
@@ -15575,13 +15575,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionTrigger => '用量达到';
 
   @override
-  String get compressionTarget => '压到';
+  String get compressionTarget => '目标用量';
 
   @override
-  String get compressionWindow => '摘要模型容量';
-
-  @override
-  String get compressionRequests => '最多请求';
+  String get compressionWindow => '自动压缩估算窗口';
 
   @override
   String get compressionReference => '使用背景参考资料';
@@ -15649,22 +15646,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get compressionBudgetError =>
-      '按现在的设置，压缩要请求的次数超过了上限，上下文没有改动。可以把「最多请求」调高，或换一个上下文更大的模型。';
-
-  @override
   String get compressionIncomplete => '摘要没写完或被模型拒绝，上下文没有改动。可以调高输出上限，或换一个模型。';
 
   @override
-  String get compressionReferenceTooLarge =>
-      '用来参考的内容已经占满这个模型的容量，没剩下空间写摘要。减少参考内容，或换一个上下文更大的模型。';
+  String get compressionProviderContextRejected => '服务端返回请求过大。可以换一个上下文更大的模型再试。';
 
   @override
   String get compressionReferenceChanged => '参考的背景已经变了。请先看一下这份摘要，或重新生成一次。';
 
   @override
-  String get compressionTargetNotReached =>
-      '压完之后还是会超过自动压缩的起点，所以原文没动。可以再缩短摘要，或把「用量达到」调高。';
+  String get compressionTargetNotReached => '压缩后预计没有节省上下文。可以查看并缩短摘要。';
 
   @override
   String get compressionTemplateMissing => '当前选的模板不可用，请换一个。';
@@ -15747,8 +15738,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionOverflowAction => '先压缩一次，再重试刚才失败的回复';
 
   @override
-  String compressionPlannedCalls(int count, int limit) {
-    return '预计 $count 次请求 · 本次上限 $limit 次（含重试）';
+  String compressionPlannedCalls(int count) {
+    return '预计 $count 次请求';
   }
 
   @override
@@ -15834,9 +15825,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionTurnUnit => '轮';
 
   @override
-  String get compressionCallUnit => '次';
-
-  @override
   String get compressionRequestTimeout => '压缩请求超时';
 
   @override
@@ -15858,10 +15846,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionAdvancedOptions => '压缩细节';
 
   @override
-  String get compressionAdvancedHint => '参考内容、是否回头看原文，以及请求次数上限';
+  String get compressionAdvancedHint => '背景参考、历史原文和窗口估算';
 
   @override
   String get compressionAutomaticWindow => '自动';
+
+  @override
+  String compressionSummaryWindowEstimate(String tokens, String source) {
+    return '摘要模型窗口 · $tokens token · $source';
+  }
 
   @override
   String get compressionAutoOffHint => '需要时可在压缩页手动开始。';
@@ -15898,8 +15891,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressionScopeRecentHint => '在字数限制内，选较近的完整消息来压缩，没选中的仍保留原文。';
 
   @override
-  String get compressionAutoKeepHint =>
-      '自动压缩总会保留最近原文，不受这次手动范围的影响。保留轮数和手动压缩是同一个设置。';
+  String get compressionAutoKeepHint => '自动压缩会尽量保留最近轮次。空间不足时会多压一些旧轮次，当前请求会保留。';
 
   @override
   String get requestBudgetTitle => '图片与请求预算';
@@ -30956,7 +30948,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get compressOverSnack => '摘要还是太长，发给模型会超限，所以没有采用。可以再压一次，或换一个上下文更大的模型。';
+  String get compressOverSnack => '压缩后的上下文可能超过聊天模型的窗口。可以查看摘要并确认采用。';
 
   @override
   String get contextSummaryHint =>
@@ -32195,13 +32187,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressionTrigger => '用量达到';
 
   @override
-  String get compressionTarget => '压到';
+  String get compressionTarget => '目标用量';
 
   @override
-  String get compressionWindow => '摘要模型容量';
-
-  @override
-  String get compressionRequests => '最多请求';
+  String get compressionWindow => '自动压缩估算窗口';
 
   @override
   String get compressionReference => '使用背景参考资料';
@@ -32269,22 +32258,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get compressionBudgetError =>
-      '按现在的设置，压缩要请求的次数超过了上限，上下文没有改动。可以把「最多请求」调高，或换一个上下文更大的模型。';
-
-  @override
   String get compressionIncomplete => '摘要没写完或被模型拒绝，上下文没有改动。可以调高输出上限，或换一个模型。';
 
   @override
-  String get compressionReferenceTooLarge =>
-      '用来参考的内容已经占满这个模型的容量，没剩下空间写摘要。减少参考内容，或换一个上下文更大的模型。';
+  String get compressionProviderContextRejected => '服务端返回请求过大。可以换一个上下文更大的模型再试。';
 
   @override
   String get compressionReferenceChanged => '参考的背景已经变了。请先看一下这份摘要，或重新生成一次。';
 
   @override
-  String get compressionTargetNotReached =>
-      '压完之后还是会超过自动压缩的起点，所以原文没动。可以再缩短摘要，或把「用量达到」调高。';
+  String get compressionTargetNotReached => '压缩后预计没有节省上下文。可以查看并缩短摘要。';
 
   @override
   String get compressionTemplateMissing => '当前选的模板不可用，请换一个。';
@@ -32367,8 +32350,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressionOverflowAction => '先压缩一次，再重试刚才失败的回复';
 
   @override
-  String compressionPlannedCalls(int count, int limit) {
-    return '预计 $count 次请求 · 本次上限 $limit 次（含重试）';
+  String compressionPlannedCalls(int count) {
+    return '预计 $count 次请求';
   }
 
   @override
@@ -32454,9 +32437,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressionTurnUnit => '轮';
 
   @override
-  String get compressionCallUnit => '次';
-
-  @override
   String get compressionRequestTimeout => '压缩请求超时';
 
   @override
@@ -32478,10 +32458,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressionAdvancedOptions => '压缩细节';
 
   @override
-  String get compressionAdvancedHint => '参考内容、是否回头看原文，以及请求次数上限';
+  String get compressionAdvancedHint => '背景参考、历史原文和窗口估算';
 
   @override
   String get compressionAutomaticWindow => '自动';
+
+  @override
+  String compressionSummaryWindowEstimate(String tokens, String source) {
+    return '摘要模型窗口 · $tokens token · $source';
+  }
 
   @override
   String get compressionAutoOffHint => '需要时可在压缩页手动开始。';
@@ -32518,8 +32503,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressionScopeRecentHint => '在字数限制内，选较近的完整消息来压缩，没选中的仍保留原文。';
 
   @override
-  String get compressionAutoKeepHint =>
-      '自动压缩总会保留最近原文，不受这次手动范围的影响。保留轮数和手动压缩是同一个设置。';
+  String get compressionAutoKeepHint => '自动压缩会尽量保留最近轮次。空间不足时会多压一些旧轮次，当前请求会保留。';
 
   @override
   String get requestBudgetTitle => '图片与请求预算';
@@ -47591,7 +47575,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get compressOverSnack => '摘要還是太長，傳送給模型會超限，所以沒有套用。可以再壓一次，或換一個上下文更大的模型。';
+  String get compressOverSnack => '壓縮後的上下文可能超過聊天模型的視窗。可以檢視摘要並確認採用。';
 
   @override
   String get contextSummaryHint =>
@@ -48831,13 +48815,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressionTrigger => '用量達到';
 
   @override
-  String get compressionTarget => '壓到';
+  String get compressionTarget => '目標用量';
 
   @override
-  String get compressionWindow => '摘要模型容量';
-
-  @override
-  String get compressionRequests => '最多請求';
+  String get compressionWindow => '自動壓縮估算視窗';
 
   @override
   String get compressionReference => '使用背景參考資料';
@@ -48906,22 +48887,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get compressionBudgetError =>
-      '按現在的設定，壓縮要請求的次數超過了上限，上下文沒有改動。可以把「最多請求」調高，或換一個上下文更大的模型。';
-
-  @override
   String get compressionIncomplete => '摘要沒寫完或被模型拒絕，上下文沒有改動。可以調高輸出上限，或換一個模型。';
 
   @override
-  String get compressionReferenceTooLarge =>
-      '用來參考的內容已經佔滿這個模型的容量，沒剩下空間寫摘要。減少參考內容，或換一個上下文更大的模型。';
+  String get compressionProviderContextRejected => '服務端回傳請求過大。可以換一個上下文更大的模型再試。';
 
   @override
   String get compressionReferenceChanged => '參考的背景已經變了。請先看一下這份摘要，或重新產生一次。';
 
   @override
-  String get compressionTargetNotReached =>
-      '壓完之後還是會超過自動壓縮的起點，所以原文沒動。可以再縮短摘要，或把「用量達到」調高。';
+  String get compressionTargetNotReached => '壓縮後預計沒有節省上下文。可以檢視並縮短摘要。';
 
   @override
   String get compressionTemplateMissing => '目前選的模板不可用，請換一個。';
@@ -49004,8 +48979,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressionOverflowAction => '先壓縮一次，再重試剛才失敗的回覆';
 
   @override
-  String compressionPlannedCalls(int count, int limit) {
-    return '預計 $count 次請求 · 本次上限 $limit 次（含重試）';
+  String compressionPlannedCalls(int count) {
+    return '預計 $count 次請求';
   }
 
   @override
@@ -49091,9 +49066,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressionTurnUnit => '輪';
 
   @override
-  String get compressionCallUnit => '次';
-
-  @override
   String get compressionRequestTimeout => '壓縮請求逾時';
 
   @override
@@ -49115,10 +49087,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressionAdvancedOptions => '壓縮細節';
 
   @override
-  String get compressionAdvancedHint => '參考內容、是否回頭看原文，以及請求次數上限';
+  String get compressionAdvancedHint => '背景參考、歷史原文和視窗估算';
 
   @override
   String get compressionAutomaticWindow => '自動';
+
+  @override
+  String compressionSummaryWindowEstimate(String tokens, String source) {
+    return '摘要模型視窗 · $tokens token · $source';
+  }
 
   @override
   String get compressionAutoOffHint => '需要時可在壓縮頁手動開始。';
@@ -49155,8 +49132,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressionScopeRecentHint => '在字數限制內，選較近的完整訊息來壓縮，沒選中的仍保留原文。';
 
   @override
-  String get compressionAutoKeepHint =>
-      '自動壓縮總會保留最近原文，不受這次手動範圍的影響。保留輪數和手動壓縮是同一個設定。';
+  String get compressionAutoKeepHint => '自動壓縮會盡量保留最近輪次。空間不足時會多壓一些舊輪次，目前請求會保留。';
 
   @override
   String get requestBudgetTitle => '圖片與請求預算';

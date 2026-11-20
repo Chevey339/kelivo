@@ -7442,7 +7442,7 @@
   "contextOperationSuperseded": "Replaced by a later summary",
   "compressIncludeAttachments": "Attachment text & tool results",
   "contextEditCharacters": "{count} characters",
-  "compressOverSnack": "The summary is still too long and would exceed the limit, so it wasn’t used. Compress again, or switch to a model with a larger context.",
+  "compressOverSnack": "The result may exceed the chat model’s window. You can review and apply the summary.",
   "contextSummaryHint": "This is the summary the model will see next. Saving changes only the summary, not existing replies. Attachments contribute only text already extracted; images are not re-read.",
   "compressAdvanced": "Advanced",
   "compressTaskWaiting": "Waiting for the current reply",
@@ -8278,9 +8278,8 @@
   "compressionKeepHint": "A turn is one user message plus the replies and tool activity that follow it.",
   "compressionLength": "Summary length (tokens)",
   "compressionTrigger": "Start at",
-  "compressionTarget": "Compress to",
-  "compressionWindow": "Summary model capacity",
-  "compressionRequests": "Maximum requests",
+  "compressionTarget": "Aim for",
+  "compressionWindow": "Auto compression planning window",
   "compressionReference": "Use background references",
   "compressionReferenceHint": "The summary can draw on the assistant’s system prompt, world book entries matched to this part of the chat, and memories saved at the time. The chat history establishes what happened and what each character knows.",
   "compressionInstructionInjections": "Use instruction injections as references",
@@ -8299,11 +8298,10 @@
   "compressionActualUsage": "Summary model usage",
   "compressionUsageValues": "Input {input} · output {output} tokens",
   "compressionUsageUnknown": "{count} request(s) didn’t return usage data. That doesn’t mean they were free.",
-  "compressionBudgetError": "This would take more model requests than the current limit allows, so the context is unchanged. Raise Maximum requests, or switch to a model with a larger context.",
   "compressionIncomplete": "The summary was cut off or refused, and the context is unchanged. Raise the output limit, or try a different model.",
-  "compressionReferenceTooLarge": "Reference material already fills this model’s capacity, leaving no room for the summary. Use fewer references, or switch to a model with a larger context.",
+  "compressionProviderContextRejected": "The provider reported that the request was too large. Try a model with a larger context.",
   "compressionReferenceChanged": "The referenced background has changed. Review this summary, or generate a new one.",
-  "compressionTargetNotReached": "Even after compression, usage would still be above the automatic starting point, so the original context was kept. Shorten the summary, or raise Start at.",
+  "compressionTargetNotReached": "The result is estimated to use at least as much context as the original. You can review and shorten the summary.",
   "compressionTemplateMissing": "The selected template isn’t available. Please choose another.",
   "compressionTemplates": "Templates",
   "compressionRecipes": "Recipes",
@@ -8375,17 +8373,14 @@
     },
     "description": "Text showing how many conversation overrides reference this template; {count} is an integer."
   },
-  "compressionPlannedCalls": "Estimated {count} request(s) · limit {limit}, including retries",
+  "compressionPlannedCalls": "{count, plural, =1{About 1 request} other{About {count} requests}}",
   "@compressionPlannedCalls": {
     "placeholders": {
       "count": {
         "type": "int"
-      },
-      "limit": {
-        "type": "int"
       }
     },
-    "description": "Status line in the compression options dialog showing estimated request count and the per-run limit, including retries."
+    "description": "Status line in the compression options dialog with the estimated number of summary model requests. The count can change as the server replies."
   },
   "compressionGlobalTemplateReference": "Also used as the global default.",
   "compressionRecipeReferences": "{count} recipe(s) keep their own copy of the template from that time.",
@@ -8429,7 +8424,6 @@
   "compressionSearchRecipes": "Search recipes",
   "compressionRecipeCreateHint": "Save a recipe from More settings to reuse a configuration.",
   "compressionTurnUnit": "turns",
-  "compressionCallUnit": "calls",
   "compressionRequestTimeout": "Compression request timeout",
   "@compressionRequestTimeout": {
     "description": "Timeout field for each compression request, in minutes. Also labels the recovery action that opens this field."
@@ -8456,8 +8450,20 @@
     }
   },
   "compressionAdvancedOptions": "Compression details",
-  "compressionAdvancedHint": "References, whether to look back at originals, and the request limit",
+  "compressionAdvancedHint": "Background references, original history, and planning estimates",
   "compressionAutomaticWindow": "Auto",
+  "compressionSummaryWindowEstimate": "Summary model window · {tokens} tokens · {source}",
+  "@compressionSummaryWindowEstimate": {
+    "description": "Read-only line in compression details showing the estimated capacity of the model used for summaries. The tokens placeholder is a compact count like 128K, and source is a localized model metadata source such as Catalog or Custom.",
+    "placeholders": {
+      "tokens": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
   "compressionAutoOffHint": "Compress manually whenever you need.",
   "compressionAutoNotifyHint": "You’ll be notified when usage is close to the limit, and you decide when to compress.",
   "compressionAutoOnHint": "When usage reaches the set percentage, earlier history is summarized automatically. This uses additional model tokens.",
@@ -8469,7 +8475,7 @@
   "compressionScopeAllHint": "Summarize all history currently in context, without keeping a separate recent original. The original messages can still be viewed.",
   "compressionScopeStartHint": "Within the character limit, compress earlier complete messages. Messages not selected stay as original text.",
   "compressionScopeRecentHint": "Within the character limit, compress more recent complete messages. Messages not selected stay as original text.",
-  "compressionAutoKeepHint": "Automatic compression always keeps recent originals, regardless of the range you pick for a manual run. The turn count is shared with manual compression.",
+  "compressionAutoKeepHint": "Automatic compression keeps recent turns when there is room. It can summarize additional older turns and always protects the current request.",
   "requestBudgetTitle": "Image & request budgets",
   "requestBudgetInherited": "Inherited",
   "requestBudgetCustom": "Custom",
@@ -20788,7 +20794,7 @@
     "description": "Toggle label and detail text for including attachment text and tool results when compressing context."
   },
   "@compressOverSnack": {
-    "description": "Error message when a summary would exceed the context limit and was therefore not applied."
+    "description": "Advisory notice in manual compression review when the locally estimated context after applying the summary exceeds the chat model window. The user can still choose to apply the summary."
   },
   "@contextSummaryHint": {
     "description": "Hint on the summary editor explaining the summary is used in later requests, saving doesn't rewrite replies, and attachments use only existing text."
@@ -21739,13 +21745,10 @@
     "description": "Percentage field in automatic compression settings: input usage at which compression starts."
   },
   "@compressionTarget": {
-    "description": "Percentage field in automatic compression settings: desired input usage after compression."
+    "description": "Percentage field in automatic compression settings giving a preferred input usage after compression. This percentage guides planning."
   },
   "@compressionWindow": {
-    "description": "Optional input-capacity override for the summary model in compression details, measured in tokens."
-  },
-  "@compressionRequests": {
-    "description": "Maximum number of model requests allowed for one compression task, including retries. Also labels the recovery action that opens this field."
+    "description": "Optional window override in compression details for estimating the current chat model's input capacity when planning automatic compression, measured in tokens. The summary model has its own window."
   },
   "@compressionReference": {
     "description": "Main switch in the text compression details for including background information in the summary request. It also controls the availability of the instruction injection option. No placeholders."
@@ -21789,20 +21792,17 @@
   "@compressionActualUsage": {
     "description": "Detail-row label for the summary model's actual token usage."
   },
-  "@compressionBudgetError": {
-    "description": "Compression failure when the estimated or actual request count exceeds the configured maximum. Refers to the setting named compressionRequests and confirms no result was applied."
-  },
   "@compressionIncomplete": {
     "description": "Error message when the summary was truncated or refused and not applied, advising adjusting output limit or model."
   },
-  "@compressionReferenceTooLarge": {
-    "description": "Error message when template, reference, or working summary fills the model budget, advising fewer references or a larger model."
+  "@compressionProviderContextRejected": {
+    "description": "Compression error shown when the model provider actually rejected the final attempted input with a context length or payload size error. Original provider details are shown separately."
   },
   "@compressionReferenceChanged": {
     "description": "Error message when referenced background changed, advising reviewing the candidate or regenerating."
   },
   "@compressionTargetNotReached": {
-    "description": "Review notice when automatic compression did not reduce the full request below its trigger ratio. The original context remains active; suggests shortening the summary or adjusting compressionTrigger."
+    "description": "Review notice when automatic compression estimates that the projected chat request with the generated summary and retained messages does not reduce input usage."
   },
   "@compressionTemplateMissing": {
     "description": "Error message when the selected template is unavailable, advising choosing another."
@@ -21948,14 +21948,11 @@
   "@compressionTurnUnit": {
     "description": "Unit suffix ('turns') appended to a numeric field for kept recent turns in compression options."
   },
-  "@compressionCallUnit": {
-    "description": "Unit suffix ('calls') appended to the numeric request-attempts field in compression options."
-  },
   "@compressionAdvancedOptions": {
     "description": "Disclosure title in compression options and context operation widgets for advanced compression details."
   },
   "@compressionAdvancedHint": {
-    "description": "Subtitle under the advanced options disclosure describing references, original-history rereading and request limits."
+    "description": "Subtitle under the advanced options disclosure describing references, original history, and window planning estimates."
   },
   "@compressionAutomaticWindow": {
     "description": "Hint for the window field indicating automatic sizing."
@@ -21994,7 +21991,7 @@
     "description": "Hint describing the recent scope: recent whole messages selected within a character budget, others kept as original."
   },
   "@compressionAutoKeepHint": {
-    "description": "Hint in the compression options dialog explaining that automatic compression always keeps recent turns regardless of the manual scope, and that this turn count is shared with manual compression."
+    "description": "Hint beneath the numeric field for recent turns in automatic text compression. The app may summarize additional old turns when needed. The current request is protected. This is plain text with no placeholders."
   },
   "@requestBudgetTitle": {
     "description": "Title of the image and request budget settings row and desktop dialog header in provider settings."

@@ -2485,22 +2485,27 @@ class ChatActions {
         '${nativeCompactionScope(ctx.config)}:${spec.apiModelId ?? ctx.modelId}';
     var nativeAttempted = false;
     var notified = false;
-    final attempted = <String>{};
+    final attempted = <(String, bool)>{};
+    ContextCompressionTask? automaticReview;
     bool cancelled() =>
         disposed ||
         isStopping(id) ||
         !identical(_streamingStates[state.messageId], state) ||
         !_activeAssistantMessages.isActive(ctx.assistantMessage);
     late RequestHistoryContext history;
-    Future<int> estimate(
+    Future<int?> estimate(
       Map<String, dynamic> body, {
       Set<String> excluded = const {},
     }) async {
-      final projected =
-          await ctx.imageContext?.project(body, excludedOwners: excluded) ??
-          body;
-      return (estimateRequestInput(projected, kind) * history.calibration)
-          .ceil();
+      try {
+        final projected =
+            await ctx.imageContext?.project(body, excludedOwners: excluded) ??
+            body;
+        return (estimateRequestInput(projected, kind) * history.calibration)
+            .ceil();
+      } catch (_) {
+        return null;
+      }
     }
 
     Future<void> checkMode() async {
@@ -2554,7 +2559,8 @@ class ChatActions {
           return null;
         }
         var before = await estimate(body);
-        history.lastEstimatedTokens = (before / history.calibration).ceil();
+        history.lastEstimatedTokens = ((before ?? 0) / history.calibration)
+            .ceil();
         final output = normalizedRequestOutputReserve(body, spec.maxOutput);
         final budget = window == null
             ? null
@@ -2574,11 +2580,13 @@ class ChatActions {
             return null;
           }
           before = overflow
-              ? math.max(before, budget?.input ?? window ?? before)
+              ? math.max(before ?? 0, budget?.input ?? window ?? 0)
               : nativeEstimate ?? measured!.usedTokens;
         }
         if (!overflow &&
-            (budget == null || !budget.shouldTrigger(before, preferences))) {
+            (before == null ||
+                budget == null ||
+                !budget.shouldTrigger(before, preferences))) {
           return null;
         }
         if (current.mode == AutoCompressionMode.notify) {
@@ -2588,30 +2596,51 @@ class ChatActions {
           }
           return null;
         }
-        if (chatService.contextCompression.taskFor(id)?.active == true) {
+        final compression = chatService.contextCompression;
+        final previousTask = compression.taskFor(id);
+        final retryReview =
+            overflow &&
+            previousTask?.phase == CompressionPhase.review &&
+            identical(previousTask, automaticReview);
+        if (previousTask?.active == true && !retryReview) {
           return null;
         }
         await _checkpointWriters[state.messageId]?.barrier();
         if (cancelled() || !allowed) return null;
         final snapshot = await chatService.loadContextSnapshot(id);
         final source = ContextHistory.throughMessage(snapshot.messages, userId);
-        final options = CompressContextOptions(
+        CompressContextOptions optionsFor(int keep) => CompressContextOptions(
           mode: CompressContextLimitMode.keepRecent,
           native: useNative,
           carry: useNative
               ? preferences.nativeCarryOriginals
               : preferences.carryOriginals,
-          keepUserMessages: useNative
+          keepUserMessages: keep,
+          regenerateExisting: overflow && !useNative,
+        );
+        CompressionSelection select(CompressContextOptions options) =>
+            selectCompressionHistory(
+              source,
+              snapshot.operations,
+              options,
+              protectedMessageId: userId,
+              effectiveMessageIds: allowedMessageIds,
+            );
+
+        var options = optionsFor(
+          useNative
               ? preferences.nativeKeepRecentUserTurns
+              : overflow
+              ? 1
               : preferences.keepRecentUserTurns,
         );
-        final selection = selectCompressionHistory(
-          source,
-          snapshot.operations,
-          options,
-          protectedMessageId: userId,
-          effectiveMessageIds: allowedMessageIds,
-        );
+        var selection = select(options);
+        if (!useNative &&
+            options.keepUserMessages! > 1 &&
+            selection.covered.isEmpty) {
+          options = optionsFor(1);
+          selection = select(options);
+        }
         if (selection.missingOriginals) {
           if (!notified) {
             notified = true;
@@ -2626,9 +2655,9 @@ class ChatActions {
           source,
           snapshot.operations,
         );
-        if (!attempted.add(fingerprint)) return null;
+        if (!attempted.add((fingerprint, overflow))) return null;
         nativeAttempted = useNative;
-        final excluded = selection.covered.map((m) => m.id).toSet();
+        var excluded = selection.covered.map((m) => m.id).toSet();
         List<ChatMessage> candidateHistory(ContextOperation candidate) =>
             ContextHistory.resolve(source, [...snapshot.operations, candidate])
                 .where(
@@ -2655,43 +2684,63 @@ class ChatActions {
           return preview.apiMessages;
         }
 
+        Future<int?> estimateFixed() async {
+          final empty = ContextOperation(
+            id: 'planning',
+            kind: ContextOperationKind.compress,
+            anchorGroupId: ContextHistory.group(selection.covered.last),
+            appliedAfterGroupId: ContextHistory.group(source.last),
+            sourceGroups: selection.covered.map(ContextHistory.group).toList(),
+            dependencies: selection.dependencies,
+            createdAt: DateTime.now(),
+            compressionDetails: const {'envelope': 'history-v1'},
+          );
+          try {
+            return await estimate(
+              project(await rebuild(empty)),
+              excluded: excluded,
+            );
+          } catch (_) {
+            return null;
+          }
+        }
+
         List<Map<String, dynamic>>? replacement;
         try {
           var summaryTokens = preferences.summaryTokens;
           int? carryBudgetTokens;
           if (budget != null) {
-            final empty = ContextOperation(
-              id: 'planning',
-              kind: ContextOperationKind.compress,
-              anchorGroupId: ContextHistory.group(selection.covered.last),
-              appliedAfterGroupId: ContextHistory.group(source.last),
-              sourceGroups: selection.covered
-                  .map(ContextHistory.group)
-                  .toList(),
-              dependencies: selection.dependencies,
-              createdAt: DateTime.now(),
-              compressionDetails: const {'envelope': 'history-v1'},
-            );
-            final fixed = await estimate(
-              project(await rebuild(empty)),
-              excluded: excluded,
-            );
-            final space =
-                (budget.input * preferences.targetInputRatio).floor() - fixed;
-            if (space < 128 && !useNative) {
-              if (!notified) {
-                notified = true;
-                viewModel.onError?.call('compression_reference_too_large');
+            var fixed = await estimateFixed();
+            if (!useNative &&
+                options.keepUserMessages! > 1 &&
+                fixed != null &&
+                budget.input - fixed < 128) {
+              final shorter = optionsFor(1);
+              final expanded = select(shorter);
+              if (expanded.covered.isNotEmpty &&
+                  !expanded.missingOriginals &&
+                  !expanded.needsRegeneration) {
+                options = shorter;
+                selection = expanded;
+                excluded = selection.covered.map((m) => m.id).toSet();
+                fixed = await estimateFixed();
               }
-              return null;
             }
-            carryBudgetTokens = useNative
-                ? space.clamp(0, 64000)
-                : (space - 128).clamp(0, space);
-            if (!useNative) {
-              summaryTokens = space.clamp(128, summaryTokens);
+            if (fixed != null) {
+              final goal =
+                  (budget.input * preferences.targetInputRatio).floor() - fixed;
+              final space = useNative || goal >= 128
+                  ? goal
+                  : budget.input - fixed;
+              carryBudgetTokens = useNative
+                  ? space.clamp(0, 64000)
+                  : math.max(0, space - 128);
+              if (!useNative && space > 0) {
+                summaryTokens = space.clamp(128, summaryTokens);
+              }
             }
           }
+          if (cancelled() || !allowed) return null;
           final request = await viewModel.buildCompressionRequest(
             id,
             options: options,
@@ -2720,22 +2769,23 @@ class ChatActions {
                 replacement = next;
                 return true;
               }
+              final prior = before;
               final after = await estimate(project(next), excluded: excluded);
-              final accepted = budget == null
-                  ? after < before
-                  : budget.accepts(
-                      before: before,
-                      after: after,
-                      config: preferences,
-                    );
+              final accepted = prior == null || after == null || after < prior;
               if (accepted) replacement = next;
               return accepted;
             },
           );
-          final task = await chatService.contextCompression.runAtSafePoint(
-            id,
-            request,
-          );
+          if (retryReview) {
+            if (!identical(compression.taskFor(id), previousTask) ||
+                previousTask?.phase != CompressionPhase.review) {
+              return null;
+            }
+            await compression.cancel(id);
+          }
+          if (cancelled() || !allowed) return null;
+          final task = await compression.runAtSafePoint(id, request);
+          automaticReview = task.phase == CompressionPhase.review ? task : null;
           if (cancelled() ||
               !allowed ||
               task.phase != CompressionPhase.completed) {
@@ -3607,7 +3657,8 @@ class ChatActions {
             _conversationStreams.remove(conversationId);
           }
           if (!oauthFailure && truncation == null) {
-            if (isContextLengthError(errorText) && onContextOverflow != null) {
+            if (isCompressionCapacityError(errorText) &&
+                onContextOverflow != null) {
               onContextOverflow!(
                 errorMessage,
                 errorText,

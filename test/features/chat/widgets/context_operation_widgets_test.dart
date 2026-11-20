@@ -195,19 +195,11 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
       }
       expect(requests, hasLength(1));
-      pending.first.complete((
-        prompt: 'old',
-        estimatedRequests: 99,
-        maxRequestAttempts: 1,
-      ));
+      pending.first.complete((prompt: 'old', estimatedRequests: 99));
       await tester.pump();
       expect(requests, hasLength(2));
       expect(requests.last.keepUserMessages, 3);
-      pending.last.complete((
-        prompt: 'latest',
-        estimatedRequests: 1,
-        maxRequestAttempts: 1,
-      ));
+      pending.last.complete((prompt: 'latest', estimatedRequests: 1));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     },
@@ -229,7 +221,7 @@ void main() {
               ),
           ], const []),
           previewRequest: (_, _) async =>
-              (prompt: 'Preview', estimatedRequests: 1, maxRequestAttempts: 1),
+              (prompt: 'Preview', estimatedRequests: 1),
         ),
       ),
     );

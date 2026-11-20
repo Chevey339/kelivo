@@ -158,7 +158,10 @@ void main() {
         error: 'compression_incomplete:max_output_tokens',
         label: zh.compressionOutputBudget,
       ),
-      (error: 'compression_request_budget', label: zh.compressionRequests),
+      (
+        error: 'compression_reference_changed',
+        label: zh.compressionSourceSettings,
+      ),
       (error: 'request_timeout:120000000', label: zh.compressionRequestTimeout),
     ]) {
       check('failure action opens ${entry.error} setting on $platform', (
@@ -262,10 +265,12 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text(entry.label));
         await settleCompressionOptions(tester);
-        final field = find.descendant(
-          of: find.widgetWithText(IosFormTextField, entry.label),
-          matching: find.byType(TextField),
-        );
+        final field = entry.error == 'compression_reference_changed'
+            ? find.text(zh.compressionReference)
+            : find.descendant(
+                of: find.widgetWithText(IosFormTextField, entry.label),
+                matching: find.byType(TextField),
+              );
         expect(field.hitTestable(), findsOneWidget);
         expect(settings.compressionDefaults.toJson(), before);
         expect(retries, 0);
@@ -274,4 +279,13 @@ void main() {
       });
     }
   }
+
+  test('provider capacity rejection points to the summary model', () {
+    const error = 'HttpException: HTTP 400: context_length_exceeded';
+    expect(
+      compressionErrorLabel(en, error),
+      en.compressionProviderContextRejected,
+    );
+    expect(compressionRecoveryTarget(error), CompressionRecoveryTarget.model);
+  });
 }
