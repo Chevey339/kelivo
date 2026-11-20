@@ -141,11 +141,11 @@ void main() {
     expect(find.text('diagram'), findsOneWidget);
     final recall = imageSwitch('Allow the model to recall images');
     final automatic = imageSwitch('Manage history images automatically');
-    expect(tester.widget<IosSwitch>(recall).value, isTrue);
+    expect(tester.widget<IosSwitch>(recall).value, isFalse);
     expect(tester.widget<IosSwitch>(automatic).value, isTrue);
     await tester.tap(recall);
     await settlePanel(tester);
-    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
     expect(tester.widget<IosSwitch>(automatic).value, isTrue);
 
     await tester.scrollUntilVisible(
@@ -160,14 +160,14 @@ void main() {
     await tester.tap(find.byTooltip('Pin image'));
     await settlePanel(tester);
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
-    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
     expect(find.byTooltip('Unpin image'), findsOneWidget);
     await tester.ensureVisible(automatic);
     await tester.pumpAndSettle();
     await tester.tap(automatic);
     await settlePanel(tester);
     expect((await chat.imageContextSettings('chat')).automatic, isFalse);
-    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
 
     await tester.scrollUntilVisible(
@@ -189,7 +189,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(recall);
     await settlePanel(tester);
-    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
     expect((await chat.imageContextSettings('chat')).automatic, isFalse);
     expect((await chat.imageContextSettings('chat')).pinned, {image.key});
   });
@@ -219,14 +219,15 @@ void main() {
     expect(find.text('No images yet'), findsOneWidget);
     final recall = imageSwitch('Allow the model to recall images');
     final automatic = imageSwitch('Manage history images automatically');
+    expect(tester.widget<IosSwitch>(recall).value, isFalse);
     await tester.tap(recall);
     await settlePanel(tester);
-    expect((await chat.imageContextSettings('chat')).allowRecall, isFalse);
+    expect((await chat.imageContextSettings('chat')).allowRecall, isTrue);
     expect(tester.widget<IosSwitch>(automatic).value, isTrue);
     expect(find.text('No images yet'), findsOneWidget);
     await tester.tap(automatic);
     await settlePanel(tester);
     expect((await chat.imageContextSettings('chat')).automatic, isFalse);
-    expect(tester.widget<IosSwitch>(recall).value, isFalse);
+    expect(tester.widget<IosSwitch>(recall).value, isTrue);
   });
 }

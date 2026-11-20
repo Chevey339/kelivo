@@ -500,7 +500,7 @@ void main() {
     () async {
       final settings = ImageContextSettings(
         automatic: false,
-        allowRecall: false,
+        allowRecall: true,
         pinned: {
           const ContextImageIdentity('u1', 'part:1').key,
           const ContextImageIdentity('u3', 'part:0').key,
@@ -514,7 +514,7 @@ void main() {
       final forkMessages = (await repo.readContextSnapshot(fork.id)).messages;
       final forkSettings = await repo.readImageContextSettings(fork.id);
       expect(forkSettings.automatic, isFalse);
-      expect(forkSettings.allowRecall, isFalse);
+      expect(forkSettings.allowRecall, isTrue);
       expect(forkSettings.pinned, {
         ContextImageIdentity(forkMessages.first.id, 'part:1').key,
       });
@@ -540,7 +540,7 @@ void main() {
           importedId,
         );
         expect(importedSettings.automatic, isFalse);
-        expect(importedSettings.allowRecall, isFalse);
+        expect(importedSettings.allowRecall, isTrue);
         expect(importedSettings.pinned, {
           ContextImageIdentity(importedMessages.first.id, 'part:1').key,
           ContextImageIdentity(importedMessages[4].id, 'part:0').key,
@@ -560,7 +560,7 @@ void main() {
         );
         expect(
           (await target.readImageContextSettings(importedId)).allowRecall,
-          isTrue,
+          isFalse,
         );
       } finally {
         await target.close();

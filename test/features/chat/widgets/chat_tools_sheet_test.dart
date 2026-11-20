@@ -270,10 +270,6 @@ void main() {
       (tester) async {
         final conversation = Conversation(id: 'images', title: 'Images');
         final chat = _TemporaryImageChat(conversation);
-        await chat.setImageContextSettings(
-          'images',
-          const ImageContextSettings(automatic: false, pinned: {'pinned'}),
-        );
         addTearDown(chat.dispose);
         final l10n = await pumpSheet(
           tester,
@@ -317,23 +313,17 @@ void main() {
         expect(row, findsOneWidget);
         await tester.tap(row);
         await tester.pumpAndSettle();
-        expect(
-          (await chat.imageContextSettings('images')).allowRecall,
-          isFalse,
-        );
-        expect((await chat.imageContextSettings('images')).automatic, isFalse);
-        expect((await chat.imageContextSettings('images')).pinned, {'pinned'});
+        expect((await chat.imageContextSettings('images')).allowRecall, isTrue);
         await chat.setImageContextSettings(
           'images',
-          const ImageContextSettings(),
+          const ImageContextSettings(automatic: false, pinned: {'pinned'}),
         );
         await tester.pumpAndSettle();
         await tester.tap(row);
         await tester.pumpAndSettle();
-        expect(
-          (await chat.imageContextSettings('images')).allowRecall,
-          isFalse,
-        );
+        expect((await chat.imageContextSettings('images')).allowRecall, isTrue);
+        expect((await chat.imageContextSettings('images')).automatic, isFalse);
+        expect((await chat.imageContextSettings('images')).pinned, {'pinned'});
       },
     );
 
@@ -455,7 +445,7 @@ void main() {
 
     expect(find.byKey(ChatToolsSheet.localGroupKey), findsOneWidget);
     expect(
-      find.text('1/${availableLocalToolIds().length + 1}'),
+      find.text('0/${availableLocalToolIds().length + 1}'),
       findsOneWidget,
       reason: 'the folded header still reports how many tools are on',
     );
@@ -471,7 +461,7 @@ void main() {
     tester,
   ) async {
     final l10n = await pumpSheet(tester);
-    final count = '1/${availableLocalToolIds().length + 1}';
+    final count = '0/${availableLocalToolIds().length + 1}';
     expect(find.text(count), findsOneWidget);
 
     await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
@@ -542,18 +532,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final enabledCount = '1/${availableLocalToolIds().length + 1}';
     expect(
-      find.text('2/${availableLocalToolIds().length + 1}'),
+      find.text(enabledCount),
       findsOneWidget,
       reason: 'the count updates while the local tools remain expanded',
     );
 
     await tester.tap(find.text(l10n.assistantEditPageLocalToolsTab));
     await tester.pumpAndSettle();
-    expect(
-      find.text('2/${availableLocalToolIds().length + 1}'),
-      findsOneWidget,
-    );
+    expect(find.text(enabledCount), findsOneWidget);
   });
 
   testWidgets('hides the MCP group when nothing is connected', (tester) async {

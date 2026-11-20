@@ -49,6 +49,10 @@ void main() {
       addTearDown(settings.dispose);
       await settings.loaded;
       await assistants.loaded;
+      await chat.setImageContextSettings(
+        'chat',
+        const ImageContextSettings(allowRecall: true),
+      );
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -64,7 +68,7 @@ void main() {
         contextProvider: tester.element(find.byType(SizedBox)),
       ).buildToolCallHandler(settings, null, conversationId: 'chat')!;
       final context = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: [
           ChatContextImage(
             identity: const ContextImageIdentity('u', 'part:0'),

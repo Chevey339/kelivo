@@ -29,7 +29,7 @@ class ContextImageIdentity {
 class ImageContextSettings {
   const ImageContextSettings({
     this.automatic = true,
-    this.allowRecall = true,
+    this.allowRecall = false,
     this.pinned = const {},
   });
 
@@ -41,7 +41,7 @@ class ImageContextSettings {
   factory ImageContextSettings.fromJson(Map<String, dynamic> json) =>
       ImageContextSettings(
         automatic: json['automatic'] != false,
-        allowRecall: json['allowRecall'] != false,
+        allowRecall: json['allowRecall'] == true,
         pinned: Set.unmodifiable(
           (json['pinned'] as List? ?? const []).whereType<String>(),
         ),

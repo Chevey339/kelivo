@@ -222,7 +222,7 @@ void main() {
       final tools = [ViewImageTool.withHistory()];
       RequestImageContext context(List<ChatContextImage> images) =>
           RequestImageContext(
-            settings: const ImageContextSettings(),
+            settings: const ImageContextSettings(allowRecall: true),
             images: images,
             latestUserId: 'user',
           );
@@ -271,6 +271,7 @@ void main() {
       final context = RequestImageContext(
         settings: ImageContextSettings(
           automatic: false,
+          allowRecall: true,
           pinned: {originalImage.key},
         ),
         images: [originalImage],
@@ -643,7 +644,7 @@ void main() {
       parts: [ImagePart(uri: pixels, mime: 'image/png')],
     );
     final request = RequestImageContext(
-      settings: const ImageContextSettings(),
+      settings: const ImageContextSettings(allowRecall: true),
       images: RequestImageContext.collect([original]),
     );
     final result = request.readImage(request.images.single.handle);
@@ -665,7 +666,7 @@ void main() {
     final catalog = RequestImageContext.collect([retained]);
     expect(catalog, hasLength(1));
     final replay = RequestImageContext(
-      settings: const ImageContextSettings(),
+      settings: const ImageContextSettings(allowRecall: true),
       images: catalog,
     );
     final body = await replay.project({
@@ -826,7 +827,7 @@ void main() {
         parts: [ImagePart(uri: pixels)],
       );
       final request = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: RequestImageContext.collect([owner]),
         targetMessageId: 'next',
       );
@@ -884,7 +885,7 @@ void main() {
     () async {
       final items = [for (var i = 0; i < 35; i++) image(i)];
       final request = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: items,
       );
       request.activeHandles.addAll(items.map((im) => im.handle));
@@ -1117,7 +1118,7 @@ void main() {
         parts: [ImagePart(uri: pixels)],
       );
       final request = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: RequestImageContext.collect([owner]),
         targetMessageId: 'assistant',
         loader: (_) async => pixels,
@@ -1147,7 +1148,7 @@ void main() {
         yield 0;
       }).drain<void>();
       final cleared = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: [],
       );
       expect(cleared.readImage(original.handle).metadata, isNull);

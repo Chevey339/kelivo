@@ -103,9 +103,13 @@ void main() {
       final conversation = await chat.createDraftConversation(
         temporary: temporary,
       );
+      expect(
+        (await chat.imageContextSettings(conversation.id)).allowRecall,
+        isFalse,
+      );
       await chat.setImageContextSettings(
         conversation.id,
-        const ImageContextSettings(allowRecall: false),
+        const ImageContextSettings(allowRecall: true),
       );
       final message = await chat.addMessage(
         conversationId: conversation.id,
@@ -119,7 +123,7 @@ void main() {
       final image = RequestImageContext.collect(before).single;
       expect(image.key, ContextImageIdentity(message.id, 'part:1').key);
       final settings = await chat.imageContextSettings(conversation.id);
-      expect(settings.allowRecall, isFalse);
+      expect(settings.allowRecall, isTrue);
       final revision = chat.contextRevision(conversation.id);
       await chat.setImageContextSettings(
         conversation.id,
@@ -131,7 +135,7 @@ void main() {
       });
       expect(
         (await chat.imageContextSettings(conversation.id)).allowRecall,
-        isFalse,
+        isTrue,
       );
       expect(
         (await chat.chatRepositoryOrNull!.readImageContextSettings(
@@ -143,12 +147,12 @@ void main() {
         (await chat.chatRepositoryOrNull!.readImageContextSettings(
           conversation.id,
         )).allowRecall,
-        temporary,
+        !temporary,
       );
       await chat.clearConversationContext(conversation.id);
       expect(
         (await chat.imageContextSettings(conversation.id)).allowRecall,
-        isFalse,
+        isTrue,
       );
       expect(await chat.imageContextHistory(conversation.id), isEmpty);
       expect(
@@ -181,7 +185,7 @@ void main() {
       );
       expect(
         (await chat.imageContextSettings(conversation.id)).allowRecall,
-        isTrue,
+        isFalse,
       );
     });
   }

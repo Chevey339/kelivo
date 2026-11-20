@@ -51,7 +51,7 @@ void main() {
         label: 'drawing',
       );
       final context = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: [entry],
       );
       await image.delete();
@@ -105,7 +105,7 @@ void main() {
         label: 'photo',
       );
       final context = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: [entry],
         targetMessageId: 'a',
       );
@@ -294,7 +294,7 @@ void main() {
         label: 'drawing',
       );
       final context = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: [original],
         targetMessageId: 'new',
       );

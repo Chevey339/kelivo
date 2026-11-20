@@ -72,7 +72,7 @@ void main() {
       ],
     );
     final context = RequestImageContext(
-      settings: const ImageContextSettings(),
+      settings: const ImageContextSettings(allowRecall: true),
       images: RequestImageContext.collect([upload]),
     );
     final result = context.readImage(context.images.single.handle);
@@ -97,6 +97,13 @@ void main() {
     tester,
   ) async {
     final source = (await tester.runAsync(uploadAndRead))!;
+    const recallSettings = ImageContextSettings(allowRecall: true);
+    await tester.runAsync(
+      () => service.setImageContextSettings(
+        source.upload.conversationId,
+        recallSettings,
+      ),
+    );
     final target = (await tester.runAsync(
       () => service.addMessage(
         conversationId: source.upload.conversationId,
@@ -136,7 +143,7 @@ void main() {
           conversationId: source.upload.conversationId,
         )!;
     final context = RequestImageContext(
-      settings: const ImageContextSettings(),
+      settings: recallSettings,
       images: RequestImageContext.collect([source.upload]),
       targetMessageId: target.id,
     );
@@ -426,7 +433,7 @@ void main() {
       ],
     );
     final request = RequestImageContext(
-      settings: const ImageContextSettings(),
+      settings: const ImageContextSettings(allowRecall: true),
       images: RequestImageContext.collect([browser]),
     );
     final read = request.readImage(request.images.single.handle);

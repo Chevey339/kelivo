@@ -34,7 +34,7 @@ void main() {
     () async {
       final viewer = ViewImageTool.withHistory();
       final context = RequestImageContext(
-        settings: const ImageContextSettings(),
+        settings: const ImageContextSettings(allowRecall: true),
         images: [_image],
         latestUserId: _image.identity.messageId,
       );
@@ -99,7 +99,7 @@ void main() {
   );
 
   test(
-    'disabling recall keeps the file viewer and its edited descriptions',
+    'default settings keep the file viewer and its edited descriptions',
     () async {
       final fileViewer = WorkspaceToolsService.definitions().singleWhere(
         (tool) => tool['function']['name'] == 'view_image',
@@ -115,7 +115,7 @@ void main() {
       );
       final original = jsonEncode(candidates);
       final context = RequestImageContext(
-        settings: const ImageContextSettings(allowRecall: false),
+        settings: const ImageContextSettings(),
         images: [_image],
       );
       final projected = await context.project({
@@ -205,7 +205,7 @@ void main() {
       () async {
         final original = jsonEncode(body);
         final context = RequestImageContext(
-          settings: const ImageContextSettings(),
+          settings: const ImageContextSettings(allowRecall: true),
           images: [],
         );
         expect(await context.project(body), isEmpty);
@@ -221,7 +221,7 @@ void main() {
         expect(jsonEncode(body), original);
 
         final disabled = RequestImageContext(
-          settings: const ImageContextSettings(allowRecall: false),
+          settings: const ImageContextSettings(),
           images: [_image],
         );
         expect(await disabled.project(body), isEmpty);
@@ -341,17 +341,17 @@ void main() {
       }
       for (final context in [
         RequestImageContext(
-          settings: const ImageContextSettings(),
+          settings: const ImageContextSettings(allowRecall: true),
           images: [_image],
           canRecall: false,
         ),
         RequestImageContext(
-          settings: const ImageContextSettings(),
+          settings: const ImageContextSettings(allowRecall: true),
           images: [_image],
           canImageInput: false,
         ),
         RequestImageContext(
-          settings: const ImageContextSettings(),
+          settings: const ImageContextSettings(allowRecall: true),
           images: [
             ChatContextImage(
               identity: _image.identity,
@@ -379,13 +379,16 @@ void main() {
       final candidates = [_recall, _other];
       for (final context in <RequestImageContext?>[
         null,
-        RequestImageContext(settings: const ImageContextSettings(), images: []),
         RequestImageContext(
-          settings: const ImageContextSettings(),
+          settings: const ImageContextSettings(allowRecall: true),
+          images: [],
+        ),
+        RequestImageContext(
+          settings: const ImageContextSettings(allowRecall: true),
           images: [_image],
         ),
         RequestImageContext(
-          settings: const ImageContextSettings(allowRecall: false),
+          settings: const ImageContextSettings(),
           images: [_image],
         ),
       ]) {
