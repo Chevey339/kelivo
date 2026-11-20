@@ -1211,6 +1211,8 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "啟用程式碼解譯器工具（容器自動，記憶體上限 4g）",
   "modelDetailSheetOpenaiImageGenerationTool": "圖像生成",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "啟用圖像生成工具",
+  "modelDetailSheetDeepSeekReadUrlTool": "讀取連結",
+  "modelDetailSheetDeepSeekReadUrlToolDescription": "讓模型使用 DeepSeek 伺服器端工具讀取你訊息中的連結",
   "modelDetailSheetCancelButton": "取消",
   "modelDetailSheetAddButton": "新增",
   "modelDetailSheetConfirmButton": "確認",

@@ -124,6 +124,13 @@ class ModelBuiltInToolTiles {
             desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
             available: responses,
           ),
+          if (BuiltInToolsHelper.isDeepSeekProvider(cfg))
+            ModelBuiltInToolTile(
+              name: BuiltInToolNames.readUrl,
+              title: l10n.modelDetailSheetDeepSeekReadUrlTool,
+              desc: l10n.modelDetailSheetDeepSeekReadUrlToolDescription,
+              available: true,
+            ),
         ];
     }
   }

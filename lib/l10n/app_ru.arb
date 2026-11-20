@@ -1211,6 +1211,8 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "Включить инструмент интерпретатора кода (контейнер автоматически, лимит памяти 4g)",
   "modelDetailSheetOpenaiImageGenerationTool": "Генерация изображений",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "Включить инструмент генерации изображений",
+  "modelDetailSheetDeepSeekReadUrlTool": "Чтение ссылки",
+  "modelDetailSheetDeepSeekReadUrlToolDescription": "Позволяет модели читать ссылки в вашем сообщении с помощью серверного инструмента DeepSeek",
   "modelDetailSheetCancelButton": "Отмена",
   "modelDetailSheetAddButton": "Добавить",
   "modelDetailSheetConfirmButton": "Подтвердить",

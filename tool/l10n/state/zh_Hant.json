@@ -1211,6 +1211,8 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "5a099b8f95b0b52e51ee8fd75f4969f1513ac0269b754c5063eee928c1f30bd4",
   "modelDetailSheetOpenaiImageGenerationTool": "0f93a05b22954223a99d5b315b8a27da9c3330ef5b233ae054daa37a8541460d",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "c8c64ea510f8a6a4bb6f1d121086f4978357b971e0f2eda9b3e57076b607da42",
+  "modelDetailSheetDeepSeekReadUrlTool": "dbd60f95d1f29d4ffea516aff529a58fe2e5cc5c2e3e722e81aaa9d6a2c1e812",
+  "modelDetailSheetDeepSeekReadUrlToolDescription": "86e3bc80409bc77199084f9ccc2b8437724767715b027aab1cf2cc65f0653938",
   "modelDetailSheetCancelButton": "f964d3d50ff38a0af24dd9ebb6edfa5e73d2f25f95898317e056888201ab9b5b",
   "modelDetailSheetAddButton": "c03485871b76ca283d99fac1ce3bcf6975d2235c13ebdfe64c5cfc79a7245d18",
   "modelDetailSheetConfirmButton": "090c6467d13817f9ef5222026f55bd5bde2424aff495d1b6d935f438de113053",
