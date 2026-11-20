@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,71 @@ import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import '../../../support/storage_images_test_fixture.dart';
 
 void main() {
+  testWidgets(
+    'days label fits beside a compact field on narrow Android with large text',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final fixture = (await tester.runAsync(StorageImagesFixture.create))!;
+      final settings = (await tester.runAsync(() async {
+        final provider = SettingsProvider(fixture.preferences);
+        await provider.loaded;
+        return provider;
+      }))!;
+      addTearDown(() async {
+        settings.dispose();
+        await fixture.dispose();
+      });
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Center(
+                child: AttachmentCleanupButton(onChanged: () async {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('attachment-cleanup-settings')),
+      );
+      await tester.pumpAndSettle();
+
+      final label = tester.renderObject<RenderParagraph>(
+        find.text('Days before cleanup'),
+      );
+      final field = find.byType(TextField);
+      expect(label.didExceedMaxLines, isFalse);
+      expect(tester.getSize(field).width, lessThan(label.size.width));
+
+      await tester.enterText(field, '${AttachmentRetention.maxDays}');
+      await tester.pump();
+      final editable = tester
+          .state<EditableTextState>(find.byType(EditableText))
+          .renderEditable;
+      expect(
+        editable.getMaxIntrinsicWidth(double.infinity),
+        lessThanOrEqualTo(editable.size.width),
+      );
+      expect(label.didExceedMaxLines, isFalse);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
   for (final desktop in [false, true]) {
     testWidgets(
       'retention accepts zero, persists days and rejects invalid values desktop=$desktop',

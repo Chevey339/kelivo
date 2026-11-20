@@ -104,6 +104,8 @@ class _AttachmentCleanupButtonState extends State<AttachmentCleanupButton> {
                               key: const ValueKey('attachment-retention-days'),
                               label: l10n.storageAttachmentRetentionDays,
                               controller: controller,
+                              fitInlineField: true,
+                              fieldWidth: 80,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,

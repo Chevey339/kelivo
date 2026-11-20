@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -15,6 +17,7 @@ class IosFormTextField extends StatelessWidget {
     this.minLines,
     this.scrollPhysics,
     this.inlineLabel,
+    this.fitInlineField = false,
     this.outerPadding,
     this.fieldWidth,
     this.keyboardType,
@@ -51,6 +54,11 @@ class IosFormTextField extends StatelessWidget {
   final int? minLines;
   final ScrollPhysics? scrollPhysics;
   final bool? inlineLabel;
+
+  /// Sizes the inline input to its contents with [fieldWidth] as a minimum
+  /// and allows the label to wrap.
+  final bool fitInlineField;
+
   final EdgeInsetsGeometry? outerPadding;
   final double? fieldWidth;
   final TextInputType? keyboardType;
@@ -224,8 +232,8 @@ class IosFormTextField extends StatelessWidget {
           fontWeight: AppFontWeights.medium,
           color: labelColor,
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        maxLines: fitInlineField ? null : 1,
+        overflow: fitInlineField ? TextOverflow.clip : TextOverflow.ellipsis,
       );
       final fieldWidget = Container(
         constraints: const BoxConstraints(minHeight: 40),
@@ -239,22 +247,41 @@ class IosFormTextField extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: fieldHorizontalPadding),
         child: field,
       );
-      return Padding(
-        padding: resolvedOuterPadding,
-        child: Row(
-          children: [
-            if (fieldWidth == null)
-              Expanded(flex: 3, child: labelWidget)
-            else
-              Expanded(child: labelWidget),
-            const SizedBox(width: 8),
-            if (fieldWidth == null)
-              Expanded(flex: 8, child: fieldWidget)
-            else
-              SizedBox(width: fieldWidth, child: fieldWidget),
-          ],
-        ),
+      const gap = 8.0;
+      const labelFlex = 3;
+      const fieldFlex = 8;
+      Row buildRow(Widget input) => Row(
+        children: [
+          Expanded(
+            flex: fieldWidth == null ? labelFlex : 1,
+            child: labelWidget,
+          ),
+          const SizedBox(width: gap),
+          input,
+        ],
       );
+      final row = fitInlineField
+          ? LayoutBuilder(
+              builder: (context, constraints) {
+                final rowWidth = math.max(0.0, constraints.maxWidth - gap);
+                final maxWidth = rowWidth * fieldFlex / (labelFlex + fieldFlex);
+                return buildRow(
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: math.min(fieldWidth ?? 0, maxWidth),
+                      maxWidth: maxWidth,
+                    ),
+                    child: IntrinsicWidth(child: fieldWidget),
+                  ),
+                );
+              },
+            )
+          : buildRow(
+              fieldWidth == null
+                  ? Expanded(flex: fieldFlex, child: fieldWidget)
+                  : SizedBox(width: fieldWidth, child: fieldWidget),
+            );
+      return Padding(padding: resolvedOuterPadding, child: row);
     }
 
     final decoration =
