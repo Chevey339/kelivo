@@ -160,6 +160,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         'SiliconFlow',
         'OpenRouter',
         'Vercel',
+        'Atlas Cloud',
         'DeepSeek',
         'Tensdaq',
         'AIhubmix',
