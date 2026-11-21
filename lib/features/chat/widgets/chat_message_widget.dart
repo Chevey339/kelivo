@@ -5334,7 +5334,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                     ),
                   ),
                 ViewportBlockList(
-                  storageId: ('steps', widget.key),
+                  storageId: ('steps', widget.key, showBrowserPageCards),
                   revealIndex: findStep >= 0 ? findStep - hiddenCount : null,
                   itemCount: visibleSteps.length,
                   structureToken: (visibleSteps.length, hiddenCount),
@@ -5352,7 +5352,14 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                       toolName: step.tool!.toolName,
                     );
                   },
-                  estimateExtent: (i, width) => 36,
+                  estimateExtent: (i, width) {
+                    final step = visibleSteps[i];
+                    if (!showBrowserPageCards || step.browserTools == null) {
+                      return 36;
+                    }
+                    return 36 +
+                        estimateBrowserGroupBodyHeight(lite: step.browserLite);
+                  },
                   keepAlive: (i) =>
                       visibleSteps[i].tool?.toolName ==
                           LocalToolNames.askUser &&

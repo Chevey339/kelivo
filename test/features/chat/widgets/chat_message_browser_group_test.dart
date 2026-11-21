@@ -120,6 +120,34 @@ void main() {
     expect(find.byKey(const ValueKey('browser-actions-toggle')), findsNothing);
   });
 
+  testWidgets('hiding browser page cards refreshes unvisited step extents', (
+    tester,
+  ) async {
+    const calls = 100;
+    final parts = <MessagePart>[
+      for (var i = 0; i < calls; i++) ...[
+        browserPart('page-$i'),
+        ReasoningPart('Review page $i.'),
+      ],
+    ];
+    final steps = find.byWidgetPredicate(
+      (widget) =>
+          widget is ViewportBlockList && widget.itemCount == parts.length,
+    );
+    await pump(tester, parts);
+    await tester.pumpAndSettle();
+    expect(find.byType(BrowserPageCard).evaluate().length, lessThan(calls));
+
+    await tester.runAsync(() => settings.setShowBrowserPageCards(false));
+    await tester.pumpAndSettle();
+    final hiddenHeight = tester.getSize(steps).height;
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pump(tester, parts);
+    await tester.pumpAndSettle();
+    expect(hiddenHeight, closeTo(tester.getSize(steps).height, .5));
+  });
+
   for (final missingIds in [false, true]) {
     testWidgets(
       missingIds

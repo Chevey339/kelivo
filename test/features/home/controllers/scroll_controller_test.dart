@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/widgets/viewport_block_list.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/shared/widgets/scroll_layout_anchor.dart';
 import 'package:flutter/material.dart';
@@ -107,7 +108,7 @@ void main() {
       expect(scrollController.position.maxScrollExtent, 0);
 
       itemCount = 40;
-      chatScrollController.positionAtBottomOnNextLayout();
+      chatScrollController.positionAtBottomOnOpen();
       await tester.pumpWidget(
         _ScrollHarness(
           scrollController: scrollController,
@@ -119,6 +120,7 @@ void main() {
         scrollController.offset,
         scrollController.position.maxScrollExtent,
       );
+      expect(scrollController.hasActiveLayoutPositioningRequest, isFalse);
 
       chatScrollController.dispose();
       scrollController.dispose();
@@ -218,6 +220,55 @@ void main() {
 
       chatScrollController.dispose();
       scrollController.dispose();
+    });
+
+    testWidgets('animated opening layout mounts the visible lazy tail', (
+      tester,
+    ) async {
+      final scroll = ChatAutoFollowScrollController();
+      final chat = ChatScrollController(
+        scrollController: scroll,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+      );
+      const tailKey = ValueKey('lazy-tail');
+      chat.positionAtBottomOnOpen();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SuperListView(
+              controller: scroll,
+              listController: chat.messageListController,
+              physics: const ClampingScrollPhysics(),
+              children: [
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOutCubicEmphasized,
+                  alignment: Alignment.topLeft,
+                  child: ViewportBlockList(
+                    itemCount: 80,
+                    itemKey: (i) => i,
+                    structureToken: 1,
+                    estimateExtent: (_, _) => 40,
+                    itemBuilder: (_, i) => SizedBox(
+                      key: i == 79 ? tailKey : null,
+                      height: i == 15 ? 1800 : 40,
+                      child: Text('Row $i'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 16));
+
+      expect(scroll.position.extentAfter, lessThanOrEqualTo(.5));
+      expect(find.byKey(tailKey).hitTestable(), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      chat.dispose();
+      scroll.dispose();
     });
 
     testWidgets('viewport shrink pins only a timeline already at bottom', (

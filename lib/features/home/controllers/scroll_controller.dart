@@ -19,7 +19,7 @@ class ChatAutoFollowScrollController extends ScrollController {
   /// Callback checked during layout to decide whether to auto-follow bottom.
   bool Function() shouldAutoFollow = () => false;
 
-  /// One-frame positioning request used when a conversation window is opened.
+  /// Positioning request applied while the timeline is laid out.
   ///
   /// Unlike a post-frame `jumpTo`, this is consumed by the scroll position
   /// while the new list is being laid out, so an old conversation offset is
@@ -28,16 +28,16 @@ class ChatAutoFollowScrollController extends ScrollController {
 
   /// Whether the active bottom request must stand down while the user drags.
   ///
-  /// A single-frame request (opening a conversation) owns the frame outright.
-  /// A request held across several frames has to yield to a real gesture, or
-  /// it would fight the drag for as long as it is held.
+  /// Requests held across multiple frames yield to real gestures.
   bool _bottomRequestYieldsToUserScroll = false;
   int _layoutBottomRequest = 0;
+  int? _openingBottomRequest;
+  int _deferredLayoutRevision = 0;
   bool _preserveDistanceFromEndDuringLayout = false;
   double _preservedDistanceFromEnd = 0;
   int _layoutDistanceRequest = 0;
 
-  /// Whether a one-frame layout positioning request is currently armed.
+  /// Whether a layout positioning request is currently armed.
   ///
   /// While one is active it owns the scroll position for the upcoming layout,
   /// so anchor-restoring jumps scheduled by the list must stand down.
@@ -47,13 +47,48 @@ class ChatAutoFollowScrollController extends ScrollController {
   int requestPositionAtBottomDuringLayout({bool yieldsToUserScroll = false}) {
     _positionAtBottomDuringLayout = true;
     _bottomRequestYieldsToUserScroll = yieldsToUserScroll;
+    _openingBottomRequest = null;
     return ++_layoutBottomRequest;
   }
 
   void finishPositionAtBottomDuringLayout(int request) {
     if (request == _layoutBottomRequest) {
       _positionAtBottomDuringLayout = false;
+      _openingBottomRequest = null;
     }
+  }
+
+  Future<void> _positionAtBottomForOpening() async {
+    final request = requestPositionAtBottomDuringLayout(
+      yieldsToUserScroll: true,
+    );
+    _openingBottomRequest = request;
+    _deferredLayoutRevision = 0;
+
+    final binding = WidgetsBinding.instance;
+    (double, int)? previousLayout;
+    var stableFrames = 0;
+    // AnimatedSize can keep the old extent on the frame it starts. Check for
+    // two quiet frames and use only frames that layout already scheduled.
+    do {
+      await binding.endOfFrame;
+      if (_openingBottomRequest != request) return;
+      if (_deferredLayoutRevision == 0 || positions.length != 1) break;
+      final position = this.position;
+      if (!position.hasContentDimensions ||
+          position.userScrollDirection != ScrollDirection.idle) {
+        break;
+      }
+      final layout = (position.maxScrollExtent, _deferredLayoutRevision);
+      stableFrames = layout == previousLayout ? stableFrames + 1 : 0;
+      previousLayout = layout;
+    } while (binding.hasScheduledFrame && stableFrames < 2);
+    finishPositionAtBottomDuringLayout(request);
+  }
+
+  void _releaseOpeningBottom() {
+    final request = _openingBottomRequest;
+    if (request != null) finishPositionAtBottomDuringLayout(request);
   }
 
   int? requestPreserveDistanceFromEndDuringLayout() {
@@ -96,6 +131,20 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
 
   final ChatAutoFollowScrollController controller;
 
+  bool get _bottomRequestActive =>
+      controller._positionAtBottomDuringLayout &&
+      (!controller._bottomRequestYieldsToUserScroll ||
+          userScrollDirection == ScrollDirection.idle);
+
+  @override
+  bool get isSettlingAtBottom =>
+      controller._openingBottomRequest != null && _bottomRequestActive;
+
+  @override
+  void didScheduleDeferredLayout() {
+    controller._deferredLayoutRevision++;
+  }
+
   _IndexedScrollActivity beginIndexedAnimation(VoidCallback onCanceled) {
     clearScrollLayoutAnchor();
     final indexedActivity = _IndexedScrollActivity(this, onCanceled);
@@ -118,6 +167,7 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
 
   @override
   void jumpTo(double value) {
+    controller._releaseOpeningBottom();
     // Until the jump is laid out, the render tree still shows the old location.
     // A newly decoded image must not anchor that content to the new position.
     clearScrollLayoutAnchor(invalidateLayout: hasPixels && value != pixels);
@@ -130,6 +180,7 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
     required Duration duration,
     required Curve curve,
   }) {
+    controller._releaseOpeningBottom();
     clearScrollLayoutAnchor();
     return super.animateTo(to, duration: duration, curve: curve);
   }
@@ -145,18 +196,14 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
     // controller listener that sets _isUserScrolling.  Without this check,
     // correctPixels would override the user's drag for one frame, causing a
     // "stuck / can't scroll up" feeling.
-    final bottomRequestActive =
-        controller._positionAtBottomDuringLayout &&
-        (!controller._bottomRequestYieldsToUserScroll ||
-            userScrollDirection == ScrollDirection.idle);
     final shouldPositionAtBottom =
-        bottomRequestActive ||
+        _bottomRequestActive ||
         (controller.shouldAutoFollow() &&
             userScrollDirection == ScrollDirection.idle);
     if (shouldPositionAtBottom) {
       clearScrollLayoutAnchor();
       final gap = this.maxScrollExtent - pixels;
-      if (gap > 0.5) {
+      if (gap > 0.5 || (isSettlingAtBottom && gap < -0.5)) {
         correctPixels(this.maxScrollExtent);
         return false; // Force viewport re-layout with corrected position
       }
@@ -178,7 +225,9 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext
         activity is DrivenScrollActivity) {
       clearScrollLayoutAnchor();
     }
-    return result && applyScrollLayoutAnchor();
+    final accepted = result && applyScrollLayoutAnchor();
+    if (accepted && isSettlingAtBottom) reportOpeningLayoutOffset();
+    return accepted;
   }
 }
 
@@ -364,6 +413,10 @@ class ChatScrollController {
   /// otherwise the old pixel offset paints one frame above the new bottom.
   bool pinBottomDuringViewportResizeIfNeeded() {
     if (_isUserScrolling || !isNearBottom(24)) return false;
+    if (_scrollController case ChatAutoFollowScrollController controller
+        when controller._openingBottomRequest != null) {
+      return true;
+    }
     positionAtBottomOnNextLayout();
     return true;
   }
@@ -461,13 +514,19 @@ class ChatScrollController {
   // Scroll To Bottom Methods
   // ============================================================================
 
-  /// Position a newly opened conversation at its tail before the next paint.
+  /// Position the timeline at its tail before the next paint.
   ///
   /// The initial position participates in layout instead of correcting a
   /// visible frame afterward. The flag remains active for the whole frame
   /// because a lazy viewport may refine its max extent more than once
   /// during layout.
-  void positionAtBottomOnNextLayout() {
+  void positionAtBottomOnNextLayout() => _positionAtBottom();
+
+  /// Keep an opening conversation at its tail as lazy extents are refined.
+  void positionAtBottomOnOpen() =>
+      _positionAtBottom(settleContent: !(isGenerating?.call() ?? false));
+
+  void _positionAtBottom({bool settleContent = false}) {
     _cancelProgrammaticNavigation(stopDrivenScroll: true);
     _lastJumpUserMessageId = null;
     _isUserScrolling = false;
@@ -477,10 +536,21 @@ class ChatScrollController {
       _scheduleExplicitScrollToBottom(animate: false);
       return;
     }
+    if (settleContent) {
+      unawaited(controller._positionAtBottomForOpening());
+      return;
+    }
     final request = controller.requestPositionAtBottomDuringLayout();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.finishPositionAtBottomDuringLayout(request);
     });
+  }
+
+  void _releaseOpeningBottom() {
+    final controller = _scrollController;
+    if (controller is ChatAutoFollowScrollController) {
+      controller._releaseOpeningBottom();
+    }
   }
 
   /// Resolve the actual indexed tail before a switched conversation is shown.
@@ -489,6 +559,13 @@ class ChatScrollController {
   /// heights. Avoid treating that estimate as the destination: request the
   /// last item directly and wait for the tail extent to become concrete.
   Future<void> settleAtBottomBeforeReveal() async {
+    final controller = _scrollController;
+    if (controller is ChatAutoFollowScrollController &&
+        controller._openingBottomRequest != null &&
+        _messageListController.isAttached) {
+      // The opening layout already owns the tail, including viewport padding.
+      return;
+    }
     _cancelProgrammaticNavigation(stopDrivenScroll: true);
     _lastJumpUserMessageId = null;
     _isUserScrolling = false;
@@ -634,6 +711,7 @@ class ChatScrollController {
   /// Used for user-triggered "go to bottom" and as fallback for streaming
   /// auto-scroll when the custom [ScrollPosition] is not available.
   void _scheduleExplicitScrollToBottom({bool animate = true}) {
+    _releaseOpeningBottom();
     final request = ++_bottomScrollRequest;
     _scheduledBottomScrollRequest = request;
     _explicitBottomAnimationInProgress =
@@ -1167,6 +1245,7 @@ class ChatScrollController {
   }
 
   void _cancelProgrammaticNavigation({bool stopDrivenScroll = false}) {
+    _releaseOpeningBottom();
     _releaseBottomHold();
     _bottomScrollRequest++;
     _deferredBottomRequest++;
@@ -1206,6 +1285,7 @@ class ChatScrollController {
 
   /// Dispose of resources.
   void dispose() {
+    _releaseOpeningBottom();
     _scrollController.removeListener(_onScrollControllerChanged);
     _navButtonsHideTimer?.cancel();
     _bottomHoldTimer?.cancel();

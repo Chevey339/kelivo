@@ -40,6 +40,28 @@ void preserveScrollLayoutAnchor(BuildContext context, {int layoutFrames = 1}) {
 /// [applyScrollLayoutAnchor] after applying dimensions, unless an explicit
 /// navigation or bottom-follow request owns that layout.
 mixin ScrollLayoutAnchor on ScrollPosition {
+  /// Whether deferred layout should yield to the viewport's bottom anchor.
+  bool get isSettlingAtBottom => false;
+
+  /// A lazy list scheduled another layout to apply new measurements.
+  void didScheduleDeferredLayout() {}
+
+  ValueNotifier<double?>? _openingLayoutOffset;
+
+  /// Lets virtual lists refresh their range after a silent layout correction.
+  Listenable get openingLayoutOffsets =>
+      _openingLayoutOffset ??= ValueNotifier<double?>(null);
+
+  void reportOpeningLayoutOffset() {
+    _openingLayoutOffset?.value = pixels;
+  }
+
+  @override
+  void dispose() {
+    _openingLayoutOffset?.dispose();
+    super.dispose();
+  }
+
   _ReadingAnchor? _readingAnchor;
   int _anchorFrames = 0;
   double _layoutCorrection = 0;

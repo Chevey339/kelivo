@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../shared/widgets/export_capture_scope.dart';
+import '../../../shared/widgets/scroll_layout_anchor.dart';
 
 /// Virtualizes blocks inside a message using the *outer* scroll position.
 /// There is no nested Scrollable or shrink-wrapping viewport. Only the visible
@@ -68,6 +69,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
   Map<Object, double>? _storedExtents;
   PageStorageBucket? _storage;
   ScrollPosition? _position;
+  Listenable? _openingLayoutOffsets;
   double? _width;
   double? _textScale;
   ({Object key, double offset})? _pendingAnchor;
@@ -102,9 +104,15 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
     _scheduleRefresh();
   }
 
-  void _syncStorage({bool storageIdChanged = false}) {
+  void _syncStorage({ViewportBlockList? previousWidget}) {
     final storage = PageStorage.maybeOf(context);
-    if (!storageIdChanged && identical(storage, _storage)) return;
+    if (identical(storage, _storage)) {
+      if (previousWidget == null ||
+          previousWidget.storageId == widget.storageId) {
+        return;
+      }
+      _preserveReadingAnchor(previousWidget);
+    }
     _storage = storage;
     _storedExtents = _readStoredExtents();
     _extents.clear();
@@ -160,7 +168,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
     // PageStorage is not inherited: replacing its bucket does not trigger
     // didChangeDependencies. Switch caches before pruning or measuring a new
     // message version, even when it keeps the same storageId.
-    _syncStorage(storageIdChanged: oldWidget.storageId != widget.storageId);
+    _syncStorage(previousWidget: oldWidget);
     if (oldWidget.structureToken != widget.structureToken) {
       _preserveReadingAnchor(oldWidget);
       // A changed shape may insert/reorder blocks. Transfer only measured
@@ -198,6 +206,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
   void dispose() {
     _pendingAnchor = null;
     _position?.removeListener(_onScroll);
+    _openingLayoutOffsets?.removeListener(_scheduleRefresh);
     super.dispose();
   }
 
@@ -276,6 +285,11 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
       final position = _position;
       final geometry = _viewportGeometry();
       if (position == null || geometry == null) return;
+      final bottomAnchor = switch (position) {
+        ScrollLayoutAnchor anchor when anchor.isSettlingAtBottom => anchor,
+        _ => null,
+      };
+      if (bottomAnchor != null) _pendingAnchor = null;
       var start = geometry.start;
       int? pendingIndex;
       final pending = _pendingAnchor;
@@ -289,7 +303,10 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
         if (pendingIndex == null) _pendingAnchor = null;
       }
       final readingInside =
-          !_anchoredByDescendant && start >= 0 && start < geometry.height;
+          bottomAnchor == null &&
+          !_anchoredByDescendant &&
+          start >= 0 &&
+          start < geometry.height;
       final anchor = _extents.indexAt(math.max(0, start));
       final anchorBefore = _extents.prefix(anchor);
       var sizeChanged = false;
@@ -328,6 +345,7 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
         _pendingAnchor = null;
       }
       if (rangeChanged || sizeChanged || positionChanged) {
+        bottomAnchor?.didScheduleDeferredLayout();
         setState(() {
           _first = first;
           _last = last;
@@ -339,9 +357,20 @@ class _ViewportBlockListState extends State<ViewportBlockList> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.itemCount <= widget.threshold ||
-        _position == null ||
-        ExportCaptureScope.of(context)) {
+    final position = _position;
+    final virtualized =
+        widget.itemCount > widget.threshold &&
+        position != null &&
+        !ExportCaptureScope.of(context);
+    final openingLayoutOffsets = virtualized && position is ScrollLayoutAnchor
+        ? position.openingLayoutOffsets
+        : null;
+    if (!identical(_openingLayoutOffsets, openingLayoutOffsets)) {
+      _openingLayoutOffsets?.removeListener(_scheduleRefresh);
+      _openingLayoutOffsets = openingLayoutOffsets
+        ?..addListener(_scheduleRefresh);
+    }
+    if (!virtualized) {
       _pendingAnchor = null;
       return Column(
         mainAxisSize: MainAxisSize.min,

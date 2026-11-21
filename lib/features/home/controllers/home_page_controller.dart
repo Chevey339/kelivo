@@ -1016,7 +1016,7 @@ class HomePageController extends ChangeNotifier {
       // Committing the new window already invalidated its predecessor's read.
       _resetMessageJump();
       _restoreMessageUiState();
-      _scrollCtrl.positionAtBottomOnNextLayout();
+      _scrollCtrl.positionAtBottomOnOpen();
     };
     _viewModel.onStreamFinished = (conversationId) {
       onFindGenerationFinished?.call(conversationId);
@@ -1061,7 +1061,7 @@ class HomePageController extends ChangeNotifier {
     _scrollCtrl.dispose();
     _scrollController = controller;
     _initializeScrollController();
-    _scrollCtrl.positionAtBottomOnNextLayout();
+    _scrollCtrl.positionAtBottomOnOpen();
   }
 
   void _initializeProviders() {
@@ -1401,7 +1401,7 @@ class HomePageController extends ChangeNotifier {
           notifyListeners();
           await Future.wait([restoreAssistant, loadWindow]);
           _restoreMessageUiState();
-          _scrollCtrl.positionAtBottomOnNextLayout();
+          _scrollCtrl.positionAtBottomOnOpen();
           notifyListeners();
           _scheduleStartupWarmup();
         } else {
