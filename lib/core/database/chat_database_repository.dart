@@ -4517,6 +4517,12 @@ ORDER BY m.message_order DESC LIMIT 20
     });
   }
 
+  // Start with revisions awaiting asset indexing. An ordinary JOIN can scan
+  // every message part per candidate even when the dirty table is empty.
+  static const _dirtyAssetPartsJoin =
+      'FROM asset_reference_dirty_rows d '
+      'CROSS JOIN message_part_rows p ON p.revision_id = d.revision_id';
+
   /// Set-based dirty-part protection for a candidate page.
   ///
   /// A never-registered malformed attachment whose raw payload no longer
@@ -4552,8 +4558,7 @@ ORDER BY m.message_order DESC LIMIT 20
           FROM candidates c
           WHERE EXISTS (
             SELECT 1
-            FROM asset_reference_dirty_rows d
-            JOIN message_part_rows p ON p.revision_id = d.revision_id
+            $_dirtyAssetPartsJoin
             WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
               AND (
                 instr(p.payload, c.path_form) > 0
@@ -4599,8 +4604,7 @@ ORDER BY m.message_order DESC LIMIT 20
               WHERE r.asset_id = g.asset_id
             )
             AND NOT EXISTS (
-              SELECT 1 FROM asset_reference_dirty_rows d
-              JOIN message_part_rows p ON p.revision_id = d.revision_id
+              SELECT 1 $_dirtyAssetPartsJoin
               WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
                 AND (
                   instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0
@@ -4655,8 +4659,7 @@ ORDER BY m.message_order DESC LIMIT 20
                 WHERE r.asset_id = g.asset_id
               )
               AND NOT EXISTS (
-                SELECT 1 FROM asset_reference_dirty_rows d
-                JOIN message_part_rows p ON p.revision_id = d.revision_id
+                SELECT 1 $_dirtyAssetPartsJoin
                 WHERE p.kind IN ('text', 'image', 'file', 'tool_call')
                   AND (
                     instr(p.payload, ?) > 0 OR instr(p.payload, ?) > 0

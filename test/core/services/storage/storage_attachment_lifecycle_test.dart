@@ -1,4 +1,5 @@
 import 'package:Kelivo/core/services/storage/attachment_file_lock.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'package:image/image.dart' as img;
 import 'package:Kelivo/core/services/mcp/mcp_image_snapshot.dart';
@@ -18,15 +19,27 @@ import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 import '../../../support/storage_images_test_fixture.dart';
 
+class _AssetGcTestRepository extends ChatDatabaseRepository {
+  _AssetGcTestRepository(super.db);
+
+  Future<void> Function()? beforeValidateAssetGcClaim;
+
+  @override
+  Future<bool> isAssetGcClaimStillValid(AssetGcCandidate candidate) async {
+    await beforeValidateAssetGcClaim?.call();
+    return super.isAssetGcClaimStillValid(candidate);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late StorageImagesFixture fixture;
-  late ChatDatabaseRepository repository;
+  late _AssetGcTestRepository repository;
   late ChatService chat;
 
   setUp(() async {
     fixture = await StorageImagesFixture.create();
-    repository = ChatDatabaseRepository(fixture.database);
+    repository = _AssetGcTestRepository(fixture.database);
     chat = ChatService(existingRepository: repository);
     await chat.init();
     await chat.runAssetReferenceMaintenance();
@@ -53,6 +66,9 @@ void main() {
     return (file: file, message: message);
   }
 
+  Future<void> waitForAssetMaintenance() =>
+      AttachmentFileLock.synchronized(() async {});
+
   test(
     'zero days removes the last reference immediately and keeps a fork',
     () async {
@@ -76,6 +92,7 @@ void main() {
         0,
       );
       await chat.deleteConversation(source.message.conversationId);
+      await waitForAssetMaintenance();
       expect(source.file.existsSync(), isTrue);
       expect(
         (await StorageUsageService.listUploadEntries(
@@ -84,6 +101,7 @@ void main() {
         [fork.id],
       );
       await chat.deleteConversation(fork.id);
+      await waitForAssetMaintenance();
       expect(source.file.existsSync(), isFalse);
     },
   );
@@ -119,6 +137,7 @@ void main() {
         isStreaming: true,
       );
       await chat.deleteConversation(original.id);
+      await waitForAssetMaintenance();
       expect(file.existsSync(), isTrue);
       expect(
         await StorageUsageService.deleteUploadFiles([file.path], images: true),
@@ -252,6 +271,7 @@ void main() {
       );
       await chat.setToolEvents(message.id, [event]);
       await chat.deleteConversation(original.id);
+      await waitForAssetMaintenance();
       expect(file.existsSync(), isTrue);
       expect(
         await StorageUsageService.deleteUploadFiles([file.path], images: true),
@@ -262,6 +282,7 @@ void main() {
       )).single;
       expect(listed.conversations.keys, [temporary.id]);
       await chat.deleteConversation(temporary.id);
+      await waitForAssetMaintenance();
       expect(file.existsSync(), isFalse);
     },
   );
@@ -280,6 +301,7 @@ void main() {
         parts: [FilePart(uri: source.file.path, name: 'Shared')],
       );
       await chat.deleteConversation(source.message.conversationId);
+      await waitForAssetMaintenance();
       expect(source.file.existsSync(), isTrue);
       chat.setCurrentConversation(null);
       for (var i = 0; i < 200 && source.file.existsSync(); i++) {
@@ -340,21 +362,104 @@ void main() {
     },
   );
 
-  test('immediate collection drains more than one batch', () async {
+  test(
+    'conversation deletion publishes before cleanup and drains all batches',
+    () async {
+      await fixture.preferences.setInt(AttachmentRetention.preferenceKey, 0);
+      final conversation = await chat.createConversation(title: 'Batch');
+      final files = <File>[];
+      for (var index = 0; index < 55; index++) {
+        files.add(await fixture.file('upload/$index.txt', [index]));
+      }
+      await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        parts: [
+          for (final file in files) FilePart(uri: file.path, name: 'File'),
+        ],
+      );
+      var notifiedOfDeletion = false;
+      chat.addListener(() {
+        notifiedOfDeletion |= chat.getConversation(conversation.id) == null;
+      });
+      final lease = await AttachmentFileLock.acquire();
+      final deletion = chat.deleteConversation(conversation.id);
+      try {
+        await deletion.timeout(const Duration(seconds: 5));
+        expect(await repository.getConversation(conversation.id), isNull);
+        expect(notifiedOfDeletion, isTrue);
+        expect(files.every((file) => file.existsSync()), isTrue);
+      } finally {
+        lease.release();
+        await deletion;
+      }
+      await waitForAssetMaintenance();
+      expect(files.where((file) => file.existsSync()), isEmpty);
+    },
+  );
+
+  test('closing skips post-delete cleanup queued behind a file lock', () async {
     await fixture.preferences.setInt(AttachmentRetention.preferenceKey, 0);
-    final conversation = await chat.createConversation(title: 'Batch');
-    final files = <File>[];
-    for (var index = 0; index < 55; index++) {
-      files.add(await fixture.file('upload/$index.txt', [index]));
+    final source = await upload();
+    final lease = await AttachmentFileLock.acquire();
+    Future<void>? closing;
+    try {
+      await chat.deleteConversation(source.message.conversationId);
+      closing = chat.close();
+      await closing.timeout(const Duration(seconds: 5));
+    } finally {
+      lease.release();
+      await closing;
     }
-    await chat.addMessage(
-      conversationId: conversation.id,
-      role: 'user',
-      parts: [for (final file in files) FilePart(uri: file.path, name: 'File')],
-    );
-    await chat.deleteConversation(conversation.id);
-    expect(files.where((file) => file.existsSync()), isEmpty);
+    await waitForAssetMaintenance();
+    expect(source.file.existsSync(), isTrue);
+
+    await chat.init();
+    await chat.runAssetMaintenance();
+    expect(source.file.existsSync(), isFalse);
   });
+
+  test(
+    'closing finishes the active attachment and leaves the rest queued',
+    () async {
+      await fixture.preferences.setInt(AttachmentRetention.preferenceKey, 0);
+      final conversation = await chat.createConversation(
+        title: 'Two attachments',
+      );
+      final files = [
+        await fixture.file('upload/first.txt', [1]),
+        await fixture.file('upload/second.txt', [2]),
+      ];
+      await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        parts: [
+          for (final file in files) FilePart(uri: file.path, name: 'File'),
+        ],
+      );
+      final started = Completer<void>();
+      final resume = Completer<void>();
+      repository.beforeValidateAssetGcClaim = () async {
+        repository.beforeValidateAssetGcClaim = null;
+        started.complete();
+        await resume.future;
+      };
+      Future<void>? closing;
+      try {
+        await chat.deleteConversation(conversation.id);
+        await started.future.timeout(const Duration(seconds: 5));
+        closing = chat.close();
+      } finally {
+        resume.complete();
+        await closing;
+      }
+      expect(files.where((file) => file.existsSync()), hasLength(1));
+
+      await chat.init();
+      await chat.runAssetMaintenance();
+      expect(files.where((file) => file.existsSync()), isEmpty);
+    },
+  );
 
   test(
     'identical uploads at different paths are both recycled after the last reference',
@@ -369,8 +474,10 @@ void main() {
         parts: [FilePart(uri: copy.path, name: 'another.txt')],
       );
       await chat.deleteConversation(source.message.conversationId);
+      await waitForAssetMaintenance();
       expect(copy.existsSync(), isTrue);
       await chat.deleteConversation(other.id);
+      await waitForAssetMaintenance();
       expect(copy.existsSync(), isFalse);
       expect(source.file.existsSync(), isFalse);
     },

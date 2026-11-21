@@ -13,6 +13,7 @@ import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/services/mcp/mcp_image_snapshot.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/storage/attachment_file_lock.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import '../../../support/claude_test_api.dart' show FakePathProviderPlatform;
 
@@ -228,6 +229,7 @@ void main() {
           parts: [ToolCallPart(jsonEncode(event(saved.uri)))],
         );
         await service.deleteConversation(old.id);
+        await AttachmentFileLock.synchronized(() async {});
         final past = DateTime.now().toUtc().subtract(const Duration(days: 8));
         await file.setLastModified(past);
         final db = sqlite.sqlite3.open(
