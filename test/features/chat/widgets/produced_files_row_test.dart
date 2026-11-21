@@ -196,36 +196,91 @@ void main() {
     expect(find.byTooltip('新文件.txt'), findsOneWidget);
   });
 
-  testWidgets('limits visible chips and shows +N', (tester) async {
-    final parts = <WorkspaceToolPart>[
-      for (var i = 0; i < 15; i++)
-        _write(links: ['kelivo://workspace/file_$i.txt']),
-    ];
-    expect(collectProducedFileEntries(parts), hasLength(15));
+  testWidgets(
+    'more files shows file names and disambiguates matches by directory',
+    (tester) async {
+      const directory =
+          '/workspace/Personal-Knowledge-Base/100-Notes/Projects/Tool-Outputs';
+      const firstParent = '$directory/first/reports';
+      const secondParent = '$directory/second/reports';
+      const windowsParent = r'C:\Users\Example\Personal-Knowledge-Base\reports';
+      const uncParent = r'\\server\share\Personal-Knowledge-Base\reports';
+      const overflowName = r'file_12\notes.txt';
+      const parentsByPath = {
+        '$firstParent/report.txt': firstParent,
+        '$secondParent/report.txt': secondParent,
+        '$windowsParent\\report.txt': windowsParent,
+        '$uncParent\\report.txt': uncParent,
+      };
+      final paths = [
+        for (var i = 0; i < 12; i++) '$directory/file_$i.txt',
+        '$directory/$overflowName',
+        ...parentsByPath.keys,
+      ];
+      final parts = [
+        _write(
+          links: [
+            for (var i = 0; i < paths.length; i++)
+              'kelivo://workspace/file_$i.txt',
+          ],
+          files: paths,
+        ),
+      ];
+      expect(collectProducedFileEntries(parts), hasLength(17));
 
-    await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => SettingsProvider(createBusinessTestPreferences()),
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ProducedFilesRow(parts: parts, conversationId: 'c1'),
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ProducedFilesRow(parts: parts, conversationId: 'c1'),
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(find.byKey(ProducedFilesRow.rowKey), findsOneWidget);
-    expect(find.byKey(ProducedFilesRow.moreKey), findsOneWidget);
-    expect(find.text('+3'), findsOneWidget);
-    expect(find.text('file_0.txt'), findsOneWidget);
-    expect(find.text('file_14.txt'), findsNothing);
-    await tester.tap(find.byKey(ProducedFilesRow.moreKey));
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('file_14.txt'), 300);
-    expect(find.text('file_14.txt'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.byKey(ProducedFilesRow.rowKey), findsOneWidget);
+      expect(find.text('+5'), findsOneWidget);
+      expect(find.text('file_0.txt'), findsOneWidget);
+      expect(find.text(overflowName), findsNothing);
+      await tester.tap(find.byKey(ProducedFilesRow.moreKey));
+      await tester.pumpAndSettle();
+
+      final list = find.byType(ListView);
+      final fileName = find.descendant(
+        of: list,
+        matching: find.text(overflowName),
+      );
+      await tester.scrollUntilVisible(fileName, 250);
+      expect(fileName, findsOneWidget);
+
+      for (final entry in parentsByPath.entries) {
+        final directoryLabel = find.descendant(
+          of: list,
+          matching: find.text(entry.value),
+        );
+        await tester.scrollUntilVisible(directoryLabel, 250);
+        final chip = find.ancestor(
+          of: directoryLabel,
+          matching: find.byType(WorkspaceFileChip),
+        );
+        expect(
+          find.descendant(of: chip, matching: find.text('report.txt')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: chip, matching: find.byTooltip(entry.key)),
+          findsOneWidget,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.macOS,
+    }),
+  );
 }

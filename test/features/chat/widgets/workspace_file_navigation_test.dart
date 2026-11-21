@@ -198,6 +198,50 @@ void main() {
     }),
   );
 
+  testWidgets(
+    'related files opens a directory with its full path as the root label',
+    (tester) async {
+      const folderPath = '/workspace/folder';
+      await tester.pumpWidget(
+        harness(
+          WorkspaceToolCardBody(
+            part: WorkspaceToolPart(
+              id: 'list-dir',
+              toolName: 'list_dir',
+              metadata: WorkspaceToolMetadata(
+                tool: 'list_dir',
+                status: 'ok',
+                files: [
+                  for (var i = 0; i < 3; i++)
+                    WorkspaceToolFile(path: '/workspace/item_$i.txt'),
+                  const WorkspaceToolFile(
+                    path: folderPath,
+                    link: 'kelivo://workspace/folder',
+                    isDirectory: true,
+                  ),
+                ],
+              ).toJson(),
+            ),
+            conversationId: 'c1',
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('+1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('folder'));
+      await settle(tester);
+
+      final browser = tester.widget<FileBrowser>(find.byType(FileBrowser));
+      expect(browser.root.path, p.join(root.path, 'folder'));
+      expect(browser.rootLabel, folderPath);
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.macOS,
+    }),
+  );
+
   testWidgets('shell images use the bounded shared thumbnail loader', (
     tester,
   ) async {

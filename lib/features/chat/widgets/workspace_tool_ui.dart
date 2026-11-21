@@ -431,6 +431,8 @@ class WorkspaceFileChip extends StatelessWidget {
     this.link,
     this.conversationId,
     this.displayName,
+    this.parentPath,
+    this.previewTitle,
     this.isDirectory = false,
     this.loading = false,
     this.tags = const <Widget>[],
@@ -445,6 +447,8 @@ class WorkspaceFileChip extends StatelessWidget {
   final String? link;
   final String? conversationId;
   final String? displayName;
+  final String? parentPath;
+  final String? previewTitle;
   final bool isDirectory;
   final bool loading;
   final List<Widget> tags;
@@ -455,6 +459,18 @@ class WorkspaceFileChip extends StatelessWidget {
     final fg = chatSurfaceForegroundPalette(context);
     final name =
         displayName ?? (p.basename(path).isEmpty ? path : p.basename(path));
+    final parent = parentPath;
+    final labelStyle = TextStyle(
+      fontSize: 12,
+      fontFamily: workspaceCodeFontFamily(context),
+      color: fg.body,
+    );
+    final nameLabel = Text(
+      name,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: labelStyle,
+    );
     final open =
         onTap ??
         ((link == null || link!.isEmpty)
@@ -465,7 +481,7 @@ class WorkspaceFileChip extends StatelessWidget {
                     context,
                     link,
                     conversationId: conversationId,
-                    title: name,
+                    title: previewTitle ?? name,
                   ),
                 );
               });
@@ -487,16 +503,22 @@ class WorkspaceFileChip extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Flexible(
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: workspaceCodeFontFamily(context),
-                  color: fg.body,
-                ),
-              ),
+              child: parent == null
+                  ? nameLabel
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        nameLabel,
+                        Text(
+                          parent,
+                          style: labelStyle.copyWith(
+                            fontSize: 11,
+                            color: fg.muted,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
             if (open == null) ...[
               const SizedBox(width: 6),
@@ -1183,17 +1205,40 @@ Future<void> showWorkspaceFileList(
   required String title,
   String? conversationId,
 }) {
+  final entries = <({WorkspaceToolFile file, String name, String parent})>[];
+  final firstParentByName = <String, String>{};
+  final namesWithMultipleParents = <String>{};
+  for (final file in files) {
+    final path = file.path;
+    // Stored tool paths may come from a different operating system.
+    final pathContext =
+        p.windows.isAbsolute(path) && !p.windows.isRootRelative(path)
+        ? p.windows
+        : p.posix;
+    final basename = pathContext.basename(path);
+    final name = basename.isEmpty ? path : basename;
+    final parent = pathContext.dirname(path);
+    entries.add((file: file, name: name, parent: parent));
+    final firstParent = firstParentByName.putIfAbsent(name, () => parent);
+    if (parent != firstParent) namesWithMultipleParents.add(name);
+  }
+
   final list = ListView.separated(
     padding: const EdgeInsets.all(16),
-    itemCount: files.length,
+    itemCount: entries.length,
     separatorBuilder: (_, _) => const SizedBox(height: 8),
     itemBuilder: (_, index) {
-      final file = files[index];
+      final entry = entries[index];
+      final file = entry.file;
       return Align(
         alignment: Alignment.centerLeft,
         child: WorkspaceFileChip(
           path: file.path,
-          displayName: file.path,
+          displayName: entry.name,
+          parentPath: namesWithMultipleParents.contains(entry.name)
+              ? entry.parent
+              : null,
+          previewTitle: file.path,
           link: file.link,
           isDirectory: file.isDirectory,
           conversationId: conversationId,
