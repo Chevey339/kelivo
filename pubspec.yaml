@@ -128,7 +128,7 @@ dependencies:
   flutter_tts:
     path: ./dependencies/flutter_tts
   flutter_local_notifications: ^17.2.3
-  image: ^4.8.0
+  image: ^4.13.0
   downsize:
     path: ./dependencies/downsize
   petitparser: ^6.1.0
