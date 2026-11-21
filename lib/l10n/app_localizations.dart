@@ -12427,6 +12427,18 @@ abstract class AppLocalizations {
   /// **'You.com Search API. Returns web and news results with highlights or snippets.'**
   String get searchProviderYouDescription;
 
+  /// Display name for the Keenable search provider, returned by a switch on the service type in the search services settings pane and editor page.
+  ///
+  /// In en, this message translates to:
+  /// **'Keenable'**
+  String get searchServiceNameKeenable;
+
+  /// Short description shown under the Keenable provider in the search service editor, noting that an API key is optional and keyless calls use the public endpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keenable Search. An API key is optional; without one, requests use the public endpoint.'**
+  String get searchProviderKeenableDescription;
+
   /// Dropdown label in the search service settings for choosing You.com content mode (Highlights or Snippets).
   ///
   /// In en, this message translates to:

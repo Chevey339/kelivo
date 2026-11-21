@@ -6958,6 +6958,13 @@ class AppLocalizationsTr extends AppLocalizations {
       'You.com Arama API\'si. Highlights veya Snippets ile web ve haber sonuçları döndürür.';
 
   @override
+  String get searchServiceNameKeenable => 'Keenable';
+
+  @override
+  String get searchProviderKeenableDescription =>
+      'Keenable Search. API anahtarı isteğe bağlıdır; yoksa herkese açık uç nokta kullanılır.';
+
+  @override
   String get searchServicesDialogContentMode => 'İçerik modu';
 
   @override

@@ -2051,6 +2051,8 @@
   "searchServicesDialogSearchMode": "Режим поиска",
   "searchServiceNameYou": "You.com",
   "searchProviderYouDescription": "You.com Search API. Возвращает веб-результаты и новости с highlights или сниппетами.",
+  "searchServiceNameKeenable": "Keenable",
+  "searchProviderKeenableDescription": "Keenable Search. API-ключ необязателен; без него используется публичный эндпоинт.",
   "searchServicesDialogContentMode": "Режим контента",
   "searchServicesDialogHighlights": "Highlights",
   "searchServicesDialogSnippets": "Snippets",

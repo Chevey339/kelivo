@@ -33,6 +33,7 @@ import 'providers/kelivo_search_service.dart';
 import 'providers/parallel_search_service.dart';
 import 'providers/kimi_search_service.dart';
 import 'providers/you_search_service.dart';
+import 'providers/keenable_search_service.dart';
 
 // Base interface for all search services
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -128,6 +129,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return KimiSearchService() as SearchService;
       case YouSearchOptions _:
         return YouSearchService() as SearchService;
+      case KeenableOptions _:
+        return KeenableSearchService() as SearchService;
       default:
         return BingSearchService(locale: locale) as SearchService;
     }
@@ -296,6 +299,8 @@ abstract class SearchServiceOptions {
         return KimiOptions.fromJson(json);
       case 'you':
         return YouSearchOptions.fromJson(json);
+      case 'keenable':
+        return KeenableOptions.fromJson(json);
       default:
         return BingLocalOptions(id: json['id']);
     }
@@ -1298,6 +1303,27 @@ class YouSearchOptions extends SearchServiceOptions {
         id: json['id'],
         apiKey: json['apiKey'] ?? '',
         contentMode: normalizeContentMode(json['contentMode']),
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
+}
+
+class KeenableOptions extends SearchServiceOptions {
+  final String apiKey;
+
+  KeenableOptions({required super.id, this.apiKey = '', super.extraApiKeys});
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'keenable',
+    'id': id,
+    'apiKey': apiKey,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory KeenableOptions.fromJson(Map<String, dynamic> json) =>
+      KeenableOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
         extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
       );
 }

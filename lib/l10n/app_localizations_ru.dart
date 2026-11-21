@@ -7003,6 +7003,13 @@ class AppLocalizationsRu extends AppLocalizations {
       'You.com Search API. Возвращает веб-результаты и новости с highlights или сниппетами.';
 
   @override
+  String get searchServiceNameKeenable => 'Keenable';
+
+  @override
+  String get searchProviderKeenableDescription =>
+      'Keenable Search. API-ключ необязателен; без него используется публичный эндпоинт.';
+
+  @override
   String get searchServicesDialogContentMode => 'Режим контента';
 
   @override

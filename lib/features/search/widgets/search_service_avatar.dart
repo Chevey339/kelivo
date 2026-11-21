@@ -65,6 +65,7 @@ class SearchServiceAvatar extends StatelessWidget {
         ParallelOptions() => 'parallel',
         KimiOptions() => 'kimi',
         YouSearchOptions() => 'you',
+        KeenableOptions() => 'keenable',
         KelivoOptions() => 'kelivo',
         _ => 'search',
       };

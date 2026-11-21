@@ -6897,6 +6897,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'You.com Search API. Returns web and news results with highlights or snippets.';
 
   @override
+  String get searchServiceNameKeenable => 'Keenable';
+
+  @override
+  String get searchProviderKeenableDescription =>
+      'Keenable Search. An API key is optional; without one, requests use the public endpoint.';
+
+  @override
   String get searchServicesDialogContentMode => 'Content mode';
 
   @override

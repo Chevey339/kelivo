@@ -5118,5 +5118,7 @@
   "backupEncryptionChangePassword": "57b03a271968dd419d630176957f882486f986f99f6534390ab437978505d4d5",
   "backupMacKeychainNeedsUnlock": "9d82d8d175ecde0fb03c421530a92a92358f55d479a64ce7bedc4ffc71ca3193",
   "backupMacOpenKeychainAccess": "aa1451af372fd9a0c9c463fcbdf199f77fee42b4563311d4afae134a93497852",
-  "backupMacKeychainAccessDenied": "8bf323d77e6029949077003437c5279a68cde3fd5ae0fb8692a90126d17a5252"
+  "backupMacKeychainAccessDenied": "8bf323d77e6029949077003437c5279a68cde3fd5ae0fb8692a90126d17a5252",
+  "searchServiceNameKeenable": "5ac1838f97c41d23db439f58b9374f1c36b3889ccb01980fcefb2fe4d9be8f1f",
+  "searchProviderKeenableDescription": "dfb6296fccba1108cd53b348963fd177b8bc0d7516da5ef6110c6cbabf85cff2"
 }
