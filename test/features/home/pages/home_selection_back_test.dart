@@ -352,6 +352,8 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.byType(DesktopSettingsPage), findsOneWidget);
           final settingsState = tester.state(find.byType(DesktopSettingsPage));
+          final chat = find.byType(HomePage, skipOffstage: false);
+          expect(TickerMode.valuesOf(tester.element(chat)).enabled, isFalse);
           await tester.tap(
             find.byKey(const ValueKey('desktop-navigation-menu')),
           );
@@ -362,6 +364,7 @@ void main() {
             tester.state(find.byType(DesktopSettingsPage, skipOffstage: false)),
             same(settingsState),
           );
+          expect(TickerMode.valuesOf(tester.element(chat)).enabled, isTrue);
           ChatActionBus.instance.fire(ChatAction.toggleLeftPanelTopics);
           await tester.pumpAndSettle();
           expect(

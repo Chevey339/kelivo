@@ -178,6 +178,9 @@ class StreamController {
         _ensureStreamTimer(entry.key);
       } else {
         _streamThrottleTimers.remove(entry.key)?.cancel();
+        if (entry.value.hasPendingPresentation) {
+          entry.value.catchUpOnShow = true;
+        }
       }
     }
   }
@@ -246,6 +249,13 @@ class StreamController {
 
   /// Get tool parts for a message.
   List<ToolUIPart>? getToolParts(String messageId) => _toolParts[messageId];
+
+  ToolUIPart? lastLoadingTool(String messageId) {
+    final parts = _toolParts[messageId];
+    return parts is ToolPartSnapshot
+        ? parts.lastLoading
+        : parts?.reversed.where((part) => part.loading).firstOrNull;
+  }
 
   /// Set tool parts for a message.
   void setToolParts(String messageId, List<ToolUIPart> parts) {
@@ -497,9 +507,9 @@ class StreamController {
 
   void _ensureStreamTimer(String messageId) {
     final state = _streamSmoothStates[messageId];
-    if (state == null ||
-        !_isPresented(state.conversationId) ||
-        !state.hasPendingPresentation) {
+    if (state == null || !state.hasPendingPresentation) return;
+    if (!_isPresented(state.conversationId)) {
+      state.catchUpOnShow = true;
       return;
     }
     _streamThrottleTimers[messageId] ??= Timer(_streamThrottleInterval, () {
@@ -541,14 +551,32 @@ class StreamController {
     if (state == null) return;
     if (!_isPresented(state.conversationId)) return;
 
+    if (state.toolsDirty) {
+      state.toolsDirty = false;
+      state.heightDirty = false;
+      streamingContentNotifier.notifyToolPartsUpdated(
+        messageId,
+        contentSplitOffsets: state.contentSplitOffsets,
+        reasoningCountAtSplit: state.reasoningCountAtSplit,
+        toolCountAtSplit: state.toolCountAtSplit,
+      );
+    } else if (state.heightDirty) {
+      state.heightDirty = false;
+      streamingContentNotifier.notifyToolHeightChanged(messageId);
+    }
     _applyContentBuilder(state);
-    final nextContent = state.takeNextContentSlice(
-      minCount: _streamSmoothMinCount,
-      baseCount: _streamSmoothBaseCount,
-      maxCount: _streamSmoothMaxCount,
-      pickRate: _streamSmoothPickRate,
-      moveAverageLength: _streamSmoothMoveAverageLength,
-    );
+    // Deltas received offscreen are already history when the user returns.
+    // Publish that prefix once. Subsequent live deltas use the normal typewriter.
+    final nextContent = state.catchUpOnShow
+        ? state.flushTargetContent()
+        : state.takeNextContentSlice(
+            minCount: _streamSmoothMinCount,
+            baseCount: _streamSmoothBaseCount,
+            maxCount: _streamSmoothMaxCount,
+            pickRate: _streamSmoothPickRate,
+            moveAverageLength: _streamSmoothMoveAverageLength,
+          );
+    state.catchUpOnShow = false;
     if (nextContent != null || state.reasoningDirty || state.partsDirty) {
       _publishSmoothStreamContent(
         messageId,
@@ -771,7 +799,7 @@ class StreamController {
     if (!state.ctx.streamOutput) return;
     _beginReasoning(id, state, startedAt: receivedAt);
     _scheduleReasoningUpdate(state, activityChanged: true);
-    streamingContentNotifier.notifyToolHeightChanged(state.messageId);
+    _notifyReasoningHeight(state.messageId, state.conversationId);
   }
 
   void handleReasoningEnd(String id, StreamingState state) {
@@ -790,7 +818,7 @@ class StreamController {
       }
     }
     _scheduleReasoningUpdate(state, activityChanged: true);
-    streamingContentNotifier.notifyToolHeightChanged(state.messageId);
+    _notifyReasoningHeight(state.messageId, state.conversationId);
   }
 
   ReasoningSegmentData _beginReasoning(
@@ -865,70 +893,56 @@ class StreamController {
   }
 
   /// Process a tool-call [StreamChunk] (Start placeholder or End with args).
-  Future<void> handleToolCallsChunk(
+  void handleToolCallsChunk(
     StreamChunk chunk,
     StreamingState state, {
-    required Future<void> Function(String messageId, String json)
-    updateReasoningSegmentsInDb,
-    required Future<void> Function(
-      String messageId,
-      List<Map<String, dynamic>> events,
-    )
-    setToolEventsInDb,
-    required List<Map<String, dynamic>> Function(String messageId)
-    getToolEventsFromDb,
-  }) async {
+    required void Function(Map<String, dynamic> event) recordCall,
+  }) {
     final call = _toolCallUiFromChunk(chunk, state);
     if (call == null) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
-    // Finish any unfinished reasoning segment when tools start
-    final segments = _reasoningSegments[messageId] ?? <ReasoningSegmentData>[];
-    if (finishReasoningIfNeeded(messageId)) {
-      await updateReasoningSegmentsInDb(
-        messageId,
-        serializeReasoningSegmentsWithSplits(segments),
-      );
-    }
+    finishReasoningIfNeeded(messageId);
 
-    final existing = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
-    existing.add(
-      ToolUIPart(
+    final previous = _toolParts[messageId] ?? const <ToolUIPart>[];
+    final index = state._toolIndex.lookup(previous, call.id);
+    if (index == null ||
+        index < 0 ||
+        !hasCompletedToolContent(previous[index].content)) {
+      final part = ToolUIPart(
         id: call.id,
         toolName: call.name,
         arguments: call.arguments,
         metadata: call.metadata,
         loading: true,
-      ),
-    );
-    _toolParts[messageId] = ToolPartSnapshot(dedupeToolPartsList(existing));
-    if (getCurrentConversationId() == conversationId) {
-      streamingContentNotifier.notifyToolPartsUpdated(
-        messageId,
-        contentSplitOffsets: state.contentSplitOffsets,
-        reasoningCountAtSplit: state.reasoningCountAtSplit,
-        toolCountAtSplit: state.toolCountAtSplit,
+      );
+      _storeToolPart(
+        state,
+        previous,
+        index,
+        index == null || index < 0 ? previous.length : index,
+        part,
       );
     }
+    _toolPartsChanged(
+      messageId,
+      conversationId,
+      state.contentSplitOffsets,
+      state.reasoningCountAtSplit,
+      state.toolCountAtSplit,
+    );
 
-    try {
-      final prev = getToolEventsFromDb(messageId);
-      final newEvents = <Map<String, dynamic>>[
-        ...prev,
-        {
-          'id': call.id,
-          'name': call.name,
-          'arguments': call.arguments,
-          'content': null,
-          if (chunk is ServerToolStart) 'server': true,
-          if (call.metadata != null && call.metadata!.isNotEmpty)
-            'metadata': call.metadata,
-        },
-      ];
-      await setToolEventsInDb(messageId, dedupeToolEvents(newEvents));
-    } catch (_) {}
+    recordCall({
+      'id': call.id,
+      'name': call.name,
+      'arguments': call.arguments,
+      'content': null,
+      if (chunk is ServerToolStart) 'server': true,
+      if (call.metadata != null && call.metadata!.isNotEmpty)
+        'metadata': call.metadata,
+    });
   }
 
   /// Process a tool-result [StreamChunk] (local result, server tool, or citations).
@@ -951,26 +965,30 @@ class StreamController {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
-    final parts = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
-    int idx = -1;
-    for (int i = 0; i < parts.length; i++) {
-      if (parts[i].loading &&
-          (parts[i].id == result.id ||
-              (parts[i].id.isEmpty && parts[i].toolName == result.name))) {
-        idx = i;
-        break;
-      }
-    }
-    if (idx < 0 && result.id.isNotEmpty) {
+    final parts = _toolParts[messageId] ?? const <ToolUIPart>[];
+    final indexed = state._toolIndex.lookup(parts, result.id);
+    var idx = indexed ?? -1;
+    if (indexed == null) {
       for (int i = 0; i < parts.length; i++) {
-        if (parts[i].id == result.id) {
+        if (parts[i].loading &&
+            (parts[i].id == result.id ||
+                (parts[i].id.isEmpty && parts[i].toolName == result.name))) {
           idx = i;
           break;
         }
       }
+      if (idx < 0 && result.id.isNotEmpty) {
+        for (int i = 0; i < parts.length; i++) {
+          if (parts[i].id == result.id) {
+            idx = i;
+            break;
+          }
+        }
+      }
     }
+    final ToolUIPart replacement;
     if (idx >= 0) {
-      parts[idx] = ToolUIPart(
+      replacement = ToolUIPart(
         id: parts[idx].id,
         toolName: parts[idx].toolName,
         arguments: result.arguments.isNotEmpty
@@ -986,15 +1004,13 @@ class StreamController {
         )) {
       return;
     } else {
-      parts.add(
-        ToolUIPart(
-          id: result.id,
-          toolName: result.name,
-          arguments: result.arguments,
-          content: result.content,
-          metadata: result.metadata,
-          loading: false,
-        ),
+      replacement = ToolUIPart(
+        id: result.id,
+        toolName: result.name,
+        arguments: result.arguments,
+        content: result.content,
+        metadata: result.metadata,
+        loading: false,
       );
     }
     try {
@@ -1007,16 +1023,92 @@ class StreamController {
         metadata: result.metadata,
       );
     } catch (_) {}
-    _toolParts[messageId] = ToolPartSnapshot(dedupeToolPartsList(parts));
-    if (getCurrentConversationId() == conversationId) {
-      final splits = _contentSplits[messageId];
+    _storeToolPart(
+      state,
+      parts,
+      indexed,
+      idx < 0 ? parts.length : idx,
+      replacement,
+    );
+    final splits = _contentSplits[messageId];
+    _toolPartsChanged(
+      messageId,
+      conversationId,
+      splits?.offsets,
+      splits?.reasoningCounts,
+      splits?.toolCounts,
+    );
+  }
+
+  void _storeToolPart(
+    StreamingState state,
+    List<ToolUIPart> previous,
+    int? indexed,
+    int index,
+    ToolUIPart part,
+  ) {
+    if (indexed != null) {
+      final next = ToolPartSnapshot.withPart(previous, index, part);
+      state._toolIndex.record(next, index, part.id);
+      _toolParts[state.messageId] = next;
+      return;
+    }
+    final updated = List<ToolUIPart>.of(previous);
+    if (index == updated.length) {
+      updated.add(part);
+    } else {
+      updated[index] = part;
+    }
+    _toolParts[state.messageId] = ToolPartSnapshot(
+      dedupeToolPartsList(updated),
+    );
+  }
+
+  void _toolPartsChanged(
+    String messageId,
+    String conversationId,
+    List<int>? offsets,
+    List<int>? reasoningCounts,
+    List<int>? toolCounts,
+  ) {
+    if (_isPresented(conversationId)) {
+      final smooth = _streamSmoothStates[messageId];
+      if (smooth != null) {
+        smooth.toolsDirty = false;
+        smooth.heightDirty = false;
+      }
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
-        contentSplitOffsets: splits?.offsets,
-        reasoningCountAtSplit: splits?.reasoningCounts,
-        toolCountAtSplit: splits?.toolCounts,
+        contentSplitOffsets: offsets,
+        reasoningCountAtSplit: reasoningCounts,
+        toolCountAtSplit: toolCounts,
       );
+      return;
     }
+    final smooth = _streamSmoothStates.putIfAbsent(
+      messageId,
+      _StreamSmoothState.new,
+    );
+    smooth
+      ..conversationId = conversationId
+      ..toolsDirty = true
+      ..contentSplitOffsets = offsets
+      ..reasoningCountAtSplit = reasoningCounts
+      ..toolCountAtSplit = toolCounts;
+  }
+
+  void _notifyReasoningHeight(String messageId, String? conversationId) {
+    if (conversationId == null || _isPresented(conversationId)) {
+      streamingContentNotifier.notifyToolHeightChanged(messageId);
+      return;
+    }
+    final smooth = _streamSmoothStates.putIfAbsent(
+      messageId,
+      _StreamSmoothState.new,
+    );
+    smooth
+      ..conversationId = conversationId
+      ..heightDirty = true;
   }
 
   ({
@@ -1382,53 +1474,24 @@ class StreamController {
     }
 
     if (changed) {
-      streamingContentNotifier.notifyToolHeightChanged(messageId);
+      _notifyReasoningHeight(
+        messageId,
+        _streamSmoothStates[messageId]?.conversationId,
+      );
       _safeNotifyStateChanged();
     }
     return changed;
   }
 
-  /// Finishes reasoning and persists to database.
-  ///
-  /// This is a convenience method that combines finishing reasoning state
-  /// and persisting it to the database in one call.
-  Future<void> finishReasoningAndPersist(
-    String messageId, {
-    bool forceCollapse = false,
-    required Future<void> Function(
-      String messageId, {
-      String? reasoningText,
-      DateTime? reasoningFinishedAt,
-      String? reasoningSegmentsJson,
-    })
-    updateReasoningInDb,
-  }) async {
-    final changed = finishReasoningIfNeeded(
-      messageId,
-      forceCollapse: forceCollapse,
+  /// Encode the current reasoning when a durable checkpoint actually needs it.
+  String? reasoningSegmentsForCheckpoint(String messageId) {
+    final segments = _reasoningSegments[messageId];
+    final details = _reasoningDetails[messageId];
+    if (segments == null && details == null) return null;
+    return serializeReasoningSegmentsWithSplits(
+      segments ?? const [],
+      reasoningDetails: details,
     );
-    final splits = _contentSplits[messageId];
-    final segments =
-        _reasoningSegments[messageId] ?? const <ReasoningSegmentData>[];
-    if (!changed && splits == null) return;
-
-    // Persist reasoning data
-    final r = _reasoning[messageId];
-    if (r != null) {
-      await updateReasoningInDb(
-        messageId,
-        reasoningText: r.text,
-        reasoningFinishedAt: r.finishedAt,
-      );
-    }
-
-    // Persist reasoning segments
-    if (segments.isNotEmpty || splits != null) {
-      await updateReasoningInDb(
-        messageId,
-        reasoningSegmentsJson: serializeReasoningSegmentsWithSplits(segments),
-      );
-    }
   }
 
   // ============================================================================
@@ -1621,6 +1684,37 @@ class GenerationContext {
   final bool scheduledNotify, scheduledPreview;
 }
 
+/// Looks up named tool cards in the active run's current UI snapshot.
+class _StreamingToolIndex {
+  List<ToolUIPart>? _source;
+  final _byId = <String, int>{};
+  bool _canonical = false;
+
+  /// Null requests full deduplication for anonymous or ambiguous records.
+  int? lookup(List<ToolUIPart> parts, String id) {
+    if (id.isEmpty || id != id.trim()) return null;
+    if (!identical(parts, _source)) {
+      _source = parts;
+      _byId.clear();
+      _canonical = true;
+      for (var i = 0; i < parts.length; i++) {
+        final key = parts[i].id;
+        if (key.isEmpty || key != key.trim() || _byId.containsKey(key)) {
+          _canonical = false;
+          break;
+        }
+        _byId[key] = i;
+      }
+    }
+    return _canonical ? (_byId[id] ?? -1) : null;
+  }
+
+  void record(List<ToolUIPart> source, int index, String id) {
+    _source = source;
+    _byId[id] = index;
+  }
+}
+
 /// State object for streaming message generation.
 class StreamingState {
   StreamingState(this.ctx, {this.responsesTurnPrefix, this.claudeTurnPrefix})
@@ -1632,6 +1726,7 @@ class StreamingState {
       partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
   final GenerationContext ctx;
+  final _toolIndex = _StreamingToolIndex();
 
   /// Immutable native history already owned by this message before resuming.
   final String? responsesTurnPrefix;
@@ -1869,6 +1964,9 @@ class _StreamSmoothState {
   String Function()? contentBuilder;
   bool contentDirty = false;
   bool partsDirty = false;
+  bool toolsDirty = false;
+  bool heightDirty = false;
+  bool catchUpOnShow = false;
   List<MessagePart> Function(String visibleText)? partsBuilder;
   int totalTokens = 0;
   List<int>? contentSplitOffsets;
@@ -1890,6 +1988,8 @@ class _StreamSmoothState {
   int _lastPickCount = 0;
 
   bool get hasPendingPresentation =>
+      heightDirty ||
+      toolsDirty ||
       contentDirty ||
       partsDirty ||
       reasoningDirty ||

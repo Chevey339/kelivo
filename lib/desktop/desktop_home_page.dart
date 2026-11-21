@@ -262,7 +262,10 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
                           child: IndexedStack(
                             index: _tabIndex,
                             children: [
-                              const DesktopChatPage(),
+                              TickerMode(
+                                enabled: _tabIndex == 0,
+                                child: const DesktopChatPage(),
+                              ),
                               _visitedTabs.contains(1)
                                   ? const DesktopTranslatePage(
                                       key: ValueKey('translate_page'),

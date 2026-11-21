@@ -68,6 +68,13 @@ class ThinkingTagParser {
     bool includeUnclosed = true,
     List<SourceSpan> protectedRanges = const [],
   }) {
+    if (!input.contains('<')) {
+      return ThinkingTagParseRanges(
+        visibleContent: input,
+        thinkingTexts: const [],
+        hiddenRanges: const [],
+      );
+    }
     final visible = StringBuffer();
     final thinkingTexts = <String>[];
     final hiddenRanges = <ThinkingTagHiddenRange>[];
@@ -245,20 +252,21 @@ class ThinkingTagParser {
       includeUnclosed: includeUnclosed,
       protectedRanges: protectedRanges,
     );
+    final text = parsed.visibleContent;
+    final trimmed = text.trim();
+    final start = trimmed.length == text.length
+        ? 0
+        : text.length - text.trimLeft().length;
     return ThinkingTagParseResult(
-      visibleContent: parsed.visibleContent.trim(),
-      sourceMap: SourceTextMap.identity(input.length)
-          .replace([
-            for (final range in parsed.hiddenRanges)
-              (range.start, range.end, 0),
-          ])
-          .slice(
-            parsed.visibleContent.length -
-                parsed.visibleContent.trimLeft().length,
-            parsed.visibleContent.length -
-                parsed.visibleContent.trimLeft().length +
-                parsed.visibleContent.trim().length,
-          ),
+      visibleContent: trimmed,
+      sourceMap: parsed.hiddenRanges.isEmpty
+          ? SourceTextMap.identity(trimmed.length, offset: start)
+          : SourceTextMap.identity(input.length)
+                .replace([
+                  for (final range in parsed.hiddenRanges)
+                    (range.start, range.end, 0),
+                ])
+                .slice(start, start + trimmed.length),
       thinkingTexts: List.unmodifiable(
         parsed.thinkingTexts.map((s) => s.trim()).where((s) => s.isNotEmpty),
       ),

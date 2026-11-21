@@ -220,7 +220,7 @@ void main() {
     expect(state.fullContentRaw, '先确认一下。');
   });
 
-  test('finishReasoningAndPersist no longer writes content splits', () async {
+  test('reasoning checkpoints omit display-only content splits', () {
     final controller = buildController();
     const messageId = 'assistant-message';
     controller.setContentSplitData(
@@ -232,24 +232,11 @@ void main() {
       ),
     );
 
-    String? persistedJson;
-    await controller.finishReasoningAndPersist(
-      messageId,
-      updateReasoningInDb:
-          (
-            messageId, {
-            String? reasoningText,
-            DateTime? reasoningFinishedAt,
-            String? reasoningSegmentsJson,
-          }) async {
-            expect(messageId, 'assistant-message');
-            persistedJson = reasoningSegmentsJson ?? persistedJson;
-          },
-    );
-
-    expect(persistedJson, isNotNull);
-    expect(controller.deserializeReasoningSegments(persistedJson), isEmpty);
-    expect(controller.deserializeContentSplits(persistedJson), isNull);
+    controller.setReasoningSegments(messageId, []);
+    controller.finishReasoningIfNeeded(messageId);
+    final persisted = controller.reasoningSegmentsForCheckpoint(messageId)!;
+    expect(controller.deserializeContentSplits(persisted), isNull);
+    expect(jsonDecode(persisted), isA<List>());
   });
 
   test('streaming reasoning honors disabled auto-collapse setting', () async {
@@ -269,16 +256,7 @@ void main() {
       isTrue,
     );
 
-    await controller.finishReasoningAndPersist(
-      state.messageId,
-      updateReasoningInDb:
-          (
-            messageId, {
-            String? reasoningText,
-            DateTime? reasoningFinishedAt,
-            String? reasoningSegmentsJson,
-          }) async {},
-    );
+    controller.finishReasoningIfNeeded(state.messageId);
 
     expect(
       controller.reasoningSegments[state.messageId]!.single.expanded,
@@ -902,17 +880,7 @@ void main() {
     );
 
     state.partsHandler.handle(chunk);
-    await controller.handleToolCallsChunk(
-      chunk,
-      state,
-      updateReasoningSegmentsInDb: (_, __) async {},
-      setToolEventsInDb: (_, events) async {
-        stored
-          ..clear()
-          ..addAll(events);
-      },
-      getToolEventsFromDb: (_) => const [],
-    );
+    controller.handleToolCallsChunk(chunk, state, recordCall: stored.add);
 
     expect(stored.single['arguments'], {
       'action': {'query': 'kotlin coroutines'},
@@ -946,29 +914,13 @@ void main() {
       for (final chunk in [start, delta, end]) {
         state.partsHandler.handle(chunk);
       }
-      await controller.handleToolCallsChunk(
-        end,
-        state,
-        updateReasoningSegmentsInDb: (_, __) async {},
-        setToolEventsInDb: (_, events) async {
-          stored
-            ..clear()
-            ..addAll(events);
-        },
-        getToolEventsFromDb: (_) => const [],
-      );
+      controller.handleToolCallsChunk(end, state, recordCall: stored.add);
 
       state.partsHandler.handle(serverStart);
-      await controller.handleToolCallsChunk(
+      controller.handleToolCallsChunk(
         serverStart,
         state,
-        updateReasoningSegmentsInDb: (_, __) async {},
-        setToolEventsInDb: (_, events) async {
-          stored
-            ..clear()
-            ..addAll(events);
-        },
-        getToolEventsFromDb: (_) => List<Map<String, dynamic>>.from(stored),
+        recordCall: stored.add,
       );
 
       expect(stored.last['arguments'], {

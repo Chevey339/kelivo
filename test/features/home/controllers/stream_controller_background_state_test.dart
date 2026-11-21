@@ -59,15 +59,7 @@ void main() {
         if (startsInBackground) currentConversationId = 'new-draft';
         const start = ToolCallStart(id: 'tool-1', toolName: 'search_web');
         state.partsHandler.handle(start);
-        await controller.handleToolCallsChunk(
-          start,
-          state,
-          updateReasoningSegmentsInDb: (_, _) async {},
-          getToolEventsFromDb: (_) => events,
-          setToolEventsInDb: (_, next) async {
-            events = next;
-          },
-        );
+        controller.handleToolCallsChunk(start, state, recordCall: events.add);
         expect(controller.toolParts[message.id]!.single.loading, isTrue);
 
         currentConversationId = 'new-draft';

@@ -64,6 +64,97 @@ void main() {
     );
   }
 
+  testWidgets(
+    'hidden reasoning and tool updates deliver one height invalidation on resume',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      final controller = buildController(
+        settings: settings,
+        currentConversationId: 'conversation-1',
+      );
+      final state = buildStreamingState(settings);
+      addTearDown(controller.dispose);
+      controller.markStreamingStarted(state.messageId);
+      controller.setPresentationEnabled(false);
+      var heights = 0;
+      controller.streamingContentNotifier.toolHeightEvents.addListener(
+        () => heights++,
+      );
+      for (var i = 0; i < 48; i++) {
+        controller.handleReasoningStart('r$i', state);
+        controller.handleReasoningEnd('r$i', state);
+        controller.handleToolCallsChunk(
+          ToolCallStart(id: 't$i', toolName: 'calculate'),
+          state,
+          recordCall: (_) {},
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(heights, 0);
+      expect(controller.toolParts[state.messageId], hasLength(48));
+      controller.setPresentationEnabled(true);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(heights, 1);
+      expect(
+        controller.streamingContentNotifier
+            .getNotifier(state.messageId)
+            .value
+            .toolPartsVersion,
+        1,
+      );
+    },
+  );
+
+  for (final hiddenApp in [false, true]) {
+    testWidgets(
+      'returning shows a long offscreen prefix in one tick (hidden app=$hiddenApp)',
+      (tester) async {
+        var current = hiddenApp ? 'chat' : 'other';
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        final controller = StreamController(
+          onStateChanged: () {},
+          getSettingsProvider: () => settings,
+          getCurrentConversationId: () => current,
+        );
+        addTearDown(controller.dispose);
+        if (hiddenApp) controller.setPresentationEnabled(false);
+        final notifier = controller.streamingContentNotifier.getNotifier(
+          'reply',
+        );
+        var content = 'a' * 65536;
+        var reads = 0;
+        void publish() => controller.scheduleThrottledUpdate(
+          'reply',
+          'chat',
+          () {
+            reads++;
+            return content;
+          },
+          updateMessageInList: (_, _, _) {},
+          totalTokens: 0,
+        );
+        publish();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(reads, 0);
+        current = 'chat';
+        controller.setPresentationEnabled(true);
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(notifier.value.content, content);
+        expect(reads, 1);
+
+        final prefixLength = content.length;
+        content += 'b' * 1024;
+        publish();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(
+          notifier.value.content.length,
+          inExclusiveRange(prefixLength, content.length),
+        );
+        controller.cleanupTimers('reply');
+      },
+    );
+  }
+
   for (final withHistory in [false, true]) {
     for (final initialSummary in ['', 'first']) {
       testWidgets('returning to background reasoning preserves live overlays '

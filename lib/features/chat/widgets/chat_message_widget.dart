@@ -4810,6 +4810,22 @@ List<WorkspaceToolPart> _producedWorkspaceParts(List<ToolUIPart>? parts) {
 class ToolPartSnapshot extends UnmodifiableListView<ToolUIPart> {
   ToolPartSnapshot(Iterable<ToolUIPart> parts)
     : super(List<ToolUIPart>.of(parts, growable: false));
+
+  ToolPartSnapshot.withPart(
+    List<ToolUIPart> previous,
+    int index,
+    ToolUIPart part,
+  ) : super(
+        List<ToolUIPart>.generate(
+          index == previous.length ? previous.length + 1 : previous.length,
+          (i) => i == index ? part : previous[i],
+          growable: false,
+        ),
+      );
+
+  late final ToolUIPart? lastLoading = reversed
+      .where((part) => part.loading)
+      .firstOrNull;
 }
 
 // Data for a reasoning segment (for mixed display)

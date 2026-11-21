@@ -1182,7 +1182,16 @@ class ChatService extends ChangeNotifier {
     String conversationId,
     Iterable<ChatMessage> messages,
   ) {
-    if (_conversationForMessages(conversationId) == null) return;
+    if (_mergeCachedMessages(conversationId, messages)) {
+      _enforceMessageCacheLimits();
+    }
+  }
+
+  bool _mergeCachedMessages(
+    String conversationId,
+    Iterable<ChatMessage> messages,
+  ) {
+    if (_conversationForMessages(conversationId) == null) return false;
     final byId = <String, ChatMessage>{
       for (final message in _messagesCache[conversationId] ?? const [])
         message.id: message,
@@ -1202,12 +1211,29 @@ class ChatService extends ChangeNotifier {
       cached.sort((a, b) => a.storageOrder!.compareTo(b.storageOrder!));
     }
     _touchMessageCache(conversationId);
-    _enforceMessageCacheLimits();
+    return true;
   }
 
   void _touchMessageCache(String conversationId) {
     final messages = _messagesCache.remove(conversationId);
     if (messages != null) _messagesCache[conversationId] = messages;
+  }
+
+  /// Drop reloadable history when the app goes into the background. Current,
+  /// temporary and still-generating conversations keep their in-memory state.
+  void releaseInactiveMessageCaches(Set<String> keepConversationIds) {
+    _messagesCache.removeWhere((id, messages) {
+      if (id == _currentConversationId ||
+          keepConversationIds.contains(id) ||
+          _temporaryConversationIds.contains(id) ||
+          messages.any((message) => message.isStreaming)) {
+        return false;
+      }
+      for (final message in messages) {
+        _evictMessageCaches(message.id);
+      }
+      return true;
+    });
   }
 
   int _estimateCachedMessageBytes(ChatMessage message) {
@@ -1235,7 +1261,7 @@ class ChatService extends ChangeNotifier {
       .expand((entry) => entry.value)
       .fold(0, (sum, message) => sum + _estimateCachedMessageBytes(message));
 
-  void _enforceMessageCacheLimits() {
+  void _trimMessageCacheToBudget() {
     var entries = 0;
     var bytes = 0;
     final sizes = <String, int>{};
@@ -1269,6 +1295,10 @@ class ChatService extends ChangeNotifier {
       }
       _messagesCache[conversation.key] = retained;
     }
+  }
+
+  void _enforceMessageCacheLimits() {
+    _trimMessageCacheToBudget();
     final retainedIds = {
       for (final messages in _messagesCache.values)
         for (final message in messages) message.id,
@@ -4094,9 +4124,35 @@ class ChatService extends ChangeNotifier {
     if (_compressionHistoryCache?.id == message.conversationId) {
       _compressionHistoryCache = null;
     }
-    _replaceCachedMessage(message);
-    _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
+    _cachePersistedCheckpoint(message, toolEvents);
   });
+
+  void _cachePersistedCheckpoint(
+    ChatMessage message,
+    List<Map<String, dynamic>> toolEvents,
+  ) {
+    _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
+    final artifacts = _providerArtifactsCache[message.id];
+    if (artifacts != null &&
+        artifacts.entries.any(
+          (entry) => message.providerArtifactSnapshot[entry.key] != entry.value,
+        )) {
+      message.hydrateProviderArtifacts({
+        ...message.providerArtifactSnapshot,
+        ...artifacts,
+      });
+    }
+    if (!_replaceCachedMessage(message)) {
+      // A recovered tool turn may have been evicted before it resumed. Give
+      // its native history and tool overlay a message owner before pruning.
+      _mergeCachedMessages(message.conversationId, [message]);
+    }
+    if (!message.isStreaming) {
+      // Other resumed runs can receive native replay artifacts before their
+      // first checkpoint. Evict only the messages actually over budget here.
+      _trimMessageCacheToBudget();
+    }
+  }
 
   Future<GenerationRun> transitionGenerationRun({
     required String id,
@@ -4175,8 +4231,7 @@ class ChatService extends ChangeNotifier {
       // Tool-event overlays may be ahead of the message's streaming parts.
       await _synchronizePersistedMessageAssetsBestEffort(message.id);
     }
-    _replaceCachedMessage(message);
-    _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
+    _cachePersistedCheckpoint(message, toolEvents);
     _bumpCompressionHistoryRevision(message.conversationId);
     _statisticsRevision++;
     notifyListeners();

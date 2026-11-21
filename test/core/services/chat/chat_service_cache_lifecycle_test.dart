@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -56,6 +57,166 @@ void main() {
   }
 
   group('cache lifecycle', () {
+    for (final sameConversation in [false, true]) {
+      test(
+        'finishing a large reply keeps another recovered native turn (same chat=$sameConversation)',
+        () async {
+          final service = createService();
+          await service.init();
+          final first = await service.createConversation();
+          final second = sameConversation
+              ? first
+              : await service.createConversation();
+          final active = await service.addMessage(
+            conversationId: first.id,
+            role: 'assistant',
+            content: '',
+            isStreaming: true,
+          );
+          final recovered = await service.addMessage(
+            conversationId: second.id,
+            role: 'assistant',
+            content: 'prior',
+          );
+          await service.setProviderArtifact(
+            recovered.id,
+            responsesTurnArtifactKind,
+            'prior native rounds',
+          );
+          final held = (await service.loadMessagesByIds([recovered.id])).single;
+          final pressure = await service.createConversation(activate: false);
+          await service.addMessage(
+            conversationId: pressure.id,
+            role: 'user',
+            content: 'x' * (5 << 20),
+          );
+          expect(
+            service.getMessages(second.id).any((m) => m.id == recovered.id),
+            isFalse,
+          );
+          // The real recovery path reopens the persisted row before receiving
+          // new chunks. A late checkpoint alone cannot resurrect a finished turn.
+          await service.updateMessageSilent(recovered.id, isStreaming: true);
+          await service.setProviderArtifact(
+            recovered.id,
+            responsesTurnArtifactKind,
+            'new native rounds',
+          );
+          await service.updateStreamingCheckpointSilent(
+            active.copyWith(content: 'x' * (5 << 20), isStreaming: false),
+            const [],
+          );
+          expect(
+            service.getProviderArtifact(
+              recovered.id,
+              responsesTurnArtifactKind,
+            ),
+            'new native rounds',
+          );
+          final resumed = held.copyWith(
+            isStreaming: true,
+            content: 'new answer',
+          );
+          await service.updateStreamingCheckpointSilent(resumed, const []);
+          expect(
+            service.getProviderArtifactForMessage(
+              resumed,
+              responsesTurnArtifactKind,
+            ),
+            'new native rounds',
+          );
+          expect(
+            (await service.loadMessagesByIds([recovered.id])).single.content,
+            'new answer',
+          );
+        },
+      );
+    }
+
+    test(
+      'a large reply is protected while running and obeys the cache budget after completion',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = await service.createConversation(
+          title: 'Long run',
+        );
+        final reply = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: '',
+          isStreaming: true,
+        );
+        final text = '长' * (5 * 1024 * 1024);
+        final checkpoint = reply.copyWith(content: text);
+        await service.updateStreamingCheckpointSilent(checkpoint, const []);
+        service.releaseInactiveMessageCaches({});
+        expect(
+          service.getMessages(conversation.id).single.content.length,
+          text.length,
+        );
+        await service.updateStreamingCheckpointSilent(
+          checkpoint.copyWith(isStreaming: false),
+          const [],
+        );
+        expect(
+          service.debugCachedMessageBytes,
+          lessThanOrEqualTo(8 * 1024 * 1024),
+        );
+        expect(
+          (await service.loadMessagesByIds([reply.id])).single.content,
+          text,
+        );
+      },
+    );
+
+    test(
+      'background release keeps temporary and active replies and reloads durable history',
+      () async {
+        final service = createService();
+        await service.init();
+        final cold = await service.createConversation(title: 'Earlier chat');
+        final saved = await service.addMessage(
+          conversationId: cold.id,
+          role: 'assistant',
+          content: 'saved answer',
+        );
+        await service.setToolEvents(saved.id, [
+          {
+            'id': 't',
+            'name': 'calculate',
+            'arguments': <String, dynamic>{},
+            'content': '12',
+          },
+        ]);
+        final active = await service.createConversation(
+          title: 'Still generating',
+        );
+        final live = await service.addMessage(
+          conversationId: active.id,
+          role: 'assistant',
+          content: 'partial',
+          isStreaming: true,
+        );
+        final temp = await service.createDraftConversation(temporary: true);
+        final private = await service.addMessage(
+          conversationId: temp.id,
+          role: 'user',
+          content: 'temporary',
+        );
+        service.releaseInactiveMessageCaches({active.id});
+        expect(service.getMessages(cold.id), isEmpty);
+        expect(service.getMessages(active.id).single.id, live.id);
+        expect(service.getMessages(temp.id).single.id, private.id);
+        final restored = (await service.loadMessages(cold.id)).single;
+        expect(restored.content, 'saved answer');
+        expect(
+          service.getToolEventsForMessage(restored).single['content'],
+          '12',
+        );
+      },
+    );
+
     test(
       'oversized conversation is tail-trimmed without evicting others',
       () async {

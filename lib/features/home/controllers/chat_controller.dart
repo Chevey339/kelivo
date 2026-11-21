@@ -941,9 +941,8 @@ class ChatController extends ChangeNotifier {
   /// persisted count between those two messages would briefly create a false
   /// gap and trigger an unnecessary window reload.
   ///
-  /// Normal path appends the already-persisted messages straight into the
-  /// loaded window with no timeline query; only a detected count gap falls
-  /// back to the full window reload.
+  /// Appends directly when the revision index proves the rows are contiguous.
+  /// Otherwise the timeline query sizes the tail by logical message slots.
   Future<bool> appendPersistedTailMessages(List<ChatMessage> messages) async {
     if (messages.isEmpty) return false;
     final conversation = _currentConversation;
@@ -959,13 +958,43 @@ class ChatController extends ChangeNotifier {
       return true;
     }
 
-    // Fallback: the window does not provably cover the persisted tail, so
-    // reload the whole tail window instead of appending blindly.
-    final page = await _chatService.loadTimelinePage(
+    // Without the revision-ID index, read an authoritative tail page. Start
+    // with the loaded window plus the batch; its logical slot count reveals
+    // any gap without charging old, unselected revisions to the new window.
+    final serial = _windowLoadSerial;
+    final previousStart = _loadedStartIndex;
+    final limit = !hasMoreAfter && _messages.isNotEmpty
+        ? math.min(
+            ChatService.defaultLoadedWindowMax,
+            _messages.length + messages.length,
+          )
+        : ChatService.defaultLoadedWindowMax;
+    var page = await _chatService.loadTimelinePage(
       conversation.id,
-      limit: ChatService.defaultLoadedWindowMax,
+      limit: limit,
     );
-    if (_currentConversation?.id != conversation.id) return false;
+    if (_currentConversation?.id != conversation.id ||
+        serial != _windowLoadSerial) {
+      return false;
+    }
+    // With an unknown row index, the first page reveals the authoritative
+    // logical count. A real gap can require a larger tail than the sent batch.
+    if (page != null && limit < ChatService.defaultLoadedWindowMax) {
+      final needed = math.min(
+        ChatService.defaultLoadedWindowMax,
+        page.totalSlotCount - previousStart,
+      );
+      if (needed > limit) {
+        page = await _chatService.loadTimelinePage(
+          conversation.id,
+          limit: needed,
+        );
+        if (_currentConversation?.id != conversation.id ||
+            serial != _windowLoadSerial) {
+          return false;
+        }
+      }
+    }
     _replaceWindow(page);
     await _preloadVisibleGroupData();
     notifyListeners();
@@ -973,8 +1002,7 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Folds persisted tail messages into the loaded window without a timeline
-  /// query. Returns false when contiguity cannot be proven, so the caller
-  /// falls back to the full window reload.
+  /// query. Returns false when the caller needs to read the persisted tail.
   bool _tryAppendPersistedTail(
     String conversationId,
     List<ChatMessage> messages,

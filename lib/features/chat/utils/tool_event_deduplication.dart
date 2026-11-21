@@ -14,8 +14,7 @@ List<Map<String, dynamic>> dedupeToolEvents(List<Map<String, dynamic>> events) {
           hasCompletedToolContent(e['content']?.toString()))
         toolEventBaseKey(
           e['name']?.toString() ?? '',
-          (e['arguments'] as Map?)?.cast<String, dynamic>() ??
-              const <String, dynamic>{},
+          e['arguments'] ?? const <String, dynamic>{},
         ),
   };
   final indexByKey = <String, int>{};
@@ -23,9 +22,7 @@ List<Map<String, dynamic>> dedupeToolEvents(List<Map<String, dynamic>> events) {
   for (final e in events) {
     final id = (e['id']?.toString() ?? '').trim();
     final name = (e['name']?.toString() ?? '');
-    final args =
-        ((e['arguments'] as Map?)?.cast<String, dynamic>() ??
-        const <String, dynamic>{});
+    final args = e['arguments'] ?? const <String, dynamic>{};
     if (!hasCompletedToolContent(e['content']?.toString()) &&
         ((id.isNotEmpty && completedIds.contains(id)) ||
             (id.isEmpty &&
@@ -50,7 +47,7 @@ List<Map<String, dynamic>> dedupeToolEvents(List<Map<String, dynamic>> events) {
   return out;
 }
 
-String toolEventBaseKey(String name, Map<String, dynamic> arguments) {
+String toolEventBaseKey(String name, Object arguments) {
   return 'name:$name|args:${jsonEncode(arguments)}';
 }
 
@@ -60,7 +57,7 @@ bool hasCompletedToolContent(String? content) =>
 String toolEventIdentityKey({
   required String id,
   required String name,
-  required Map<String, dynamic> arguments,
+  required Object arguments,
   String? content,
 }) {
   final trimmedId = id.trim();
