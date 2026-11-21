@@ -3893,6 +3893,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetOpenaiImageGenerationToolDescription => '启用图像生成工具';
 
   @override
+  String get modelDetailSheetDeepSeekReadUrlTool => '读取链接';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlToolDescription =>
+      '声明 deepseek_read_url，让模型读取你消息里的链接';
+
+  @override
   String get modelDetailSheetCancelButton => '取消';
 
   @override
@@ -20523,6 +20530,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetOpenaiImageGenerationToolDescription => '启用图像生成工具';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlTool => '读取链接';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlToolDescription =>
+      '声明 deepseek_read_url，让模型读取你消息里的链接';
 
   @override
   String get modelDetailSheetCancelButton => '取消';
@@ -37160,6 +37174,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetOpenaiImageGenerationToolDescription => '啟用圖像生成工具';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlTool => '讀取連結';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlToolDescription =>
+      '讓模型使用 DeepSeek 伺服器端工具讀取你訊息中的連結';
 
   @override
   String get modelDetailSheetCancelButton => '取消';

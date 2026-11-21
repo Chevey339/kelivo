@@ -33,6 +33,10 @@ abstract class BuiltInToolNames {
   static const codeInterpreter = 'code_interpreter';
   static const imageGeneration = 'image_generation';
 
+  // DeepSeek specific. The API documents `deepseek_read_url`; a plain
+  // `web_search`/`url_context` type is silently ignored by the server.
+  static const readUrl = 'read_url';
+
   /// Normalize a tool name to snake_case format.
   /// Handles legacy camelCase formats for backward compatibility.
   static String normalize(String name) {
@@ -260,6 +264,20 @@ abstract class BuiltInToolsHelper {
   static bool isDeepSeekProvider(ProviderConfig? cfg) =>
       ProviderConfig.isDeepSeekConfig(cfg);
 
+  /// Only the official DeepSeek endpoint speaks the server-side tool protocol.
+  /// Matching on the provider name would also catch a gateway or relay that
+  /// happens to be called "DeepSeek" and would send it an unknown tool type.
+  static bool _isOfficialDeepSeek(ProviderConfig? cfg) {
+    if (cfg == null) return false;
+    final host = Uri.tryParse(cfg.baseUrl.trim())?.host.toLowerCase() ?? '';
+    return host == 'api.deepseek.com';
+  }
+
+  /// `deepseek-v4-pro` documents `web_search`; the flash family documents
+  /// `deepseek_web_search`.
+  static bool _deepSeekUsesNewToolNames(String upstreamModelId) =>
+      !upstreamModelId.toLowerCase().contains('v4-pro');
+
   /// Whether [cfg] talks to Anthropic itself. The Anthropic-hosted server tools
   /// only work there: a Claude-compatible relay either rejects the tool types
   /// outright or answers from an account pool, and results from a pool cannot
@@ -361,6 +379,9 @@ abstract class BuiltInToolsHelper {
         if (isOpenRouterProvider(cfg)) return true;
         // Native Grok search is only available as Responses tools.
         if (isGrokProvider(cfg)) return cfg.useResponseApi == true;
+        // DeepSeek documents its server tools for Chat Completions as well, so
+        // the built-in search toggle should not be limited to Responses mode.
+        if (isDeepSeekProvider(cfg)) return true;
         if (cfg.useResponseApi == true) return true;
         if (isDashScopeProvider(cfg)) return true;
         if (isArkProvider(cfg)) return true;
@@ -425,6 +446,26 @@ abstract class BuiltInToolsHelper {
         override is Map ? override['imageGeneration'] : null,
       );
       add({'type': 'image_generation', ...options.toJson()});
+    }
+    // DeepSeek exposes server-side tools whose names depend on the upstream
+    // model: `deepseek-v4-pro` documents `web_search`, while flash documents
+    // `deepseek_web_search`. Unknown types are dropped without an error, so a
+    // plain `web_search` looks enabled but never searches. Read Link is
+    // independent of search, so it is handled before the search guard.
+    if (_isOfficialDeepSeek(cfg)) {
+      if (configured.contains(BuiltInToolNames.search)) {
+        add({
+          'type': _deepSeekUsesNewToolNames(upstreamModelId)
+              ? 'deepseek_web_search'
+              : 'web_search',
+        });
+      }
+      if (configured.contains(BuiltInToolNames.readUrl)) {
+        add({'type': 'deepseek_read_url'});
+      }
+      if (tools.isNotEmpty) {
+        return BuiltInToolsRequestPayload(tools: tools);
+      }
     }
     if (!configured.contains(BuiltInToolNames.search)) {
       return BuiltInToolsRequestPayload(tools: tools);
@@ -491,6 +532,20 @@ abstract class BuiltInToolsHelper {
         tools: <Map<String, dynamic>>[
           for (final name in configured)
             if (supported.contains(name)) _openRouterServerTool(name)!,
+        ],
+      );
+    }
+    if (_isOfficialDeepSeek(cfg)) {
+      return BuiltInToolsRequestPayload(
+        tools: <Map<String, dynamic>>[
+          if (configured.contains(BuiltInToolNames.search))
+            <String, dynamic>{
+              'type': _deepSeekUsesNewToolNames(upstreamModelId)
+                  ? 'deepseek_web_search'
+                  : 'web_search',
+            },
+          if (configured.contains(BuiltInToolNames.readUrl))
+            <String, dynamic>{'type': 'deepseek_read_url'},
         ],
       );
     }
@@ -851,9 +906,11 @@ abstract class BuiltInToolsHelper {
         if (cfg.useResponseApi == true) BuiltInToolNames.shell,
       };
     }
-    return const <String>{
+    return <String>{
       BuiltInToolNames.codeInterpreter,
       BuiltInToolNames.imageGeneration,
+      // DeepSeek exposes a separate server tool for reading a link.
+      if (isDeepSeekProvider(cfg)) BuiltInToolNames.readUrl,
     };
   }
 

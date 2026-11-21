@@ -1213,6 +1213,8 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "0590a58259e100d66c8ca90ad357ab45ee92520c5bd417c8cd120dc43ab23bcf",
   "modelDetailSheetOpenaiImageGenerationTool": "9c4905a8a8bda44db5c860038afc53dbc6dbc203d067e9c8967831988f9ef38c",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "bca3694dd7ddc25a544c968e687b4f5630fcdc3f839fd356923524bba6f9019c",
+  "modelDetailSheetDeepSeekReadUrlTool": "679e5a18e187b7011203d8785c2b25d76220fa0cd3d991b57b4928d205c4ed38",
+  "modelDetailSheetDeepSeekReadUrlToolDescription": "9c1fb81d5e9e97f5779b21b36390ca53e25c5ea5138dbeb09dc3d08d357457eb",
   "modelDetailSheetCancelButton": "bed34b646ac799c3aa77767510ca788dd344ac3fc7ca93835f93d44dab670049",
   "modelDetailSheetAddButton": "6012a2fa2721ab39e689fad4a3fcc0a45cb3b8f6f1cc83bde3b020c37078745e",
   "modelDetailSheetConfirmButton": "456c6a281461f09eecacc9e25760b3bf157b75d36f9c93917f1c7c9e8b427500",

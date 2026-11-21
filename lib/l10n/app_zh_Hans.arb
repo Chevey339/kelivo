@@ -1394,6 +1394,8 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "启用代码解释器工具（容器自动，内存上限 4g）",
   "modelDetailSheetOpenaiImageGenerationTool": "图像生成",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "启用图像生成工具",
+  "modelDetailSheetDeepSeekReadUrlTool": "读取链接",
+  "modelDetailSheetDeepSeekReadUrlToolDescription": "声明 deepseek_read_url，让模型读取你消息里的链接",
   "modelDetailSheetCancelButton": "取消",
   "modelDetailSheetAddButton": "添加",
   "modelDetailSheetConfirmButton": "确认",

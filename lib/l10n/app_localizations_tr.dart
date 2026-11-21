@@ -4085,6 +4085,13 @@ class AppLocalizationsTr extends AppLocalizations {
       'Görsel oluşturma aracını etkinleştir';
 
   @override
+  String get modelDetailSheetDeepSeekReadUrlTool => 'Bağlantıyı Oku';
+
+  @override
+  String get modelDetailSheetDeepSeekReadUrlToolDescription =>
+      'DeepSeek sunucu tarafı aracıyla modelin mesajınızdaki bağlantıları okumasına izin verin';
+
+  @override
   String get modelDetailSheetCancelButton => 'İptal';
 
   @override

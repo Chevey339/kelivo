@@ -1991,6 +1991,8 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "Enable code interpreter tool (container auto, memory limit 4g)",
   "modelDetailSheetOpenaiImageGenerationTool": "Image Generation",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "Enable image generation tool",
+  "modelDetailSheetDeepSeekReadUrlTool": "Read Link",
+  "modelDetailSheetDeepSeekReadUrlToolDescription": "Let the model read links in your message with the DeepSeek server-side tool",
   "modelDetailSheetCancelButton": "Cancel",
   "modelDetailSheetAddButton": "Add",
   "modelDetailSheetConfirmButton": "Confirm",
@@ -12008,6 +12010,12 @@
   },
   "@modelDetailSheetOpenaiImageGenerationToolDescription": {
     "description": "Description for the image generation tool tile enabling image generation."
+  },
+  "@modelDetailSheetDeepSeekReadUrlTool": {
+    "description": "Title of the Read Link built-in tool tile shown for DeepSeek providers."
+  },
+  "@modelDetailSheetDeepSeekReadUrlToolDescription": {
+    "description": "Description for the DeepSeek read link tool tile that reads links from the user message."
   },
   "@modelDetailSheetCancelButton": {
     "description": "Secondary button label to cancel and dismiss the model spec edit dialog."
