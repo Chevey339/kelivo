@@ -3262,6 +3262,24 @@ abstract class AppLocalizations {
   /// **'Choose iCloud Drive or a folder outside On My iPhone > Kelivo. Files in the Kelivo folder are deleted with the app. The backup was not saved.'**
   String get backupPageChooseExternalFolder;
 
+  /// Error during a local backup export when the selected Android document already contains data or the file provider cannot confirm it is empty. Ask the user to select a fresh destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new filename or another folder to save your backup.'**
+  String get backupPageChooseNewFile;
+
+  /// Backup export or restore error. {name} is a file path inside the ZIP and {limit} is the formatted maximum supported uncompressed size of one file.
+  ///
+  /// In en, this message translates to:
+  /// **'The backup file “{name}” exceeds the per-file limit of {limit}.'**
+  String backupArchiveFileSizeLimit(String name, String limit);
+
+  /// Error when the combined file sizes in a backup ZIP exceed the supported uncompressed total. {limit} is the formatted maximum size.
+  ///
+  /// In en, this message translates to:
+  /// **'The uncompressed backup exceeds the {limit} limit.'**
+  String backupArchiveTotalSizeLimit(String limit);
+
   /// Category label in the backup and import content selector. Includes attachments, avatars, background images, custom fonts and session files.
   ///
   /// In en, this message translates to:
@@ -3490,10 +3508,10 @@ abstract class AppLocalizations {
   /// **'Installing the backup'**
   String get restoreProgressStageInstallingBackup;
 
-  /// Restore progress stage label shown while the restored data is being verified.
+  /// Startup restore progress label while verifying that the installed data is intact before completing the restore.
   ///
   /// In en, this message translates to:
-  /// **'Verifying'**
+  /// **'Checking restored data'**
   String get restoreProgressStageVerifying;
 
   /// Restore progress stage label shown when a failed restore is reverting to the user's previous data.
@@ -4018,6 +4036,42 @@ abstract class AppLocalizations {
   /// **'Preparing'**
   String get backupProgressPreparing;
 
+  /// Phase in the backup and restore progress dialog while scanning the files to pack or validate.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning backup files'**
+  String get backupProgressScanning;
+
+  /// Subtitle during an export or restore file scan. {count} is the number of files discovered so far, not a final total.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 file found} other{{count} files found}}'**
+  String backupProgressDiscoveredFiles(int count);
+
+  /// Restore dialog phase while SQLite prepares or checks a database snapshot. The duration is unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the database'**
+  String get backupProgressCheckingDatabase;
+
+  /// Local backup export phase while the system save dialog waits for the user to choose a destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Choosing where to save'**
+  String get backupProgressChoosingDestination;
+
+  /// Local backup export phase while writing the finished archive to the user-selected destination.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving backup file'**
+  String get backupProgressSavingFile;
+
+  /// Subtitle for a backup or restore phase without a measurable total. {time} is the elapsed time in minutes and seconds, for example 2:35.
+  ///
+  /// In en, this message translates to:
+  /// **'Elapsed {time}'**
+  String backupProgressElapsed(String time);
+
   /// Progress phase label for creating a database snapshot during backup.
   ///
   /// In en, this message translates to:
@@ -4030,10 +4084,10 @@ abstract class AppLocalizations {
   /// **'Packing'**
   String get backupProgressPacking;
 
-  /// Progress phase label for verifying the backup archive.
+  /// Phase in the export progress dialog while checking the archive index and manifest, or reading back an internal recovery snapshot.
   ///
   /// In en, this message translates to:
-  /// **'Verifying'**
+  /// **'Checking backup archive'**
   String get backupProgressVerifying;
 
   /// Progress phase label for uploading a backup to remote storage.
@@ -4054,10 +4108,10 @@ abstract class AppLocalizations {
   /// **'Extracting'**
   String get backupProgressExtracting;
 
-  /// Progress phase label for validating the backup contents.
+  /// Phase in the backup import dialog while checking the contents of files prepared for restoration.
   ///
   /// In en, this message translates to:
-  /// **'Validating'**
+  /// **'Checking restore files'**
   String get backupProgressValidating;
 
   /// Progress phase label for reading settings from the backup.
@@ -4066,10 +4120,10 @@ abstract class AppLocalizations {
   /// **'Reading settings'**
   String get backupProgressReadingSettings;
 
-  /// Progress phase label for staging candidate data before committing an import.
+  /// Phase in the backup import dialog while moving or copying selected files into a private folder before replacing current data.
   ///
   /// In en, this message translates to:
-  /// **'Staging'**
+  /// **'Preparing restore files'**
   String get backupProgressStaging;
 
   /// Progress phase label for committing imported data to the database.

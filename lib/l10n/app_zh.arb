@@ -530,6 +530,9 @@
   "backupPageFilesDescription": "聊天附件、头像、背景图和自定义字体。恢复头像或背景图时，还需选中对应的助手、服务商或设置。",
   "backupPageChooseBackupFolder": "选择备份保存文件夹",
   "backupPageChooseExternalFolder": "请选择 iCloud 云盘或“我的 iPhone > Kelivo”之外的文件夹。Kelivo 文件夹会随 App 卸载而删除，本次备份尚未保存。",
+  "backupPageChooseNewFile": "请使用新的文件名或选择其他文件夹保存备份。",
+  "backupArchiveFileSizeLimit": "「{name}」超过了备份单个文件 {limit} 的大小上限。",
+  "backupArchiveTotalSizeLimit": "备份的未压缩大小超过了 {limit} 的上限。",
   "backupPageFilesLabel": "文件与图片",
   "backupPageSettingsSaveFailed": "备份设置保存失败，请重试。",
   "backupPageScopeTitle": "备份与导入内容",
@@ -585,7 +588,7 @@
   "restoreProgressStageCheckingBackup": "正在校验备份",
   "restoreProgressStagePreservingCurrentData": "正在保留当前数据",
   "restoreProgressStageInstallingBackup": "正在写入备份",
-  "restoreProgressStageVerifying": "正在验证",
+  "restoreProgressStageVerifying": "正在核对已恢复的数据",
   "restoreProgressStageRollingBack": "正在恢复原有数据",
   "restoreProgressStageFinishing": "即将完成",
   "backupRestoreFailureRestartButton": "重启 Kelivo",
@@ -704,15 +707,35 @@
     }
   },
   "backupProgressPreparing": "准备中",
+  "backupProgressScanning": "正在扫描备份文件",
+  "backupProgressDiscoveredFiles": "已发现 {count} 个文件",
+  "@backupProgressDiscoveredFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "backupProgressCheckingDatabase": "正在检查数据库",
+  "backupProgressChoosingDestination": "正在选择保存位置",
+  "backupProgressSavingFile": "正在保存备份文件",
+  "backupProgressElapsed": "已用时 {time}",
+  "@backupProgressElapsed": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "backupProgressSnapshotting": "正在创建数据库快照",
   "backupProgressPacking": "正在打包",
-  "backupProgressVerifying": "正在校验",
+  "backupProgressVerifying": "正在检查备份包",
   "backupProgressUploading": "正在上传",
   "backupProgressDownloading": "正在下载",
   "backupProgressExtracting": "正在解压",
-  "backupProgressValidating": "正在验证",
+  "backupProgressValidating": "正在核对恢复文件",
   "backupProgressReadingSettings": "正在读取设置",
-  "backupProgressStaging": "正在暂存",
+  "backupProgressStaging": "正在准备恢复文件",
   "backupProgressCommitting": "正在提交",
   "backupProgressImportingSessions": "正在导入会话",
   "backupProgressImportingMessages": "正在导入消息",

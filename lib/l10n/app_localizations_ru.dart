@@ -1759,6 +1759,20 @@ class AppLocalizationsRu extends AppLocalizations {
       'Выберите iCloud Drive или папку вне «На моём iPhone > Kelivo». Файлы в папке Kelivo удаляются вместе с приложением. Резервная копия не сохранена.';
 
   @override
+  String get backupPageChooseNewFile =>
+      'Выберите новое имя файла или другую папку для сохранения резервной копии.';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return 'Файл резервной копии «$name» превышает предельный размер одного файла $limit.';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return 'Размер резервной копии в распакованном виде превышает предел $limit.';
+  }
+
+  @override
   String get backupPageFilesLabel => 'Файлы и изображения';
 
   @override
@@ -1889,7 +1903,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Установка резервной копии';
 
   @override
-  String get restoreProgressStageVerifying => 'Проверка';
+  String get restoreProgressStageVerifying => 'Проверка восстановленных данных';
 
   @override
   String get restoreProgressStageRollingBack =>
@@ -2206,13 +2220,43 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupProgressPreparing => 'Подготовка';
 
   @override
+  String get backupProgressScanning => 'Сканирование файлов резервной копии';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Найдено $count файла',
+      many: 'Найдено $count файлов',
+      few: 'Найдено $count файла',
+      one: 'Найден $count файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => 'Проверка базы данных';
+
+  @override
+  String get backupProgressChoosingDestination => 'Выбор места сохранения';
+
+  @override
+  String get backupProgressSavingFile => 'Сохранение файла резервной копии';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return 'Прошло $time';
+  }
+
+  @override
   String get backupProgressSnapshotting => 'Создание снимка базы данных';
 
   @override
   String get backupProgressPacking => 'Упаковка';
 
   @override
-  String get backupProgressVerifying => 'Проверка';
+  String get backupProgressVerifying => 'Проверка архива резервной копии';
 
   @override
   String get backupProgressUploading => 'Загрузка';
@@ -2224,13 +2268,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get backupProgressExtracting => 'Распаковка';
 
   @override
-  String get backupProgressValidating => 'Валидация';
+  String get backupProgressValidating => 'Проверка файлов восстановления';
 
   @override
   String get backupProgressReadingSettings => 'Чтение настроек';
 
   @override
-  String get backupProgressStaging => 'Подготовка данных';
+  String get backupProgressStaging => 'Подготовка файлов восстановления';
 
   @override
   String get backupProgressCommitting => 'Фиксация';

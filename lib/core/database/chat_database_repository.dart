@@ -764,7 +764,9 @@ class ChatDatabaseRepository {
     final database = sqlite.sqlite3.open(snapshotFile.absolute.path);
     late final ChatDatabaseSnapshotInfo initialInfo;
     try {
-      initialInfo = _validateRawSnapshot(database);
+      // This is a disposable copy. Check its shape and counts before editing;
+      // inspectPreparedSnapshot fully checks the reopened result before use.
+      initialInfo = _readSnapshotInfo(database);
       // Now a post-condition: the migration above guarantees it.
       if (initialInfo.schemaVersion != AppDatabase.currentSchemaVersion) {
         throw StateError('database_schema_version');
@@ -893,6 +895,10 @@ class ChatDatabaseRepository {
       throw StateError('foreign_key_check');
     }
 
+    return _readSnapshotInfo(database);
+  }
+
+  static ChatDatabaseSnapshotInfo _readSnapshotInfo(sqlite.Database database) {
     _validateRawStructure(database);
 
     return (

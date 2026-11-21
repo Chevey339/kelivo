@@ -1729,6 +1729,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choose iCloud Drive or a folder outside On My iPhone > Kelivo. Files in the Kelivo folder are deleted with the app. The backup was not saved.';
 
   @override
+  String get backupPageChooseNewFile =>
+      'Choose a new filename or another folder to save your backup.';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return 'The backup file “$name” exceeds the per-file limit of $limit.';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return 'The uncompressed backup exceeds the $limit limit.';
+  }
+
+  @override
   String get backupPageFilesLabel => 'Files and Images';
 
   @override
@@ -1859,7 +1873,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get restoreProgressStageInstallingBackup => 'Installing the backup';
 
   @override
-  String get restoreProgressStageVerifying => 'Verifying';
+  String get restoreProgressStageVerifying => 'Checking restored data';
 
   @override
   String get restoreProgressStageRollingBack => 'Restoring your previous data';
@@ -2169,13 +2183,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupProgressPreparing => 'Preparing';
 
   @override
+  String get backupProgressScanning => 'Scanning backup files';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files found',
+      one: '1 file found',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => 'Checking the database';
+
+  @override
+  String get backupProgressChoosingDestination => 'Choosing where to save';
+
+  @override
+  String get backupProgressSavingFile => 'Saving backup file';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return 'Elapsed $time';
+  }
+
+  @override
   String get backupProgressSnapshotting => 'Creating database snapshot';
 
   @override
   String get backupProgressPacking => 'Packing';
 
   @override
-  String get backupProgressVerifying => 'Verifying';
+  String get backupProgressVerifying => 'Checking backup archive';
 
   @override
   String get backupProgressUploading => 'Uploading';
@@ -2187,13 +2229,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupProgressExtracting => 'Extracting';
 
   @override
-  String get backupProgressValidating => 'Validating';
+  String get backupProgressValidating => 'Checking restore files';
 
   @override
   String get backupProgressReadingSettings => 'Reading settings';
 
   @override
-  String get backupProgressStaging => 'Staging';
+  String get backupProgressStaging => 'Preparing restore files';
 
   @override
   String get backupProgressCommitting => 'Committing';

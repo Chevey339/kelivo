@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
@@ -355,7 +356,10 @@ final class RestoreReceiptStore {
   Future<List<RestoreReceipt>> readHistoryWhileWorkspaceLocked() =>
       _readHistoryUnlocked();
 
-  Future<void> publish(RestoreReceipt receipt) async {
+  Future<void> publish(
+    RestoreReceipt receipt, {
+    StagedRestoreBundle? staged,
+  }) async {
     if (archived) throw StateError('restore_receipt_archived_publish');
     if (receipt.runId != runId) throw StateError('restore_receipt_run_id');
     await _workspaceLock.withPublishingRun(
@@ -363,6 +367,7 @@ final class RestoreReceiptStore {
       action: () => _publishUnlocked(
         receipt,
         activeRunFileName: RestoreWorkspaceLock.publishingRunFileName,
+        staged: staged,
       ),
     );
   }
@@ -377,6 +382,7 @@ final class RestoreReceiptStore {
   Future<void> _publishUnlocked(
     RestoreReceipt receipt, {
     required String activeRunFileName,
+    StagedRestoreBundle? staged,
   }) async {
     if (receipt.runId != runId) throw StateError('restore_receipt_run_id');
     await _requireExclusiveRunWorkspace(activeRunFileName: activeRunFileName);
@@ -402,7 +408,7 @@ final class RestoreReceiptStore {
         throw StateError('restore_receipt_initial_directory');
       }
       await _validatePreparedRunTopology(expectReceipts: false);
-      await _validatePreparedCandidate(receipt);
+      await _validatePreparedCandidate(receipt, staged: staged);
     } else {
       _validateContinuation(latest, receipt);
     }
@@ -500,14 +506,34 @@ final class RestoreReceiptStore {
     if (!foundActiveRun) throw StateError('restore_receipt_active_run');
   }
 
-  Future<void> _validatePreparedCandidate(RestoreReceipt receipt) async {
+  Future<void> _validatePreparedCandidate(
+    RestoreReceipt receipt, {
+    StagedRestoreBundle? staged,
+  }) async {
     final candidateDirectory = Directory(
       p.join(runDirectory.path, 'candidate'),
     );
-    final candidate = await RestoreBundleStaging.validateExistingCandidate(
-      candidateDirectory: candidateDirectory,
-      expectedManifestSha256: receipt.candidateManifestSha256,
-    );
+    if (staged != null &&
+        (staged.runId != runId ||
+            !p.equals(staged.payloadDirectory.path, candidateDirectory.path) ||
+            staged.candidateManifestSha256 !=
+                receipt.candidateManifestSha256)) {
+      throw StateError('restore_receipt_candidate_binding');
+    }
+    // The initial handoff only needs the sealed manifest. Standalone and
+    // retried publications, and startup before cutover, independently validate
+    // the on-disk payload. Never carry this proof across a process restart.
+    final candidate = staged == null
+        ? await RestoreBundleStaging.validateExistingCandidate(
+            candidateDirectory: candidateDirectory,
+            expectedManifestSha256: receipt.candidateManifestSha256,
+          )
+        : await Isolate.run(
+            () => RestoreBundleStaging.readCandidateManifest(
+              candidateDirectory: candidateDirectory,
+              expectedManifestSha256: receipt.candidateManifestSha256,
+            ),
+          );
     if (receipt.selectedComponents.contains(RestoreComponent.database) !=
             candidate.includeChats ||
         receipt.selectedComponents.contains(RestoreComponent.assets) !=

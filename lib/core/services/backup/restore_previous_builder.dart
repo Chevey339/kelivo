@@ -1,11 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
 import '../../../utils/app_directories.dart';
+import 'backup_file_digest.dart';
+import 'backup_archive_limits.dart';
+import 'backup_isolate_runner.dart';
+import 'backup_task_progress.dart';
 import 'restore_durability.dart';
 import 'restore_previous_plan.dart';
 import 'restore_receipt.dart';
@@ -26,17 +30,14 @@ final class RestorePreviousBuilder {
 
   static const assetRootNames = RestorePreviousAssetsPlan.rootNames;
   static const _databaseSidecarSuffixes = ['-wal', '-shm', '-journal'];
-  static const _maximumEntryBytes = 8 * 1024 * 1024 * 1024;
-  static const _maximumTotalBytes = 16 * 1024 * 1024 * 1024;
-  static const _maximumAssetEntries = 0xffff;
   static const _maximumAssetPathBytes = 8 * 1024 * 1024;
   static const _maximumSinglePathBytes = 0xffff;
-  static const _maximumManifestBytes = 16 * 1024 * 1024;
 
   static Future<RestorePreviousBundle> build({
     required Directory appDataDirectory,
     required RestoreReceipt preparedReceipt,
     Iterable<String> assetRoots = assetRootNames,
+    BackupProgressSink? onProgress,
   }) async {
     if (preparedReceipt.state != RestoreReceiptState.prepared ||
         preparedReceipt.sequence != 1) {
@@ -50,12 +51,16 @@ final class RestorePreviousBuilder {
       throw StateError('restore_previous_builder_app_data');
     }
 
-    final database = await inspectDatabase(appDataDirectory);
+    final database = await inspectDatabase(
+      appDataDirectory,
+      onProgress: onProgress,
+    );
     final assets =
         preparedReceipt.selectedComponents.contains(RestoreComponent.assets)
         ? await inspectAssets(
             await AppDirectories.contentDirectoryFor(appDataDirectory),
             rootNames: assetRoots,
+            onProgress: onProgress,
           )
         : null;
     final totalBytes =
@@ -65,7 +70,7 @@ final class RestorePreviousBuilder {
               (total, descriptor) => total + descriptor.bytes,
             ) ??
             0);
-    if (totalBytes > _maximumTotalBytes) {
+    if (totalBytes > BackupArchiveLimits.totalBytes) {
       throw StateError('restore_previous_total_budget');
     }
     final plan = RestorePreviousPlan.forPreparedReceipt(
@@ -73,7 +78,8 @@ final class RestorePreviousBuilder {
       database: database,
       assets: assets,
     );
-    if (utf8.encode(jsonEncode(plan.toJson())).length > _maximumManifestBytes) {
+    if (utf8.encode(jsonEncode(plan.toJson())).length >
+        BackupArchiveLimits.manifestBytes) {
       throw StateError('restore_previous_manifest_budget');
     }
     return RestorePreviousBundle(plan: plan);
@@ -105,14 +111,18 @@ final class RestorePreviousBuilder {
     }
   }
 
-  static Future<RestorePreviousDatabasePlan> inspectDatabase(Directory root) =>
-      _inspectDatabaseFile(
-        File(p.join(root.path, AppDatabase.databaseFileName)),
-      );
+  static Future<RestorePreviousDatabasePlan> inspectDatabase(
+    Directory root, {
+    BackupProgressSink? onProgress,
+  }) => _inspectDatabaseFile(
+    File(p.join(root.path, AppDatabase.databaseFileName)),
+    onProgress: onProgress,
+  );
 
   static Future<void> validateStoredPayload({
     required Directory directory,
     required RestorePreviousPlan expected,
+    BackupProgressSink? onProgress,
   }) async {
     if (await FileSystemEntity.type(directory.path, followLinks: false) !=
         FileSystemEntityType.directory) {
@@ -124,7 +134,10 @@ final class RestorePreviousBuilder {
         ...RestorePreviousDatabasePlan.databasePath.split('/'),
       ]),
     );
-    final actual = await _inspectDatabaseFile(databaseFile);
+    final actual = await _inspectDatabaseFile(
+      databaseFile,
+      onProgress: onProgress,
+    );
     if (!_sameDatabase(actual, expected.database)) {
       throw StateError('restore_previous_stored_database');
     }
@@ -151,6 +164,7 @@ final class RestorePreviousBuilder {
       final actual = await inspectAssets(
         directory,
         rootNames: expected.assets!.rootStates.keys,
+        onProgress: onProgress,
       );
       if (!_sameAssets(actual, expected.assets!)) {
         throw StateError('restore_previous_stored_assets');
@@ -159,8 +173,9 @@ final class RestorePreviousBuilder {
   }
 
   static Future<RestorePreviousDatabasePlan> _inspectDatabaseFile(
-    File database,
-  ) async {
+    File database, {
+    BackupProgressSink? onProgress,
+  }) async {
     for (final suffix in _databaseSidecarSuffixes) {
       if (await FileSystemEntity.type(
             '${database.path}$suffix',
@@ -177,8 +192,8 @@ final class RestorePreviousBuilder {
     if (type != FileSystemEntityType.file) {
       throw StateError('restore_previous_database_type');
     }
-    final descriptor = await describeFile(database);
-    if (descriptor.bytes > _maximumEntryBytes) {
+    final descriptor = await describeFile(database, onProgress: onProgress);
+    if (descriptor.bytes > BackupArchiveLimits.entryBytes) {
       throw StateError('restore_previous_database_budget');
     }
     return RestorePreviousDatabasePlan.file(descriptor);
@@ -187,7 +202,19 @@ final class RestorePreviousBuilder {
   static Future<RestorePreviousAssetsPlan> inspectAssets(
     Directory root, {
     Iterable<String> rootNames = assetRootNames,
-  }) async {
+    BackupProgressSink? onProgress,
+  }) => runBackupIsolate(
+    body: _inspectAssets,
+    payload: (root: root, names: rootNames.toList(growable: false)),
+    onProgress: onProgress,
+  );
+
+  static Future<RestorePreviousAssetsPlan> _inspectAssets(
+    BackupIsolateContext ctx,
+    ({Directory root, List<String> names}) args,
+  ) async {
+    final root = args.root;
+    final rootNames = args.names;
     if (rootNames.isEmpty ||
         rootNames.any((name) => !assetRootNames.contains(name))) {
       throw ArgumentError.value(rootNames, 'rootNames');
@@ -202,7 +229,7 @@ final class RestorePreviousBuilder {
 
     for (final rootName in rootNames) {
       final assetRoot = Directory(p.join(root.path, rootName));
-      final rootType = await FileSystemEntity.type(
+      final rootType = FileSystemEntity.typeSync(
         assetRoot.path,
         followLinks: false,
       );
@@ -219,10 +246,7 @@ final class RestorePreviousBuilder {
         recursive: true,
         followLinks: false,
       )) {
-        final type = await FileSystemEntity.type(
-          entity.path,
-          followLinks: false,
-        );
+        final type = FileSystemEntity.typeSync(entity.path, followLinks: false);
         final relativeName = _portableRelativePath(root: root, entity: entity);
         final pathBytes = utf8.encode(relativeName).length;
         totalPathBytes += pathBytes;
@@ -236,17 +260,24 @@ final class RestorePreviousBuilder {
         if (type == FileSystemEntityType.directory) {
           continue;
         }
-        if (++entryCount > _maximumAssetEntries) {
+        if (++entryCount > BackupArchiveLimits.entries) {
           throw StateError('restore_previous_asset_budget');
         }
+        ctx.reportProgress(
+          BackupProgress(
+            phase: BackupPhase.scanning,
+            processed: entryCount,
+            unit: BackupProgressUnit.items,
+          ),
+        );
         if (type == FileSystemEntityType.link) {
-          final target = await Link(entity.path).target();
+          final target = Link(entity.path).targetSync();
           final targetBytes = utf8.encode(target).length;
           totalPathBytes += targetBytes;
           totalBytes += targetBytes;
           if (targetBytes > _maximumSinglePathBytes ||
               totalPathBytes > _maximumAssetPathBytes ||
-              totalBytes > _maximumTotalBytes) {
+              totalBytes > BackupArchiveLimits.totalBytes) {
             throw StateError('restore_previous_asset_budget');
           }
           entries[relativeName] = RestoreAssetDescriptor.link(target);
@@ -265,11 +296,11 @@ final class RestorePreviousBuilder {
             'restore_previous_asset_entry_type:$relativeName:$type',
           );
         }
-        final stat = await File(entity.path).stat();
+        final stat = File(entity.path).statSync();
         totalBytes += stat.size;
         if (stat.type != FileSystemEntityType.file ||
-            stat.size > _maximumEntryBytes ||
-            totalBytes > _maximumTotalBytes) {
+            stat.size > BackupArchiveLimits.entryBytes ||
+            totalBytes > BackupArchiveLimits.totalBytes) {
           throw StateError('restore_previous_asset_budget');
         }
         pendingFiles.add((
@@ -280,12 +311,41 @@ final class RestorePreviousBuilder {
       }
     }
     pendingFiles.sort((left, right) => left.name.compareTo(right.name));
+    final meter = BackupByteProgress(
+      phase: BackupPhase.validating,
+      total: pendingFiles.fold<int>(0, (sum, file) => sum + file.stat.size),
+      onProgress: ctx.reportProgress,
+    );
+    var checkedFiles = 0;
+    void reportEmptyFiles() => ctx.reportProgress(
+      BackupProgress(
+        phase: BackupPhase.validating,
+        processed: checkedFiles,
+        total: pendingFiles.length,
+        unit: BackupProgressUnit.items,
+      ),
+    );
+    if (meter.total > 0) {
+      meter.report();
+    } else if (pendingFiles.isNotEmpty) {
+      reportEmptyFiles();
+    }
+    late final buffer = Uint8List(1024 * 1024);
     for (final pending in pendingFiles) {
-      final descriptor = await describeFile(pending.file);
+      final descriptor = _describeFileSync(
+        ctx,
+        pending.file,
+        buffer: buffer,
+        meter: meter,
+      );
       if (descriptor.bytes != pending.stat.size) {
         throw StateError('restore_previous_file_changed');
       }
       entries[pending.name] = RestoreAssetDescriptor.file(descriptor);
+      if (meter.total == 0) {
+        checkedFiles++;
+        reportEmptyFiles();
+      }
     }
     return RestorePreviousAssetsPlan(rootStates: rootStates, entries: entries);
   }
@@ -301,6 +361,7 @@ final class RestorePreviousBuilder {
     required RestorePreviousAssetsPlan expected,
     required Set<String> rootNames,
     required RestoreDurability durability,
+    BackupProgressSink? onProgress,
   }) async {
     if (await FileSystemEntity.type(root.path, followLinks: false) !=
         FileSystemEntityType.directory) {
@@ -358,7 +419,11 @@ final class RestorePreviousBuilder {
     }
     await durability.syncDirectory(root, fullBarrier: true);
 
-    final after = await inspectAssets(root, rootNames: rootNames);
+    final after = await inspectAssets(
+      root,
+      rootNames: rootNames,
+      onProgress: onProgress,
+    );
     for (final rootName in rootNames) {
       if (!_sameAssetRoot(after, expected, rootName)) {
         throw StateError('restore_previous_asset_sync_changed:$rootName');
@@ -416,27 +481,44 @@ final class RestorePreviousBuilder {
     return left.bytes == right.bytes && left.sha256 == right.sha256;
   }
 
-  static Future<RestoreFileDescriptor> describeFile(File file) async {
-    if (await FileSystemEntity.type(file.path, followLinks: false) !=
+  static Future<RestoreFileDescriptor> describeFile(
+    File file, {
+    BackupProgressSink? onProgress,
+  }) => runBackupIsolate(
+    body: _describeFileSync,
+    payload: file,
+    onProgress: onProgress,
+  );
+
+  static RestoreFileDescriptor _describeFileSync(
+    BackupIsolateContext ctx,
+    File file, {
+    Uint8List? buffer,
+    BackupByteProgress? meter,
+  }) {
+    if (FileSystemEntity.typeSync(file.path, followLinks: false) !=
         FileSystemEntityType.file) {
       throw StateError('restore_previous_file_type');
     }
-    final before = await file.stat();
-    final digest = await sha256.bind(file.openRead()).first;
-    final afterType = await FileSystemEntity.type(
-      file.path,
-      followLinks: false,
-    );
-    final after = await file.stat();
+    final before = file.statSync();
+    meter ??= BackupByteProgress(
+      phase: BackupPhase.validating,
+      total: before.size,
+      onProgress: ctx.reportProgress,
+    )..report();
+    final digest = digestBackupFile(file, buffer: buffer, onBytes: meter.add);
+    final afterType = FileSystemEntity.typeSync(file.path, followLinks: false);
+    final after = file.statSync();
     if (afterType != FileSystemEntityType.file ||
         before.type != FileSystemEntityType.file ||
         after.type != FileSystemEntityType.file ||
+        digest.bytes != before.size ||
         before.size != after.size ||
         before.modified != after.modified ||
         before.changed != after.changed) {
       throw StateError('restore_previous_file_changed');
     }
-    return RestoreFileDescriptor(bytes: after.size, sha256: digest.toString());
+    return RestoreFileDescriptor(bytes: after.size, sha256: digest.sha256);
   }
 
   static String _portableRelativePath({

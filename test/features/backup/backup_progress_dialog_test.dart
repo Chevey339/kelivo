@@ -10,6 +10,7 @@ import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/features/backup/backup_task_runner.dart';
 import 'package:Kelivo/features/backup/widgets/backup_progress_dialog.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/utils/backup_progress_text.dart';
 import 'package:Kelivo/shared/widgets/animated_progress_bar.dart';
 import 'package:Kelivo/shared/widgets/task_progress_dialog.dart';
 
@@ -45,6 +46,29 @@ Future<void> _openDialog(
 void main() {
   setUp(BackupActivity.debugReset);
   tearDown(BackupActivity.debugReset);
+
+  test('shows discoveries and elapsed time for unmeasured phases', () {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    expect(
+      backupProgressSubtitle(
+        l10n,
+        const BackupProgress(
+          phase: BackupPhase.scanning,
+          processed: 42,
+          unit: BackupProgressUnit.items,
+        ),
+      ),
+      '42 files found',
+    );
+    expect(
+      backupProgressSubtitle(
+        l10n,
+        const BackupProgress(phase: BackupPhase.checkingDatabase, processed: 0),
+        elapsed: const Duration(minutes: 2, seconds: 8),
+      ),
+      'Elapsed 2:08',
+    );
+  });
 
   for (final failTask in [false, true]) {
     testWidgets(
@@ -116,7 +140,7 @@ void main() {
           },
         );
       });
-      expect(find.text('Validating'), findsOneWidget);
+      expect(find.text('Checking restore files'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
       expect(BackupActivity.isActive, isTrue);
 
@@ -125,7 +149,10 @@ void main() {
 
       expect(result, isNull);
       expect(find.text('Operation failed'), findsOneWidget);
-      expect(find.text('Failed during: Validating'), findsOneWidget);
+      expect(
+        find.text('Failed during: Checking restore files'),
+        findsOneWidget,
+      );
       expect(find.text(error.toString()), findsOneWidget);
       expect(find.byType(SelectableText), findsOneWidget);
       expect(find.byType(CupertinoActivityIndicator), findsNothing);
@@ -136,7 +163,10 @@ void main() {
 
       await tester.tap(find.text('Copy error'));
       await tester.pumpAndSettle();
-      expect(copied, 'Import backup\nFailed during: Validating\n\n$error');
+      expect(
+        copied,
+        'Import backup\nFailed during: Checking restore files\n\n$error',
+      );
       expect(find.text('Error copied'), findsOneWidget);
       expect(result, isNull);
 

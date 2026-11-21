@@ -6,6 +6,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../database/app_database.dart';
 import '../../database/database_installation_gate.dart';
+import 'backup_task_progress.dart';
 import 'restore_bundle_mover.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_durability.dart';
@@ -57,6 +58,7 @@ final class RestoreCutoverExecutor {
     bool archived = false,
     ValidatedRestoreCandidate? validatedCandidate,
     RestoreStartupStageSink? onStage,
+    BackupProgressSink? onProgress,
     RestoreStartupDiagnostics? diagnostics,
   }) {
     final resolvedDurability = durability ?? RestorePlatformDurability();
@@ -68,6 +70,7 @@ final class RestoreCutoverExecutor {
       archived: archived,
       validatedCandidate: validatedCandidate,
       onStage: onStage,
+      onProgress: onProgress,
       diagnostics: diagnostics,
     );
   }
@@ -80,6 +83,7 @@ final class RestoreCutoverExecutor {
     required bool archived,
     required ValidatedRestoreCandidate? validatedCandidate,
     required this.onStage,
+    required this.onProgress,
     required this.diagnostics,
   }) : _provenCandidate = validatedCandidate,
        _proofHold = validatedCandidate == null
@@ -94,12 +98,14 @@ final class RestoreCutoverExecutor {
     previousStore = RestorePreviousStore(
       runDirectory: receiptStore.runDirectory,
       durability: durability,
+      onProgress: onProgress,
     );
     mover = RestoreBundleMover(
       appDataDirectory: appDataDirectory,
       candidateDirectory: candidateDirectory,
       previousStore: previousStore,
       durability: durability,
+      onProgress: onProgress,
     );
   }
 
@@ -108,6 +114,7 @@ final class RestoreCutoverExecutor {
   final RestoreWorkspaceLock workspaceLock;
   final RestoreDurability durability;
   final RestoreStartupStageSink? onStage;
+  final BackupProgressSink? onProgress;
   final RestoreStartupDiagnostics? diagnostics;
   final RestoreReceiptStore receiptStore;
   late final RestorePreviousStore previousStore;
@@ -160,6 +167,7 @@ final class RestoreCutoverExecutor {
             candidate = await RestoreBundleStaging.validateExistingCandidate(
               candidateDirectory: candidateDirectory,
               expectedManifestSha256: preparedReceipt.candidateManifestSha256,
+              onProgress: onProgress,
             );
             _provenCandidate = candidate;
           }
@@ -444,6 +452,7 @@ final class RestoreCutoverExecutor {
         appDataDirectory: appDataDirectory,
         preparedReceipt: preparedReceipt,
         assetRoots: candidate.assetRoots,
+        onProgress: onProgress,
       );
       pending = await previousStore.persistPending(
         bundle: bundle,

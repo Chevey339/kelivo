@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/backup_scope.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -631,6 +632,59 @@ void main() {
       );
     });
 
+    test(
+      'consumes only selected files from a disposable same-volume extraction',
+      () async {
+        final extracted = await _createExtractedBundle(
+          root,
+          includeFiles: true,
+        );
+        for (final name in ['upload/report.txt', 'workspaces/ws/note.txt']) {
+          final file = File(p.join(extracted.path, name));
+          await file.parent.create(recursive: true);
+          await file.writeAsString(name);
+          await _addDeclaredEntry(extracted, name: name, file: file);
+        }
+        final events = <BackupProgress>[];
+        final staged = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          consumeExtractedFiles: true,
+          includeChats: true,
+          includeFiles: true,
+          scope: const BackupScope(excluded: {BackupCategory.workspaces}),
+          sourceManifestSha256: await _manifestSha256(extracted),
+          onProgress: events.add,
+        );
+        final moves = events.where(
+          (e) =>
+              e.phase == BackupPhase.stagingCandidate &&
+              e.unit == BackupProgressUnit.items,
+        );
+        expect(moves.first.processed, 0);
+        expect(moves.last.processed, moves.last.total);
+        expect(moves.last.processed, greaterThan(1));
+        expect(
+          await File(p.join(extracted.path, 'upload/report.txt')).exists(),
+          isFalse,
+        );
+        expect(
+          await File(p.join(extracted.path, 'database/kelivo.db')).exists(),
+          isFalse,
+        );
+        expect(
+          await File(p.join(extracted.path, 'workspaces/ws/note.txt')).exists(),
+          isTrue,
+        );
+        expect(
+          await File(
+            p.join(staged.payloadDirectory.path, 'upload/report.txt'),
+          ).readAsString(),
+          'upload/report.txt',
+        );
+      },
+    );
+
     test('rejects a source entry changed after its descriptor froze', () async {
       final extracted = await _createExtractedBundle(root);
       await File(
@@ -1085,6 +1139,56 @@ void main() {
         isTrue,
       );
     });
+
+    test(
+      'staging and final verification count bytes within a large attachment',
+      () async {
+        final extracted = await _createExtractedBundle(
+          root,
+          includeFiles: true,
+        );
+        const entry = 'upload/large.mp4';
+        final blob = File(p.join(extracted.path, entry));
+        await blob.parent.create(recursive: true);
+        const bytes = 64 * 1024 * 1024;
+        blob.openSync(mode: FileMode.write)
+          ..truncateSync(bytes)
+          ..closeSync();
+        await _addDeclaredEntry(extracted, name: entry, file: blob);
+        final events = <BackupProgress>[];
+        final result = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: true,
+          sourceManifestSha256: await _manifestSha256(extracted),
+          onProgress: events.add,
+        );
+        for (final phase in [
+          BackupPhase.stagingCandidate,
+          BackupPhase.validating,
+        ]) {
+          final progress = events.where(
+            (e) => e.phase == phase && e.detail == entry,
+          );
+          expect(
+            progress.any(
+              (e) =>
+                  e.unit == BackupProgressUnit.bytes &&
+                  e.processed > 0 &&
+                  e.processed < e.total!,
+            ),
+            isTrue,
+            reason: 'expected an intermediate byte count in ${phase.name}',
+          );
+          expect(progress.last.processed, progress.last.total);
+        }
+        expect(
+          File(p.join(result.payloadDirectory.path, entry)).lengthSync(),
+          bytes,
+        );
+      },
+    );
 
     test(
       'cancel during staging of a large file does not publish a candidate',

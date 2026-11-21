@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/services/backup/backup_archive_limits.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 
 void main() {
@@ -12,6 +13,60 @@ void main() {
     root = await Directory.systemTemp.createTemp('backup_asset_read_failure_');
   });
   tearDown(() => root.delete(recursive: true));
+
+  test('the writer rejects an oversized input before reading its contents', () {
+    final source = File('${root.path}/movie.mp4')
+      ..writeAsStringSync('small fixture');
+    final destination = File('${root.path}/backup.zip');
+    final wrapped = _FailingFile(
+      source,
+      readFailure: true,
+      reportedSize: BackupArchiveLimits.entryBytes + 1,
+    );
+    expect(
+      () => IOOverrides.runZoned(
+        () => DataSync.debugPackAssetFiles(
+          destination: destination,
+          source: root,
+          files: [source],
+        ),
+        createFile: (path) => path == source.path ? wrapped : destination,
+      ),
+      throwsA(
+        isA<FormatException>().having(
+          (e) => e.message,
+          'limit',
+          'zip_entry_size:upload/movie.mp4',
+        ),
+      ),
+    );
+    expect(wrapped.opened?.bytesRead, 0);
+    expect(wrapped.opened?.closed, isTrue);
+  });
+
+  test('archive limits include generated metadata and allow exact fits', () {
+    final add = BackupArchiveLimits.addFile;
+    expect(
+      add(0, 'upload/file', BackupArchiveLimits.entryBytes),
+      BackupArchiveLimits.entryBytes,
+    );
+    expect(
+      add(0, 'settings.json', BackupArchiveLimits.settingsBytes),
+      BackupArchiveLimits.settingsBytes,
+    );
+    expect(
+      () => add(0, 'settings.json', BackupArchiveLimits.settingsBytes + 1),
+      throwsFormatException,
+    );
+    expect(
+      add(BackupArchiveLimits.totalBytes - 1, 'manifest.json', 1),
+      BackupArchiveLimits.totalBytes,
+    );
+    expect(
+      () => add(BackupArchiveLimits.totalBytes, 'manifest.json', 1),
+      throwsFormatException,
+    );
+  });
 
   test(
     'a mid-read failure removes the partial ZIP entry and preserves siblings',
@@ -91,9 +146,10 @@ void main() {
 }
 
 class _FailingFile implements File {
-  _FailingFile(this.file, {required this.readFailure});
+  _FailingFile(this.file, {required this.readFailure, this.reportedSize});
   final File file;
   final bool readFailure;
+  final int? reportedSize;
   _FailingHandle? opened;
   @override
   String get path => file.path;
@@ -102,20 +158,25 @@ class _FailingFile implements File {
   @override
   int lengthSync() => file.lengthSync();
   @override
-  RandomAccessFile openSync({FileMode mode = FileMode.read}) => opened =
-      _FailingHandle(file.openSync(mode: mode), readFailure: readFailure);
+  RandomAccessFile openSync({FileMode mode = FileMode.read}) =>
+      opened = _FailingHandle(
+        file.openSync(mode: mode),
+        readFailure: readFailure,
+        reportedSize: reportedSize,
+      );
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FailingHandle implements RandomAccessFile {
-  _FailingHandle(this.file, {required this.readFailure});
+  _FailingHandle(this.file, {required this.readFailure, this.reportedSize});
   final RandomAccessFile file;
   final bool readFailure;
+  final int? reportedSize;
   int bytesRead = 0;
   bool closed = false;
   @override
-  int lengthSync() => file.lengthSync();
+  int lengthSync() => reportedSize ?? file.lengthSync();
   @override
   int positionSync() => file.positionSync();
   @override

@@ -216,6 +216,39 @@ void main() {
     });
 
     test(
+      'final snapshot inspection rejects orphaned rows after normalization',
+      () async {
+        final snapshot = File('${directory.path}/broken-foreign-key.sqlite');
+        await _createSnapshotFixture(
+          databaseFile: snapshot,
+          conversationId: 'chat',
+          title: 'Chat',
+          messageId: 'message',
+          messageContent: 'text',
+        );
+        final raw = sqlite.sqlite3.open(snapshot.path);
+        try {
+          raw.execute('PRAGMA foreign_keys = OFF');
+          raw.execute(
+            "UPDATE message_rows SET conversation_id = 'missing' WHERE id = 'message'",
+          );
+        } finally {
+          raw.close();
+        }
+        await expectLater(
+          ChatDatabaseRepository.prepareSnapshotForRestore(snapshot),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'error',
+              'foreign_key_check',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
       'inspects only normalized standalone snapshots without writing',
       () async {
         final snapshotFile = File('${directory.path}/inspection.sqlite');

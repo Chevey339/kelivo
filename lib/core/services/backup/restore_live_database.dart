@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -44,7 +45,28 @@ final class RestoreLiveDatabase {
       throw StateError('restore_live_database_type');
     }
 
-    final database = sqlite.sqlite3.open(databaseFile.absolute.path);
+    final path = databaseFile.absolute.path;
+    await Isolate.run(() => _checkpoint(path));
+
+    for (final suffix in _sidecarSuffixes) {
+      if (await FileSystemEntity.type(
+            '${databaseFile.path}$suffix',
+            followLinks: false,
+          ) !=
+          FileSystemEntityType.notFound) {
+        throw StateError('restore_live_database_sidecar_remains:$suffix');
+      }
+    }
+    await resolvedDurability.syncFile(databaseFile, fullBarrier: true);
+    await resolvedDurability.syncDirectory(
+      databaseFile.parent,
+      fullBarrier: true,
+    );
+    return true;
+  }
+
+  static void _checkpoint(String path) {
+    final database = sqlite.sqlite3.open(path);
     try {
       database.execute('PRAGMA busy_timeout = 5000;');
       final checkpoint = database.select('PRAGMA wal_checkpoint(TRUNCATE);');
@@ -62,21 +84,5 @@ final class RestoreLiveDatabase {
     } finally {
       database.close();
     }
-
-    for (final suffix in _sidecarSuffixes) {
-      if (await FileSystemEntity.type(
-            '${databaseFile.path}$suffix',
-            followLinks: false,
-          ) !=
-          FileSystemEntityType.notFound) {
-        throw StateError('restore_live_database_sidecar_remains:$suffix');
-      }
-    }
-    await resolvedDurability.syncFile(databaseFile, fullBarrier: true);
-    await resolvedDurability.syncDirectory(
-      databaseFile.parent,
-      fullBarrier: true,
-    );
-    return true;
   }
 }

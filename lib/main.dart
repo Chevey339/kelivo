@@ -268,7 +268,10 @@ Future<void> main(List<String> arguments) async {
               target: appDataDirectory,
               onCopying: () => runApp(
                 _RestoreProgressApp(
-                  stage: ValueNotifier(RestoreStartupStage.protectingData),
+                  progress: ValueNotifier<RestoreStartupProgress>((
+                    stage: RestoreStartupStage.protectingData,
+                    detail: null,
+                  )),
                 ),
               ),
             );
@@ -295,15 +298,18 @@ Future<void> main(List<String> arguments) async {
         // them before the first frame, which is indistinguishable from a hang.
         // Only paint when there is actually work waiting: an ordinary launch
         // must not pay for a frame it immediately replaces.
-        final restoreStage =
+        final restoreProgress =
             await RestoreStartupGate.hasPendingWork(
               appDataDirectory: appDataDirectory,
             )
-            ? ValueNotifier(RestoreStartupStage.checkingBackup)
+            ? ValueNotifier<RestoreStartupProgress>((
+                stage: RestoreStartupStage.checkingBackup,
+                detail: null,
+              ))
             : null;
-        if (restoreStage != null) {
+        if (restoreProgress != null) {
           await _initRestoreFailureWindow();
-          runApp(_RestoreProgressApp(stage: restoreStage));
+          runApp(_RestoreProgressApp(progress: restoreProgress));
         }
         while (true) {
           try {
@@ -317,9 +323,18 @@ Future<void> main(List<String> arguments) async {
                   appDataDirectory: appDataDirectory,
                   businessLease: businessLease,
                   diagnostics: restoreDiagnostics,
-                  onStage: restoreStage == null
+                  onStage: restoreProgress == null
                       ? null
-                      : (stage) => restoreStage.value = stage,
+                      : (stage) => restoreProgress.value = (
+                          stage: stage,
+                          detail: null,
+                        ),
+                  onProgress: restoreProgress == null
+                      ? null
+                      : (detail) => restoreProgress.value = (
+                          stage: restoreProgress.value.stage,
+                          detail: detail,
+                        ),
                 );
             break;
           } catch (error, stackTrace) {
@@ -350,9 +365,12 @@ Future<void> main(List<String> arguments) async {
             );
             if (retry == null) return;
             await retry.future;
-            if (restoreStage != null) {
-              restoreStage.value = RestoreStartupStage.checkingBackup;
-              runApp(_RestoreProgressApp(stage: restoreStage));
+            if (restoreProgress != null) {
+              restoreProgress.value = (
+                stage: RestoreStartupStage.checkingBackup,
+                detail: null,
+              );
+              runApp(_RestoreProgressApp(progress: restoreProgress));
             }
           }
         }
@@ -629,9 +647,9 @@ Future<void> _initRestoreFailureWindow() async {
 /// Deliberately built from defaults: the user's theme and locale live in the
 /// settings this restore may be replacing, and nothing here may open them.
 class _RestoreProgressApp extends StatelessWidget {
-  const _RestoreProgressApp({required this.stage});
+  const _RestoreProgressApp({required this.progress});
 
-  final ValueNotifier<RestoreStartupStage> stage;
+  final ValueNotifier<RestoreStartupProgress> progress;
 
   @override
   Widget build(BuildContext context) {
@@ -643,7 +661,7 @@ class _RestoreProgressApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: RestoreProgressScreen(stage: stage),
+      home: RestoreProgressScreen(progress: progress),
     );
   }
 }

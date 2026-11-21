@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/services/backup/backup_activity.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/backup_task_progress.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/utils/format_bytes.dart';
+import '../../../shared/utils/backup_progress_text.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/task_progress_dialog.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
@@ -177,6 +176,42 @@ class _BackupProgressDialogHostState<T>
   var _errorCopied = false;
   late T _completedValue;
 
+  final _phaseTime = Stopwatch();
+  BackupPhase? _timedPhase;
+  Timer? _elapsedTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.handle._progress.addListener(_trackPhase);
+    _trackPhase();
+  }
+
+  void _trackPhase() {
+    final progress = widget.handle.current;
+    if (_timedPhase != progress.phase) {
+      _timedPhase = progress.phase;
+      _phaseTime
+        ..reset()
+        ..start();
+    }
+    if (progress.total != null || progress.phase == BackupPhase.scanning) {
+      _elapsedTimer?.cancel();
+      _elapsedTimer = null;
+    } else {
+      _elapsedTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (_outcome == TaskProgressOutcome.running) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.handle._progress.removeListener(_trackPhase);
+    _elapsedTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -224,6 +259,8 @@ class _BackupProgressDialogHostState<T>
           detail: widget.handle.current.detail,
         ),
       );
+    } finally {
+      _elapsedTimer?.cancel();
     }
   }
 
@@ -283,7 +320,11 @@ class _BackupProgressDialogHostState<T>
               ? l10n.backupProgressSkippedMessage(
                   widget.handle._skippedEntries.length,
                 )
-              : backupProgressSubtitle(l10n, progress),
+              : backupProgressSubtitle(
+                  l10n,
+                  progress,
+                  elapsed: _phaseTime.elapsed,
+                ),
           phaseIcon: backupPhaseIcon(progress.phase),
           cancellable: progress.cancellable && widget.initiallyCancellable,
           onCancel: _cancel,
@@ -322,6 +363,10 @@ IconData backupPhaseIcon(BackupPhase phase) {
   return switch (phase) {
     BackupPhase.preparing => Lucide.Loader,
     BackupPhase.snapshottingDatabase => Lucide.Database,
+    BackupPhase.scanning => Lucide.Folder,
+    BackupPhase.checkingDatabase => Lucide.Database,
+    BackupPhase.saving => Lucide.HardDrive,
+    BackupPhase.choosingDestination => Lucide.FolderOpen,
     BackupPhase.packing => Lucide.Folder,
     BackupPhase.verifying => Lucide.Shield,
     BackupPhase.encrypting => Lucide.Lock,
@@ -345,6 +390,10 @@ String backupPhaseLabel(AppLocalizations l10n, BackupPhase phase) {
   return switch (phase) {
     BackupPhase.preparing => l10n.backupProgressPreparing,
     BackupPhase.snapshottingDatabase => l10n.backupProgressSnapshotting,
+    BackupPhase.scanning => l10n.backupProgressScanning,
+    BackupPhase.checkingDatabase => l10n.backupProgressCheckingDatabase,
+    BackupPhase.saving => l10n.backupProgressSavingFile,
+    BackupPhase.choosingDestination => l10n.backupProgressChoosingDestination,
     BackupPhase.packing => l10n.backupProgressPacking,
     BackupPhase.verifying => l10n.backupProgressVerifying,
     BackupPhase.encrypting => l10n.backupProgressEncrypting,
@@ -362,24 +411,4 @@ String backupPhaseLabel(AppLocalizations l10n, BackupPhase phase) {
     BackupPhase.listingRemote => l10n.backupProgressListingRemote,
     BackupPhase.finalizing => l10n.backupProgressFinalizing,
   };
-}
-
-String? backupProgressSubtitle(AppLocalizations l10n, BackupProgress progress) {
-  final total = progress.total;
-  if (total == null) return null;
-  switch (progress.unit) {
-    case BackupProgressUnit.bytes:
-      return l10n.backupProgressBytes(
-        formatBytes(progress.processed),
-        formatBytes(total),
-      );
-    case BackupProgressUnit.items:
-      final format = NumberFormat.decimalPattern();
-      return l10n.backupProgressItems(
-        format.format(progress.processed),
-        format.format(total),
-      );
-    case BackupProgressUnit.none:
-      return null;
-  }
 }

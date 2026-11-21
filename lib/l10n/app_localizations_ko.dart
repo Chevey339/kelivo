@@ -1693,6 +1693,19 @@ class AppLocalizationsKo extends AppLocalizations {
       'iCloud Drive 또는 \'내 iPhone > Kelivo\' 외부의 폴더를 선택하세요. Kelivo 폴더의 파일은 앱과 함께 삭제됩니다. 백업이 저장되지 않았습니다.';
 
   @override
+  String get backupPageChooseNewFile => '백업을 저장할 새 파일 이름이나 다른 폴더를 선택하세요.';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return '백업 파일 “$name”이(가) 파일당 최대 크기 $limit을(를) 초과했습니다.';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return '압축 해제된 백업이 최대 크기 $limit을(를) 초과했습니다.';
+  }
+
+  @override
   String get backupPageFilesLabel => '파일 및 이미지';
 
   @override
@@ -1819,7 +1832,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get restoreProgressStageInstallingBackup => '백업 설치 중';
 
   @override
-  String get restoreProgressStageVerifying => '확인 중';
+  String get restoreProgressStageVerifying => '복원된 데이터 확인 중';
 
   @override
   String get restoreProgressStageRollingBack => '이전 데이터 복원 중';
@@ -2124,13 +2137,40 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupProgressPreparing => '준비 중';
 
   @override
+  String get backupProgressScanning => '백업 파일 스캔 중';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 파일 발견됨',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => '데이터베이스 확인 중';
+
+  @override
+  String get backupProgressChoosingDestination => '저장 위치 선택 중';
+
+  @override
+  String get backupProgressSavingFile => '백업 파일 저장 중';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return '경과 시간 $time';
+  }
+
+  @override
   String get backupProgressSnapshotting => '데이터베이스 스냅샷 생성 중';
 
   @override
   String get backupProgressPacking => '패키징 중';
 
   @override
-  String get backupProgressVerifying => '검증 중';
+  String get backupProgressVerifying => '백업 아카이브 확인 중';
 
   @override
   String get backupProgressUploading => '업로드 중';
@@ -2142,13 +2182,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get backupProgressExtracting => '압축 해제 중';
 
   @override
-  String get backupProgressValidating => '확인 중';
+  String get backupProgressValidating => '복원 파일 확인 중';
 
   @override
   String get backupProgressReadingSettings => '설정 읽는 중';
 
   @override
-  String get backupProgressStaging => '준비 중';
+  String get backupProgressStaging => '복원 파일 준비 중';
 
   @override
   String get backupProgressCommitting => '커밋 중';

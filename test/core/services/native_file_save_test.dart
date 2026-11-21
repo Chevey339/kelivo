@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:Kelivo/core/services/native_file_save.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -47,6 +49,47 @@ void main() {
       );
     });
   }
+
+  test(
+    'routes save progress and cancellation only to the active request',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final started = Completer<int>(),
+          stop = Completer<void>(),
+          replied = Completer<bool>();
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'cancelSave') {
+          expect(call.arguments, await started.future);
+          replied.complete(false);
+          return null;
+        }
+        started.complete(call.arguments['progressId'] as int);
+        return replied.future;
+      });
+      final updates = <(int, int)>[];
+      final saving = NativeFileSave.saveFileFromPath(
+        sourcePath: '/tmp/sample.zip',
+        onProgress: (done, total) => updates.add((done, total)),
+        whenCancelled: stop.future,
+      );
+      final id = await started.future;
+      Future<void> report(int key) => messenger.handlePlatformMessage(
+        channel.name,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('saveProgress', [key, 3, 10]),
+        ),
+        (_) {},
+      );
+      await report(id + 1);
+      await report(id);
+      stop.complete();
+      expect(await saving, isFalse);
+      await report(id);
+      expect(updates, [(3, 10)]);
+    },
+  );
 
   test('direct writer streams chunks and completes the destination', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

@@ -42,6 +42,8 @@ import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowContentResolver
 import org.robolectric.shadows.ShadowInstrumentation
 import java.io.File
+import java.io.FilterOutputStream
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -103,17 +105,27 @@ class FileSaveEngineHandoffTest {
         }
     }
 
-    private class DestinationProvider(private val file: File) : DocumentsProvider() {
+    private class DestinationProvider(
+        private val file: File,
+        private val reportedSize: Long? = null,
+        private val readable: Boolean = true,
+        private val beforeRead: () -> Unit = {},
+    ) : DocumentsProvider() {
         val deleted = CountDownLatch(1)
 
         override fun onCreate() = true
         override fun queryRoots(projection: Array<out String>?): Cursor = MatrixCursor(projection ?: emptyArray())
         override fun queryDocument(documentId: String, projection: Array<out String>?): Cursor =
-            MatrixCursor(projection ?: emptyArray())
+            MatrixCursor(projection ?: emptyArray()).apply {
+                addRow(columnNames.map { if (it == DocumentsContract.Document.COLUMN_SIZE) reportedSize else null })
+            }
         override fun queryChildDocuments(parentDocumentId: String, projection: Array<out String>?, sortOrder: String?): Cursor =
             MatrixCursor(projection ?: emptyArray())
-        override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor =
-            ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode))
+        override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
+            if (mode == "r" && !readable) throw java.io.FileNotFoundException("Read unavailable")
+            if (mode == "r") beforeRead()
+            return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode))
+        }
         override fun deleteDocument(documentId: String) {
             check(file.delete())
             deleted.countDown()
@@ -215,6 +227,96 @@ class FileSaveEngineHandoffTest {
         assertEquals("backup bytes", destination.readText())
     }
 
+    @Test fun backupExportPreservesExistingContentsBeforeOpeningTheOutput() {
+        val activity = createActivity().get()
+        val destination = File(activity.cacheDir, "existing-backup.zip").apply { writeText("previous backup") }
+        for ((reportedSize, readable) in listOf(destination.length() to true, 0L to true, null to true, 0L to false)) {
+            val uri = registerDestination(activity, DestinationProvider(destination, reportedSize, readable))
+            val (id, picker) = openSavePicker(activity, progressId = 30)
+            shadowOf(activity).receiveResult(picker, Activity.RESULT_OK, Intent().setData(uri))
+            assertEquals("backup_destination_needs_new_file", (awaitReply(id) as FlutterException).code)
+            assertEquals("previous backup", destination.readText())
+        }
+    }
+
+    @Test fun backupExportCanSaveToAnEmptyDocumentWithUnknownSize() {
+        val activity = createActivity().get()
+        val destination = File(activity.cacheDir, "new-backup.zip").apply { createNewFile() }
+        val uri = registerDestination(activity, DestinationProvider(destination))
+        val (id, picker) = openSavePicker(activity, progressId = 31)
+        shadowOf(activity).receiveResult(picker, Activity.RESULT_OK, Intent().setData(uri))
+        assertEquals(true, awaitReply(id))
+        assertEquals("backup bytes", destination.readText())
+    }
+
+    @Test fun cancellationReleasesAStalledReadProbeBeforeAnotherSaveStarts() {
+        val activity = createActivity().get()
+        val destination = File(activity.cacheDir, "slow-placeholder.zip").apply { createNewFile() }
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val probing = AtomicReference<Thread>()
+        val provider = DestinationProvider(destination, beforeRead = {
+            probing.set(Thread.currentThread())
+            entered.countDown()
+            check(release.await(10, TimeUnit.SECONDS))
+        })
+        val uri = registerDestination(activity, provider)
+        val (id, picker) = openSavePicker(activity, progressId = 34)
+        shadowOf(activity).receiveResult(picker, Activity.RESULT_OK, Intent().setData(uri))
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            callFile("cancelSave", 34)
+            assertEquals(false, awaitReply(id))
+            assertSavePickerWorks(activity)
+        } finally {
+            release.countDown()
+        }
+        probing.get().join(5_000)
+        assertFalse(probing.get().isAlive)
+        assertTrue(destination.isFile)
+        assertEquals(0L, destination.length())
+    }
+
+    @Test fun failedBackupKeepsTheOriginalEmptyDocumentAndItsGrant() {
+        val activity = createActivity().get()
+        val destination = File(activity.cacheDir, "placeholder.zip").apply { createNewFile() }
+        val uri = registerDestination(activity, DestinationProvider(destination))
+        val (id, picker) = openSavePicker(activity, progressId = 32)
+        File(activity.cacheDir, "backup.zip").delete()
+        shadowOf(activity).receiveResult(picker, Activity.RESULT_OK, Intent().setData(uri))
+        assertEquals("save_failed", (awaitReply(id) as FlutterException).code)
+        assertTrue(destination.isFile)
+
+        for (cancel in listOf(true, false)) {
+            val wrote = CountDownLatch(1)
+            val resume = CountDownLatch(1)
+            var firstOpen = true
+            shadowOf(activity.contentResolver).registerOutputStreamSupplier(uri) {
+                val output = destination.outputStream()
+                if (!firstOpen) output else {
+                    firstOpen = false
+                    object : FilterOutputStream(output) {
+                        override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                            out.write(bytes, offset, length)
+                            wrote.countDown()
+                            check(resume.await(5, TimeUnit.SECONDS))
+                            if (!cancel) throw IOException("Provider write failed")
+                        }
+                    }
+                }
+            }
+            val (copyId, copyPicker) = openSavePicker(activity, progressId = 33)
+            shadowOf(activity).receiveResult(copyPicker, Activity.RESULT_OK, Intent().setData(uri))
+            assertTrue(wrote.await(5, TimeUnit.SECONDS))
+            if (cancel) callFile("cancelSave", 33)
+            resume.countDown()
+            val reply = awaitReply(copyId)
+            if (cancel) assertEquals(false, reply) else assertEquals("save_failed", (reply as FlutterException).code)
+            assertTrue(destination.isFile)
+            assertEquals(0L, destination.length())
+        }
+    }
+
     @Test fun engineHandoffCancelsOldPickerWithoutBreakingTheNewOne() {
         val previous = createActivity()
         val (id, picker) = openSavePicker(previous.get())
@@ -283,16 +385,7 @@ class FileSaveEngineHandoffTest {
         val activity = previous.get()
         val destination = File(activity.cacheDir, "pending-backup.zip")
         val provider = DestinationProvider(destination)
-        val authority = "export.test"
-        provider.attachInfo(activity, ProviderInfo().apply {
-            this.authority = authority
-            exported = true
-            grantUriPermissions = true
-            readPermission = "android.permission.MANAGE_DOCUMENTS"
-            writePermission = "android.permission.MANAGE_DOCUMENTS"
-        })
-        ShadowContentResolver.registerProviderInternal(authority, provider)
-        val uri = DocumentsContract.buildDocumentUri(authority, "backup")
+        val uri = registerDestination(activity, provider)
         val opened = callFile("createWritableFile", mapOf("fileName" to "pending-backup.zip"))
         val picker = shadowOf(activity).nextStartedActivityForResult
         shadowOf(activity).receiveResult(picker.intent, Activity.RESULT_OK, Intent().setData(uri))
@@ -325,9 +418,22 @@ class FileSaveEngineHandoffTest {
         assertSavePickerWorks(replacement.get())
     }
 
-    private fun openSavePicker(activity: MainActivity): Pair<Int, Intent> {
+    private fun registerDestination(activity: MainActivity, provider: DestinationProvider): Uri {
+        val authority = "export.test"
+        provider.attachInfo(activity, ProviderInfo().apply {
+            this.authority = authority
+            exported = true
+            grantUriPermissions = true
+            readPermission = "android.permission.MANAGE_DOCUMENTS"
+            writePermission = "android.permission.MANAGE_DOCUMENTS"
+        })
+        ShadowContentResolver.registerProviderInternal(authority, provider)
+        return DocumentsContract.buildDocumentUri(authority, "backup")
+    }
+
+    private fun openSavePicker(activity: MainActivity, progressId: Int? = null): Pair<Int, Intent> {
         val source = File(activity.cacheDir, "backup.zip").apply { writeText("backup bytes") }
-        val id = callFile("saveFileFromPath", mapOf("sourcePath" to source.path, "fileName" to source.name))
+        val id = callFile("saveFileFromPath", mapOf("sourcePath" to source.path, "fileName" to source.name, "progressId" to progressId))
         assertFalse(
             "saveFileFromPath lost its native handler: ${native.replies[id]}",
             native.replies.containsKey(id),

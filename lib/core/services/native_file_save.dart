@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,15 @@ import 'package:flutter/services.dart';
 
 class NativeFileSave {
   static const MethodChannel _channel = MethodChannel('app.file_save');
+
+  static int _nextProgressId = 0;
+  static final _progress = <int, void Function(int, int)>{};
+
+  static Future<void> _receiveProgress(MethodCall call) async {
+    if (call.method != 'saveProgress') return;
+    final values = call.arguments as List;
+    _progress[values[0]]?.call(values[1] as int, values[2] as int);
+  }
 
   @visibleForTesting
   static bool debugForceAndroidForTest = false;
@@ -66,6 +76,8 @@ class NativeFileSave {
     String? fileName,
     bool requireOutsideAppContainer = false,
     String? dialogTitle,
+    void Function(int written, int total)? onProgress,
+    Future<void>? whenCancelled,
   }) async {
     if (kIsWeb ||
         (defaultTargetPlatform != TargetPlatform.android &&
@@ -75,15 +87,41 @@ class NativeFileSave {
       );
     }
 
-    final result = await _channel.invokeMethod<dynamic>('saveFileFromPath', {
-      'sourcePath': sourcePath,
-      if (fileName != null && fileName.isNotEmpty) 'fileName': fileName,
-      if (requireOutsideAppContainer &&
-          defaultTargetPlatform == TargetPlatform.iOS)
-        'requireOutsideAppContainer': true,
-      if (dialogTitle != null) 'dialogTitle': dialogTitle,
-    });
-    if (result is bool) return result;
-    return result == true;
+    final id = onProgress == null ? null : ++_nextProgressId;
+    if (id != null) {
+      _channel.setMethodCallHandler(_receiveProgress);
+      _progress[id] = onProgress!;
+      if (whenCancelled != null) {
+        unawaited(
+          whenCancelled.then((_) async {
+            if (!_progress.containsKey(id)) return;
+            try {
+              await _channel.invokeMethod<void>('cancelSave', id);
+            } on PlatformException {
+              // The original save call owns the result if its Activity detached.
+            } on MissingPluginException {
+              // The engine has already detached from the native picker.
+            }
+          }),
+        );
+      }
+    }
+    try {
+      return await _channel.invokeMethod<bool>('saveFileFromPath', {
+            'sourcePath': sourcePath,
+            if (fileName != null && fileName.isNotEmpty) 'fileName': fileName,
+            if (requireOutsideAppContainer &&
+                defaultTargetPlatform == TargetPlatform.iOS)
+              'requireOutsideAppContainer': true,
+            if (dialogTitle != null) 'dialogTitle': dialogTitle,
+            if (id != null) 'progressId': id,
+          }) ==
+          true;
+    } on PlatformException catch (error) {
+      if (id != null && error.code == 'cancelled') return false;
+      rethrow;
+    } finally {
+      if (id != null) _progress.remove(id);
+    }
   }
 }

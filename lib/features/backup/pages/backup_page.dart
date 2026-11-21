@@ -22,12 +22,9 @@ import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
-import '../../../core/services/backup/backup_task_progress.dart';
-import '../../../core/services/backup/data_sync.dart';
 import '../backup_task_runner.dart';
 import 'local_snapshots_page.dart';
 import '../widgets/backup_progress_dialog.dart';
-import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../core/services/backup/cherry_importer.dart';
@@ -1131,7 +1128,7 @@ class _BackupPageState extends State<BackupPage> {
             icon: Lucide.Export,
             label: l10n.backupPageExportToFile,
             subtitle: l10n.backupPageExportToFileSubtitle,
-            onTap: busy ? null : () => _doExport(context, vm),
+            onTap: busy ? null : () => runLocalFileBackup(context),
           ),
           _iosDivider(context),
           _iosNavRow(
@@ -1275,107 +1272,6 @@ class _BackupPageState extends State<BackupPage> {
           ' • Conversations: ${res.conversations}\n'
           ' • Messages: ${res.messages}',
     );
-  }
-
-  Future<void> _doExport(BuildContext context, BackupProvider vm) async {
-    final cfg = context.read<SettingsProvider>().webDavConfig;
-    final l10n = AppLocalizations.of(context)!;
-    File? file;
-    final ok = await runBackupTask(
-      context,
-      title: l10n.backupPageExportToFile,
-      errorMessage: (error) => l10n.backupPageExportFailedMessage(
-        backupRestoreErrorMessage(l10n, error),
-      ),
-      task: (handle) async {
-        file = await vm.exportToFile(
-          cfg,
-          password: await backupPasswordForExport(context),
-          onProgress: handle.report,
-          cancelToken: handle.cancelToken,
-        );
-      },
-    );
-    if (!ok || file == null) return;
-    final exported = file!;
-
-    try {
-      if (!context.mounted) return;
-      final isMobile = Platform.isAndroid || Platform.isIOS;
-      if (isMobile) {
-        try {
-          Future<bool> save() => NativeFileSave.saveFileFromPath(
-            sourcePath: exported.path,
-            fileName: exported.uri.pathSegments.last,
-            requireOutsideAppContainer: Platform.isIOS,
-            dialogTitle: l10n.backupPageChooseBackupFolder,
-          );
-          var saved = false;
-          if (Platform.isIOS) {
-            await runBackupTask(
-              context,
-              title: l10n.backupPageExportToFile,
-              task: (handle) async {
-                handle.report(
-                  const BackupProgress(
-                    phase: BackupPhase.finalizing,
-                    processed: 0,
-                    cancellable: false,
-                  ),
-                );
-                saved = await save();
-                if (!saved) throw const BackupCancelledException();
-              },
-            );
-          } else {
-            saved = await save();
-          }
-          if (saved && context.mounted) {
-            await context
-                .read<BackupReminderProvider>()
-                .recordBackupCompleted();
-          }
-        } catch (e) {
-          if (!context.mounted) return;
-          showAppSnackBar(
-            context,
-            message: backupRestoreErrorMessage(l10n, e),
-            type: NotificationType.error,
-          );
-        }
-      } else {
-        final savePath = await FilePicker.platform.saveFile(
-          dialogTitle: l10n.backupPageExportToFile,
-          fileName: exported.uri.pathSegments.last,
-          type: FileType.custom,
-          allowedExtensions: [
-            exported.path.endsWith('.kbackup') ? 'kbackup' : 'zip',
-          ],
-        );
-        if (savePath != null) {
-          try {
-            await File(savePath).parent.create(recursive: true);
-            await exported.copy(savePath);
-            if (context.mounted) {
-              await context
-                  .read<BackupReminderProvider>()
-                  .recordBackupCompleted();
-            }
-          } catch (e) {
-            // A full disk or unwritable target must not look like a
-            // successful export.
-            if (!context.mounted) return;
-            showAppSnackBar(
-              context,
-              message: e.toString(),
-              type: NotificationType.error,
-            );
-          }
-        }
-      }
-    } finally {
-      await DataSync.cleanupTemporaryBackupFile(file);
-    }
   }
 
   Future<void> _doImportLocal(BuildContext context, BackupProvider vm) async {

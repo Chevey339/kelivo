@@ -18,6 +18,8 @@ import '../../database/business_repository.dart';
 import '../../database/business_restore_service.dart';
 import '../../database/chat_database_repository.dart';
 import 'backup_cancel_token.dart';
+import 'backup_file_digest.dart';
+import 'backup_archive_limits.dart';
 import 'backup_isolate_runner.dart';
 import 'backup_settings_validator.dart';
 import 'backup_task_progress.dart';
@@ -28,6 +30,17 @@ import 'restore_workspace_lock.dart';
 
 typedef ValidatedRestoreEntry = ({int bytes, String sha256});
 typedef _StagedRestoreEntry = ValidatedRestoreEntry;
+typedef _PreparedDatabase = ({
+  ChatDatabaseSnapshotInfo info,
+  _StagedRestoreEntry entry,
+});
+typedef _StageFiles = ({
+  String source,
+  String candidate,
+  bool consumeExtractedFiles,
+  Set<String> roots,
+  Map<String, _StagedRestoreEntry> entries,
+});
 
 final class ValidatedRestoreCandidate {
   ValidatedRestoreCandidate({
@@ -49,7 +62,7 @@ final class ValidatedRestoreCandidate {
 }
 
 final class StagedRestoreBundle {
-  const StagedRestoreBundle({
+  const StagedRestoreBundle._({
     required this.runId,
     required this.workspace,
     required this.payloadDirectory,
@@ -87,10 +100,8 @@ final class RestoreBundleStaging {
     'sessions',
   ];
   static const _databaseEntry = 'database/kelivo.db';
-  static const _maximumManifestBytes = 16 * 1024 * 1024;
   // Settings contain structured preferences, never chat rows or binary assets.
   // Cap JSON before copying/parsing to bound UTF-8 and DOM amplification.
-  static const _maximumSettingsBytes = 1024 * 1024 * 1024;
 
   /// Test-only stall inside the candidate-db isolate (milliseconds).
   @visibleForTesting
@@ -117,9 +128,13 @@ final class RestoreBundleStaging {
   @visibleForTesting
   static Duration? debugIsolateTimeout;
 
+  /// [consumeExtractedFiles] transfers ownership of a disposable user-import
+  /// tree. Its sealed candidate is fully verified at startup before live data
+  /// moves. Reusable sources stay intact and get a full staged readback.
   static Future<StagedRestoreBundle> create({
     required Directory appDataDirectory,
     required Directory extractedDirectory,
+    bool consumeExtractedFiles = false,
     required bool includeChats,
     required bool includeFiles,
     BackupScope scope = const BackupScope(),
@@ -156,7 +171,6 @@ final class RestoreBundleStaging {
     final runId = allocation.runId;
     final workspace = allocation.workspace;
     final payloadDirectory = Directory(p.join(workspace.path, 'candidate'));
-    final stagedEntries = <String, _StagedRestoreEntry>{};
 
     try {
       _throwIfCancelled(cancelToken);
@@ -177,7 +191,7 @@ final class RestoreBundleStaging {
       );
       final sourceManifestBytes = await _readBoundedBytes(
         sourceManifestFile,
-        maximumBytes: _maximumManifestBytes,
+        maximumBytes: BackupArchiveLimits.manifestBytes,
         error: 'restore_staging_manifest',
         cancelToken: cancelToken,
       );
@@ -219,13 +233,40 @@ final class RestoreBundleStaging {
       final sourceSettingsFile = File(
         p.join(extractedDirectory.path, settingsEntry),
       );
-      _throwIfCancelled(cancelToken);
-      await _verifySourceDescriptor(
-        sourceSettingsFile,
-        settingsEntry,
-        declaredEntries[settingsEntry]!,
-        cancelToken: cancelToken,
+      final stagedEntries = {
+        for (final entry in declaredEntries.entries)
+          if (entry.key == _databaseEntry ||
+              selectedAssetRoots.contains(entry.key.split('/').first))
+            entry.key: entry.value,
+      };
+      final files = (
+        source: extractedDirectory.path,
+        consumeExtractedFiles: consumeExtractedFiles,
+        candidate: payloadDirectory.path,
+        roots: selectedAssetRoots,
+        entries: {
+          settingsEntry: declaredEntries[settingsEntry]!,
+          ...stagedEntries,
+        },
       );
+      // Platform durability owns native handles, so construct it on the worker.
+      // An explicitly injected durability object belongs to its caller.
+      if (durability == null || durability is RestorePlatformDurability) {
+        await runBackupIsolate<void, _StageFiles>(
+          body: _stageFilesInIsolate,
+          payload: files,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+        );
+      } else {
+        await _stageFiles(
+          files,
+          durability,
+          onProgress,
+          () => _throwIfCancelled(cancelToken),
+        );
+      }
+      _throwIfCancelled(cancelToken);
       final Map<String, dynamic> settings;
       if (validatedSettings != null) {
         settings = Map<String, dynamic>.from(validatedSettings);
@@ -242,28 +283,7 @@ final class RestoreBundleStaging {
       final stagedDatabaseFile = File(
         p.joinAll([payloadDirectory.path, ..._databaseEntry.split('/')]),
       );
-      _throwIfCancelled(cancelToken);
-      stagedEntries[_databaseEntry] = await _copyVerified(
-        File(
-          p.joinAll([extractedDirectory.path, ..._databaseEntry.split('/')]),
-        ),
-        stagedDatabaseFile,
-        _databaseEntry,
-        declaredEntries[_databaseEntry]!,
-        payloadDirectory,
-        resolvedDurability,
-        cancelToken: cancelToken,
-      );
-      onProgress?.call(
-        const BackupProgress(
-          phase: BackupPhase.stagingCandidate,
-          processed: 1,
-          cancellable: true,
-        ),
-      );
-      _throwIfCancelled(cancelToken);
-
-      final databaseInfo = await _replaceCandidateBusinessSettings(
+      final prepared = await _replaceCandidateBusinessSettings(
         databaseFile: stagedDatabaseFile,
         // Startup recovery must not open the missing or damaged live database.
         deviceDatabasePath: useExistingLocalAttachments
@@ -274,6 +294,7 @@ final class RestoreBundleStaging {
         entityRowIds: businessEntityRowIds,
         preserveExplicitEmptyInstructionList: businessEntityRowIds == null,
         expectedDatabaseInfo: declaredDatabaseInfo,
+        expectedEntry: stagedEntries[_databaseEntry]!,
         durability: resolvedDurability,
         recomputeAttachmentsUnavailable:
             !includeFiles || !scope.includes(BackupCategory.files),
@@ -287,56 +308,8 @@ final class RestoreBundleStaging {
         onProgress: onProgress,
         cancelToken: cancelToken,
       );
-      stagedEntries[_databaseEntry] = (
-        bytes: await stagedDatabaseFile.length(),
-        sha256: await _sha256(stagedDatabaseFile, cancelToken: cancelToken),
-      );
-      if (includeFiles) {
-        for (final rootName in selectedAssetRoots) {
-          await _ensureDurableDirectory(
-            directory: Directory(p.join(payloadDirectory.path, rootName)),
-            boundary: payloadDirectory,
-            durability: resolvedDurability,
-          );
-        }
-        final assetEntries = declaredEntries.keys.where(
-          (name) => selectedAssetRoots.any((root) => name.startsWith('$root/')),
-        );
-        var processed = 1;
-        for (final entryName in assetEntries) {
-          _throwIfCancelled(cancelToken);
-          stagedEntries[entryName] = await _copyVerified(
-            File(p.joinAll([extractedDirectory.path, ...entryName.split('/')])),
-            File(p.joinAll([payloadDirectory.path, ...entryName.split('/')])),
-            entryName,
-            declaredEntries[entryName]!,
-            payloadDirectory,
-            resolvedDurability,
-            cancelToken: cancelToken,
-          );
-          processed++;
-          onProgress?.call(
-            BackupProgress(
-              phase: BackupPhase.stagingCandidate,
-              processed: processed,
-              cancellable: true,
-            ),
-          );
-        }
-      }
-
-      final expectedEntryNames = <String>{
-        _databaseEntry,
-        if (includeFiles)
-          ...declaredEntries.keys.where(
-            (name) =>
-                selectedAssetRoots.any((root) => name.startsWith('$root/')),
-          ),
-      };
-      if (expectedEntryNames.length != stagedEntries.length ||
-          !expectedEntryNames.containsAll(stagedEntries.keys)) {
-        throw const FormatException('restore_staging_entries');
-      }
+      final databaseInfo = prepared.info;
+      stagedEntries[_databaseEntry] = prepared.entry;
       final sortedEntryNames = stagedEntries.keys.toList()..sort();
       manifest['formatVersion'] = _backupFormatVersion;
       manifest.remove('scope');
@@ -370,7 +343,7 @@ final class RestoreBundleStaging {
         p.join(payloadDirectory.path, 'manifest.json'),
       );
       final stagedManifestBytes = utf8.encode(jsonEncode(manifest));
-      if (stagedManifestBytes.length > _maximumManifestBytes) {
+      if (stagedManifestBytes.length > BackupArchiveLimits.manifestBytes) {
         throw const FormatException('restore_staging_manifest_size');
       }
       _throwIfCancelled(cancelToken);
@@ -382,7 +355,10 @@ final class RestoreBundleStaging {
         fullBarrier: true,
       );
       _throwIfCancelled(cancelToken);
-      final validated = await validateExistingCandidate(
+      final validated = await _checkCandidate(
+        // User imports just checked their content while extracting it. Check
+        // the staged inventory now; startup reopens every byte before cutover.
+        verifyContents: !consumeExtractedFiles,
         candidateDirectory: payloadDirectory,
         expectedManifestSha256: sha256.convert(stagedManifestBytes).toString(),
         cancelToken: cancelToken,
@@ -392,7 +368,7 @@ final class RestoreBundleStaging {
         throw const FormatException('restore_staging_candidate_selection');
       }
 
-      return StagedRestoreBundle(
+      return StagedRestoreBundle._(
         runId: runId,
         workspace: workspace,
         payloadDirectory: payloadDirectory,
@@ -427,11 +403,26 @@ final class RestoreBundleStaging {
     required String expectedManifestSha256,
     BackupCancelToken? cancelToken,
     BackupProgressSink? onProgress,
-  }) async {
+  }) => _checkCandidate(
+    candidateDirectory: candidateDirectory,
+    expectedManifestSha256: expectedManifestSha256,
+    verifyContents: true,
+    cancelToken: cancelToken,
+    onProgress: onProgress,
+  );
+
+  static Future<ValidatedRestoreCandidate> _checkCandidate({
+    required Directory candidateDirectory,
+    required String expectedManifestSha256,
+    required bool verifyContents,
+    BackupCancelToken? cancelToken,
+    BackupProgressSink? onProgress,
+  }) {
     return runBackupIsolate<ValidatedRestoreCandidate, _ValidateCandidateArgs>(
       body: _validateExistingCandidateInIsolate,
       payload: _ValidateCandidateArgs(
         candidatePath: candidateDirectory.path,
+        verifyContents: verifyContents,
         expectedManifestSha256: expectedManifestSha256,
         stallMs: debugCandidateValidateStallMs,
         hangSeconds: debugCandidateValidateHangSeconds,
@@ -462,7 +453,7 @@ final class RestoreBundleStaging {
     final manifestFile = File(p.join(candidateDirectory.path, 'manifest.json'));
     final manifestBytes = await _readBoundedBytes(
       manifestFile,
-      maximumBytes: _maximumManifestBytes,
+      maximumBytes: BackupArchiveLimits.manifestBytes,
       error: 'restore_staging_manifest_reopen',
     );
     final manifestSha256 = sha256.convert(manifestBytes).toString();
@@ -745,64 +736,125 @@ final class RestoreBundleStaging {
     }
   }
 
-  static Future<_StagedRestoreEntry> _copyVerified(
-    File source,
-    File target,
-    String entryName,
-    _StagedRestoreEntry expected,
-    Directory payloadDirectory,
-    RestoreDurability durability, {
-    BackupCancelToken? cancelToken,
-  }) async {
-    _throwIfCancelled(cancelToken);
-    final sourceDescriptor = await _verifySourceDescriptor(
-      source,
-      entryName,
-      expected,
-      cancelToken: cancelToken,
-    );
-    await _ensureDurableDirectory(
-      directory: target.parent,
-      boundary: payloadDirectory,
-      durability: durability,
-    );
-    if (await FileSystemEntity.type(target.path, followLinks: false) !=
-        FileSystemEntityType.notFound) {
-      throw StateError('restore_staging_target:$entryName');
-    }
-    await _copyChunked(source, target, cancelToken: cancelToken);
-    _throwIfCancelled(cancelToken);
-    await durability.restrictFile(target);
-    await durability.syncFile(target);
-    await durability.syncDirectory(target.parent);
-    _throwIfCancelled(cancelToken);
-    final targetBytes = await target.length();
-    final targetSha256 = await _sha256(target, cancelToken: cancelToken);
-    if (targetBytes != sourceDescriptor.bytes ||
-        targetSha256 != sourceDescriptor.sha256) {
-      throw StateError('restore_staging_copy:$entryName');
-    }
-    return (bytes: targetBytes, sha256: targetSha256);
-  }
+  static Future<void> _stageFilesInIsolate(
+    BackupIsolateContext ctx,
+    _StageFiles files,
+  ) => _stageFiles(
+    files,
+    RestorePlatformDurability(),
+    ctx.reportProgress,
+    ctx.throwIfCancelled,
+  );
 
-  static Future<_StagedRestoreEntry> _verifySourceDescriptor(
-    File source,
-    String entryName,
-    _StagedRestoreEntry expected, {
-    BackupCancelToken? cancelToken,
-  }) async {
-    if (await FileSystemEntity.type(source.path, followLinks: false) !=
-        FileSystemEntityType.file) {
-      throw FormatException('restore_staging_source:$entryName');
-    }
-    final actual = (
-      bytes: await source.length(),
-      sha256: await _sha256(source, cancelToken: cancelToken),
+  static Future<void> _stageFiles(
+    _StageFiles files,
+    RestoreDurability durability,
+    BackupProgressSink? onProgress,
+    void Function() checkCancelled,
+  ) async {
+    var canMove = files.consumeExtractedFiles;
+    var stagedFiles = 0;
+    void reportFileCount() => onProgress?.call(
+      BackupProgress(
+        phase: BackupPhase.stagingCandidate,
+        processed: stagedFiles,
+        total: files.entries.length,
+        unit: BackupProgressUnit.items,
+      ),
     );
-    if (actual != expected) {
-      throw FormatException('restore_staging_descriptor:$entryName');
+    final meter = BackupByteProgress(
+      phase: BackupPhase.stagingCandidate,
+      total: files.entries.values.fold<int>(0, (sum, e) => sum + e.bytes),
+      onProgress: (progress) {
+        if (!canMove) onProgress?.call(progress);
+      },
+      checkCancelled: checkCancelled,
+    )..report();
+    if (canMove) reportFileCount();
+    final candidate = Directory(files.candidate);
+    final directories = <String>{};
+    Future<void> ensureDirectory(Directory dir) async {
+      checkCancelled();
+      if (directories.add(dir.path)) {
+        await _ensureDurableDirectory(
+          directory: dir,
+          boundary: candidate,
+          durability: durability,
+        );
+      }
     }
-    return actual;
+
+    for (final root in files.roots) {
+      await ensureDirectory(Directory(p.join(files.candidate, root)));
+    }
+    final buffer = Uint8List(1024 * 1024);
+    for (final entry in files.entries.entries) {
+      checkCancelled();
+      final parts = entry.key.split('/');
+      final source = File(p.joinAll([files.source, ...parts]));
+      if (FileSystemEntity.typeSync(source.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        throw FormatException('restore_staging_source:${entry.key}');
+      }
+      if (source.lengthSync() != entry.value.bytes) {
+        throw FormatException('restore_staging_descriptor:${entry.key}');
+      }
+      // Business settings live in the candidate database, not in a second JSON file.
+      final target = entry.key == 'settings.json'
+          ? null
+          : File(p.joinAll([files.candidate, ...parts]));
+      if (target != null) {
+        await ensureDirectory(target.parent);
+        if (FileSystemEntity.typeSync(target.path, followLinks: false) !=
+            FileSystemEntityType.notFound) {
+          throw StateError('restore_staging_target:${entry.key}');
+        }
+      }
+      // Only the importer's disposable extraction tree may be consumed. A
+      // same-volume rename keeps the exact file; the candidate is independently
+      // verified before publication. A reusable source is always copied.
+      var moved = false;
+      if (canMove && target != null) {
+        try {
+          source.renameSync(target.path);
+          moved = true;
+        } on FileSystemException catch (error) {
+          if (error.osError?.errorCode != (Platform.isWindows ? 17 : 18)) {
+            rethrow;
+          }
+          canMove = false;
+          meter.report();
+        }
+      }
+      if (moved) {
+        meter.add(entry.value.bytes, detail: entry.key);
+      } else {
+        final actual = digestBackupFile(
+          source,
+          copyTo: target,
+          buffer: buffer,
+          checkCancelled: checkCancelled,
+          onBytes: (n) => meter.add(n, detail: entry.key),
+        );
+        if (actual != entry.value) {
+          throw FormatException('restore_staging_descriptor:${entry.key}');
+        }
+      }
+      if (target != null) {
+        await durability.restrictFile(target);
+        await durability.syncFile(target);
+      }
+      if (canMove) {
+        stagedFiles++;
+        reportFileCount();
+      }
+    }
+    // The unpublished workspace can be discarded after a crash. Flush each
+    // populated directory once before any candidate can be published.
+    for (final path in directories) {
+      checkCancelled();
+      await durability.syncDirectory(Directory(path));
+    }
   }
 
   static Future<void> _ensureDurableDirectory({
@@ -858,7 +910,7 @@ final class RestoreBundleStaging {
     final settingsBytes = entries['settings.json']?.bytes;
     if (settingsBytes == null ||
         settingsBytes <= 0 ||
-        settingsBytes > _maximumSettingsBytes ||
+        settingsBytes > BackupArchiveLimits.settingsBytes ||
         hasDatabase != includeChats ||
         (!includeFiles && hasAssets)) {
       throw const FormatException('restore_staging_entries');
@@ -941,7 +993,7 @@ final class RestoreBundleStaging {
       throw const FormatException('restore_staging_settings');
     }
     final length = file.lengthSync();
-    if (length <= 0 || length > _maximumSettingsBytes) {
+    if (length <= 0 || length > BackupArchiveLimits.settingsBytes) {
       throw const FormatException('restore_staging_settings');
     }
     final decoded = jsonDecode(file.readAsStringSync());
@@ -954,7 +1006,7 @@ final class RestoreBundleStaging {
     return settings;
   }
 
-  static Future<ChatDatabaseSnapshotInfo> _replaceCandidateBusinessSettings({
+  static Future<_PreparedDatabase> _replaceCandidateBusinessSettings({
     required File databaseFile,
     required String? deviceDatabasePath,
     required Map<String, dynamic> settings,
@@ -962,6 +1014,7 @@ final class RestoreBundleStaging {
     required Map<String, Object?>? entityRowIds,
     required bool preserveExplicitEmptyInstructionList,
     required ChatDatabaseSnapshotInfo expectedDatabaseInfo,
+    required _StagedRestoreEntry expectedEntry,
     required RestoreDurability durability,
     required bool recomputeAttachmentsUnavailable,
     String? localSnapshotAppDataPath,
@@ -969,10 +1022,7 @@ final class RestoreBundleStaging {
     BackupCancelToken? cancelToken,
   }) async {
     final databaseInfo =
-        await runBackupIsolate<
-          ChatDatabaseSnapshotInfo,
-          _CandidateDbIsolateArgs
-        >(
+        await runBackupIsolate<_PreparedDatabase, _CandidateDbIsolateArgs>(
           body: _prepareCandidateDatabaseInIsolate,
           payload: _CandidateDbIsolateArgs(
             databasePath: databaseFile.path,
@@ -983,6 +1033,7 @@ final class RestoreBundleStaging {
             preserveExplicitEmptyInstructionList:
                 preserveExplicitEmptyInstructionList,
             expectedDatabaseInfo: expectedDatabaseInfo,
+            expectedEntry: expectedEntry,
             recomputeAttachmentsUnavailable: recomputeAttachmentsUnavailable,
             localSnapshotAppDataPath: localSnapshotAppDataPath,
             stallMs: debugCandidateDbStallMs,
@@ -1006,8 +1057,10 @@ final class RestoreBundleStaging {
     _ValidateCandidateArgs args,
   ) async {
     ctx.reportProgress(
-      const BackupProgress(
-        phase: BackupPhase.validating,
+      BackupProgress(
+        phase: args.verifyContents
+            ? BackupPhase.checkingDatabase
+            : BackupPhase.validating,
         processed: 0,
         cancellable: true,
         detail: 'candidate-revalidate',
@@ -1029,7 +1082,7 @@ final class RestoreBundleStaging {
       expectedManifestSha256: args.expectedManifestSha256,
     );
     ctx.throwIfCancelled();
-    if (candidate.includeChats) {
+    if (args.verifyContents && candidate.includeChats) {
       final actual = await ChatDatabaseRepository.inspectPreparedSnapshot(
         File(
           p.joinAll([candidateDirectory.path, ..._databaseEntry.split('/')]),
@@ -1041,25 +1094,29 @@ final class RestoreBundleStaging {
     }
     ctx.throwIfCancelled();
     await _validateCandidateTopology(
+      ctx,
       candidateDirectory,
       expectedFiles: {...candidate.entries.keys, 'manifest.json'},
+      checkSizes: args.verifyContents ? null : candidate.entries,
       includeChats: candidate.includeChats,
       assetRoots: candidate.assetRoots,
     );
     ctx.throwIfCancelled();
-    await _validateCandidateEntries(candidateDirectory, candidate.entries);
+    if (args.verifyContents) {
+      _validateCandidateEntries(ctx, candidateDirectory, candidate.entries);
+    }
     ctx.throwIfCancelled();
     return candidate;
   }
 
-  static Future<ChatDatabaseSnapshotInfo> _prepareCandidateDatabaseInIsolate(
+  static Future<_PreparedDatabase> _prepareCandidateDatabaseInIsolate(
     BackupIsolateContext ctx,
     _CandidateDbIsolateArgs args,
   ) async {
     ctx.reportProgress(
       const BackupProgress(
-        phase: BackupPhase.stagingCandidate,
-        processed: 1,
+        phase: BackupPhase.checkingDatabase,
+        processed: 0,
         cancellable: true,
         detail: 'candidate-db',
       ),
@@ -1075,6 +1132,17 @@ final class RestoreBundleStaging {
       }
     }
     final databaseFile = File(args.databasePath);
+    if (_databaseDigest(ctx, databaseFile) != args.expectedEntry) {
+      throw StateError('restore_staging_copy:$_databaseEntry');
+    }
+    ctx.reportProgress(
+      const BackupProgress(
+        phase: BackupPhase.checkingDatabase,
+        processed: 0,
+        detail: 'candidate-db',
+      ),
+    );
+
     // A backup authored by an older build carries an older schema. Bring the
     // staged copy forward first: everything below — the snapshot validators,
     // the business overwrite, the candidate manifest — only ever describes the
@@ -1159,7 +1227,7 @@ final class RestoreBundleStaging {
       );
     }
     ctx.throwIfCancelled();
-    return databaseInfo;
+    return (info: databaseInfo, entry: _databaseDigest(ctx, databaseFile));
   }
 
   static Map<String, Object?>? _parseBusinessEntityRowIds(
@@ -1244,11 +1312,24 @@ final class RestoreBundleStaging {
   }
 
   static Future<void> _validateCandidateTopology(
+    BackupIsolateContext ctx,
     Directory candidate, {
     required Set<String> expectedFiles,
+    required Map<String, _StagedRestoreEntry>? checkSizes,
     required bool includeChats,
     required Set<String> assetRoots,
   }) async {
+    void report(int count) => ctx.reportProgress(
+      BackupProgress(
+        phase: checkSizes == null
+            ? BackupPhase.scanning
+            : BackupPhase.validating,
+        processed: count,
+        total: expectedFiles.length,
+        unit: BackupProgressUnit.items,
+      ),
+    );
+    report(0);
     final actualFiles = <String>{};
     final actualDirectories = <String>{};
     final expectedDirectories = <String>{};
@@ -1263,7 +1344,8 @@ final class RestoreBundleStaging {
       recursive: true,
       followLinks: false,
     )) {
-      final type = await FileSystemEntity.type(entity.path, followLinks: false);
+      ctx.throwIfCancelled();
+      final type = FileSystemEntity.typeSync(entity.path, followLinks: false);
       final relativePath = p
           .relative(entity.path, from: candidate.path)
           .replaceAll('\\', '/');
@@ -1286,7 +1368,13 @@ final class RestoreBundleStaging {
           'entry type': '$type',
         });
       }
+      final descriptor = checkSizes?[relativePath];
+      if (descriptor != null &&
+          File(entity.path).lengthSync() != descriptor.bytes) {
+        throw FormatException('restore_staging_candidate:$relativePath');
+      }
       actualFiles.add(relativePath);
+      report(actualFiles.length);
     }
     if (actualFiles.length != expectedFiles.length ||
         !actualFiles.containsAll(expectedFiles)) {
@@ -1328,18 +1416,48 @@ final class RestoreBundleStaging {
     };
   }
 
-  static Future<void> _validateCandidateEntries(
+  static _StagedRestoreEntry _databaseDigest(
+    BackupIsolateContext ctx,
+    File file,
+  ) {
+    final meter = BackupByteProgress(
+      phase: BackupPhase.validating,
+      total: file.lengthSync(),
+      onProgress: ctx.reportProgress,
+      checkCancelled: ctx.throwIfCancelled,
+    )..report();
+    return digestBackupFile(
+      file,
+      checkCancelled: ctx.throwIfCancelled,
+      onBytes: (n) => meter.add(n, detail: _databaseEntry),
+    );
+  }
+
+  static void _validateCandidateEntries(
+    BackupIsolateContext ctx,
     Directory candidate,
-    Map<String, _StagedRestoreEntry> expectedEntries, {
-    BackupCancelToken? cancelToken,
-  }) async {
+    Map<String, _StagedRestoreEntry> expectedEntries,
+  ) {
+    final meter = BackupByteProgress(
+      phase: BackupPhase.validating,
+      total: expectedEntries.values.fold<int>(0, (sum, e) => sum + e.bytes),
+      onProgress: ctx.reportProgress,
+      checkCancelled: ctx.throwIfCancelled,
+    )..report();
+    final buffer = Uint8List(1024 * 1024);
     for (final entry in expectedEntries.entries) {
-      _throwIfCancelled(cancelToken);
+      ctx.throwIfCancelled();
       final file = File(p.joinAll([candidate.path, ...entry.key.split('/')]));
-      if (await FileSystemEntity.type(file.path, followLinks: false) !=
+      if (FileSystemEntity.typeSync(file.path, followLinks: false) !=
               FileSystemEntityType.file ||
-          await file.length() != entry.value.bytes ||
-          await _sha256(file, cancelToken: cancelToken) != entry.value.sha256) {
+          file.lengthSync() != entry.value.bytes ||
+          digestBackupFile(
+                file,
+                buffer: buffer,
+                checkCancelled: ctx.throwIfCancelled,
+                onBytes: (n) => meter.add(n, detail: entry.key),
+              ) !=
+              entry.value) {
         throw FormatException('restore_staging_candidate:${entry.key}');
       }
     }
@@ -1349,56 +1467,10 @@ final class RestoreBundleStaging {
   static Future<String> debugSha256(
     File file, {
     BackupCancelToken? cancelToken,
-  }) {
-    return _sha256(file, cancelToken: cancelToken);
-  }
-
-  static Future<void> _copyChunked(
-    File source,
-    File target, {
-    BackupCancelToken? cancelToken,
-  }) async {
-    final input = await source.open();
-    final output = await target.open(mode: FileMode.writeOnly);
-    final buffer = Uint8List(64 * 1024);
-    try {
-      while (true) {
-        _throwIfCancelled(cancelToken);
-        final n = await input.readInto(buffer);
-        if (n == 0) break;
-        await output.writeFrom(buffer, 0, n);
-      }
-    } finally {
-      await input.close();
-      await output.close();
-    }
-  }
-
-  static Future<String> _sha256(
-    File file, {
-    BackupCancelToken? cancelToken,
-  }) async {
-    final digestSink = _Sha256DigestSink();
-    final hashSink = sha256.startChunkedConversion(digestSink);
-    final handle = await file.open();
-    final buffer = Uint8List(64 * 1024);
-    try {
-      while (true) {
-        _throwIfCancelled(cancelToken);
-        final n = await handle.readInto(buffer);
-        if (n == 0) break;
-        hashSink.add(Uint8List.sublistView(buffer, 0, n));
-      }
-      hashSink.close();
-    } finally {
-      await handle.close();
-    }
-    final digest = digestSink.digest;
-    if (digest == null) {
-      throw StateError('sha256');
-    }
-    return digest.toString();
-  }
+  }) async => digestBackupFile(
+    file,
+    checkCancelled: cancelToken?.throwIfCancelled,
+  ).sha256;
 
   static bool _isCanonicalEntryName(String name) {
     if (name.isEmpty ||
@@ -1459,12 +1531,14 @@ final class RestoreBundleStaging {
 final class _ValidateCandidateArgs {
   const _ValidateCandidateArgs({
     required this.candidatePath,
+    required this.verifyContents,
     required this.expectedManifestSha256,
     required this.stallMs,
     required this.hangSeconds,
   });
 
   final String candidatePath;
+  final bool verifyContents;
   final String expectedManifestSha256;
   final int stallMs;
   final int hangSeconds;
@@ -1479,6 +1553,7 @@ final class _CandidateDbIsolateArgs {
     required this.entityRowIds,
     required this.preserveExplicitEmptyInstructionList,
     required this.expectedDatabaseInfo,
+    required this.expectedEntry,
     required this.recomputeAttachmentsUnavailable,
     required this.localSnapshotAppDataPath,
     required this.stallMs,
@@ -1492,20 +1567,9 @@ final class _CandidateDbIsolateArgs {
   final Map<String, Object?>? entityRowIds;
   final bool preserveExplicitEmptyInstructionList;
   final ChatDatabaseSnapshotInfo expectedDatabaseInfo;
+  final _StagedRestoreEntry expectedEntry;
   final bool recomputeAttachmentsUnavailable;
   final String? localSnapshotAppDataPath;
   final int stallMs;
   final int hangSeconds;
-}
-
-class _Sha256DigestSink implements Sink<Digest> {
-  Digest? digest;
-
-  @override
-  void add(Digest data) {
-    digest = data;
-  }
-
-  @override
-  void close() {}
 }

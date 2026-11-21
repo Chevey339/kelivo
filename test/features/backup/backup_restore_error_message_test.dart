@@ -105,5 +105,23 @@ void main() {
       ),
       AppLocalizations.of(context)!.backupPageChooseExternalFolder,
     );
+    expect(
+      backupRestoreErrorMessage(
+        l10n,
+        PlatformException(code: 'backup_destination_needs_new_file'),
+      ),
+      l10n.backupPageChooseNewFile,
+    );
+    expect(
+      backupRestoreErrorMessage(
+        l10n,
+        const FormatException('zip_entry_size:upload/movie.mp4'),
+      ),
+      l10n.backupArchiveFileSizeLimit('upload/movie.mp4', '8.00 GB'),
+    );
+    expect(
+      backupRestoreErrorMessage(l10n, const FormatException('zip_total_size')),
+      l10n.backupArchiveTotalSizeLimit('16.00 GB'),
+    );
   });
 }

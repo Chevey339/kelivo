@@ -1,9 +1,11 @@
 import 'package:flutter/services.dart';
+import '../../core/services/backup/backup_archive_limits.dart';
 import '../../core/services/backup/backup_folder_access.dart';
 import '../../core/services/backup/backup_secure_password_store.dart';
 import '../../core/providers/external_backup_auto_provider.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../shared/utils/format_bytes.dart';
 import '../../core/services/backup/backup_cancel_token.dart';
 import '../../core/services/backup/backup_encryption.dart';
 import '../../core/services/backup/chatbox_backup_archive.dart';
@@ -68,6 +70,10 @@ String backupRestoreErrorMessage(AppLocalizations localizations, Object error) {
       error.code == 'backup_destination_inside_app') {
     return localizations.backupPageChooseExternalFolder;
   }
+  if (error is PlatformException &&
+      error.code == 'backup_destination_needs_new_file') {
+    return localizations.backupPageChooseNewFile;
+  }
   if (error is BackupCancelledException) {
     return localizations.backupProgressCancelled;
   }
@@ -75,7 +81,18 @@ String backupRestoreErrorMessage(AppLocalizations localizations, Object error) {
     return localizations.backupEncryptionFailed;
   }
   if (error is FormatException) {
+    const entrySizePrefix = 'zip_entry_size:';
+    if (error.message.startsWith(entrySizePrefix)) {
+      return localizations.backupArchiveFileSizeLimit(
+        error.message.substring(entrySizePrefix.length),
+        formatBytes(BackupArchiveLimits.entryBytes),
+      );
+    }
     switch (error.message) {
+      case 'zip_total_size':
+        return localizations.backupArchiveTotalSizeLimit(
+          formatBytes(BackupArchiveLimits.totalBytes),
+        );
       case 'backup_encryption_version':
         return localizations.backupEncryptionUnsupported;
       case 'backup_password_required':

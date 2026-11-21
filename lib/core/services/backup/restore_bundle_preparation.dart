@@ -44,6 +44,7 @@ final class RestoreBundlePreparation {
   static Future<PreparedRestoreBundle> prepare({
     required Directory appDataDirectory,
     required Directory extractedDirectory,
+    bool consumeExtractedFiles = false,
     required String sourceManifestSha256,
     required bool bundleIncludesChats,
     required bool bundleIncludesFiles,
@@ -81,6 +82,7 @@ final class RestoreBundlePreparation {
       staged = await RestoreBundleStaging.create(
         appDataDirectory: appDataDirectory,
         extractedDirectory: extractedDirectory,
+        consumeExtractedFiles: consumeExtractedFiles,
         includeChats: selectedChats,
         includeFiles: selectedFiles,
         scope: scope,
@@ -118,7 +120,7 @@ final class RestoreBundlePreparation {
       );
       await beforePublish?.call();
       publicationStarted = true;
-      await store.publish(receipt);
+      await store.publish(receipt, staged: staged);
       final published = await store.readLatest();
       if (published == null || published.checksum != receipt.checksum) {
         throw StateError('restore_preparation_receipt');

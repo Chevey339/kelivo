@@ -1,6 +1,17 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
+import '../../core/providers/backup_provider.dart';
+import '../../core/providers/backup_reminder_provider.dart';
+import '../../core/providers/settings_provider.dart';
+import '../../core/services/backup/backup_cancel_token.dart';
+import '../../core/services/backup/backup_file_export.dart';
+import '../../core/services/backup/backup_task_progress.dart';
+import '../../core/services/backup/data_sync.dart';
+import '../../core/services/native_file_save.dart';
 import '../../core/providers/external_backup_auto_provider.dart';
 import '../../core/services/backup/backup_activity.dart';
 import '../../l10n/app_localizations.dart';
@@ -72,6 +83,88 @@ Future<bool> runBackupTask(
     await onSuccess();
   }
   return true;
+}
+
+Future<void> runLocalFileBackup(BuildContext context) async {
+  final l10n = AppLocalizations.of(context)!;
+  final backup = context.read<BackupProvider>();
+  final reminder = context.read<BackupReminderProvider>();
+  final config = context.read<SettingsProvider>().webDavConfig;
+  await runBackupTask(
+    context,
+    title: l10n.backupPageExportToFile,
+    errorMessage: (error) => l10n.backupPageExportFailedMessage(
+      backupRestoreErrorMessage(l10n, error),
+    ),
+    task: (handle) async {
+      final file = await backup.exportToFile(
+        config,
+        password: await backupPasswordForExport(context),
+        onProgress: handle.report,
+        cancelToken: handle.cancelToken,
+      );
+      await DataSync.completeLocalFileExport(
+        exported: file,
+        persist: (file) async {
+          handle.cancelToken.throwIfCancelled();
+          handle.report(
+            const BackupProgress(
+              phase: BackupPhase.choosingDestination,
+              processed: 0,
+            ),
+          );
+          final name = file.uri.pathSegments.last;
+          if (Platform.isAndroid || Platform.isIOS) {
+            final saved = await NativeFileSave.saveFileFromPath(
+              sourcePath: file.path,
+              fileName: name,
+              requireOutsideAppContainer: Platform.isIOS,
+              dialogTitle: l10n.backupPageChooseBackupFolder,
+              whenCancelled: handle.cancelToken.whenCancelled,
+              onProgress: (written, total) {
+                if (written == total) {
+                  handle.report(
+                    const BackupProgress(
+                      phase: BackupPhase.finalizing,
+                      processed: 0,
+                      cancellable: false,
+                    ),
+                  );
+                } else {
+                  handle.report(
+                    BackupProgress(
+                      phase: BackupPhase.saving,
+                      processed: written,
+                      total: total,
+                      unit: BackupProgressUnit.bytes,
+                    ),
+                  );
+                }
+              },
+            );
+            if (!saved) throw const BackupCancelledException();
+          } else {
+            final path = await FilePicker.platform.saveFile(
+              dialogTitle: l10n.backupPageExportToFile,
+              fileName: name,
+              type: FileType.custom,
+              allowedExtensions: [
+                name.endsWith('.kbackup') ? 'kbackup' : 'zip',
+              ],
+            );
+            if (path == null) throw const BackupCancelledException();
+            await saveBackupToPath(
+              file,
+              path,
+              cancelToken: handle.cancelToken,
+              onProgress: handle.report,
+            );
+          }
+          await reminder.recordBackupCompleted();
+        },
+      );
+    },
+  );
 }
 
 Future<void> runExternalBackup(

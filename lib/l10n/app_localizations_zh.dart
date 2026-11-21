@@ -1653,6 +1653,19 @@ class AppLocalizationsZh extends AppLocalizations {
       '请选择 iCloud 云盘或“我的 iPhone > Kelivo”之外的文件夹。Kelivo 文件夹会随 App 卸载而删除，本次备份尚未保存。';
 
   @override
+  String get backupPageChooseNewFile => '请使用新的文件名或选择其他文件夹保存备份。';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return '「$name」超过了备份单个文件 $limit 的大小上限。';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return '备份的未压缩大小超过了 $limit 的上限。';
+  }
+
+  @override
   String get backupPageFilesLabel => '文件与图片';
 
   @override
@@ -1775,7 +1788,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get restoreProgressStageInstallingBackup => '正在写入备份';
 
   @override
-  String get restoreProgressStageVerifying => '正在验证';
+  String get restoreProgressStageVerifying => '正在核对已恢复的数据';
 
   @override
   String get restoreProgressStageRollingBack => '正在恢复原有数据';
@@ -2075,13 +2088,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupProgressPreparing => '准备中';
 
   @override
+  String get backupProgressScanning => '正在扫描备份文件';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    return '已发现 $count 个文件';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => '正在检查数据库';
+
+  @override
+  String get backupProgressChoosingDestination => '正在选择保存位置';
+
+  @override
+  String get backupProgressSavingFile => '正在保存备份文件';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return '已用时 $time';
+  }
+
+  @override
   String get backupProgressSnapshotting => '正在创建数据库快照';
 
   @override
   String get backupProgressPacking => '正在打包';
 
   @override
-  String get backupProgressVerifying => '正在校验';
+  String get backupProgressVerifying => '正在检查备份包';
 
   @override
   String get backupProgressUploading => '正在上传';
@@ -2093,13 +2128,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupProgressExtracting => '正在解压';
 
   @override
-  String get backupProgressValidating => '正在验证';
+  String get backupProgressValidating => '正在核对恢复文件';
 
   @override
   String get backupProgressReadingSettings => '正在读取设置';
 
   @override
-  String get backupProgressStaging => '正在暂存';
+  String get backupProgressStaging => '正在准备恢复文件';
 
   @override
   String get backupProgressCommitting => '正在提交';
@@ -18285,6 +18320,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '请选择 iCloud 云盘或“我的 iPhone > Kelivo”之外的文件夹。Kelivo 文件夹会随 App 卸载而删除，本次备份尚未保存。';
 
   @override
+  String get backupPageChooseNewFile => '请使用新的文件名或选择其他文件夹保存备份。';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return '「$name」超过了备份单个文件 $limit 的大小上限。';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return '备份的未压缩大小超过了 $limit 的上限。';
+  }
+
+  @override
   String get backupPageFilesLabel => '文件与图片';
 
   @override
@@ -18407,7 +18455,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get restoreProgressStageInstallingBackup => '正在写入备份';
 
   @override
-  String get restoreProgressStageVerifying => '正在验证';
+  String get restoreProgressStageVerifying => '正在核对已恢复的数据';
 
   @override
   String get restoreProgressStageRollingBack => '正在恢复原有数据';
@@ -18707,13 +18755,35 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupProgressPreparing => '准备中';
 
   @override
+  String get backupProgressScanning => '正在扫描备份文件';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    return '已发现 $count 个文件';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => '正在检查数据库';
+
+  @override
+  String get backupProgressChoosingDestination => '正在选择保存位置';
+
+  @override
+  String get backupProgressSavingFile => '正在保存备份文件';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return '已用时 $time';
+  }
+
+  @override
   String get backupProgressSnapshotting => '正在创建数据库快照';
 
   @override
   String get backupProgressPacking => '正在打包';
 
   @override
-  String get backupProgressVerifying => '正在校验';
+  String get backupProgressVerifying => '正在检查备份包';
 
   @override
   String get backupProgressUploading => '正在上传';
@@ -18725,13 +18795,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupProgressExtracting => '正在解压';
 
   @override
-  String get backupProgressValidating => '正在验证';
+  String get backupProgressValidating => '正在核对恢复文件';
 
   @override
   String get backupProgressReadingSettings => '正在读取设置';
 
   @override
-  String get backupProgressStaging => '正在暂存';
+  String get backupProgressStaging => '正在准备恢复文件';
 
   @override
   String get backupProgressCommitting => '正在提交';
@@ -34922,6 +34992,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '請選擇 iCloud 雲碟或「我的 iPhone > Kelivo」以外的資料夾。Kelivo 資料夾會隨 App 解除安裝而刪除，本次備份尚未儲存。';
 
   @override
+  String get backupPageChooseNewFile => '請選擇新的檔案名稱或其他資料夾來儲存備份。';
+
+  @override
+  String backupArchiveFileSizeLimit(String name, String limit) {
+    return '備份檔案「$name」超過單一檔案 $limit 的大小上限。';
+  }
+
+  @override
+  String backupArchiveTotalSizeLimit(String limit) {
+    return '備份的未壓縮大小超過 $limit 的上限。';
+  }
+
+  @override
   String get backupPageFilesLabel => '檔案與圖片';
 
   @override
@@ -35045,7 +35128,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get restoreProgressStageInstallingBackup => '正在寫入備份';
 
   @override
-  String get restoreProgressStageVerifying => '正在驗證';
+  String get restoreProgressStageVerifying => '正在核對已還原的資料';
 
   @override
   String get restoreProgressStageRollingBack => '正在還原原有資料';
@@ -35345,13 +35428,40 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupProgressPreparing => '準備中';
 
   @override
+  String get backupProgressScanning => '正在掃描備份檔案';
+
+  @override
+  String backupProgressDiscoveredFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已發現 $count 個檔案',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupProgressCheckingDatabase => '正在檢查資料庫';
+
+  @override
+  String get backupProgressChoosingDestination => '正在選擇儲存位置';
+
+  @override
+  String get backupProgressSavingFile => '正在儲存備份檔案';
+
+  @override
+  String backupProgressElapsed(String time) {
+    return '已用時 $time';
+  }
+
+  @override
   String get backupProgressSnapshotting => '正在建立資料庫快照';
 
   @override
   String get backupProgressPacking => '正在打包';
 
   @override
-  String get backupProgressVerifying => '正在校驗';
+  String get backupProgressVerifying => '正在檢查備份封存檔';
 
   @override
   String get backupProgressUploading => '正在上傳';
@@ -35363,13 +35473,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupProgressExtracting => '正在解壓';
 
   @override
-  String get backupProgressValidating => '正在驗證';
+  String get backupProgressValidating => '正在核對還原檔案';
 
   @override
   String get backupProgressReadingSettings => '正在讀取設定';
 
   @override
-  String get backupProgressStaging => '正在暫存';
+  String get backupProgressStaging => '正在準備還原檔案';
 
   @override
   String get backupProgressCommitting => '正在提交';

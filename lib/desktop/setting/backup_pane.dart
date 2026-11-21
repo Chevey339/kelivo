@@ -23,7 +23,6 @@ import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
 import '../../core/services/backup/import_toolbox.dart';
-import '../../core/services/backup/data_sync.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../features/backup/backup_restore_error_message.dart';
@@ -718,71 +717,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 label: l10n.backupPageExportToFile,
                 filled: false,
                 dense: true,
-                onTap: busy
-                    ? null
-                    : () async {
-                        final backupProvider = context.read<BackupProvider>();
-                        final cfg = context
-                            .read<SettingsProvider>()
-                            .webDavConfig;
-                        File? file;
-                        try {
-                          final ok = await runBackupTask(
-                            context,
-                            title: l10n.backupPageExportToFile,
-                            errorMessage: (error) =>
-                                l10n.backupPageExportFailedMessage(
-                                  backupRestoreErrorMessage(l10n, error),
-                                ),
-                            task: (handle) async {
-                              file = await backupProvider.exportToFile(
-                                cfg,
-                                password: await backupPasswordForExport(
-                                  context,
-                                ),
-                                onProgress: handle.report,
-                                cancelToken: handle.cancelToken,
-                              );
-                            },
-                          );
-                          if (!ok || file == null) return;
-                          final exported = file!;
-                          String? savePath = await FilePicker.platform.saveFile(
-                            dialogTitle: l10n.backupPageExportToFile,
-                            fileName: exported.uri.pathSegments.last,
-                            type: FileType.custom,
-                            allowedExtensions: [
-                              exported.path.endsWith('.kbackup')
-                                  ? 'kbackup'
-                                  : 'zip',
-                            ],
-                          );
-                          if (savePath != null) {
-                            try {
-                              await File(
-                                savePath,
-                              ).parent.create(recursive: true);
-                              await exported.copy(savePath);
-                              if (context.mounted) {
-                                await context
-                                    .read<BackupReminderProvider>()
-                                    .recordBackupCompleted();
-                              }
-                            } catch (e) {
-                              // A full disk or unwritable target must not look like
-                              // a successful export.
-                              if (!context.mounted) return;
-                              showAppSnackBar(
-                                context,
-                                message: e.toString(),
-                                type: NotificationType.error,
-                              );
-                            }
-                          }
-                        } finally {
-                          await DataSync.cleanupTemporaryBackupFile(file);
-                        }
-                      },
+                onTap: busy ? null : () => runLocalFileBackup(context),
               ),
               _DeskIosButton(
                 label: l10n.backupPageImportBackupFile,
