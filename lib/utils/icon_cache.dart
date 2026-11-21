@@ -12,6 +12,7 @@ import 'package:uuid/uuid.dart';
 import 'package:xml/xml.dart';
 
 import 'app_directories.dart';
+import 'avatar_cache.dart';
 
 typedef _IconRequest = ({String source, bool allowCrossOriginRedirects});
 
@@ -21,6 +22,7 @@ class IconCache {
   static const timeout = Duration(seconds: 8);
   static final _pending = <_IconRequest, Future<String?>>{};
   static final _cache = <_IconRequest, ({String? path, DateTime time})>{};
+  static int _directoryRevision = AvatarCache.directoryRevision;
 
   static bool isWebUri(Uri? uri) =>
       uri != null &&
@@ -52,6 +54,7 @@ class IconCache {
   }
 
   static String? peek(String source, {bool allowCrossOriginRedirects = false}) {
+    _syncDirectoryRevision();
     final cached =
         _cache[(
               source: source,
@@ -63,6 +66,12 @@ class IconCache {
 
   static void clearMemory() {
     _cache.clear();
+    _pending.clear();
+    _directoryRevision = AvatarCache.directoryRevision;
+  }
+
+  static void _syncDirectoryRevision() {
+    if (_directoryRevision != AvatarCache.directoryRevision) clearMemory();
   }
 
   static Future<String?> getPath(
@@ -71,6 +80,7 @@ class IconCache {
     http.Client? client,
     Directory? directory,
   }) {
+    _syncDirectoryRevision();
     final key = (
       source: source,
       allowCrossOriginRedirects: allowCrossOriginRedirects,
@@ -83,22 +93,38 @@ class IconCache {
                     const Duration(minutes: 5))) {
       return Future.value(entry.path);
     }
-    return _pending.putIfAbsent(key, () async {
+    final existing = _pending[key];
+    if (existing != null) return existing;
+    final revision = _directoryRevision;
+    late final Future<String?> request;
+    bool current() =>
+        revision == AvatarCache.directoryRevision &&
+        identical(_pending[key], request);
+    request = () async {
       try {
-        final path = await _load(key, client: client, directory: directory);
+        final path = await _load(
+          key,
+          current,
+          client: client,
+          directory: directory,
+        );
+        if (!current()) return null;
         _cache[key] = (path: path, time: DateTime.now());
         return path;
       } catch (_) {
-        _cache[key] = (path: null, time: DateTime.now());
+        if (current()) _cache[key] = (path: null, time: DateTime.now());
         return null;
       } finally {
-        _pending.remove(key);
+        if (identical(_pending[key], request)) _pending.remove(key);
       }
-    });
+    }();
+    _pending[key] = request;
+    return request;
   }
 
   static Future<String?> _load(
-    _IconRequest key, {
+    _IconRequest key,
+    bool Function() current, {
     http.Client? client,
     Directory? directory,
   }) async {
@@ -110,10 +136,14 @@ class IconCache {
     // so a server-discovered icon still has to satisfy its origin policy.
     final prefix = key.allowCrossOriginRedirects ? 'remote_icon' : 'mcp';
     final name = '${prefix}_${sha256.convert(utf8.encode(source))}';
-    for (final extension in ['svg', 'png', 'img']) {
-      final cached = File(p.join(dir.path, '$name.$extension'));
-      if (await cached.exists()) return cached.path;
-    }
+    final path = await AvatarCache.withCacheFiles(() async {
+      for (final extension in ['svg', 'png', 'img']) {
+        final cached = File(p.join(dir.path, '$name.$extension'));
+        if (await cached.exists()) return cached.path;
+      }
+      return null;
+    });
+    if (!current() || path != null) return path;
     Uint8List bytes;
     if (uri.scheme == 'data') {
       if (source.length > maxBytes * 2) return null;
@@ -165,13 +195,16 @@ class IconCache {
         if (client == null) connection.close();
       }
     }
-    if (bytes.isEmpty || bytes.length > maxBytes) return null;
+    if (!current() || bytes.isEmpty || bytes.length > maxBytes) return null;
     final normalized = await compute(normalize, bytes);
     if (normalized == null) return null;
-    await dir.create(recursive: true);
-    final file = File(p.join(dir.path, '$name.${normalized.extension}'));
-    await file.writeAsBytes(normalized.bytes, flush: true);
-    return file.path;
+    return AvatarCache.withCacheFiles(() async {
+      if (!current()) return null;
+      await dir.create(recursive: true);
+      final file = File(p.join(dir.path, '$name.${normalized.extension}'));
+      await file.writeAsBytes(normalized.bytes, flush: true);
+      return file.path;
+    });
   }
 
   static ({Uint8List bytes, String extension})? normalize(

@@ -680,7 +680,7 @@ const String _rawModelsDevPayload = '''
 ''';
 
 final String _trimmedFixtureJson = jsonEncode(
-  trimModelsDevJson(<String, dynamic>{
+  parseModelsDevCatalog(<String, dynamic>{
     'openai': <String, dynamic>{
       'id': 'openai',
       'name': 'OpenAI',
@@ -688,5 +688,5 @@ final String _trimmedFixtureJson = jsonEncode(
         'gpt-4o': <String, dynamic>{'id': 'gpt-4o', 'name': 'GPT-4o'},
       },
     },
-  }, generatedAt: DateTime.utc(2026, 1, 1)),
+  }, generatedAt: DateTime.utc(2026, 1, 1)).toJson(),
 );

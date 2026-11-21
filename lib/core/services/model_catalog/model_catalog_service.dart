@@ -657,17 +657,11 @@ class _RemoteCatalogResult {
 
 _RemoteCatalogResult _trimAndParseRemote(String body, DateTime generatedAt) {
   final decoded = jsonDecode(body);
-  if (decoded is! Map) {
+  if (decoded is! Map<String, dynamic>) {
     throw const FormatException('models.dev payload is not an object');
   }
-  final trimmed = trimModelsDevJson(
-    Map<String, dynamic>.from(decoded),
-    generatedAt: generatedAt,
-  );
-  return _RemoteCatalogResult(
-    json: jsonEncode(trimmed),
-    data: parseTrimmedCatalog(trimmed),
-  );
+  final data = parseModelsDevCatalog(decoded, generatedAt: generatedAt);
+  return _RemoteCatalogResult(json: jsonEncode(data.toJson()), data: data);
 }
 
 Future<ModelCatalogData> _parseTrimmedInIsolate(String json) {
@@ -866,7 +860,7 @@ List<String> catalogProvidersForHost(String host) {
 }
 
 Future<String> _defaultLoadBundledJson() {
-  return rootBundle.loadString(kModelCatalogAssetPath);
+  return rootBundle.loadString(kModelCatalogAssetPath, cache: false);
 }
 
 Future<Directory> _defaultCacheDirectory() async {

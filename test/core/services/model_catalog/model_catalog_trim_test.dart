@@ -13,7 +13,10 @@ void main() {
   }
 
   Map<String, dynamic> trimmedFixture() {
-    return trimModelsDevJson(rawFixture(), generatedAt: generatedAt);
+    return parseModelsDevCatalog(
+      rawFixture(),
+      generatedAt: generatedAt,
+    ).toJson();
   }
 
   test('trims providers and skips malformed entries', () {

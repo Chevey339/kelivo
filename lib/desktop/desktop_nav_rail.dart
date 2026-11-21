@@ -1,4 +1,4 @@
-import 'dart:io' show File, Platform;
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../shared/widgets/emoji_text.dart';
@@ -7,7 +7,7 @@ import '../core/providers/user_provider.dart';
 import '../core/providers/settings_provider.dart';
 import 'user_profile_dialog.dart';
 import '../icons/lucide_adapter.dart' as lucide;
-import '../utils/sandbox_path_resolver.dart';
+import '../shared/widgets/avatar_image.dart';
 import '../theme/app_font_weights.dart';
 import 'widgets/desktop_pane_surface.dart';
 
@@ -132,34 +132,15 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
         alignment: Alignment.center,
         child: EmojiText(value, fontSize: 18, optimizeEmojiAlign: true),
       );
-    } else if (type == 'url' && value != null && value.isNotEmpty) {
-      avatar = ClipOval(
-        child: Image.network(
-          value,
-          width: 36,
-          height: 36,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return _initialAvatar(up.name, cs);
-          },
-        ),
+    } else if ((type == 'file' || type == 'url') &&
+        value != null &&
+        value.isNotEmpty) {
+      avatar = AvatarImage(
+        source: value,
+        isNetwork: type == 'url',
+        size: 36,
+        fallback: _initialAvatar(up.name, cs),
       );
-    } else if (type == 'file' && value != null && value.isNotEmpty) {
-      // Local file path (gracefully handle missing files from imported backups)
-      final fixed = SandboxPathResolver.fix(value);
-      final f = File(fixed);
-      if (f.existsSync()) {
-        avatar = ClipOval(
-          child: Image(
-            image: FileImage(f),
-            width: 36,
-            height: 36,
-            fit: BoxFit.cover,
-          ),
-        );
-      } else {
-        avatar = _initialAvatar(up.name, cs);
-      }
     } else {
       avatar = _initialAvatar(up.name, cs);
     }

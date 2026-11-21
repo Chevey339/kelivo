@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -6,11 +7,15 @@ import 'dart:ui' as ui;
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_assistant_background.dart';
+import 'package:Kelivo/features/chat/widgets/chat_wallpaper_image.dart';
 import 'package:Kelivo/features/chat/widgets/frosted/chat_frosted_backdrop.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_overlay_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:image/image.dart' as img;
 import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -18,6 +23,182 @@ import '../../../support/business_test_harness.dart';
 const _wallpaperColor = Color(0xFF4080C0);
 
 void main() {
+  testWidgets(
+    'remount shares a pending wallpaper download and a repaint retries a failure',
+    (tester) async {
+      final firstResponse = Completer<http.Response>();
+      var requests = 0;
+      Widget host({Color? tint}) => MaterialApp(
+        home: ChatWallpaperImage(
+          source: const NetworkImage('https://wallpaper.test/recover.png'),
+          tint: tint,
+        ),
+      );
+      await http.runWithClient(
+        () async {
+          await tester.pumpWidget(host());
+          expect(requests, 1);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpWidget(host());
+          expect(requests, 1);
+          firstResponse.complete(http.Response('offline', 503));
+          await tester.pumpAndSettle();
+          expect(find.byType(RawImage), findsNothing);
+          await tester.pumpWidget(host(tint: Colors.transparent));
+          for (var i = 0; i < 100; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 5)),
+            );
+            await tester.pump();
+            if (tester
+                .widgetList<RawImage>(find.byType(RawImage))
+                .any((raw) => raw.image?.width == 7)) {
+              break;
+            }
+          }
+          expect(
+            tester.widget<RawImage>(find.byType(RawImage)).image?.width,
+            7,
+          );
+          expect(requests, 2);
+          await tester.pumpWidget(const SizedBox());
+        },
+        () => MockClient(
+          (_) async => ++requests == 1
+              ? firstResponse.future
+              : http.Response.bytes(
+                  img.encodePng(img.Image(width: 7, height: 7)),
+                  200,
+                ),
+        ),
+      );
+    },
+  );
+
+  for (final remote in [false, true]) {
+    testWidgets(
+      'wallpaper resizes from its source and reuses identical frames (remote=$remote)',
+      (tester) async {
+        final original = remote
+            ? const Size(3840, 2160)
+            : const Size(1600, 1000);
+        final bytes = img.encodePng(
+          img.Image(
+            width: original.width.toInt(),
+            height: original.height.toInt(),
+          ),
+        );
+        var requests = 0;
+        var source = 'https://wallpaper.test/wall.png';
+        if (!remote) {
+          final directory = Directory.systemTemp.createTempSync('chat-resize-');
+          addTearDown(() => directory.deleteSync(recursive: true));
+          final file = File('${directory.path}/wallpaper.png')
+            ..writeAsBytesSync(bytes);
+          source = file.path;
+        }
+        final prefs = createBusinessTestPreferences();
+        await prefs.load();
+        await prefs.setString(
+          'assistants_v1',
+          jsonEncode([
+            {'id': 'wall', 'name': 'Wall', 'background': source},
+          ]),
+        );
+        final assistants = AssistantProvider(preferences: prefs);
+        await assistants.loaded;
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        addTearDown(assistants.dispose);
+        addTearDown(settings.dispose);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(640, 400);
+        tester.view.display.size = const Size(5120, 2880);
+        addTearDown(tester.view.reset);
+        addTearDown(tester.view.display.reset);
+        final cache = PaintingBinding.instance.imageCache
+          ..clear()
+          ..clearLiveImages();
+        final raw = find.descendant(
+          of: find.byType(ChatAssistantBackground),
+          matching: find.byType(RawImage),
+        );
+        void expectBothFrames(ui.Image frame) {
+          final layers = tester.widgetList<RawImage>(raw).toList();
+          expect(layers, hasLength(2));
+          expect(
+            layers.map((w) => w.image?.isCloneOf(frame)),
+            everyElement(true),
+          );
+        }
+
+        await http.runWithClient(
+          () async {
+            await tester.pumpWidget(
+              MultiProvider(
+                providers: [
+                  ChangeNotifierProvider.value(value: assistants),
+                  ChangeNotifierProvider.value(value: settings),
+                ],
+                child: const MaterialApp(
+                  home: ChatFrostedBackdrop(
+                    backdrop: ChatAssistantBackground(
+                      desktop: true,
+                      includeSurfaceFill: true,
+                    ),
+                    child: ChatAssistantBackground(
+                      desktop: true,
+                      includeSurfaceFill: true,
+                      pinnedToBackdrop: true,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            final firstSize = await _waitForWallpaper(tester);
+            expect(firstSize.width, inInclusiveRange(640, 1024));
+            await tester.pump();
+            final first = tester.widget<RawImage>(raw.first).image!.clone();
+            addTearDown(first.dispose);
+            expectBothFrames(first);
+
+            // Enlarge the same wallpaper on another display after the first download.
+            tester.view.display.size = const Size(3840, 2160);
+            tester.view.devicePixelRatio = 2;
+            tester.view.physicalSize = original;
+            await tester.pump();
+            expectBothFrames(first);
+            expect(await _waitForWallpaper(tester), original);
+            await tester.pump();
+            final full = tester.widget<RawImage>(raw.first).image!.clone();
+            addTearDown(full.dispose);
+            for (final delta in [140, 280, 420, 560, 700, 840]) {
+              tester.view.physicalSize = Size(
+                original.width + delta,
+                original.height,
+              );
+              await tester.pump();
+              expectBothFrames(full);
+            }
+            expect(cache.currentSize, 1);
+            expect(
+              cache.currentSizeBytes,
+              (original.width * original.height * 4).toInt(),
+            );
+            expect(requests, remote ? 1 : 0);
+            await tester.pumpWidget(const SizedBox());
+            await tester.pump();
+            expect(cache.currentSize, 0);
+          },
+          () => MockClient((_) async {
+            if (++requests > 1) return http.Response('offline', 503);
+            return http.Response.bytes(bytes, 200);
+          }),
+        );
+      },
+    );
+  }
+
   for (final desktop in [true, false]) {
     testWidgets(
       'wallpaper overlays stay aligned while sidebars and keyboard move: desktop=$desktop',
@@ -30,7 +211,7 @@ void main() {
         addTearDown(() => directory.deleteSync(recursive: true));
         final file = File('${directory.path}/wallpaper.png');
         final recorder = ui.PictureRecorder();
-        const rect = Rect.fromLTWH(0, 0, 320, 240);
+        const rect = Rect.fromLTWH(0, 0, 1680, 1080);
         Canvas(recorder).drawRect(
           rect,
           Paint()
@@ -41,7 +222,10 @@ void main() {
             ).createShader(rect),
         );
         final picture = recorder.endRecording();
-        final image = picture.toImageSync(320, 240);
+        final image = picture.toImageSync(
+          rect.width.toInt(),
+          rect.height.toInt(),
+        );
         final png = await tester.runAsync(
           () => image.toByteData(format: ui.ImageByteFormat.png),
         );
@@ -73,13 +257,6 @@ void main() {
           includeSurfaceFill: desktop,
         );
 
-        await tester.pumpWidget(const SizedBox());
-        await tester.runAsync(
-          () => precacheImage(
-            FileImage(file),
-            tester.element(find.byType(SizedBox)),
-          ),
-        );
         await tester.pumpWidget(
           MultiProvider(
             providers: [
@@ -123,6 +300,9 @@ void main() {
             ),
           ),
         );
+        final decoded = await _waitForWallpaper(tester);
+        expect(decoded.width, inInclusiveRange(840, 1679));
+        expect(decoded.height, inInclusiveRange(540, 1079));
         await tester.pumpAndSettle();
 
         Future<void> expectAligned(String state) async {
@@ -161,6 +341,8 @@ void main() {
         await expectAligned('keyboard open');
         tester.view.viewInsets = FakeViewPadding.zero;
         tester.view.physicalSize = const Size(540, 840);
+        await tester.pump();
+        await _waitForWallpaper(tester);
         await tester.pumpAndSettle();
         await expectAligned('rotated');
 
@@ -199,14 +381,6 @@ void main() {
           image.dispose();
           picture.dispose();
 
-          await tester.pumpWidget(const SizedBox());
-          await tester.runAsync(
-            () => precacheImage(
-              FileImage(file),
-              tester.element(find.byType(SizedBox)),
-            ),
-          );
-
           final preferences = createBusinessTestPreferences();
           await preferences.load();
           await preferences.setString(
@@ -241,9 +415,7 @@ void main() {
               ),
             ),
           );
-          await tester.runAsync(() async {
-            await precacheImage(FileImage(file), boundaryKey.currentContext!);
-          });
+          await _waitForWallpaper(tester);
           await tester.pumpAndSettle();
 
           Future<List<Color>> sample() async {
@@ -292,6 +464,44 @@ void main() {
         variant: TargetPlatformVariant({config.$1}),
       );
     }
+  }
+}
+
+Future<Size> _waitForWallpaper(WidgetTester tester) async {
+  final backgrounds = find.byType(ChatAssistantBackground);
+  final layers = find.descendant(of: backgrounds, matching: find.byType(Image));
+  for (var i = 0; i < 100 && layers.evaluate().isEmpty; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+    );
+    await tester.pump();
+  }
+  final providers = tester
+      .widgetList<Image>(layers)
+      .map((w) => w.image)
+      .toSet();
+  // The pinned copies and base must resolve the same decoded image.
+  final context = tester.element(backgrounds.first);
+  final stream = providers.single.resolve(
+    createLocalImageConfiguration(context),
+  );
+  Size? decoded;
+  final listener = ImageStreamListener((info, _) {
+    decoded = Size(info.image.width.toDouble(), info.image.height.toDouble());
+    info.dispose();
+  });
+  stream.addListener(listener);
+  try {
+    for (var i = 0; i < 100 && decoded == null; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 5)),
+      );
+      await tester.pump();
+    }
+    expect(decoded, isNotNull);
+    return decoded!;
+  } finally {
+    stream.removeListener(listener);
   }
 }
 

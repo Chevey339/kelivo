@@ -1,5 +1,6 @@
 import 'package:Kelivo/desktop/hotkeys/hotkey_event_bus.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
+import 'package:Kelivo/desktop/desktop_translate_page.dart';
 import 'package:Kelivo/features/side_panel/widgets/desktop_side_panel.dart';
 import 'dart:io';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
@@ -249,6 +250,14 @@ void main() {
           if (list.messages.isNotEmpty && !list.isLoadingWindow) break;
         }
         await tester.pumpAndSettle();
+        expect(
+          find.byType(DesktopSettingsPage, skipOffstage: false),
+          findsNothing,
+        );
+        expect(
+          find.byType(DesktopTranslatePage, skipOffstage: false),
+          findsNothing,
+        );
         final list = tester.widget<MessageListView>(
           find.byType(MessageListView),
         );
@@ -342,12 +351,17 @@ void main() {
           HotkeyEventBus.instance.fire(HotkeyAction.openSettings);
           await tester.pumpAndSettle();
           expect(find.byType(DesktopSettingsPage), findsOneWidget);
+          final settingsState = tester.state(find.byType(DesktopSettingsPage));
           await tester.tap(
             find.byKey(const ValueKey('desktop-navigation-menu')),
           );
           await tester.pumpAndSettle();
           await tester.tap(find.byTooltip(l10n.desktopNavChatTooltip));
           await tester.pumpAndSettle();
+          expect(
+            tester.state(find.byType(DesktopSettingsPage, skipOffstage: false)),
+            same(settingsState),
+          );
           ChatActionBus.instance.fire(ChatAction.toggleLeftPanelTopics);
           await tester.pumpAndSettle();
           expect(

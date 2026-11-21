@@ -51,8 +51,7 @@ import '../core/providers/assistant_provider.dart';
 import '../features/assistant/widgets/assistant_copy_dialog.dart';
 import '../features/home/controllers/chat_actions.dart' show ChatActions;
 import '../core/models/assistant.dart';
-import '../utils/avatar_cache.dart';
-import '../utils/sandbox_path_resolver.dart';
+import '../shared/widgets/avatar_image.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
@@ -223,40 +222,22 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       _showDetail = true;
       _selected = _SettingsMenuItem.providers;
     }
-    // The settings pane is lazy. Preserve a topic-position request delivered
-    // before this first mount, then consume later requests from the stream.
-    if (DesktopSettingsNavigationBus.instance.consumeTopicPositionRequest()) {
-      _selected = _SettingsMenuItem.display;
-      _showDetail = true;
-      _showTopicPosition = true;
-    }
-    _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((
+    _settingsNavSub = DesktopSettingsNavigationBus.instance.listenForPane((
       target,
     ) {
-      if (!mounted) return;
-      switch (target) {
-        case DesktopSettingsNavigationTarget.topicPosition:
-          DesktopSettingsNavigationBus.instance.consumeTopicPositionRequest();
-          setState(() {
-            _selected = _SettingsMenuItem.display;
-            _showDetail = true;
-            _showTopicPosition = true;
-            _searchNavigation++;
-          });
-          break;
-        case DesktopSettingsNavigationTarget.backup:
-          setState(() {
-            _selected = _SettingsMenuItem.backup;
-            _showDetail = true;
-          });
-          break;
-        case DesktopSettingsNavigationTarget.mcp:
-          setState(() {
-            _selected = _SettingsMenuItem.mcp;
-            _showDetail = true;
-          });
-          break;
-      }
+      setState(() {
+        _showDetail = true;
+        _selected = switch (target) {
+          DesktopSettingsNavigationTarget.topicPosition =>
+            _SettingsMenuItem.display,
+          DesktopSettingsNavigationTarget.backup => _SettingsMenuItem.backup,
+          DesktopSettingsNavigationTarget.mcp => _SettingsMenuItem.mcp,
+        };
+        if (target == DesktopSettingsNavigationTarget.topicPosition) {
+          _showTopicPosition = true;
+          _searchNavigation++;
+        }
+      });
     });
   }
 

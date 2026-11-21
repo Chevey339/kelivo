@@ -12,10 +12,12 @@ class AvatarCache {
   static Listenable get changes => _changes;
   static int get revision => _changes.value;
   static Future<void>? _diskQueue;
+  static int _directoryRevision = 0;
+  static int get directoryRevision => _directoryRevision;
 
   // Downloads run concurrently; only short file operations and cache deletion
   // are ordered, so a completed old write cannot undo a clear or eviction.
-  static Future<T> _onDisk<T>(Future<T> Function() action) {
+  static Future<T> withCacheFiles<T>(Future<T> Function() action) {
     final result = (_diskQueue ?? Future<void>.value()).then((_) => action());
     late final Future<void> tail;
     tail = result
@@ -36,9 +38,12 @@ class AvatarCache {
   /// Invalidates in-flight loads before deleting cache files. New loads wait
   /// for [deleteFiles], and old downloads cannot repopulate the cleared cache.
   static Future<void> clearCache(Future<void> Function() deleteFiles) {
-    final cleared = _onDisk(deleteFiles);
-    clearMemory();
-    return cleared;
+    _directoryRevision++;
+    _memo.clear();
+    _pending.clear();
+    // Other icon loaders share this directory. Refresh mounted images after
+    // deletion so their synchronous cache peeks cannot return an old file.
+    return withCacheFiles(deleteFiles).whenComplete(() => _changes.value++);
   }
 
   static Future<Directory> _cacheDir() async {
@@ -106,7 +111,7 @@ class AvatarCache {
   static Future<String?> _load(String url, bool Function() current) async {
     try {
       late File file;
-      final cached = await _onDisk(() async {
+      final cached = await withCacheFiles(() async {
         if (!current()) return null;
         final memo = _memo[url];
         if (memo != null && await File(memo).exists()) return memo;
@@ -121,7 +126,7 @@ class AvatarCache {
       // Download and save
       final res = await http.get(Uri.parse(url));
       if (current() && res.statusCode >= 200 && res.statusCode < 300) {
-        return await _onDisk(() async {
+        return await withCacheFiles(() async {
           if (!current()) return null;
           await file.parent.create(recursive: true);
           await file.writeAsBytes(res.bodyBytes, flush: true);
@@ -137,14 +142,12 @@ class AvatarCache {
   static Future<void> evict(String url) {
     _pending.remove(url);
     _memo.remove(url);
-    final removed = _onDisk(() async {
+    return withCacheFiles(() async {
       try {
         final dir = await _cacheDir();
         final file = File('${dir.path}/${_safeName(url)}');
         if (await file.exists()) await file.delete();
       } catch (_) {}
-    });
-    _changes.value++;
-    return removed;
+    }).whenComplete(() => _changes.value++);
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -9,6 +10,7 @@ import 'package:image/image.dart' as img;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:Kelivo/utils/icon_cache.dart';
+import 'package:Kelivo/utils/avatar_cache.dart';
 
 class _Paths extends PathProviderPlatform {
   _Paths(this.root);
@@ -27,6 +29,43 @@ void main() {
     directory = Directory.systemTemp.createTempSync('mcp-icon-test-');
   });
   tearDown(() => directory.deleteSync(recursive: true));
+
+  test(
+    'clearing the avatar directory rejects a late normalized icon download',
+    () async {
+      final started = Completer<void>();
+      final stale = Completer<http.Response>();
+      var requests = 0;
+      http.Response photo(int width) => http.Response.bytes(
+        img.encodePng(img.Image(width: width, height: width)),
+        200,
+      );
+      final client = MockClient((_) async {
+        if (++requests == 1) {
+          started.complete();
+          return stale.future;
+        }
+        return photo(13);
+      });
+      Future<String?> load() => IconCache.getPath(
+        'https://icons.example/photo.png',
+        client: client,
+        directory: directory,
+        allowCrossOriginRedirects: true,
+      );
+      final old = load();
+      await started.future;
+      await AvatarCache.clearCache(
+        () async => directory.delete(recursive: true),
+      );
+      final path = (await load())!;
+      stale.complete(photo(9));
+      expect(await old, isNull);
+      expect(await load(), path);
+      expect(img.decodeImage(await File(path).readAsBytes())?.width, 13);
+      expect(requests, 2);
+    },
+  );
 
   test(
     'favicon URL contains only the server origin and no credentials or query',

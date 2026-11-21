@@ -1,10 +1,10 @@
 import 'catalog_entry.dart';
 
-/// Converts a raw models.dev payload into the trimmed catalog JSON.
+/// Reads the supported fields of a raw models.dev payload.
 ///
-/// [schemaVersion] is always `1`. A single malformed provider or model is
+/// [ModelCatalogData.schemaVersion] is always `1`. A single malformed provider or model is
 /// skipped; this function does not throw for bad entries.
-Map<String, dynamic> trimModelsDevJson(
+ModelCatalogData parseModelsDevCatalog(
   Map<String, dynamic> raw, {
   DateTime? generatedAt,
 }) {
@@ -12,7 +12,7 @@ Map<String, dynamic> trimModelsDevJson(
     schemaVersion: 1,
     generatedAt: generatedAt ?? DateTime.now().toUtc(),
     providers: _providersFromRaw(raw),
-  ).toJson();
+  );
 }
 
 /// Parses trimmed catalog JSON.

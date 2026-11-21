@@ -41,7 +41,7 @@ class DesktopHomePage extends StatefulWidget {
 
 class _DesktopHomePageState extends State<DesktopHomePage> {
   int _tabIndex = 0; // 0=Chat, 1=Translate, 2=Storage, 3=Settings
-  bool _storageVisited = false;
+  final _visitedTabs = <int>{};
   bool _navigationOpen = false;
   bool _globalSearchActive = false;
   StreamSubscription<HotkeyAction>? _hotkeySub;
@@ -55,7 +55,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     if (widget.initialTabIndex != null) {
       _tabIndex = widget.initialTabIndex!.clamp(0, 3);
     }
-    _storageVisited = _tabIndex == 2;
+    _visitedTabs.add(_tabIndex);
     _conversationOpenSub = NotificationService.conversationTaps.listen((_) {
       if (!mounted) return;
       setState(() {
@@ -94,13 +94,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
         case HotkeyAction.sidePanelFocus:
           break;
         case HotkeyAction.openSettings:
-          if (mounted) {
-            setState(() {
-              _tabIndex = 3;
-              _globalSearchActive = false;
-            });
-            ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-          }
+          if (mounted) _selectTab(3, dismissNavigation: false);
           break;
         case HotkeyAction.closeWindow:
           final panel = DesktopSidePanelController.instance;
@@ -183,30 +177,21 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
           break;
       }
     });
-    _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((
-      target,
-    ) {
-      if (!mounted) return;
-      switch (target) {
-        case DesktopSettingsNavigationTarget.topicPosition:
-        case DesktopSettingsNavigationTarget.backup:
-        case DesktopSettingsNavigationTarget.mcp:
-          setState(() {
-            _tabIndex = 3;
-            _globalSearchActive = false;
-          });
-          ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-          break;
-      }
+    _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((_) {
+      if (mounted) _selectTab(3, dismissNavigation: false);
     });
   }
 
-  void _selectTab(int index, {bool search = false}) {
+  void _selectTab(
+    int index, {
+    bool search = false,
+    bool dismissNavigation = true,
+  }) {
     setState(() {
       _tabIndex = index;
       _globalSearchActive = search;
-      _navigationOpen = false;
-      if (index == 2) _storageVisited = true;
+      if (dismissNavigation) _navigationOpen = false;
+      _visitedTabs.add(index);
     });
     ChatActionBus.instance.fire(
       search ? ChatAction.enterGlobalSearch : ChatAction.exitGlobalSearch,
@@ -278,20 +263,25 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
                             index: _tabIndex,
                             children: [
                               const DesktopChatPage(),
-                              const DesktopTranslatePage(
-                                key: ValueKey('translate_page'),
-                              ),
-                              _storageVisited
+                              _visitedTabs.contains(1)
+                                  ? const DesktopTranslatePage(
+                                      key: ValueKey('translate_page'),
+                                    )
+                                  : const SizedBox.shrink(),
+                              _visitedTabs.contains(2)
                                   ? StorageSpacePage(
                                       key: const ValueKey('storage_space_page'),
                                       embedded: true,
                                       active: _tabIndex == 2,
                                     )
                                   : const SizedBox.shrink(),
-                              DesktopSettingsPage(
-                                key: const ValueKey('settings_page'),
-                                initialProviderKey: widget.initialProviderKey,
-                              ),
+                              _visitedTabs.contains(3)
+                                  ? DesktopSettingsPage(
+                                      key: const ValueKey('settings_page'),
+                                      initialProviderKey:
+                                          widget.initialProviderKey,
+                                    )
+                                  : const SizedBox.shrink(),
                             ],
                           ),
                         ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/models/avatar_config.dart';
 import '../../theme/app_font_weights.dart';
 import '../../utils/avatar_cache.dart';
+import '../../utils/avatar_file_image.dart';
+import '../../utils/safe_resize_image.dart';
 import '../../utils/brand_assets.dart';
 import '../../utils/icon_cache.dart';
 import '../../utils/sandbox_path_resolver.dart';
@@ -60,7 +63,7 @@ class ConfigurableAvatar extends StatelessWidget {
           content = _RemoteAvatar(
             avatar: config,
             normalizeIcons: normalizeRemoteIcons,
-            builder: (path) => path == null
+            builder: (path, onImage) => path == null
                 ? fallback
                 : _file(
                     context,
@@ -68,6 +71,8 @@ class ConfigurableAvatar extends StatelessWidget {
                     fallback,
                     brand: config.type == AvatarType.lobehub,
                     monochrome: config.monochrome,
+                    cacheRevision: AvatarCache.revision,
+                    onImage: onImage,
                   ),
           );
       }
@@ -127,6 +132,8 @@ class ConfigurableAvatar extends StatelessWidget {
     Widget fallback, {
     bool brand = false,
     bool monochrome = false,
+    int? cacheRevision,
+    ValueChanged<AvatarFileImage>? onImage,
   }) {
     final dimension = brand ? size * iconScale : size;
     if (path.toLowerCase().endsWith('.svg')) {
@@ -143,8 +150,16 @@ class ConfigurableAvatar extends StatelessWidget {
         errorBuilder: (_, __, ___) => fallback,
       );
     }
-    return Image.file(
+    final pixels = (dimension * MediaQuery.devicePixelRatioOf(context)).ceil();
+    final image = AvatarFileImage(
       File(path),
+      pixels: pixels,
+      fit: brand ? SafeResizeFit.contain : SafeResizeFit.cover,
+      cacheRevision: cacheRevision,
+    );
+    onImage?.call(image);
+    return Image(
+      image: image,
       width: dimension,
       height: dimension,
       fit: brand ? BoxFit.contain : BoxFit.cover,
@@ -163,7 +178,7 @@ class _RemoteAvatar extends StatefulWidget {
   });
   final AvatarConfig avatar;
   final bool normalizeIcons;
-  final Widget Function(String?) builder;
+  final Widget Function(String?, ValueChanged<AvatarFileImage>) builder;
 
   @override
   State<_RemoteAvatar> createState() => _RemoteAvatarState();
@@ -171,6 +186,7 @@ class _RemoteAvatar extends StatefulWidget {
 
 class _RemoteAvatarState extends State<_RemoteAvatar> {
   late Future<String?> _path;
+  AvatarFileImage? _image;
 
   List<String> get _urls => widget.avatar.type == AvatarType.lobehub
       ? BrandAssets.lobehubIconUrls(
@@ -195,7 +211,13 @@ class _RemoteAvatarState extends State<_RemoteAvatar> {
     return null;
   }
 
-  void _reload() => setState(() => _path = _load());
+  void _reload() {
+    unawaited(_image?.evict());
+    _image = null;
+    setState(() {
+      _path = _load();
+    });
+  }
 
   @override
   void initState() {
@@ -222,10 +244,16 @@ class _RemoteAvatarState extends State<_RemoteAvatar> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String?>(
-      key: ValueKey((widget.avatar, widget.normalizeIcons)),
+      key: ValueKey((
+        widget.avatar,
+        widget.normalizeIcons,
+        AvatarCache.revision,
+      )),
       future: _path,
       initialData: _urls.map(_peek).whereType<String>().firstOrNull,
-      builder: (_, snapshot) => widget.builder(snapshot.data),
+      builder: (_, snapshot) => widget.builder(snapshot.data, (image) {
+        if (_image != image) _image = image;
+      }),
     );
   }
 }

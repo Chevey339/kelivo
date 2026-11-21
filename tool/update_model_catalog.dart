@@ -21,13 +21,11 @@ Future<void> main(List<String> args) async {
         ? await File(options.input!).readAsString()
         : await _download(options.url);
     final decoded = jsonDecode(sourceText);
-    if (decoded is! Map) {
+    if (decoded is! Map<String, dynamic>) {
       throw const FormatException('raw catalog must be a JSON object');
     }
-    final raw = Map<String, dynamic>.from(decoded);
-    final trimmed = trimModelsDevJson(raw);
-    final catalog = parseTrimmedCatalog(trimmed);
-    final encoded = jsonEncode(trimmed);
+    final catalog = parseModelsDevCatalog(decoded);
+    final encoded = jsonEncode(catalog.toJson());
     final output = File(options.output);
     output.parent.createSync(recursive: true);
     final bytes = utf8.encode('$encoded\n');

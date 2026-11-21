@@ -26,7 +26,6 @@ import '../../../core/models/assistant.dart';
 import '../../chat/pages/chat_history_page.dart';
 import '../../../desktop/chat_history_dialog.dart';
 import 'package:flutter/services.dart';
-import 'dart:io' show File;
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
@@ -35,9 +34,8 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animations/animations.dart';
-import '../../../utils/sandbox_path_resolver.dart';
+import '../../../shared/widgets/avatar_image.dart';
 import '../../../utils/search_highlight.dart';
-import '../../../utils/avatar_cache.dart';
 import 'dart:ui' as ui;
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -1734,66 +1732,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           ),
         );
       }
-      if (type == 'url' && value != null && value.isNotEmpty) {
-        return FutureBuilder<String?>(
-          future: AvatarCache.getPath(value),
-          builder: (ctx, snap) {
-            final p = snap.data;
-            if (p != null && File(p).existsSync()) {
-              return ClipOval(
-                child: Image(
-                  image: FileImage(File(p)),
-                  width: size,
-                  height: size,
-                  fit: BoxFit.cover,
-                ),
-              );
-            }
-            return ClipOval(
-              child: Image.network(
-                value,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => Container(
-                  width: size,
-                  height: size,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '?',
-                    style: TextStyle(
-                      color: cs.primary,
-                      fontSize: size * 0.42,
-                      fontWeight: AppFontWeights.emphasis,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      }
-      if (type == 'file' && value != null && value.isNotEmpty && !kIsWeb) {
-        final fixed = SandboxPathResolver.fix(value);
-        final f = File(fixed);
-        if (f.existsSync()) {
-          return ClipOval(
-            child: Image(
-              image: FileImage(f),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-            ),
-          );
-        }
-      }
-      // default: initial
-      final letter = name.isNotEmpty ? name.characters.first : '?';
-      return Container(
+      final hasImage = value != null && value.isNotEmpty;
+      final letter = (type == 'url' && hasImage) || name.isEmpty
+          ? '?'
+          : name.characters.first;
+      final initial = Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
@@ -1810,6 +1753,15 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           ),
         ),
       );
+      if (hasImage && (type == 'url' || (type == 'file' && !kIsWeb))) {
+        return AvatarImage(
+          source: value,
+          size: size,
+          isNetwork: type == 'url',
+          fallback: initial,
+        );
+      }
+      return initial;
     }
 
     // Desktop-only: enable tabs for embedded sidebar when requested

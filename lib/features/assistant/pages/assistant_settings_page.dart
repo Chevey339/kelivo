@@ -6,12 +6,10 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../home/controllers/chat_actions.dart';
 import '../../../core/models/assistant.dart';
-import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'assistant_settings_edit_page.dart';
 import '../widgets/assistant_copy_dialog.dart';
-import '../../../utils/avatar_cache.dart';
-import '../../../utils/sandbox_path_resolver.dart';
+import '../../../shared/widgets/avatar_image.dart';
 import '../../../core/services/haptics.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -557,46 +555,14 @@ class _AssistantAvatar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final av = (item.avatar ?? '').trim();
     if (av.isNotEmpty) {
-      if (av.startsWith('http')) {
-        return FutureBuilder<String?>(
-          future: AvatarCache.getPath(av),
-          builder: (ctx, snap) {
-            final p = snap.data;
-            if (p != null && File(p).existsSync()) {
-              return ClipOval(
-                child: Image(
-                  image: FileImage(File(p)),
-                  width: size,
-                  height: size,
-                  fit: BoxFit.cover,
-                ),
-              );
-            }
-            return ClipOval(
-              child: Image.network(
-                av,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => _initial(cs),
-              ),
-            );
-          },
+      if (av.startsWith('http') ||
+          (!kIsWeb && (av.startsWith('/') || av.contains(':')))) {
+        return AvatarImage(
+          source: av,
+          isNetwork: av.startsWith('http'),
+          size: size,
+          fallback: _initial(cs),
         );
-      } else if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
-        final fixed = SandboxPathResolver.fix(av);
-        final f = File(fixed);
-        if (f.existsSync()) {
-          return ClipOval(
-            child: Image(
-              image: FileImage(f),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-            ),
-          );
-        }
-        return _initial(cs);
       } else {
         return _emoji(cs, av);
       }

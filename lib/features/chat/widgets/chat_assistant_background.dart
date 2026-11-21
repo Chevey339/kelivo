@@ -7,6 +7,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import 'chat_gradient_background.dart';
+import 'chat_wallpaper_image.dart';
 import 'frosted/chat_frosted_backdrop.dart';
 
 /// Shared assistant wallpaper + surface-mask gradient for chat surfaces.
@@ -74,18 +75,9 @@ class ChatAssistantBackground extends StatelessWidget {
       return includeSurfaceFill ? ColoredBox(color: cs.surface) : empty;
     }
 
-    ImageProvider? provider;
-    Widget? imageWidget;
+    final ImageProvider source;
     if (bg.startsWith('http')) {
-      if (includeSurfaceFill) {
-        imageWidget = Image.network(
-          bg,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-        );
-      } else {
-        provider = NetworkImage(bg);
-      }
+      source = NetworkImage(bg);
     } else {
       try {
         final localPath = SandboxPathResolver.fix(bg);
@@ -93,11 +85,7 @@ class ChatAssistantBackground extends StatelessWidget {
         if (!file.existsSync()) {
           return includeSurfaceFill ? ColoredBox(color: cs.surface) : empty;
         }
-        if (includeSurfaceFill) {
-          imageWidget = Image(image: FileImage(file), fit: BoxFit.cover);
-        } else {
-          provider = FileImage(file);
-        }
+        source = FileImage(file);
       } catch (_) {
         return includeSurfaceFill ? ColoredBox(color: cs.surface) : empty;
       }
@@ -129,28 +117,19 @@ class ChatAssistantBackground extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             ColoredBox(color: cs.surface),
-            if (imageWidget != null)
-              Opacity(
-                opacity: (1.0 - 0.1 * maskStrength).clamp(0.0, 1.0),
-                child: imageWidget,
-              ),
+            Opacity(
+              opacity: (1.0 - 0.1 * maskStrength).clamp(0.0, 1.0),
+              child: ChatWallpaperImage(source: source),
+            ),
             mask,
           ],
         ),
       );
     }
 
-    final wallpaper = DecoratedBox(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: provider!,
-          fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(
-            cs.shadow.withValues(alpha: (0.04 * maskStrength).clamp(0.0, 1.0)),
-            BlendMode.srcATop,
-          ),
-        ),
-      ),
+    final wallpaper = ChatWallpaperImage(
+      source: source,
+      tint: cs.shadow.withValues(alpha: (0.04 * maskStrength).clamp(0.0, 1.0)),
     );
 
     if (expand) {

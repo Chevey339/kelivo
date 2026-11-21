@@ -60,7 +60,6 @@ enum SafeResizeFit { contain, cover }
 /// Decode box after knowing intrinsic size. Caps first, then floor, then
 /// re-check. Both axes are at least 1. Never returns the uncapped original
 /// when the source exceeds the budget.
-@visibleForTesting
 ({int width, int height}) computeSafeResizeTarget({
   required int intrinsicWidth,
   required int intrinsicHeight,
@@ -211,12 +210,12 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
           final target = computeSafeResizeTarget(
             intrinsicWidth: intrinsicWidth,
             intrinsicHeight: intrinsicHeight,
-            boxWidth: width,
-            boxHeight: height,
-            fit: fit,
-            allowUpscaling: allowUpscaling,
-            maxEdge: maxEdge,
-            maxPixels: maxPixels,
+            boxWidth: key.width,
+            boxHeight: key.height,
+            fit: key.fit,
+            allowUpscaling: key.allowUpscaling,
+            maxEdge: key.maxEdge,
+            maxPixels: key.maxPixels,
           );
           return ui.TargetImageSize(width: target.width, height: target.height);
         },
@@ -284,6 +283,7 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is SafeResizeImage &&
+        other.runtimeType == runtimeType &&
         imageProvider == other.imageProvider &&
         width == other.width &&
         height == other.height &&
