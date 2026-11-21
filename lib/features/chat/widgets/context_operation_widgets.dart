@@ -5,9 +5,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/models/context_operation.dart';
 import '../../../core/models/context_compression_task.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/markdown/markdown_with_code_highlight.dart';
 import '../../../shared/text_input/message_editing_controller.dart';
@@ -234,6 +237,15 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
     final timestamp =
         '${MaterialLocalizations.of(context).formatShortDate(time)} '
         '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(time))}';
+    final modelName = operation.isCompression && _detailsExpanded
+        ? context.select<SettingsProvider?, String?>(
+            (settings) =>
+                ModelSpecResolver.instance.compressionModelDisplayName(
+                  operation.model,
+                  settings?.providerConfigs ?? const {},
+                ),
+          )
+        : null;
     final over =
         widget.undoBudget?.contextWindow != null &&
         widget.undoBudget!.usedTokens > widget.undoBudget!.contextWindow!;
@@ -335,7 +347,7 @@ class _ContextOperationContentState extends State<ContextOperationContent> {
             ),
           ContextDetailRow(
             label: l10n.contextDetailModel,
-            value: '${operation.model} · $timestamp',
+            value: '${modelName ?? operation.model} · $timestamp',
           ),
         ],
         ContextDetailRow(

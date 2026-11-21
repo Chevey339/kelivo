@@ -1158,14 +1158,14 @@ class _CompressContextOptionsDialogState
     final provider = resolved.providerKey == null
         ? null
         : settings.getProviderConfig(resolved.providerKey!);
-    final summarySpec =
-        _advanced &&
-            !_native &&
-            _detailsExpanded &&
-            provider != null &&
-            resolved.modelId != null
-        ? ModelSpecResolver.instance.resolve(provider, resolved.modelId!)
+    final modelId = resolved.modelId;
+    late final modelSpec = provider != null && modelId != null
+        ? ModelSpecResolver.instance.resolve(provider, modelId)
         : null;
+    late final modelLabel =
+        modelSpec?.spec.displayName ??
+        modelId ??
+        l10n.compressContextModelUnset;
     final codex = provider?.oauthProvider == OAuthProvider.chatgpt;
     _ensureCarryPreview(codex, chatModel.providerKey, chatModel.modelId);
     final selectedTemplate = _templates
@@ -1236,8 +1236,7 @@ class _CompressContextOptionsDialogState
                           iconScale: .65,
                           withBackground: false,
                         ),
-                        label:
-                            resolved.modelId ?? l10n.compressContextModelUnset,
+                        label: modelLabel,
                         subtitle:
                             '${provider?.name ?? ''} · ${l10n.compressionChatModel}',
                       ),
@@ -1329,9 +1328,7 @@ class _CompressContextOptionsDialogState
                                   iconScale: .65,
                                   withBackground: false,
                                 ),
-                          label:
-                              resolved.modelId ??
-                              l10n.compressContextModelUnset,
+                          label: modelLabel,
                           subtitle: [
                             if (provider != null) provider.name,
                             if (_config.providerId == null)
@@ -1594,7 +1591,7 @@ class _CompressContextOptionsDialogState
                                 _window,
                                 hint: l10n.compressionAutomaticWindow,
                               ),
-                              if (summarySpec != null)
+                              if (_detailsExpanded && modelSpec != null)
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(
                                     14,
@@ -1605,13 +1602,13 @@ class _CompressContextOptionsDialogState
                                   child: Text(
                                     l10n.compressionSummaryWindowEstimate(
                                       contextTokenValue(
-                                        summarySpec.spec.contextWindow ??
+                                        modelSpec.spec.contextWindow ??
                                             CompressContextOptions
                                                 .defaultContextWindowTokens,
                                       ),
                                       specSourceLabel(
                                         l10n,
-                                        summarySpec.sources[ModelSpecField
+                                        modelSpec.sources[ModelSpecField
                                                 .contextWindow] ??
                                             SpecSource.fallback,
                                       ),

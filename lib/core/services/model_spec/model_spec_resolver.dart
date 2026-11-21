@@ -122,6 +122,34 @@ class ModelSpecResolver {
   ModelSpec spec(ProviderConfig cfg, String modelKey, {String? displayName}) =>
       resolve(cfg, modelKey, displayName: displayName).spec;
 
+  /// Finds a configured name for a saved compression model reference.
+  String? compressionModelDisplayName(
+    String storedModel,
+    Map<String, ProviderConfig> providers,
+  ) {
+    const separator = ' / ';
+    ({ProviderConfig provider, String modelId})? match;
+    // Provider keys and model IDs can both contain the separator.
+    for (
+      var boundary = storedModel.indexOf(separator);
+      boundary >= 0;
+      boundary = storedModel.indexOf(separator, boundary + 1)
+    ) {
+      final provider = providers[storedModel.substring(0, boundary)];
+      if (provider == null) continue;
+      final modelId = storedModel.substring(boundary + separator.length);
+      if (!provider.modelOverrides.containsKey(modelId) &&
+          !provider.models.contains(modelId)) {
+        continue;
+      }
+      if (match != null) return null;
+      match = (provider: provider, modelId: modelId);
+    }
+    return match == null
+        ? null
+        : resolve(match.provider, match.modelId).override.displayName;
+  }
+
   Future<ModelListRefresh> startModelListRefresh(ProviderConfig cfg) =>
       _modelLists.startRefresh(cfg);
 

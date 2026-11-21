@@ -632,6 +632,81 @@ void main() {
     await tester.pumpAndSettle();
     await closed;
   });
+  check('compression history shows the name or keeps the recorded model ID', (
+    tester,
+  ) async {
+    const primaryProviderId = 'summary-provider';
+    const providerId = '$primaryProviderId / backup';
+    const modelId = 'namespace/summary-model';
+    await tester.runAsync(() async {
+      await settings.setProviderConfig(
+        providerId,
+        ProviderConfig(
+          id: providerId,
+          name: 'Summary Provider / Backup',
+          enabled: true,
+          apiKey: '',
+          baseUrl: 'https://example.test',
+          models: const [modelId, 'shared-model', 'other-model'],
+          modelOverrides: const {
+            modelId: {'name': 'Summary Model'},
+            'shared-model': {'name': 'Backup Model'},
+          },
+        ),
+      );
+      await settings.setProviderConfig(
+        primaryProviderId,
+        ProviderConfig(
+          id: primaryProviderId,
+          name: 'Summary Provider',
+          enabled: true,
+          apiKey: '',
+          baseUrl: 'https://example.test',
+          models: const ['backup / shared-model'],
+        ),
+      );
+    });
+    for (final (storedModel, expected) in const [
+      ('$providerId / $modelId', 'Summary Model'),
+      ('$providerId / other-model', '$providerId / other-model'),
+      ('$providerId / shared-model', '$providerId / shared-model'),
+      ('removed-provider / $modelId', 'removed-provider / $modelId'),
+      ('legacy-model-id', 'legacy-model-id'),
+    ]) {
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: ContextOperationContent(
+                  key: ValueKey(storedModel),
+                  operation: ContextOperation(
+                    id: 'compression',
+                    kind: ContextOperationKind.compress,
+                    anchorGroupId: 'anchor',
+                    appliedAfterGroupId: 'anchor',
+                    sourceGroups: const ['anchor'],
+                    dependencies: const [],
+                    createdAt: DateTime(2026, 5, 1),
+                    model: storedModel,
+                  ),
+                  onClose: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('context-summary-details-toggle')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('$expected · '), findsOneWidget);
+    }
+  });
   check('operation details paint and close while budgets are pending', (
     tester,
   ) async {

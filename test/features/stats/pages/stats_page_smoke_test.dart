@@ -84,6 +84,9 @@ class _StableAssistantProvider extends AssistantProvider {
 }
 
 class _ControllableStatsChatService extends ChatService {
+  _ControllableStatsChatService({this.models = const []});
+
+  final List<ChatStatsRank> models;
   var queryCount = 0;
   var failQueries = true;
   var _revision = 0;
@@ -107,19 +110,19 @@ class _ControllableStatsChatService extends ChatService {
   }) async {
     queryCount++;
     if (failQueries) throw StateError('stats query failed');
-    return const ChatStatsAggregate(
+    return ChatStatsAggregate(
       conversations: 1,
-      totals: ChatStatsTotals(
+      totals: const ChatStatsTotals(
         messages: 7,
         inputTokens: 11,
         outputTokens: 13,
         cachedTokens: 0,
       ),
-      heatmap: [],
-      trend: [],
-      models: [],
-      assistants: [],
-      topics: [],
+      heatmap: const [],
+      trend: const [],
+      models: models,
+      assistants: const [],
+      topics: const [],
     );
   }
 
@@ -395,7 +398,7 @@ void main() {
     expect(find.text('model-6'), findsOneWidget);
   });
 
-  testWidgets('ranking expand opens a mobile page for long names', (
+  testWidgets('model rankings use display names in the card and mobile page', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -403,29 +406,109 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final ranks = [
-      for (var i = 1; i <= 6; i++)
-        StatsRankItem(
-          id: 'model-$i',
-          label: 'very-long-model-name-that-needs-mobile-dialog-width-$i',
-          value: 10 - i,
+    const providerId = 'rank-provider';
+    const importedProviderId = '$providerId ';
+    const alternateProviderId = '$importedProviderId / shared';
+    const summaryModelId = 'shared / compression-model';
+    const storedSummaryModel = '$importedProviderId / $summaryModelId';
+    const longName = 'very-long-model-name-that-needs-mobile-dialog-width';
+    final chatService = _ControllableStatsChatService(
+      models: [
+        const ChatStatsRank(
+          id: storedSummaryModel,
+          label: storedSummaryModel,
+          count: 10,
         ),
-    ];
+        for (var i = 1; i <= 6; i++)
+          ChatStatsRank(
+            id: 'model-$i',
+            label: 'model-$i',
+            providerId: providerId,
+            originalProviderId: importedProviderId,
+            count: 10 - i,
+          ),
+        const ChatStatsRank(
+          id: 'model-1',
+          label: 'model-1',
+          providerId: 'removed-provider',
+          originalProviderId: 'removed-provider',
+          count: 1,
+        ),
+      ],
+    )..allowSuccessAndInvalidate();
+    final assistants = _StableAssistantProvider();
+    addTearDown(chatService.dispose);
+    addTearDown(assistants.dispose);
+    final settings = (await tester.runAsync(() async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      addTearDown(settings.dispose);
+      await settings.loaded;
+      await settings.setProviderConfig(
+        importedProviderId,
+        ProviderConfig(
+          id: importedProviderId,
+          name: 'Rank Provider',
+          enabled: true,
+          apiKey: '',
+          baseUrl: 'https://example.test',
+          modelOverrides: const {
+            'model-1': {'name': 'First Model'},
+            'model-6': {'name': longName},
+            summaryModelId: {'name': 'Summary Model'},
+          },
+        ),
+      );
+      await settings.setProviderConfig(
+        alternateProviderId,
+        ProviderConfig(
+          id: alternateProviderId,
+          name: 'Alternate Provider',
+          enabled: true,
+          apiKey: '',
+          baseUrl: 'https://example.test',
+          models: const ['compression-model'],
+        ),
+      );
+      return settings;
+    }))!;
 
-    await tester.pumpWidget(_harness(_snapshot(modelRank: ranks)));
+    await tester.pumpWidget(
+      _liveHarness(
+        chatService: chatService,
+        settings: settings,
+        assistants: assistants,
+      ),
+    );
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, -700));
-    await tester.pumpAndSettle();
+    final expand = find.byTooltip('Show all');
+    await tester.scrollUntilVisible(
+      expand,
+      260,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('First Model'), findsOneWidget);
+    expect(find.text('model-2'), findsOneWidget);
+    expect(find.text('model-1'), findsNothing);
+    expect(find.text(longName), findsNothing);
+    expect(find.text(storedSummaryModel), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Show all').first);
+    await tester.runAsync(
+      () => settings.deleteModels(alternateProviderId, {'compression-model'}),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Summary Model'), findsOneWidget);
+    expect(find.text(storedSummaryModel), findsNothing);
+
+    await tester.tap(expand);
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.widgetWithText(AppBar, 'Model Usage'), findsOneWidget);
-    expect(
-      find.text('very-long-model-name-that-needs-mobile-dialog-width-6'),
-      findsOneWidget,
-    );
+    expect(find.text('First Model'), findsOneWidget);
+    expect(find.text(longName), findsOneWidget);
+    expect(find.text('model-1'), findsOneWidget);
+    expect(find.text('Summary Model'), findsOneWidget);
+    expect(find.text(storedSummaryModel), findsNothing);
   });
 
   testWidgets('ranking sections can render per-item leading widgets', (

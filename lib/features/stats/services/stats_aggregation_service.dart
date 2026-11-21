@@ -20,6 +20,7 @@ class StatsAggregationService {
     Map<String, String> assistantNames = const {},
     Map<String, String> providerNames = const {},
     ModelPricingLookup? resolvePricing,
+    String? Function(ChatStatsRank row)? resolveModelName,
   }) {
     final assistantCounts = <String, int>{};
     for (final row in aggregate.assistants) {
@@ -41,7 +42,7 @@ class StatsAggregationService {
       for (final row in aggregate.models)
         StatsRankItem(
           id: row.id,
-          label: row.label,
+          label: resolveModelName?.call(row) ?? row.label,
           value: row.count,
           providerId: row.providerId,
           cost: estimateModelCost(

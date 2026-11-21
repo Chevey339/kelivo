@@ -283,7 +283,7 @@ void main() {
         updatedAt: now,
       );
       final messages = [
-        for (final provider in ['a-usd', 'b-cny', 'c-missing'])
+        for (final provider in ['a-usd ', 'b-cny', 'c-missing', 'c-missing '])
           ChatMessage(
             id: provider,
             role: 'assistant',
@@ -313,12 +313,13 @@ void main() {
       );
       expect(
         aggregate.models.map(
-          (row) => (row.id, row.providerId, row.inputTokens),
+          (row) =>
+              (row.id, row.providerId, row.originalProviderId, row.inputTokens),
         ),
         [
-          ('same-model', 'a-usd', 1000000),
-          ('same-model', 'b-cny', 1000000),
-          ('same-model', 'c-missing', 1000000),
+          ('same-model', 'c-missing', null, 2000000),
+          ('same-model', 'a-usd', 'a-usd ', 1000000),
+          ('same-model', 'b-cny', 'b-cny', 1000000),
         ],
       );
       ModelPricing? pricing(String? provider, String model) =>

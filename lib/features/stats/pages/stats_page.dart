@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import '../../../shared/widgets/ios_date_picker.dart';
 
 import 'package:flutter/material.dart';
@@ -192,10 +193,21 @@ class _StatsPageState extends State<StatsPage> {
             : assistant.name.trim(),
       '_default': l10n.statsPageUnknownAssistant,
     };
+    final providerConfigs = settings.providerConfigs;
     final providerNames = {
-      for (final entry in settings.providerConfigs.entries)
-        entry.key: entry.value.name,
+      for (final entry in providerConfigs.entries) entry.key: entry.value.name,
     };
+    String? resolveModelName(ChatStatsRank row) {
+      final resolver = ModelSpecResolver.instance;
+      if (row.providerId == null) {
+        // A summary copied into a new conversation stores a combined model ID.
+        return resolver.compressionModelDisplayName(row.id, providerConfigs);
+      }
+      final config = providerConfigs[row.originalProviderId];
+      if (config == null) return null;
+      return resolver.resolve(config, row.id).override.displayName;
+    }
+
     ModelPricing? resolvePricing(String? providerKey, String modelId) {
       final key = providerKey?.trim();
       if (key == null || key.isEmpty) return null;
@@ -220,7 +232,7 @@ class _StatsPageState extends State<StatsPage> {
         '$conversationSignature|${_range.preset.name}:'
         '${_range.start}:${_range.end}:${settings.appLaunchCount}:'
         '${_mapSignature(providerNames)}:${_mapSignature(assistantNames)}:'
-        '${_pricingSignature(settings)}:${chatService.statisticsRevision}';
+        '${_modelSettingsSignature(providerConfigs)}:${chatService.statisticsRevision}';
     if (_failedStatsSignature != null && _failedStatsSignature != signature) {
       _failedStatsSignature = null;
     }
@@ -276,6 +288,7 @@ class _StatsPageState extends State<StatsPage> {
                         unknownProviderLabel: l10n.statsPageUnknownProvider,
                         unknownTopicLabel: l10n.statsPageUnknownTopic,
                         resolvePricing: resolvePricing,
+                        resolveModelName: resolveModelName,
                       );
                   _statsSignature = signature;
                   _pendingStatsSignature = null;
@@ -327,12 +340,13 @@ class _StatsPageState extends State<StatsPage> {
     return entries.map((entry) => '${entry.key}=${entry.value}').join(',');
   }
 
-  String _pricingSignature(SettingsProvider settings) {
-    final entries = settings.providerConfigs.entries.toList()
+  String _modelSettingsSignature(Map<String, ProviderConfig> providers) {
+    final entries = providers.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
-    return entries
-        .map((entry) => '${entry.key}=${entry.value.modelOverrides}')
-        .join(',');
+    return jsonEncode([
+      for (final entry in entries)
+        [entry.key, entry.value.models, entry.value.modelOverrides],
+    ]);
   }
 
   void _setPreset(StatsDateRangePreset preset) {
