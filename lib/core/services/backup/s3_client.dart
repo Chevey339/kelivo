@@ -397,14 +397,11 @@ class S3BackupClient {
     final auth =
         'AWS4-HMAC-SHA256 Credential=${cfg.accessKeyId.trim()}/$scope, SignedHeaders=$signedHeaders, Signature=$sig';
 
-    final req = http.StreamedRequest(method, uri);
-    req.headers.addAll({...reqHeaders, 'Authorization': auth});
-    // Pipe file bytes into the request body. addStream honors the sink's pause
-    // signal, so a slow network throttles disk reads instead of buffering the
-    // whole zip in RAM (which OOM-killed large mobile uploads).
-    unawaited(
-      req.sink
-          .addStream(
+    // Let the HTTP client pull file bytes after it opens the connection.
+    final req =
+        _FileUploadRequest(
+            method,
+            uri,
             _watchedByteStream(
               bodyFile.openRead(),
               phase: BackupPhase.uploading,
@@ -413,14 +410,8 @@ class S3BackupClient {
               cancelToken: cancelToken,
             ),
           )
-          .then(
-            (_) => req.sink.close(),
-            onError: (Object error) {
-              req.sink.addError(error);
-              req.sink.close();
-            },
-          ),
-    );
+          ..contentLength = fileLen
+          ..headers.addAll({...reqHeaders, 'Authorization': auth});
 
     final client = http.Client();
     StreamSubscription<void>? cancelSub;
@@ -975,7 +966,10 @@ class S3BackupClient {
     final size = await file.length();
     final partial = '$key.partial';
     final name = _displayNameFromKey(partial);
-    Future<void> put(String objectKey) async {
+    Future<void> put(
+      String objectKey,
+      BackupProgressSink? reportProgress,
+    ) async {
       final res = await _sendSignedStreamedFile(
         cfg,
         method: 'PUT',
@@ -987,7 +981,7 @@ class S3BackupClient {
               : 'application/zip',
         },
         cancelToken: cancelToken,
-        onProgress: onProgress,
+        onProgress: reportProgress,
       );
       cancelToken?.throwIfCancelled();
       if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -995,29 +989,32 @@ class S3BackupClient {
       }
     }
 
+    void beginFinalizing() {
+      // The server may publish the final object before its response arrives.
+      cancelToken?.setCancellable(false);
+      onProgress?.call(
+        BackupProgress(
+          phase: BackupPhase.finalizing,
+          processed: size,
+          total: size,
+          unit: BackupProgressUnit.bytes,
+          cancellable: false,
+        ),
+      );
+    }
+
     await partials.publish(
       scope: _scope(cfg),
       name: name,
       removePartial: () => _deletePartial(cfg, partial),
       write: () async {
-        await put(partial);
+        await put(partial, onProgress);
         cancelToken?.throwIfCancelled();
         final source = [
           cfg.bucket.trim(),
           ...partial.split('/'),
         ].map(_awsEncode).join('/');
-        // Publication is the commit point. Cancelling it could report failure
-        // after the server had already made the final object visible.
-        cancelToken?.setCancellable(false);
-        onProgress?.call(
-          BackupProgress(
-            phase: BackupPhase.finalizing,
-            processed: size,
-            total: size,
-            unit: BackupProgressUnit.bytes,
-            cancellable: false,
-          ),
-        );
+        beginFinalizing();
         final copy = await _sendSigned(
           cfg,
           method: 'PUT',
@@ -1038,19 +1035,17 @@ class S3BackupClient {
                 'UnsupportedOperation',
                 'InvalidRequest',
                 'InvalidArgument',
+                'NoSuchKey',
               }.contains(code)) {
-            cancelToken?.setCancellable(true);
-            await put(key);
-            cancelToken?.setCancellable(false);
-            onProgress?.call(
-              BackupProgress(
-                phase: BackupPhase.finalizing,
-                processed: size,
-                total: size,
-                unit: BackupProgressUnit.bytes,
-                cancellable: false,
-              ),
-            );
+            await put(key, (progress) {
+              // _watchedByteStream reports each chunk before handing it to HTTP.
+              if (progress.processed == progress.total) {
+                beginFinalizing();
+              } else {
+                cancelToken?.setCancellable(true);
+                onProgress?.call(progress);
+              }
+            });
           } else {
             throw Exception('S3 copy failed: ${_extractErrorMessage(copy)}');
           }
@@ -1205,13 +1200,25 @@ class S3BackupClient {
   }
 }
 
+final class _FileUploadRequest extends http.BaseRequest {
+  _FileUploadRequest(super.method, super.url, this._body);
+
+  final Stream<List<int>> _body;
+
+  @override
+  http.ByteStream finalize() {
+    super.finalize();
+    return http.ByteStream(_body);
+  }
+}
+
 Stream<List<int>> _watchedByteStream(
   Stream<List<int>> source, {
   required BackupPhase phase,
   required int? total,
   BackupProgressSink? onProgress,
   BackupCancelToken? cancelToken,
-}) async* {
+}) {
   var processed = 0;
   onProgress?.call(
     BackupProgress(
@@ -1222,10 +1229,8 @@ Stream<List<int>> _watchedByteStream(
       cancellable: true,
     ),
   );
-  await for (final chunk in source) {
-    if (cancelToken?.isCancelled == true) {
-      throw const BackupCancelledException();
-    }
+  return source.map((chunk) {
+    cancelToken?.throwIfCancelled();
     processed += chunk.length;
     onProgress?.call(
       BackupProgress(
@@ -1236,6 +1241,6 @@ Stream<List<int>> _watchedByteStream(
         cancellable: true,
       ),
     );
-    yield chunk;
-  }
+    return chunk;
+  });
 }
