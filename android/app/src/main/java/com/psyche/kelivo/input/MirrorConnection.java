@@ -33,6 +33,8 @@ import java.util.function.Consumer;
 /** Experimental Android authority: full Editable, sparse ordered events. */
 public final class MirrorConnection extends BaseInputConnection {
   static final int QUERY_LIMIT = 2048;
+  // A complete snapshot can carry up to 64 KiB of UTF-16 text over Binder.
+  private static final int EXTRACTED_TEXT_LIMIT = 32 * 1024;
   final View view;
   final String session;
   final MirrorEditable text;
@@ -426,12 +428,11 @@ public final class MirrorConnection extends BaseInputConnection {
     return super.getSurroundingText(Math.min(before, QUERY_LIMIT), Math.min(after, QUERY_LIMIT), flags);
   }
   @Override public ExtractedText getExtractedText(ExtractedTextRequest request, int flags) {
-    // Never expose a partial document as a complete extraction: iFlytek derives
-    // select-all from its length. Large documents use the standard context-menu
-    // action instead, without sending an unbounded snapshot over Binder. Keep
-    // complete small/empty snapshots for IME operations such as paste after cut.
+    // WeChat needs a snapshot for repeated backspace and swipe-to-clear. iFlytek
+    // derives Select All from the snapshot length, so return the whole document
+    // within the bound and let oversized documents use the context-menu action.
     // Monitoring remains unsupported because a later edit can exceed the bound.
-    if (navigationPending || text.length() > QUERY_LIMIT
+    if (navigationPending || text.length() > EXTRACTED_TEXT_LIMIT
         || (flags & GET_EXTRACTED_TEXT_MONITOR) != 0) return null;
     ExtractedText result = new ExtractedText();
     result.text = text.toString();
