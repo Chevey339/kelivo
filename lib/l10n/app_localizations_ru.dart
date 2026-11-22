@@ -17306,6 +17306,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get languageDisplayBangla => 'Бенгальский';
 
   @override
+  String get languageDisplayArabic => 'Арабский';
+
+  @override
+  String get translationLanguageManagerTitle => 'Управление языками перевода';
+
+  @override
+  String get translationLanguageManagerHint =>
+      'Отметьте языки, которые должны отображаться в меню перевода. Перетаскивайте отмеченные языки, чтобы изменить их порядок.';
+
+  @override
+  String get translationLanguageManagerKeepOne =>
+      'Оставьте хотя бы один язык перевода видимым.';
+
+  @override
+  String get translationLanguageManagerSaveFailed =>
+      'Не удалось сохранить языки перевода. Попробуйте ещё раз.';
+
+  @override
   String sideDrawerDeleteConfirmContent(String title) {
     return 'Удалить «$title»?';
   }

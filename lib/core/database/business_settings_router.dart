@@ -130,6 +130,7 @@ final class BusinessKeyRegistry {
     'translate_model_v1',
     'translate_prompt_v1',
     'translate_target_lang_v1',
+    'translate_visible_language_codes_v1',
     'ocr_model_v1',
     'ocr_prompt_v1',
     'ocr_enabled_v1',

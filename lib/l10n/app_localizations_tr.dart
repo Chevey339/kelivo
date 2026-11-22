@@ -17117,6 +17117,24 @@ class AppLocalizationsTr extends AppLocalizations {
   String get languageDisplayBangla => 'Bengalce';
 
   @override
+  String get languageDisplayArabic => 'Arapça';
+
+  @override
+  String get translationLanguageManagerTitle => 'Çeviri dillerini yönet';
+
+  @override
+  String get translationLanguageManagerHint =>
+      'Çeviri menülerinde gösterilecek dilleri işaretleyin. İşaretli dilleri sürükleyerek sıralarını değiştirebilirsiniz.';
+
+  @override
+  String get translationLanguageManagerKeepOne =>
+      'En az bir çeviri dilini görünür tutun.';
+
+  @override
+  String get translationLanguageManagerSaveFailed =>
+      'Çeviri dilleri kaydedilemedi. Tekrar deneyin.';
+
+  @override
   String sideDrawerDeleteConfirmContent(String title) {
     return '\"$title\" silinsin mi?';
   }

@@ -17014,6 +17014,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageDisplayBangla => 'Bangla';
 
   @override
+  String get languageDisplayArabic => 'Arabic';
+
+  @override
+  String get translationLanguageManagerTitle => 'Manage translation languages';
+
+  @override
+  String get translationLanguageManagerHint =>
+      'Check the languages to show in translation menus. Drag checked languages to reorder them.';
+
+  @override
+  String get translationLanguageManagerKeepOne =>
+      'Keep at least one translation language visible.';
+
+  @override
+  String get translationLanguageManagerSaveFailed =>
+      'Could not save the translation languages. Try again.';
+
+  @override
   String sideDrawerDeleteConfirmContent(String title) {
     return 'Delete \"$title\"?';
   }

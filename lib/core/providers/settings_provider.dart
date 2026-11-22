@@ -61,6 +61,7 @@ import '../../theme/palettes.dart';
 import '../../theme/custom_theme.dart';
 import '../../theme/chat_bubble_style.dart';
 import '../models/tool_schema_override.dart';
+import '../models/translation_language.dart';
 import '../services/app_exit_flush.dart';
 import '../services/linux_window_service.dart';
 import '../services/provider_balance_refresh.dart';
@@ -414,6 +415,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _translateModelKey = 'translate_model_v1';
   static const String _translatePromptKey = 'translate_prompt_v1';
   static const String _translateTargetLangKey = 'translate_target_lang_v1';
+  static const String _translateVisibleLanguageCodesKey =
+      'translate_visible_language_codes_v1';
   static const String _ocrEnabledKey = 'ocr_enabled_v1';
   static const String _learningModeEnabledKey = 'learning_mode_enabled_v1';
   static const String _learningModePromptKey = 'learning_mode_prompt_v1';
@@ -865,6 +868,12 @@ class SettingsProvider extends ChangeNotifier {
     if (targetLang != null && targetLang.trim().isNotEmpty) {
       _translateTargetLang = targetLang.trim();
     }
+    final visibleLanguages = _translationLanguagesForCodes(
+      prefs.getStringList(_translateVisibleLanguageCodesKey) ?? const [],
+    );
+    _visibleTranslationLanguages = visibleLanguages.isEmpty
+        ? supportedLanguages
+        : visibleLanguages;
     // load OCR model
     final ocrSel = prefs.getString(_ocrModelKey);
     if (ocrSel != null && ocrSel.contains('::')) {
@@ -4135,6 +4144,36 @@ Please translate the <source_text> section:
   String get translatePrompt => _translatePrompt;
   String? _translateTargetLang;
   String? get translateTargetLang => _translateTargetLang;
+  List<LanguageOption> _visibleTranslationLanguages = supportedLanguages;
+  List<LanguageOption> get visibleTranslationLanguages =>
+      _visibleTranslationLanguages;
+
+  static List<LanguageOption> _translationLanguagesForCodes(
+    Iterable<String> codes,
+  ) {
+    final byCode = {
+      for (final language in supportedLanguages) language.code: language,
+    };
+    return List.unmodifiable([
+      for (final code in codes.toSet())
+        if (byCode[code] case final language?) language,
+    ]);
+  }
+
+  Future<void> setVisibleTranslationLanguages(Iterable<String> codes) async {
+    final languages = _translationLanguagesForCodes(codes);
+    if (languages.isEmpty) return;
+    await loaded;
+    if (listEquals(languages, supportedLanguages)) {
+      await _preferences.remove(_translateVisibleLanguageCodesKey);
+    } else {
+      await _preferences.setStringList(_translateVisibleLanguageCodesKey, [
+        for (final language in languages) language.code,
+      ]);
+    }
+    _visibleTranslationLanguages = languages;
+    notifyListeners();
+  }
 
   Future<void> setTranslateModel(String providerKey, String modelId) async {
     _translateModelProvider = providerKey;
@@ -6448,6 +6487,7 @@ Requirements:
     copy._translateModelId = _translateModelId;
     copy._translatePrompt = _translatePrompt;
     copy._translateTargetLang = _translateTargetLang;
+    copy._visibleTranslationLanguages = _visibleTranslationLanguages;
     copy._ocrModelProvider = _ocrModelProvider;
     copy._ocrModelId = _ocrModelId;
     copy._ocrPrompt = _ocrPrompt;

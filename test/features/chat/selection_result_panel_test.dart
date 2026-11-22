@@ -5,7 +5,7 @@ import 'dart:async';
 
 import 'package:Kelivo/features/chat/controllers/selection_translation_controller.dart';
 import 'package:Kelivo/features/chat/widgets/selection_result_panel.dart';
-import 'package:Kelivo/features/settings/widgets/language_select_sheet.dart';
+import 'package:Kelivo/core/models/translation_language.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +18,7 @@ void main() {
       final settings = SettingsProvider(createBusinessTestPreferences());
       await settings.loaded;
       addTearDown(settings.dispose);
+      await settings.setVisibleTranslationLanguages(['zh-CN', 'en']);
       final runs = <StreamController<String>>[];
       final languages = <String>[];
       String? copied;
@@ -98,6 +99,7 @@ void main() {
       expect(copied, '完整译文');
       await tester.tap(find.text('简体中文'));
       await tester.pumpAndSettle();
+      expect(find.text('阿拉伯语'), findsNothing);
       await tester.tap(find.text('English').last);
       await tester.pump();
       expect(languages.last, 'English');

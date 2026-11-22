@@ -29820,6 +29820,36 @@ abstract class AppLocalizations {
   /// **'Bangla'**
   String get languageDisplayBangla;
 
+  /// Name of the Arabic language as a target in the translation menus and standalone translator.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic'**
+  String get languageDisplayArabic;
+
+  /// Tooltip for the standalone translator's top-right button and title of the dialog for choosing visible translation languages and their order.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage translation languages'**
+  String get translationLanguageManagerTitle;
+
+  /// Instructions above the translation language management list. Checked languages appear in the translation menus in the order set by dragging.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the languages to show in translation menus. Drag checked languages to reorder them.'**
+  String get translationLanguageManagerHint;
+
+  /// Validation message in the translation language manager when no languages are checked and the Save button is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep at least one translation language visible.'**
+  String get translationLanguageManagerKeepOne;
+
+  /// Error in the translation language manager if saving the visible languages or their order fails. The user can retry with their current choices.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the translation languages. Try again.'**
+  String get translationLanguageManagerSaveFailed;
+
   /// Confirmation question before deleting the named chat from the sidebar. Keep the title placeholder; reorder the sentence naturally.
   ///
   /// In en, this message translates to:

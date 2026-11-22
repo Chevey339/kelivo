@@ -8666,6 +8666,26 @@
   "@languageDisplayBangla": {
     "description": "Name of the Bengali language (Bangla) as a target in the assistant reply translation menu and standalone translator."
   },
+  "languageDisplayArabic": "Arabic",
+  "@languageDisplayArabic": {
+    "description": "Name of the Arabic language as a target in the translation menus and standalone translator."
+  },
+  "translationLanguageManagerTitle": "Manage translation languages",
+  "@translationLanguageManagerTitle": {
+    "description": "Tooltip for the standalone translator's top-right button and title of the dialog for choosing visible translation languages and their order."
+  },
+  "translationLanguageManagerHint": "Check the languages to show in translation menus. Drag checked languages to reorder them.",
+  "@translationLanguageManagerHint": {
+    "description": "Instructions above the translation language management list. Checked languages appear in the translation menus in the order set by dragging."
+  },
+  "translationLanguageManagerKeepOne": "Keep at least one translation language visible.",
+  "@translationLanguageManagerKeepOne": {
+    "description": "Validation message in the translation language manager when no languages are checked and the Save button is disabled."
+  },
+  "translationLanguageManagerSaveFailed": "Could not save the translation languages. Try again.",
+  "@translationLanguageManagerSaveFailed": {
+    "description": "Error in the translation language manager if saving the visible languages or their order fails. The user can retry with their current choices."
+  },
   "sideDrawerDeleteConfirmContent": "Delete \"{title}\"?",
   "@sideDrawerDeleteConfirmContent": {
     "description": "Confirmation question before deleting the named chat from the sidebar. Keep the title placeholder; reorder the sentence naturally.",

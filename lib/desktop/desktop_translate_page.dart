@@ -8,6 +8,7 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'macos_window_drag_area.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
+import '../core/models/translation_language.dart';
 import '../features/home/widgets/model_icon.dart';
 import '../core/providers/settings_provider.dart';
 import '../theme/app_semantic_colors.dart';
@@ -15,15 +16,12 @@ import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
 import '../core/services/api/stream/stream_chunk.dart';
 import '../shared/widgets/snackbar.dart';
+import '../features/translate/widgets/translation_languages_button.dart';
 import '../features/translate/widgets/translation_output.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
 import '../features/settings/widgets/language_select_sheet.dart'
-    show
-        LanguageOption,
-        buildLanguageFlag,
-        languageDisplayName,
-        supportedLanguages;
+    show languageDisplayName;
 
 class DesktopTranslatePage extends StatefulWidget {
   const DesktopTranslatePage({super.key});
@@ -36,7 +34,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   final TextEditingController _source = TextEditingController();
   final ValueNotifier<String> _output = ValueNotifier('');
 
-  LanguageOption? _targetLang;
   String? _modelProviderKey;
   String? _modelId;
 
@@ -64,15 +61,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     final settings = context.read<SettingsProvider>();
     final assistant = context.read<AssistantProvider>().currentAssistant;
 
-    final savedLang = _languageForCode(settings.translateTargetLang);
-    final locale = Localizations.localeOf(context).languageCode.toLowerCase();
-    final localeLang = locale.startsWith('zh')
-        ? _languageForCode('zh-CN')
-        : _languageForCode(locale) ?? _languageForCode('en');
-    setState(() {
-      _targetLang = savedLang ?? localeLang ?? supportedLanguages.first;
-    });
-
     // Default model: translate model -> assistant's chat model -> global default
     final providerKey =
         settings.translateModelProvider ??
@@ -86,21 +74,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _modelProviderKey = providerKey;
       _modelId = modelId;
     });
-  }
-
-  LanguageOption? _languageForCode(String? code) {
-    if (code == null || code.isEmpty) return null;
-    try {
-      return supportedLanguages.firstWhere((e) => e.code == code);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _onLanguageChanged(LanguageOption? lang) async {
-    if (lang == null) return;
-    setState(() => _targetLang = lang);
-    await context.read<SettingsProvider>().setTranslateTargetLang(lang.code);
   }
 
   Future<void> _pickModel() async {
@@ -122,7 +95,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     await settings.setTranslateModel(sel.providerKey, sel.modelId);
   }
 
-  Future<void> _startTranslate() async {
+  Future<void> _startTranslate(LanguageOption target) async {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
 
@@ -142,10 +115,9 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
     final cfg = settings.getProviderConfig(providerKey);
 
-    final lang = _targetLang ?? supportedLanguages.first;
     final prompt = settings.translatePrompt
         .replaceAll('{source_text}', text)
-        .replaceAll('{target_lang}', languageDisplayName(l10n, lang.code));
+        .replaceAll('{target_lang}', languageDisplayName(l10n, target.code));
 
     setState(() {
       _translating = true;
@@ -209,22 +181,40 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     final cs = Theme.of(context).colorScheme;
     final compact = MediaQuery.sizeOf(context).width < 600;
     final l10n = AppLocalizations.of(context)!;
+    final (languages, selectedCode) = context.select(
+      (SettingsProvider settings) =>
+          (settings.visibleTranslationLanguages, settings.translateTargetLang),
+    );
+    final target = standaloneTranslationLanguage(
+      languages,
+      selectedCode: selectedCode,
+      localeLanguageCode: Localizations.localeOf(context).languageCode,
+    );
 
     final topBar = SizedBox(
       height: 36,
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 16, top: 8),
-          child: Text(
-            l10n.desktopNavTranslateTooltip, // 显示“翻译”
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: AppFontWeights.semibold,
-              color: cs.onSurface,
-              decoration: TextDecoration.none,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  l10n.desktopNavTranslateTooltip,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
             ),
-          ),
+            TranslationLanguagesButton(enabled: !_translating),
+          ],
         ),
       ),
     );
@@ -266,16 +256,22 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                     children: [
                                       Flexible(
                                         child: _LanguageDropdown(
-                                          value: _targetLang,
+                                          value: target,
+                                          languages: languages,
                                           onChanged: _translating
                                               ? null
-                                              : _onLanguageChanged,
+                                              : (language) => context
+                                                    .read<SettingsProvider>()
+                                                    .setTranslateTargetLang(
+                                                      language.code,
+                                                    ),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       _TranslateButton(
                                         translating: _translating,
-                                        onTranslate: _startTranslate,
+                                        onTranslate: () =>
+                                            _startTranslate(target),
                                         onStop: _stopTranslate,
                                       ),
                                     ],
@@ -418,9 +414,14 @@ class _PaneContainer extends StatelessWidget {
 }
 
 class _LanguageDropdown extends StatefulWidget {
-  const _LanguageDropdown({required this.value, required this.onChanged});
-  final LanguageOption? value;
-  final ValueChanged<LanguageOption?>? onChanged;
+  const _LanguageDropdown({
+    required this.value,
+    required this.languages,
+    required this.onChanged,
+  });
+  final LanguageOption value;
+  final List<LanguageOption> languages;
+  final ValueChanged<LanguageOption>? onChanged;
 
   @override
   State<_LanguageDropdown> createState() => _LanguageDropdownState();
@@ -479,7 +480,8 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                   widget.onChanged?.call(opt);
                   _close();
                 },
-                selected: widget.value ?? supportedLanguages.first,
+                selected: widget.value,
+                languages: widget.languages,
               ),
             ),
           ],
@@ -499,7 +501,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     final hoverBorder = cs.primary; // hover/focus border
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
-    final selected = widget.value ?? supportedLanguages.first;
+    final selected = widget.value;
     final label = languageDisplayName(l10n, selected.code);
 
     return CompositedTransformTarget(
@@ -536,7 +538,10 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    buildLanguageFlag(selected, size: 16, lineHeight: 1),
+                    Text(
+                      selected.flag,
+                      style: TextStyle(fontSize: 16, height: 1),
+                    ),
                     const SizedBox(width: 8),
                     Flexible(
                       child: ConstrainedBox(
@@ -585,6 +590,7 @@ class _LangDropdownOverlay extends StatefulWidget {
     required this.onClose,
     required this.onSelected,
     required this.selected,
+    required this.languages,
   });
 
   final double width;
@@ -592,6 +598,7 @@ class _LangDropdownOverlay extends StatefulWidget {
   final VoidCallback onClose;
   final ValueChanged<LanguageOption> onSelected;
   final LanguageOption selected;
+  final List<LanguageOption> languages;
 
   @override
   State<_LangDropdownOverlay> createState() => _LangDropdownOverlayState();
@@ -630,10 +637,6 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final borderColor = cs.outlineVariant.withValues(alpha: 0.12);
-    // divider removed
-
-    final filtered = supportedLanguages;
-
     return FadeTransition(
       opacity: _opacity,
       child: SlideTransition(
@@ -670,9 +673,9 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay>
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
                       shrinkWrap: true,
-                      itemCount: filtered.length,
+                      itemCount: widget.languages.length,
                       itemBuilder: (context, index) {
-                        final item = filtered[index];
+                        final item = widget.languages[index];
                         final selected = item.code == widget.selected.code;
                         return _LangOptionTile(
                           option: item,
@@ -747,7 +750,10 @@ class _LangOptionTileState extends State<_LangOptionTile> {
             ),
             child: Row(
               children: [
-                buildLanguageFlag(widget.option, size: 16, lineHeight: 1),
+                Text(
+                  widget.option.flag,
+                  style: TextStyle(fontSize: 16, height: 1),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

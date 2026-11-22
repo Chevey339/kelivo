@@ -16102,6 +16102,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageDisplayBangla => '孟加拉语';
 
   @override
+  String get languageDisplayArabic => '阿拉伯语';
+
+  @override
+  String get translationLanguageManagerTitle => '管理翻译语言';
+
+  @override
+  String get translationLanguageManagerHint => '勾选要在翻译菜单中显示的语言，拖动已勾选的语言可以调整顺序。';
+
+  @override
+  String get translationLanguageManagerKeepOne => '请至少保留一种翻译语言。';
+
+  @override
+  String get translationLanguageManagerSaveFailed => '无法保存翻译语言设置，请重试。';
+
+  @override
   String sideDrawerDeleteConfirmContent(String title) {
     return '删除“$title”？';
   }
@@ -32832,6 +32847,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get languageDisplayBangla => '孟加拉语';
+
+  @override
+  String get languageDisplayArabic => '阿拉伯语';
+
+  @override
+  String get translationLanguageManagerTitle => '管理翻译语言';
+
+  @override
+  String get translationLanguageManagerHint => '勾选要在翻译菜单中显示的语言，拖动已勾选的语言可以调整顺序。';
+
+  @override
+  String get translationLanguageManagerKeepOne => '请至少保留一种翻译语言。';
+
+  @override
+  String get translationLanguageManagerSaveFailed => '无法保存翻译语言设置，请重试。';
 
   @override
   String sideDrawerDeleteConfirmContent(String title) {
@@ -49586,6 +49616,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get languageDisplayBangla => '孟加拉語';
+
+  @override
+  String get languageDisplayArabic => '阿拉伯文';
+
+  @override
+  String get translationLanguageManagerTitle => '管理翻譯語言';
+
+  @override
+  String get translationLanguageManagerHint => '勾選要在翻譯選單中顯示的語言，拖曳已勾選的語言可以調整順序。';
+
+  @override
+  String get translationLanguageManagerKeepOne => '請至少保留一種翻譯語言。';
+
+  @override
+  String get translationLanguageManagerSaveFailed => '無法儲存翻譯語言設定，請重試。';
 
   @override
   String sideDrawerDeleteConfirmContent(String title) {
