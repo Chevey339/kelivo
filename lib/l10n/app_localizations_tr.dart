@@ -17120,11 +17120,17 @@ class AppLocalizationsTr extends AppLocalizations {
   String get languageDisplayArabic => 'Arapça';
 
   @override
-  String get translationLanguageManagerTitle => 'Çeviri dillerini yönet';
+  String get translationLanguageManagerTitle => 'Çeviri dilleri';
 
   @override
   String get translationLanguageManagerHint =>
-      'Çeviri menülerinde gösterilecek dilleri işaretleyin. İşaretli dilleri sürükleyerek sıralarını değiştirebilirsiniz.';
+      'Gösterilecek dilleri açın. Sıralamak için sürükleyin.';
+
+  @override
+  String get translationLanguageManagerShown => 'Menülerde gösterilir';
+
+  @override
+  String get translationLanguageManagerHidden => 'Gizli';
 
   @override
   String get translationLanguageManagerKeepOne =>

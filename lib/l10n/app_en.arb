@@ -8670,13 +8670,21 @@
   "@languageDisplayArabic": {
     "description": "Name of the Arabic language as a target in the translation menus and standalone translator."
   },
-  "translationLanguageManagerTitle": "Manage translation languages",
+  "translationLanguageManagerTitle": "Translation languages",
   "@translationLanguageManagerTitle": {
-    "description": "Tooltip for the standalone translator's top-right button and title of the dialog for choosing visible translation languages and their order."
+    "description": "Accessible label for the translation toolbar action and title of its mobile page or desktop dialog. The settings control which target languages appear and in what order."
   },
-  "translationLanguageManagerHint": "Check the languages to show in translation menus. Drag checked languages to reorder them.",
+  "translationLanguageManagerHint": "Turn on the languages to show. Drag to reorder.",
   "@translationLanguageManagerHint": {
-    "description": "Instructions above the translation language management list. Checked languages appear in the translation menus in the order set by dragging."
+    "description": "Brief instructions above the translation languages list. Turning on a switch shows its language in translation menus. Drag handles on those rows change the order."
+  },
+  "translationLanguageManagerShown": "Shown in menus",
+  "@translationLanguageManagerShown": {
+    "description": "Section heading above the enabled translation languages. These languages appear in translation menus in this order."
+  },
+  "translationLanguageManagerHidden": "Hidden",
+  "@translationLanguageManagerHidden": {
+    "description": "Section heading above translation languages that are currently hidden from the translation menus and can be turned on again."
   },
   "translationLanguageManagerKeepOne": "Keep at least one translation language visible.",
   "@translationLanguageManagerKeepOne": {

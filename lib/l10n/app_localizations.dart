@@ -29826,17 +29826,29 @@ abstract class AppLocalizations {
   /// **'Arabic'**
   String get languageDisplayArabic;
 
-  /// Tooltip for the standalone translator's top-right button and title of the dialog for choosing visible translation languages and their order.
+  /// Accessible label for the translation toolbar action and title of its mobile page or desktop dialog. The settings control which target languages appear and in what order.
   ///
   /// In en, this message translates to:
-  /// **'Manage translation languages'**
+  /// **'Translation languages'**
   String get translationLanguageManagerTitle;
 
-  /// Instructions above the translation language management list. Checked languages appear in the translation menus in the order set by dragging.
+  /// Brief instructions above the translation languages list. Turning on a switch shows its language in translation menus. Drag handles on those rows change the order.
   ///
   /// In en, this message translates to:
-  /// **'Check the languages to show in translation menus. Drag checked languages to reorder them.'**
+  /// **'Turn on the languages to show. Drag to reorder.'**
   String get translationLanguageManagerHint;
+
+  /// Section heading above the enabled translation languages. These languages appear in translation menus in this order.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown in menus'**
+  String get translationLanguageManagerShown;
+
+  /// Section heading above translation languages that are currently hidden from the translation menus and can be turned on again.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get translationLanguageManagerHidden;
 
   /// Validation message in the translation language manager when no languages are checked and the Save button is disabled.
   ///

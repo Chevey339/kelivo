@@ -19,8 +19,8 @@ import '../../settings/widgets/language_select_sheet.dart'
 import '../../../core/services/haptics.dart';
 import '../../model/widgets/model_select_sheet.dart' show showModelSelector;
 import '../../../theme/app_font_weights.dart';
-import '../widgets/translation_languages_button.dart';
 import '../widgets/translation_output.dart';
+import 'translation_languages_page.dart';
 
 class TranslatePage extends StatefulWidget {
   const TranslatePage({super.key});
@@ -234,6 +234,21 @@ class _TranslatePageState extends State<TranslatePage> {
         ),
         title: Text(l10n.desktopNavTranslateTooltip),
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: IosIconButton(
+              icon: lucide.Lucide.SlidersHorizontal,
+              size: 20,
+              padding: const EdgeInsets.all(8),
+              tooltip: l10n.translationLanguageManagerTitle,
+              enabled: !_loading,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const TranslationLanguagesPage(),
+                ),
+              ),
+            ),
+          ),
           // Paste
           Tooltip(
             message: l10n.translatePagePasteButton,
@@ -289,10 +304,6 @@ class _TranslatePageState extends State<TranslatePage> {
                     ),
               onTap: _pickModel,
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TranslationLanguagesButton(enabled: !_loading, minSize: 44),
           ),
         ],
       ),

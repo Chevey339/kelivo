@@ -16,7 +16,10 @@ import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
 import '../core/services/api/stream/stream_chunk.dart';
 import '../shared/widgets/snackbar.dart';
-import '../features/translate/widgets/translation_languages_button.dart';
+import '../shared/widgets/ios_tactile.dart';
+import '../shared/widgets/ios_text_button.dart';
+import '../features/settings/widgets/custom_theme_widgets.dart';
+import '../features/translate/widgets/translation_languages_editor.dart';
 import '../features/translate/widgets/translation_output.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
@@ -176,8 +179,48 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     if (mounted) setState(() => _translating = false);
   }
 
+  Future<void> _manageLanguages() async {
+    await showAppDialog<void>(
+      context,
+      maxWidth: 400,
+      child: Builder(
+        builder: (dialogContext) => TranslationLanguagesEditor(
+          compact: true,
+          onSaved: () {
+            if (ModalRoute.of(dialogContext)?.isCurrent == true) {
+              Navigator.of(dialogContext).pop();
+            }
+          },
+          builder: (context, body, onSave) => ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppDialogHeader(
+                  title: AppLocalizations.of(
+                    context,
+                  )!.translationLanguageManagerTitle,
+                  actions: [
+                    IosTextButton(
+                      label: MaterialLocalizations.of(context).saveButtonLabel,
+                      onPressed: onSave,
+                    ),
+                  ],
+                ),
+                Flexible(child: body),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    const paneTextPadding = EdgeInsets.fromLTRB(14, 14, 46, 14);
+    const paneTextStyle = TextStyle(fontSize: 14.5, height: 1.4);
     final cs = Theme.of(context).colorScheme;
     final compact = MediaQuery.sizeOf(context).width < 600;
     final l10n = AppLocalizations.of(context)!;
@@ -193,28 +236,20 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
     final topBar = SizedBox(
       height: 36,
-      child: Padding(
-        padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  l10n.desktopNavTranslateTooltip,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: AppFontWeights.semibold,
-                    color: cs.onSurface,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(start: 16, top: 8),
+          child: Text(
+            l10n.desktopNavTranslateTooltip,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: AppFontWeights.semibold,
+              color: cs.onSurface,
             ),
-            TranslationLanguagesButton(enabled: !_translating),
-          ],
+          ),
         ),
       ),
     );
@@ -267,7 +302,18 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                                     ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 4),
+                                      IosIconButton(
+                                        icon: lucide.Lucide.SlidersHorizontal,
+                                        size: 16,
+                                        minSize: 30,
+                                        color: cs.onSurfaceVariant,
+                                        tooltip: l10n
+                                            .translationLanguageManagerTitle,
+                                        enabled: !_translating,
+                                        onTap: _manageLanguages,
+                                      ),
+                                      const SizedBox(width: 4),
                                       _TranslateButton(
                                         translating: _translating,
                                         onTranslate: () =>
@@ -326,11 +372,15 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   expands: true,
                                   decoration: InputDecoration(
                                     hintText: l10n.translatePageInputHint,
+                                    hintStyle: paneTextStyle.copyWith(
+                                      color: Theme.of(context).hintColor,
+                                    ),
                                     border: InputBorder.none,
                                     isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
+                                    visualDensity: VisualDensity.standard,
+                                    contentPadding: paneTextPadding,
                                   ),
-                                  style: TextStyle(fontSize: 14.5, height: 1.4),
+                                  style: paneTextStyle,
                                 ),
                               ),
                             ),
@@ -359,16 +409,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                 child: TranslationOutput(
                                   text: _output,
                                   streaming: _translating,
-                                  padding: const EdgeInsets.fromLTRB(
-                                    14,
-                                    44,
-                                    14,
-                                    14,
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 14.5,
-                                    height: 1.4,
-                                  ),
+                                  padding: paneTextPadding,
+                                  style: paneTextStyle,
                                 ),
                               ),
                             ),

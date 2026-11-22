@@ -16105,10 +16105,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageDisplayArabic => '阿拉伯语';
 
   @override
-  String get translationLanguageManagerTitle => '管理翻译语言';
+  String get translationLanguageManagerTitle => '翻译语言';
 
   @override
-  String get translationLanguageManagerHint => '勾选要在翻译菜单中显示的语言，拖动已勾选的语言可以调整顺序。';
+  String get translationLanguageManagerHint => '开启开关即可显示，拖动调整顺序。';
+
+  @override
+  String get translationLanguageManagerShown => '显示在菜单中';
+
+  @override
+  String get translationLanguageManagerHidden => '已隐藏';
 
   @override
   String get translationLanguageManagerKeepOne => '请至少保留一种翻译语言。';
@@ -32852,10 +32858,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get languageDisplayArabic => '阿拉伯语';
 
   @override
-  String get translationLanguageManagerTitle => '管理翻译语言';
+  String get translationLanguageManagerTitle => '翻译语言';
 
   @override
-  String get translationLanguageManagerHint => '勾选要在翻译菜单中显示的语言，拖动已勾选的语言可以调整顺序。';
+  String get translationLanguageManagerHint => '开启开关即可显示，拖动调整顺序。';
+
+  @override
+  String get translationLanguageManagerShown => '显示在菜单中';
+
+  @override
+  String get translationLanguageManagerHidden => '已隐藏';
 
   @override
   String get translationLanguageManagerKeepOne => '请至少保留一种翻译语言。';
@@ -49621,10 +49633,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get languageDisplayArabic => '阿拉伯文';
 
   @override
-  String get translationLanguageManagerTitle => '管理翻譯語言';
+  String get translationLanguageManagerTitle => '翻譯語言';
 
   @override
-  String get translationLanguageManagerHint => '勾選要在翻譯選單中顯示的語言，拖曳已勾選的語言可以調整順序。';
+  String get translationLanguageManagerHint => '開啟開關即可顯示，拖曳調整順序。';
+
+  @override
+  String get translationLanguageManagerShown => '顯示於選單中';
+
+  @override
+  String get translationLanguageManagerHidden => '已隱藏';
 
   @override
   String get translationLanguageManagerKeepOne => '請至少保留一種翻譯語言。';

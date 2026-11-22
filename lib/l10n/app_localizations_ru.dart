@@ -17309,11 +17309,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get languageDisplayArabic => 'Арабский';
 
   @override
-  String get translationLanguageManagerTitle => 'Управление языками перевода';
+  String get translationLanguageManagerTitle => 'Языки перевода';
 
   @override
   String get translationLanguageManagerHint =>
-      'Отметьте языки, которые должны отображаться в меню перевода. Перетаскивайте отмеченные языки, чтобы изменить их порядок.';
+      'Включите языки, которые должны отображаться. Перетаскивайте для изменения порядка.';
+
+  @override
+  String get translationLanguageManagerShown => 'Показаны в меню';
+
+  @override
+  String get translationLanguageManagerHidden => 'Скрыты';
 
   @override
   String get translationLanguageManagerKeepOne =>

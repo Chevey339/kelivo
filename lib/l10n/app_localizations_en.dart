@@ -17017,11 +17017,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageDisplayArabic => 'Arabic';
 
   @override
-  String get translationLanguageManagerTitle => 'Manage translation languages';
+  String get translationLanguageManagerTitle => 'Translation languages';
 
   @override
   String get translationLanguageManagerHint =>
-      'Check the languages to show in translation menus. Drag checked languages to reorder them.';
+      'Turn on the languages to show. Drag to reorder.';
+
+  @override
+  String get translationLanguageManagerShown => 'Shown in menus';
+
+  @override
+  String get translationLanguageManagerHidden => 'Hidden';
 
   @override
   String get translationLanguageManagerKeepOne =>

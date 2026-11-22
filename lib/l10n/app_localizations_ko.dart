@@ -16497,11 +16497,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get languageDisplayArabic => '아랍어';
 
   @override
-  String get translationLanguageManagerTitle => '번역 언어 관리';
+  String get translationLanguageManagerTitle => '번역 언어';
 
   @override
-  String get translationLanguageManagerHint =>
-      '번역 메뉴에 표시할 언어를 선택하세요. 선택한 언어를 드래그하여 순서를 변경할 수 있습니다.';
+  String get translationLanguageManagerHint => '표시할 언어를 켜세요. 드래그하여 순서를 변경하세요.';
+
+  @override
+  String get translationLanguageManagerShown => '메뉴에 표시됨';
+
+  @override
+  String get translationLanguageManagerHidden => '숨김';
 
   @override
   String get translationLanguageManagerKeepOne => '번역 언어를 하나 이상 표시해야 합니다.';
