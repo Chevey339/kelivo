@@ -2085,25 +2085,30 @@ class ChatActions {
     }
     final streamingMessage = answeredMessage.copyWith(isStreaming: true);
     _activeAssistantMessages.put(streamingMessage);
-    chatController.publishGenerationStarted(streamingMessage);
-    await chatService.updateMessage(streamingMessage.id, isStreaming: true);
-    onMessagesChanged?.call();
-    _setConversationLoading(conversation.id, true);
-
-    final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          _selectedReasoning(
-            settings: settings,
-            providerKey: providerKey,
-            modelId: modelId,
-            assistant: assistant,
-          ),
-        );
-
-    _bindFileProcessingCallbacks();
     try {
+      await chatService.updateMessage(streamingMessage.id, isStreaming: true);
+      if (isStopping(conversation.id) ||
+          !_activeAssistantMessages.isActive(streamingMessage)) {
+        return ChatActionResult.success(streamingMessage);
+      }
+      // A window opened during the write may still show the completed snapshot.
+      chatController.publishGenerationStarted(streamingMessage);
+      onMessagesChanged?.call();
+      _setConversationLoading(conversation.id, true);
+
+      final supportsReasoning = _isReasoningModel(providerKey, modelId);
+      final enableReasoning =
+          supportsReasoning &&
+          _isReasoningEnabled(
+            _selectedReasoning(
+              settings: settings,
+              providerKey: providerKey,
+              modelId: modelId,
+              assistant: assistant,
+            ),
+          );
+
+      _bindFileProcessingCallbacks();
       final apiContextMessages = List<ChatMessage>.of(completeMessages);
       apiContextMessages[contextIndex] = streamingMessage;
       final prepared = await messageGenerationService

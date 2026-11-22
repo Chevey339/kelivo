@@ -1162,9 +1162,28 @@ class HomeViewModel extends ChangeNotifier {
     return PreparedConversationSwitch(conversation: convo, window: window);
   }
 
-  /// Commit phase of an animated conversation switch: installs a snapshot
-  /// previously fetched by [prepareConversationSwitch].
-  void commitConversationSwitch(PreparedConversationSwitch prepared) {
+  /// Installs the prepared window while the switch still owns the UI.
+  Future<bool> commitConversationSwitch(
+    PreparedConversationSwitch? prepared, {
+    required bool Function() isCurrent,
+  }) async {
+    while (prepared != null && isCurrent()) {
+      final id = prepared.conversation.id;
+      if (_chatService.getCompleteConversation(id) == null) return false;
+      final page = prepared.window.page;
+      if (page == null || _chatService.isTimelinePageCurrent(page)) {
+        _commitConversationSwitch(prepared);
+        return true;
+      }
+
+      // A background reply can finish after the window was read and before
+      // this switch is ready to display it. Reload the complete reply.
+      prepared = await prepareConversationSwitch(id);
+    }
+    return false;
+  }
+
+  void _commitConversationSwitch(PreparedConversationSwitch prepared) {
     final id = prepared.conversation.id;
     _chatService.setCurrentConversation(id);
     _syncContextUsageConversation(id);

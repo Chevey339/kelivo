@@ -18,6 +18,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
@@ -93,6 +95,93 @@ class _GatedChatRepository extends ChatDatabaseRepository {
     return super.hasDueAssetGc();
   }
 
+  String? holdMessageReadFor;
+  final messageRead = Completer<ChatMessage>();
+  final releaseMessageRead = Completer<void>();
+
+  @override
+  Future<List<ChatMessage>> getMessagesByIds(
+    List<String> ids, {
+    bool background = false,
+  }) {
+    final result = super.getMessagesByIds(ids, background: background);
+    final id = holdMessageReadFor;
+    if (id == null || !ids.contains(id)) return result;
+    holdMessageReadFor = null;
+    return result.then((messages) async {
+      messageRead.complete(messages.singleWhere((message) => message.id == id));
+      await releaseMessageRead.future;
+      return messages;
+    });
+  }
+
+  String? holdResumeWriteFor;
+  final resumeWriteStarted = Completer<void>();
+  final releaseResumeWrite = Completer<void>();
+
+  @override
+  Future<ChatMessage?> updateMessageFields(
+    String messageId, {
+    String? content,
+    List<MessagePart>? parts,
+    int? totalTokens,
+    bool? isStreaming,
+    String? reasoningText,
+    DateTime? reasoningStartAt,
+    DateTime? reasoningFinishedAt,
+    String? translation,
+    String? reasoningSegmentsJson,
+    int? promptTokens,
+    int? completionTokens,
+    int? cachedTokens,
+    int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
+  }) async {
+    if (messageId == holdResumeWriteFor && isStreaming == true) {
+      holdResumeWriteFor = null;
+      resumeWriteStarted.complete();
+      await releaseResumeWrite.future;
+    }
+    return super.updateMessageFields(
+      messageId,
+      content: content,
+      parts: parts,
+      totalTokens: totalTokens,
+      isStreaming: isStreaming,
+      reasoningText: reasoningText,
+      reasoningStartAt: reasoningStartAt,
+      reasoningFinishedAt: reasoningFinishedAt,
+      translation: translation,
+      reasoningSegmentsJson: reasoningSegmentsJson,
+      promptTokens: promptTokens,
+      completionTokens: completionTokens,
+      cachedTokens: cachedTokens,
+      durationMs: durationMs,
+      reasoningTokens: reasoningTokens,
+      cacheWriteTokens: cacheWriteTokens,
+    );
+  }
+
+  String? holdToolEventsFor;
+  final toolEventsRead = Completer<List<Map<String, dynamic>>>();
+  final releaseToolEvents = Completer<void>();
+
+  @override
+  Future<Map<String, List<Map<String, dynamic>>>> getToolEventsForMessages(
+    Iterable<String> messageIds,
+  ) {
+    final result = super.getToolEventsForMessages(messageIds);
+    final id = holdToolEventsFor;
+    if (id == null || !messageIds.contains(id)) return result;
+    holdToolEventsFor = null;
+    return result.then((events) async {
+      toolEventsRead.complete(events[id] ?? const []);
+      await releaseToolEvents.future;
+      return events;
+    });
+  }
+
   late final _gatedCompression = _GatedCompressionRepository(
     super.compression.store,
   );
@@ -122,6 +211,36 @@ class _GatedChatService extends ChatService {
   bool holdBeforeFailedWrite = false;
   final beforeFailedWrite = Completer<String>();
   bool failContextRead = false;
+
+  String? holdTimelineFor;
+  final timelineRead = Completer<LoadedTimelinePage?>();
+  final releaseTimeline = Completer<void>();
+
+  @override
+  Future<LoadedTimelinePage?> loadTimelinePage(
+    String conversationId, {
+    String? beforeRevisionId,
+    String? afterRevisionId,
+    String? aroundRevisionId,
+    bool fromStart = false,
+    int limit = 40,
+  }) {
+    final result = super.loadTimelinePage(
+      conversationId,
+      beforeRevisionId: beforeRevisionId,
+      afterRevisionId: afterRevisionId,
+      aroundRevisionId: aroundRevisionId,
+      fromStart: fromStart,
+      limit: limit,
+    );
+    if (conversationId != holdTimelineFor) return result;
+    holdTimelineFor = null;
+    return result.then((page) async {
+      timelineRead.complete(page);
+      await releaseTimeline.future;
+      return page;
+    });
+  }
 
   @override
   Future<List<ChatMessage>> loadSelectedContextMessages(
@@ -667,6 +786,227 @@ void main() {
     );
     return config;
   }
+
+  for (final resumes in [false, true]) {
+    test(
+      'timeline body read retries when a reply ${resumes ? 'resumes' : 'finishes'}',
+      () async {
+        final conversation = await service.createConversation(title: 'Chat');
+        final reply = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'partial',
+          isStreaming: !resumes,
+        );
+        final contextRevision = service.contextRevision(conversation.id);
+        repository.holdMessageReadFor = reply.id;
+        final loading = service.loadTimelinePage(
+          conversation.id,
+          aroundRevisionId: reply.id,
+        );
+        try {
+          final oldReply = await repository.messageRead.future.timeout(
+            const Duration(seconds: 5),
+          );
+          expect(oldReply.isStreaming, !resumes);
+          if (resumes) {
+            await service.updateMessage(reply.id, isStreaming: true);
+          } else {
+            await service.finalizeGenerationRunSilent(
+              message: reply.copyWith(content: 'complete', isStreaming: false),
+              toolEvents: const [],
+              generationRunId: null,
+              expectedState: null,
+              expectedStateRevision: null,
+              terminalState: GenerationRunState.completed,
+            );
+          }
+        } finally {
+          repository.releaseMessageRead.complete();
+        }
+
+        final page = (await loading)!;
+        final content = resumes ? 'partial' : 'complete';
+        expect(service.isTimelinePageCurrent(page), isTrue);
+        expect(page.slots.single.message.isStreaming, resumes);
+        expect(page.slots.single.message.content, content);
+        final cached = service.getMessages(conversation.id).single;
+        expect(cached.isStreaming, resumes);
+        expect(cached.content, content);
+        expect(service.contextRevision(conversation.id), contextRevision);
+      },
+    );
+  }
+
+  test(
+    'timeline artifact read preserves a tool result saved during the read',
+    () async {
+      final conversation = await service.createConversation(
+        title: 'Chat',
+        activate: false,
+      );
+      await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'Question',
+      );
+      await service.loadMessages(conversation.id);
+      service.releaseInactiveMessageCaches(const {});
+      expect(service.getMessages(conversation.id), isEmpty);
+
+      final reply = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'partial',
+        isStreaming: true,
+      );
+      final runningTool = <String, dynamic>{
+        'id': 'tool',
+        'name': 'lookup',
+        'arguments': <String, dynamic>{},
+        'content': null,
+      };
+      await service.updateStreamingCheckpointSilent(reply, [runningTool]);
+      repository.holdToolEventsFor = reply.id;
+      final loading = service.loadTimelinePage(conversation.id);
+      try {
+        final stale = await repository.toolEventsRead.future.timeout(
+          const Duration(seconds: 5),
+        );
+        expect(stale.single['content'], isNull);
+        await service.finalizeGenerationRunSilent(
+          message: reply.copyWith(content: 'complete', isStreaming: false),
+          toolEvents: [
+            {...runningTool, 'content': 'result'},
+          ],
+          generationRunId: null,
+          expectedState: null,
+          expectedStateRevision: null,
+          terminalState: GenerationRunState.completed,
+        );
+        expect(service.getToolEvents(reply.id).single['content'], 'result');
+      } finally {
+        repository.releaseToolEvents.complete();
+      }
+
+      final finished = (await loading)!.slots.last.message;
+      expect(finished.id, reply.id);
+      expect(finished.isStreaming, isFalse);
+      expect(
+        service.getToolEventsForMessage(finished).single['content'],
+        'result',
+      );
+    },
+  );
+
+  test(
+    'an empty timeline can use the tail cache after deleting its last message',
+    () async {
+      final conversation = await service.createConversation(title: 'Chat');
+      final user = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'Question',
+      );
+      await service.deleteMessage(user.id);
+      final cacheHits = service.debugTimelineFastPathHitCount;
+
+      expect((await service.loadTimelinePage(conversation.id))!.slots, isEmpty);
+      expect((await service.loadTimelinePage(conversation.id))!.slots, isEmpty);
+      expect(service.debugTimelineFastPathHitCount, cacheHits + 1);
+    },
+  );
+
+  testWidgets(
+    'conversation switch uses a reply that finished after the window read',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      try {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          await settings.disableTitleGeneration();
+          await settings.disableSuggestionGeneration();
+          final generating = await openConversation(controller);
+          final other = await service.createConversation(title: 'Other');
+          final finishReply = Completer<void>();
+          streamHold = finishReply;
+          try {
+            expect(
+              await controller.sendMessage(const ChatInputData(text: 'Start')),
+              ChatInputSubmissionResult.sent,
+            );
+            await waitFor(() => streamRequestCount == 1, 'held reply');
+            final replyId = controller.messages.last.id;
+            await controller.switchConversationAnimated(other.id);
+            service.holdTimelineFor = generating.id;
+            final reopen = controller.switchConversationAnimated(generating.id);
+
+            final oldWindow = await service.timelineRead.future.timeout(
+              const Duration(seconds: 5),
+            );
+            expect(oldWindow!.slots.last.message.id, replyId);
+            expect(oldWindow.slots.last.message.isStreaming, isTrue);
+
+            finishReply.complete();
+            await waitFor(
+              () => !controller.chatController.isConversationLoading(
+                generating.id,
+              ),
+              'reply finishing before the window is installed',
+            );
+            expect(controller.currentConversation!.id, other.id);
+            service.releaseTimeline.complete();
+            await reopen;
+
+            final reply = controller.messages.last;
+            expect(reply.id, replyId);
+            expect(reply.isStreaming, isFalse);
+            expect(reply.content, 'ok');
+            expect(reply.generationState, GenerationRunState.completed);
+          } finally {
+            if (!finishReply.isCompleted) finishReply.complete();
+            if (!service.releaseTimeline.isCompleted) {
+              service.releaseTimeline.complete();
+            }
+          }
+        });
+        final exception = tester.takeException();
+        if (exception != null) throw exception;
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
+  testWidgets('an already prepared switch skips a deleted conversation', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final current = await openConversation(controller);
+      final target = await service.createConversation(
+        title: 'Target',
+        activate: false,
+      );
+      final prepared = (await controller.debugViewModel
+          .prepareConversationSwitch(target.id))!;
+      expect(prepared.window.page!.stateRevision, 0);
+
+      await service.deleteConversation(target.id);
+
+      expect(
+        await controller.debugViewModel.commitConversationSwitch(
+          prepared,
+          isCurrent: () => true,
+        ),
+        isFalse,
+      );
+      expect(service.currentConversationId, current.id);
+      expect(controller.currentConversation?.id, current.id);
+    });
+    final exception = tester.takeException();
+    if (exception != null) throw exception;
+  });
 
   for (final claude in [false, true]) {
     testWidgets(
@@ -1552,7 +1892,15 @@ void main() {
           ],
         );
         await controller.chatController.setCurrentConversationAndLoad(convo);
-        await controller.submitRecoveredAskUserAnswer(
+        final other = temporary
+            ? null
+            : await service.createConversation(title: 'Other', activate: false);
+        final releaseResponse = Completer<void>();
+        if (other != null) {
+          repository.holdResumeWriteFor = reply.id;
+          streamHold = releaseResponse;
+        }
+        final resume = controller.submitRecoveredAskUserAnswer(
           reply,
           ToolUIPart(
             id: 'recovered-ask',
@@ -1567,7 +1915,38 @@ void main() {
             ),
           }),
         );
-        await waitFor(() => streamRequestCount == 1, 'recovered request');
+        try {
+          if (other != null) {
+            await repository.resumeWriteStarted.future.timeout(
+              const Duration(seconds: 5),
+            );
+            final viewModel = controller.debugViewModel;
+            await viewModel.switchConversation(other.id);
+            final reopening = await viewModel.prepareConversationSwitch(
+              convo.id,
+            );
+            expect(
+              await viewModel.commitConversationSwitch(
+                reopening,
+                isCurrent: () => true,
+              ),
+              isTrue,
+            );
+            expect(controller.messages.last.isStreaming, isFalse);
+            repository.releaseResumeWrite.complete();
+          }
+          await resume;
+          await waitFor(() => streamRequestCount == 1, 'recovered request');
+          if (other != null) {
+            expect(controller.messages.last.id, reply.id);
+            expect(controller.messages.last.isStreaming, isTrue);
+          }
+        } finally {
+          if (!repository.releaseResumeWrite.isCompleted) {
+            repository.releaseResumeWrite.complete();
+          }
+          releaseResponse.complete();
+        }
         await waitFor(
           () => !controller.chatController.isConversationLoading(convo.id),
           'recovered streaming to finish',
@@ -1592,7 +1971,8 @@ void main() {
         );
         expect(assistant['tool_calls'].single['id'], 'recovered-ask');
       });
-      expect(tester.takeException(), isNull);
+      final exception = tester.takeException();
+      if (exception != null) throw exception;
     });
   }
 
@@ -1719,7 +2099,10 @@ void main() {
       final prepared = await controller.debugViewModel
           .prepareConversationSwitch(conversation.id);
       expect(assistantProvider.currentAssistantId, otherId);
-      controller.debugViewModel.commitConversationSwitch(prepared!);
+      await controller.debugViewModel.commitConversationSwitch(
+        prepared!,
+        isCurrent: () => true,
+      );
       await waitFor(
         () => assistantProvider.currentAssistantId == displayedAssistant.id,
         'assistant selection after opening a search result',

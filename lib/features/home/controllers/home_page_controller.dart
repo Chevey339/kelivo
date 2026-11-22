@@ -1950,22 +1950,24 @@ class HomePageController extends ChangeNotifier {
       // fade-out completes so no new data flashes while opacity is not 0.
       final fadeFuture = _reverseConvoFade();
       final flushFuture = _flushProgressSilently();
-      final PreparedConversationSwitch? prepared;
       try {
-        prepared = await _viewModel.prepareConversationSwitch(id);
+        final prepared = await _viewModel.prepareConversationSwitch(id);
+        if (serial != _switchSerial) return;
+        await Future.wait([fadeFuture, flushFuture]);
+        final committed = await _viewModel.commitConversationSwitch(
+          prepared,
+          isCurrent: () => serial == _switchSerial,
+        );
+        if (serial != _switchSerial) return;
+        if (!committed) {
+          // Target vanished; reveal the current list again.
+          await _forwardConvoFade();
+          return;
+        }
       } catch (_) {
         if (serial == _switchSerial) await _forwardConvoFade();
         rethrow;
       }
-      if (serial != _switchSerial) return;
-      await Future.wait([fadeFuture, flushFuture]);
-      if (serial != _switchSerial) return;
-      if (prepared == null) {
-        // Target vanished; reveal the current list again.
-        await _forwardConvoFade();
-        return;
-      }
-      _viewModel.commitConversationSwitch(prepared);
       _clearSelectionState();
       notifyListeners();
 
@@ -1993,9 +1995,11 @@ class HomePageController extends ChangeNotifier {
       } catch (_) {}
       if (serial != _switchSerial) return;
       final prepared = await _viewModel.prepareConversationSwitch(id);
-      if (serial != _switchSerial) return;
-      if (prepared == null) return;
-      _viewModel.commitConversationSwitch(prepared);
+      final committed = await _viewModel.commitConversationSwitch(
+        prepared,
+        isCurrent: () => serial == _switchSerial,
+      );
+      if (!committed || serial != _switchSerial) return;
       _clearSelectionState();
       notifyListeners();
     }
@@ -4348,6 +4352,7 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _switchSerial++;
     uiSearchNavigation.dispose();
     final owner = _composerOwner;
     final drafts = _composerDrafts;
