@@ -1076,6 +1076,7 @@
   "messageExportSheetSingleExportImageSubtitle": "将该消息渲染为 PNG 图片",
   "messageExportSheetBatchExportImageSubtitle": "将选中的消息渲染为 PNG 图片",
   "messageExportSheetShowThinkingAndToolCards": "显示思考卡片和工具卡片",
+  "messageExportSheetExpandAllSteps": "展开全部步骤",
   "messageExportSheetShowThinkingContent": "显示思考内容",
   "messageExportThinkingContentLabel": "思考内容",
   "messageExportSheetDateTimeWithSecondsPattern": "yyyy年M月d日 HH:mm:ss",

@@ -1136,6 +1136,7 @@ Future<void> exportChatMessagesImage(
   required List<ChatMessage> messages,
   bool showThinkingAndToolCards = false,
   bool expandThinkingContent = false,
+  bool? collapseThinkingSteps,
 }) async {
   try {
     final uiCaptures = await captureUiExportMessages(context, messages);
@@ -1150,6 +1151,7 @@ Future<void> exportChatMessagesImage(
         uiCaptures: uiCaptures,
         showThinkingAndToolCards: showThinkingAndToolCards,
         expandThinkingContent: expandThinkingContent,
+        collapseThinkingSteps: collapseThinkingSteps,
       );
     });
     if (file == null) throw 'render error';
@@ -1179,6 +1181,7 @@ Future<_ExportedImageResult?> _renderAndSaveMessageImage(
   required UiExportCapture uiCaptures,
   bool showThinkingAndToolCards = false,
   bool expandThinkingContent = false,
+  bool? collapseThinkingSteps,
 }) async {
   message = uiCaptures.messages.single;
   final theme = Theme.of(context);
@@ -1220,6 +1223,7 @@ Future<_ExportedImageResult?> _renderAndSaveMessageImage(
         chatFontScale: settings.chatFontScale,
         showThinkingAndToolCards: showThinkingAndToolCards,
         expandThinkingContent: expandThinkingContent,
+        collapseThinkingSteps: collapseThinkingSteps,
         isDesktop: isDesktop,
       ),
     ),
@@ -1244,6 +1248,7 @@ Future<_ExportedImageResult?> _renderAndSaveChatImage(
   required UiExportCapture uiCaptures,
   bool showThinkingAndToolCards = false,
   bool expandThinkingContent = false,
+  bool? collapseThinkingSteps,
 }) async {
   messages = uiCaptures.messages;
   final theme = Theme.of(context);
@@ -1287,6 +1292,7 @@ Future<_ExportedImageResult?> _renderAndSaveChatImage(
         timestamp: conversation.updatedAt,
         showThinkingAndToolCards: showThinkingAndToolCards,
         expandThinkingContent: expandThinkingContent,
+        collapseThinkingSteps: collapseThinkingSteps,
         isDesktop: isDesktop,
       ),
     ),
@@ -1624,6 +1630,88 @@ Future<void> showChatExportSheet(
   );
 }
 
+mixin _ThinkingExportOptions<T extends StatefulWidget> on State<T> {
+  bool _showThinkingAndToolCards = false;
+  bool _expandThinkingContent = false;
+  bool? _collapseThinkingSteps;
+
+  Widget _buildThinkingOptions(BuildContext parentContext) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        children: [
+          _buildSwitchRow(
+            context,
+            title: l10n.messageExportSheetShowThinkingAndToolCards,
+            value: _showThinkingAndToolCards,
+            onChanged: (show) => setState(() {
+              _showThinkingAndToolCards = show;
+              if (show) {
+                _collapseThinkingSteps = parentContext
+                    .read<SettingsProvider>()
+                    .collapseThinkingSteps;
+              } else {
+                _expandThinkingContent = false;
+                _collapseThinkingSteps = null;
+              }
+            }),
+          ),
+          _buildSwitchRow(
+            context,
+            title: l10n.messageExportSheetExpandAllSteps,
+            value: _collapseThinkingSteps == false,
+            onChanged: _showThinkingAndToolCards
+                ? (expand) => setState(() => _collapseThinkingSteps = !expand)
+                : null,
+          ),
+          _buildSwitchRow(
+            context,
+            title: l10n.messageExportSheetShowThinkingContent,
+            value: _expandThinkingContent,
+            onChanged: _showThinkingAndToolCards
+                ? (expand) => setState(() => _expandThinkingContent = expand)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwitchRow(
+    BuildContext context, {
+    required String title,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final isEnabled = onChanged != null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                color: isEnabled
+                    ? cs.onSurface
+                    : cs.onSurface.withValues(alpha: 0.4),
+              ),
+            ),
+          ),
+          IosSwitch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: cs.primary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // Desktop dialog: single message export
 class _ExportDialog extends StatefulWidget {
   const _ExportDialog({required this.message, required this.parentContext});
@@ -1634,10 +1722,9 @@ class _ExportDialog extends StatefulWidget {
   State<_ExportDialog> createState() => _ExportDialogState();
 }
 
-class _ExportDialogState extends State<_ExportDialog> {
+class _ExportDialogState extends State<_ExportDialog>
+    with _ThinkingExportOptions<_ExportDialog> {
   final bool _exporting = false;
-  bool _showThinkingAndToolCards = false;
-  bool _expandThinkingContent = false;
 
   Future<void> _onExportMarkdown() async {
     if (_exporting) return;
@@ -1713,6 +1800,9 @@ class _ExportDialogState extends State<_ExportDialog> {
 
   Future<void> _onExportImage() async {
     if (_exporting) return;
+    final showThinkingAndToolCards = _showThinkingAndToolCards;
+    final expandThinkingContent = _expandThinkingContent;
+    final collapseThinkingSteps = _collapseThinkingSteps;
     try {
       final pctx = widget.parentContext;
       final uiCaptures = await captureUiExportMessages(pctx, [widget.message]);
@@ -1727,8 +1817,9 @@ class _ExportDialogState extends State<_ExportDialog> {
           widget.message,
           progress: progress,
           uiCaptures: uiCaptures,
-          showThinkingAndToolCards: _showThinkingAndToolCards,
-          expandThinkingContent: _expandThinkingContent,
+          showThinkingAndToolCards: showThinkingAndToolCards,
+          expandThinkingContent: expandThinkingContent,
+          collapseThinkingSteps: collapseThinkingSteps,
         );
       });
       if (file == null) throw 'render error';
@@ -1827,36 +1918,7 @@ class _ExportDialogState extends State<_ExportDialog> {
                           onTap: _exporting ? null : _onExportImage,
                         ),
                         const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Column(
-                            children: [
-                              _buildSwitchRow(
-                                context,
-                                title: l10n
-                                    .messageExportSheetShowThinkingAndToolCards,
-                                value: _showThinkingAndToolCards,
-                                onChanged: (v) {
-                                  setState(() {
-                                    _showThinkingAndToolCards = v;
-                                    if (!v) _expandThinkingContent = false;
-                                  });
-                                },
-                              ),
-                              _buildSwitchRow(
-                                context,
-                                title:
-                                    l10n.messageExportSheetShowThinkingContent,
-                                value: _expandThinkingContent,
-                                onChanged: _showThinkingAndToolCards
-                                    ? (v) => setState(
-                                        () => _expandThinkingContent = v,
-                                      )
-                                    : null,
-                              ),
-                            ],
-                          ),
-                        ),
+                        _buildThinkingOptions(widget.parentContext),
                       ],
                     ),
                   ),
@@ -1865,39 +1927,6 @@ class _ExportDialogState extends State<_ExportDialog> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSwitchRow(
-    BuildContext context, {
-    required String title,
-    required bool value,
-    required ValueChanged<bool>? onChanged,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final isEnabled = onChanged != null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                color: isEnabled
-                    ? cs.onSurface
-                    : cs.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
-          IosSwitch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: cs.primary,
-          ),
-        ],
       ),
     );
   }
@@ -1918,11 +1947,10 @@ class _BatchExportDialog extends StatefulWidget {
   State<_BatchExportDialog> createState() => _BatchExportDialogState();
 }
 
-class _BatchExportDialogState extends State<_BatchExportDialog> {
+class _BatchExportDialogState extends State<_BatchExportDialog>
+    with _ThinkingExportOptions<_BatchExportDialog> {
   final _scrollController = ScrollController();
   bool _exporting = false;
-  bool _showThinkingAndToolCards = false;
-  bool _expandThinkingContent = false;
 
   @override
   void dispose() {
@@ -1971,6 +1999,7 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
       messages: widget.messages,
       showThinkingAndToolCards: _showThinkingAndToolCards,
       expandThinkingContent: _expandThinkingContent,
+      collapseThinkingSteps: _collapseThinkingSteps,
     );
   }
 
@@ -2046,36 +2075,7 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
                           onTap: _exporting ? null : _onExportImage,
                         ),
                         const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Column(
-                            children: [
-                              _buildSwitchRow(
-                                context,
-                                title: l10n
-                                    .messageExportSheetShowThinkingAndToolCards,
-                                value: _showThinkingAndToolCards,
-                                onChanged: (v) {
-                                  setState(() {
-                                    _showThinkingAndToolCards = v;
-                                    if (!v) _expandThinkingContent = false;
-                                  });
-                                },
-                              ),
-                              _buildSwitchRow(
-                                context,
-                                title:
-                                    l10n.messageExportSheetShowThinkingContent,
-                                value: _expandThinkingContent,
-                                onChanged: _showThinkingAndToolCards
-                                    ? (v) => setState(
-                                        () => _expandThinkingContent = v,
-                                      )
-                                    : null,
-                              ),
-                            ],
-                          ),
-                        ),
+                        _buildThinkingOptions(widget.parentContext),
                       ],
                     ),
                   ),
@@ -2084,39 +2084,6 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSwitchRow(
-    BuildContext context, {
-    required String title,
-    required bool value,
-    required ValueChanged<bool>? onChanged,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final isEnabled = onChanged != null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                color: isEnabled
-                    ? cs.onSurface
-                    : cs.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
-          IosSwitch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: cs.primary,
-          ),
-        ],
       ),
     );
   }
@@ -2145,11 +2112,10 @@ class _BatchExportSheet extends StatefulWidget {
   State<_BatchExportSheet> createState() => _BatchExportSheetState();
 }
 
-class _BatchExportSheetState extends State<_BatchExportSheet> {
+class _BatchExportSheetState extends State<_BatchExportSheet>
+    with _ThinkingExportOptions<_BatchExportSheet> {
   final DraggableScrollableController _ctrl = DraggableScrollableController();
   bool _exporting = false;
-  bool _showThinkingAndToolCards = false;
-  bool _expandThinkingContent = false;
 
   @override
   void dispose() {
@@ -2200,6 +2166,7 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
       messages: widget.messages,
       showThinkingAndToolCards: _showThinkingAndToolCards,
       expandThinkingContent: _expandThinkingContent,
+      collapseThinkingSteps: _collapseThinkingSteps,
     );
   }
 
@@ -2275,39 +2242,7 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
                   ),
                   const SizedBox(height: 8),
                   // Image export options
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      children: [
-                        _buildSwitchRow(
-                          context,
-                          title:
-                              l10n.messageExportSheetShowThinkingAndToolCards,
-                          value: _showThinkingAndToolCards,
-                          onChanged: (v) {
-                            setState(() {
-                              _showThinkingAndToolCards = v;
-                              if (!v) {
-                                _expandThinkingContent = false;
-                              }
-                            });
-                          },
-                        ),
-                        _buildSwitchRow(
-                          context,
-                          title: l10n.messageExportSheetShowThinkingContent,
-                          value: _expandThinkingContent,
-                          onChanged: _showThinkingAndToolCards
-                              ? (v) {
-                                  setState(() {
-                                    _expandThinkingContent = v;
-                                  });
-                                }
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildThinkingOptions(widget.parentContext),
                 ],
               ),
             ),
@@ -2316,46 +2251,12 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
       ),
     );
   }
-
-  Widget _buildSwitchRow(
-    BuildContext context, {
-    required String title,
-    required bool value,
-    required ValueChanged<bool>? onChanged,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final isEnabled = onChanged != null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                color: isEnabled
-                    ? cs.onSurface
-                    : cs.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
-          IosSwitch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: cs.primary,
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-class _ExportSheetState extends State<_ExportSheet> {
+class _ExportSheetState extends State<_ExportSheet>
+    with _ThinkingExportOptions<_ExportSheet> {
   final DraggableScrollableController _ctrl = DraggableScrollableController();
   bool _exporting = false;
-  bool _showThinkingAndToolCards = false;
-  bool _expandThinkingContent = false;
 
   @override
   void dispose() {
@@ -2438,6 +2339,9 @@ class _ExportSheetState extends State<_ExportSheet> {
   Future<void> _onExportImage() async {
     if (_exporting) return;
     setState(() => _exporting = true);
+    final showThinkingAndToolCards = _showThinkingAndToolCards;
+    final expandThinkingContent = _expandThinkingContent;
+    final collapseThinkingSteps = _collapseThinkingSteps;
     try {
       final pctx = widget.parentContext;
       final uiCaptures = await captureUiExportMessages(pctx, [widget.message]);
@@ -2449,8 +2353,9 @@ class _ExportSheetState extends State<_ExportSheet> {
           widget.message,
           progress: progress,
           uiCaptures: uiCaptures,
-          showThinkingAndToolCards: _showThinkingAndToolCards,
-          expandThinkingContent: _expandThinkingContent,
+          showThinkingAndToolCards: showThinkingAndToolCards,
+          expandThinkingContent: expandThinkingContent,
+          collapseThinkingSteps: collapseThinkingSteps,
         );
       });
       if (file == null) throw 'render error';
@@ -2550,77 +2455,12 @@ class _ExportSheetState extends State<_ExportSheet> {
                   ),
                   const SizedBox(height: 8),
                   // Image export options
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      children: [
-                        _buildSwitchRow(
-                          context,
-                          title:
-                              l10n.messageExportSheetShowThinkingAndToolCards,
-                          value: _showThinkingAndToolCards,
-                          onChanged: (v) {
-                            setState(() {
-                              _showThinkingAndToolCards = v;
-                              if (!v) {
-                                _expandThinkingContent = false;
-                              }
-                            });
-                          },
-                        ),
-                        _buildSwitchRow(
-                          context,
-                          title: l10n.messageExportSheetShowThinkingContent,
-                          value: _expandThinkingContent,
-                          onChanged: _showThinkingAndToolCards
-                              ? (v) {
-                                  setState(() {
-                                    _expandThinkingContent = v;
-                                  });
-                                }
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildThinkingOptions(widget.parentContext),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSwitchRow(
-    BuildContext context, {
-    required String title,
-    required bool value,
-    required ValueChanged<bool>? onChanged,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final isEnabled = onChanged != null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                color: isEnabled
-                    ? cs.onSurface
-                    : cs.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
-          IosSwitch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: cs.primary,
-          ),
-        ],
       ),
     );
   }
@@ -2660,6 +2500,7 @@ class _ExportedMessageCard extends StatelessWidget {
     required this.chatFontScale,
     this.showThinkingAndToolCards = false,
     this.expandThinkingContent = false,
+    this.collapseThinkingSteps,
     this.isDesktop = false,
   });
   final ChatMessage message;
@@ -2668,6 +2509,7 @@ class _ExportedMessageCard extends StatelessWidget {
   final double chatFontScale;
   final bool showThinkingAndToolCards;
   final bool expandThinkingContent;
+  final bool? collapseThinkingSteps;
   final bool isDesktop;
 
   @override
@@ -2782,6 +2624,7 @@ class _ExportedMessageCard extends StatelessWidget {
               hideStreamingIndicator: true,
               showThinkingCards: showThinkingAndToolCards,
               showToolCards: showThinkingAndToolCards,
+              collapseThinkingSteps: collapseThinkingSteps,
             ),
             SizedBox(height: isDesktop ? 12.0 : 16.0),
             _ExportDisclaimer(isDesktop: isDesktop),
@@ -2801,6 +2644,7 @@ class _ExportedChatImage extends StatelessWidget {
     required this.timestamp,
     this.showThinkingAndToolCards = false,
     this.expandThinkingContent = false,
+    this.collapseThinkingSteps,
     this.isDesktop = false,
   });
   final String conversationTitle;
@@ -2810,6 +2654,7 @@ class _ExportedChatImage extends StatelessWidget {
   final DateTime timestamp;
   final bool showThinkingAndToolCards;
   final bool expandThinkingContent;
+  final bool? collapseThinkingSteps;
   final bool isDesktop;
 
   @override
@@ -2866,6 +2711,7 @@ class _ExportedChatImage extends StatelessWidget {
                   cs: cs,
                   showThinkingAndToolCards: showThinkingAndToolCards,
                   expandThinkingContent: expandThinkingContent,
+                  collapseThinkingSteps: collapseThinkingSteps,
                   isDesktop: isDesktop,
                 ),
                 SizedBox(height: isDesktop ? 6.0 : 8.0),
@@ -2886,12 +2732,14 @@ class _ExportedBubble extends StatelessWidget {
     required this.cs,
     this.showThinkingAndToolCards = false,
     this.expandThinkingContent = false,
+    this.collapseThinkingSteps,
     this.isDesktop = false,
   });
   final ChatMessage message;
   final ColorScheme cs;
   final bool showThinkingAndToolCards;
   final bool expandThinkingContent;
+  final bool? collapseThinkingSteps;
   final bool isDesktop;
 
   @override
@@ -2993,6 +2841,7 @@ class _ExportedBubble extends StatelessWidget {
             hideStreamingIndicator: true,
             showThinkingCards: showThinkingAndToolCards,
             showToolCards: showThinkingAndToolCards,
+            collapseThinkingSteps: collapseThinkingSteps,
           ),
         ),
       );

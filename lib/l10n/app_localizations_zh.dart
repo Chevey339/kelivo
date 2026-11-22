@@ -3014,6 +3014,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageExportSheetShowThinkingAndToolCards => '显示思考卡片和工具卡片';
 
   @override
+  String get messageExportSheetExpandAllSteps => '展开全部步骤';
+
+  @override
   String get messageExportSheetShowThinkingContent => '显示思考内容';
 
   @override
@@ -19686,6 +19689,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageExportSheetShowThinkingAndToolCards => '显示思考卡片和工具卡片';
+
+  @override
+  String get messageExportSheetExpandAllSteps => '展开全部步骤';
 
   @override
   String get messageExportSheetShowThinkingContent => '显示思考内容';
@@ -36370,6 +36376,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageExportSheetShowThinkingAndToolCards => '顯示深度思考卡片與工具卡片';
+
+  @override
+  String get messageExportSheetExpandAllSteps => '展開全部步驟';
 
   @override
   String get messageExportSheetShowThinkingContent => '顯示思考內容';

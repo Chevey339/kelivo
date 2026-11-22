@@ -3080,6 +3080,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get messageExportSheetShowThinkingAndToolCards => '깊은 사고 및 도구 카드 표시';
 
   @override
+  String get messageExportSheetExpandAllSteps => '모든 단계 펼치기';
+
+  @override
   String get messageExportSheetShowThinkingContent => '사고 내용 표시';
 
   @override

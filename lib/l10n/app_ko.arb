@@ -938,6 +938,7 @@
   "messageExportSheetSingleExportImageSubtitle": "이 메시지를 PNG 이미지로 렌더링",
   "messageExportSheetBatchExportImageSubtitle": "선택한 메시지를 PNG 이미지로 렌더링",
   "messageExportSheetShowThinkingAndToolCards": "깊은 사고 및 도구 카드 표시",
+  "messageExportSheetExpandAllSteps": "모든 단계 펼치기",
   "messageExportSheetShowThinkingContent": "사고 내용 표시",
   "messageExportThinkingContentLabel": "사고 내용",
   "messageExportSheetDateTimeWithSecondsPattern": "yyyy-MM-dd HH:mm:ss",

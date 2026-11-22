@@ -938,6 +938,7 @@
   "messageExportSheetSingleExportImageSubtitle": "174525a446e263a82a7e6be7d7c8147377ae9d205a11a1daf8157a665d9f5c53",
   "messageExportSheetBatchExportImageSubtitle": "fd308b605a33ae6de8c42d9ce87895ad52a6b5a89e96dcac9cf8df2c2bacc510",
   "messageExportSheetShowThinkingAndToolCards": "597ea2a64651da39a53dcc759074b8fb5e00cc55ff7a8931f762552f92a84050",
+  "messageExportSheetExpandAllSteps": "a560018eebbd5f02e5c7fb7474f1aa2007533d067ebc45727ee5087b1283a1a8",
   "messageExportSheetShowThinkingContent": "13acb11c6c66568b799a4cdea6aa815000f0718c327333f4c6272d1ae3d4b75e",
   "messageExportThinkingContentLabel": "1e29be325003c8fd0045c7ff37fb27e671e9a77c666ea341aa7d7b9d47319ed9",
   "messageExportSheetDateTimeWithSecondsPattern": "6a69fde8724f647fe05b3eec92a159ad4270964bf5e20e886a30ce3a0dca14f9",
@@ -2051,6 +2052,8 @@
   "searchServicesDialogSearchMode": "2f8e588c9bcb46cd47474a4614900f5d973c4f61826427e4a3866704a83a453e",
   "searchServiceNameYou": "8fde92df0477827990e853bb36af00c8cb9ebcaf87ae8798a855d26e7180cf31",
   "searchProviderYouDescription": "1b5a122f9560aaf2804c684c00c96b9035de29da32f809d7b8c9508e15e598d5",
+  "searchServiceNameKeenable": "6c0cc24be66599b1397ccf1b3373c2a433c8cc7c9566fd43a29e472bf5cd37a7",
+  "searchProviderKeenableDescription": "592660528aaf1cae3b390c0509cbbb0597b9b0c1ab522b672dec1a160f02c83a",
   "searchServicesDialogContentMode": "76e4d59b4bd7a69ead38ca7736ec75847cf7a3043fe5bf61d30425a6a30200d7",
   "searchServicesDialogHighlights": "a1bed5a0e657192f175d67223630ae15ee40fed08a5d51209c0afd82beb854a5",
   "searchServicesDialogSnippets": "cdd066c6ab1f1725144244cccc5189ca8ac8ffe8e327c5c118debaaafbcfe83f",
@@ -5118,7 +5121,5 @@
   "backupEncryptionChangePassword": "e553b975c27a684929fec792e07a96eba365f2a786460bc6b8d0d938c049f666",
   "backupMacKeychainNeedsUnlock": "e6f9c6b6e30d4c57a6e73b658a07844bc15daeb2e0e08bac26bb0beb49ad7520",
   "backupMacOpenKeychainAccess": "39f5ed534a71e3efbbca8ce30693bb774a7e6ff81ff2b896728c42c18fe18dee",
-  "backupMacKeychainAccessDenied": "1180accbf16f8c29d0174143757601bc8d38dadf2c73c76d465f3b4d2ea989b8",
-  "searchServiceNameKeenable": "6c0cc24be66599b1397ccf1b3373c2a433c8cc7c9566fd43a29e472bf5cd37a7",
-  "searchProviderKeenableDescription": "592660528aaf1cae3b390c0509cbbb0597b9b0c1ab522b672dec1a160f02c83a"
+  "backupMacKeychainAccessDenied": "1180accbf16f8c29d0174143757601bc8d38dadf2c73c76d465f3b4d2ea989b8"
 }

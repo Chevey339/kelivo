@@ -1548,6 +1548,7 @@
   "messageExportSheetSingleExportImageSubtitle": "Render this message to a PNG image",
   "messageExportSheetBatchExportImageSubtitle": "Render selected messages to a PNG image",
   "messageExportSheetShowThinkingAndToolCards": "Show Deep Thinking and tool cards",
+  "messageExportSheetExpandAllSteps": "Expand all steps",
   "messageExportSheetShowThinkingContent": "Show thinking content",
   "messageExportThinkingContentLabel": "Thinking content",
   "messageExportSheetDateTimeWithSecondsPattern": "yyyy-MM-dd HH:mm:ss",
@@ -11275,6 +11276,9 @@
   },
   "@messageExportSheetShowThinkingAndToolCards": {
     "description": "Label for a toggle in the export sheet controlling whether deep-thinking and tool-call cards are included in the export."
+  },
+  "@messageExportSheetExpandAllSteps": {
+    "description": "Switch in the single-message and batch PNG export options. On shows all thinking and tool-call steps in each card. Off folds older steps and shows the latest ones. The adjacent Show thinking content switch controls the reasoning text inside each step."
   },
   "@messageExportSheetShowThinkingContent": {
     "description": "Label for a toggle controlling whether the expanded thinking content is included in the export."

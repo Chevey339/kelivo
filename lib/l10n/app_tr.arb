@@ -938,6 +938,7 @@
   "messageExportSheetSingleExportImageSubtitle": "Bu mesajı PNG görseli olarak oluştur",
   "messageExportSheetBatchExportImageSubtitle": "Seçili mesajları PNG görseli olarak oluştur",
   "messageExportSheetShowThinkingAndToolCards": "Derin Düşünme ve araç kartlarını göster",
+  "messageExportSheetExpandAllSteps": "Tüm adımları genişlet",
   "messageExportSheetShowThinkingContent": "Düşünme içeriğini göster",
   "messageExportThinkingContentLabel": "Düşünme içeriği",
   "messageExportSheetDateTimeWithSecondsPattern": "dd.MM.yyyy HH:mm:ss",

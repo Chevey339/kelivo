@@ -938,6 +938,7 @@
   "messageExportSheetSingleExportImageSubtitle": "Отрисовать это сообщение в PNG-изображение",
   "messageExportSheetBatchExportImageSubtitle": "Отрисовать выбранные сообщения в PNG-изображение",
   "messageExportSheetShowThinkingAndToolCards": "Показывать карточки рассуждений и инструментов",
+  "messageExportSheetExpandAllSteps": "Развернуть все шаги",
   "messageExportSheetShowThinkingContent": "Показывать содержимое рассуждений",
   "messageExportThinkingContentLabel": "Содержимое рассуждений",
   "messageExportSheetDateTimeWithSecondsPattern": "dd.MM.yyyy HH:mm:ss",

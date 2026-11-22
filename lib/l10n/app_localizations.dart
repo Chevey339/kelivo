@@ -5746,6 +5746,12 @@ abstract class AppLocalizations {
   /// **'Show Deep Thinking and tool cards'**
   String get messageExportSheetShowThinkingAndToolCards;
 
+  /// Switch in the single-message and batch PNG export options. On shows all thinking and tool-call steps in each card. Off folds older steps and shows the latest ones. The adjacent Show thinking content switch controls the reasoning text inside each step.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand all steps'**
+  String get messageExportSheetExpandAllSteps;
+
   /// Label for a toggle controlling whether the expanded thinking content is included in the export.
   ///
   /// In en, this message translates to:

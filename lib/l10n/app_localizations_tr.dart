@@ -3181,6 +3181,9 @@ class AppLocalizationsTr extends AppLocalizations {
       'Derin Düşünme ve araç kartlarını göster';
 
   @override
+  String get messageExportSheetExpandAllSteps => 'Tüm adımları genişlet';
+
+  @override
   String get messageExportSheetShowThinkingContent =>
       'Düşünme içeriğini göster';
 

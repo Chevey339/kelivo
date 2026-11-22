@@ -1346,6 +1346,10 @@ class ChatMessageWidget extends StatefulWidget {
 
   /// When null, follows [SettingsProvider.showToolCards].
   final bool? showToolCards;
+
+  /// When null, follows [SettingsProvider.collapseThinkingSteps].
+  /// A false override also expands browser tool groups in the export.
+  final bool? collapseThinkingSteps;
   final void Function(String imageKey, double aspectRatio)? onInlineImageAspect;
 
   /// Off for exports, which must render the whole user message.
@@ -1399,6 +1403,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.onRecoveredAskUserAnswer,
     this.showThinkingCards,
     this.showToolCards,
+    this.collapseThinkingSteps,
     this.onInlineImageAspect,
     this.collapseLongUserText = true,
   });
@@ -3673,6 +3678,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       streaming,
                       showThinkingCards,
                       showToolCards,
+                      widget.collapseThinkingSteps,
                       blockKey(index),
                       widget.message.modelId,
                       widget.message.timestamp,
@@ -3691,6 +3697,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       ),
                       showThinkingCards: showThinkingCards,
                       showToolCards: showToolCards,
+                      collapseThinkingSteps: widget.collapseThinkingSteps,
                       streaming: streaming,
                       onRecoveredAnswer: widget.onRecoveredAskUserAnswer == null
                           ? null
@@ -5113,6 +5120,7 @@ class _ChainOfThoughtCard extends StatefulWidget {
     required this.message,
     required this.showThinkingCards,
     required this.showToolCards,
+    required this.collapseThinkingSteps,
     required this.streaming,
     this.onRecoveredAnswer,
   });
@@ -5122,6 +5130,7 @@ class _ChainOfThoughtCard extends StatefulWidget {
   String get conversationId => message.conversationId;
   final bool showThinkingCards;
   final bool showToolCards;
+  final bool? collapseThinkingSteps;
   final bool streaming;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
@@ -5210,9 +5219,9 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
       context,
       target: ChatBubbleStyleTarget.thinkingToolCard,
     );
-    final collapseThinkingSteps = context.select<SettingsProvider, bool>(
-      (s) => s.collapseThinkingSteps,
-    );
+    final collapseThinkingSteps =
+        widget.collapseThinkingSteps ??
+        context.select<SettingsProvider, bool>((s) => s.collapseThinkingSteps);
     final showToolResultSummary = context.select<SettingsProvider, bool>(
       (s) => s.showToolResultSummary,
     );
@@ -5416,6 +5425,8 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                     }
                     final part = step.tool!;
                     if (step.browserTools case final tools?) {
+                      final expandAllSteps =
+                          widget.collapseThinkingSteps == false;
                       return _CachedTimelineStep(
                         key: ValueKey(
                           'browser-group-${tools.first.id}-${step.sourceOrdinal}',
@@ -5437,6 +5448,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                             ),
                           ),
                           step.browserLite,
+                          expandAllSteps,
                           isFirst,
                           isLast,
                           fg,
@@ -5451,6 +5463,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard>
                           sourceOrdinal: step.sourceOrdinal,
                           tools: tools,
                           lite: step.browserLite,
+                          expandAllSteps: expandAllSteps,
                           conversationId: widget.conversationId,
                           isFirst: isFirst,
                           isLast: isLast,
@@ -6103,6 +6116,7 @@ class _ChainOfThoughtBrowserGroup extends StatefulWidget {
     required this.sourceOrdinal,
     required this.tools,
     required this.lite,
+    required this.expandAllSteps,
     required this.conversationId,
     required this.isFirst,
     required this.isLast,
@@ -6113,6 +6127,7 @@ class _ChainOfThoughtBrowserGroup extends StatefulWidget {
   final int sourceOrdinal;
   final List<ToolUIPart> tools;
   final bool lite, isFirst, isLast, hideImages, showPageCard, streaming;
+  final bool expandAllSteps;
   final String conversationId;
   @override
   State<_ChainOfThoughtBrowserGroup> createState() =>
@@ -6279,12 +6294,14 @@ class _ChainOfThoughtBrowserGroupState
     super.dispose();
   }
 
-  bool get _isExpanded => _userToggled
-      ? _expanded!
-      : !widget.lite &&
-            !_executing &&
-            _displayAction == null &&
-            _actions.any((action) => action.failed);
+  bool get _isExpanded =>
+      widget.expandAllSteps ||
+      (_userToggled
+          ? _expanded!
+          : !widget.lite &&
+                !_executing &&
+                _displayAction == null &&
+                _actions.any((action) => action.failed));
 
   void _finishStepsAnimation() {
     if (!_isExpanded && _keepSteps) {
@@ -6308,8 +6325,10 @@ class _ChainOfThoughtBrowserGroupState
     final expanded = _isExpanded;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final tools = widget.tools;
+    final expandAllSteps = widget.expandAllSteps;
     final firstVisible =
         _keepSteps &&
+            !expandAllSteps &&
             !_showAll &&
             widget.tools.length > _browserStepsFoldThreshold
         ? widget.tools.length - _browserStepsTail
@@ -6326,7 +6345,7 @@ class _ChainOfThoughtBrowserGroupState
           ? _loadingIcon(fg.strong)
           : Icon(Lucide.AppWindow, size: 16, color: fg.strong),
       label: Semantics(
-        button: true,
+        button: !expandAllSteps,
         expanded: expanded,
         label: l.browserGroupToggleSemantics,
         child: Row(
@@ -6387,19 +6406,23 @@ class _ChainOfThoughtBrowserGroupState
       ),
       isFirst: widget.isFirst,
       isLast: widget.isLast && !_keepSteps,
-      onTap: () => setState(() {
-        _expanded = !expanded;
-        _userToggled = true;
-        // Keep the current rows (including revealed earlier steps) until
-        // closing ends, so reversal starts at the same visual position.
-        _keepSteps = !reduceMotion || _expanded!;
-        if (!_keepSteps) _showAll = false;
-      }),
-      indicator: Icon(
-        expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
-        size: 16,
-        color: fg.muted,
-      ),
+      onTap: expandAllSteps
+          ? null
+          : () => setState(() {
+              _expanded = !expanded;
+              _userToggled = true;
+              // Keep the current rows (including revealed earlier steps) until
+              // closing ends, so reversal starts at the same visual position.
+              _keepSteps = !reduceMotion || _expanded!;
+              if (!_keepSteps) _showAll = false;
+            }),
+      indicator: expandAllSteps
+          ? null
+          : Icon(
+              expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
+              size: 16,
+              color: fg.muted,
+            ),
     );
     final steps = <Widget>[];
     if (_keepSteps) {
@@ -6513,14 +6536,18 @@ class _ChainOfThoughtBrowserGroupState
     final fg = chatSurfaceForegroundPalette(context);
     final cs = Theme.of(context).colorScheme;
     final l = AppLocalizations.of(context)!;
-    final tab = action.action == 'switch_tab'
-        ? BrowserService.instance.tabs
-              .where((tab) => tab.id == action.tabId)
-              .firstOrNull
-        : null;
-    final target = tab == null
+    final tabUrl = switch ((action.action, widget.expandAllSteps)) {
+      ('switch_tab', true) => action.url,
+      ('switch_tab', false) =>
+        BrowserService.instance.tabs
+            .where((tab) => tab.id == action.tabId)
+            .firstOrNull
+            ?.url,
+      _ => null,
+    };
+    final target = tabUrl == null
         ? action.target(l, [if (snapshot != null) snapshot])
-        : browserUrlLabel(tab.url, includePath: true);
+        : browserUrlLabel(tabUrl, includePath: true);
     final content = <Widget>[
       if (action.failed)
         Text(
