@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
 import 'package:provider/provider.dart';
@@ -137,6 +138,12 @@ void main() {
           await tester.tap(find.text('English'));
           await tester.pumpAndSettle();
           final bangla = find.text('Bangla');
+          final flag = find.byWidgetPredicate(
+            (widget) =>
+                widget is SvgPicture &&
+                widget.bytesLoader ==
+                    const SvgAssetLoader('assets/icons/bangladesh-flag.svg'),
+          );
           if (desktop) {
             await tester.scrollUntilVisible(
               bangla,
@@ -149,10 +156,11 @@ void main() {
           } else {
             await tester.ensureVisible(bangla);
           }
-          expect(find.text('🇧🇩'), findsOneWidget);
+          expect(flag, findsOneWidget);
           await tester.tap(bangla);
           await tester.pumpAndSettle();
           expect(bangla, findsOneWidget);
+          expect(flag, findsOneWidget);
           expect(settings.translateTargetLang, 'bn');
 
           final output = find.byType(TranslationOutput);

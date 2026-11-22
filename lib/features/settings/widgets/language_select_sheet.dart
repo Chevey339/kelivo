@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -16,12 +17,14 @@ class LanguageOption {
   final String displayName;
   final String displayNameZh;
   final String flag;
+  final String? flagAsset;
 
   const LanguageOption({
     required this.code,
     required this.displayName,
     required this.displayNameZh,
     required this.flag,
+    this.flagAsset,
   });
 }
 
@@ -98,12 +101,28 @@ const List<LanguageOption> supportedLanguages = [
     displayName: 'Bangla',
     displayNameZh: 'বাংলা',
     flag: '🇧🇩',
+    flagAsset: 'assets/icons/bangladesh-flag.svg',
   ),
   // LanguageOption(code: 'ar', displayName: 'Arabic', displayNameZh: 'العربية', flag: '🇸🇦'),
   // LanguageOption(code: 'hi', displayName: 'Hindi', displayNameZh: 'हिन्दी', flag: '🇮🇳'),
   // LanguageOption(code: 'th', displayName: 'Thai', displayNameZh: 'ไทย', flag: '🇹🇭'),
   // LanguageOption(code: 'vi', displayName: 'Vietnamese', displayNameZh: 'Tiếng Việt', flag: '🇻🇳'),
 ];
+
+Widget buildLanguageFlag(
+  LanguageOption language, {
+  required double size,
+  double? lineHeight,
+}) {
+  final asset = language.flagAsset;
+  if (asset != null) {
+    return SvgPicture.asset(asset, width: size, height: size);
+  }
+  return Text(
+    language.flag,
+    style: TextStyle(fontSize: size, height: lineHeight),
+  );
+}
 
 String languageDisplayName(AppLocalizations l10n, String languageCode) {
   switch (languageCode) {
@@ -157,13 +176,15 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
   final l10n = AppLocalizations.of(context)!;
   LanguageOption? selected;
   final items = [
-    ...supportedLanguages.map(
-      (lang) => DesktopContextMenuItem(
-        icon: null,
-        label: '${lang.flag} ${languageDisplayName(l10n, lang.code)}',
+    ...supportedLanguages.map((lang) {
+      final name = languageDisplayName(l10n, lang.code);
+      return DesktopContextMenuItem(
+        svgAsset: lang.flagAsset,
+        tintSvg: false,
+        label: lang.flagAsset == null ? '${lang.flag} $name' : name,
         onTap: () => selected = lang,
-      ),
-    ),
+      );
+    }),
     DesktopContextMenuItem(
       icon: Lucide.X,
       label: l10n.languageSelectSheetClearButton,
@@ -306,8 +327,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              // Flag only
-              Text(lang.flag, style: const TextStyle(fontSize: 20)),
+              buildLanguageFlag(lang, size: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

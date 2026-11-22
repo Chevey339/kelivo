@@ -19,7 +19,11 @@ import '../features/translate/widgets/translation_output.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
 import '../features/settings/widgets/language_select_sheet.dart'
-    show LanguageOption, languageDisplayName, supportedLanguages;
+    show
+        LanguageOption,
+        buildLanguageFlag,
+        languageDisplayName,
+        supportedLanguages;
 
 class DesktopTranslatePage extends StatefulWidget {
   const DesktopTranslatePage({super.key});
@@ -532,10 +536,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      selected.flag,
-                      style: TextStyle(fontSize: 16, height: 1),
-                    ),
+                    buildLanguageFlag(selected, size: 16, lineHeight: 1),
                     const SizedBox(width: 8),
                     Flexible(
                       child: ConstrainedBox(
@@ -746,10 +747,7 @@ class _LangOptionTileState extends State<_LangOptionTile> {
             ),
             child: Row(
               children: [
-                Text(
-                  widget.option.flag,
-                  style: TextStyle(fontSize: 16, height: 1),
-                ),
+                buildLanguageFlag(widget.option, size: 16, lineHeight: 1),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

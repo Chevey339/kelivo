@@ -16,6 +16,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../settings/widgets/language_select_sheet.dart'
     show
         LanguageOption,
+        buildLanguageFlag,
         languageDisplayName,
         supportedLanguages,
         showLanguageSelector;
@@ -358,9 +359,9 @@ class _TranslatePageState extends State<TranslatePage> {
                       ),
                       child: Row(
                         children: [
-                          Text(
-                            (_lang ?? supportedLanguages.first).flag,
-                            style: TextStyle(fontSize: 18),
+                          buildLanguageFlag(
+                            _lang ?? supportedLanguages.first,
+                            size: 18,
                           ),
                           const SizedBox(width: 10),
                           Expanded(

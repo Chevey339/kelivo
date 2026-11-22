@@ -12,6 +12,7 @@ import 'desktop_overlay_backdrop.dart';
 class DesktopContextMenuItem {
   final IconData? icon;
   final String? svgAsset;
+  final bool tintSvg;
   final String label;
   final String? subtitle;
   final VoidCallback? onTap;
@@ -22,6 +23,7 @@ class DesktopContextMenuItem {
   const DesktopContextMenuItem({
     this.icon,
     this.svgAsset,
+    this.tintSvg = true,
     required this.label,
     this.subtitle,
     this.onTap,
@@ -163,6 +165,7 @@ Future<void> showDesktopContextMenuAt(
                                         compact: compact,
                                         icon: it.icon,
                                         svgAsset: it.svgAsset,
+                                        tintSvg: it.tintSvg,
                                         label: it.label,
                                         subtitle: it.subtitle,
                                         danger: it.danger,
@@ -310,6 +313,7 @@ class _GlassMenuItem extends StatefulWidget {
   const _GlassMenuItem({
     this.icon,
     this.svgAsset,
+    required this.tintSvg,
     required this.label,
     this.subtitle,
     this.onTap,
@@ -319,6 +323,7 @@ class _GlassMenuItem extends StatefulWidget {
   });
   final IconData? icon;
   final String? svgAsset;
+  final bool tintSvg;
   final String label;
   final String? subtitle;
   final VoidCallback? onTap;
@@ -382,7 +387,9 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
                     widget.svgAsset!,
                     width: 18,
                     height: 18,
-                    colorFilter: ColorFilter.mode(ic, BlendMode.srcIn),
+                    colorFilter: widget.tintSvg
+                        ? ColorFilter.mode(ic, BlendMode.srcIn)
+                        : null,
                   ),
                 const SizedBox(width: 10),
               ],
