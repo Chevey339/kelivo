@@ -197,7 +197,7 @@ void main() {
   });
 
   testWidgets(
-    'more files shows file names and disambiguates matches by directory',
+    'more files shows each file name and its parent directory',
     (tester) async {
       const directory =
           '/workspace/Personal-Knowledge-Base/100-Notes/Projects/Tool-Outputs';
@@ -245,6 +245,7 @@ void main() {
       expect(find.byKey(ProducedFilesRow.rowKey), findsOneWidget);
       expect(find.text('+5'), findsOneWidget);
       expect(find.text('file_0.txt'), findsOneWidget);
+      expect(find.text(directory), findsNothing);
       expect(find.text(overflowName), findsNothing);
       await tester.tap(find.byKey(ProducedFilesRow.moreKey));
       await tester.pumpAndSettle();
@@ -256,6 +257,14 @@ void main() {
       );
       await tester.scrollUntilVisible(fileName, 250);
       expect(fileName, findsOneWidget);
+      final uniqueFileChip = find.ancestor(
+        of: fileName,
+        matching: find.byType(WorkspaceFileChip),
+      );
+      expect(
+        find.descendant(of: uniqueFileChip, matching: find.text(directory)),
+        findsOneWidget,
+      );
 
       for (final entry in parentsByPath.entries) {
         final directoryLabel = find.descendant(

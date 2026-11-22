@@ -1205,40 +1205,26 @@ Future<void> showWorkspaceFileList(
   required String title,
   String? conversationId,
 }) {
-  final entries = <({WorkspaceToolFile file, String name, String parent})>[];
-  final firstParentByName = <String, String>{};
-  final namesWithMultipleParents = <String>{};
-  for (final file in files) {
-    final path = file.path;
-    // Stored tool paths may come from a different operating system.
-    final pathContext =
-        p.windows.isAbsolute(path) && !p.windows.isRootRelative(path)
-        ? p.windows
-        : p.posix;
-    final basename = pathContext.basename(path);
-    final name = basename.isEmpty ? path : basename;
-    final parent = pathContext.dirname(path);
-    entries.add((file: file, name: name, parent: parent));
-    final firstParent = firstParentByName.putIfAbsent(name, () => parent);
-    if (parent != firstParent) namesWithMultipleParents.add(name);
-  }
-
   final list = ListView.separated(
     padding: const EdgeInsets.all(16),
-    itemCount: entries.length,
+    itemCount: files.length,
     separatorBuilder: (_, _) => const SizedBox(height: 8),
     itemBuilder: (_, index) {
-      final entry = entries[index];
-      final file = entry.file;
+      final file = files[index];
+      final path = file.path;
+      // Stored tool paths may come from a different operating system.
+      final pathContext =
+          p.windows.isAbsolute(path) && !p.windows.isRootRelative(path)
+          ? p.windows
+          : p.posix;
+      final basename = pathContext.basename(path);
       return Align(
         alignment: Alignment.centerLeft,
         child: WorkspaceFileChip(
-          path: file.path,
-          displayName: entry.name,
-          parentPath: namesWithMultipleParents.contains(entry.name)
-              ? entry.parent
-              : null,
-          previewTitle: file.path,
+          path: path,
+          displayName: basename.isEmpty ? path : basename,
+          parentPath: pathContext.dirname(path),
+          previewTitle: path,
           link: file.link,
           isDirectory: file.isDirectory,
           conversationId: conversationId,
