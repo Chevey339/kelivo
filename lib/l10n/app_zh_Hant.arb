@@ -2051,6 +2051,8 @@
   "searchServicesDialogSearchMode": "搜尋模式",
   "searchServiceNameYou": "You.com",
   "searchProviderYouDescription": "You.com 搜尋 API。返回網頁與新聞結果，支援 Highlights 或 Snippets。",
+  "searchServiceNameKeenable": "Keenable",
+  "searchProviderKeenableDescription": "Keenable 搜尋。API Key 可選，不填則使用公開搜尋端點。",
   "searchServicesDialogContentMode": "內容模式",
   "searchServicesDialogHighlights": "Highlights",
   "searchServicesDialogSnippets": "Snippets",

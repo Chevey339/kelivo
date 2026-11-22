@@ -3306,6 +3306,8 @@
   "searchServicesDialogSearchMode": "Search mode",
   "searchServiceNameYou": "You.com",
   "searchProviderYouDescription": "You.com Search API. Returns web and news results with highlights or snippets.",
+  "searchServiceNameKeenable": "Keenable",
+  "searchProviderKeenableDescription": "Keenable Search. An API key is optional; without one, requests use the public endpoint.",
   "searchServicesDialogContentMode": "Content mode",
   "searchServicesDialogHighlights": "Highlights",
   "searchServicesDialogSnippets": "Snippets",
@@ -14347,6 +14349,12 @@
   },
   "@searchProviderYouDescription": {
     "description": "Short description shown under the You.com provider in the search service editor, noting web and news results with highlights or snippets."
+  },
+  "@searchServiceNameKeenable": {
+    "description": "Display name for the Keenable search provider, returned by a switch on the service type in the search services settings pane and editor page."
+  },
+  "@searchProviderKeenableDescription": {
+    "description": "Short description shown under the Keenable provider in the search service editor, noting that an API key is optional and keyless calls use the public endpoint."
   },
   "@searchServicesDialogContentMode": {
     "description": "Dropdown label in the search service settings for choosing You.com content mode (Highlights or Snippets)."

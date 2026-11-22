@@ -6716,6 +6716,13 @@ class AppLocalizationsKo extends AppLocalizations {
       'You.com 검색 API. Highlights 또는 Snippets와 함께 웹 및 뉴스 결과를 반환합니다.';
 
   @override
+  String get searchServiceNameKeenable => 'Keenable';
+
+  @override
+  String get searchProviderKeenableDescription =>
+      'Keenable 검색. API 키는 선택 사항이며, 없으면 공개 엔드포인트를 사용합니다.';
+
+  @override
   String get searchServicesDialogContentMode => '콘텐츠 모드';
 
   @override

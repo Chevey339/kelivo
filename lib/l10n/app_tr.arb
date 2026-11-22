@@ -2051,6 +2051,8 @@
   "searchServicesDialogSearchMode": "Arama modu",
   "searchServiceNameYou": "You.com",
   "searchProviderYouDescription": "You.com Arama API'si. Highlights veya Snippets ile web ve haber sonuçları döndürür.",
+  "searchServiceNameKeenable": "Keenable",
+  "searchProviderKeenableDescription": "Keenable Search. API anahtarı isteğe bağlıdır; yoksa herkese açık uç nokta kullanılır.",
   "searchServicesDialogContentMode": "İçerik modu",
   "searchServicesDialogHighlights": "Highlights",
   "searchServicesDialogSnippets": "Snippets",

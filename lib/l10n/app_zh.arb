@@ -2385,6 +2385,8 @@
   "searchServicesDialogSearchMode": "搜索模式",
   "searchServiceNameYou": "You.com",
   "searchProviderYouDescription": "You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。",
+  "searchServiceNameKeenable": "Keenable",
+  "searchProviderKeenableDescription": "Keenable 搜索。API Key 可选，不填则使用公开搜索端点。",
   "searchServicesDialogContentMode": "内容模式",
   "searchServicesDialogHighlights": "Highlights",
   "searchServicesDialogSnippets": "Snippets",

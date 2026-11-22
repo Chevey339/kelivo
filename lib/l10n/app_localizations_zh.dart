@@ -6594,6 +6594,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
 
   @override
+  String get searchServiceNameKeenable => 'Keenable';
+
+  @override
+  String get searchProviderKeenableDescription =>
+      'Keenable 搜索。API Key 可选，不填则使用公开搜索端点。';
+
+  @override
   String get searchServicesDialogContentMode => '内容模式';
 
   @override
@@ -23259,6 +23266,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get searchProviderYouDescription =>
       'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
+
+  @override
+  String get searchServiceNameKeenable => 'Keenable';
+
+  @override
+  String get searchProviderKeenableDescription =>
+      'Keenable 搜索。API Key 可选，不填则使用公开搜索端点。';
 
   @override
   String get searchServicesDialogContentMode => '内容模式';
@@ -39941,6 +39955,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get searchProviderYouDescription =>
       'You.com 搜尋 API。返回網頁與新聞結果，支援 Highlights 或 Snippets。';
+
+  @override
+  String get searchServiceNameKeenable => 'Keenable';
+
+  @override
+  String get searchProviderKeenableDescription =>
+      'Keenable 搜尋。API Key 可選，不填則使用公開搜尋端點。';
 
   @override
   String get searchServicesDialogContentMode => '內容模式';
