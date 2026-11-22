@@ -15,6 +15,7 @@ import '../../support/recovery_snapshot_fixture.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpRecoverySnapshotPaths();
   late Directory root;
   setUp(() async {
     root = await Directory.systemTemp.createTemp('kelivo-loss-recovery-');

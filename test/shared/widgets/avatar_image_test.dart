@@ -29,6 +29,23 @@ class _Paths extends PathProviderPlatform {
   }
 }
 
+Future<void> _waitForAvatarWidth(WidgetTester tester, int width) async {
+  final elapsed = Stopwatch()..start();
+  do {
+    // File I/O and image decoding complete outside the widget test clock.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump();
+    if (tester
+        .widgetList<RawImage>(find.byType(RawImage))
+        .any((image) => image.image?.width == width)) {
+      return;
+    }
+  } while (elapsed.elapsed < const Duration(seconds: 5));
+  fail('Avatar did not finish loading an image of width $width');
+}
+
 void main() {
   testWidgets(
     'rebuilds reuse a lookup; source changes and eviction reload the image',
@@ -63,25 +80,11 @@ void main() {
           ),
         ),
       );
-      Future<void> ready(int expectedWidth) async {
-        for (var i = 0; i < 100; i++) {
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 10)),
-          );
-          await tester.pump();
-          final images = tester.widgetList<RawImage>(find.byType(RawImage));
-          if (images.any((image) => image.image?.width == expectedWidth)) {
-            return;
-          }
-        }
-        fail('Avatar did not finish loading width $expectedWidth');
-      }
-
       await http.runWithClient(
         () async {
           const first = 'https://avatar.test/first.png';
           await tester.pumpWidget(host(first));
-          await ready(2);
+          await _waitForAvatarWidth(tester, 2);
           expect(requests, 1);
           final provider =
               tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
@@ -97,23 +100,15 @@ void main() {
           expect(requests, 1);
 
           const second = 'https://avatar.test/second.png';
+          size = 3;
           await tester.pumpWidget(host(second));
-          await ready(size);
+          await _waitForAvatarWidth(tester, size);
           expect(requests, 2);
-          expect(
-            tester.widget<RawImage>(find.byType(RawImage)).image!.width,
-            2,
-          );
 
           size = 4;
-          final eviction = AvatarCache.evict(second);
-          await ready(size);
-          await eviction;
+          await tester.runAsync(() => AvatarCache.evict(second));
+          await _waitForAvatarWidth(tester, size);
           expect(requests, 3);
-          expect(
-            tester.widget<RawImage>(find.byType(RawImage)).image!.width,
-            4,
-          );
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox.shrink());
         },
@@ -153,38 +148,23 @@ void main() {
             ),
           ),
         );
-        Future<void> ready(int expectedWidth) async {
-          for (var i = 0; i < 100; i++) {
-            await tester.runAsync(
-              () => Future<void>.delayed(const Duration(milliseconds: 10)),
-            );
-            await tester.pump();
-            if (tester
-                .widgetList<RawImage>(find.byType(RawImage))
-                .any((image) => image.image?.width == expectedWidth)) {
-              return;
-            }
-          }
-          fail('Expected refreshed avatar width $expectedWidth');
-        }
-
         await http.runWithClient(
           () async {
             await tester.pumpWidget(host());
-            await ready(2);
+            await _waitForAvatarWidth(tester, 2);
             if (unmounted) {
               await tester.pumpWidget(const SizedBox.shrink());
             } else {
               displaySize = 32;
               await tester.pumpWidget(host());
-              await ready(2);
+              await _waitForAvatarWidth(tester, 2);
             }
             pixels = 4;
             await tester.runAsync(() => AvatarCache.evict(url));
-            if (!unmounted) await ready(4);
+            if (!unmounted) await _waitForAvatarWidth(tester, 4);
             displaySize = 82;
             await tester.pumpWidget(host());
-            await ready(4);
+            await _waitForAvatarWidth(tester, 4);
             expect(requests, 2);
             expect(tester.takeException(), isNull);
             await tester.pumpWidget(const SizedBox.shrink());

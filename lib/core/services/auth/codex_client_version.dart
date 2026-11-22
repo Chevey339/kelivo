@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../database/business_settings_router.dart';
+
 const defaultCodexClientVersion = '0.169.0';
 typedef CodexVersionSnapshot = ({String version, int revision});
 const bundledCodexVersion = (version: defaultCodexClientVersion, revision: 0);
@@ -16,7 +18,6 @@ class CodexClientVersion extends ChangeNotifier {
   static final _latestUri = Uri.parse(
     'https://registry.npmjs.org/@openai/codex/latest',
   );
-  static const _cacheKey = 'codex_client_version_v1';
   static const _refreshInterval = Duration(hours: 6);
   static const _retryInterval = Duration(minutes: 5);
   static final _stableVersion = RegExp(r'^\d{1,9}\.\d{1,9}\.\d{1,9}$');
@@ -56,7 +57,9 @@ class CodexClientVersion extends ChangeNotifier {
     SharedPreferences? preferences;
     try {
       preferences = await SharedPreferences.getInstance();
-      final raw = preferences.get(_cacheKey);
+      final raw = preferences.get(
+        BusinessKeyRegistry.codexClientVersionCacheKey,
+      );
       if (raw is! String) return preferences;
       final record = jsonDecode(raw);
       if (record is Map && _adopt(record['version'])) {
@@ -93,7 +96,7 @@ class CodexClientVersion extends ChangeNotifier {
       final now = DateTime.now();
       _nextCheck = now.add(_refreshInterval);
       await preferences?.setString(
-        _cacheKey,
+        BusinessKeyRegistry.codexClientVersionCacheKey,
         jsonEncode({
           'version': snapshot.version,
           'checkedAt': now.millisecondsSinceEpoch,

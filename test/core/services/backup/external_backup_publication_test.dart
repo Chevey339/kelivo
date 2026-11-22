@@ -24,11 +24,15 @@ void main() {
         ..createSync(recursive: true);
       final live = Directory('${root.path}/working')..createSync();
       final source = File('${live.path}/database')..createSync();
+      final legacyWork = Directory('${tmp.path}/kelivo_backup_old')
+        ..createSync();
+      File('${legacyWork.path}/orphan.zip').createSync();
       final debris = [
         File('${root.path}/discard.kbackup'),
         File('${tmp.path}/kelivo_backup_old.kbackup'),
         File('${tmp.path}/kelivo_restore_interrupted.zip'),
         File('${tmp.path}/_bk_kelivo.db'),
+        File('${tmp.path}/_bk_chats.json'),
       ];
       for (final file in debris) {
         file.createSync();
@@ -45,6 +49,7 @@ void main() {
       expect(source.existsSync(), isTrue);
       expect(snap.existsSync(), isTrue);
       expect(user.readAsStringSync(), 'keep');
+      expect(legacyWork.existsSync(), isFalse);
       expect(debris.where((f) => f.existsSync()), isEmpty);
     },
   );

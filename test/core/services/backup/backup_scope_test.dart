@@ -233,8 +233,13 @@ void main() {
             BackupCategory.providers,
             BackupCategory.settings,
           });
-          final backup = await exporter.prepareBackupFile(
+          final stagedBackup = await exporter.prepareBackupFile(
             WebDavConfig(scope: scope),
+          );
+          final backup = File('${root.path}/exported.zip');
+          await DataSync.completeLocalFileExport(
+            exported: stagedBackup,
+            persist: (file) => file.copy(backup.path),
           );
           final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
           for (final entry in assets.entries) {

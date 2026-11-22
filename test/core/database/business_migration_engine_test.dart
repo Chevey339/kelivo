@@ -272,8 +272,14 @@ void main() {
   );
 
   test('routes a complete registered business snapshot without loss', () async {
+    const codexCache = '{"version":"0.170.0","checkedAt":1786012880106}';
     final source = <String, Object?>{
-      for (final key in BusinessKeyRegistry.preferenceKeys) key: 'value:$key',
+      for (final key in BusinessKeyRegistry.preferenceKeys)
+        key: switch (key) {
+          BusinessKeyRegistry.balanceRefreshIntervalKey => 10,
+          BusinessKeyRegistry.balanceRefreshOnReplyKey => true,
+          _ => 'value:$key',
+        },
       for (final kind in BusinessEntityKind.values)
         kind.sourceKey: kind == BusinessEntityKind.provider
             ? jsonEncode({
@@ -326,6 +332,7 @@ void main() {
       'future_string_list_v1': <String>['future-a', 'future-b'],
       'pinned_chat_ids': <String>['discarded'],
       'flutter_log_enabled_v1': true,
+      BusinessKeyRegistry.codexClientVersionCacheKey: codexCache,
     };
     final expected = BusinessSettingsRouter.exportSnapshot(
       BusinessSettingsRouter.normalizeAndRoute(source),
@@ -341,7 +348,14 @@ void main() {
       await repository.readSnapshot(),
     );
     expect(actual, expected);
-    expect(legacy.values, <String, Object?>{'flutter_log_enabled_v1': true});
+    expect(
+      actual,
+      isNot(contains(BusinessKeyRegistry.codexClientVersionCacheKey)),
+    );
+    expect(legacy.values, <String, Object?>{
+      'flutter_log_enabled_v1': true,
+      BusinessKeyRegistry.codexClientVersionCacheKey: codexCache,
+    });
   });
 
   test('checkpoints before the first SharedPreferences deletion', () async {

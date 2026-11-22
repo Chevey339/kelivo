@@ -221,7 +221,7 @@ final class RestorePreviousBuilder {
     }
     final rootStates = <String, RestorePreviousAssetRootState>{};
     final entries = <String, RestoreAssetDescriptor>{};
-    final foldedNames = <String>{};
+    final foldedNames = <String, FileSystemEntityType>{};
     final pendingFiles = <({File file, String name, FileStat stat})>[];
     var totalPathBytes = 0;
     var totalBytes = 0;
@@ -254,9 +254,16 @@ final class RestorePreviousBuilder {
             totalPathBytes > _maximumAssetPathBytes) {
           throw StateError('restore_previous_asset_budget');
         }
-        if (!foldedNames.add(relativeName.toLowerCase())) {
+        // Directories are implicit in the asset manifest. The filesystem
+        // can distinguish their paths while their child entries stay unique.
+        final foldedName = relativeName.toLowerCase();
+        final previousType = foldedNames[foldedName];
+        if (previousType != null &&
+            (previousType != FileSystemEntityType.directory ||
+                type != FileSystemEntityType.directory)) {
           throw StateError('restore_previous_asset_case_collision');
         }
+        foldedNames[foldedName] = type;
         if (type == FileSystemEntityType.directory) {
           continue;
         }

@@ -11,6 +11,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/providers/s3_backup_provider.dart';
+import 'package:Kelivo/core/services/backup/backup_staging.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -117,12 +118,8 @@ void main() {
 
       expect(await relativeSentinel.readAsString(), 'keep relative');
       expect(await absoluteSentinel.readAsString(), 'keep absolute');
-      expect(
-        await Directory(
-          '${root.path}/tmp/kelivo_backup_staging',
-        ).list().toList(),
-        isEmpty,
-      );
+      final staging = await BackupStaging.resolveRoot();
+      expect(await staging.list().toList(), isEmpty);
     });
   });
 }

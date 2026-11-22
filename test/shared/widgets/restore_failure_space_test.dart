@@ -2,8 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:archive/archive_io.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
-// ignore: depend_on_referenced_packages
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,20 +11,24 @@ import 'package:Kelivo/shared/widgets/restore_failure_screen.dart';
 import '../../support/recovery_snapshot_fixture.dart';
 import 'restore_failure_screen_test.dart' as helpers;
 
-class _TemporaryPaths extends PathProviderPlatform {
-  _TemporaryPaths(this.root);
-  final Directory root;
+final class _RecoveryStagingFailure extends IOOverrides {
+  _RecoveryStagingFailure(this.diskFull);
+  final bool diskFull;
+
   @override
-  Future<String?> getTemporaryPath() async => '${root.path}/tmp';
+  Directory createDirectory(String path) =>
+      p.basename(path).startsWith('kelivo-recovery-check-')
+      ? _UnavailableStagingDirectory(path, diskFull)
+      : super.createDirectory(path);
 }
 
-class _UnavailableTemporaryDirectory implements Directory {
-  _UnavailableTemporaryDirectory(this.path, this.diskFull);
+class _UnavailableStagingDirectory implements Directory {
+  _UnavailableStagingDirectory(this.path, this.diskFull);
   final bool diskFull;
   @override
   final String path;
   @override
-  Future<Directory> createTemp([String? prefix]) async =>
+  Future<Directory> create({bool recursive = false}) async =>
       throw FileSystemException(
         diskFull ? 'No space left on device' : 'Permission denied',
         path,
@@ -42,6 +45,7 @@ class _UnavailableTemporaryDirectory implements Directory {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpRecoverySnapshotPaths();
   testWidgets(
     'newer database copies guide an app update without calling them invalid',
     (tester) async {
@@ -49,9 +53,6 @@ void main() {
       final root = (await tester.runAsync(
         () => Directory.systemTemp.createTemp('newer-recovery-'),
       ))!;
-      final previousPaths = PathProviderPlatform.instance;
-      PathProviderPlatform.instance = _TemporaryPaths(root);
-      addTearDown(() => PathProviderPlatform.instance = previousPaths);
       addTearDown(() => root.delete(recursive: true));
       final snapshot = File(
         '${root.path}/kelivo-snapshot-1792421104232879.zip',
@@ -168,48 +169,40 @@ void main() {
             appVersionLoader: helpers.stubVersion,
           ),
         );
-        final temporaryPath = Directory.systemTemp.path;
-        await IOOverrides.runZoned(
-          () async {
-            await tester.pumpWidget(screen(const ValueKey('full')));
-            await helpers.settleDiagnostics(tester);
-            expect(
-              find.text('Some free space is needed'),
-              diskFull ? findsOneWidget : findsNothing,
+        await IOOverrides.runWithIOOverrides(() async {
+          await tester.pumpWidget(screen(const ValueKey('full')));
+          await helpers.settleDiagnostics(tester);
+          expect(
+            find.text('Some free space is needed'),
+            diskFull ? findsOneWidget : findsNothing,
+          );
+          expect(
+            find.textContaining(
+              diskFull
+                  ? 'This does not mean they are damaged'
+                  : 'Some local copies could not be checked yet',
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining(
+              'validation failed. The original file has been kept.',
+            ),
+            findsNothing,
+          );
+          expect(find.text('Choose a copy to recover'), findsNothing);
+          expect(find.textContaining('No space left on device'), findsNothing);
+          if (diskFull) {
+            await tester.ensureVisible(find.text('Other options'));
+            await tester.tap(find.text('Other options'));
+            await tester.pumpAndSettle();
+            final reset = find.widgetWithText(
+              OutlinedButton,
+              'Start with an empty chat list',
             );
-            expect(
-              find.textContaining(
-                diskFull
-                    ? 'This does not mean they are damaged'
-                    : 'Some local copies could not be checked yet',
-              ),
-              findsOneWidget,
-            );
-            expect(
-              find.textContaining(
-                'validation failed. The original file has been kept.',
-              ),
-              findsNothing,
-            );
-            expect(find.text('Choose a copy to recover'), findsNothing);
-            expect(
-              find.textContaining('No space left on device'),
-              findsNothing,
-            );
-            if (diskFull) {
-              await tester.ensureVisible(find.text('Other options'));
-              await tester.tap(find.text('Other options'));
-              await tester.pumpAndSettle();
-              final reset = find.widgetWithText(
-                OutlinedButton,
-                'Start with an empty chat list',
-              );
-              expect(tester.widget<OutlinedButton>(reset).onPressed, isNull);
-            }
-          },
-          getSystemTempDirectory: () =>
-              _UnavailableTemporaryDirectory(temporaryPath, diskFull),
-        );
+            expect(tester.widget<OutlinedButton>(reset).onPressed, isNull);
+          }
+        }, _RecoveryStagingFailure(diskFull));
         await tester.runAsync(() async {
           expect(
             (await sha256.bind(snapshot.openRead()).first).toString(),

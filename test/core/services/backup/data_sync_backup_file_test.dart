@@ -37,6 +37,7 @@ import 'package:Kelivo/core/services/backup/backup_archive_limits.dart';
 import 'package:Kelivo/core/services/backup/backup_file_export.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
+import 'package:Kelivo/core/services/backup/backup_staging.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
@@ -520,6 +521,7 @@ Future<RestoreReceipt?> _recoverAcrossColdRestart({
 void main() {
   group('DataSync backup file', () {
     late Directory root;
+    late Directory stagingDirectory;
     late File validSettingsFile;
     late AppDatabase businessDatabase;
     late BusinessRepository businessRepository;
@@ -527,6 +529,7 @@ void main() {
     setUp(() async {
       root = await Directory.systemTemp.createTemp('kelivo_data_sync_test_');
       PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
+      stagingDirectory = await BackupStaging.resolveRoot();
       PackageInfo.setMockInitialValues(
         appName: 'Kelivo',
         packageName: 'Kelivo',
@@ -1733,8 +1736,7 @@ void main() {
         final fontFile = File('${fontsDir.path}/custom.ttf');
         await fontFile.writeAsBytes(List<int>.filled(256, 9));
 
-        final tmpDir = Directory('${root.path}/tmp');
-        // Previous releases put these working files in the cache root.
+        final tmpDir = await BackupStaging.root();
         final staleWorkDir = Directory(
           '${tmpDir.path}/kelivo_backup_2000-01-01T00-00-00.000000',
         );
@@ -1994,10 +1996,9 @@ void main() {
       await File(
         '${uploadDir.path}/payload.bin',
       ).writeAsBytes(List<int>.filled(32 * 1024, 5), flush: true);
-      final tmpDir = Directory('${root.path}/tmp/kelivo_backup_staging');
-      await tmpDir.create(recursive: true);
+      await stagingDirectory.create(recursive: true);
       final createdVerify = <String>[];
-      final watch = tmpDir.watch(recursive: true).listen((event) {
+      final watch = stagingDirectory.watch(recursive: true).listen((event) {
         if (p.basename(event.path) == '_verify') {
           createdVerify.add(event.path);
         }
@@ -2111,9 +2112,8 @@ void main() {
         throwsA(isA<BackupCancelledException>()),
       );
 
-      final tmp = Directory('${root.path}/tmp/kelivo_backup_staging');
-      if (await tmp.exists()) {
-        final leftovers = tmp
+      if (await stagingDirectory.exists()) {
+        final leftovers = stagingDirectory
             .listSync(recursive: true, followLinks: false)
             .map((entity) => p.basename(entity.path))
             .toList();
@@ -2172,9 +2172,8 @@ void main() {
         events.map((event) => event.phase),
         contains(BackupPhase.verifying),
       );
-      final tmp = Directory('${root.path}/tmp/kelivo_backup_staging');
-      if (await tmp.exists()) {
-        final leftovers = tmp
+      if (await stagingDirectory.exists()) {
+        final leftovers = stagingDirectory
             .listSync(recursive: true, followLinks: false)
             .map((entity) => p.basename(entity.path))
             .toList();
@@ -2320,9 +2319,8 @@ void main() {
         throwsA(isA<BackupCancelledException>()),
       );
 
-      final tmp = Directory('${root.path}/tmp/kelivo_backup_staging');
-      if (await tmp.exists()) {
-        final leftovers = tmp
+      if (await stagingDirectory.exists()) {
+        final leftovers = stagingDirectory
             .listSync(followLinks: false)
             .map((entity) => p.basename(entity.path))
             .toList();
@@ -2477,10 +2475,7 @@ void main() {
             ),
           ),
         );
-        expect(
-          await Directory('${root.path}/tmp/kelivo_backup_staging').exists(),
-          isFalse,
-        );
+        expect(await stagingDirectory.exists(), isFalse);
         expect(preferences.getBool('backup_encryption_enabled_v1'), isTrue);
       },
     );
@@ -2541,9 +2536,7 @@ void main() {
         );
         expect(await backup.readAsBytes(), original);
         expect(
-          (await Directory(
-            '${root.path}/tmp/kelivo_backup_staging',
-          ).list().toList()).where(
+          (await stagingDirectory.list().toList()).where(
             (e) => p.basename(e.path).startsWith('kelivo_decrypted_'),
           ),
           isEmpty,
@@ -2563,9 +2556,7 @@ void main() {
           'keep-on-cancel',
         );
         expect(
-          (await Directory(
-            '${root.path}/tmp/kelivo_backup_staging',
-          ).list().toList()).where(
+          (await stagingDirectory.list().toList()).where(
             (e) => p.basename(e.path).startsWith('kelivo_decrypted_'),
           ),
           isEmpty,
@@ -2655,12 +2646,7 @@ void main() {
           await RestoreStartupGate.inspect(appDataDirectory: root),
           isNull,
         );
-        expect(
-          await Directory(
-            '${root.path}/tmp/kelivo_backup_staging',
-          ).list().toList(),
-          isEmpty,
-        );
+        expect(await stagingDirectory.list().toList(), isEmpty);
       },
     );
 
@@ -2824,12 +2810,7 @@ void main() {
             'KELIVENC',
           );
           expect(mimeTypes[archivePath], 'application/octet-stream');
-          expect(
-            await Directory(
-              '${root.path}/tmp/kelivo_backup_staging',
-            ).list().toList(),
-            isEmpty,
-          );
+          expect(await stagingDirectory.list().toList(), isEmpty);
           final items = useS3
               ? await s3.listRemote(s3Config)
               : await dav.listRemote(davConfig);
@@ -2865,12 +2846,7 @@ void main() {
             (await service.exportSettings())['global_proxy_password_v1'],
             'remote-secret',
           );
-          expect(
-            await Directory(
-              '${root.path}/tmp/kelivo_backup_staging',
-            ).list().toList(),
-            isEmpty,
-          );
+          expect(await stagingDirectory.list().toList(), isEmpty);
 
           // A compromised endpoint must not downgrade the selected .kbackup
           // to an ordinary ZIP when the downloaded file has a temporary name.
@@ -2911,12 +2887,7 @@ void main() {
             (await service.exportSettings())['global_proxy_password_v1'],
             'keep-secret',
           );
-          expect(
-            await Directory(
-              '${root.path}/tmp/kelivo_backup_staging',
-            ).list().toList(),
-            isEmpty,
-          );
+          expect(await stagingDirectory.list().toList(), isEmpty);
         },
       );
     }
@@ -6168,9 +6139,7 @@ void main() {
         encoder.addFileSync(chatsFile, 'chats.json');
         encoder.addFileSync(untrustedCandidate, 'candidate.sqlite');
         encoder.closeSync();
-        final chatService = _CandidateCleanupChatService(
-          Directory('${root.path}/tmp/kelivo_backup_staging'),
-        );
+        final chatService = _CandidateCleanupChatService(stagingDirectory);
 
         await DataSync(
           businessRepository: businessRepository,
@@ -6731,7 +6700,6 @@ void main() {
           businessRepository: businessRepository,
           chatService: ChatService(),
         );
-        final tmpDir = Directory('${root.path}/tmp/kelivo_backup_staging');
         final relativeSentinel = File('${root.path}/webdav_relative.zip');
         final absoluteSentinel = File('${root.path}/webdav_absolute.zip');
         await relativeSentinel.writeAsString('keep relative');
@@ -6764,7 +6732,7 @@ void main() {
 
         expect(await relativeSentinel.readAsString(), 'keep relative');
         expect(await absoluteSentinel.readAsString(), 'keep absolute');
-        expect(await tmpDir.list().toList(), isEmpty);
+        expect(await stagingDirectory.list().toList(), isEmpty);
       },
     );
   });

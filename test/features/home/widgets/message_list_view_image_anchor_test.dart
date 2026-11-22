@@ -208,6 +208,7 @@ void main() {
       addTearDown(tester.view.reset);
       for (final name in [
         'app.desktop_startup',
+        'flutter_tts',
         'xyz.luan/audioplayers.global',
         'xyz.luan/audioplayers.global/events',
         'xyz.luan/audioplayers',
@@ -215,6 +216,9 @@ void main() {
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           MethodChannel(name),
           (call) async {
+            if (name == 'flutter_tts' && call.method == 'getLanguages') {
+              return <String>['en-US'];
+            }
             if (call.method == 'create') {
               final id = (call.arguments as Map)['playerId'];
               tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(

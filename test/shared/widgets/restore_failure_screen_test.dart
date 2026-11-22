@@ -301,6 +301,7 @@ void main() {
   });
 
   group('with a data directory', () {
+    setUpRecoverySnapshotPaths();
     late Directory directory;
 
     setUp(() async {

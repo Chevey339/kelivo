@@ -842,12 +842,15 @@ void main() {
               );
         await entered.future;
         final newer = await chat.createDraftConversation(temporary: true);
-        final newerMessage = await chat.addMessage(
+        final pendingMessage = chat.addMessage(
           conversationId: newer.id,
           role: 'user',
           content: 'Keep this new draft',
         );
+        // Attachment maintenance can hold the file lock while waiting for
+        // the fork transaction. The new draft is already the current owner.
         release.complete();
+        final newerMessage = await pendingMessage;
         final copied = await copying;
         expect(chat.currentConversationId, newer.id);
         expect(chat.getMessages(newer.id).single.id, newerMessage.id);

@@ -25,9 +25,11 @@ void main() {
     late Directory appData;
 
     setUp(() async {
-      root = await Directory.systemTemp.createTemp(
-        'kelivo_restore_cutover_test_',
-      );
+      // Unix socket addresses need a short path even when TMPDIR is long.
+      final temp = Platform.isWindows
+          ? Directory.systemTemp
+          : Directory('/tmp');
+      root = await temp.createTemp('kelivo_restore_cutover_test_');
       appData = Directory(p.join(root.path, 'app_data'));
       await appData.create();
     });
@@ -275,17 +277,12 @@ void main() {
             ])).exitCode,
             0,
           );
-          // Bind at a short path to stay within the Unix socket path limit.
-          final socketRoot = await Directory.systemTemp.createTemp('ks_');
-          final socketPath = p.join(socketRoot.path, 's');
+          final socketPath = p.join(root.path, 's');
           final socket = await ServerSocket.bind(
             InternetAddress(socketPath, type: InternetAddressType.unix),
             0,
           );
-          addTearDown(() async {
-            await socket.close();
-            await socketRoot.delete(recursive: true);
-          });
+          addTearDown(socket.close);
           await File(socketPath).rename(p.join(workspace.path, 'socket'));
 
           final prepared = await _prepareBundle(

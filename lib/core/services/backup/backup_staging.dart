@@ -29,10 +29,12 @@ abstract final class BackupStaging {
       ? AppDirectories.getAppDataDirectory()
       : getTemporaryDirectory();
 
+  /// Resolves the path without creating the staging directory.
+  static Future<Directory> resolveRoot({Directory? temporary}) async =>
+      Directory(p.join((temporary ?? await _parent()).path, directoryName));
+
   static Future<Directory> root({Directory? temporary}) async {
-    final dir = Directory(
-      p.join((temporary ?? await _parent()).path, directoryName),
-    );
+    final dir = await resolveRoot(temporary: temporary);
     if (await FileSystemEntity.type(dir.path, followLinks: false) ==
         FileSystemEntityType.link) {
       throw FileSystemException('Invalid backup staging directory', dir.path);
