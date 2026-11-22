@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../database/business_preferences.dart';
 import '../models/world_book.dart';
+import '../models/world_book_grouping.dart';
 
 class WorldBookStore {
   WorldBookStore(this._preferences);
@@ -10,6 +11,7 @@ class WorldBookStore {
   static const String _activeIdsByAssistantKey =
       'world_books_active_ids_by_assistant_v1';
   static const String _collapsedBooksKey = 'world_books_collapsed_v1';
+  static const String _groupingKey = WorldBookGrouping.preferenceKey;
   static const String _defaultAssistantKey = '__global__';
 
   final BusinessPreferences _preferences;
@@ -52,32 +54,53 @@ class WorldBookStore {
     }
   }
 
-  Future<void> save(List<WorldBook> items) async {
-    await _preferences.setString(
-      _itemsKey,
-      jsonEncode(items.map((e) => e.toJson()).toList(growable: false)),
-    );
+  Future<void> save(
+    List<WorldBook> items, {
+    WorldBookGrouping? grouping,
+  }) async {
+    await _preferences.setMany({
+      _itemsKey: jsonEncode(items.map((e) => e.toJson()).toList()),
+      if (grouping != null) _groupingKey: grouping.encode(),
+    });
   }
 
-  Future<void> add(WorldBook item) async {
+  Future<void> add(WorldBook item, {String? groupId}) async {
     final all = await getAll();
-    all.add(item);
-    await save(all);
+    WorldBookGrouping? grouping;
+    if (groupId != null) {
+      final current = await getGrouping();
+      if (current.names.containsKey(groupId)) {
+        grouping = WorldBookGrouping(
+          names: current.names,
+          memberships: {...current.memberships, item.id: groupId},
+        );
+      }
+    }
+    await save([...all, item], grouping: grouping);
   }
 
-  Future<void> update(WorldBook item) async {
+  Future<void> update(WorldBook item, {WorldBookGrouping? grouping}) async {
     final all = await getAll();
     final index = all.indexWhere((e) => e.id == item.id);
     if (index != -1) {
       all[index] = item;
-      await save(all);
+      await save(all, grouping: grouping);
     }
   }
 
   Future<void> delete(String id) async {
     final all = await getAll();
     all.removeWhere((e) => e.id == id);
-    await save(all);
+    final grouping = await getGrouping();
+    await save(
+      all,
+      grouping: grouping.memberships.containsKey(id)
+          ? WorldBookGrouping(
+              names: grouping.names,
+              memberships: Map.of(grouping.memberships)..remove(id),
+            )
+          : null,
+    );
 
     await removeBookFromBindings(id);
 
@@ -91,6 +114,16 @@ class WorldBookStore {
     await save(const <WorldBook>[]);
     await _preferences.remove(_activeIdsByAssistantKey);
     await _preferences.remove(_collapsedBooksKey);
+    await _preferences.remove(_groupingKey);
+  }
+
+  Future<WorldBookGrouping> getGrouping() async {
+    await _preferences.load();
+    return WorldBookGrouping.decode(_preferences.get(_groupingKey));
+  }
+
+  Future<void> saveGrouping(WorldBookGrouping grouping) async {
+    await _preferences.setString(_groupingKey, grouping.encode());
   }
 
   Future<void> reorder({required int oldIndex, required int newIndex}) async {
@@ -115,12 +148,23 @@ class WorldBookStore {
     return _cloneActiveIdsMap(await _loadActiveIdsMap());
   }
 
-  Future<void> setActiveIds(List<String> ids, {String? assistantId}) =>
-      _preferences.runExclusiveMutation(() async {
-        final map = await _loadActiveIdsMap();
-        map[assistantKey(assistantId)] = _cleanIds(ids);
-        await _persistActiveIdsMap(map);
-      });
+  Future<void> setActiveIds(List<String> ids, {String? assistantId}) async {
+    await updateActiveIds((_) => ids, assistantId: assistantId);
+  }
+
+  Future<Map<String, List<String>>> updateActiveIds(
+    List<String>? Function(List<String>) update, {
+    String? assistantId,
+  }) => _preferences.runExclusiveMutation(() async {
+    final map = await _loadActiveIdsMap();
+    final key = assistantKey(assistantId);
+    final current = map[key] ?? map[_defaultAssistantKey] ?? const <String>[];
+    final next = update(current);
+    if (next == null) return map;
+    map[key] = _cleanIds(next);
+    await _persistActiveIdsMap(map);
+    return map;
+  });
 
   /// Read inside the copy transaction's queue so removing one book cannot
   /// overwrite bindings added by an assistant copy while a write was pending.

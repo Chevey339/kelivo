@@ -83,6 +83,10 @@ Map<String, Object?> _fixture(String prefix) => {
   'world_books_v1': jsonEncode([
     {'id': prefix, 'name': '$prefix book'},
   ]),
+  'world_books_grouping_v1': jsonEncode({
+    'names': {'$prefix-group': '$prefix folder'},
+    'memberships': {prefix: '$prefix-group'},
+  }),
   'skills_v1': jsonEncode([
     {
       'id': prefix,
@@ -412,6 +416,10 @@ void main() {
               exported.containsKey('orphaned_conversations_assistant_id_v1'),
               category == BackupCategory.assistants,
             );
+            expect(
+              exported.containsKey('world_books_grouping_v1'),
+              category == BackupCategory.worldBooks,
+            );
             for (final entry in keys.entries) {
               expect(
                 exported.containsKey(entry.value),
@@ -438,6 +446,12 @@ void main() {
             after['orphaned_conversations_assistant_id_v1'],
             category == BackupCategory.assistants ? 'source' : 'local',
           );
+          expect(
+            after['world_books_grouping_v1'],
+            category == BackupCategory.worldBooks
+                ? incoming['world_books_grouping_v1']
+                : before['world_books_grouping_v1'],
+          );
           for (final entry in keys.entries) {
             expect(
               after[entry.value],
@@ -451,6 +465,32 @@ void main() {
       );
     }
   }
+
+  test('merging a World Book backup retains both libraries’ folders', () async {
+    final scope = _only({BackupCategory.worldBooks});
+    final config = WebDavConfig(scope: scope);
+    final backup = await exporter.prepareBackupFile(config);
+
+    await importer.restoreFromLocalFile(
+      backup,
+      config,
+      mode: RestoreMode.merge,
+    );
+
+    final restored = await BusinessRestoreService(
+      targetRepository,
+    ).exportSettings();
+    expect(jsonDecode(restored['world_books_grouping_v1']! as String), {
+      'names': {'local-group': 'local folder', 'source-group': 'source folder'},
+      'memberships': {'local': 'local-group', 'source': 'source-group'},
+    });
+    expect(
+      (await targetRepository.readEntities(
+        BusinessEntityKind.worldBook,
+      )).map((row) => row.id),
+      ['local', 'source'],
+    );
+  });
 
   for (final category in [
     BackupCategory.files,

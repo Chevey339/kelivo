@@ -16,11 +16,15 @@ import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/desktop/setting/world_book_pane.dart';
 import 'package:Kelivo/features/world_book/pages/world_book_page.dart';
 import 'package:Kelivo/features/world_book/widgets/world_book_entry_widgets.dart';
+import 'package:Kelivo/features/world_book/widgets/world_book_card_header.dart';
+import 'package:Kelivo/features/world_book/widgets/world_book_library.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/adaptive_form.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/shared/widgets/text_input_dialog.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 
 import '../../support/business_test_harness.dart';
@@ -239,6 +243,218 @@ void main() {
 
   for (final desktop in [false, true]) {
     final platform = desktop ? 'desktop' : 'mobile';
+    testWidgets(
+      '$platform edits a book and its group from the same form',
+      (tester) async {
+        const haptics = MethodChannel('haptic_feedback');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(haptics, (_) async => null);
+        addTearDown(() => messenger.setMockMethodCallHandler(haptics, null));
+        final provider = await mount(tester, desktop: desktop);
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(WorldBookLibrary)),
+        )!;
+        final groupField = find.text(l10n.worldBookGroupLabel);
+
+        await tester.tap(find.byTooltip(l10n.worldBookConfig));
+        await tester.pumpAndSettle();
+        expect(find.text(l10n.worldBookGroupUngrouped), findsOneWidget);
+        await tester.tap(groupField);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.worldBookGroupNew).last);
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(TextInputDialog),
+            matching: find.byType(EditableText),
+          ),
+          'History',
+        );
+        await tester.pump();
+        await tester.tap(find.text(l10n.worldBookSave).last);
+        await reloadBooks(tester, provider);
+        expect(
+          find.descendant(
+            of: find.byType(AdaptiveForm),
+            matching: find.text('History'),
+          ),
+          findsOneWidget,
+        );
+        final id = provider.groups.keys.single;
+        expect(provider.groupIdForBook('book'), isNull);
+
+        await tester.enterText(find.byType(EditableText).first, 'Renamed lore');
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AdaptiveForm),
+            matching: find.byType(IosSwitch),
+          ),
+        );
+        await tester.tap(find.text(l10n.worldBookSave));
+        await reloadBooks(tester, provider);
+        expect(provider.groupIdForBook('book'), id);
+        expect(provider.getById('book')?.name, 'Renamed lore');
+        expect(provider.getById('book')?.entries.length, 3);
+        expect(provider.getById('book')?.enabled, isFalse);
+        expect(
+          find.descendant(
+            of: find.byType(WorldBookCardHeader),
+            matching: find.textContaining(l10n.worldBookDisabledTag),
+          ),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byTooltip(l10n.worldBookConfig));
+        await tester.pumpAndSettle();
+        await tester.tap(groupField);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('group-option-ungrouped')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.worldBookCancel));
+        await tester.pumpAndSettle();
+        expect(provider.groupIdForBook('book'), id);
+      },
+      variant: TargetPlatformVariant({
+        desktop ? TargetPlatform.macOS : TargetPlatform.iOS,
+      }),
+    );
+
+    testWidgets(
+      '$platform shows multiple World Book groups and keeps cards in selection',
+      (tester) async {
+        const haptics = MethodChannel('haptic_feedback');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(haptics, (_) async => null);
+        addTearDown(() => messenger.setMockMethodCallHandler(haptics, null));
+        final provider = await mount(tester, desktop: desktop);
+        await tester.runAsync(() async {
+          final past = await provider.createGroup('Past timeline');
+          final present = await provider.createGroup('Present timeline');
+          await provider.addBook(
+            const WorldBook(id: 'past', name: 'Past book'),
+            groupId: past,
+          );
+          await provider.addBook(
+            const WorldBook(id: 'present', name: 'Present book'),
+            groupId: present,
+          );
+        });
+        await tester.pumpAndSettle();
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(WorldBookLibrary)),
+        )!;
+        final past = find.text('Past timeline');
+        final present = find.text('Present timeline');
+        final editor = find.descendant(
+          of: find.byType(TextInputDialog),
+          matching: find.byType(EditableText),
+        );
+        expect(past, findsOneWidget);
+        expect(present, findsOneWidget);
+        expect(find.text(l10n.worldBookGroupUngrouped), findsOneWidget);
+        expect(find.text('Past book'), findsOneWidget);
+        expect(find.text('Present book'), findsOneWidget);
+
+        await tester.tap(past);
+        await tester.pumpAndSettle();
+        expect(find.text('Past book'), findsNothing);
+        expect(find.text('Present book'), findsOneWidget);
+        await tester.tap(past);
+        await tester.pumpAndSettle();
+        expect(find.text('Past book'), findsOneWidget);
+        expect(find.text('Present book'), findsOneWidget);
+
+        await tester.tap(
+          desktop
+              ? find.text(l10n.worldBookGroupNew)
+              : find.byTooltip(l10n.worldBookGroupNew),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(editor, 'Shared');
+        await tester.pump();
+        await tester.tap(find.text(l10n.worldBookSave));
+        await reloadBooks(tester, provider);
+        final shared = provider.groups.entries
+            .singleWhere((entry) => entry.value == 'Shared')
+            .key;
+
+        final libraryMenu = find.byKey(
+          const ValueKey('world-book-library-menu'),
+        );
+        await tester.tap(libraryMenu);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.worldBookGroupSelectBooks));
+        await tester.pumpAndSettle();
+        for (final id in ['book', 'past']) {
+          final checkbox = find.byKey(ValueKey('world-book-select-$id'));
+          expect(
+            find.ancestor(
+              of: checkbox,
+              matching: find.byType(WorldBookCardHeader),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(checkbox);
+          await tester.pump();
+        }
+        expect(find.text(l10n.worldBookGroupSelectedBooks(2)), findsOneWidget);
+        await tester.tap(find.text(l10n.worldBookGroupMove));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('group-option-$shared')));
+        await reloadBooks(tester, provider);
+        expect(provider.booksInGroup(shared).map((book) => book.id), [
+          'book',
+          'past',
+        ]);
+        expect(past, findsOneWidget);
+        expect(present, findsOneWidget);
+
+        final sharedMenu = find.byKey(
+          ValueKey('world-book-group-menu-$shared'),
+        );
+        await tester.tap(sharedMenu);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.worldBookGroupRename));
+        await tester.pumpAndSettle();
+        await tester.enterText(editor, 'Shared lore');
+        await tester.pump();
+        await tester.tap(find.text(l10n.worldBookSave));
+        await reloadBooks(tester, provider);
+        expect(find.text('Shared lore'), findsOneWidget);
+
+        await tester.tap(sharedMenu);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.worldBookGroupDelete));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.worldBookDelete));
+        await reloadBooks(tester, provider);
+        expect(find.text('Shared lore'), findsNothing);
+        expect(provider.booksInGroup(null).map((book) => book.id), [
+          'book',
+          'past',
+        ]);
+        expect(find.text(l10n.worldBookGroupUngrouped), findsOneWidget);
+
+        await tester.tap(libraryMenu);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.worldBookOrder));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('world-book-order-book')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byTooltip(l10n.worldBookSelectionDone));
+        await tester.pumpAndSettle();
+        expect(past, findsOneWidget);
+        expect(present, findsOneWidget);
+      },
+      variant: TargetPlatformVariant({
+        desktop ? TargetPlatform.macOS : TargetPlatform.iOS,
+      }),
+    );
+
     testWidgets(
       '$platform keeps selection after a failed save and can exit selection',
       (tester) async {

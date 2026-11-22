@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../core/models/world_book.dart';
 import '../core/providers/world_book_provider.dart';
+import '../features/world_book/widgets/world_book_selection_groups.dart';
+import '../features/world_book/widgets/world_book_group_actions.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -78,6 +80,7 @@ class _WorldBookPopoverState extends State<_WorldBookPopover>
   late final Animation<double> _fadeIn;
   Offset _offset = const Offset(0, 0.12);
   bool _closing = false;
+  bool _choosingGroup = false;
 
   @override
   void initState() {
@@ -112,6 +115,16 @@ class _WorldBookPopoverState extends State<_WorldBookPopover>
     if (mounted) widget.onClose();
   }
 
+  Future<void> _moveBook(String bookId) async {
+    if (_choosingGroup) return;
+    setState(() => _choosingGroup = true);
+    try {
+      await moveWorldBookToGroup(context, bookId, desktop: true);
+    } finally {
+      if (mounted) setState(() => _choosingGroup = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
@@ -126,50 +139,54 @@ class _WorldBookPopoverState extends State<_WorldBookPopover>
         );
     final clipHeight = widget.anchorRect.top.clamp(0.0, screen.height);
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _close,
+    return Offstage(
+      offstage: _choosingGroup,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _close,
+            ),
           ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          height: clipHeight,
-          child: ClipRect(
-            child: Stack(
-              children: [
-                Positioned(
-                  left: left,
-                  width: width,
-                  bottom: 0,
-                  child: FadeTransition(
-                    opacity: _fadeIn,
-                    child: AnimatedSlide(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      offset: _offset,
-                      child: _GlassPanel(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(14),
-                        ),
-                        child: _WorldBookList(
-                          assistantId: widget.assistantId,
-                          conversationId: widget.conversationId,
-                          onClose: _close,
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: clipHeight,
+            child: ClipRect(
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: left,
+                    width: width,
+                    bottom: 0,
+                    child: FadeTransition(
+                      opacity: _fadeIn,
+                      child: AnimatedSlide(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutCubic,
+                        offset: _offset,
+                        child: _GlassPanel(
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(14),
+                          ),
+                          child: _WorldBookList(
+                            assistantId: widget.assistantId,
+                            conversationId: widget.conversationId,
+                            onMoveBook: _moveBook,
+                            onClose: _close,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -220,11 +237,13 @@ class _WorldBookList extends StatelessWidget {
     required this.assistantId,
     this.conversationId,
     required this.onClose,
+    required this.onMoveBook,
   });
 
   final String? assistantId;
   final String? conversationId;
   final VoidCallback onClose;
+  final ValueChanged<String> onMoveBook;
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +255,7 @@ class _WorldBookList extends StatelessWidget {
           assistantId: assistantId,
           conversationId: conversationId,
           onClose: onClose,
+          onMoveBook: onMoveBook,
         ),
       ),
     );
@@ -247,11 +267,13 @@ class _WorldBookListInner extends StatelessWidget {
     required this.assistantId,
     this.conversationId,
     required this.onClose,
+    required this.onMoveBook,
   });
 
   final String? assistantId;
   final String? conversationId;
   final VoidCallback onClose;
+  final ValueChanged<String> onMoveBook;
 
   @override
   Widget build(BuildContext context) {
@@ -300,8 +322,12 @@ class _WorldBookListInner extends StatelessWidget {
               },
             ),
           ),
-          for (final book in books)
-            Padding(
+          ...worldBookSelectionRows(
+            provider: provider,
+            selectedIds: selected,
+            assistantId: assistantId,
+            conversationId: conversationId,
+            buildBook: (book) => Padding(
               padding: const EdgeInsets.only(bottom: 1),
               child: _RowItem(
                 title: book.name.trim().isEmpty
@@ -311,6 +337,11 @@ class _WorldBookListInner extends StatelessWidget {
                     '${l10n.worldBookEnabledCount(book.enabledEntryCount, book.entries.length)}${book.description.isEmpty ? '' : ' · ${book.description}'}',
                 active: selected.contains(book.id),
                 disabled: !book.enabled,
+                groupButton: WorldBookGroupButton(
+                  key: ValueKey('world-book-assign-${book.id}'),
+                  desktop: true,
+                  onPressed: () => onMoveBook(book.id),
+                ),
                 onTap: () async {
                   final isActive = selected.contains(book.id);
                   if (!book.enabled && !isActive) return;
@@ -326,6 +357,7 @@ class _WorldBookListInner extends StatelessWidget {
                 },
               ),
             ),
+          ),
         ],
       ),
     );
@@ -408,6 +440,7 @@ class _RowItem extends StatefulWidget {
     required this.active,
     required this.disabled,
     required this.onTap,
+    required this.groupButton,
   });
 
   final String title;
@@ -415,6 +448,7 @@ class _RowItem extends StatefulWidget {
   final bool active;
   final bool disabled;
   final VoidCallback onTap;
+  final Widget groupButton;
 
   @override
   State<_RowItem> createState() => _RowItemState();
@@ -508,10 +542,12 @@ class _RowItemState extends State<_RowItem> {
                         size: 14,
                         color: cs.primary.withValues(alpha: opacity),
                       ),
-                    ],
+                    ] else
+                      const SizedBox(width: 20),
                   ],
                 ),
               ),
+              widget.groupButton,
             ],
           ),
         ),

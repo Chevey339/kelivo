@@ -17113,4 +17113,61 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get backupMacKeychainAccessDenied =>
       'macOS에서 백업 비밀번호 접근이 거부되었습니다. 시스템 프롬프트가 나타나면 Kelivo의 접근을 허용해 주세요. 키체인 접근에서 기본 키체인과 비밀번호 항목의 권한을 확인할 수도 있습니다.';
+
+  @override
+  String get worldBookGroupActions => '그룹 작업';
+
+  @override
+  String get worldBookGroupLabel => '그룹';
+
+  @override
+  String get worldBookOrder => '주입 순서 정렬';
+
+  @override
+  String worldBookGroupSelectedBooks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count권 선택됨',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get worldBookGroupUngrouped => '그룹 없음';
+
+  @override
+  String get worldBookGroupNew => '새 그룹';
+
+  @override
+  String get worldBookGroupName => '그룹 이름';
+
+  @override
+  String get worldBookGroupNameInvalid => '중복되지 않는 그룹 이름을 입력하세요.';
+
+  @override
+  String get worldBookGroupRename => '그룹 이름 변경';
+
+  @override
+  String get worldBookGroupDelete => '그룹 삭제';
+
+  @override
+  String worldBookGroupDeleteMessage(String group) {
+    return '“$group”의 책은 그룹 없음으로 이동합니다.';
+  }
+
+  @override
+  String get worldBookGroupMove => '그룹으로 이동';
+
+  @override
+  String get worldBookGroupSelectBooks => '세계관 선택';
+
+  @override
+  String get worldBookGroupSaveFailed => '변경 사항을 저장하지 못했습니다. 다시 시도하세요.';
+
+  @override
+  String get worldBookGroupSelectAll => '그룹 전체 선택';
+
+  @override
+  String get worldBookGroupClearSelection => '그룹 선택 해제';
 }

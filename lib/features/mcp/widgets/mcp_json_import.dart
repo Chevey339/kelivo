@@ -7,7 +7,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/section_card.dart';
-import 'mcp_form.dart';
+import '../../../shared/widgets/adaptive_form.dart';
 import '../../../shared/widgets/ios_text_button.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
@@ -16,7 +16,7 @@ Future<void> showMcpJsonImport(
   bool desktop = false,
 }) async {
   final provider = context.read<McpProvider>();
-  await showMcpForm<void>(
+  await showAdaptiveForm<void>(
     context,
     desktop: desktop,
     builder: (_) => _McpJsonImport(provider: provider, desktop: desktop),
@@ -73,7 +73,7 @@ class _McpJsonImportState extends State<_McpJsonImport> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    return McpForm(
+    return AdaptiveForm(
       desktop: widget.desktop,
       width: 640,
       title: l10n.mcpImportJson,

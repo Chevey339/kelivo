@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/ios_form_text_field.dart';
-import '../../../shared/widgets/ios_text_button.dart';
-import '../../../desktop/widgets/desktop_form_dialog.dart';
-import '../../../theme/app_font_weights.dart';
+import 'ios_form_text_field.dart';
+import 'ios_text_button.dart';
+import '../../desktop/widgets/desktop_form_dialog.dart';
+import '../../theme/app_font_weights.dart';
 
 /// Owns the controller until the dialog's closing animation is finished.
-class McpTextDialog extends StatefulWidget {
-  const McpTextDialog({
+class TextInputDialog extends StatefulWidget {
+  const TextInputDialog({
     super.key,
     required this.title,
     required this.hint,
@@ -16,19 +15,21 @@ class McpTextDialog extends StatefulWidget {
     required this.valid,
     this.initialValue = '',
     this.invalidMessage,
+    this.cancelLabel,
   });
   final String title;
   final String hint;
   final String submitLabel;
   final String initialValue;
   final String? invalidMessage;
+  final String? cancelLabel;
   final bool Function(String) valid;
 
   @override
-  State<McpTextDialog> createState() => _McpTextDialogState();
+  State<TextInputDialog> createState() => _TextInputDialogState();
 }
 
-class _McpTextDialogState extends State<McpTextDialog> {
+class _TextInputDialogState extends State<TextInputDialog> {
   late final controller = TextEditingController(text: widget.initialValue);
   @override
   void dispose() {
@@ -89,7 +90,9 @@ class _McpTextDialogState extends State<McpTextDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   IosTextButton(
-                    label: AppLocalizations.of(context)!.mcpPageCancel,
+                    label:
+                        widget.cancelLabel ??
+                        MaterialLocalizations.of(context).cancelButtonLabel,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(width: 8),

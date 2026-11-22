@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../desktop/widgets/desktop_form_dialog.dart';
-import '../../../shared/responsive/screen_type_helper.dart';
-import '../../../shared/widgets/form_sheet.dart';
+import '../../desktop/widgets/desktop_form_dialog.dart';
+import '../responsive/screen_type_helper.dart';
+import 'form_sheet.dart';
 
 /// Uses the existing mobile form sheet and desktop dialog chrome.
-Future<T?> showMcpForm<T>(
+Future<T?> showAdaptiveForm<T>(
   BuildContext context, {
   required WidgetBuilder builder,
   bool? desktop,
@@ -16,8 +16,8 @@ Future<T?> showMcpForm<T>(
   return showFormSheet<T>(context, builder: builder);
 }
 
-class McpForm extends StatelessWidget {
-  const McpForm({
+class AdaptiveForm extends StatelessWidget {
+  const AdaptiveForm({
     super.key,
     required this.title,
     required this.children,

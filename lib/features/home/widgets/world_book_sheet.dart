@@ -10,6 +10,8 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../world_book/widgets/world_book_selection_groups.dart';
+import '../../world_book/widgets/world_book_group_actions.dart';
 
 class WorldBookSheet extends StatelessWidget {
   const WorldBookSheet({
@@ -78,45 +80,56 @@ class WorldBookSheet extends StatelessWidget {
                         ),
                       )
                     else
-                      for (final book in books)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Builder(
-                            builder: (rowCtx) {
-                              final selected = activeIds.contains(book.id);
-                              final disabled = !book.enabled;
-                              final canTap = !disabled || selected;
-                              return _SelectableRow(
-                                icon: Lucide.BookOpen,
-                                label: book.name.trim().isEmpty
-                                    ? l10n.worldBookUnnamed
-                                    : book.name.trim(),
-                                subtitle: [
-                                  l10n.worldBookEnabledCount(
-                                    book.enabledEntryCount,
-                                    book.entries.length,
-                                  ),
-                                  if (book.description.trim().isNotEmpty)
-                                    book.description.trim(),
-                                ].join(' · '),
-                                selected: selected,
-                                disabled: disabled,
-                                onTap: !canTap
-                                    ? null
-                                    : () async {
-                                        Haptics.light();
-                                        await togglePromptSelection(
-                                          rowCtx,
-                                          book.id,
-                                          kind: PromptSelectionKind.worldBook,
-                                          assistantId: assistantId,
-                                          conversationId: conversationId,
-                                        );
-                                      },
-                              );
-                            },
-                          ),
-                        ),
+                      ...worldBookSelectionRows(
+                        provider: provider,
+                        selectedIds: activeIds,
+                        assistantId: assistantId,
+                        conversationId: conversationId,
+                        buildBook: (book) {
+                          final selected = activeIds.contains(book.id);
+                          final disabled = !book.enabled;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _SelectableRow(
+                              icon: Lucide.BookOpen,
+                              label: book.name.trim().isEmpty
+                                  ? l10n.worldBookUnnamed
+                                  : book.name.trim(),
+                              subtitle: [
+                                l10n.worldBookEnabledCount(
+                                  book.enabledEntryCount,
+                                  book.entries.length,
+                                ),
+                                if (book.description.trim().isNotEmpty)
+                                  book.description.trim(),
+                              ].join(' · '),
+                              selected: selected,
+                              disabled: disabled,
+                              groupButton: WorldBookGroupButton(
+                                key: ValueKey('world-book-assign-${book.id}'),
+                                desktop: false,
+                                onPressed: () => moveWorldBookToGroup(
+                                  ctx,
+                                  book.id,
+                                  desktop: false,
+                                ),
+                              ),
+                              onTap: disabled && !selected
+                                  ? null
+                                  : () async {
+                                      Haptics.light();
+                                      await togglePromptSelection(
+                                        ctx,
+                                        book.id,
+                                        kind: PromptSelectionKind.worldBook,
+                                        assistantId: assistantId,
+                                        conversationId: conversationId,
+                                      );
+                                    },
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -194,6 +207,7 @@ class _SelectableRow extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    required this.groupButton,
     this.subtitle,
     this.disabled = false,
   });
@@ -204,6 +218,7 @@ class _SelectableRow extends StatelessWidget {
   final bool selected;
   final bool disabled;
   final VoidCallback? onTap;
+  final Widget groupButton;
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +275,7 @@ class _SelectableRow extends StatelessWidget {
               )
             else
               const SizedBox(width: 18),
+            groupButton,
           ],
         ),
       ),

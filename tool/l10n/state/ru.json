@@ -5121,5 +5121,21 @@
   "backupEncryptionChangePassword": "21c7cec4a4e4f85fce78cd38a426d624ee6f123a507808e18e06a0b72518bb95",
   "backupMacKeychainNeedsUnlock": "0a92e8458c66282b1a683fc1c37eda6b135a2a238edce31076865aabf39aa78d",
   "backupMacOpenKeychainAccess": "ebb2e842f0c54cf97be26cbf084adc4860710442de82fc96aab749e843fc00eb",
-  "backupMacKeychainAccessDenied": "f2574bd434d6c63ef1c660680ebcf7ec40d6cbbbc2c068bc1a7af1629aee9627"
+  "backupMacKeychainAccessDenied": "f2574bd434d6c63ef1c660680ebcf7ec40d6cbbbc2c068bc1a7af1629aee9627",
+  "worldBookGroupActions": "8154e4d0962a20cf3c0cd974e17350cf7132ddff31d78efe3a5809fbb76c145a",
+  "worldBookGroupLabel": "9a85a6fb9373c3fbffc8a4af9bf224018014ff94b2132f1057b051b730f3edfc",
+  "worldBookOrder": "d4c79a5bc2d790e4d19cba3e1b1c2f06e9a1c54e0834298e9b39b653d4f6e113",
+  "worldBookGroupSelectedBooks": "1de6fbe0da7704bebf5c745bca8473eca70a9af17bf6832503239e307af2b046",
+  "worldBookGroupUngrouped": "5d393c0c2d3ca0cd4842a47f7dcf48ce83e5ac2e9bf1d6e415489cf2e044ccf6",
+  "worldBookGroupNew": "7dad9d43efe7b781614345b61fd59aad18237ffe104bfc6f515ed1501f5d7f63",
+  "worldBookGroupName": "aac563b6226d0a521b40db4cedb1628ae1c4f43d85fdfb5837af53510190c035",
+  "worldBookGroupNameInvalid": "ccfe2e27f5c001ffd004648205a1570f02900598239beac4eb2dded7099dc163",
+  "worldBookGroupRename": "4ac1e2d1d5b6b440ad7f0bc648a7723fda2c96a70d649d13b108810a82a536fd",
+  "worldBookGroupDelete": "1b32b4c14cfec6c3f3b92a06682c85313f3dbcc969af6d3324f15f395a66a610",
+  "worldBookGroupDeleteMessage": "b6499d807eab3fd4a6ba9766bd0b709596ae0cc1f1c6b1bc8868c1fea85104aa",
+  "worldBookGroupMove": "70cb3e40adbabf92e71fc15c784b5cddb654152c7fff891c0284fe7025ddf59d",
+  "worldBookGroupSelectBooks": "29713cd0d7fea6e69248f26fc3b0f867ff0158cf627c7152b298feb87d9c955d",
+  "worldBookGroupSaveFailed": "66b45a66ca4fab68720770b9f2e7a292cd8b0434d087ae8350db2f9fd7fe8245",
+  "worldBookGroupSelectAll": "575f2c4d22206a4acabae5e975504e62f036f8d8840cbe379f0cec605082b900",
+  "worldBookGroupClearSelection": "b16c9d847d3f7835373c5fcaa877febf294482e3028770f390172ad31299c713"
 }

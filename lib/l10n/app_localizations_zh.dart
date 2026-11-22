@@ -16679,6 +16679,58 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get backupMacKeychainAccessDenied =>
       'macOS 拒绝访问备份密码。如果出现系统提示，请允许 Kelivo 访问。你也可以在「钥匙串访问」中检查默认钥匙串和备份密码项目的权限。';
+
+  @override
+  String get worldBookGroupActions => '分组操作';
+
+  @override
+  String get worldBookGroupLabel => '分组';
+
+  @override
+  String get worldBookOrder => '调整注入顺序';
+
+  @override
+  String worldBookGroupSelectedBooks(int count) {
+    return '已选 $count 本';
+  }
+
+  @override
+  String get worldBookGroupUngrouped => '未分组';
+
+  @override
+  String get worldBookGroupNew => '新建分组';
+
+  @override
+  String get worldBookGroupName => '分组名称';
+
+  @override
+  String get worldBookGroupNameInvalid => '请输入不重复的分组名称。';
+
+  @override
+  String get worldBookGroupRename => '重命名分组';
+
+  @override
+  String get worldBookGroupDelete => '删除分组';
+
+  @override
+  String worldBookGroupDeleteMessage(String group) {
+    return '「$group」中的世界书将移到「未分组」。';
+  }
+
+  @override
+  String get worldBookGroupMove => '移到分组';
+
+  @override
+  String get worldBookGroupSelectBooks => '选择世界书';
+
+  @override
+  String get worldBookGroupSaveFailed => '保存失败，请重试。';
+
+  @override
+  String get worldBookGroupSelectAll => '全选本组';
+
+  @override
+  String get worldBookGroupClearSelection => '清空本组勾选';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -33356,6 +33408,58 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get backupMacKeychainAccessDenied =>
       'macOS 拒绝访问备份密码。如果出现系统提示，请允许 Kelivo 访问。你也可以在「钥匙串访问」中检查默认钥匙串和备份密码项目的权限。';
+
+  @override
+  String get worldBookGroupActions => '分组操作';
+
+  @override
+  String get worldBookGroupLabel => '分组';
+
+  @override
+  String get worldBookOrder => '调整注入顺序';
+
+  @override
+  String worldBookGroupSelectedBooks(int count) {
+    return '已选 $count 本';
+  }
+
+  @override
+  String get worldBookGroupUngrouped => '未分组';
+
+  @override
+  String get worldBookGroupNew => '新建分组';
+
+  @override
+  String get worldBookGroupName => '分组名称';
+
+  @override
+  String get worldBookGroupNameInvalid => '请输入不重复的分组名称。';
+
+  @override
+  String get worldBookGroupRename => '重命名分组';
+
+  @override
+  String get worldBookGroupDelete => '删除分组';
+
+  @override
+  String worldBookGroupDeleteMessage(String group) {
+    return '「$group」中的世界书将移到「未分组」。';
+  }
+
+  @override
+  String get worldBookGroupMove => '移到分组';
+
+  @override
+  String get worldBookGroupSelectBooks => '选择世界书';
+
+  @override
+  String get worldBookGroupSaveFailed => '保存失败，请重试。';
+
+  @override
+  String get worldBookGroupSelectAll => '全选本组';
+
+  @override
+  String get worldBookGroupClearSelection => '清空本组勾选';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -50078,4 +50182,62 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get backupMacKeychainAccessDenied =>
       'macOS 拒絕存取備份密碼。如果出現系統提示，請允許 Kelivo 存取。你也可以在「鑰匙串存取」中檢查預設鑰匙串和備份密碼項目的權限。';
+
+  @override
+  String get worldBookGroupActions => '群組操作';
+
+  @override
+  String get worldBookGroupLabel => '分組';
+
+  @override
+  String get worldBookOrder => '調整注入順序';
+
+  @override
+  String worldBookGroupSelectedBooks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已選 $count 本書',
+      one: '已選 1 本書',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get worldBookGroupUngrouped => '未分組';
+
+  @override
+  String get worldBookGroupNew => '新增分組';
+
+  @override
+  String get worldBookGroupName => '分組名稱';
+
+  @override
+  String get worldBookGroupNameInvalid => '請輸入不重複的分組名稱。';
+
+  @override
+  String get worldBookGroupRename => '重新命名分組';
+
+  @override
+  String get worldBookGroupDelete => '刪除分組';
+
+  @override
+  String worldBookGroupDeleteMessage(String group) {
+    return '「$group」中的世界書將移至「未分組」。';
+  }
+
+  @override
+  String get worldBookGroupMove => '移至分組';
+
+  @override
+  String get worldBookGroupSelectBooks => '選擇世界書';
+
+  @override
+  String get worldBookGroupSaveFailed => '儲存失敗，請重試。';
+
+  @override
+  String get worldBookGroupSelectAll => '全選本組';
+
+  @override
+  String get worldBookGroupClearSelection => '清空本組勾選';
 }

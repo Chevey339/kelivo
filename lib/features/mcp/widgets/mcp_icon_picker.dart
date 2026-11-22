@@ -10,7 +10,7 @@ import '../../../utils/icon_cache.dart';
 import '../../provider/widgets/avatar_input_dialog.dart';
 import '../../provider/widgets/avatar_picker.dart';
 import '../../provider/widgets/provider_icon_picker.dart';
-import 'mcp_text_dialog.dart';
+import '../../../shared/widgets/text_input_dialog.dart';
 
 Future<void> showMcpIconPicker(
   BuildContext context, {
@@ -103,7 +103,8 @@ Future<String?> _input(
 }) async {
   return showDialog<String>(
     context: context,
-    builder: (_) => McpTextDialog(
+    builder: (_) => TextInputDialog(
+      cancelLabel: AppLocalizations.of(context)!.mcpPageCancel,
       title: title,
       hint: hint,
       valid: valid,

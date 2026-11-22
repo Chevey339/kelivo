@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../database/business_preferences.dart';
 import '../models/world_book.dart';
+import '../models/world_book_grouping.dart';
 import '../services/world_book_store.dart';
 
 class WorldBookProvider with ChangeNotifier {
@@ -17,8 +18,98 @@ class WorldBookProvider with ChangeNotifier {
   Map<String, List<String>> _activeIdsByAssistant =
       const <String, List<String>>{};
   Map<String, bool> _collapsedBooks = const <String, bool>{};
+  WorldBookGrouping _grouping = const WorldBookGrouping();
 
   List<WorldBook> get books => List<WorldBook>.unmodifiable(_books);
+
+  Map<String, String> get groups => Map.unmodifiable(_grouping.names);
+
+  String? groupIdForBook(String bookId) => _grouping.memberships[bookId];
+
+  List<WorldBook> booksInGroup(String? groupId) => [
+    for (final book in _books)
+      if (groupIdForBook(book.id) == groupId) book,
+  ];
+
+  bool isGroupNameAvailable(String name, {String? exceptId}) {
+    final normalized = name.trim().toLowerCase();
+    return normalized.isNotEmpty &&
+        !_grouping.names.entries.any(
+          (entry) =>
+              entry.key != exceptId && entry.value.toLowerCase() == normalized,
+        );
+  }
+
+  Future<String> createGroup(String name) => _serializeBookOperation(() async {
+    final id = const Uuid().v4();
+    final validated = _validateGroupName(name);
+    await _saveGrouping(
+      WorldBookGrouping(
+        names: {id: validated, ..._grouping.names},
+        memberships: _grouping.memberships,
+      ),
+    );
+    return id;
+  });
+
+  Future<void> renameGroup(String id, String name) =>
+      _serializeBookOperation(() async {
+        if (!_grouping.names.containsKey(id)) return;
+        final validated = _validateGroupName(name, exceptId: id);
+        await _saveGrouping(
+          WorldBookGrouping(
+            names: {..._grouping.names, id: validated},
+            memberships: _grouping.memberships,
+          ),
+        );
+      });
+
+  Future<void> deleteGroup(String id) => _serializeBookOperation(() async {
+    if (!_grouping.names.containsKey(id)) return;
+    await _saveGrouping(
+      WorldBookGrouping(
+        names: Map.of(_grouping.names)..remove(id),
+        memberships: Map.of(_grouping.memberships)
+          ..removeWhere((_, groupId) => groupId == id),
+      ),
+    );
+  });
+
+  Future<void> moveBooksToGroup(Set<String> bookIds, String? groupId) =>
+      _serializeBookOperation(() async {
+        final grouping = _groupingAfterMove(bookIds, groupId);
+        if (grouping != null) await _saveGrouping(grouping);
+      });
+
+  WorldBookGrouping? _groupingAfterMove(Set<String> bookIds, String? groupId) {
+    if (groupId != null && !_grouping.names.containsKey(groupId)) {
+      throw ArgumentError.value(groupId);
+    }
+    final memberships = Map.of(_grouping.memberships);
+    for (final book in _books) {
+      if (!bookIds.contains(book.id)) continue;
+      if (groupId == null) {
+        memberships.remove(book.id);
+      } else {
+        memberships[book.id] = groupId;
+      }
+    }
+    if (mapEquals(memberships, _grouping.memberships)) return null;
+    return WorldBookGrouping(names: _grouping.names, memberships: memberships);
+  }
+
+  String _validateGroupName(String name, {String? exceptId}) {
+    if (!isGroupNameAvailable(name, exceptId: exceptId)) {
+      throw ArgumentError.value(name);
+    }
+    return name.trim();
+  }
+
+  Future<void> _saveGrouping(WorldBookGrouping grouping) async {
+    await _store.saveGrouping(grouping);
+    _grouping = grouping;
+    notifyListeners();
+  }
 
   WorldBook? getById(String id) {
     try {
@@ -65,7 +156,7 @@ class WorldBookProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _serializeBookOperation(Future<void> Function() operation) {
+  Future<T> _serializeBookOperation<T>(Future<T> Function() operation) {
     final result = _bookOperationTail.then((_) => operation());
     _bookOperationTail = result.then<void>(
       (_) {},
@@ -79,6 +170,7 @@ class WorldBookProvider with ChangeNotifier {
   Future<void> _loadAll() async {
     try {
       _books = await _store.getAll();
+      _grouping = await _store.getGrouping();
       _activeIdsByAssistant = await _store.getActiveIdsByAssistant();
       final collapsed = await _store.getCollapsedBooksMap();
       final knownIds = _books.map((e) => e.id).toSet();
@@ -98,28 +190,34 @@ class WorldBookProvider with ChangeNotifier {
       _books = const <WorldBook>[];
       _activeIdsByAssistant = const <String, List<String>>{};
       _collapsedBooks = const <String, bool>{};
+      _grouping = const WorldBookGrouping();
       notifyListeners();
     }
   }
 
-  Future<void> addBook(WorldBook book) => _serializeBookOperation(() async {
-    await _store.add(book);
-    await _loadAll();
-  });
+  Future<void> addBook(WorldBook book, {String? groupId}) =>
+      _serializeBookOperation(() async {
+        await _store.add(book, groupId: groupId);
+        await _loadAll();
+      });
 
   Future<void> updateBook(
     String id,
-    WorldBook Function(WorldBook current) update,
-  ) => _serializeBookOperation(() async {
+    WorldBook Function(WorldBook current) update, {
+    ({String? groupId})? group,
+  }) => _serializeBookOperation(() async {
     final current = getById(id);
     if (current == null) return;
     final book = update(current);
+    final grouping = group == null
+        ? null
+        : _groupingAfterMove({id}, group.groupId);
+    await _store.update(book, grouping: grouping);
     if (!book.enabled) {
       try {
         await _store.removeBookFromBindings(book.id);
       } catch (_) {}
     }
-    await _store.update(book);
     await _loadAll();
   });
 
@@ -149,21 +247,43 @@ class WorldBookProvider with ChangeNotifier {
     _books = const <WorldBook>[];
     _activeIdsByAssistant = const <String, List<String>>{};
     _collapsedBooks = const <String, bool>{};
+    _grouping = const WorldBookGrouping();
     notifyListeners();
   });
 
-  Future<void> reorderBooks({required int oldIndex, required int newIndex}) =>
-      _serializeBookOperation(() async {
-        if (_books.isEmpty) return;
-        if (oldIndex < 0 || oldIndex >= _books.length) return;
-        if (newIndex < 0 || newIndex >= _books.length) return;
-        final list = List<WorldBook>.from(_books);
-        final item = list.removeAt(oldIndex);
-        list.insert(newIndex, item);
-        _books = list;
-        notifyListeners();
-        await _store.save(_books);
-      });
+  Future<void> reorderBooks({
+    required int oldIndex,
+    required int newIndex,
+    ({String? id})? group,
+  }) => _serializeBookOperation(() async {
+    final previous = _books;
+    final members = group == null ? List.of(previous) : booksInGroup(group.id);
+    if (oldIndex == newIndex || oldIndex < 0 || oldIndex >= members.length) {
+      return;
+    }
+    if (newIndex < 0 || newIndex >= members.length) return;
+    members.insert(newIndex, members.removeAt(oldIndex));
+
+    // Keep the positions of books in other folders in the injection order.
+    var memberIndex = 0;
+    _books = group == null
+        ? members
+        : [
+            for (final book in previous)
+              if (groupIdForBook(book.id) == group.id)
+                members[memberIndex++]
+              else
+                book,
+          ];
+    notifyListeners();
+    try {
+      await _store.save(_books);
+    } catch (_) {
+      _books = previous;
+      notifyListeners();
+      rethrow;
+    }
+  });
 
   Future<void> reorderEntries({
     required String bookId,
@@ -279,28 +399,25 @@ class WorldBookProvider with ChangeNotifier {
     await setBookCollapsed(id, !isBookCollapsed(id));
   }
 
-  Future<void> setActiveBookIds(List<String> ids, {String? assistantId}) async {
-    final key = WorldBookStore.assistantKey(assistantId);
-    final nextMap = Map<String, List<String>>.from(_activeIdsByAssistant);
-    nextMap[key] = ids.toSet().toList(growable: false);
-    _activeIdsByAssistant = nextMap;
-    notifyListeners();
-    await _store.setActiveIds(ids, assistantId: assistantId);
-  }
+  Future<void> setActiveBookIds(List<String> ids, {String? assistantId}) =>
+      updateActiveBookIds((_) => ids, assistantId: assistantId);
 
-  Future<void> toggleActiveBookId(String id, {String? assistantId}) async {
-    final set = activeBookIdsFor(assistantId).toSet();
-    if (set.contains(id)) {
-      set.remove(id);
-    } else {
-      final book = getById(id);
-      if (book == null) return;
-      if (!book.enabled) return;
-      set.add(id);
-    }
-    await setActiveBookIds(
-      set.toList(growable: false),
+  Future<void> updateActiveBookIds(
+    List<String>? Function(List<String>) update, {
+    String? assistantId,
+  }) => _serializeBookOperation(() async {
+    _activeIdsByAssistant = await _store.updateActiveIds(
+      update,
       assistantId: assistantId,
     );
-  }
+    notifyListeners();
+  });
+
+  Future<void> toggleActiveBookId(String id, {String? assistantId}) =>
+      updateActiveBookIds((ids) {
+        final next = ids.toSet();
+        if (next.remove(id)) return next.toList();
+        if (getById(id)?.enabled != true) return null;
+        return [...next, id];
+      }, assistantId: assistantId);
 }

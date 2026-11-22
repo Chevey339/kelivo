@@ -112,7 +112,7 @@ void main() {
       );
       await submitNewGroup(tester);
       final pickerContext = tester.element(
-        find.byKey(const ValueKey('mcp-group-option-other')),
+        find.byKey(const ValueKey('group-option-ungrouped')),
       );
       Navigator.of(pickerContext).pop();
       await tester.pump(const Duration(milliseconds: 16));

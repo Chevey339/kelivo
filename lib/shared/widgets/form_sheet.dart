@@ -7,8 +7,7 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// Opens a World Book–style keyboard form sheet
-/// (`_showBookConfigSheet` in `world_book_page.dart`).
+/// Opens the app's keyboard-aware form sheet.
 ///
 /// Text fields inside [FormSheet] should be
 /// `IosFormTextField(inlineLabel: false)` — label stacked above a filled
@@ -37,8 +36,7 @@ Future<T?> showFormSheet<T>(
   );
 }
 
-/// Sheet body matching `_WorldBookEditSheet`: handle, centred title,
-/// content-sized column that scrolls when the keyboard is up.
+/// Sheet body with a handle, centered title, and scrollable form fields.
 class FormSheet extends StatelessWidget {
   const FormSheet({
     super.key,

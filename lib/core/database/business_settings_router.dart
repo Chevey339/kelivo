@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 
 import '../models/assistant.dart';
 import '../models/provider_balance_refresh_interval.dart';
+import '../models/world_book_grouping.dart';
 import 'business_data.dart';
 
 enum BusinessKeyDisposition {
@@ -73,6 +74,7 @@ final class BusinessKeyRegistry {
     'instruction_injection_group_collapsed_v1',
     'world_books_active_ids_by_assistant_v1',
     'world_books_collapsed_v1',
+    WorldBookGrouping.preferenceKey,
     'search_common_v1',
     'search_selected_v1',
     'search_enabled_v1',

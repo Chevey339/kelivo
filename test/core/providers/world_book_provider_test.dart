@@ -70,6 +70,92 @@ void main() {
     return next;
   }
 
+  test('group edits persist and preserve book order and selections', () async {
+    expect(provider.booksInGroup(null).map((book) => book.id), [
+      'source',
+      'target',
+    ]);
+
+    final group = await provider.createGroup(' Past ');
+    await expectLater(provider.createGroup('past'), throwsArgumentError);
+    await provider.moveBooksToGroup({'source', 'target'}, group);
+    await provider.addBook(const WorldBook(id: 'new'), groupId: group);
+    await provider.renameGroup(group, 'Past timeline');
+
+    final saved = await reload();
+    expect(saved.groups, {group: 'Past timeline'});
+    expect(saved.booksInGroup(group).map((book) => book.id), [
+      'source',
+      'target',
+      'new',
+    ]);
+    expect(saved.activeBookIdsFor('assistant'), ['source']);
+    await saved.deleteBook('target');
+    expect(saved.groupIdForBook('target'), isNull);
+    await saved.deleteGroup(group);
+
+    final ungrouped = await reload();
+    expect(ungrouped.groups, isEmpty);
+    expect(ungrouped.booksInGroup(null).map((book) => book.id), [
+      'source',
+      'new',
+    ]);
+    expect(ungrouped.activeBookIdsFor('assistant'), ['source']);
+  });
+
+  test('grouped creation and moves publish only after persistence', () async {
+    final group = await provider.createGroup('Past');
+    await harness.preferences.runWithRestoreWriteFence(() async {});
+
+    await expectLater(
+      provider.moveBooksToGroup({'source', 'target'}, group),
+      throwsStateError,
+    );
+    await expectLater(
+      provider.addBook(const WorldBook(id: 'new'), groupId: group),
+      throwsStateError,
+    );
+    await expectLater(
+      provider.updateBook(
+        'source',
+        (book) => book.copyWith(enabled: false),
+        group: (groupId: group),
+      ),
+      throwsStateError,
+    );
+    final saved = await reload();
+    for (final current in [provider, saved]) {
+      expect(current.booksInGroup(group), isEmpty);
+      expect(current.getById('new'), isNull);
+      expect(current.getById('source')!.enabled, isTrue);
+      expect(current.activeBookIdsFor('assistant'), ['source']);
+      expect(current.booksInGroup(null).map((book) => book.id), [
+        'source',
+        'target',
+      ]);
+    }
+  });
+
+  test('sorting a group keeps other books in their original slots', () async {
+    await provider.addBook(const WorldBook(id: 'third'));
+    final group = await provider.createGroup('Timeline');
+    await provider.moveBooksToGroup({'source', 'third'}, group);
+
+    await provider.reorderBooks(group: (id: group), oldIndex: 1, newIndex: 0);
+
+    final saved = await reload();
+    expect(saved.books.map((book) => book.id), ['third', 'target', 'source']);
+    expect(saved.booksInGroup(group).map((book) => book.id), [
+      'third',
+      'source',
+    ]);
+    expect(saved.groupIdForBook('target'), isNull);
+
+    await saved.reorderBooks(oldIndex: 1, newIndex: 0);
+    expect(saved.books.map((book) => book.id), ['target', 'third', 'source']);
+    expect(saved.groupIdForBook('target'), isNull);
+  });
+
   for (final delete in [true, false]) {
     test(
       '${delete ? 'deleting' : 'disabling'} a book during assistant copy preserves other bindings',

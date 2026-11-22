@@ -5121,5 +5121,21 @@
   "backupEncryptionChangePassword": "7b64b792598b36dbff3514cb0450cd063e05426b9398b0e67ff12039d08a2e8d",
   "backupMacKeychainNeedsUnlock": "3d2ffb96bbc66a5048e53926d3009cfb1079e90cf585bdeee1b04faf4a5110b9",
   "backupMacOpenKeychainAccess": "c136cb097a7ae1611e49b4dd4dd6d9efcb67f81543a4bad73d484680c6d6e8b4",
-  "backupMacKeychainAccessDenied": "628d87aafd43e2c0e1a254cf527dd1c2cec911196d8358fdd1210d761f83f154"
+  "backupMacKeychainAccessDenied": "628d87aafd43e2c0e1a254cf527dd1c2cec911196d8358fdd1210d761f83f154",
+  "worldBookGroupActions": "b1d4dd9320c19523b9e274982cf3e1858ac4a2f49df3fc5b3307eef7a2cbbada",
+  "worldBookGroupLabel": "d2a46606f3df49e6a58ccc54f61150dcae990fd568bf36171d639277bf81776e",
+  "worldBookOrder": "df1d71b4c2e402d585f39161e667e560bb2442cf11d758393e967576390b15aa",
+  "worldBookGroupSelectedBooks": "4de9db8ba80d2a357b00b0c1be27bb4f97a1e94c132e752b7af9f006cc90080f",
+  "worldBookGroupUngrouped": "317cf99badd3793361aa39f35b4bc8818257037bcdee73de534bf9b69eef5350",
+  "worldBookGroupNew": "4c84c21b888bf4dd1a9f5cc59e8a925cdd926ea4c87b2eaf5e2d6b8515fae443",
+  "worldBookGroupName": "a08b07ca78fe498d46f9c4141689f023b5fe5f5d7f7b7d7ddf03757ad4495cdf",
+  "worldBookGroupNameInvalid": "403543e3d75c288ad52e360d7503c0b7f8f54922f35244107ced29ee8dc760ee",
+  "worldBookGroupRename": "70e2d954959998873644d4c223955a6c6425a19b5106872021592c21a77eecbb",
+  "worldBookGroupDelete": "55c759ce70e97f229186e55843a46b26a4f08475e77cf0cfd8cd9352519e56c9",
+  "worldBookGroupDeleteMessage": "0dee31311b8b0c1a01c1d0f7ddf18c20c5c0c460eb00e0fe4d0a038252f610bc",
+  "worldBookGroupMove": "1c567fa2173e867a92d560a824619ee4d61f16d64f78aebd44abf1c269c8e93a",
+  "worldBookGroupSelectBooks": "f55f8a169e666d1bdca6fd4641e44b09641767a5ef82bf906d23c93b00c5010a",
+  "worldBookGroupSaveFailed": "c42aa169bd4c321ab0a36676355f0060440d1c5e62a43c0cfa47d954ae625882",
+  "worldBookGroupSelectAll": "03685ef675aca607b038341d068adfbf3e395ddbeb7e399e26234ab1fa9bdcb3",
+  "worldBookGroupClearSelection": "a167753c0889bd1fb352511b921d02ab679e7637de6c46c23119c5d33a080c12"
 }

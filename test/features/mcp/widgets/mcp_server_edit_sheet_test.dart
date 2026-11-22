@@ -48,7 +48,7 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const ValueKey('mcp-edit-group')));
           await tester.pumpAndSettle();
-          await tester.tap(find.byKey(ValueKey('mcp-group-option-$group')));
+          await tester.tap(find.byKey(ValueKey('group-option-$group')));
           await tester.pumpAndSettle();
           expect(provider.presentationFor('guest').icon, isNull);
           expect(provider.presentationFor('guest').groupId, isNull);
@@ -106,7 +106,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('mcp-edit-group')));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(ValueKey('mcp-group-option-$group')));
+        await tester.tap(find.byKey(ValueKey('group-option-$group')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('mcp-edit-icon')));
         await tester.pumpAndSettle();

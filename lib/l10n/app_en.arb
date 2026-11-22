@@ -22922,5 +22922,79 @@
   "backupMacKeychainAccessDenied": "macOS denied access to the backup password. If a system prompt appears, allow Kelivo to access it. You can also check the default keychain and the password item’s permissions in Keychain Access.",
   "@backupMacKeychainAccessDenied": {
     "description": "Backup password error when macOS denied access even though the default keychain was reported unlocked. Covers access denied by item permissions or an unusable login keychain without assuming that the user cancelled."
+  },
+  "worldBookGroupActions": "Group actions",
+  "@worldBookGroupActions": {
+    "description": "Tooltip for a group-related action menu in World Book settings. A group header shows actions for its folder, and the main menu shows actions across folders."
+  },
+  "worldBookGroupLabel": "Group",
+  "@worldBookGroupLabel": {
+    "description": "Label of the folder field in the World Book editor and title of its group picker. This sets which folder contains the book."
+  },
+  "worldBookOrder": "Arrange injection order",
+  "@worldBookOrder": {
+    "description": "Menu action and page title in World Book settings for dragging all books into the order used to break ties between entries with the same priority."
+  },
+  "worldBookGroupSelectedBooks": "{count, plural, =1{1 book selected} other{{count} books selected}}",
+  "@worldBookGroupSelectedBooks": {
+    "description": "Title in World Book settings while selecting books to move. count is the number selected across all folders.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worldBookGroupUngrouped": "Ungrouped",
+  "@worldBookGroupUngrouped": {
+    "description": "Name of the section and move destination for World Books without a folder."
+  },
+  "worldBookGroupNew": "New group",
+  "@worldBookGroupNew": {
+    "description": "Action and dialog title for creating a World Book folder in settings."
+  },
+  "worldBookGroupName": "Group name",
+  "@worldBookGroupName": {
+    "description": "Input field hint when naming or renaming a World Book folder in settings."
+  },
+  "worldBookGroupNameInvalid": "Enter a unique group name.",
+  "@worldBookGroupNameInvalid": {
+    "description": "Validation below the group name field when another World Book folder has this name."
+  },
+  "worldBookGroupRename": "Rename group",
+  "@worldBookGroupRename": {
+    "description": "Action and dialog title for renaming the currently displayed World Book folder."
+  },
+  "worldBookGroupDelete": "Delete group",
+  "@worldBookGroupDelete": {
+    "description": "Action and confirmation title for removing the currently displayed World Book folder. Its books are kept."
+  },
+  "worldBookGroupDeleteMessage": "Books in “{group}” will move to Ungrouped.",
+  "@worldBookGroupDeleteMessage": {
+    "description": "Text in the World Book folder deletion confirmation. group is the user-provided name of the folder being deleted.",
+    "placeholders": {
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookGroupMove": "Move to group",
+  "@worldBookGroupMove": {
+    "description": "Control and destination picker title for moving one or more World Books into a folder or back to Ungrouped."
+  },
+  "worldBookGroupSelectBooks": "Select World Books",
+  "@worldBookGroupSelectBooks": {
+    "description": "Title of the checklist for choosing books to move together in World Book settings."
+  },
+  "worldBookGroupSaveFailed": "Could not save your changes. Try again.",
+  "@worldBookGroupSaveFailed": {
+    "description": "Error when a World Book folder edit, bulk move, or group selection could not be saved."
+  },
+  "worldBookGroupSelectAll": "Select all in group",
+  "@worldBookGroupSelectAll": {
+    "description": "Action in the chat World Book picker to select the currently enabled books in this folder for the current chat or assistant."
+  },
+  "worldBookGroupClearSelection": "Clear group selection",
+  "@worldBookGroupClearSelection": {
+    "description": "Action in the chat World Book picker to deselect all books in this folder for the current chat or assistant."
   }
 }

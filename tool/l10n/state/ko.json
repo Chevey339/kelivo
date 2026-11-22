@@ -5121,5 +5121,21 @@
   "backupEncryptionChangePassword": "e553b975c27a684929fec792e07a96eba365f2a786460bc6b8d0d938c049f666",
   "backupMacKeychainNeedsUnlock": "e6f9c6b6e30d4c57a6e73b658a07844bc15daeb2e0e08bac26bb0beb49ad7520",
   "backupMacOpenKeychainAccess": "39f5ed534a71e3efbbca8ce30693bb774a7e6ff81ff2b896728c42c18fe18dee",
-  "backupMacKeychainAccessDenied": "1180accbf16f8c29d0174143757601bc8d38dadf2c73c76d465f3b4d2ea989b8"
+  "backupMacKeychainAccessDenied": "1180accbf16f8c29d0174143757601bc8d38dadf2c73c76d465f3b4d2ea989b8",
+  "worldBookGroupActions": "cd05e7730ed52cd01ad7c4be33a009e68887fac258f337a759573b11df5d5130",
+  "worldBookGroupLabel": "c5c65465bd1f620a758b34cccba8cb700e5c6eb70143c00d6cb25f78dd258d06",
+  "worldBookOrder": "d92fc2961dacd4e2530c1a7448e1d92faf1cfde89b664b262539018e4b590616",
+  "worldBookGroupSelectedBooks": "5c006e10d1785dfc4f7b565238e019996989a399db0fb118c286579522360f84",
+  "worldBookGroupUngrouped": "c86bb699a21c1cd2f8f0727c4eed77504849629ed6d88ae1248ebf3ac6f1aca3",
+  "worldBookGroupNew": "00a758b08dc93b0682bd477afe53dfcff4fbf25eac1733889cc793a9f9ecae7c",
+  "worldBookGroupName": "327de46c4398775d8abc6d8c09198655d52bce4b8a312142def325c9e8ea652b",
+  "worldBookGroupNameInvalid": "9f38afe6385994bafe201adc74b2b061d22881c858477a65485d9b6a0abac63e",
+  "worldBookGroupRename": "d283dba8c35e04b52fff40b078695187b4bc3480d53ccad8cb6e6b398d619535",
+  "worldBookGroupDelete": "d029a6ea813eb5959ce4f244eb58021e50c56e9dc65ae38e789e716ba113e2a6",
+  "worldBookGroupDeleteMessage": "f927b71100f727f38523be7351bb56f51b3ad668cf1c32ff31570548ebe2abe4",
+  "worldBookGroupMove": "ee6fddf9814e4ec464bf1ddcf592886f018dd0f56311ce31989bda47b0a7b72b",
+  "worldBookGroupSelectBooks": "f38da2a70bac1f5d874f957803eb105bc530e6e3361ed5fe0329c6b70e27f382",
+  "worldBookGroupSaveFailed": "80f05f3029dd2a17adc7cb412433591894b7dc06957c7479b986acc374707054",
+  "worldBookGroupSelectAll": "07c7f9c360de2306d98d525da98fce69ef55a52b46ebd751e5c25ffc5c7f1b70",
+  "worldBookGroupClearSelection": "172c3515d1b8426c9953de479ee5851b4cbac699cb5d82eb07212c88b93850a3"
 }

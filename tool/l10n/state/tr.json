@@ -5121,5 +5121,21 @@
   "backupEncryptionChangePassword": "57b03a271968dd419d630176957f882486f986f99f6534390ab437978505d4d5",
   "backupMacKeychainNeedsUnlock": "9d82d8d175ecde0fb03c421530a92a92358f55d479a64ce7bedc4ffc71ca3193",
   "backupMacOpenKeychainAccess": "aa1451af372fd9a0c9c463fcbdf199f77fee42b4563311d4afae134a93497852",
-  "backupMacKeychainAccessDenied": "8bf323d77e6029949077003437c5279a68cde3fd5ae0fb8692a90126d17a5252"
+  "backupMacKeychainAccessDenied": "8bf323d77e6029949077003437c5279a68cde3fd5ae0fb8692a90126d17a5252",
+  "worldBookGroupActions": "f5eae03bdc26904c17035bd21befa0d4b93f9377bfb6daa6cb4cfb6bc3b93ab3",
+  "worldBookGroupLabel": "990e3763f57021cb1c7f32979bface3119302ab9d059864e3c82a198b4be1e9f",
+  "worldBookOrder": "a5b54d062ffd534ef57030a621a0bb8c004017e9687de151f36b7a08cab86179",
+  "worldBookGroupSelectedBooks": "d8607b17e55572ed294e6e9b9ea46f390b0c506e193b71d0ba5f98241d5642fd",
+  "worldBookGroupUngrouped": "13de183ab4be6940aee3c236c0b0463ed6c2b3f2686cee9a73facf1b5db65dcb",
+  "worldBookGroupNew": "dd7dcc7361f2c56585a6c43eab1e65c444a240efa8b1551f7e0e305044578694",
+  "worldBookGroupName": "160b64f2f61c5e0da4e9a0a2d7c5329a0bf8009caf2961dd6d0abc651ef1ab45",
+  "worldBookGroupNameInvalid": "07af3d5fe443fdb733cbd04eb6bc2a9e93ed15c88d8a0055270612958eb744c1",
+  "worldBookGroupRename": "2bf95c87e1951f6e38afd93a298121d0741f41a6fad0da4f22b7cea6f69a10f8",
+  "worldBookGroupDelete": "cadfc8e67631da9830dd9b2dd731a852013faa590a0ba8d342c39411ee544a3b",
+  "worldBookGroupDeleteMessage": "17362ce18863b190b571e6c2d3d68ebb6814343f6ac037f2461a56cdfac8bf73",
+  "worldBookGroupMove": "79df2d3341038ad46fad4a54596c56b49239a0cff8d1d50df767525df61eec5b",
+  "worldBookGroupSelectBooks": "261c7f32372f5ce8567eea8cab45378fed2548965aafaecb09c108249125b3d0",
+  "worldBookGroupSaveFailed": "6ddcd1bb7b9778a93ba809a07119438bbb9ff2c36ea2d002bae3f83ad0b94d05",
+  "worldBookGroupSelectAll": "797b03fdeac69ef1fc61d0ee7ae7bbffd8bd963b17a61ecddad4c20805a08bac",
+  "worldBookGroupClearSelection": "d6b470344955aae1f4cff2cad9042576219b8a618cfe6d44829a3c011a9b1515"
 }

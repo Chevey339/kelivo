@@ -1,5 +1,6 @@
 import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'package:Kelivo/features/home/widgets/world_book_sheet.dart';
+import 'package:Kelivo/desktop/world_book_popover.dart';
 import 'package:Kelivo/features/home/services/message_generation_service.dart';
 import 'package:Kelivo/features/home/services/context_usage_service.dart';
 import 'package:Kelivo/features/home/controllers/generation_controller.dart';
@@ -623,6 +624,174 @@ void main() {
       expect(books.activeBookIdsFor('assistant'), isEmpty);
     },
   );
+
+  for (final desktop in [false, true]) {
+    testWidgets('chat picker can move a book to a group desktop=$desktop', (
+      tester,
+    ) async {
+      late String group;
+      await tester.runAsync(() async {
+        group = await books.createGroup('Past timeline');
+        await books.addBook(const WorldBook(id: 'lore', name: 'Lore'));
+        await chat.updateConversationExtras(
+          'one',
+          (extras) => const ConversationPromptSettings(
+            worldBookIds: ['lore'],
+          ).applyTo(extras),
+        );
+      });
+      final anchor = GlobalKey();
+      await mount(
+        tester,
+        child: desktop
+            ? Align(
+                alignment: Alignment.bottomCenter,
+                child: SizedBox(key: anchor, width: 480, height: 48),
+              )
+            : const WorldBookSheet(
+                assistantId: 'assistant',
+                conversationId: 'one',
+              ),
+      );
+      if (desktop) {
+        await showDesktopWorldBookPopover(
+          context,
+          anchorKey: anchor,
+          books: books.books,
+          assistantId: 'assistant',
+          conversationId: 'one',
+        );
+      }
+      await tester.pumpAndSettle();
+      final l10n = AppLocalizations.of(context)!;
+      await tester.tap(find.text(l10n.worldBookGroupUngrouped));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('world-book-assign-lore')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('group-option-$group')));
+      for (var attempt = 0; attempt < 100; attempt++) {
+        await tester.pump();
+        if (books.groupIdForBook('lore') == group) break;
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      await tester.pumpAndSettle();
+      expect(books.groupIdForBook('lore'), group);
+      expect(
+        ConversationPromptSettings.fromExtras(
+          chat.getConversation('one')!.extras,
+        ).worldBookIds,
+        ['lore'],
+      );
+      expect(find.text('Past timeline'), findsOneWidget);
+    });
+  }
+
+  for (final scoped in [false, true]) {
+    testWidgets(
+      'group selection saves enabled book IDs in the active scope ($scoped)',
+      (tester) async {
+        final conversationId = scoped ? 'one' : null;
+        late String group;
+        await tester.runAsync(() async {
+          group = await books.createGroup('Past timeline');
+          await books.addBook(const WorldBook(id: 'outside'));
+          for (final id in ['past-a', 'past-b', 'disabled']) {
+            await books.addBook(
+              WorldBook(id: id, name: id, enabled: id != 'disabled'),
+              groupId: group,
+            );
+          }
+          await books.setActiveBookIds(['outside'], assistantId: 'assistant');
+          if (conversationId != null) {
+            await chat.updateConversationExtras(
+              conversationId,
+              (extras) => const ConversationPromptSettings(
+                worldBookIds: ['outside'],
+              ).applyTo(extras),
+            );
+          }
+        });
+
+        await mount(
+          tester,
+          child: WorldBookSheet(
+            assistantId: 'assistant',
+            conversationId: conversationId,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l10n = AppLocalizations.of(context)!;
+        final section = find.byKey(
+          ValueKey('world-book-selection-group-$group'),
+        );
+        List<String> selectedIds() => conversationId == null
+            ? books.activeBookIdsFor('assistant')
+            : ConversationPromptSettings.fromExtras(
+                chat.getConversation(conversationId)!.extras,
+              ).worldBookIds;
+
+        Future<void> toggleGroup(String tooltip, Set<String> expected) async {
+          await tester.tap(
+            find.descendant(of: section, matching: find.byTooltip(tooltip)),
+          );
+          for (var attempt = 0; attempt < 100; attempt++) {
+            await tester.pump();
+            final selected = selectedIds().toSet();
+            if (selected.length == expected.length &&
+                selected.containsAll(expected)) {
+              break;
+            }
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+          }
+          await tester.pumpAndSettle();
+          expect(selectedIds(), unorderedEquals(expected));
+        }
+
+        expect(find.text('past-a'), findsNothing);
+        await toggleGroup(l10n.worldBookGroupSelectAll, {
+          'outside',
+          'past-a',
+          'past-b',
+        });
+        await tester.tap(find.text('Past timeline'));
+        await tester.pumpAndSettle();
+        expect(find.text('past-a'), findsOneWidget);
+        await toggleGroup(l10n.worldBookGroupClearSelection, {'outside'});
+        await toggleGroup(l10n.worldBookGroupSelectAll, {
+          'outside',
+          'past-a',
+          'past-b',
+        });
+        var added = false;
+        final addition = books
+            .addBook(const WorldBook(id: 'new'), groupId: group)
+            .then((_) => added = true);
+        // The assistant selection may have queued the previous operation in
+        // FakeAsync, while adding the book also needs the real SQLite worker.
+        for (var attempt = 0; attempt < 100 && !added; attempt++) {
+          await tester.pump();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+        }
+        expect(added, isTrue);
+        await addition;
+        await tester.pumpAndSettle();
+        expect(selectedIds(), unorderedEquals(['outside', 'past-a', 'past-b']));
+        expect(
+          ConversationPromptSettings.fromExtras(
+            chat.getConversation('two')!.extras,
+          ).worldBookIds,
+          isEmpty,
+        );
+        if (scoped) expect(books.activeBookIdsFor('assistant'), ['outside']);
+      },
+    );
+  }
 
   for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
     testWidgets(

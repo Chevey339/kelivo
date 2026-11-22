@@ -6378,5 +6378,21 @@
   "backupEncryptionChangePassword": "更改备份密码",
   "backupMacKeychainNeedsUnlock": "macOS 无法解锁登录钥匙串。请打开「钥匙串访问」，解锁「登录」，再回到 Kelivo 重试。",
   "backupMacOpenKeychainAccess": "打开钥匙串访问",
-  "backupMacKeychainAccessDenied": "macOS 拒绝访问备份密码。如果出现系统提示，请允许 Kelivo 访问。你也可以在「钥匙串访问」中检查默认钥匙串和备份密码项目的权限。"
+  "backupMacKeychainAccessDenied": "macOS 拒绝访问备份密码。如果出现系统提示，请允许 Kelivo 访问。你也可以在「钥匙串访问」中检查默认钥匙串和备份密码项目的权限。",
+  "worldBookGroupActions": "分组操作",
+  "worldBookGroupLabel": "分组",
+  "worldBookOrder": "调整注入顺序",
+  "worldBookGroupSelectedBooks": "已选 {count} 本",
+  "worldBookGroupUngrouped": "未分组",
+  "worldBookGroupNew": "新建分组",
+  "worldBookGroupName": "分组名称",
+  "worldBookGroupNameInvalid": "请输入不重复的分组名称。",
+  "worldBookGroupRename": "重命名分组",
+  "worldBookGroupDelete": "删除分组",
+  "worldBookGroupDeleteMessage": "「{group}」中的世界书将移到「未分组」。",
+  "worldBookGroupMove": "移到分组",
+  "worldBookGroupSelectBooks": "选择世界书",
+  "worldBookGroupSaveFailed": "保存失败，请重试。",
+  "worldBookGroupSelectAll": "全选本组",
+  "worldBookGroupClearSelection": "清空本组勾选"
 }

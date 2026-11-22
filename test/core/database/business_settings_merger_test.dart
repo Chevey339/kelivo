@@ -474,6 +474,58 @@ void main() {
     expect(merged['pinned_models_v1'], <String>['provider/model']);
   });
 
+  test(
+    'merges World Book groups and keeps local assignments on ID conflicts',
+    () {
+      final existing = {
+        'world_books_v1': jsonEncode([
+          {'id': 'local-book'},
+          {'id': 'ungrouped-book'},
+        ]),
+        'world_books_grouping_v1': jsonEncode({
+          'names': {'local-group': 'Timeline'},
+          'memberships': {'local-book': 'local-group'},
+        }),
+      };
+      final incoming = {
+        'world_books_v1': jsonEncode([
+          {'id': 'local-book'},
+          {'id': 'ungrouped-book'},
+          {'id': 'imported-book'},
+          {'id': 'imported-again'},
+        ]),
+        'world_books_grouping_v1': jsonEncode({
+          'names': {
+            'local-group': 'Previous name',
+            'imported-group': 'timeline',
+            'second-group': 'TIMELINE',
+          },
+          'memberships': {
+            'local-book': 'imported-group',
+            'ungrouped-book': 'imported-group',
+            'imported-book': 'imported-group',
+            'imported-again': 'local-group',
+            'deleted-book': 'second-group',
+          },
+        }),
+      };
+
+      final merged = BusinessSettingsMerger.merge(existing, incoming);
+      expect(jsonDecode(merged['world_books_grouping_v1']! as String), {
+        'names': {
+          'local-group': 'Timeline',
+          'imported-group': 'timeline (2)',
+          'second-group': 'TIMELINE (3)',
+        },
+        'memberships': {
+          'local-book': 'local-group',
+          'imported-book': 'imported-group',
+          'imported-again': 'local-group',
+        },
+      });
+    },
+  );
+
   test('merge keeps local list entities and adds imported rows', () {
     final entityKeys = <String, String>{
       'world_books_v1': 'world-book',

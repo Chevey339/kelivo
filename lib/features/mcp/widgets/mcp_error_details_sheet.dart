@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/section_card.dart';
-import 'mcp_form.dart';
+import '../../../shared/widgets/adaptive_form.dart';
 
 /// FormSheet bounds and scrolls the details while keeping actions reachable.
 class McpErrorDetailsSheet extends StatelessWidget {
@@ -71,7 +71,7 @@ class McpErrorDetailsDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return McpForm(
+    return AdaptiveForm(
       desktop: true,
       width: 600,
       title: l10n.mcpPageErrorDialogTitle,

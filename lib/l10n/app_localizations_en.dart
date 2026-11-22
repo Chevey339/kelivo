@@ -17653,4 +17653,63 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get backupMacKeychainAccessDenied =>
       'macOS denied access to the backup password. If a system prompt appears, allow Kelivo to access it. You can also check the default keychain and the password item’s permissions in Keychain Access.';
+
+  @override
+  String get worldBookGroupActions => 'Group actions';
+
+  @override
+  String get worldBookGroupLabel => 'Group';
+
+  @override
+  String get worldBookOrder => 'Arrange injection order';
+
+  @override
+  String worldBookGroupSelectedBooks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count books selected',
+      one: '1 book selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get worldBookGroupUngrouped => 'Ungrouped';
+
+  @override
+  String get worldBookGroupNew => 'New group';
+
+  @override
+  String get worldBookGroupName => 'Group name';
+
+  @override
+  String get worldBookGroupNameInvalid => 'Enter a unique group name.';
+
+  @override
+  String get worldBookGroupRename => 'Rename group';
+
+  @override
+  String get worldBookGroupDelete => 'Delete group';
+
+  @override
+  String worldBookGroupDeleteMessage(String group) {
+    return 'Books in “$group” will move to Ungrouped.';
+  }
+
+  @override
+  String get worldBookGroupMove => 'Move to group';
+
+  @override
+  String get worldBookGroupSelectBooks => 'Select World Books';
+
+  @override
+  String get worldBookGroupSaveFailed =>
+      'Could not save your changes. Try again.';
+
+  @override
+  String get worldBookGroupSelectAll => 'Select all in group';
+
+  @override
+  String get worldBookGroupClearSelection => 'Clear group selection';
 }

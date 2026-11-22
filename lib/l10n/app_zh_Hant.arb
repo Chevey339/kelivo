@@ -5121,5 +5121,21 @@
   "backupEncryptionChangePassword": "變更備份密碼",
   "backupMacKeychainNeedsUnlock": "macOS 無法解鎖登入鑰匙圈。請開啟「鑰匙串存取」，解鎖「登入」，再回到 Kelivo 重試。",
   "backupMacOpenKeychainAccess": "開啟鑰匙圈存取",
-  "backupMacKeychainAccessDenied": "macOS 拒絕存取備份密碼。如果出現系統提示，請允許 Kelivo 存取。你也可以在「鑰匙串存取」中檢查預設鑰匙串和備份密碼項目的權限。"
+  "backupMacKeychainAccessDenied": "macOS 拒絕存取備份密碼。如果出現系統提示，請允許 Kelivo 存取。你也可以在「鑰匙串存取」中檢查預設鑰匙串和備份密碼項目的權限。",
+  "worldBookGroupActions": "群組操作",
+  "worldBookGroupLabel": "分組",
+  "worldBookOrder": "調整注入順序",
+  "worldBookGroupSelectedBooks": "{count, plural, =1{已選 1 本書} other{已選 {count} 本書}}",
+  "worldBookGroupUngrouped": "未分組",
+  "worldBookGroupNew": "新增分組",
+  "worldBookGroupName": "分組名稱",
+  "worldBookGroupNameInvalid": "請輸入不重複的分組名稱。",
+  "worldBookGroupRename": "重新命名分組",
+  "worldBookGroupDelete": "刪除分組",
+  "worldBookGroupDeleteMessage": "「{group}」中的世界書將移至「未分組」。",
+  "worldBookGroupMove": "移至分組",
+  "worldBookGroupSelectBooks": "選擇世界書",
+  "worldBookGroupSaveFailed": "儲存失敗，請重試。",
+  "worldBookGroupSelectAll": "全選本組",
+  "worldBookGroupClearSelection": "清空本組勾選"
 }
