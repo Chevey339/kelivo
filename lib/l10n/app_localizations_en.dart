@@ -17011,6 +17011,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageDisplayTurkish => 'Turkish';
 
   @override
+  String get languageDisplayBangla => 'Bangla';
+
+  @override
   String sideDrawerDeleteConfirmContent(String title) {
     return 'Delete \"$title\"?';
   }

@@ -14,7 +14,11 @@ import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../settings/widgets/language_select_sheet.dart'
-    show LanguageOption, supportedLanguages, showLanguageSelector;
+    show
+        LanguageOption,
+        languageDisplayName,
+        supportedLanguages,
+        showLanguageSelector;
 import '../../../core/services/haptics.dart';
 import '../../model/widgets/model_select_sheet.dart' show showModelSelector;
 import '../../../theme/app_font_weights.dart';
@@ -126,7 +130,7 @@ class _TranslatePageState extends State<TranslatePage> {
         .replaceAll('{source_text}', txt)
         .replaceAll(
           '{target_lang}',
-          _displayNameFor(l10n, (_lang ?? supportedLanguages.first).code),
+          languageDisplayName(l10n, (_lang ?? supportedLanguages.first).code),
         );
 
     setState(() {
@@ -191,31 +195,6 @@ class _TranslatePageState extends State<TranslatePage> {
       return supportedLanguages.firstWhere((e) => e.code == code);
     } catch (_) {
       return null;
-    }
-  }
-
-  String _displayNameFor(AppLocalizations l10n, String code) {
-    switch (code) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return code;
     }
   }
 
@@ -386,7 +365,7 @@ class _TranslatePageState extends State<TranslatePage> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              _displayNameFor(
+                              languageDisplayName(
                                 l10n,
                                 (_lang ?? supportedLanguages.first).code,
                               ),

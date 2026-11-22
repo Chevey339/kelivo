@@ -19,7 +19,7 @@ import '../features/translate/widgets/translation_output.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
 import '../features/settings/widgets/language_select_sheet.dart'
-    show LanguageOption, supportedLanguages;
+    show LanguageOption, languageDisplayName, supportedLanguages;
 
 class DesktopTranslatePage extends StatefulWidget {
   const DesktopTranslatePage({super.key});
@@ -99,31 +99,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     await context.read<SettingsProvider>().setTranslateTargetLang(lang.code);
   }
 
-  String _displayNameFor(AppLocalizations l10n, String code) {
-    switch (code) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return code;
-    }
-  }
-
   Future<void> _pickModel() async {
     if (_translating) return; // avoid switching mid-stream
     final settings = context.read<SettingsProvider>();
@@ -166,7 +141,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     final lang = _targetLang ?? supportedLanguages.first;
     final prompt = settings.translatePrompt
         .replaceAll('{source_text}', text)
-        .replaceAll('{target_lang}', _displayNameFor(l10n, lang.code));
+        .replaceAll('{target_lang}', languageDisplayName(l10n, lang.code));
 
     setState(() {
       _translating = true;
@@ -521,7 +496,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
     final selected = widget.value ?? supportedLanguages.first;
-    final label = _displayNameFor(l10n, selected.code);
+    final label = languageDisplayName(l10n, selected.code);
 
     return CompositedTransformTarget(
       link: _link,
@@ -599,31 +574,6 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         ),
       ),
     );
-  }
-
-  String _displayNameFor(AppLocalizations l10n, String code) {
-    switch (code) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return code;
-    }
   }
 }
 
@@ -803,7 +753,7 @@ class _LangOptionTileState extends State<_LangOptionTile> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _localizedLabel(
+                    languageDisplayName(
                       AppLocalizations.of(context)!,
                       widget.option.code,
                     ),
@@ -829,31 +779,6 @@ class _LangOptionTileState extends State<_LangOptionTile> {
         ),
       ),
     );
-  }
-
-  String _localizedLabel(AppLocalizations l10n, String code) {
-    switch (code) {
-      case 'zh-CN':
-        return l10n.languageDisplaySimplifiedChinese;
-      case 'en':
-        return l10n.languageDisplayEnglish;
-      case 'zh-TW':
-        return l10n.languageDisplayTraditionalChinese;
-      case 'ja':
-        return l10n.languageDisplayJapanese;
-      case 'ko':
-        return l10n.languageDisplayKorean;
-      case 'fr':
-        return l10n.languageDisplayFrench;
-      case 'de':
-        return l10n.languageDisplayGerman;
-      case 'it':
-        return l10n.languageDisplayItalian;
-      case 'es':
-        return l10n.languageDisplaySpanish;
-      default:
-        return code;
-    }
   }
 }
 

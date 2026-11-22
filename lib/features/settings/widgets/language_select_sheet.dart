@@ -93,6 +93,12 @@ const List<LanguageOption> supportedLanguages = [
     displayNameZh: 'Türkçe',
     flag: '🇹🇷',
   ),
+  LanguageOption(
+    code: 'bn',
+    displayName: 'Bangla',
+    displayNameZh: 'বাংলা',
+    flag: '🇧🇩',
+  ),
   // LanguageOption(code: 'ar', displayName: 'Arabic', displayNameZh: 'العربية', flag: '🇸🇦'),
   // LanguageOption(code: 'hi', displayName: 'Hindi', displayNameZh: 'हिन्दी', flag: '🇮🇳'),
   // LanguageOption(code: 'th', displayName: 'Thai', displayNameZh: 'ไทย', flag: '🇹🇭'),
@@ -115,6 +121,8 @@ String languageDisplayName(AppLocalizations l10n, String languageCode) {
       return l10n.languageDisplayRussian;
     case 'tr':
       return l10n.languageDisplayTurkish;
+    case 'bn':
+      return l10n.languageDisplayBangla;
     case 'fr':
       return l10n.languageDisplayFrench;
     case 'de':

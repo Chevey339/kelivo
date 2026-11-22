@@ -8662,6 +8662,10 @@
   "@languageDisplayTurkish": {
     "description": "Language name for the Turkish translation target; the app-language selector uses its native name Türkçe."
   },
+  "languageDisplayBangla": "Bangla",
+  "@languageDisplayBangla": {
+    "description": "Name of the Bengali language (Bangla) as a target in the assistant reply translation menu and standalone translator."
+  },
   "sideDrawerDeleteConfirmContent": "Delete \"{title}\"?",
   "@sideDrawerDeleteConfirmContent": {
     "description": "Confirmation question before deleting the named chat from the sidebar. Keep the title placeholder; reorder the sentence naturally.",

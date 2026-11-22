@@ -4947,6 +4947,7 @@
   "compressionNativeAutoHint": "사용량이 설정한 비율에 도달하면 현재 대화 모델로 서버 측 압축을 수행한 후 전송을 계속합니다. 실패하면 원본 컨텍스트를 유지하며 텍스트 요약으로 대체하지 않습니다.",
   "languageDisplayRussian": "러시아어",
   "languageDisplayTurkish": "튀르키예어",
+  "languageDisplayBangla": "벵골어",
   "sideDrawerDeleteConfirmContent": "\"{title}\"을(를) 삭제하시겠습니까?",
   "backupPageCherryImportWarning": "이 기능은 실험적입니다. 어시스턴트, 대화, 공급자 및 파일을 가져옵니다. 일부 공급자는 기본 URL 끝에 /v1 또는 /v1beta가 필요합니다. 가져오기 전에 데이터를 백업하세요. 파일 선택을 계속하시겠습니까?",
   "themePaletteDefault": "기본",

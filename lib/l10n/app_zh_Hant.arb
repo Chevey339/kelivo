@@ -4947,6 +4947,7 @@
   "compressionNativeAutoHint": "達到設定的比例時，用目前對話模型做服務端壓縮，然後再繼續傳送。失敗時原文不動，也不會改用文字摘要。",
   "languageDisplayRussian": "俄語",
   "languageDisplayTurkish": "土耳其語",
+  "languageDisplayBangla": "孟加拉語",
   "sideDrawerDeleteConfirmContent": "刪除「{title}」？",
   "backupPageCherryImportWarning": "此功能目前仍處於實驗階段，可匯入助手、對話、供應商和檔案。部分供應商需要在基礎 URL 後加上 /v1 或 /v1beta。為確保資料安全，請在匯入前備份。是否繼續選擇檔案？",
   "themePaletteDefault": "預設",

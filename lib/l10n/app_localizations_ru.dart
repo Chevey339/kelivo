@@ -17303,6 +17303,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get languageDisplayTurkish => 'Турецкий';
 
   @override
+  String get languageDisplayBangla => 'Бенгальский';
+
+  @override
   String sideDrawerDeleteConfirmContent(String title) {
     return 'Удалить «$title»?';
   }

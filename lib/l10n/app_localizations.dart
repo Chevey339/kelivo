@@ -29814,6 +29814,12 @@ abstract class AppLocalizations {
   /// **'Turkish'**
   String get languageDisplayTurkish;
 
+  /// Name of the Bengali language (Bangla) as a target in the assistant reply translation menu and standalone translator.
+  ///
+  /// In en, this message translates to:
+  /// **'Bangla'**
+  String get languageDisplayBangla;
+
   /// Confirmation question before deleting the named chat from the sidebar. Keep the title placeholder; reorder the sentence naturally.
   ///
   /// In en, this message translates to:

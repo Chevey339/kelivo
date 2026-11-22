@@ -16491,6 +16491,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get languageDisplayTurkish => '튀르키예어';
 
   @override
+  String get languageDisplayBangla => '벵골어';
+
+  @override
   String sideDrawerDeleteConfirmContent(String title) {
     return '\"$title\"을(를) 삭제하시겠습니까?';
   }
