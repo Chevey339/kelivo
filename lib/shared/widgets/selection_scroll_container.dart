@@ -9,6 +9,27 @@ import 'package:markstream/markstream.dart';
 /// outside the message list's pointer listener.
 class SelectionAutoScrollNotification extends Notification {}
 
+/// Exposes the enclosing list's own drag updates to its selection areas.
+class SelectionScrollScope extends InheritedWidget {
+  const SelectionScrollScope({
+    super.key,
+    required this.readDragRevision,
+    required this.handleViewportInsets,
+    required super.child,
+  });
+
+  final int Function() readDragRevision;
+  final EdgeInsets handleViewportInsets;
+
+  static SelectionScrollScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SelectionScrollScope>();
+
+  @override
+  bool updateShouldNotify(SelectionScrollScope oldWidget) =>
+      readDragRevision != oldWidget.readDragRevision ||
+      handleViewportInsets != oldWidget.handleViewportInsets;
+}
+
 /// Connects a message-local SelectionArea to its enclosing vertical viewport.
 /// Scrollables inside the selection area continue using Flutter's own handler.
 class SelectionScrollContainer extends StatefulWidget {
@@ -45,6 +66,20 @@ class SelectionScrollContainerState extends State<SelectionScrollContainer> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final scope = SelectionScrollScope.maybeOf(context);
+    final handleViewport = scope == null
+        ? null
+        : (
+            context: context
+                .getElementForInheritedWidgetOfExactType<
+                  SelectionScrollScope
+                >()!,
+            insets: scope.handleViewportInsets,
+          );
+    if (_delegate.handleViewport != handleViewport) {
+      _delegate.handleViewport = handleViewport;
+      _scrolled();
+    }
     final scrollable = Scrollable.maybeOf(context, axis: Axis.vertical);
     if (_scrollable != scrollable || _position != scrollable?.position) {
       _stop();
@@ -118,6 +153,7 @@ class SelectionScrollContainerState extends State<SelectionScrollContainer> {
       } else {
         _delegate.layoutDidChange();
       }
+      _delegate.updateHandleLayers();
     });
   }
 
@@ -145,6 +181,45 @@ class _ScrollSelectionDelegate extends StableSelectionDelegate {
   final void Function(SelectionEdgeUpdateEvent, SelectionResult) onEdge;
   final VoidCallback onReset;
   ScrollableState? scrollable;
+  ({BuildContext context, EdgeInsets insets})? handleViewport;
+  LayerLink? _startHandle;
+  LayerLink? _endHandle;
+
+  @override
+  void pushHandleLayers(LayerLink? startHandle, LayerLink? endHandle) {
+    _startHandle = startHandle;
+    _endHandle = endHandle;
+    updateHandleLayers();
+  }
+
+  void updateHandleLayers() {
+    final handleViewport = this.handleViewport;
+    if (handleViewport == null ||
+        (_startHandle == null && _endHandle == null)) {
+      super.pushHandleLayers(_startHandle, _endHandle);
+      return;
+    }
+    final viewport = handleViewport.context.findRenderObject();
+    if (viewport is! RenderBox || !viewport.attached || !viewport.hasSize) {
+      super.pushHandleLayers(_startHandle, _endHandle);
+      return;
+    }
+    // Keep both text anchors for copy and drag, but unlink handles whose
+    // followers would otherwise intercept input outside the usable timeline.
+    final bounds = handleViewport.insets.deflateRect(
+      Offset.zero & viewport.size,
+    );
+    final transform = getTransformTo(viewport);
+    bool visible(SelectionPoint? point) =>
+        point != null &&
+        bounds.contains(
+          MatrixUtils.transformPoint(transform, point.localPosition),
+        );
+    super.pushHandleLayers(
+      visible(value.startSelectionPoint) ? _startHandle : null,
+      visible(value.endSelectionPoint) ? _endHandle : null,
+    );
+  }
 
   @override
   SelectionGeometry getSelectionGeometry() {

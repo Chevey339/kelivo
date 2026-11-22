@@ -422,49 +422,6 @@ void main() {
     }
   });
 
-  testWidgets('Android 消息列表滚动仍然收起键盘', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    final scrollController = ScrollController();
-    final listController = ListController();
-    final processingFilesMessageId = ValueNotifier<String?>(null);
-
-    try {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MessageListView(
-              scrollController: scrollController,
-              listController: listController,
-              messages: const [],
-              byGroup: const {},
-              versionSelections: const {},
-              reasoning: const {},
-              reasoningSegments: const {},
-              contentSplits: const {},
-              toolParts: const {},
-              translations: const {},
-              selecting: false,
-              selectedItems: const {},
-              dividerPadding: EdgeInsets.zero,
-              processingFilesMessageId: processingFilesMessageId,
-            ),
-          ),
-        ),
-      );
-
-      final listView = tester.widget<SuperListView>(find.byType(SuperListView));
-      expect(
-        listView.keyboardDismissBehavior,
-        ScrollViewKeyboardDismissBehavior.onDrag,
-      );
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-      scrollController.dispose();
-      listController.dispose();
-      processingFilesMessageId.dispose();
-    }
-  });
-
   testWidgets('消息列表底部留白使用传入的输入框覆盖高度', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();

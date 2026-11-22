@@ -1,9 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart'
+    show
+        cupertinoDesktopTextSelectionHandleControls,
+        cupertinoTextSelectionHandleControls;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
+import 'package:flutter/gestures.dart'
+    show kSecondaryMouseButton, PointerDeviceKind;
 import 'package:uuid/uuid.dart';
 import '../../core/models/chat_message.dart';
 import '../../core/models/quote_ref.dart';
@@ -70,16 +76,21 @@ class AppSelectionArea extends StatefulWidget {
   State<AppSelectionArea> createState() => _AppSelectionAreaState();
 }
 
-class _AppSelectionAreaState extends State<AppSelectionArea> {
+class _AppSelectionAreaState extends State<AppSelectionArea>
+    with AutomaticKeepAliveClientMixin<AppSelectionArea> {
   static const _translation = MethodChannel('app.ios_translation');
   bool _translationAvailable = false;
   String _selectedText = '';
   final _ownedMarkdownSelection = MarkstreamSelectionController();
-  final _regionFocus = FocusNode();
+  final _regionFocus = _SelectionFocusNode();
   final _selectionKey = GlobalKey<SelectionScrollContainerState>();
-  final _areaKey = GlobalKey<SelectionAreaState>();
+  late final _areaKey = GlobalKey<SelectionAreaState>();
+  late final _scrollRegionKey = GlobalKey<SelectableRegionState>();
+  SelectableRegionState? get _region =>
+      _scrollRegionKey.currentState ?? _areaKey.currentState?.selectableRegion;
   final _quickToolbar = OverlayPortalController();
   final _scrollPositions = <ScrollPosition>[];
+  SelectionScrollScope? _scrollScope;
   bool _pointerSelecting = false,
       _keyboardSelecting = false,
       _contextClick = false;
@@ -96,6 +107,11 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   );
   late MarkstreamSelectionController _markdownSelection;
 
+  // The selection belongs to the reply's render objects, even while offscreen.
+  @override
+  bool get wantKeepAlive =>
+      _scrollScope != null && _regionFocus.hasFocus && _selectedText.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -106,23 +122,26 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   }
 
   void _focusChanged() {
+    updateKeepAlive();
     if (!_regionFocus.hasFocus) _hideQuickToolbar();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _scrollScope = SelectionScrollScope.maybeOf(context);
+    updateKeepAlive();
     for (final position in _scrollPositions) {
-      position.removeListener(_hideQuickToolbar);
+      position.removeListener(_hideToolbarsOnScroll);
     }
     _scrollPositions.clear();
-    if (widget.message == null) return;
+    if (widget.message == null && _scrollScope == null) return;
     context.visitAncestorElements((element) {
       if (element is StatefulElement && element.state is ScrollableState) {
         final position = (element.state as ScrollableState).position;
         if (!_scrollPositions.contains(position)) {
           _scrollPositions.add(position);
-          position.addListener(_hideQuickToolbar);
+          position.addListener(_hideToolbarsOnScroll);
         }
       }
       return true;
@@ -132,6 +151,15 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   void _hideQuickToolbar() {
     _toolbarRevision++;
     if (_quickToolbar.isShowing) _quickToolbar.hide();
+  }
+
+  void _hideToolbarsOnScroll() {
+    _hideQuickToolbar();
+    if (_scrollScope != null &&
+        !selectionUsesDesktop &&
+        _regionFocus.hasPrimaryFocus) {
+      _region?.hideToolbar(false);
+    }
   }
 
   SelectionSnapshot? _captureSelection() {
@@ -225,11 +253,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
     if (rects != null && rects.isNotEmpty) return rects.first;
     final anchor =
         fallbackAnchor ??
-        _areaKey
-            .currentState
-            ?.selectableRegion
-            .contextMenuAnchors
-            .primaryAnchor ??
+        _region?.contextMenuAnchors.primaryAnchor ??
         Offset.zero;
     return Rect.fromLTWH(anchor.dx, anchor.dy, 1, 18);
   }
@@ -259,7 +283,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
       }
       _quickSnapshot = snapshot;
       _quickAnchor = _selectionAnchor();
-      _areaKey.currentState?.selectableRegion.hideToolbar(false);
+      _region?.hideToolbar(false);
       _quickToolbar.show();
     });
     // Pointer-up may change no render object after the last drag frame.
@@ -272,7 +296,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
     final message = widget.message;
     if (actions == null || message == null) return;
     _hideQuickToolbar();
-    _areaKey.currentState?.selectableRegion.hideToolbar();
+    _region?.hideToolbar();
     widget.onQuoteSelected?.call();
     unawaited(
       actions.onQuote(
@@ -294,7 +318,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
     final message = widget.message;
     if (message == null) return;
     _hideQuickToolbar();
-    _areaKey.currentState?.selectableRegion.hideToolbar();
+    _region?.hideToolbar();
     unawaited(
       showSelectionTranslationPanel(
         context,
@@ -618,10 +642,60 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
     );
   }
 
+  void _selectionChanged(SelectedContent? content) {
+    _selectedText = content?.plainText ?? '';
+    updateKeepAlive();
+    if (_selectedText.isEmpty) {
+      _hideQuickToolbar();
+      return;
+    }
+    _regionFocus.finishTouch(applyRequest: true);
+    if (selectionUsesDesktop && HardwareKeyboard.instance.isShiftPressed) {
+      _keyboardSelecting = true;
+      _hideQuickToolbar();
+    }
+    _scheduleQuickToolbar();
+  }
+
+  Widget _buildSelectionArea(BuildContext context) {
+    final child = SelectionScrollContainer(
+      key: _selectionKey,
+      child: widget.child,
+    );
+    final scope = _scrollScope;
+    if (scope == null) {
+      return SelectionArea(
+        key: _areaKey,
+        focusNode: _regionFocus,
+        onSelectionChanged: _selectionChanged,
+        contextMenuBuilder: _buildMenu,
+        child: child,
+      );
+    }
+    final controls = switch (Theme.of(context).platform) {
+      TargetPlatform.android ||
+      TargetPlatform.fuchsia => materialTextSelectionHandleControls,
+      TargetPlatform.linux ||
+      TargetPlatform.windows => desktopTextSelectionHandleControls,
+      TargetPlatform.iOS => cupertinoTextSelectionHandleControls,
+      TargetPlatform.macOS => cupertinoDesktopTextSelectionHandleControls,
+    };
+    return _ScrollPreservingSelectableRegion(
+      key: _scrollRegionKey,
+      selectionFocus: _regionFocus,
+      readDragRevision: scope.readDragRevision,
+      selectionControls: controls,
+      magnifierConfiguration: TextMagnifier.adaptiveMagnifierConfiguration,
+      onSelectionChanged: _selectionChanged,
+      contextMenuBuilder: _buildMenu,
+      child: child,
+    );
+  }
+
   @override
   void dispose() {
     for (final position in _scrollPositions) {
-      position.removeListener(_hideQuickToolbar);
+      position.removeListener(_hideToolbarsOnScroll);
     }
     _regionFocus.removeListener(_focusChanged);
     _ownedMarkdownSelection.dispose();
@@ -631,6 +705,7 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     _markdownSelection =
         MarkstreamSelectionScope.maybeOf(context) ?? _ownedMarkdownSelection;
     return MarkstreamSelectionScope(
@@ -692,34 +767,125 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
                   _pointerSelecting = false;
                   _hideQuickToolbar();
                 },
-                child: SelectionArea(
-                  key: _areaKey,
-                  focusNode: _regionFocus,
-                  onSelectionChanged: (content) {
-                    _selectedText = content?.plainText ?? '';
-                    if (_selectedText.isEmpty) {
-                      _hideQuickToolbar();
-                    } else {
-                      if (selectionUsesDesktop &&
-                          HardwareKeyboard.instance.isShiftPressed) {
-                        _keyboardSelecting = true;
-                        _hideQuickToolbar();
-                      }
-                      _scheduleQuickToolbar();
-                    }
-                  },
-                  contextMenuBuilder: _buildMenu,
-                  child: SelectionScrollContainer(
-                    key: _selectionKey,
-                    child: widget.child,
-                  ),
-                ),
+                child: _buildSelectionArea(context),
               ),
             ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _SelectionFocusNode extends FocusNode {
+  bool deferTouchRequest = false;
+  bool _requested = false;
+
+  @override
+  void requestFocus([FocusNode? node]) {
+    if (deferTouchRequest && node == null) {
+      _requested = true;
+      return;
+    }
+    super.requestFocus(node);
+  }
+
+  void finishTouch({required bool applyRequest}) {
+    final requested = _requested;
+    deferTouchRequest = false;
+    _requested = false;
+    if (requested && applyRequest) super.requestFocus();
+  }
+}
+
+class _ScrollPreservingSelectableRegion extends SelectableRegion {
+  const _ScrollPreservingSelectableRegion({
+    super.key,
+    required this.selectionFocus,
+    required this.readDragRevision,
+    required super.selectionControls,
+    required super.magnifierConfiguration,
+    required super.onSelectionChanged,
+    required super.contextMenuBuilder,
+    required super.child,
+  }) : super(focusNode: selectionFocus);
+
+  final _SelectionFocusNode selectionFocus;
+  final int Function() readDragRevision;
+
+  @override
+  SelectableRegionState createState() =>
+      _ScrollPreservingSelectableRegionState();
+}
+
+class _ScrollPreservingSelectableRegionState extends SelectableRegionState {
+  _ScrollPreservingSelectableRegion get _region =>
+      widget as _ScrollPreservingSelectableRegion;
+  ({int pointer, int dragRevision})? _touch;
+  bool _handlingTouchMove = false;
+
+  void _touchDown(PointerDownEvent event) {
+    // Match SelectableRegion's non-mouse recognizer, including stylus drags.
+    if (_touch != null || event.kind == PointerDeviceKind.mouse) return;
+    _touch = (pointer: event.pointer, dragRevision: _region.readDragRevision());
+    final focusedArea = FocusManager.instance.primaryFocus?.context
+        ?.findAncestorStateOfType<_AppSelectionAreaState>();
+    // Flutter may request focus in another reply on tap-down before the list
+    // knows this is a swipe. Keep focus with the selection until then.
+    if (!_region.selectionFocus.hasFocus &&
+        focusedArea != null &&
+        focusedArea._regionFocus.hasPrimaryFocus &&
+        focusedArea._selectedText.isNotEmpty) {
+      _region.selectionFocus.deferTouchRequest = true;
+    }
+  }
+
+  void _touchMove(PointerMoveEvent event) {
+    if (_touch?.pointer != event.pointer || _handlingTouchMove) return;
+    _handlingTouchMove = true;
+    scheduleMicrotask(() => _handlingTouchMove = false);
+  }
+
+  void _finishTouch(PointerEvent event) {
+    final touch = _touch;
+    if (touch == null || touch.pointer != event.pointer) return;
+    _touch = null;
+    _handlingTouchMove = false;
+    _region.selectionFocus.finishTouch(
+      applyRequest:
+          event is PointerUpEvent &&
+          touch.dragRevision == _region.readDragRevision(),
+    );
+  }
+
+  @override
+  void clearSelection() {
+    if (!_handlingTouchMove || !_region.selectionFocus.hasFocus) {
+      super.clearSelection();
+      return;
+    }
+    // The gesture arena cancels the selection's tap before starting the list
+    // drag. Check the outcome after both callbacks have run.
+    final readDragRevision = _region.readDragRevision;
+    final before = readDragRevision();
+    scheduleMicrotask(() {
+      if (mounted && readDragRevision() == before) super.clearSelection();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: _touchDown,
+    onPointerMove: _touchMove,
+    onPointerUp: _finishTouch,
+    onPointerCancel: _finishTouch,
+    child: super.build(context),
+  );
+
+  @override
+  void dispose() {
+    _region.selectionFocus.finishTouch(applyRequest: false);
+    super.dispose();
   }
 }
 

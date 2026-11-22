@@ -350,6 +350,7 @@ class _MessageListViewState extends State<MessageListView> {
 
   bool _historyLoadScheduled = false;
   bool _pointerDragInProgress = false;
+  int _dragRevision = 0;
   ScrollMetrics? _latestPointerDragMetrics;
   bool _userScrollActive = false;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
@@ -1768,13 +1769,6 @@ class _MessageListViewState extends State<MessageListView> {
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux;
 
-  ScrollViewKeyboardDismissBehavior get _keyboardDismissBehavior {
-    if (_isDesktopPlatform) {
-      return ScrollViewKeyboardDismissBehavior.manual;
-    }
-    return ScrollViewKeyboardDismissBehavior.onDrag;
-  }
-
   @override
   void dispose() {
     widget.streamingContentNotifier?.toolHeightEvents.removeListener(
@@ -1873,7 +1867,8 @@ class _MessageListViewState extends State<MessageListView> {
                 itemCount: _effectiveRenderModels.isEmpty && _hasFooter
                     ? 1
                     : _effectiveRenderModels.length,
-                keyboardDismissBehavior: _keyboardDismissBehavior,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.manual,
                 itemBuilder: (context, index) {
                   if (_effectiveRenderModels.isEmpty && _hasFooter) {
                     return widget.footer!;
@@ -1897,7 +1892,14 @@ class _MessageListViewState extends State<MessageListView> {
                     },
                     child: NotificationListener<ScrollNotification>(
                       onNotification: _handleScrollNotification,
-                      child: list,
+                      child: SelectionScrollScope(
+                        readDragRevision: _readDragRevision,
+                        handleViewportInsets: EdgeInsets.only(
+                          top: widget.topContentPadding,
+                          bottom: widget.bottomContentPadding,
+                        ),
+                        child: list,
+                      ),
                     ),
                   );
 
@@ -1976,6 +1978,11 @@ class _MessageListViewState extends State<MessageListView> {
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null &&
+        !_isDesktopPlatform) {
+      _dismissKeyboardForScroll();
+    }
     if (notification.depth != 0) return false;
     if (notification.metrics.axis != Axis.vertical) return false;
     if (notification is ScrollUpdateNotification) {
@@ -2028,7 +2035,21 @@ class _MessageListViewState extends State<MessageListView> {
     return false;
   }
 
+  void _dismissKeyboardForScroll() {
+    final scope = FocusScope.of(context, createDependency: false);
+    if (!scope.hasFocus || scope.hasPrimaryFocus) return;
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus == null) return;
+    // Flutter's on-drag behavior also unfocuses selectable text, clearing it.
+    final selection = focus.context
+        ?.findAncestorStateOfType<SelectableRegionState>();
+    if (selection?.widget.focusNode != focus) focus.unfocus();
+  }
+
+  int _readDragRevision() => _dragRevision;
+
   void _recordPointerDrag(ScrollMetrics metrics) {
+    _dragRevision++;
     _pointerDragInProgress = true;
     _latestPointerDragMetrics = metrics;
   }
