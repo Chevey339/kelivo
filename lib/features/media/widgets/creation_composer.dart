@@ -686,6 +686,9 @@ class _CreationComposerState extends State<CreationComposer> {
                                               duration,
                                             ),
                                         ].join(' · '),
+                                        modified: state.hasAdvancedOptions(
+                                          widget.topicId,
+                                        ),
                                         leading: const Icon(
                                           Lucide.SlidersHorizontal,
                                           size: 15,
@@ -809,17 +812,12 @@ class _CreationComposerState extends State<CreationComposer> {
                                       _ComposerChip(
                                         maxWidth: 109,
                                         label: l10n.creationMoreOptions,
-                                        leading: Badge(
-                                          isLabelVisible: state
-                                              .hasAdvancedOptions(
-                                                widget.topicId,
-                                              ),
-                                          backgroundColor: cs.primary,
-                                          smallSize: 5,
-                                          child: const Icon(
-                                            Lucide.SlidersHorizontal,
-                                            size: 15,
-                                          ),
+                                        leading: const Icon(
+                                          Lucide.SlidersHorizontal,
+                                          size: 14,
+                                        ),
+                                        modified: state.hasAdvancedOptions(
+                                          widget.topicId,
                                         ),
                                         onTap: (anchor) => _showPicker(
                                           anchor,
@@ -883,6 +881,7 @@ class _ComposerChip extends StatelessWidget {
     this.leading,
     this.trailing,
     this.strong = false,
+    this.modified = false,
     this.maxWidth,
     required this.onTap,
   });
@@ -890,7 +889,7 @@ class _ComposerChip extends StatelessWidget {
   final String label;
   final Widget? leading;
   final IconData? trailing;
-  final bool strong;
+  final bool strong, modified;
   final double? maxWidth;
   final ValueChanged<BuildContext>? onTap;
 
@@ -936,11 +935,31 @@ class _ComposerChip extends StatelessWidget {
         ),
       ),
     );
+    final control = modified
+        ? Stack(
+            children: [
+              chip,
+              PositionedDirectional(
+                end: 6,
+                top: 6,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const SizedBox.square(dimension: 5),
+                  ),
+                ),
+              ),
+            ],
+          )
+        : chip;
     return maxWidth == null
-        ? chip
+        ? control
         : ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth!),
-            child: chip,
+            child: control,
           );
   }
 }

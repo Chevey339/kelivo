@@ -292,60 +292,77 @@ class CreationEmptyState extends StatelessWidget {
               ),
               SizedBox(height: desktop ? 22 : 20),
               if (missing)
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (!video)
+                Builder(
+                  builder: (context) {
+                    final subscriptions = <Widget>[
+                      if (!video)
+                        CreationAction(
+                          tone: CreationActionTone.tonal,
+                          pill: true,
+                          icon: const ProviderAvatar(
+                            providerKey: 'chatgpt',
+                            displayName: 'ChatGPT',
+                            size: 16,
+                          ),
+                          child: Text(l10n.creationConnectChatGPT),
+                          onPressed: () => _login(
+                            context,
+                            OAuthProvider.chatgpt,
+                            l10n.creationConnectChatGPT,
+                          ),
+                        ),
                       CreationAction(
                         tone: CreationActionTone.tonal,
                         pill: true,
                         icon: const ProviderAvatar(
-                          providerKey: 'chatgpt',
-                          displayName: 'ChatGPT',
+                          providerKey: 'grok',
+                          displayName: 'Grok',
                           size: 16,
                         ),
-                        child: Text(l10n.creationConnectChatGPT),
+                        child: Text(l10n.creationConnectGrok),
                         onPressed: () => _login(
                           context,
-                          OAuthProvider.chatgpt,
-                          l10n.creationConnectChatGPT,
+                          OAuthProvider.grok,
+                          l10n.creationConnectGrok,
                         ),
                       ),
-                    CreationAction(
-                      tone: CreationActionTone.tonal,
-                      pill: true,
-                      icon: const ProviderAvatar(
-                        providerKey: 'grok',
-                        displayName: 'Grok',
-                        size: 16,
+                    ];
+                    final providers = <Widget>[
+                      CreationAction(
+                        tone: CreationActionTone.tonal,
+                        pill: true,
+                        icon: ProviderAvatar(
+                          providerKey: 'fal',
+                          displayName: 'fal',
+                          size: 16,
+                        ),
+                        child: Text(l10n.creationConfigureFal),
+                        onPressed: () => _provider(context, fal: true),
                       ),
-                      child: Text(l10n.creationConnectGrok),
-                      onPressed: () => _login(
-                        context,
-                        OAuthProvider.grok,
-                        l10n.creationConnectGrok,
+                      CreationAction(
+                        pill: true,
+                        icon: const Icon(Lucide.Settings, size: 15),
+                        child: Text(l10n.creationOtherProviders),
+                        onPressed: () => _provider(context),
                       ),
-                    ),
-                    CreationAction(
-                      tone: CreationActionTone.tonal,
-                      pill: true,
-                      icon: ProviderAvatar(
-                        providerKey: 'fal',
-                        displayName: 'fal',
-                        size: 16,
-                      ),
-                      child: Text(l10n.creationConfigureFal),
-                      onPressed: () => _provider(context, fal: true),
-                    ),
-                    CreationAction(
-                      pill: true,
-                      icon: const Icon(Lucide.Settings, size: 15),
-                      child: Text(l10n.creationOtherProviders),
-                      onPressed: () => _provider(context),
-                    ),
-                  ],
+                    ];
+                    Widget row(List<Widget> actions) => Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: actions,
+                    );
+                    return desktop
+                        ? row([...subscriptions, ...providers])
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              row(subscriptions),
+                              const SizedBox(height: 8),
+                              row(providers),
+                            ],
+                          );
+                  },
                 )
               else
                 Wrap(

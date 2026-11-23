@@ -26,9 +26,21 @@ class CreationSurface extends StatelessWidget {
     return Material(
       type: MaterialType.transparency,
       textStyle: style,
-      child: IconTheme(
-        data: IconThemeData(color: cs.onSurface, size: 18),
-        child: ColoredBox(color: cs.surface, child: child),
+      child: TooltipTheme(
+        data: TooltipThemeData(
+          waitDuration: const Duration(milliseconds: 300),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: cs.onSurface,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          textStyle: TextStyle(color: cs.surface, fontSize: 12),
+          constraints: const BoxConstraints(minHeight: 0),
+        ),
+        child: IconTheme(
+          data: IconThemeData(color: cs.onSurface, size: 18),
+          child: ColoredBox(color: cs.surface, child: child),
+        ),
       ),
     );
   }

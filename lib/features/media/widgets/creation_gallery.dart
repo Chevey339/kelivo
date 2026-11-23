@@ -150,7 +150,12 @@ class _CreationGalleryState extends State<CreationGallery> {
                         height: 48,
                         child: Row(
                           children: [
-                            Flexible(child: heading),
+                            Expanded(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: heading,
+                              ),
+                            ),
                             const SizedBox(width: 12),
                             Expanded(flex: 2, child: search),
                           ],
@@ -167,10 +172,15 @@ class _CreationGalleryState extends State<CreationGallery> {
                   height: 52,
                   child: Row(
                     children: [
-                      Flexible(child: heading),
-                      const SizedBox(width: 12),
-                      SizedBox(width: 195, child: tabs),
-                      const Spacer(),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(child: heading),
+                            const SizedBox(width: 12),
+                            SizedBox(width: 195, child: tabs),
+                          ],
+                        ),
+                      ),
                       ListenableBuilder(
                         listenable: _searchFocus,
                         child: search,

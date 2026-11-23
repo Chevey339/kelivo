@@ -198,7 +198,9 @@ class _IosIconButtonState extends State<IosIconButton> {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         triggerMode: TooltipTriggerMode.longPress,
         showDuration: const Duration(milliseconds: 1500),
-        waitDuration: const Duration(milliseconds: 400),
+        waitDuration:
+            TooltipTheme.of(context).waitDuration ??
+            const Duration(milliseconds: 400),
         child: content,
       );
     }
