@@ -885,7 +885,7 @@ class _Tag extends StatelessWidget {
   );
 }
 
-class _BatchResults extends StatelessWidget {
+class _BatchResults extends StatefulWidget {
   const _BatchResults({
     required this.batch,
     required this.items,
@@ -896,19 +896,50 @@ class _BatchResults extends StatelessWidget {
   final bool desktop;
 
   @override
+  State<_BatchResults> createState() => _BatchResultsState();
+}
+
+class _BatchResultsState extends State<_BatchResults> {
+  final _published = <int>{};
+  bool _observed = false;
+
+  @override
+  void didUpdateWidget(covariant _BatchResults oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.batch.id != widget.batch.id ||
+        !oldWidget.batch.status.isActive && widget.batch.status.isActive) {
+      _published.clear();
+      _observed = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final media = context.read<MediaCreationController>();
+    final batch = widget.batch;
+    final desktop = widget.desktop;
     final params = _parameters(batch);
-    final visible = items
+    final visible = widget.items
         .where((row) => row.status == GenerationItemStatus.ready)
         .toList();
-    final pending = batch.status.isActive
-        ? (params.count - visible.length).clamp(0, 16)
-        : 0;
-    final missing = batch.status == GenerationStatus.partial
-        ? (params.count - visible.length).clamp(0, 16)
-        : 0;
-    final total = pending + visible.length + missing;
+    final remaining = (params.count - visible.length).clamp(0, 16);
+    final slots = media.runner.resultSlotsFor(batch.id);
+    final first = slots?.first ?? (visible.lastOrNull?.ordinal ?? -1) + 1;
+    final end = slots?.end ?? first + remaining;
+    if (!_observed && slots != null) {
+      for (var ordinal = first; ordinal < slots.next; ordinal++) {
+        _published.add(ordinal);
+      }
+    }
+    _observed = true;
+    _published.addAll(visible.map((item) => item.ordinal));
+    final waiting = [
+      if (batch.status.isActive)
+        for (var ordinal = first; ordinal < end; ordinal++)
+          if (!_published.contains(ordinal)) ordinal,
+    ];
+    final missing = batch.status == GenerationStatus.partial ? remaining : 0;
+    final total = waiting.length + visible.length + missing;
     if (total == 0) return const SizedBox.shrink();
     final requestedRatio =
         params.ratio == 'auto' && batch.mode == MediaMode.video
@@ -939,18 +970,48 @@ class _BatchResults extends StatelessWidget {
         final width =
             (math.min(limit, constraints.maxWidth) - (columns - 1) * 8) /
             columns;
+        Widget slot(
+          int ordinal,
+          double aspectRatio, {
+          GenerationItemRow? item,
+        }) {
+          final result = item == null ? null : _artwork(context, item);
+          return SizedBox(
+            key: ValueKey((batch.id, ordinal)),
+            width: width,
+            child: AspectRatio(
+              aspectRatio: aspectRatio.clamp(.3, 4),
+              child: AnimatedBuilder(
+                animation: item == null ? media.runner : _idle,
+                child: result,
+                builder: (context, result) {
+                  final progress = item == null
+                      ? media.runner.progressFor(batch.id)
+                      : null;
+                  return CreationWaitingCard(
+                    batch: batch,
+                    ordinal: ordinal,
+                    progress: progress?.fraction,
+                    preview: ordinal == waiting.firstOrNull
+                        ? progress?.preview
+                        : null,
+                    queueAhead: item == null
+                        ? media.runner.queueAhead(batch.id)
+                        : 0,
+                    result: result,
+                  );
+                },
+              ),
+            ),
+          );
+        }
+
         return Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             for (final item in visible)
-              SizedBox(
-                width: width,
-                child: AspectRatio(
-                  aspectRatio: _itemRatio(item, requestedRatio).clamp(.3, 4),
-                  child: _artwork(context, item),
-                ),
-              ),
+              slot(item.ordinal, _itemRatio(item, requestedRatio), item: item),
             for (var index = 0; index < missing; index++)
               SizedBox(
                 width: width,
@@ -959,32 +1020,18 @@ class _BatchResults extends StatelessWidget {
                   child: _DownloadFailure(batch: batch),
                 ),
               ),
-            for (var index = 0; index < pending; index++)
-              SizedBox(
-                key: ValueKey((batch.id, index)),
-                width: width,
-                child: AspectRatio(
-                  aspectRatio: ratio.clamp(.3, 4),
-                  child: ListenableBuilder(
-                    listenable: media.runner,
-                    builder: (context, _) => CreationWaitingCard(
-                      batch: batch,
-                      progress: media.runner.progressFor(batch.id)?.fraction,
-                      preview: index == 0
-                          ? media.runner.progressFor(batch.id)?.preview
-                          : null,
-                      queueAhead: media.runner.queueAhead(batch.id),
-                    ),
-                  ),
-                ),
-              ),
+            for (final ordinal in waiting) slot(ordinal, ratio),
           ],
         );
       },
     );
   }
 
+  static const _idle = AlwaysStoppedAnimation<double>(0);
+
   Widget _artwork(BuildContext context, GenerationItemRow item) {
+    final batch = widget.batch;
+    final desktop = widget.desktop;
     final tile = CreationArtworkTile(
       key: ValueKey(item.id),
       item: item,
@@ -997,16 +1044,7 @@ class _BatchResults extends StatelessWidget {
         draftTopicId: batch.topicId,
       ),
     );
-    if (MediaQuery.disableAnimationsOf(context) ||
-        DateTime.now().difference(item.createdAt) >
-            const Duration(seconds: 2)) {
-      return tile;
-    }
-    return tile
-        .animate()
-        .fadeIn(duration: const Duration(milliseconds: 700))
-        .blurXY(begin: 18, end: 0)
-        .scale(begin: const Offset(1.04, 1.04), end: const Offset(1, 1));
+    return animateCreationResult(context, item, tile);
   }
 }
 

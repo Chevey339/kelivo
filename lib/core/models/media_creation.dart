@@ -32,6 +32,8 @@ enum GenerationItemStatus { pending, ready, failed }
 
 enum CreationTopicView { coverAndTitle, covers, list }
 
+enum CreationWaitGame { random, snake, brick, off }
+
 enum CreationGalleryFilter { all, images, videos, favorites }
 
 enum RecentImageSource { all, creation, chat }

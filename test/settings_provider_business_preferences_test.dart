@@ -212,6 +212,7 @@ void main() {
         'MaruCode',
         '砂糖酒馆',
         'Vercel',
+        'fal',
       ];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({

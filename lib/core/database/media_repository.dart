@@ -50,6 +50,24 @@ class MediaRepository {
     return [for (final row in rows) row.id];
   }
 
+  Future<List<String>> completedBatchIdsBefore(DateTime cutoff) async {
+    final table = _db.generationBatchRows;
+    final rows =
+        await (_db.selectOnly(table)
+              ..addColumns([table.id])
+              ..where(
+                table.createdAt.isSmallerThanValue(
+                      cutoff.microsecondsSinceEpoch,
+                    ) &
+                    table.status.isIn([
+                      for (final status in GenerationStatus.values)
+                        if (!status.isActive) status.name,
+                    ]),
+              ))
+            .get();
+    return [for (final row in rows) row.read(table.id)!];
+  }
+
   Future<void> enqueue(
     GenerationBatchRowsCompanion batch, {
     GenerationTopicRowsCompanion? topic,

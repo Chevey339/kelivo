@@ -18563,9 +18563,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get creationWaitingDetails => 'Ayrıntılar işleniyor';
 
   @override
-  String get creationWaitingColor => 'Renkler ve ışık üzerinde çalışılıyor';
-
-  @override
   String get creationWaitingFinish => 'Görsel tamamlanıyor';
 
   @override
@@ -18715,5 +18712,118 @@ class AppLocalizationsTr extends AppLocalizations {
       one: '1 görsel oluşturuldu',
     );
     return '$_temp0 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => 'İstemi geliştir';
+
+  @override
+  String get creationEnhanceLoading => 'İstem yeniden yazılıyor…';
+
+  @override
+  String get creationEnhanceResult => 'Yeniden yazılmış istem';
+
+  @override
+  String get creationEnhanceOriginal => 'Orijinal';
+
+  @override
+  String get creationEnhanceAgain => 'Başka dene';
+
+  @override
+  String get creationEnhanceApply => 'Değiştir';
+
+  @override
+  String get creationEnhanceNeedsModel =>
+      'Varsayılan modeller bölümünden bir istem geliştirme modeli seçin.';
+
+  @override
+  String get creationStorageHint =>
+      'Oluşturma tarafından saklanan görseller, videolar, küçük resimler ve referans görselleri.';
+
+  @override
+  String get creationStorageDate =>
+      'Bu tarihe kadar olan oluşturmaları temizle';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '$date tarihine kadar tamamlanmış üretimler, görselleri, videoları ve referans kopyalarıyla birlikte silinsin mi? Bu üretimlerden gelen görseller sohbette de görüntülenemeyecek.';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count üretim temizlendi',
+      one: '1 üretim temizlendi',
+      zero: 'Temizlenecek üretim yok',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationStorageClean => 'Tarihe göre temizle';
+
+  @override
+  String get creationDisplayAndGames => 'Görünüm ve bekleme oyunları';
+
+  @override
+  String get creationEditInPreferences => 'Ayarlar\'da değiştir…';
+
+  @override
+  String get creationWaitGame => 'Bekleme oyunu';
+
+  @override
+  String get creationWaitGameHelp =>
+      'Bir görsel veya video oluşturulurken bekleyen karta dokunun ya da Space tuşuna basarak oynayın.';
+
+  @override
+  String get creationGameRandom => 'Rastgele';
+
+  @override
+  String get creationGameOff => 'Kapalı';
+
+  @override
+  String get creationGameSnake => 'Yılan';
+
+  @override
+  String get creationGameBrick => 'Tuğla Kırma';
+
+  @override
+  String get creationGameSnakeControls =>
+      'Yılan. Yön vermek için ok tuşlarını, W A S D tuşlarını veya kaydırmayı kullanın. Duraklatmak veya devam etmek için Space, çıkmak için Escape tuşuna basın.';
+
+  @override
+  String get creationGameBrickControls =>
+      'Tuğla Kırma. Raketi sürükleyin veya hareket ettirmek için Sol, Sağ, A ya da D tuşlarını basılı tutun. Duraklatmak veya devam etmek için Space, çıkmak için Escape tuşuna basın.';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return 'Görsel oluşturulurken $game oyna';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return 'Video oluşturulurken $game oyna';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return 'Puan $score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return 'Duraklatıldı · $score';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return 'Oyun bitti · $score';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return 'Oluşturma hazır · $score';
   }
 }

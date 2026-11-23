@@ -17421,9 +17421,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationWaitingDetails => '细化画面';
 
   @override
-  String get creationWaitingColor => '调配色彩和光线';
-
-  @override
   String get creationWaitingFinish => '完成最后调整';
 
   @override
@@ -17558,6 +17555,108 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String creationChatResultCaption(int count, String model, String ratio) {
     return '已生成 $count 张 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => '提示词增强';
+
+  @override
+  String get creationEnhanceLoading => '正在改写提示词';
+
+  @override
+  String get creationEnhanceResult => '改写后的提示词';
+
+  @override
+  String get creationEnhanceOriginal => '原文';
+
+  @override
+  String get creationEnhanceAgain => '换一个';
+
+  @override
+  String get creationEnhanceApply => '替换';
+
+  @override
+  String get creationEnhanceNeedsModel => '请先在「默认模型」里选择提示词增强模型。';
+
+  @override
+  String get creationStorageHint => '创作保存的图像、视频、缩略图和参考图。';
+
+  @override
+  String get creationStorageDate => '清理截至该日期的创作';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '删除截至 $date 已结束的生成记录及其中的图片、视频和参考图副本？聊天中由这些记录生成的图片也将无法查看。';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    return '已清理 $count 次生成记录';
+  }
+
+  @override
+  String get creationStorageClean => '按日期清理';
+
+  @override
+  String get creationDisplayAndGames => '显示方式和小游戏';
+
+  @override
+  String get creationEditInPreferences => '在设置中修改…';
+
+  @override
+  String get creationWaitGame => '等待小游戏';
+
+  @override
+  String get creationWaitGameHelp => '生成图片或视频时，点一下等待中的卡片或按空格开始。';
+
+  @override
+  String get creationGameRandom => '随机';
+
+  @override
+  String get creationGameOff => '关闭';
+
+  @override
+  String get creationGameSnake => '贪吃蛇';
+
+  @override
+  String get creationGameBrick => '打砖块';
+
+  @override
+  String get creationGameSnakeControls =>
+      '贪吃蛇。方向键、W A S D 或滑动控制方向。空格暂停或继续，Esc 退出。';
+
+  @override
+  String get creationGameBrickControls =>
+      '打砖块。拖动挡板，或按住左右方向键、A 或 D 移动。空格暂停或继续，Esc 退出。';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return '图像生成时玩$game';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return '视频生成时玩$game';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return '得分：$score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return '已暂停 · $score 分';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return '游戏结束 · $score 分';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return '生成好了 · $score 分';
   }
 }
 
@@ -34978,9 +35077,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get creationWaitingDetails => '细化画面';
 
   @override
-  String get creationWaitingColor => '调配色彩和光线';
-
-  @override
   String get creationWaitingFinish => '完成最后调整';
 
   @override
@@ -35115,6 +35211,108 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String creationChatResultCaption(int count, String model, String ratio) {
     return '已生成 $count 张 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => '提示词增强';
+
+  @override
+  String get creationEnhanceLoading => '正在改写提示词';
+
+  @override
+  String get creationEnhanceResult => '改写后的提示词';
+
+  @override
+  String get creationEnhanceOriginal => '原文';
+
+  @override
+  String get creationEnhanceAgain => '换一个';
+
+  @override
+  String get creationEnhanceApply => '替换';
+
+  @override
+  String get creationEnhanceNeedsModel => '请先在「默认模型」里选择提示词增强模型。';
+
+  @override
+  String get creationStorageHint => '创作保存的图像、视频、缩略图和参考图。';
+
+  @override
+  String get creationStorageDate => '清理截至该日期的创作';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '删除截至 $date 已结束的生成记录及其中的图片、视频和参考图副本？聊天中由这些记录生成的图片也将无法查看。';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    return '已清理 $count 次生成记录';
+  }
+
+  @override
+  String get creationStorageClean => '按日期清理';
+
+  @override
+  String get creationDisplayAndGames => '显示方式和小游戏';
+
+  @override
+  String get creationEditInPreferences => '在设置中修改…';
+
+  @override
+  String get creationWaitGame => '等待小游戏';
+
+  @override
+  String get creationWaitGameHelp => '生成图片或视频时，点一下等待中的卡片或按空格开始。';
+
+  @override
+  String get creationGameRandom => '随机';
+
+  @override
+  String get creationGameOff => '关闭';
+
+  @override
+  String get creationGameSnake => '贪吃蛇';
+
+  @override
+  String get creationGameBrick => '打砖块';
+
+  @override
+  String get creationGameSnakeControls =>
+      '贪吃蛇。方向键、W A S D 或滑动控制方向。空格暂停或继续，Esc 退出。';
+
+  @override
+  String get creationGameBrickControls =>
+      '打砖块。拖动挡板，或按住左右方向键、A 或 D 移动。空格暂停或继续，Esc 退出。';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return '图像生成时玩$game';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return '视频生成时玩$game';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return '得分：$score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return '已暂停 · $score 分';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return '游戏结束 · $score 分';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return '生成好了 · $score 分';
   }
 }
 
@@ -52586,9 +52784,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationWaitingDetails => '細化畫面';
 
   @override
-  String get creationWaitingColor => '調配色彩和光線';
-
-  @override
   String get creationWaitingFinish => '完成最後調整';
 
   @override
@@ -52723,5 +52918,113 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String creationChatResultCaption(int count, String model, String ratio) {
     return '已生成 $count 張 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => '增強提示詞';
+
+  @override
+  String get creationEnhanceLoading => '正在改寫提示詞…';
+
+  @override
+  String get creationEnhanceResult => '改寫後的提示詞';
+
+  @override
+  String get creationEnhanceOriginal => '原文';
+
+  @override
+  String get creationEnhanceAgain => '換一個';
+
+  @override
+  String get creationEnhanceApply => '替換';
+
+  @override
+  String get creationEnhanceNeedsModel => '請先在「預設模型」中選擇提示詞增強模型。';
+
+  @override
+  String get creationStorageHint => '創作儲存的圖像、影片、縮圖和參考圖。';
+
+  @override
+  String get creationStorageDate => '清理截至此日期的創作';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '刪除截至 $date 已結束的生成記錄及其中的圖像、影片和參考圖副本？聊天中由這些記錄生成的圖像也將無法查看。';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已清理 $count 次生成記錄',
+      zero: '沒有可清理的生成記錄',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationStorageClean => '按日期清理';
+
+  @override
+  String get creationDisplayAndGames => '顯示方式和小遊戲';
+
+  @override
+  String get creationEditInPreferences => '在設定中修改…';
+
+  @override
+  String get creationWaitGame => '等待小遊戲';
+
+  @override
+  String get creationWaitGameHelp => '生成圖像或影片時，點一下等待中的卡片或按空格開始。';
+
+  @override
+  String get creationGameRandom => '隨機';
+
+  @override
+  String get creationGameOff => '關閉';
+
+  @override
+  String get creationGameSnake => '貪吃蛇';
+
+  @override
+  String get creationGameBrick => '打磚塊';
+
+  @override
+  String get creationGameSnakeControls =>
+      '貪吃蛇。方向鍵、W A S D 或滑動控制方向。空格暫停或繼續，Esc 退出。';
+
+  @override
+  String get creationGameBrickControls =>
+      '打磚塊。拖動擋板，或按住左右方向鍵、A 或 D 移動。空格暫停或繼續，Esc 退出。';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return '圖像生成時玩$game';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return '影片生成時玩$game';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return '得分：$score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return '已暫停 · $score 分';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return '遊戲結束 · $score 分';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return '生成好了 · $score 分';
   }
 }

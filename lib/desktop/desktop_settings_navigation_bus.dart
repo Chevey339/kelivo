@@ -7,6 +7,7 @@ enum DesktopSettingsNavigationTarget {
   providers,
   fal,
   creationPreferences,
+  defaultModel,
 }
 
 class DesktopSettingsNavigationBus {
@@ -49,4 +50,6 @@ class DesktopSettingsNavigationBus {
   void openFal() => _open(DesktopSettingsNavigationTarget.fal);
   void openCreationPreferences() =>
       _open(DesktopSettingsNavigationTarget.creationPreferences);
+  void openDefaultModel() =>
+      _open(DesktopSettingsNavigationTarget.defaultModel);
 }

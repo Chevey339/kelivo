@@ -18779,9 +18779,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationWaitingDetails => 'Прорабатываем детали';
 
   @override
-  String get creationWaitingColor => 'Работаем над цветом и светом';
-
-  @override
   String get creationWaitingFinish => 'Завершаем изображение';
 
   @override
@@ -18936,5 +18933,119 @@ class AppLocalizationsRu extends AppLocalizations {
       one: 'Сгенерировано $count изображение',
     );
     return '$_temp0 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => 'Улучшить промпт';
+
+  @override
+  String get creationEnhanceLoading => 'Переписываем промпт…';
+
+  @override
+  String get creationEnhanceResult => 'Переписанный промпт';
+
+  @override
+  String get creationEnhanceOriginal => 'Оригинал';
+
+  @override
+  String get creationEnhanceAgain => 'Другой вариант';
+
+  @override
+  String get creationEnhanceApply => 'Заменить';
+
+  @override
+  String get creationEnhanceNeedsModel =>
+      'Выберите модель для улучшения промптов в разделе «Модели по умолчанию».';
+
+  @override
+  String get creationStorageHint =>
+      'Изображения, видео, миниатюры и референсные изображения, сохранённые в «Творчестве».';
+
+  @override
+  String get creationStorageDate => 'Очистить творения до этой даты';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return 'Удалить завершённые генерации до $date, включая их изображения, видео и копии референсов? Изображения из этих генераций также станут недоступны в чате.';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Очищено $count генерации',
+      many: 'Очищено $count генераций',
+      few: 'Очищено $count генерации',
+      one: 'Очищена $count генерация',
+      zero: 'Нет генераций для очистки',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationStorageClean => 'Очистить по дате';
+
+  @override
+  String get creationDisplayAndGames => 'Отображение и игры ожидания';
+
+  @override
+  String get creationEditInPreferences => 'Изменить в настройках…';
+
+  @override
+  String get creationWaitGame => 'Игра ожидания';
+
+  @override
+  String get creationWaitGameHelp =>
+      'Пока создаётся изображение или видео, коснитесь карточки ожидания или нажмите пробел, чтобы начать игру.';
+
+  @override
+  String get creationGameRandom => 'Случайно';
+
+  @override
+  String get creationGameOff => 'Выкл.';
+
+  @override
+  String get creationGameSnake => 'Змейка';
+
+  @override
+  String get creationGameBrick => 'Арканоид';
+
+  @override
+  String get creationGameSnakeControls =>
+      'Змейка. Управляйте стрелками, W A S D или свайпами. Пробел — пауза или продолжение, Escape — выход.';
+
+  @override
+  String get creationGameBrickControls =>
+      'Арканоид. Перетаскивайте платформу или удерживайте стрелки влево/вправо, A или D. Пробел — пауза или продолжение, Escape — выход.';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return 'Играть в $game во время генерации изображения';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return 'Играть в $game во время генерации видео';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return 'Счёт: $score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return 'Пауза · $score';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return 'Игра окончена · $score';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return 'Готово · $score';
   }
 }

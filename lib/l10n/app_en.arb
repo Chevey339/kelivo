@@ -23951,10 +23951,6 @@
   "@creationWaitingDetails": {
     "description": "Rotating status during image generation after sketching."
   },
-  "creationWaitingColor": "Working on colors and light",
-  "@creationWaitingColor": {
-    "description": "Rotating status during image generation."
-  },
   "creationWaitingFinish": "Finishing the image",
   "@creationWaitingFinish": {
     "description": "Rotating status near the end of image generation."
@@ -24150,6 +24146,158 @@
       },
       "ratio": {
         "type": "String"
+      }
+    }
+  },
+  "creationEnhance": "Enhance prompt",
+  "@creationEnhance": {
+    "description": "Tooltip and accessibility label for the wand button in the creation composer that rewrites its prompt."
+  },
+  "creationEnhanceLoading": "Rewriting prompt…",
+  "@creationEnhanceLoading": {
+    "description": "Heading at the top of the creation composer while an enhancement request is running."
+  },
+  "creationEnhanceResult": "Rewritten prompt",
+  "@creationEnhanceResult": {
+    "description": "Heading at the top of the creation composer when the model has rewritten the prompt."
+  },
+  "creationEnhanceOriginal": "Original",
+  "@creationEnhanceOriginal": {
+    "description": "Disclosure button in the creation composer that shows or hides the original prompt."
+  },
+  "creationEnhanceAgain": "Try another",
+  "@creationEnhanceAgain": {
+    "description": "Button in the prompt enhancement panel asking the same model to produce another rewrite."
+  },
+  "creationEnhanceApply": "Replace",
+  "@creationEnhanceApply": {
+    "description": "Button that replaces the text in the creation composer with the rewritten prompt."
+  },
+  "creationEnhanceNeedsModel": "Choose a prompt enhancement model in Default models.",
+  "@creationEnhanceNeedsModel": {
+    "description": "Snackbar shown when the prompt enhancement model is missing or unavailable."
+  },
+  "creationStorageHint": "Images, videos, thumbnails, and reference images stored by Creation.",
+  "@creationStorageHint": {
+    "description": "Description in the Creation category of Settings › Storage space."
+  },
+  "creationStorageDate": "Clear creations through this date",
+  "@creationStorageDate": {
+    "description": "Title of the date picker for bulk deletion of finished creations. The selected day is inclusive."
+  },
+  "creationStorageConfirm": "Delete finished generations through {date}, including their images, videos, and reference copies? Images from these generations will also be unavailable in chat.",
+  "@creationStorageConfirm": {
+    "description": "Destructive confirmation in Creation storage cleanup. Date is the locally formatted last day included in deletion.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "creationStorageRemoved": "{count, plural, =0{No generations to clear} one{Cleared 1 generation} other{Cleared {count} generations}}",
+  "@creationStorageRemoved": {
+    "description": "Snackbar after a Creation storage cleanup. Count is the number of generation batches deleted.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationStorageClean": "Clear by date",
+  "@creationStorageClean": {
+    "description": "Action in the Creation storage category that opens a date picker to delete older generation batches."
+  },
+  "creationDisplayAndGames": "Display and waiting games",
+  "@creationDisplayAndGames": {
+    "description": "Tooltip and mobile sheet title for the Creation topic-list menu with appearance and waiting-game preferences."
+  },
+  "creationEditInPreferences": "Change in Settings…",
+  "@creationEditInPreferences": {
+    "description": "Action at the bottom of the Creation topic-list menu that opens the Creation section in Preferences."
+  },
+  "creationWaitGame": "Waiting game",
+  "@creationWaitGame": {
+    "description": "Settings row and topic menu section label for choosing a game to play while a creation is generating."
+  },
+  "creationWaitGameHelp": "While an image or video is generating, tap the waiting card or press Space to play.",
+  "@creationWaitGameHelp": {
+    "description": "Help for the waiting-game preference in the Creation section of Preferences."
+  },
+  "creationGameRandom": "Random",
+  "@creationGameRandom": {
+    "description": "Waiting-game option that chooses Snake or Brick Breaker for the current generation."
+  },
+  "creationGameOff": "Off",
+  "@creationGameOff": {
+    "description": "Waiting-game option that disables starting a game from waiting cards."
+  },
+  "creationGameSnake": "Snake",
+  "@creationGameSnake": {
+    "description": "Name of the Snake game available on Creation waiting cards and in settings."
+  },
+  "creationGameBrick": "Brick Breaker",
+  "@creationGameBrick": {
+    "description": "Name of the paddle-and-ball game available on Creation waiting cards and in settings."
+  },
+  "creationGameSnakeControls": "Snake. Use arrow keys, W A S D, or swipes to steer. Press Space to pause or resume and Escape to exit.",
+  "@creationGameSnakeControls": {
+    "description": "Screen reader description of the controls on an active Snake game board."
+  },
+  "creationGameBrickControls": "Brick Breaker. Drag the paddle or hold Left, Right, A, or D to move. Press Space to pause or resume and Escape to exit.",
+  "@creationGameBrickControls": {
+    "description": "Screen reader description of the controls on an active Brick Breaker game board."
+  },
+  "creationGameDuringImage": "Play {game} during image generation",
+  "@creationGameDuringImage": {
+    "description": "Accessibility label for starting a game on an image waiting card. Game is the localized game name.",
+    "placeholders": {
+      "game": {
+        "type": "String"
+      }
+    }
+  },
+  "creationGameDuringVideo": "Play {game} during video generation",
+  "@creationGameDuringVideo": {
+    "description": "Accessibility label for starting a game on a video waiting card. Game is the localized game name.",
+    "placeholders": {
+      "game": {
+        "type": "String"
+      }
+    }
+  },
+  "creationGameScore": "Score {score}",
+  "@creationGameScore": {
+    "description": "Screen reader announcement on the waiting-game board. Score is the player’s total points.",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "creationGamePaused": "Paused · {score}",
+  "@creationGamePaused": {
+    "description": "Overlay on a paused waiting game. Score is the player’s total points.",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "creationGameEnded": "Game over · {score}",
+  "@creationGameEnded": {
+    "description": "Overlay before returning to the waiting card after a game ends. Score is the player’s final points.",
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "creationGameCompleted": "Creation ready · {score}",
+  "@creationGameCompleted": {
+    "description": "Brief overlay when a creation finishes while its waiting game is active. Score is the player’s final points.",
+    "placeholders": {
+      "score": {
+        "type": "int"
       }
     }
   }

@@ -17890,9 +17890,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationWaitingDetails => '세부 묘사 다듬는 중';
 
   @override
-  String get creationWaitingColor => '색상과 빛 조정 중';
-
-  @override
   String get creationWaitingFinish => '이미지 마무리 중';
 
   @override
@@ -18034,5 +18031,114 @@ class AppLocalizationsKo extends AppLocalizations {
       other: '이미지 $count개 생성됨',
     );
     return '$_temp0 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => '프롬프트 개선';
+
+  @override
+  String get creationEnhanceLoading => '프롬프트를 다시 작성하는 중…';
+
+  @override
+  String get creationEnhanceResult => '다시 작성된 프롬프트';
+
+  @override
+  String get creationEnhanceOriginal => '원문';
+
+  @override
+  String get creationEnhanceAgain => '다른 결과';
+
+  @override
+  String get creationEnhanceApply => '바꾸기';
+
+  @override
+  String get creationEnhanceNeedsModel => '「기본 모델」에서 프롬프트 개선 모델을 먼저 선택하세요.';
+
+  @override
+  String get creationStorageHint => '창작에서 저장한 이미지, 동영상, 썸네일, 참조 이미지입니다.';
+
+  @override
+  String get creationStorageDate => '이 날짜까지의 창작 기록 정리';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return '$date까지 완료된 생성 기록과 그 안의 이미지, 동영상, 참조 이미지 사본을 삭제할까요? 이 기록에서 생성된 이미지는 채팅에서도 볼 수 없게 됩니다.';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '생성 기록 $count개를 정리했습니다',
+      zero: '정리할 생성 기록이 없습니다',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationStorageClean => '날짜별 정리';
+
+  @override
+  String get creationDisplayAndGames => '표시 방식 및 대기 미니게임';
+
+  @override
+  String get creationEditInPreferences => '설정에서 변경…';
+
+  @override
+  String get creationWaitGame => '대기 미니게임';
+
+  @override
+  String get creationWaitGameHelp =>
+      '이미지나 동영상을 생성하는 동안 대기 카드를 누르거나 스페이스 키를 눌러 시작하세요.';
+
+  @override
+  String get creationGameRandom => '무작위';
+
+  @override
+  String get creationGameOff => '끔';
+
+  @override
+  String get creationGameSnake => '뱀 게임';
+
+  @override
+  String get creationGameBrick => '벽돌 깨기';
+
+  @override
+  String get creationGameSnakeControls =>
+      '뱀 게임. 방향키, W A S D 또는 스와이프로 방향을 조종합니다. 스페이스 키로 일시정지 또는 재개하고 Esc로 나갑니다.';
+
+  @override
+  String get creationGameBrickControls =>
+      '벽돌 깨기. 패들을 드래그하거나 왼쪽·오른쪽 방향키, A 또는 D를 눌러 이동합니다. 스페이스 키로 일시정지 또는 재개하고 Esc로 나갑니다.';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return '이미지 생성 중 $game 플레이';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return '동영상 생성 중 $game 플레이';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return '점수 $score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return '일시정지 · $score';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return '게임 종료 · $score';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return '생성 완료 · $score';
   }
 }

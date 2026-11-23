@@ -318,6 +318,9 @@ class DataSync {
   final RestoreDurability? _restoreDurability;
   BackupMergeReport? _lastMergeReport;
   BackupMergeReport? get lastMergeReport => _lastMergeReport;
+  Future<bool> get _hasCreations =>
+      chatService.chatRepositoryOrNull?.mediaRepository.hasCreations ??
+      businessRepository.hasCreations;
 
   DataSync({
     required this.chatService,
@@ -694,10 +697,8 @@ class DataSync {
     final archive = await _prepareBackupArchive(
       chatService: chatService,
       verifyPayload: false,
-      // The SQLite component can carry creations independently of chats.
-      includeChats:
-          cfg.scope.includes(BackupCategory.chats) ||
-          cfg.scope.includes(BackupCategory.creations),
+      includeChats: cfg.scope.includes(BackupCategory.chats),
+      hasCreations: () => _hasCreations,
       includeFiles: cfg.scope.assetRoots.isNotEmpty,
       scope: cfg.scope,
       exportSettings: () =>
@@ -767,6 +768,7 @@ class DataSync {
     bool verifyPayload = true,
     required bool includeChats,
     required bool includeFiles,
+    Future<bool> Function()? hasCreations,
     BackupScope scope = const BackupScope(),
     required _BackupSettingsSource exportSettings,
     required _BackupDatabaseSource snapshotDatabase,
@@ -830,6 +832,11 @@ class DataSync {
       ChatDatabaseSnapshotInfo? snapshotInfo;
       var publishedDraftFiles = <String>{};
       var publishedCreationFiles = const <String>{};
+      if (!includeChats &&
+          scope.includes(BackupCategory.creations) &&
+          hasCreations != null) {
+        includeChats = await hasCreations();
+      }
       if (includeChats) {
         final databaseFile = File(p.join(workDir.path, '_bk_kelivo.db'));
         databaseTmp = databaseFile;
@@ -2916,14 +2923,17 @@ class DataSync {
     required bool overwrite,
     required bool restoreFiles,
   }) async {
-    if (!overwrite && !includeDatabase) return;
-    await chatService.init();
-    final live = chatService.chatRepositoryOrNull!.mediaRepository;
     final snapshot = includeDatabase
         ? AppDatabase.open(file: File(p.join(payload.path, _databaseEntryName)))
         : null;
     try {
       final incoming = snapshot == null ? null : MediaRepository(snapshot);
+      if (await incoming?.hasCreations != true &&
+          (!overwrite || !await _hasCreations)) {
+        return;
+      }
+      await chatService.init();
+      final live = chatService.chatRepositoryOrNull!.mediaRepository;
       final wanted = restoreFiles
           ? await incoming?.referencedFiles() ?? const <String>{}
           : const <String>{};

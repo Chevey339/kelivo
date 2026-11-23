@@ -252,10 +252,13 @@ void main() {
           findsNothing,
         );
         final picker = find.byKey(const ValueKey('backup-scope-picker'));
-        expect(find.text('15/15'), findsOneWidget);
+        final count = BackupCategory.values.length;
+        final fullScope = find.text('$count/$count');
+        final editedScope = find.text('${count - 3}/$count');
+        expect(fullScope, findsOneWidget);
         expect(tester.getSize(picker).height, lessThanOrEqualTo(48));
         expect(
-          tester.getCenter(find.text('15/15')).dy,
+          tester.getCenter(fullScope).dy,
           tester.getCenter(find.text('Backup and import content')).dy,
         );
         await tester.tap(picker);
@@ -296,7 +299,7 @@ void main() {
         expect(save.hitTestable(), findsOneWidget);
         await tester.tap(save);
         await tester.pumpAndSettle();
-        expect(find.text('12/15'), findsOneWidget);
+        expect(editedScope, findsOneWidget);
         for (final category in [
           BackupCategory.providers,
           BackupCategory.files,
@@ -341,7 +344,7 @@ void main() {
         }
         await tester.tap(find.byKey(const ValueKey('backup-scope-cancel')));
         await tester.pumpAndSettle();
-        expect(find.text('12/15'), findsOneWidget);
+        expect(editedScope, findsOneWidget);
         expect(
           settings.webDavConfig.scope.includes(BackupCategory.skills),
           isTrue,

@@ -18455,9 +18455,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creationWaitingDetails => 'Refining the details';
 
   @override
-  String get creationWaitingColor => 'Working on colors and light';
-
-  @override
   String get creationWaitingFinish => 'Finishing the image';
 
   @override
@@ -18605,5 +18602,117 @@ class AppLocalizationsEn extends AppLocalizations {
       one: 'Generated 1 image',
     );
     return '$_temp0 · $model · $ratio';
+  }
+
+  @override
+  String get creationEnhance => 'Enhance prompt';
+
+  @override
+  String get creationEnhanceLoading => 'Rewriting prompt…';
+
+  @override
+  String get creationEnhanceResult => 'Rewritten prompt';
+
+  @override
+  String get creationEnhanceOriginal => 'Original';
+
+  @override
+  String get creationEnhanceAgain => 'Try another';
+
+  @override
+  String get creationEnhanceApply => 'Replace';
+
+  @override
+  String get creationEnhanceNeedsModel =>
+      'Choose a prompt enhancement model in Default models.';
+
+  @override
+  String get creationStorageHint =>
+      'Images, videos, thumbnails, and reference images stored by Creation.';
+
+  @override
+  String get creationStorageDate => 'Clear creations through this date';
+
+  @override
+  String creationStorageConfirm(String date) {
+    return 'Delete finished generations through $date, including their images, videos, and reference copies? Images from these generations will also be unavailable in chat.';
+  }
+
+  @override
+  String creationStorageRemoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Cleared $count generations',
+      one: 'Cleared 1 generation',
+      zero: 'No generations to clear',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationStorageClean => 'Clear by date';
+
+  @override
+  String get creationDisplayAndGames => 'Display and waiting games';
+
+  @override
+  String get creationEditInPreferences => 'Change in Settings…';
+
+  @override
+  String get creationWaitGame => 'Waiting game';
+
+  @override
+  String get creationWaitGameHelp =>
+      'While an image or video is generating, tap the waiting card or press Space to play.';
+
+  @override
+  String get creationGameRandom => 'Random';
+
+  @override
+  String get creationGameOff => 'Off';
+
+  @override
+  String get creationGameSnake => 'Snake';
+
+  @override
+  String get creationGameBrick => 'Brick Breaker';
+
+  @override
+  String get creationGameSnakeControls =>
+      'Snake. Use arrow keys, W A S D, or swipes to steer. Press Space to pause or resume and Escape to exit.';
+
+  @override
+  String get creationGameBrickControls =>
+      'Brick Breaker. Drag the paddle or hold Left, Right, A, or D to move. Press Space to pause or resume and Escape to exit.';
+
+  @override
+  String creationGameDuringImage(String game) {
+    return 'Play $game during image generation';
+  }
+
+  @override
+  String creationGameDuringVideo(String game) {
+    return 'Play $game during video generation';
+  }
+
+  @override
+  String creationGameScore(int score) {
+    return 'Score $score';
+  }
+
+  @override
+  String creationGamePaused(int score) {
+    return 'Paused · $score';
+  }
+
+  @override
+  String creationGameEnded(int score) {
+    return 'Game over · $score';
+  }
+
+  @override
+  String creationGameCompleted(int score) {
+    return 'Creation ready · $score';
   }
 }

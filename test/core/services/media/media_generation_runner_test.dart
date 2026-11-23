@@ -11,6 +11,7 @@ import 'package:Kelivo/core/services/media/media_generation_runner.dart';
 import 'package:Kelivo/core/services/media/media_adapter_resolver.dart';
 import 'package:Kelivo/core/services/media/adapters/veo_video.dart';
 import 'package:Kelivo/core/services/media/media_request.dart';
+import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,6 +35,13 @@ class _HeldEnqueueRepository extends MediaRepository {
     await release.future;
     await super.enqueue(batch, topic: topic);
   }
+}
+
+class _RejectDeleteRepository extends MediaRepository {
+  _RejectDeleteRepository(super.database);
+
+  @override
+  Future<void> deleteBatch(String id) async => throw StateError('write failed');
 }
 
 void main() {
@@ -79,6 +87,74 @@ void main() {
     await database.close();
     await root.delete(recursive: true);
   });
+
+  test(
+    'a retry keeps its output ordinals after another artwork is deleted',
+    () async {
+      final requested = Completer<void>();
+      final response = Completer<http.Response>();
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+        clientFactory: (_, _) => MockClient((sent) async {
+          expect(jsonDecode(sent.body)['n'], 2);
+          requested.complete();
+          return response.future;
+        }),
+      );
+      addTearDown(() {
+        if (!response.isCompleted) response.complete(http.Response('', 400));
+        runner.dispose();
+      });
+      await runner.initialized;
+      final date = DateTime(2026);
+      await repository.enqueue(
+        GenerationBatchRowsCompanion.insert(
+          id: 'retry-slots',
+          providerId: 'retry-provider',
+          modelId: model,
+          mode: MediaMode.image,
+          prompt: 'A test',
+          paramsJson: jsonEncode(request.copyWith(count: 3).storedParameters),
+          referencesJson: '[]',
+          status: GenerationStatus.partial,
+          source: GenerationSource.workbench,
+          createdAt: date,
+        ),
+      );
+      await repository.addItem(
+        GenerationItemRow(
+          id: 'remaining-item',
+          batchId: 'retry-slots',
+          ordinal: 1,
+          mode: MediaMode.image,
+          path: 'kelivo-file:///generations/retry-slots/remaining.png',
+          mime: 'image/png',
+          byteSize: 1,
+          favorite: false,
+          status: GenerationItemStatus.ready,
+          createdAt: date,
+        ),
+      );
+      final ticket = (await runner.retry(
+        'retry-slots',
+        provider('retry-provider'),
+      ))!;
+      await requested.future.timeout(const Duration(seconds: 5));
+      const slots = (first: 2, end: 4, next: 2);
+      expect(runner.resultSlotsFor('retry-slots'), slots);
+      await repository.deleteItem('remaining-item');
+      expect(runner.resultSlotsFor('retry-slots'), slots);
+      response.complete(http.Response(success(2), 200));
+      expect(await ticket.completed, GenerationStatus.succeeded);
+      expect(
+        (await repository.itemsForBatch(
+          'retry-slots',
+        )).map((item) => item.ordinal),
+        [2, 3],
+      );
+    },
+  );
 
   test(
     'failed generation diagnostics retain only allowlisted request fields',
@@ -392,6 +468,79 @@ void main() {
     );
   });
 
+  test(
+    'creation cleanup deletes finished batches before the date cutoff',
+    () async {
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+      );
+      addTearDown(runner.dispose);
+      await runner.initialized;
+      final cutoff = DateTime(2026, 10, 2);
+      final before = cutoff.subtract(const Duration(days: 1));
+      final generations = await files.directory();
+      for (final (id, date, status) in [
+        ('older', before, GenerationStatus.succeeded),
+        ('older-failed', before, GenerationStatus.failed),
+        ('older-active', before, GenerationStatus.downloading),
+        ('at-cutoff', cutoff, GenerationStatus.succeeded),
+      ]) {
+        await repository.enqueue(
+          GenerationBatchRowsCompanion.insert(
+            id: id,
+            providerId: 'provider',
+            modelId: model,
+            mode: MediaMode.image,
+            prompt: 'Fixture',
+            paramsJson: '{}',
+            referencesJson: '[]',
+            status: status,
+            source: GenerationSource.workbench,
+            createdAt: date,
+          ),
+        );
+        final folder = await Directory(
+          p.join(generations.path, id, 'refs'),
+        ).create(recursive: true);
+        await File(p.join(folder.path, 'reference.png')).writeAsBytes([0]);
+        if (status == GenerationStatus.succeeded) {
+          await repository.addItem(
+            GenerationItemRow(
+              id: '$id-item',
+              batchId: id,
+              ordinal: 0,
+              mode: MediaMode.image,
+              path: 'kelivo-file:///generations/$id/artwork.png',
+              mime: 'image/png',
+              byteSize: 1,
+              favorite: false,
+              status: GenerationItemStatus.ready,
+              createdAt: date,
+            ),
+          );
+        }
+      }
+      expect(
+        await StorageUsageService.clearCreationBatches(runner, cutoff: cutoff),
+        2,
+      );
+      expect(await repository.itemsForBatch('older'), isEmpty);
+      for (final id in ['older', 'older-failed']) {
+        expect(await repository.batch(id), isNull);
+        expect(await Directory(p.join(generations.path, id)).exists(), isFalse);
+      }
+      for (final id in ['older-active', 'at-cutoff']) {
+        expect(await repository.batch(id), isNotNull);
+        expect(await Directory(p.join(generations.path, id)).exists(), isTrue);
+      }
+      expect(
+        await StorageUsageService.clearCreationBatches(runner, cutoff: cutoff),
+        0,
+      );
+    },
+  );
+
   test('unfinished rows are marked interrupted on startup', () async {
     for (final status in [
       GenerationStatus.queued,
@@ -431,5 +580,53 @@ void main() {
       (await repository.batch('succeeded'))!.status,
       GenerationStatus.succeeded,
     );
+  });
+
+  test('cleanup restores the files if the database delete fails', () async {
+    final rejecting = _RejectDeleteRepository(database);
+    final runner = MediaGenerationRunner(repository: rejecting, files: files);
+    addTearDown(runner.dispose);
+    await runner.initialized;
+    final date = DateTime(2026);
+    await repository.enqueue(
+      GenerationBatchRowsCompanion.insert(
+        id: 'protected',
+        providerId: 'provider',
+        modelId: model,
+        mode: MediaMode.image,
+        prompt: 'A test',
+        paramsJson: '{}',
+        referencesJson: '[]',
+        status: GenerationStatus.succeeded,
+        source: GenerationSource.workbench,
+        createdAt: date,
+      ),
+    );
+    final file = File(
+      p.join((await files.directory()).path, 'protected', 'image.png'),
+    );
+    await file.create(recursive: true);
+    await file.writeAsString('fixture artwork');
+    await expectLater(
+      StorageUsageService.clearCreationBatches(
+        runner,
+        cutoff: DateTime(2026, 10),
+      ),
+      throwsStateError,
+    );
+    expect(await repository.batch('protected'), isNotNull);
+    expect(await file.readAsString(), 'fixture artwork');
+
+    final folder = file.parent;
+    final pending = await Directory(
+      p.join(folder.parent.path, '.pending-deletions'),
+    ).create();
+    await folder.rename(p.join(pending.path, 'protected'));
+    final removed = await Directory(
+      p.join(pending.path, 'already-removed'),
+    ).create();
+    await runner.recoverBatchDeletions();
+    expect(await file.readAsString(), 'fixture artwork');
+    expect(await removed.exists(), isFalse);
   });
 }

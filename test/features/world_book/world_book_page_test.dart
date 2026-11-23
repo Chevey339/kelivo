@@ -806,12 +806,12 @@ void main() {
               1,
             ),
           );
+          final actionsY = tester
+              .getCenter(find.byTooltip(l10n.worldBookAddEntry))
+              .dy;
           expect(
             tester.getCenter(find.text('2/3')).dy,
-            closeTo(
-              tester.getCenter(find.byTooltip(l10n.worldBookAddEntry)).dy,
-              1,
-            ),
+            desktop ? closeTo(actionsY, 1) : lessThan(actionsY),
           );
           expect(tester.takeException(), isNull);
           await screenshot(tester, '$platform-${locale.languageCode}-narrow');

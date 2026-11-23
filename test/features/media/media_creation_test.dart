@@ -12,10 +12,14 @@ import 'package:Kelivo/core/services/media/media_file_store.dart';
 import 'package:Kelivo/core/services/media/media_generation_runner.dart';
 import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:Kelivo/desktop/desktop_media_creation_page.dart';
+import 'package:Kelivo/features/chat/widgets/chat_creation_images.dart';
 import 'package:Kelivo/features/media/pages/media_creation_page.dart';
 import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
 import 'package:Kelivo/features/media/widgets/creation_composer.dart';
 import 'package:Kelivo/features/media/widgets/creation_gallery.dart';
+import 'package:Kelivo/features/media/widgets/creation_lightbox.dart';
+import 'package:Kelivo/features/media/widgets/creation_timeline.dart';
+import 'package:Kelivo/features/media/widgets/creation_waiting_card.dart';
 import 'package:flutter/services.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +29,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image/image.dart' as image;
 import 'package:provider/provider.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 import '../../support/business_test_harness.dart';
 
@@ -48,6 +53,53 @@ final _videoProvider = ProviderConfig(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'enhancement includes only the selected video model’s reference frames',
+    () async {
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      final provider = _videoProvider.copyWith(
+        models: const ['grok-imagine-video-1.5', 'grok-imagine-video'],
+      );
+      await settings.setProviderConfig(provider.id, provider);
+      final runner = MediaGenerationRunner(
+        repository: MediaRepository(harness.database),
+        files: const MediaFileStore(),
+      );
+      await runner.initialized;
+      final controller = MediaCreationController(
+        runner: runner,
+        settings: settings,
+        preferences: harness.preferences,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        settings.dispose();
+        await runner.shutdown();
+        runner.dispose();
+      });
+      controller.setMode(MediaMode.video);
+      controller.selectModel(
+        controller.models.singleWhere(
+          (model) => model.spec.id == 'grok-imagine-video-1.5',
+        ),
+      );
+      controller.setFrame(null, MediaReferenceRole.firstFrame, '/first.png');
+      controller.setFrame(null, MediaReferenceRole.lastFrame, '/last.png');
+      expect(controller.enhancementReferencePaths(null), [
+        '/first.png',
+        '/last.png',
+      ]);
+      controller.selectModel(
+        controller.models.singleWhere(
+          (model) => model.spec.id == 'grok-imagine-video',
+        ),
+      );
+      expect(controller.enhancementReferencePaths(null), ['/first.png']);
+    },
+  );
 
   test(
     'sending creates a named topic and keeps each topic draft separate',
@@ -148,6 +200,13 @@ void main() {
       expect(
         harness.preferences.getString(BusinessKeyRegistry.creationTopicViewKey),
         'covers',
+      );
+      expect(controller.waitGame, CreationWaitGame.random);
+      await controller.setWaitGame(CreationWaitGame.off);
+      expect(controller.waitGame, CreationWaitGame.off);
+      expect(
+        harness.preferences.getString(BusinessKeyRegistry.creationWaitGameKey),
+        'off',
       );
 
       final repeat = (await controller.repeat(savedBatch))!;
@@ -373,6 +432,172 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  for (final chat in [false, true]) {
+    testWidgets(
+      '${chat ? 'chat' : 'creation timeline'} preserves a playing card through result publication',
+      (tester) async {
+        final visibility = VisibilityDetectorController.instance;
+        final previousInterval = visibility.updateInterval;
+        visibility.updateInterval = Duration.zero;
+        addTearDown(() => visibility.updateInterval = previousInterval);
+        final (
+          harness,
+          settings,
+          runner,
+          controller,
+          folder,
+        ) = (await tester.runAsync(() async {
+          final harness = await BusinessTestHarness.create();
+          final settings = SettingsProvider(harness.preferences);
+          await settings.loaded;
+          await settings.setProviderConfig(_provider.id, _provider);
+          final repository = MediaRepository(harness.database);
+          final runner = MediaGenerationRunner(
+            repository: repository,
+            files: const MediaFileStore(),
+          );
+          await runner.initialized;
+          final folder = await Directory.systemTemp.createTemp(
+            'creation-reveal',
+          );
+          await File(
+            '${folder.path}/result.png',
+          ).writeAsBytes(image.encodePng(image.Image(width: 12, height: 12)));
+          final created = DateTime(2026, 4);
+          await repository.enqueue(
+            GenerationBatchRowsCompanion.insert(
+              id: 'playing-batch',
+              topicId: chat ? const Value.absent() : const Value('topic'),
+              messageId: chat ? const Value('message') : const Value.absent(),
+              providerId: _provider.id,
+              modelId: _model,
+              mode: MediaMode.image,
+              prompt: 'Bird in a garden',
+              paramsJson: jsonEncode({'count': chat ? 1 : 3}),
+              referencesJson: '[]',
+              status: GenerationStatus.running,
+              source: chat ? GenerationSource.chat : GenerationSource.workbench,
+              createdAt: created,
+            ),
+            topic: chat
+                ? null
+                : GenerationTopicRowsCompanion.insert(
+                    id: 'topic',
+                    title: 'Garden',
+                    titleSource: GenerationTitleSource.manual,
+                    createdAt: created,
+                    updatedAt: created,
+                  ),
+          );
+          if (!chat) {
+            await repository.addItem(
+              GenerationItemRow(
+                id: 'previous-result',
+                batchId: 'playing-batch',
+                ordinal: 1,
+                mode: MediaMode.image,
+                path: '${folder.path}/result.png',
+                mime: 'image/png',
+                byteSize: 1,
+                favorite: false,
+                status: GenerationItemStatus.ready,
+                createdAt: created,
+              ),
+            );
+          }
+          final controller = MediaCreationController(
+            runner: runner,
+            settings: settings,
+            preferences: harness.preferences,
+          );
+          await repository.watchBatches().first;
+          await repository.watchItems().first;
+          return (harness, settings, runner, controller, folder);
+        }))!;
+        addTearDown(() async {
+          controller.dispose();
+          settings.dispose();
+          await runner.shutdown();
+          runner.dispose();
+          await harness.close();
+          await folder.delete(recursive: true);
+        });
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+              ChangeNotifierProvider<MediaCreationController>.value(
+                value: controller,
+              ),
+            ],
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              locale: const Locale('en'),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                child: child!,
+              ),
+              home: Scaffold(
+                body: chat
+                    ? const ChatCreationImages(
+                        messageId: 'message',
+                        attachments: [],
+                        streaming: true,
+                      )
+                    : const CreationTimeline(topicId: 'topic', desktop: true),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final waiting = find.byWidgetPredicate(
+          (widget) => widget is CreationWaitingCard && widget.result == null,
+        );
+        expect(waiting, findsNWidgets(chat ? 1 : 2));
+        await tester.tap(waiting.first);
+        await tester.pump();
+        expect(find.bySemanticsLabel('Score 0'), findsOneWidget);
+        await tester.runAsync(() async {
+          for (var ordinal = 0; ordinal < (chat ? 1 : 2); ordinal++) {
+            await runner.repository.addItem(
+              GenerationItemRow(
+                id: 'result-$ordinal',
+                batchId: 'playing-batch',
+                ordinal: chat ? ordinal : ordinal + 2,
+                mode: MediaMode.image,
+                path: '${folder.path}/result.png',
+                mime: 'image/png',
+                byteSize: 1,
+                favorite: false,
+                status: GenerationItemStatus.ready,
+                createdAt: DateTime(2026, 4),
+              ),
+            );
+          }
+          await runner.repository.updateBatch(
+            'playing-batch',
+            const GenerationBatchRowsCompanion(
+              status: Value(GenerationStatus.succeeded),
+            ),
+          );
+          await runner.repository.watchBatches().first;
+          await runner.repository.watchItems().first;
+        });
+        await tester.pump();
+        expect(find.text('Creation ready · 0'), findsOneWidget);
+        final images = find.byType(
+          chat ? CreationFileImage : CreationArtworkTile,
+        );
+        expect(images, chat ? findsNothing : findsNWidgets(2));
+        await tester.pump(const Duration(milliseconds: 1500));
+        expect(find.text('Creation ready · 0'), findsNothing);
+        expect(images, findsNWidgets(chat ? 1 : 3));
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 
   for (final desktop in [false, true]) {
     testWidgets(

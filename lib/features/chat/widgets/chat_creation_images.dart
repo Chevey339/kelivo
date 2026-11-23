@@ -223,6 +223,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
                     ],
                   ),
                 Row(
+                  key: const ValueKey('creation-image'),
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(child: _main(slot, slots, media, ratio, desktop)),
@@ -262,86 +263,35 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     bool desktop,
   ) {
     final batch = slot.batch;
-    if (batch != null && batch.status.isActive && media != null) {
+    if (batch != null &&
+        media != null &&
+        (batch.status.isActive || slot.item != null)) {
+      final busy = batch.status.isActive;
+      final item = slot.item;
       return AspectRatio(
         aspectRatio: ratio,
-        child: ListenableBuilder(
-          listenable: media.runner,
-          builder: (_, _) => CreationWaitingCard(
-            key: ValueKey(batch.id),
-            batch: batch,
-            progress: media.runner.progressFor(batch.id)?.fraction,
-            preview: media.runner.progressFor(batch.id)?.preview,
-            queueAhead: media.runner.queueAhead(batch.id),
-            showStatusLabel: false,
-          ),
-        ),
-      );
-    }
-    if (slot.item case final item?) {
-      final l10n = AppLocalizations.of(context)!;
-      return MouseRegion(
-        onEnter: desktop ? (_) => setState(() => _hovered = true) : null,
-        onExit: desktop ? (_) => setState(() => _hovered = false) : null,
-        child: AspectRatio(
-          aspectRatio: ratio,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                IosCardPress(
-                  onTap: () => showCreationLightbox(
-                    context,
-                    item,
-                    desktop: desktop,
-                    gallery: [
-                      for (final value in slots)
-                        if (value.item case final artwork?) artwork,
-                    ],
-                  ),
-                  child: CreationFileImage(slot.attachment?.uri ?? item.path),
-                ),
-                if (_hovered && desktop)
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(8, 18, 8, 6),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.black54],
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          IosIconButton(
-                            icon: Lucide.Download,
-                            color: Colors.white,
-                            minSize: 32,
-                            tooltip: l10n.creationSaveImage,
-                            onTap: () => saveCreationArtwork(
-                              context,
-                              item,
-                              desktop: desktop,
-                            ),
-                          ),
-                          IosIconButton(
-                            icon: Lucide.Share,
-                            color: Colors.white,
-                            minSize: 32,
-                            tooltip: l10n.creationShare,
-                            onTap: () => shareCreationArtwork(context, item),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        child: AnimatedBuilder(
+          animation: busy ? media.runner : const AlwaysStoppedAnimation(0),
+          child: !busy && item != null
+              ? animateCreationResult(
+                  context,
+                  item,
+                  _finishedImage(slot, item, slots, desktop),
+                )
+              : null,
+          builder: (_, result) {
+            final progress = busy ? media.runner.progressFor(batch.id) : null;
+            return CreationWaitingCard(
+              key: ValueKey(batch.id),
+              batch: batch,
+              progress: progress?.fraction,
+              preview: progress?.preview,
+              queueAhead: busy ? media.runner.queueAhead(batch.id) : 0,
+              showStatusLabel: false,
+              gameSeed: widget.messageId,
+              result: result,
+            );
+          },
         ),
       );
     }
@@ -426,6 +376,76 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
                   ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _finishedImage(
+    _ImageSlot slot,
+    GenerationItemRow item,
+    List<_ImageSlot> slots,
+    bool desktop,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    return MouseRegion(
+      onEnter: desktop ? (_) => setState(() => _hovered = true) : null,
+      onExit: desktop ? (_) => setState(() => _hovered = false) : null,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            IosCardPress(
+              onTap: () => showCreationLightbox(
+                context,
+                item,
+                desktop: desktop,
+                gallery: [
+                  for (final value in slots)
+                    if (value.item case final artwork?) artwork,
+                ],
+              ),
+              child: CreationFileImage(slot.attachment?.uri ?? item.path),
+            ),
+            if (_hovered && desktop)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(8, 18, 8, 6),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Colors.black54],
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IosIconButton(
+                        icon: Lucide.Download,
+                        color: Colors.white,
+                        minSize: 32,
+                        tooltip: l10n.creationSaveImage,
+                        onTap: () => saveCreationArtwork(
+                          context,
+                          item,
+                          desktop: desktop,
+                        ),
+                      ),
+                      IosIconButton(
+                        icon: Lucide.Share,
+                        color: Colors.white,
+                        minSize: 32,
+                        tooltip: l10n.creationShare,
+                        onTap: () => shareCreationArtwork(context, item),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

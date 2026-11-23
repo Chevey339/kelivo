@@ -68,7 +68,23 @@ class MediaGenerationRunner extends ChangeNotifier {
   static const _uuid = Uuid();
   late final Future<void> initialized = repository.markInterrupted();
 
+  Future<void> recoverBatchDeletions() => AttachmentFileLock.synchronized(
+    () => files.recoverBatchDeletions(
+      (id) async => await repository.batch(id) != null,
+    ),
+  );
+
   MediaRunProgress? progressFor(String id) => _progress[id];
+
+  ({int first, int end, int next})? resultSlotsFor(String id) {
+    final job = _active[id] ?? _queued.where((job) => job.id == id).firstOrNull;
+    if (job == null) return null;
+    return (
+      first: job.firstOrdinal,
+      end: job.endOrdinal,
+      next: job.nextOrdinal,
+    );
+  }
 
   int queueAhead(String id) {
     final index = _queued.indexWhere((job) => job.id == id);
@@ -278,6 +294,8 @@ class MediaGenerationRunner extends ChangeNotifier {
         }
         final request = MediaRequest.fromBatch(batch);
         final caps = _validate(provider, request);
+        final existing = await repository.itemsForBatch(id);
+        final firstOrdinal = existing.isEmpty ? 0 : existing.last.ordinal + 1;
         _requireOpen();
         await repository.updateBatch(
           id,
@@ -294,6 +312,8 @@ class MediaGenerationRunner extends ChangeNotifier {
           request: request,
           capabilities: caps,
           replacementVersion: repository.replacementVersion,
+          firstOrdinal: firstOrdinal,
+          retainedCount: existing.length,
         );
         _queued.add(job);
         _drain();
@@ -341,8 +361,9 @@ class MediaGenerationRunner extends ChangeNotifier {
     try {
       final existing = await repository.itemsForBatch(job.id);
       saved = existing.length;
+      job.endOrdinal =
+          job.firstOrdinal + math.max(0, job.request.count - saved);
       await files.validateReferences(job.request.references);
-      var ordinal = existing.isEmpty ? 0 : existing.last.ordinal + 1;
       await _updateActiveBatch(
         job,
         GenerationBatchRowsCompanion(
@@ -412,7 +433,7 @@ class MediaGenerationRunner extends ChangeNotifier {
               _checkCancelled(job);
               await files.store(
                 batchId: job.id,
-                ordinal: ordinal,
+                ordinal: job.nextOrdinal,
                 mode: request.mode,
                 result: result,
                 downloadClient: raw,
@@ -423,7 +444,7 @@ class MediaGenerationRunner extends ChangeNotifier {
               );
               job.revisedPrompt ??= result.revisedPrompt;
               saved++;
-              ordinal++;
+              job.nextOrdinal++;
             } catch (_) {
               _checkCancelled(job);
               failure = const MediaFailure(
@@ -688,13 +709,18 @@ class _MediaJob {
     required this.request,
     required this.capabilities,
     required this.replacementVersion,
-  });
+    this.firstOrdinal = 0,
+    int retainedCount = 0,
+  }) : nextOrdinal = firstOrdinal,
+       endOrdinal = firstOrdinal + math.max(0, request.count - retainedCount);
 
   final String id;
   final ProviderConfig provider;
   final MediaRequest request;
   final MediaCapabilities capabilities;
   final int replacementVersion;
+  final int firstOrdinal;
+  int nextOrdinal, endOrdinal;
   final result = Completer<GenerationStatus>();
   String? revisedPrompt;
   final token = CancelToken();

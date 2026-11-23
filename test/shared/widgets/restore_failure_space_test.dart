@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/shared/widgets/restore_failure_screen.dart';
 import '../../support/recovery_snapshot_fixture.dart';
@@ -60,6 +61,7 @@ void main() {
       final database = File('${root.path}/kelivo 2.db');
       late List<int> retainedDatabase;
       late List<int> retainedSnapshot;
+      const futureSchema = AppDatabase.currentSchemaVersion + 1;
       await tester.runAsync(() async {
         await writeRecoverySnapshot(snapshot);
         final zip = ZipDecoder().decodeBytes(await snapshot.readAsBytes());
@@ -68,7 +70,7 @@ void main() {
         );
         final raw = sqlite.sqlite3.open(database.path);
         try {
-          raw.userVersion = 6;
+          raw.userVersion = futureSchema;
         } finally {
           raw.close();
         }
@@ -76,7 +78,7 @@ void main() {
         final manifest =
             jsonDecode(utf8.decode(zip.findFile('manifest.json')!.readBytes()!))
                 as Map<String, dynamic>;
-        (manifest['database'] as Map)['schemaVersion'] = 6;
+        (manifest['database'] as Map)['schemaVersion'] = futureSchema;
         (manifest['entries'] as Map)['database/kelivo.db'] = {
           'bytes': retainedDatabase.length,
           'sha256': sha256.convert(retainedDatabase).toString(),

@@ -137,7 +137,7 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
             Builder(
               builder: (anchor) => IosIconButton(
                 icon: creationTopicViewIcon(media.topicView),
-                tooltip: l10n.creationTopicDisplay,
+                tooltip: l10n.creationDisplayAndGames,
                 minSize: 40,
                 onTap: () => showCreationDisplayMenu(anchor, desktop: false),
               ),

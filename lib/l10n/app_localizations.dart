@@ -32280,12 +32280,6 @@ abstract class AppLocalizations {
   /// **'Refining the details'**
   String get creationWaitingDetails;
 
-  /// Rotating status during image generation.
-  ///
-  /// In en, this message translates to:
-  /// **'Working on colors and light'**
-  String get creationWaitingColor;
-
   /// Rotating status near the end of image generation.
   ///
   /// In en, this message translates to:
@@ -32543,6 +32537,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, one{Generated 1 image} other{Generated {count} images}} · {model} · {ratio}'**
   String creationChatResultCaption(int count, String model, String ratio);
+
+  /// Tooltip and accessibility label for the wand button in the creation composer that rewrites its prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Enhance prompt'**
+  String get creationEnhance;
+
+  /// Heading at the top of the creation composer while an enhancement request is running.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewriting prompt…'**
+  String get creationEnhanceLoading;
+
+  /// Heading at the top of the creation composer when the model has rewritten the prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewritten prompt'**
+  String get creationEnhanceResult;
+
+  /// Disclosure button in the creation composer that shows or hides the original prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get creationEnhanceOriginal;
+
+  /// Button in the prompt enhancement panel asking the same model to produce another rewrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Try another'**
+  String get creationEnhanceAgain;
+
+  /// Button that replaces the text in the creation composer with the rewritten prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get creationEnhanceApply;
+
+  /// Snackbar shown when the prompt enhancement model is missing or unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a prompt enhancement model in Default models.'**
+  String get creationEnhanceNeedsModel;
+
+  /// Description in the Creation category of Settings › Storage space.
+  ///
+  /// In en, this message translates to:
+  /// **'Images, videos, thumbnails, and reference images stored by Creation.'**
+  String get creationStorageHint;
+
+  /// Title of the date picker for bulk deletion of finished creations. The selected day is inclusive.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear creations through this date'**
+  String get creationStorageDate;
+
+  /// Destructive confirmation in Creation storage cleanup. Date is the locally formatted last day included in deletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete finished generations through {date}, including their images, videos, and reference copies? Images from these generations will also be unavailable in chat.'**
+  String creationStorageConfirm(String date);
+
+  /// Snackbar after a Creation storage cleanup. Count is the number of generation batches deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No generations to clear} one{Cleared 1 generation} other{Cleared {count} generations}}'**
+  String creationStorageRemoved(int count);
+
+  /// Action in the Creation storage category that opens a date picker to delete older generation batches.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear by date'**
+  String get creationStorageClean;
+
+  /// Tooltip and mobile sheet title for the Creation topic-list menu with appearance and waiting-game preferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Display and waiting games'**
+  String get creationDisplayAndGames;
+
+  /// Action at the bottom of the Creation topic-list menu that opens the Creation section in Preferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Change in Settings…'**
+  String get creationEditInPreferences;
+
+  /// Settings row and topic menu section label for choosing a game to play while a creation is generating.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting game'**
+  String get creationWaitGame;
+
+  /// Help for the waiting-game preference in the Creation section of Preferences.
+  ///
+  /// In en, this message translates to:
+  /// **'While an image or video is generating, tap the waiting card or press Space to play.'**
+  String get creationWaitGameHelp;
+
+  /// Waiting-game option that chooses Snake or Brick Breaker for the current generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Random'**
+  String get creationGameRandom;
+
+  /// Waiting-game option that disables starting a game from waiting cards.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get creationGameOff;
+
+  /// Name of the Snake game available on Creation waiting cards and in settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Snake'**
+  String get creationGameSnake;
+
+  /// Name of the paddle-and-ball game available on Creation waiting cards and in settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick Breaker'**
+  String get creationGameBrick;
+
+  /// Screen reader description of the controls on an active Snake game board.
+  ///
+  /// In en, this message translates to:
+  /// **'Snake. Use arrow keys, W A S D, or swipes to steer. Press Space to pause or resume and Escape to exit.'**
+  String get creationGameSnakeControls;
+
+  /// Screen reader description of the controls on an active Brick Breaker game board.
+  ///
+  /// In en, this message translates to:
+  /// **'Brick Breaker. Drag the paddle or hold Left, Right, A, or D to move. Press Space to pause or resume and Escape to exit.'**
+  String get creationGameBrickControls;
+
+  /// Accessibility label for starting a game on an image waiting card. Game is the localized game name.
+  ///
+  /// In en, this message translates to:
+  /// **'Play {game} during image generation'**
+  String creationGameDuringImage(String game);
+
+  /// Accessibility label for starting a game on a video waiting card. Game is the localized game name.
+  ///
+  /// In en, this message translates to:
+  /// **'Play {game} during video generation'**
+  String creationGameDuringVideo(String game);
+
+  /// Screen reader announcement on the waiting-game board. Score is the player’s total points.
+  ///
+  /// In en, this message translates to:
+  /// **'Score {score}'**
+  String creationGameScore(int score);
+
+  /// Overlay on a paused waiting game. Score is the player’s total points.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused · {score}'**
+  String creationGamePaused(int score);
+
+  /// Overlay before returning to the waiting card after a game ends. Score is the player’s final points.
+  ///
+  /// In en, this message translates to:
+  /// **'Game over · {score}'**
+  String creationGameEnded(int score);
+
+  /// Brief overlay when a creation finishes while its waiting game is active. Score is the player’s final points.
+  ///
+  /// In en, this message translates to:
+  /// **'Creation ready · {score}'**
+  String creationGameCompleted(int score);
 }
 
 class _AppLocalizationsDelegate

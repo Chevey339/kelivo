@@ -15,6 +15,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/logging/log_redactor.dart';
+import '../../../core/services/media/media_generation_runner.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../core/services/storage/attachment_file_lock.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
@@ -150,6 +151,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     const order = [
       StorageUsageCategoryKey.images,
       StorageUsageCategoryKey.files,
+      StorageUsageCategoryKey.creations,
       StorageUsageCategoryKey.chatData,
       StorageUsageCategoryKey.legacyChatData,
       StorageUsageCategoryKey.restoreTraces,
@@ -172,6 +174,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.Image;
       case StorageUsageCategoryKey.files:
         return Lucide.Paperclip;
+      case StorageUsageCategoryKey.creations:
+        return Lucide.Palette;
       case StorageUsageCategoryKey.chatData:
         return Lucide.MessagesSquare;
       case StorageUsageCategoryKey.legacyChatData:
@@ -205,6 +209,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryImages;
       case StorageUsageCategoryKey.files:
         return l10n.storageSpaceCategoryFiles;
+      case StorageUsageCategoryKey.creations:
+        return l10n.creationTitle;
       case StorageUsageCategoryKey.chatData:
         return l10n.storageSpaceCategoryChatData;
       case StorageUsageCategoryKey.legacyChatData:
@@ -280,42 +286,13 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
-  Future<bool> _confirmAction(
-    BuildContext context, {
-    required String title,
-    required String message,
-    required String actionLabel,
-  }) async {
-    final l10n = AppLocalizations.of(context)!;
-    final res = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.homePageCancel),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(actionLabel),
-            ),
-          ],
-        );
-      },
-    );
-    return res ?? false;
-  }
-
   Future<void> _doClearCache({required bool avatarsOnly}) async {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = avatarsOnly
         ? l10n.storageSpaceSubCacheAvatars
         : l10n.storageSpaceCategoryCache;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearConfirmMessage(targetName),
@@ -349,7 +326,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = l10n.storageSpaceSubCacheOther;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearConfirmMessage(targetName),
@@ -383,7 +360,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = l10n.storageSpaceSubCacheSystem;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearConfirmMessage(targetName),
@@ -417,7 +394,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = l10n.storageSpaceCategoryLogs;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearConfirmMessage(targetName),
@@ -451,7 +428,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = l10n.storageSpaceCategoryLegacyChatData;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearLegacyChatDataConfirmMessage,
@@ -485,7 +462,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = l10n.storageSpaceCategoryRestoreTraces;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearRestoreTracesConfirmMessage,
@@ -519,7 +496,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = l10n.storageSpaceCategoryDisplacedDatabases;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearDisplacedDatabasesConfirmMessage,
@@ -553,7 +530,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = l10n.storageSpaceCategoryFonts;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearConfirmMessage(targetName),
@@ -587,7 +564,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
     final targetName = l10n.storageSpaceCategoryLocalModels;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSpaceClearConfirmMessage(targetName),
@@ -625,7 +602,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       conversationIds: conversationIds,
     );
     if (!mounted) return;
-    final ok = await _confirmAction(
+    final ok = await _confirmStorageAction(
       context,
       title: l10n.storageSpaceClearConfirmTitle,
       message: l10n.storageSessionFilesCleanOrphansHint(
@@ -1033,29 +1010,12 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     required String title,
     required String message,
     required String actionLabel,
-  }) async {
-    final l10n = AppLocalizations.of(context)!;
-    final res = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.homePageCancel),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(actionLabel),
-            ),
-          ],
-        );
-      },
-    );
-    return res ?? false;
-  }
+  }) => _confirmStorageAction(
+    context,
+    title: title,
+    message: message,
+    actionLabel: actionLabel,
+  );
 
   Future<void> _clearCache({required bool avatarsOnly}) async {
     if (_clearing) return;
@@ -1677,6 +1637,109 @@ class _CategoryMenu extends StatelessWidget {
   }
 }
 
+Future<bool> _confirmStorageAction(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String actionLabel,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  final res = await showDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.homePageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(actionLabel),
+          ),
+        ],
+      );
+    },
+  );
+  return res ?? false;
+}
+
+class _CreationStorageCleanup extends StatefulWidget {
+  const _CreationStorageCleanup({required this.refresh});
+  final Future<void> Function() refresh;
+
+  @override
+  State<_CreationStorageCleanup> createState() =>
+      _CreationStorageCleanupState();
+}
+
+class _CreationStorageCleanupState extends State<_CreationStorageCleanup> {
+  bool _running = false;
+
+  Future<void> _choose(MediaGenerationRunner runner) async {
+    if (_running) return;
+    final l10n = AppLocalizations.of(context)!;
+    final now = DateTime.now();
+    setState(() => _running = true);
+    try {
+      final date = await showDatePicker(
+        context: context,
+        firstDate: DateTime(2000),
+        lastDate: now,
+        initialDate: now.subtract(const Duration(days: 30)),
+        helpText: l10n.creationStorageDate,
+      );
+      if (date == null || !mounted) return;
+      final label = MaterialLocalizations.of(context).formatFullDate(date);
+      final confirmed = await _confirmStorageAction(
+        context,
+        title: l10n.storageSpaceClearConfirmTitle,
+        message: l10n.creationStorageConfirm(label),
+        actionLabel: l10n.storageSpaceClearButton,
+      );
+      if (!confirmed || !mounted) return;
+      final nextDay = DateTime(date.year, date.month, date.day + 1);
+      final removed = await StorageUsageService.clearCreationBatches(
+        runner,
+        cutoff: nextDay.isBefore(now) ? nextDay : now,
+      );
+      if (!mounted) return;
+      await widget.refresh();
+      if (!mounted) return;
+      showAppSnackBar(context, message: l10n.creationStorageRemoved(removed));
+    } catch (_) {
+      if (mounted) {
+        await widget.refresh();
+      }
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.creationActionFailed,
+          type: NotificationType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final runner = context.read<MediaGenerationRunner?>();
+    return IosTileButton(
+      label: AppLocalizations.of(context)!.creationStorageClean,
+      icon: Lucide.Trash2,
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      enabled: !_running && runner != null,
+      onTap: () {
+        if (runner != null) _choose(runner);
+      },
+    );
+  }
+}
+
 class _CategoryDetail extends StatelessWidget {
   const _CategoryDetail({
     required this.uploads,
@@ -1733,6 +1796,7 @@ class _CategoryDetail extends StatelessWidget {
       StorageUsageCategoryKey.restoreTraces =>
         l10n.storageSpaceRestoreTracesHint,
       StorageUsageCategoryKey.other => l10n.storageSpaceOtherHint,
+      StorageUsageCategoryKey.creations => l10n.creationStorageHint,
       StorageUsageCategoryKey.workspaceFiles =>
         l10n.storageSpaceCategoryWorkspaceFilesHint,
       StorageUsageCategoryKey.sandboxEnvironment =>
@@ -1754,7 +1818,9 @@ class _CategoryDetail extends StatelessWidget {
     }
 
     Widget? actions;
-    if (category.key == StorageUsageCategoryKey.cache) {
+    if (category.key == StorageUsageCategoryKey.creations) {
+      actions = _CreationStorageCleanup(refresh: refreshReport);
+    } else if (category.key == StorageUsageCategoryKey.cache) {
       actions = Wrap(
         spacing: 10,
         runSpacing: 10,

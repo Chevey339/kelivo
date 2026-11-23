@@ -14,6 +14,7 @@ class DesktopContextMenuItem {
   final String? svgAsset;
   final String label;
   final String? subtitle;
+  final String? groupLabel;
   final VoidCallback? onTap;
   final bool danger;
   final bool checked;
@@ -24,6 +25,7 @@ class DesktopContextMenuItem {
     this.svgAsset,
     required this.label,
     this.subtitle,
+    this.groupLabel,
     this.onTap,
     this.danger = false,
     this.checked = false,
@@ -81,7 +83,8 @@ Future<void> showDesktopContextMenuAt(
                   subtitle: item.subtitle,
                   compact: compact,
                 ) +
-                (item.startsGroup ? 9 : 0),
+                (item.startsGroup ? 9 : 0) +
+                (item.groupLabel == null ? 0 : 26),
           )
           .clamp(44.0, menuMaxHeight);
       const double gap = 8; // offset from cursor
@@ -157,6 +160,28 @@ Future<void> showDesktopContextMenuAt(
                                             thickness: 0.5,
                                             color: cs.outlineVariant.withValues(
                                               alpha: 0.3,
+                                            ),
+                                          ),
+                                        ),
+                                      if (it.groupLabel case final label?)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            12,
+                                            6,
+                                            12,
+                                            4,
+                                          ),
+                                          child: Align(
+                                            alignment: AlignmentDirectional
+                                                .centerStart,
+                                            child: Text(
+                                              label,
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight:
+                                                    AppFontWeights.semibold,
+                                                color: cs.onSurfaceVariant,
+                                              ),
                                             ),
                                           ),
                                         ),

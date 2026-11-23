@@ -167,6 +167,22 @@ class MediaCreationController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  CreationWaitGame get waitGame {
+    final key = preferences.getString(BusinessKeyRegistry.creationWaitGameKey);
+    return CreationWaitGame.values
+            .where((value) => value.name == key)
+            .firstOrNull ??
+        CreationWaitGame.random;
+  }
+
+  Future<void> setWaitGame(CreationWaitGame game) async {
+    await preferences.setString(
+      BusinessKeyRegistry.creationWaitGameKey,
+      game.name,
+    );
+    if (!_disposed) notifyListeners();
+  }
+
   String? lastSubmission(String? topicId) => _lastSubmissionByTopic[topicId];
 
   void _submitted(String id, MediaGenerationTicket ticket) {
@@ -518,6 +534,15 @@ class MediaCreationController extends ChangeNotifier {
 
   void updatePrompt(String? topicId, String value) {
     _drafts[topicId] = draftFor(topicId).copyWith(prompt: value);
+  }
+
+  List<String> enhancementReferencePaths(String? topicId) {
+    final caps = model?.capabilities;
+    if (caps == null) return const [];
+    return {
+      for (final reference in _effectiveReferences(topicId, caps))
+        reference.path,
+    }.toList();
   }
 
   void setReferences(String? topicId, List<MediaReference> references) {

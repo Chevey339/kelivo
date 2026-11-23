@@ -1,17 +1,22 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/models/media_creation.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/media/creation_prompt_enhancer.dart';
 import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
 import '../../../desktop/desktop_glass_popover.dart';
+import '../../../desktop/desktop_settings_navigation_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
@@ -22,10 +27,25 @@ import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/design_tokens.dart';
 import '../../provider/widgets/provider_avatar.dart';
+import '../../model/pages/default_model_page.dart';
+import '../../settings/widgets/settings_search_target.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_advanced_options.dart';
+import 'creation_enhancement_panel.dart';
 import 'creation_lightbox.dart';
 import 'creation_reference_picker.dart';
+
+typedef _Enhancement = ({
+  String requestId,
+  String original,
+  MediaMode mode,
+  String? modelKey,
+  String template,
+  List<String>? references,
+  String modelName,
+  List<CreationPromptSpan>? spans,
+  String? rewrite,
+});
 
 class CreationComposer extends StatefulWidget {
   const CreationComposer({
@@ -46,6 +66,7 @@ class CreationComposer extends StatefulWidget {
 class _CreationComposerState extends State<CreationComposer> {
   late final TextEditingController _prompt;
   final _focus = FocusNode();
+  _Enhancement? _enhancement;
 
   MediaCreationController get _controller =>
       context.read<MediaCreationController>();
@@ -62,12 +83,14 @@ class _CreationComposerState extends State<CreationComposer> {
   void didUpdateWidget(covariant CreationComposer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.topicId != widget.topicId) {
+      _discardEnhancement();
       _prompt.text = _controller.draftFor(widget.topicId).prompt;
     }
   }
 
   @override
   void dispose() {
+    _discardEnhancement();
     _prompt.dispose();
     _focus.dispose();
     super.dispose();
@@ -78,6 +101,7 @@ class _CreationComposerState extends State<CreationComposer> {
     try {
       final id = await _controller.submit(origin);
       if (!mounted || id == null || widget.topicId != origin) return;
+      _dismissEnhancement();
       _prompt.text = _controller.draftFor(origin).prompt;
       if (!widget.desktop) _focus.unfocus();
       widget.onSent(id);
@@ -149,6 +173,7 @@ class _CreationComposerState extends State<CreationComposer> {
           expected: result.paths.length,
         );
       } else if (result.text case final text?) {
+        _dismissEnhancement();
         final value = _prompt.value;
         final selection = value.selection;
         final start = selection.isValid ? selection.start : value.text.length;
@@ -172,6 +197,135 @@ class _CreationComposerState extends State<CreationComposer> {
             : l10n.creationActionFailed,
       );
     }
+  }
+
+  void _discardEnhancement() {
+    if (_enhancement case final pending?) {
+      ChatApiService.cancelRequest(pending.requestId);
+      _enhancement = null;
+    }
+  }
+
+  void _dismissEnhancement() {
+    if (_enhancement != null) setState(_discardEnhancement);
+  }
+
+  bool _matchesEnhancement(_Enhancement value, MediaCreationController media) =>
+      value.mode == media.mode &&
+      value.original == media.draftFor(widget.topicId).prompt &&
+      value.modelKey ==
+          media.settings.creationModelKey(CreationModelSlot.promptEnhance) &&
+      value.template == media.settings.promptEnhancePrompt &&
+      (value.references == null ||
+          listEquals(
+            value.references,
+            media.enhancementReferencePaths(widget.topicId),
+          ));
+
+  Future<void> _enhance({bool again = false}) async {
+    final media = _controller;
+    final l10n = AppLocalizations.of(context)!;
+    final original = media.draftFor(widget.topicId).prompt;
+    if (original.trim().isEmpty) return;
+    final selected = resolvePromptEnhancementModel(media.settings);
+    if (selected == null) {
+      showAppSnackBar(
+        context,
+        message: l10n.creationEnhanceNeedsModel,
+        actionLabel: l10n.creationDefaultEnhance,
+        onAction: () {
+          if (!mounted) return;
+          if (widget.desktop) {
+            DesktopSettingsNavigationBus.instance.openDefaultModel();
+          } else {
+            Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => SettingsSearchTarget(
+                  label: l10n.creationDefaultEnhance,
+                  child: const DefaultModelPage(),
+                ),
+              ),
+            );
+          }
+        },
+      );
+      return;
+    }
+    if (!widget.desktop) _focus.unfocus();
+    final _Enhancement request = (
+      requestId: const Uuid().v4(),
+      original: original,
+      mode: media.mode,
+      modelKey: media.settings.creationModelKey(
+        CreationModelSlot.promptEnhance,
+      ),
+      template: media.settings.promptEnhancePrompt,
+      references: selected.spec.supportsImageInput
+          ? media.enhancementReferencePaths(widget.topicId)
+          : null,
+      modelName: selected.spec.displayName,
+      spans: null,
+      rewrite: null,
+    );
+    setState(() {
+      _discardEnhancement();
+      _enhancement = request;
+    });
+    bool current() =>
+        mounted &&
+        _enhancement?.requestId == request.requestId &&
+        _matchesEnhancement(request, media);
+    try {
+      final rewrite = await CreationPromptEnhancer.rewrite(
+        provider: selected.provider,
+        model: selected.spec,
+        original: request.original,
+        template: request.template,
+        references: request.references ?? const [],
+        requestId: request.requestId,
+        again: again,
+      );
+      if (!current()) return;
+      if (rewrite.isEmpty) throw StateError('Empty rewritten prompt');
+      final spans = await CreationPromptEnhancer.diff(
+        request.original,
+        rewrite,
+      );
+      if (!current()) return;
+      setState(
+        () => _enhancement = (
+          requestId: request.requestId,
+          original: request.original,
+          mode: request.mode,
+          modelKey: request.modelKey,
+          template: request.template,
+          references: request.references,
+          modelName: request.modelName,
+          spans: spans,
+          rewrite: rewrite,
+        ),
+      );
+    } catch (_) {
+      if (!mounted || !current()) return;
+      _dismissEnhancement();
+      showAppSnackBar(context, message: l10n.creationActionFailed);
+    }
+  }
+
+  void _applyEnhancement() {
+    final result = _enhancement;
+    final rewrite = result?.rewrite;
+    if (result == null ||
+        rewrite == null ||
+        !_matchesEnhancement(result, _controller)) {
+      return;
+    }
+    _controller.updatePrompt(widget.topicId, rewrite);
+    _prompt.value = TextEditingValue(
+      text: rewrite,
+      selection: TextSelection.collapsed(offset: rewrite.length),
+    );
+    _dismissEnhancement();
   }
 
   KeyEventResult _handleDesktopKey(FocusNode node, KeyEvent event) {
@@ -202,6 +356,7 @@ class _CreationComposerState extends State<CreationComposer> {
       final start = selection.isValid ? selection.start : value.text.length;
       final end = selection.isValid ? selection.end : value.text.length;
       final text = value.text.replaceRange(start, end, '\n');
+      _dismissEnhancement();
       _prompt.value = TextEditingValue(
         text: text,
         selection: TextSelection.collapsed(offset: start + 1),
@@ -243,6 +398,11 @@ class _CreationComposerState extends State<CreationComposer> {
             (MediaMode.video, true) => l10n.creationNewVideoPrompt,
             (MediaMode.video, false) => l10n.creationVideoPrompt,
           };
+    if (_enhancement case final value?
+        when !_matchesEnhancement(value, state)) {
+      _discardEnhancement();
+    }
+    final enhancement = _enhancement;
     final limit = model?.capabilities.maxReferences ?? 0;
     final radius = BorderRadius.circular(
       widget.desktop ? AppRadii.capsule : 26,
@@ -278,6 +438,16 @@ class _CreationComposerState extends State<CreationComposer> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (enhancement != null)
+                        CreationEnhancementPanel(
+                          key: ValueKey(enhancement.requestId),
+                          original: enhancement.original,
+                          modelName: enhancement.modelName,
+                          spans: enhancement.spans,
+                          onClose: _dismissEnhancement,
+                          onAgain: () => _enhance(again: true),
+                          onApply: _applyEnhancement,
+                        ),
                       if (!video && references.isNotEmpty)
                         _ReferenceStrip(
                           references: references,
@@ -337,9 +507,23 @@ class _CreationComposerState extends State<CreationComposer> {
                                   ),
                                   textCapitalization:
                                       TextCapitalization.sentences,
-                                  onChanged: (value) =>
-                                      state.updatePrompt(widget.topicId, value),
+                                  onChanged: (value) {
+                                    _dismissEnhancement();
+                                    state.updatePrompt(widget.topicId, value);
+                                  },
                                 ),
+                              ),
+                            ),
+                            ValueListenableBuilder(
+                              valueListenable: _prompt,
+                              builder: (context, value, _) => IosIconButton(
+                                icon: Lucide.WandSparkles,
+                                tooltip: l10n.creationEnhance,
+                                minSize: 34,
+                                enabled:
+                                    model != null &&
+                                    value.text.trim().isNotEmpty,
+                                onTap: () => _enhance(),
                               ),
                             ),
                             ValueListenableBuilder(

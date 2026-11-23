@@ -115,6 +115,7 @@ import 'dart:io'
     show
         Directory,
         File,
+        FileSystemException,
         Platform,
         stderr; // kept for global override usage inside provider
 import 'core/services/mobile_background.dart';
@@ -529,6 +530,11 @@ Future<void> main(List<String> arguments) async {
           files: const MediaFileStore(),
         );
         await mediaRunner.initialized;
+        try {
+          await mediaRunner.recoverBatchDeletions();
+        } on FileSystemException catch (error) {
+          stderr.writeln('[CreationCleanup] ${error.message}');
+        }
         _installExitFlush(businessPreferences, chatService, mediaRunner);
         ScheduledTasksService.configureDevice(businessPreferences);
         // Best-effort trim of archived restore runs after a few cold starts.

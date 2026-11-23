@@ -34,6 +34,7 @@ MediaContext _context(
     enabled: true,
     models: const [_model],
     oauthProvider: oauth,
+    promptCacheKeyEnabled: true,
   ),
   client: client,
   apiKey: 'fixture',
@@ -50,6 +51,7 @@ void main() {
       expect(body['size'], '1536x1024');
       expect(body['stream'], true);
       expect(body['partial_images'], 2);
+      expect(body.containsKey('prompt_cache_key'), isFalse);
       return http.Response(
         'data: {"type":"image_generation.partial_image","b64_json":"cHJldmlldw=="}\n\n'
         'data: {"type":"image_generation.completed","b64_json":"ZmluYWw="}\n\n',

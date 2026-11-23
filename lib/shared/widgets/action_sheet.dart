@@ -20,6 +20,9 @@ class ActionSheetItem {
     required this.onTap,
     this.destructive = false,
     this.checked = false,
+    this.startsGroup = false,
+    this.groupLabel,
+    this.subtitle,
     this.key,
   });
 
@@ -28,6 +31,9 @@ class ActionSheetItem {
   final VoidCallback onTap;
   final bool destructive;
   final bool checked;
+  final bool startsGroup;
+  final String? groupLabel;
+  final String? subtitle;
   final Key? key;
 }
 
@@ -76,8 +82,11 @@ Future<void> showAdaptiveActionMenu(
           DesktopContextMenuItem(
             icon: item.icon,
             label: item.label,
+            subtitle: item.subtitle,
+            groupLabel: item.groupLabel,
             danger: item.destructive,
             checked: item.checked,
+            startsGroup: item.startsGroup,
             onTap: item.onTap,
           ),
       ],
@@ -134,7 +143,25 @@ class _MobileActionSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                     ],
-                    for (final item in items) _ActionTile(item: item),
+                    for (final item in items) ...[
+                      if (item.startsGroup) const Divider(height: 12),
+                      if (item.groupLabel case final label?)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                color: cs.onSurfaceVariant,
+                                fontSize: 12,
+                                fontWeight: AppFontWeights.semibold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      _ActionTile(item: item),
+                    ],
                   ],
                 ),
               ),
@@ -157,8 +184,8 @@ class _ActionTile extends StatelessWidget {
     final fg = item.destructive ? cs.error : cs.onSurface;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: SizedBox(
-        height: 48,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
         child: IosCardPress(
           key: item.key,
           borderRadius: BorderRadius.circular(14),
@@ -170,19 +197,36 @@ class _ActionTile extends StatelessWidget {
             Navigator.of(context).pop();
             action();
           },
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: item.subtitle == null ? 0 : 8,
+          ),
           child: Row(
             children: [
               Icon(item.icon, size: 20, color: fg),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  item.label,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: AppFontWeights.medium,
-                    color: fg,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.medium,
+                        color: fg,
+                      ),
+                    ),
+                    if (item.subtitle case final subtitle?)
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               if (item.checked) Icon(Lucide.Check, size: 18, color: cs.primary),

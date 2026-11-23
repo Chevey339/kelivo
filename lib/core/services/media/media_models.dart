@@ -54,3 +54,19 @@ MediaModelChoice? resolveDefaultImageModel(SettingsProvider settings) {
   if (provider == null) return null;
   return resolveMediaModel(provider, selection.modelId, MediaMode.image);
 }
+
+({ProviderConfig provider, ModelSpec spec})? resolvePromptEnhancementModel(
+  SettingsProvider settings,
+) {
+  final selected = settings.creationModel(CreationModelSlot.promptEnhance);
+  if (selected == null) return null;
+  final provider = settings.providerConfigs[selected.providerKey];
+  if (provider == null ||
+      !provider.enabled ||
+      !provider.enabledModels.contains(selected.modelId) ||
+      provider.isOAuth && provider.oauthCredentials?.requiresLogin != false) {
+    return null;
+  }
+  final spec = ModelSpecResolver.instance.spec(provider, selected.modelId);
+  return spec.type == ModelType.chat ? (provider: provider, spec: spec) : null;
+}

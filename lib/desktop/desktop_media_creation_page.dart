@@ -357,7 +357,7 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
                       icon: creationTopicViewIcon(media.topicView),
                       size: 16,
                       minSize: 28,
-                      tooltip: l10n.creationTopicDisplay,
+                      tooltip: l10n.creationDisplayAndGames,
                       onTap: () =>
                           showCreationDisplayMenu(anchor, desktop: true),
                     ),

@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/database/private_data_storage.dart';
 import 'package:Kelivo/core/services/storage/device_storage_probe.dart';
@@ -90,7 +91,7 @@ void main() {
         mode: sqlite.OpenMode.readOnly,
       );
       try {
-        expect(db.userVersion, 5);
+        expect(db.userVersion, AppDatabase.currentSchemaVersion);
         expect(
           db.select('SELECT id FROM conversation_rows').single['id'],
           'retained',

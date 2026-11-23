@@ -3867,7 +3867,7 @@ void main() {
           : false,
     );
 
-    test('empty versioned asset roots clear old files on startup', () async {
+    test('legacy empty roots preserve creations', () async {
       for (final rootName in RestorePreviousAssetsPlan.rootNames) {
         final directory = Directory('${root.path}/$rootName');
         await directory.create(recursive: true);
@@ -3899,7 +3899,15 @@ void main() {
       for (final rootName in RestorePreviousAssetsPlan.rootNames) {
         final directory = Directory('${root.path}/$rootName');
         expect(await directory.exists(), isTrue, reason: rootName);
-        expect(await directory.list().toList(), isEmpty, reason: rootName);
+        if (rootName == 'generations') {
+          expect(await File('${directory.path}/old.bin').readAsBytes(), [
+            1,
+            2,
+            3,
+          ]);
+        } else {
+          expect(await directory.list().toList(), isEmpty, reason: rootName);
+        }
       }
     });
 

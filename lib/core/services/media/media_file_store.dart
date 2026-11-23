@@ -382,6 +382,65 @@ class MediaFileStore {
     if (await batch.exists()) await batch.delete(recursive: true);
   }
 
+  static const _pendingDeletions = '.pending-deletions';
+
+  Future<Directory?> _deletionDirectory(
+    Directory root, {
+    bool create = false,
+  }) async {
+    final pending = Directory(p.join(root.path, _pendingDeletions));
+    switch (await FileSystemEntity.type(pending.path, followLinks: false)) {
+      case FileSystemEntityType.directory:
+        return pending;
+      case FileSystemEntityType.notFound:
+        return create ? pending.create() : null;
+      default:
+        throw FileSystemException(
+          'Invalid creation cleanup directory',
+          pending.path,
+        );
+    }
+  }
+
+  /// Keep the files recoverable until the database transaction commits.
+  /// The caller holds the attachment lock across both resources.
+  Future<void> deleteBatchAndRecord(
+    String id,
+    Future<void> Function() deleteRecord,
+  ) async {
+    final batch = await _batchDirectory(id);
+    if (!await batch.exists()) {
+      await deleteRecord();
+      return;
+    }
+    final pending = (await _deletionDirectory(batch.parent, create: true))!;
+    final staged = await batch.rename(p.join(pending.path, id));
+    try {
+      await deleteRecord();
+    } catch (_) {
+      await staged.rename(batch.path);
+      rethrow;
+    }
+    await staged.delete(recursive: true);
+  }
+
+  Future<void> recoverBatchDeletions(
+    Future<bool> Function(String id) hasRecord,
+  ) async {
+    final root = await directory();
+    final pending = await _deletionDirectory(root);
+    if (pending == null) return;
+    await for (final staged in pending.list(followLinks: false)) {
+      final id = p.basename(staged.path);
+      if (staged is! Directory || !_safeId.hasMatch(id)) continue;
+      if (await hasRecord(id)) {
+        await staged.rename(p.join(root.path, id));
+      } else {
+        await staged.delete(recursive: true);
+      }
+    }
+  }
+
   Future<void> deleteItem(GenerationItemRow item) async {
     final root = (await directory()).parent.path;
     for (final raw in [item.path, ?item.thumbnailPath]) {
