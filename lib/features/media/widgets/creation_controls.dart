@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
@@ -72,6 +74,32 @@ class CreationDockInset extends InheritedWidget {
   @override
   bool updateShouldNotify(CreationDockInset oldWidget) =>
       height != oldWidget.height;
+}
+
+/// Draw the filter against the scene, before fading in the tinted surface
+/// and its foreground. An opacity layer around the filter would isolate it
+/// from the artwork until the transition finished.
+class CreationGlassReveal extends StatelessWidget {
+  const CreationGlassReveal({
+    super.key,
+    required this.progress,
+    required this.sigma,
+    required this.child,
+  });
+
+  final double progress, sigma;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = sigma * progress;
+    final filter = ImageFilter.blur(sigmaX: radius, sigmaY: radius);
+    return BackdropFilter(
+      enabled: progress > 0,
+      filter: filter,
+      child: Opacity(opacity: progress, child: child),
+    );
+  }
 }
 
 /// Fades controls without changing the measured size of their row or tile.

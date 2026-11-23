@@ -906,6 +906,28 @@ void main() {
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await mouse.addPointer(location: outside);
       await tester.pump();
+      final glass = find.descendant(
+        of: find.byType(ChatCreationImages),
+        matching: find.byType(BackdropFilter),
+      );
+      expect(
+        tester.widgetList<BackdropFilter>(glass).where((w) => w.enabled),
+        isEmpty,
+      );
+      await mouse.moveTo(inside);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      final buttons = tester
+          .widgetList<BackdropFilter>(glass)
+          .where((w) => w.enabled)
+          .toList();
+      expect(buttons, hasLength(1));
+      await mouse.moveTo(outside);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widgetList<BackdropFilter>(glass).where((w) => w.enabled),
+        isEmpty,
+      );
       for (var i = 0; i < 6; i++) {
         await mouse.moveTo(inside);
         await tester.pump();
@@ -914,6 +936,13 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 10));
       }
+      final underGradient = tester.getBottomLeft(image) + const Offset(20, -15);
+      await mouse.moveTo(underGradient);
+      await tester.pumpAndSettle();
+      await mouse.down(underGradient);
+      await mouse.up();
+      await tester.pumpAndSettle();
+      expect(find.byType(InteractiveViewer), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       await mouse.removePointer();
       await tester.pumpAndSettle();

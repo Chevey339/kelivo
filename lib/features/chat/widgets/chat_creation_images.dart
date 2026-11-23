@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -457,24 +456,6 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     List<_ImageSlot> slots,
     bool desktop,
   ) {
-    final l10n = AppLocalizations.of(context)!;
-    Widget glass(IconData icon, String label, VoidCallback tap) => ClipOval(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: ColoredBox(
-          color: Colors.white.withValues(alpha: .16),
-          child: IosIconButton(
-            icon: icon,
-            size: 15,
-            minSize: 30,
-            padding: EdgeInsets.zero,
-            color: Colors.white,
-            tooltip: label,
-            onTap: tap,
-          ),
-        ),
-      ),
-    );
     return Focus(
       canRequestFocus: false,
       skipTraversal: true,
@@ -505,52 +486,11 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
               if (desktop)
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: CreationHoverActions(
+                  child: _ChatImageActions(
                     visible: _hovered || _imageFocused,
-                    child: Stack(
-                      alignment: AlignmentDirectional.bottomEnd,
-                      children: [
-                        const Positioned.fill(
-                          child: IgnorePointer(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Color(0x52000000),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 24, 10, 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              glass(
-                                Lucide.Download,
-                                l10n.creationSaveImage,
-                                () => saveCreationArtwork(
-                                  context,
-                                  item,
-                                  desktop: true,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              glass(
-                                Lucide.Share,
-                                l10n.creationShare,
-                                () => shareCreationArtwork(context, item),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    onSave: () =>
+                        saveCreationArtwork(context, item, desktop: true),
+                    onShare: () => shareCreationArtwork(context, item),
                   ),
                 ),
             ],
@@ -699,4 +639,108 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
       ),
     );
   }
+}
+
+class _ChatImageActions extends StatelessWidget {
+  const _ChatImageActions({
+    required this.visible,
+    required this.onSave,
+    required this.onShare,
+  });
+
+  final bool visible;
+  final VoidCallback onSave, onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    Widget button(IconData icon, String label, VoidCallback tap) => ColoredBox(
+      color: Colors.white.withValues(alpha: .16),
+      child: IosIconButton(
+        icon: icon,
+        size: 15,
+        minSize: 30,
+        padding: EdgeInsets.zero,
+        color: Colors.white,
+        tooltip: label,
+        onTap: tap,
+      ),
+    );
+    final buttons = Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 6,
+      children: [
+        button(Lucide.Download, l10n.creationSaveImage, onSave),
+        button(Lucide.Share, l10n.creationShare, onShare),
+      ],
+    );
+    return ExcludeFocus(
+      excluding: !visible,
+      child: ExcludeSemantics(
+        excluding: !visible,
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: visible ? 1 : 0),
+            duration: handoffDuration(context, 160),
+            curve: Curves.easeInOut,
+            child: buttons,
+            builder: (_, t, controls) => Stack(
+              alignment: AlignmentDirectional.bottomEnd,
+              children: [
+                if (t > 0)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: .32 * t),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 24, 10, 8),
+                  child: Align(
+                    heightFactor: 1,
+                    alignment: AlignmentDirectional.bottomEnd,
+                    child: ClipPath(
+                      clipper: const _ActionButtonCircles(),
+                      child: CreationGlassReveal(
+                        progress: t,
+                        sigma: 8,
+                        child: controls!,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The two circular buttons share one small blur pass. Their gap and the
+/// corners of the bounding box remain part of the tappable artwork.
+class _ActionButtonCircles extends CustomClipper<Path> {
+  const _ActionButtonCircles();
+  @override
+  Path getClip(Size size) {
+    final circle = Rect.fromLTWH(0, 0, size.height, size.height);
+    return Path()
+      ..addOval(circle)
+      ..addOval(circle.shift(Offset(size.width - size.height, 0)));
+  }
+
+  @override
+  bool shouldReclip(_ActionButtonCircles oldClipper) => false;
 }

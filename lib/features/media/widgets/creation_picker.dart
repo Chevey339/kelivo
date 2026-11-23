@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
+import 'creation_controls.dart';
 
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
@@ -152,52 +152,49 @@ Future<T?> showCreationPicker<T>(
         return themes.wrap(
           CustomSingleChildLayout(
             delegate: _PickerPosition(rect, width, Directionality.of(context)),
-            child: FadeTransition(
-              opacity: curve,
-              child: ScaleTransition(
-                scale: Tween(begin: .98, end: 1.0).animate(curve),
-                alignment: Alignment.bottomCenter,
-                child: AnimatedBuilder(
-                  animation: curve,
-                  builder: (_, child) => Transform.translate(
-                    offset: Offset(0, (1 - curve.value) * 6),
-                    child: child,
+            child: AnimatedBuilder(
+              animation: curve,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: context.appColors.surfaceCard.withValues(alpha: .78),
+                  borderRadius: radius,
+                  border: Border.all(
+                    color: cs.onSurface.withValues(alpha: dark ? .08 : .12),
+                    width: .7,
                   ),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: radius,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: .16),
-                          blurRadius: 48,
-                          offset: const Offset(0, 18),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: radius,
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: context.appColors.surfaceCard.withValues(
-                              alpha: .78,
-                            ),
-                            borderRadius: radius,
-                            border: Border.all(
-                              color: cs.onSurface.withValues(
-                                alpha: dark ? .08 : .12,
-                              ),
-                              width: .7,
-                            ),
+                ),
+                child: body,
+              ),
+              builder: (_, child) {
+                final t = curve.value;
+                return Transform.translate(
+                  offset: Offset(0, (1 - t) * 6),
+                  child: Transform.scale(
+                    scale: .98 + .02 * t,
+                    alignment: Alignment.bottomCenter,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: radius,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: .16 * t),
+                            blurRadius: 48,
+                            offset: const Offset(0, 18),
                           ),
-                          child: body,
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: radius,
+                        child: CreationGlassReveal(
+                          progress: t,
+                          sigma: 20,
+                          child: child!,
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         );

@@ -81,8 +81,17 @@ Future<void> showCreationLightbox(
             startEditing: startEditing,
             fromChat: fromChat,
           ),
-          transitionsBuilder: (_, animation, _, child) =>
-              FadeTransition(opacity: animation, child: child),
+          transitionsBuilder: (_, animation, _, child) => desktop
+              ? AnimatedBuilder(
+                  animation: animation,
+                  child: child,
+                  builder: (_, content) => CreationGlassReveal(
+                    progress: animation.value,
+                    sigma: 18,
+                    child: content!,
+                  ),
+                )
+              : FadeTransition(opacity: animation, child: child),
         ),
       );
   if (destination != null && context.mounted) {
@@ -481,12 +490,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                   ),
             child: AnnotatedRegion<SystemUiOverlayStyle>(
               value: SystemUiOverlayStyle.light,
-              child: desktop
-                  ? BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                      child: body,
-                    )
-                  : body,
+              child: body,
             ),
           ),
         ),
