@@ -1,5 +1,3 @@
-import '../features/media/providers/media_creation_controller.dart';
-import '../features/media/widgets/creation_preferences.dart';
 import '../features/provider/widgets/request_budget_settings.dart';
 import '../features/home/widgets/model_icon.dart';
 import '../core/models/avatar_config.dart';
@@ -162,7 +160,6 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   SettingsSearchItem? _searchTarget;
   int _searchNavigation = 0;
   bool _showTopicPosition = false;
-  bool _showCreationPreferences = false;
   bool _selectFal = false;
   bool _showDetail = false;
 
@@ -233,8 +230,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       setState(() {
         _showDetail = true;
         _selected = switch (target) {
-          DesktopSettingsNavigationTarget.topicPosition ||
-          DesktopSettingsNavigationTarget.creationPreferences =>
+          DesktopSettingsNavigationTarget.topicPosition =>
             _SettingsMenuItem.display,
           DesktopSettingsNavigationTarget.backup => _SettingsMenuItem.backup,
           DesktopSettingsNavigationTarget.mcp => _SettingsMenuItem.mcp,
@@ -245,8 +241,6 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
         };
         _showTopicPosition =
             target == DesktopSettingsNavigationTarget.topicPosition;
-        _showCreationPreferences =
-            target == DesktopSettingsNavigationTarget.creationPreferences;
         _selectFal = target == DesktopSettingsNavigationTarget.fal;
         _searchNavigation++;
       });
@@ -317,8 +311,6 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                         label:
                             (_showTopicPosition
                                 ? l10n.desktopDisplaySettingsTopicPositionTitle
-                                : _showCreationPreferences
-                                ? l10n.creationTopicDisplay
                                 : _searchTarget?.targetLabel) ??
                             switch (_searchTarget?.destination) {
                               SettingsSearchDestination.messageStyle =>

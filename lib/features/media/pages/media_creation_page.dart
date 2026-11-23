@@ -19,7 +19,7 @@ import '../providers/media_creation_controller.dart';
 import '../widgets/creation_composer.dart';
 import '../widgets/creation_controls.dart';
 import '../widgets/creation_gallery.dart';
-import '../widgets/creation_preferences.dart';
+import '../widgets/creation_display_menu.dart';
 import '../widgets/creation_reference_picker.dart';
 import '../widgets/creation_timeline.dart';
 import '../widgets/creation_topic_card.dart';
@@ -201,16 +201,6 @@ class _MobileTopics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      if (query.trim().isEmpty) return const CreationEmptyState();
-      return Align(
-        alignment: Alignment.topCenter,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(AppLocalizations.of(context)!.creationNoMatchingTopics),
-        ),
-      );
-    }
     final l10n = AppLocalizations.of(context)!;
     final covers = display == CreationTopicView.covers;
     final list = display == CreationTopicView.list;
@@ -255,30 +245,44 @@ class _MobileTopics extends StatelessWidget {
             ),
           ),
         ),
-        if (showFirst)
+        if (items.isEmpty)
+          SliverFillRemaining(
+            child: query.trim().isEmpty
+                ? const CreationEmptyState()
+                : Align(
+                    alignment: Alignment.topCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(l10n.creationNoMatchingTopics),
+                    ),
+                  ),
+          ),
+        if (items.isNotEmpty) ...[
+          if (showFirst)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              sliver: SliverToBoxAdapter(child: card(items.first, wide: true)),
+            ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            sliver: SliverToBoxAdapter(child: card(items.first, wide: true)),
+            padding: EdgeInsets.fromLTRB(
+              covers ? 6 : 16,
+              0,
+              covers ? 6 : 16,
+              CreationDockInset.bottomOf(context, 156),
+            ),
+            sliver: list
+                ? SliverList.builder(
+                    itemCount: items.length,
+                    itemBuilder: (_, i) => card(items[i]),
+                  )
+                : CreationTopicGrid(
+                    desktop: false,
+                    covers: covers,
+                    itemCount: items.length - (showFirst ? 1 : 0),
+                    itemBuilder: (_, i) => card(items[i + (showFirst ? 1 : 0)]),
+                  ),
           ),
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-            covers ? 6 : 16,
-            0,
-            covers ? 6 : 16,
-            CreationDockInset.bottomOf(context, 156),
-          ),
-          sliver: list
-              ? SliverList.builder(
-                  itemCount: items.length,
-                  itemBuilder: (_, i) => card(items[i]),
-                )
-              : CreationTopicGrid(
-                  desktop: false,
-                  covers: covers,
-                  itemCount: items.length - (showFirst ? 1 : 0),
-                  itemBuilder: (_, i) => card(items[i + (showFirst ? 1 : 0)]),
-                ),
-        ),
+        ],
       ],
     );
   }

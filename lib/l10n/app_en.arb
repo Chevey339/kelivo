@@ -23697,7 +23697,7 @@
   },
   "creationTopicDisplay": "Topic display",
   "@creationTopicDisplay": {
-    "description": "Title of the Create topic display preferences and shortcut menu."
+    "description": "Group heading for topic layout choices in the Create menu."
   },
   "creationCoversAndTitles": "Covers and titles",
   "@creationCoversAndTitles": {
@@ -23713,11 +23713,11 @@
   },
   "creationAutoTitle": "Name topics automatically",
   "@creationAutoTitle": {
-    "description": "Switch for naming a creation topic with the title summary model."
+    "description": "Toggle in the Create menu for naming a topic with the title summary model."
   },
   "creationAutoTitleHelp": "Use the title summary model to name a topic from its first prompt.",
   "@creationAutoTitleHelp": {
-    "description": "Explains automatic naming in the Create topic display menu and preferences."
+    "description": "Explains automatic naming beneath its toggle in the Create menu."
   },
   "creationAutoTitleOffHelp": "Use the beginning of the first prompt as the title.",
   "@creationAutoTitleOffHelp": {
@@ -24228,17 +24228,9 @@
   "@creationDisplayAndGames": {
     "description": "Tooltip and mobile sheet title for the Creation topic-list menu with appearance and waiting-game preferences."
   },
-  "creationEditInPreferences": "Change in Settings…",
-  "@creationEditInPreferences": {
-    "description": "Action at the bottom of the Creation topic-list menu that opens the Creation section in Preferences."
-  },
   "creationWaitGame": "Waiting game",
   "@creationWaitGame": {
     "description": "Settings row and topic menu section label for choosing a game to play while a creation is generating."
-  },
-  "creationWaitGameHelp": "While an image or video is generating, tap the waiting card or press Space to play.",
-  "@creationWaitGameHelp": {
-    "description": "Help for the waiting-game preference in the Creation section of Preferences."
   },
   "creationGameRandom": "Random",
   "@creationGameRandom": {
@@ -24250,11 +24242,11 @@
   },
   "creationGameSnake": "Snake",
   "@creationGameSnake": {
-    "description": "Name of the Snake game available on Creation waiting cards and in settings."
+    "description": "Name of the Snake game available on Creation waiting cards and in the topic display menu."
   },
   "creationGameBrick": "Brick Breaker",
   "@creationGameBrick": {
-    "description": "Name of the paddle-and-ball game available on Creation waiting cards and in settings."
+    "description": "Name of the paddle-and-ball game available on Creation waiting cards and in the topic display menu."
   },
   "creationGameSnakeControls": "Snake. Use arrow keys, W A S D, or swipes to steer. Press Space to pause or resume and Escape to exit.",
   "@creationGameSnakeControls": {

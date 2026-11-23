@@ -31962,7 +31962,7 @@ abstract class AppLocalizations {
   /// **'Removed from favorites'**
   String get creationUnfavorited;
 
-  /// Title of the Create topic display preferences and shortcut menu.
+  /// Group heading for topic layout choices in the Create menu.
   ///
   /// In en, this message translates to:
   /// **'Topic display'**
@@ -31986,13 +31986,13 @@ abstract class AppLocalizations {
   /// **'List'**
   String get creationTopicList;
 
-  /// Switch for naming a creation topic with the title summary model.
+  /// Toggle in the Create menu for naming a topic with the title summary model.
   ///
   /// In en, this message translates to:
   /// **'Name topics automatically'**
   String get creationAutoTitle;
 
-  /// Explains automatic naming in the Create topic display menu and preferences.
+  /// Explains automatic naming beneath its toggle in the Create menu.
   ///
   /// In en, this message translates to:
   /// **'Use the title summary model to name a topic from its first prompt.'**
@@ -32640,23 +32640,11 @@ abstract class AppLocalizations {
   /// **'Display and waiting games'**
   String get creationDisplayAndGames;
 
-  /// Action at the bottom of the Creation topic-list menu that opens the Creation section in Preferences.
-  ///
-  /// In en, this message translates to:
-  /// **'Change in Settings…'**
-  String get creationEditInPreferences;
-
   /// Settings row and topic menu section label for choosing a game to play while a creation is generating.
   ///
   /// In en, this message translates to:
   /// **'Waiting game'**
   String get creationWaitGame;
-
-  /// Help for the waiting-game preference in the Creation section of Preferences.
-  ///
-  /// In en, this message translates to:
-  /// **'While an image or video is generating, tap the waiting card or press Space to play.'**
-  String get creationWaitGameHelp;
 
   /// Waiting-game option that chooses Snake or Brick Breaker for the current generation.
   ///
@@ -32670,13 +32658,13 @@ abstract class AppLocalizations {
   /// **'Off'**
   String get creationGameOff;
 
-  /// Name of the Snake game available on Creation waiting cards and in settings.
+  /// Name of the Snake game available on Creation waiting cards and in the topic display menu.
   ///
   /// In en, this message translates to:
   /// **'Snake'**
   String get creationGameSnake;
 
-  /// Name of the paddle-and-ball game available on Creation waiting cards and in settings.
+  /// Name of the paddle-and-ball game available on Creation waiting cards and in the topic display menu.
   ///
   /// In en, this message translates to:
   /// **'Brick Breaker'**

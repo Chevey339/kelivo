@@ -17716,7 +17716,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationUnfavorited => '즐겨찾기에서 제거됨';
 
   @override
-  String get creationTopicDisplay => '주제 표시 방식';
+  String get creationTopicDisplay => '주제 표시';
 
   @override
   String get creationCoversAndTitles => '커버 + 제목';
@@ -17731,7 +17731,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationAutoTitle => '주제 자동 이름 지정';
 
   @override
-  String get creationAutoTitleHelp => '제목 요약 모델을 사용해 첫 번째 프롬프트로 주제 이름을 지정합니다.';
+  String get creationAutoTitleHelp => '제목 요약 모델을 사용하여 첫 번째 프롬프트로 주제 이름을 지정합니다.';
 
   @override
   String get creationAutoTitleOffHelp => '첫 번째 프롬프트의 시작 부분을 제목으로 사용합니다.';
@@ -18097,14 +18097,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationDisplayAndGames => '표시 방식 및 대기 미니게임';
 
   @override
-  String get creationEditInPreferences => '설정에서 변경…';
-
-  @override
   String get creationWaitGame => '대기 미니게임';
-
-  @override
-  String get creationWaitGameHelp =>
-      '이미지나 동영상을 생성하는 동안 대기 카드를 누르거나 스페이스 키를 눌러 시작하세요.';
 
   @override
   String get creationGameRandom => '무작위';

@@ -89,8 +89,8 @@ Future<void> showCreationMenu(
                               vertical: 4,
                             ),
                             child: ColoredBox(
-                              color: cs.onSurface.withValues(alpha: .08),
-                              child: const SizedBox(height: 1),
+                              color: ctx.appColors.hairline,
+                              child: const SizedBox(height: .5),
                             ),
                           ),
                         if (it.groupLabel case final label?)

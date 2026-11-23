@@ -18597,7 +18597,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationUnfavorited => 'Удалено из избранного';
 
   @override
-  String get creationTopicDisplay => 'Отображение тем';
+  String get creationTopicDisplay => 'Отображение темы';
 
   @override
   String get creationCoversAndTitles => 'Обложки и названия';
@@ -18613,7 +18613,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get creationAutoTitleHelp =>
-      'Использовать модель для краткого названия, чтобы назвать тему по первому промпту.';
+      'Использовать модель суммаризации заголовков для названия темы по первому запросу.';
 
   @override
   String get creationAutoTitleOffHelp =>
@@ -19004,14 +19004,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationDisplayAndGames => 'Отображение и игры ожидания';
 
   @override
-  String get creationEditInPreferences => 'Изменить в настройках…';
-
-  @override
   String get creationWaitGame => 'Игра ожидания';
-
-  @override
-  String get creationWaitGameHelp =>
-      'Пока создаётся изображение или видео, коснитесь карточки ожидания или нажмите пробел, чтобы начать игру.';
 
   @override
   String get creationGameRandom => 'Случайно';

@@ -431,6 +431,42 @@ void main() {
     },
   );
 
+  testWidgets(
+    'the creation menu manages preferences before the first mobile topic',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final media = await _pumpCreationGallery(
+        tester,
+        desktop: false,
+        seedTopic: false,
+      );
+      await tester.pumpAndSettle();
+      final menu = find.byTooltip('Display and waiting games');
+      expect(menu.hitTestable(), findsOneWidget);
+      Future<void> choose(String label) async {
+        await tester.runAsync(() => tester.tap(menu));
+        await tester.pumpAndSettle();
+        expect(find.text('Change in Settings…'), findsNothing);
+        await tester.runAsync(() async {
+          await tester.tap(find.text(label));
+          await media.preferences.flushPendingWrites();
+        });
+        await tester.pumpAndSettle();
+      }
+
+      await choose('Covers only');
+      expect(media.topicView, CreationTopicView.covers);
+      await choose('Name topics automatically');
+      expect(media.autoTitle, isFalse);
+      await choose('Off');
+      expect(media.waitGame, CreationWaitGame.off);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   for (final desktop in [false, true]) {
     testWidgets(
       'single artwork lightbox returns a reference to its ${desktop ? 'desktop' : 'mobile'} topic draft',
@@ -910,6 +946,7 @@ Future<MediaCreationController> _pumpCreationGallery(
   WidgetTester tester, {
   required bool desktop,
   int count = 2,
+  bool seedTopic = true,
   int laterBatches = 0,
 }) async {
   final (harness, settings, runner, controller, folder) = (await tester
@@ -927,67 +964,69 @@ Future<MediaCreationController> _pumpCreationGallery(
         final folder = await Directory.systemTemp.createTemp(
           'creation-gallery-test',
         );
-        final file = await File(
-          '${folder.path}/result.png',
-        ).writeAsBytes(image.encodePng(image.Image(width: 30, height: 17)));
-        final created = DateTime(2025, 1, 2);
-        await repository.enqueue(
-          GenerationBatchRowsCompanion.insert(
-            id: 'batch',
-            topicId: const Value('topic'),
-            providerId: _provider.id,
-            modelId: _model,
-            mode: MediaMode.image,
-            prompt: 'A wide mountain lake',
-            paramsJson: '{}',
-            referencesJson: '[]',
-            status: GenerationStatus.succeeded,
-            source: GenerationSource.workbench,
-            createdAt: created,
-          ),
-          topic: GenerationTopicRowsCompanion.insert(
-            id: 'topic',
-            title: 'Mountain trip',
-            titleSource: GenerationTitleSource.manual,
-            createdAt: created,
-            updatedAt: created,
-          ),
-        );
-        for (var index = 0; index < count; index++) {
-          await harness.database
-              .into(harness.database.generationItemRows)
-              .insert(
-                GenerationItemRowsCompanion.insert(
-                  id: 'image-$index',
-                  batchId: 'batch',
-                  ordinal: index,
-                  mode: MediaMode.image,
-                  width: const Value(30),
-                  height: const Value(17),
-                  path: file.path,
-                  mime: 'image/png',
-                  byteSize: await file.length(),
-                  status: GenerationItemStatus.ready,
-                  createdAt: created,
-                ),
-              );
-        }
-        for (var i = 1; i <= laterBatches; i++) {
+        if (seedTopic) {
+          final file = await File(
+            '${folder.path}/result.png',
+          ).writeAsBytes(image.encodePng(image.Image(width: 30, height: 17)));
+          final created = DateTime(2025, 1, 2);
           await repository.enqueue(
             GenerationBatchRowsCompanion.insert(
-              id: 'later-$i',
+              id: 'batch',
               topicId: const Value('topic'),
               providerId: _provider.id,
               modelId: _model,
               mode: MediaMode.image,
-              prompt: 'Study $i',
+              prompt: 'A wide mountain lake',
               paramsJson: '{}',
               referencesJson: '[]',
-              status: GenerationStatus.cancelled,
+              status: GenerationStatus.succeeded,
               source: GenerationSource.workbench,
-              createdAt: created.add(Duration(minutes: i)),
+              createdAt: created,
+            ),
+            topic: GenerationTopicRowsCompanion.insert(
+              id: 'topic',
+              title: 'Mountain trip',
+              titleSource: GenerationTitleSource.manual,
+              createdAt: created,
+              updatedAt: created,
             ),
           );
+          for (var index = 0; index < count; index++) {
+            await harness.database
+                .into(harness.database.generationItemRows)
+                .insert(
+                  GenerationItemRowsCompanion.insert(
+                    id: 'image-$index',
+                    batchId: 'batch',
+                    ordinal: index,
+                    mode: MediaMode.image,
+                    width: const Value(30),
+                    height: const Value(17),
+                    path: file.path,
+                    mime: 'image/png',
+                    byteSize: await file.length(),
+                    status: GenerationItemStatus.ready,
+                    createdAt: created,
+                  ),
+                );
+          }
+          for (var i = 1; i <= laterBatches; i++) {
+            await repository.enqueue(
+              GenerationBatchRowsCompanion.insert(
+                id: 'later-$i',
+                topicId: const Value('topic'),
+                providerId: _provider.id,
+                modelId: _model,
+                mode: MediaMode.image,
+                prompt: 'Study $i',
+                paramsJson: '{}',
+                referencesJson: '[]',
+                status: GenerationStatus.cancelled,
+                source: GenerationSource.workbench,
+                createdAt: created.add(Duration(minutes: i)),
+              ),
+            );
+          }
         }
         final controller = MediaCreationController(
           runner: runner,

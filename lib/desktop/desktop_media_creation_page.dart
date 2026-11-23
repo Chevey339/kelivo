@@ -10,7 +10,7 @@ import '../core/database/app_database.dart';
 import '../core/models/media_creation.dart';
 import 'hotkeys/chat_action_bus.dart';
 import '../features/media/widgets/creation_gallery.dart';
-import '../features/media/widgets/creation_preferences.dart';
+import '../features/media/widgets/creation_display_menu.dart';
 import '../features/media/pages/media_creation_page.dart';
 import '../features/media/providers/media_creation_controller.dart';
 import '../features/media/widgets/creation_composer.dart';

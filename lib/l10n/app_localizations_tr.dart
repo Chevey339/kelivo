@@ -18397,7 +18397,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get creationAutoTitleHelp =>
-      'Başlık özetleme modelini kullanarak konuyu ilk istemden adlandır.';
+      'İlk istemden yola çıkarak konuyu adlandırmak için başlık özetleme modelini kullan.';
 
   @override
   String get creationAutoTitleOffHelp =>
@@ -18782,14 +18782,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get creationDisplayAndGames => 'Görünüm ve bekleme oyunları';
 
   @override
-  String get creationEditInPreferences => 'Ayarlar\'da değiştir…';
-
-  @override
   String get creationWaitGame => 'Bekleme oyunu';
-
-  @override
-  String get creationWaitGameHelp =>
-      'Bir görsel veya video oluşturulurken bekleyen karta dokunun ya da Space tuşuna basarak oynayın.';
 
   @override
   String get creationGameRandom => 'Rastgele';

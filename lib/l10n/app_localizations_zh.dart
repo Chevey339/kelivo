@@ -17615,13 +17615,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationDisplayAndGames => '显示方式和小游戏';
 
   @override
-  String get creationEditInPreferences => '在设置中修改…';
-
-  @override
   String get creationWaitGame => '等待小游戏';
-
-  @override
-  String get creationWaitGameHelp => '生成图片或视频时，点一下等待中的卡片或按空格开始。';
 
   @override
   String get creationGameRandom => '随机';
@@ -35353,13 +35347,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get creationDisplayAndGames => '显示方式和小游戏';
 
   @override
-  String get creationEditInPreferences => '在设置中修改…';
-
-  @override
   String get creationWaitGame => '等待小游戏';
-
-  @override
-  String get creationWaitGameHelp => '生成图片或视频时，点一下等待中的卡片或按空格开始。';
 
   @override
   String get creationGameRandom => '随机';
@@ -52790,7 +52778,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationAutoTitle => '自動命名話題';
 
   @override
-  String get creationAutoTitleHelp => '用標題總結模型根據第一條提示詞起標題。';
+  String get creationAutoTitleHelp => '使用標題總結模型，根據第一條提示詞為話題命名。';
 
   @override
   String get creationAutoTitleOffHelp => '直接用第一條提示詞的開頭作為標題。';
@@ -53148,13 +53136,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationDisplayAndGames => '顯示方式和小遊戲';
 
   @override
-  String get creationEditInPreferences => '在設定中修改…';
-
-  @override
   String get creationWaitGame => '等待小遊戲';
-
-  @override
-  String get creationWaitGameHelp => '生成圖像或影片時，點一下等待中的卡片或按空格開始。';
 
   @override
   String get creationGameRandom => '隨機';

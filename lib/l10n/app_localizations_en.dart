@@ -18671,14 +18671,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creationDisplayAndGames => 'Display and waiting games';
 
   @override
-  String get creationEditInPreferences => 'Change in Settings…';
-
-  @override
   String get creationWaitGame => 'Waiting game';
-
-  @override
-  String get creationWaitGameHelp =>
-      'While an image or video is generating, tap the waiting card or press Space to play.';
 
   @override
   String get creationGameRandom => 'Random';

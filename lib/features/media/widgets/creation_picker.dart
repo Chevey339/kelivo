@@ -331,20 +331,17 @@ Future<void> showCreationActions(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final item in items) ...[
-            if (item.startsGroup)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
-                child: ColoredBox(
-                  color: cs.onSurface.withValues(alpha: .08),
-                  child: const SizedBox(height: 1),
-                ),
-              ),
+            if (item.startsGroup) const SizedBox(height: 9),
             if (item.groupLabel case final label?)
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
                 child: Text(
                   label,
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
               ),
             Semantics(
@@ -354,23 +351,25 @@ Future<void> showCreationActions(
                 key: item.key,
                 focusable: true,
                 onTap: () => Navigator.of(sheet).pop(item),
-                baseColor: item.checked
-                    ? cs.primary.withValues(
-                        alpha: cs.brightness == Brightness.dark ? .16 : .12,
-                      )
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                baseColor: Colors.transparent,
+                pressedBlendStrength: .055,
+                borderRadius: BorderRadius.circular(12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 52),
+                  constraints: const BoxConstraints(minHeight: 42),
                   child: Row(
                     children: [
                       Icon(
                         item.icon,
-                        size: 20,
-                        color: item.destructive ? cs.error : cs.onSurface,
+                        size: 18,
+                        color: item.destructive
+                            ? cs.error
+                            : cs.onSurfaceVariant,
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,13 +378,17 @@ Future<void> showCreationActions(
                             Text(
                               item.label,
                               style: TextStyle(
-                                fontSize: 15.5,
+                                fontSize: 15,
+                                fontWeight: item.checked
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
                                 color: item.destructive
                                     ? cs.error
                                     : cs.onSurface,
                               ),
                             ),
-                            if (item.subtitle case final subtitle?)
+                            if (item.subtitle case final subtitle?) ...[
+                              const SizedBox(height: 2),
                               Text(
                                 subtitle,
                                 style: TextStyle(
@@ -393,6 +396,7 @@ Future<void> showCreationActions(
                                   color: cs.onSurfaceVariant,
                                 ),
                               ),
+                            ],
                           ],
                         ),
                       ),
@@ -403,6 +407,7 @@ Future<void> showCreationActions(
                 ),
               ),
             ),
+            if (!identical(item, items.last)) const SizedBox(height: 3),
           ],
         ],
       );
