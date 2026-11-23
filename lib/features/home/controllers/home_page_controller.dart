@@ -255,9 +255,6 @@ class HomePageController extends ChangeNotifier {
   int _selectionEpoch = 0;
   bool _openingSelectionExport = false;
 
-  // Desktop drag-and-drop
-  bool _isDragHovering = false;
-
   // App and route visibility determine whether a completion notification
   // would add value or merely duplicate content already on screen.
   bool _homeRouteVisible = true;
@@ -697,7 +694,6 @@ class HomePageController extends ChangeNotifier {
   bool get selecting => _selecting;
   Set<String> get selectedItems => _selectedItems;
   int get selectedCount => _selectedItems.length;
-  bool get isDragHovering => _isDragHovering;
   bool get tabletSidebarOpen =>
       _compactDesktop ? _compactSidebarOpen : _tabletSidebarOpen;
   double get embeddedSidebarWidth => _embeddedSidebarWidth;
@@ -3447,11 +3443,6 @@ class HomePageController extends ChangeNotifier {
         notifyListeners();
       }
     }
-  }
-
-  void setDragHovering(bool hovering) {
-    _isDragHovering = hovering;
-    notifyListeners();
   }
 
   // ============================================================================

@@ -505,62 +505,52 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
               if (desktop)
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: AnimatedSwitcher(
-                    duration: handoffDuration(context, 160),
-                    switchInCurve: handoffCurve,
-                    switchOutCurve: handoffCurve,
-                    child: _hovered || _imageFocused
-                        ? Stack(
-                            key: const ValueKey('image-actions'),
-                            alignment: AlignmentDirectional.bottomEnd,
-                            children: [
-                              const Positioned.fill(
-                                child: IgnorePointer(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Colors.transparent,
-                                          Color(0x52000000),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  10,
-                                  24,
-                                  10,
-                                  8,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    glass(
-                                      Lucide.Download,
-                                      l10n.creationSaveImage,
-                                      () => saveCreationArtwork(
-                                        context,
-                                        item,
-                                        desktop: true,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    glass(
-                                      Lucide.Share,
-                                      l10n.creationShare,
-                                      () => shareCreationArtwork(context, item),
-                                    ),
+                  child: CreationHoverActions(
+                    visible: _hovered || _imageFocused,
+                    child: Stack(
+                      alignment: AlignmentDirectional.bottomEnd,
+                      children: [
+                        const Positioned.fill(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Color(0x52000000),
                                   ],
                                 ),
                               ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 24, 10, 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              glass(
+                                Lucide.Download,
+                                l10n.creationSaveImage,
+                                () => saveCreationArtwork(
+                                  context,
+                                  item,
+                                  desktop: true,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              glass(
+                                Lucide.Share,
+                                l10n.creationShare,
+                                () => shareCreationArtwork(context, item),
+                              ),
                             ],
-                          )
-                        : const SizedBox.shrink(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],

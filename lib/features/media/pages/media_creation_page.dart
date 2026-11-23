@@ -1,7 +1,7 @@
 import '../widgets/creation_reference_actions.dart';
 import 'dart:async';
 
-import 'package:desktop_drop/desktop_drop.dart';
+import '../../../shared/widgets/desktop_file_drop_target.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -401,7 +401,7 @@ class CreationComposerStack extends StatefulWidget {
 }
 
 class _CreationComposerStackState extends State<CreationComposerStack> {
-  bool _hover = false, _measurePending = false;
+  bool _measurePending = false;
   final _dockKey = GlobalKey();
   double _dockHeight = 0;
 
@@ -475,48 +475,34 @@ class _CreationComposerStackState extends State<CreationComposerStack> {
             ),
           ),
         ),
-        if (_hover)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Container(
-                margin: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: colors.primary, width: 2),
-                  color: surface.withValues(alpha: .86),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        LucideIcons.imagePlus,
-                        color: colors.primary,
-                        size: 30,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        media.mode == MediaMode.video
-                            ? l10n.creationFirstFrameDrop
-                            : l10n.creationReferenceDrop,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
       ],
     );
     if (!desktop) return stack;
-    return DropTarget(
-      onDragEntered: (_) => setState(() => _hover = true),
-      onDragExited: (_) => setState(() => _hover = false),
-      onDragDone: (details) {
-        setState(() => _hover = false);
-        final paths = creationImagePaths(
-          details.files.map((file) => file.path),
-        );
+    return DesktopFileDropTarget(
+      overlay: Container(
+        margin: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colors.primary, width: 2),
+          color: surface.withValues(alpha: .86),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(LucideIcons.imagePlus, color: colors.primary, size: 30),
+              const SizedBox(height: 10),
+              Text(
+                media.mode == MediaMode.video
+                    ? l10n.creationFirstFrameDrop
+                    : l10n.creationReferenceDrop,
+              ),
+            ],
+          ),
+        ),
+      ),
+      onFiles: (files) {
+        final paths = creationImagePaths(files.map((file) => file.path));
         if (paths.isEmpty) return;
         addCreationReferences(context, media, widget.topicId, paths);
       },

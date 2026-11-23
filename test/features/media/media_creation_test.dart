@@ -807,6 +807,38 @@ void main() {
     },
   );
 
+  testWidgets(
+    'rapid desktop artwork hover and leaving the conversation retire all controls',
+    (tester) async {
+      await _pumpCreationGallery(
+        tester,
+        desktop: true,
+        count: 1,
+        chatMessageId: 'message',
+      );
+      await tester.pumpAndSettle();
+      final image = find.byType(CreationFileImage).first;
+      final inside = tester.getCenter(image);
+      final outside = tester.getBottomRight(image) + const Offset(22, 18);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: outside);
+      await tester.pump();
+      for (var i = 0; i < 6; i++) {
+        await mouse.moveTo(inside);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 36));
+        await mouse.moveTo(outside);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      await mouse.removePointer();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
   for (final chat in [false, true]) {
     testWidgets(
       '${chat ? 'chat' : 'creation timeline'} preserves a playing card through result publication',
@@ -1170,6 +1202,7 @@ Future<MediaCreationController> _pumpCreationGallery(
   int count = 2,
   Locale locale = const Locale('en'),
   bool seedTopic = true,
+  String? chatMessageId,
   int laterBatches = 0,
 }) async {
   final (harness, settings, runner, controller, folder) = (await tester
@@ -1195,7 +1228,10 @@ Future<MediaCreationController> _pumpCreationGallery(
           await repository.enqueue(
             GenerationBatchRowsCompanion.insert(
               id: 'batch',
-              topicId: const Value('topic'),
+              topicId: chatMessageId == null
+                  ? const Value('topic')
+                  : const Value.absent(),
+              messageId: Value(chatMessageId),
               providerId: _provider.id,
               modelId: _model,
               mode: MediaMode.image,
@@ -1203,7 +1239,9 @@ Future<MediaCreationController> _pumpCreationGallery(
               paramsJson: '{}',
               referencesJson: '[]',
               status: GenerationStatus.succeeded,
-              source: GenerationSource.workbench,
+              source: chatMessageId == null
+                  ? GenerationSource.workbench
+                  : GenerationSource.chat,
               createdAt: created,
             ),
             topic: GenerationTopicRowsCompanion.insert(
@@ -1279,7 +1317,15 @@ Future<MediaCreationController> _pumpCreationGallery(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: locale,
-        home: desktop
+        home: chatMessageId != null
+            ? Scaffold(
+                body: ChatCreationImages(
+                  messageId: chatMessageId,
+                  attachments: const [],
+                  streaming: false,
+                ),
+              )
+            : desktop
             ? const DesktopMediaCreationPage()
             : MediaCreationPage(onOpenDrawer: () {}),
       ),
