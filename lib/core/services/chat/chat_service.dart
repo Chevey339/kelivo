@@ -49,6 +49,7 @@ import '../api/providers/claude/claude_history.dart';
 import '../api/providers/claude/claude_thinking_recovery.dart';
 import '../api/providers/google_gemini.dart';
 import '../api/providers/openai/responses_history.dart';
+import '../api/providers/openai/deepseek_server_tool_history.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../../models/conversation_mcp_settings.dart';
@@ -253,6 +254,7 @@ class ChatService extends ChangeNotifier {
     claudeThinkingRecoveryArtifactKind,
     geminiThoughtSignatureArtifactKind,
     responsesTurnArtifactKind,
+    deepSeekServerToolArtifactKind,
   };
   final Map<String, Map<String, String>> _providerArtifactsCache = {};
 

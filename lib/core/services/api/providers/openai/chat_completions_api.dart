@@ -31,6 +31,7 @@ import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_decoder.dart';
 import 'openai_tool_transcript.dart';
 import 'reasoning_details_replay.dart';
+import 'deepseek_server_tool_history.dart';
 import 'openai_request_shaping.dart';
 
 Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
@@ -52,6 +53,12 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
   // Preserve assistant tool_calls + vendor reasoning echoes (when present).
   if (role == 'assistant') {
     final toolCalls = m['tool_calls'];
+    for (final key in [
+      deepSeekServerToolHistoryKey,
+      deepSeekServerToolCallsField,
+    ]) {
+      if (m.containsKey(key)) out[key] = m[key];
+    }
     if (toolCalls is List && toolCalls.isNotEmpty) {
       out['tool_calls'] = [
         for (final toolCall in toolCalls.whereType<Map>())
@@ -356,6 +363,24 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       m[multimodalInternalMediaPathsKey],
     );
     final outMsg = Map<String, dynamic>.from(m);
+    final deepSeekHistory = outMsg.remove(deepSeekServerToolHistoryKey);
+    final serverCalls = outMsg.remove(deepSeekServerToolCallsField);
+    if (isAssistant) {
+      final config = nativeInputs.config;
+      final model = nativeInputs.spec.apiModelId ?? nativeInputs.spec.id;
+      final calls =
+          replayDeepSeekServerToolCalls(
+            deepSeekHistory,
+            config,
+            model,
+            m['tool_calls'],
+          ) ??
+          (isOfficialDeepSeekChat(config) && serverCalls is List
+              ? serverCalls
+              : null);
+      if (calls != null && calls.isNotEmpty)
+        outMsg[deepSeekServerToolCallsField] = calls;
+    }
     outMsg.remove(imageContextOwnerKey);
     outMsg.remove(multimodalInternalImageReferencesKey);
     outMsg.remove(multimodalInternalMediaPathsKey);
@@ -863,6 +888,8 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required String firstAssistantContent,
   required String firstReasoning,
   required dynamic firstReasoningDetails,
+  List<dynamic>? firstServerToolCalls,
+  DeepSeekServerToolRecorder? deepSeekRecorder,
   required ToolCallHandler onToolCall,
   required List<String>? userImagePaths,
   required bool canImageInput,
@@ -899,9 +926,17 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   String assistantContent() =>
       lastRound?.assistantContent ?? firstAssistantContent;
   String reasoningEcho() => lastRound?.reasoningEcho ?? firstReasoning;
+  List<dynamic>? serverCalls() =>
+      lastRound == null ? firstServerToolCalls : lastRound!.serverToolCalls;
   dynamic reasoningDetails() =>
       lastRound == null ? firstReasoningDetails : lastRound!.reasoningDetails;
 
+  final firstArtifact = deepSeekRecorder?.record(
+    firstServerToolCalls,
+    clientCallId:
+        clientToolCallsFromChatAcc(firstToolAcc).firstOrNull?.id ?? '',
+  );
+  if (firstArtifact != null) yield firstArtifact;
   yield* runClientToolFollowUps(
     reasoningDetailsOf: reasoningDetails,
     initialCalls: clientToolCallsFromChatAcc(firstToolAcc),
@@ -916,7 +951,10 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           reasoningField: spec.reasoning.replayField.wireName,
           includeEmptyReasoningContent: needsReasoningEcho,
           reasoningDetails: reasoningDetails(),
-        ),
+        )..addAll({
+          if (isOfficialDeepSeekChat(config) && serverCalls() != null)
+            deepSeekServerToolCallsField: serverCalls(),
+        }),
         ...openaiToolResultMessages(executed),
       ];
     },
@@ -1016,6 +1054,15 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       // Add this round. `=` would drop earlier rounds when usage is absent.
       chars += roundDecoder.approxCompletionChars;
       lastRound = roundDecoder;
+      final artifact = deepSeekRecorder?.record(
+        roundDecoder.serverToolCalls,
+        clientCallId:
+            clientToolCallsFromChatAcc(
+              roundDecoder.toolCalls,
+            ).firstOrNull?.id ??
+            '',
+      );
+      if (artifact != null) yield artifact;
     },
     takeCallsAfterRound: () {
       final decoder = lastRound;
@@ -1053,6 +1100,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   required List<Map<String, dynamic>> messages,
   required Map<String, dynamic> requestBody,
   required Map<String, dynamic> firstObj,
+  DeepSeekServerToolRecorder? deepSeekRecorder,
   required List<EmitToolCall> initialCalls,
   required ToolCallHandler onToolCall,
   required List<String>? userImagePaths,
@@ -1076,6 +1124,12 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   var round = 0;
   Stream<StreamChunk> emitToolRoundOutput() async* {
     final message = openaiFirstChoiceMessage(lastObj);
+    final artifact = deepSeekRecorder?.record(
+      message?[deepSeekServerToolCallsField],
+      clientCallId:
+          openaiCallsFromCompletionMessage(message).firstOrNull?.id ?? '',
+    );
+    if (artifact != null) yield artifact;
     final visible = openaiVisibleOutputFromMessage(message);
     final ids = StreamChunkIds('round-${round++}');
     yield* emitDelta(
@@ -1110,7 +1164,11 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
           reasoningField: spec.reasoning.replayField.wireName,
           includeEmptyReasoningContent: needsReasoningEcho,
           reasoningDetails: msg['reasoning_details'],
-        ),
+        )..addAll({
+          if (isOfficialDeepSeekChat(config) &&
+              msg[deepSeekServerToolCallsField] is List)
+            deepSeekServerToolCallsField: msg[deepSeekServerToolCallsField],
+        }),
         ...openaiToolResultMessages(executed),
       ];
     },
@@ -1185,6 +1243,10 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
         (choice['message'] as Map?)?.cast<String, dynamic>(),
       );
       final lastMessage = openaiFirstChoiceMessage(lastObj);
+      final artifact = deepSeekRecorder?.record(
+        lastMessage?[deepSeekServerToolCallsField],
+      );
+      if (artifact != null) yield artifact;
       final ids = StreamChunkIds('finish');
       yield* emitImages(visible.images, ids: ids);
       yield* emitDone(
