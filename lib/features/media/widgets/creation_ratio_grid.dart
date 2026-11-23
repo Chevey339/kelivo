@@ -50,12 +50,14 @@ class CreationRatioGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     if (values.isEmpty) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
-    final cols = math.min(4, values.length);
     final index = values.indexOf(selected);
-    final rowHeight = math.max(
-      66.0,
-      MediaQuery.textScalerOf(context).scale(12.5) + 44,
-    );
+    final labels = [
+      for (final value in values)
+        value == 'auto' ? AppLocalizations.of(context)!.creationAuto : value,
+    ];
+    final labelStyle = DefaultTextStyle.of(
+      context,
+    ).style.copyWith(fontSize: 12.5, fontWeight: FontWeight.w500);
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -64,6 +66,26 @@ class CreationRatioGrid extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, box) {
+          final painter = TextPainter(
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+            locale: Localizations.maybeLocaleOf(context),
+          );
+          var minimumWidth = 32.0, rowHeight = 66.0;
+          for (final label in labels) {
+            painter.text = TextSpan(text: label, style: labelStyle);
+            painter.layout(maxWidth: math.max(1, box.maxWidth - 8));
+            minimumWidth = math.max(
+              minimumWidth,
+              painter.width.ceilToDouble() + 8,
+            );
+            rowHeight = math.max(rowHeight, 24 + 6 + painter.height + 12);
+          }
+          painter.dispose();
+          final cols = (box.maxWidth / minimumWidth).floor().clamp(
+            1,
+            math.min(4, values.length),
+          );
           final cell = box.maxWidth / cols;
           return SizedBox(
             height: (values.length / cols).ceil() * rowHeight,
@@ -126,15 +148,12 @@ class CreationRatioGrid extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              value == 'auto'
-                                  ? AppLocalizations.of(context)!.creationAuto
-                                  : value,
-                              style: TextStyle(
-                                fontSize: 12.5,
+                              labels[i],
+                              textAlign: TextAlign.center,
+                              style: labelStyle.copyWith(
                                 color: i == index
                                     ? cs.onSurface
                                     : cs.onSurfaceVariant,
-                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],

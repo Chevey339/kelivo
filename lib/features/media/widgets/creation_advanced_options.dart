@@ -155,7 +155,7 @@ class CreationAdvancedOptions extends StatelessWidget {
             ),
           ),
         if (caps.platformOptions.isNotEmpty) ...[
-          const Divider(height: 20),
+          const SizedBox(height: 14),
           Text(
             '${model.provider.name} · ${l10n.creationPlatformOptions}',
             style: TextStyle(
@@ -171,7 +171,7 @@ class CreationAdvancedOptions extends StatelessWidget {
               topicId: topicId,
             ),
         ],
-        const Divider(height: 20),
+        const SizedBox(height: 14),
         _Option(
           label: l10n.creationExtraJson,
           child: _OptionText(
@@ -367,7 +367,7 @@ class _Choices extends StatelessWidget {
     final index = values.indexOf(value ?? 'auto');
     return SlidingSegmentedTabs(
       height: 36,
-      expand: values.length <= 4,
+      fitLabels: true,
       allowReselect: true,
       index: index,
       tabs: [for (final v in values) SegmentedTab(label: display(v))],
@@ -385,7 +385,7 @@ class _Option extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 9),
+    padding: const EdgeInsets.only(bottom: 12),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

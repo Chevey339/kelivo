@@ -535,6 +535,11 @@ class _CreationComposerState extends State<CreationComposer> {
                                           builder: (context, value, _) =>
                                               IosIconButton(
                                                 icon: Lucide.WandSparkles,
+                                                size: widget.desktop ? 16 : 17,
+                                                visualSize: widget.desktop
+                                                    ? 27
+                                                    : 30,
+                                                color: cs.onSurfaceVariant,
                                                 tooltip: l10n.creationEnhance,
                                                 minSize: buttonSize,
                                                 padding: EdgeInsets.zero,
@@ -672,6 +677,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                           : (anchor) => _showPicker(
                                               anchor,
                                               width: 340,
+                                              scroll: false,
                                               title: video
                                                   ? l10n.creationVideoModels
                                                   : l10n.creationImageModels,
@@ -820,7 +826,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                           ),
                                           onTap: (anchor) => _showPicker(
                                             anchor,
-                                            width: 260,
+                                            width: 304,
                                             title: l10n.creationCountLabel,
                                             content: (_) => _ParameterOptions(
                                               count: true,
@@ -883,11 +889,13 @@ class _CreationComposerState extends State<CreationComposer> {
     required double width,
     required String title,
     required Widget Function(VoidCallback) content,
+    bool scroll = true,
   }) {
     return showCreationPicker<void>(
       anchor,
       desktop: widget.desktop,
       width: width,
+      scroll: scroll,
       title: title,
       builder: (context) => content(() => Navigator.of(context).pop()),
     );
@@ -1029,137 +1037,161 @@ class _ModelOptionsState extends State<_ModelOptions> {
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             ),
           ),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 320),
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              for (final models in groups.values) ...[
-                Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Text(
-                    [
-                      models.first.provider.name,
-                      if (models.first.provider.isOAuth)
-                        l10n.creationSubscriptionLogin,
-                    ].join(' · '),
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface.withValues(alpha: .42),
-                    ),
-                  ),
-                ),
-                for (final model in models)
-                  IosCardPress(
-                    onTap: () => widget.onSelected(model),
-                    focusable: true,
-                    baseColor: state.model?.key == model.key
-                        ? cs.primary.withValues(
-                            alpha: cs.brightness == Brightness.dark ? .16 : .12,
-                          )
-                        : Colors.transparent,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Row(
-                      children: [
-                        ProviderAvatar(
-                          providerKey: model.provider.id,
-                          displayName: model.provider.name,
-                          size: 26,
+        if (groups.isNotEmpty)
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: ListView(
+                primary: false,
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: [
+                  for (final models in groups.values) ...[
+                    Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 8, 5),
+                      child: Text(
+                        [
+                          models.first.provider.name,
+                          if (models.first.provider.isOAuth)
+                            l10n.creationSubscriptionLogin,
+                        ].join(' · '),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface.withValues(alpha: .42),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                    ),
+                    for (final model in models)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: IosCardPress(
+                          onTap: () => widget.onSelected(model),
+                          focusable: true,
+                          baseColor: state.model?.key == model.key
+                              ? cs.primary.withValues(
+                                  alpha: cs.brightness == Brightness.dark
+                                      ? .16
+                                      : .12,
+                                )
+                              : Colors.transparent,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      model.spec.displayName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  if (model.spec.type == ModelType.chat)
-                                    Padding(
-                                      padding: const EdgeInsetsDirectional.only(
-                                        start: 5,
-                                      ),
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          color: context.appColors.surfaceFill,
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 4,
-                                            vertical: 2,
-                                          ),
+                              ProviderAvatar(
+                                providerKey: model.provider.id,
+                                displayName: model.provider.name,
+                                size: 26,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
                                           child: Text(
-                                            l10n.creationChatModelBadge,
-                                            style: TextStyle(
-                                              fontSize: 10.5,
-                                              color: cs.onSurfaceVariant,
+                                            model.spec.displayName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                         ),
+                                        if (model.spec.type == ModelType.chat)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsetsDirectional.only(
+                                                  start: 5,
+                                                ),
+                                            child: DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                color: context
+                                                    .appColors
+                                                    .surfaceFill,
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 2,
+                                                    ),
+                                                child: Text(
+                                                  l10n.creationChatModelBadge,
+                                                  style: TextStyle(
+                                                    fontSize: 10.5,
+                                                    color: cs.onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    Text(
+                                      [
+                                        if (model.spec.displayName !=
+                                            model.spec.id)
+                                          model.spec.id,
+                                        if (model.provider.isOAuth)
+                                          l10n.creationSubscriptionLogin,
+                                        if (state.mode == MediaMode.video) ...[
+                                          if (model
+                                              .capabilities
+                                              .durations
+                                              .isNotEmpty)
+                                            model.capabilities.durations
+                                                .map(
+                                                  (v) => l10n
+                                                      .creationDurationSeconds(
+                                                        v,
+                                                      ),
+                                                )
+                                                .join(' / '),
+                                          if (model
+                                              .capabilities
+                                              .frameRoles
+                                              .isEmpty)
+                                            l10n.creationTextOnlyVideo,
+                                        ] else
+                                          model.capabilities.maxReferences > 0
+                                              ? l10n.creationModelReferenceLimit(
+                                                  model
+                                                      .capabilities
+                                                      .maxReferences,
+                                                )
+                                              : l10n.creationTextOnlyImage,
+                                      ].join(' · '),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: cs.onSurfaceVariant,
                                       ),
                                     ),
-                                ],
-                              ),
-                              Text(
-                                [
-                                  if (model.spec.displayName != model.spec.id)
-                                    model.spec.id,
-                                  if (model.provider.isOAuth)
-                                    l10n.creationSubscriptionLogin,
-                                  if (state.mode == MediaMode.video) ...[
-                                    if (model.capabilities.durations.isNotEmpty)
-                                      model.capabilities.durations
-                                          .map(
-                                            (v) =>
-                                                l10n.creationDurationSeconds(v),
-                                          )
-                                          .join(' / '),
-                                    if (model.capabilities.frameRoles.isEmpty)
-                                      l10n.creationTextOnlyVideo,
-                                  ] else
-                                    model.capabilities.maxReferences > 0
-                                        ? l10n.creationModelReferenceLimit(
-                                            model.capabilities.maxReferences,
-                                          )
-                                        : l10n.creationTextOnlyImage,
-                                ].join(' · '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: cs.onSurfaceVariant,
+                                  ],
                                 ),
                               ),
+                              if (state.model?.key == model.key)
+                                Icon(Lucide.Check, size: 16, color: cs.primary),
                             ],
                           ),
                         ),
-                        if (state.model?.key == model.key)
-                          Icon(Lucide.Check, size: 16, color: cs.primary),
-                      ],
-                    ),
-                  ),
-              ],
-            ],
+                      ),
+                  ],
+                ],
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1213,8 +1245,8 @@ class _ParameterOptions extends StatelessWidget {
           Text(l10n.creationDuration),
           const SizedBox(height: 6),
           SlidingSegmentedTabs(
+            fitLabels: true,
             height: 36,
-            expand: caps.durations.length <= 4,
 
             tabs: [
               for (final value in caps.durations)
@@ -1230,7 +1262,7 @@ class _ParameterOptions extends StatelessWidget {
           const SizedBox(height: 6),
           SlidingSegmentedTabs(
             height: 36,
-
+            fitLabels: true,
             tabs: [for (final value in resolutions) SegmentedTab(label: value)],
             index: resolutions.indexOf(state.resolutionFor(topicId)!),
             onChanged: (index) => state.selectResolution(resolutions[index]),
@@ -1261,7 +1293,7 @@ class _ParameterOptions extends StatelessWidget {
           ),
         ],
         if (advanced) ...[
-          const Divider(height: 24),
+          const SizedBox(height: 20),
           CreationAdvancedOptions(topicId: topicId),
         ],
       ],
@@ -1302,6 +1334,7 @@ class _ImageCountOptionsState extends State<_ImageCountOptions> {
           const SizedBox(height: 6),
         ],
         SlidingSegmentedTabs(
+          fitLabels: true,
           height: 36,
 
           tabs: [
@@ -1323,60 +1356,69 @@ class _ImageCountOptionsState extends State<_ImageCountOptions> {
                 color: context.appColors.surfaceFill,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.creationCustomCountLabel,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
+              child: CreationLabeledActions(
+                label: Text(
+                  l10n.creationCustomCountLabel,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                actions: Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: context.appColors.surfaceCard,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IosIconButton(
+                            icon: Lucide.Minus,
+                            size: 14,
+                            minSize: 32,
+                            enabled: count > 1,
+                            tooltip: l10n.genuiDecrease(
+                              l10n.creationCountLabel,
+                            ),
+                            onTap: count > 1
+                                ? () => state.selectCount(count - 1)
+                                : null,
+                          ),
+                          _CountInput(
+                            value: count,
+                            onChanged: state.selectCount,
+                            label: l10n.creationCountLabel,
+                          ),
+                          IosIconButton(
+                            icon: Lucide.Plus,
+                            size: 14,
+                            minSize: 32,
+                            enabled: count < 16,
+                            tooltip: l10n.genuiIncrease(
+                              l10n.creationCountLabel,
+                            ),
+                            onTap: count < 16
+                                ? () => state.selectCount(count + 1)
+                                : null,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: context.appColors.surfaceCard,
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IosIconButton(
-                          icon: Lucide.Minus,
-                          size: 13,
-                          minSize: 26,
-                          onTap: count > 1
-                              ? () => state.selectCount(count - 1)
-                              : null,
-                        ),
-                        _CountInput(
-                          value: count,
-                          onChanged: state.selectCount,
-                          label: l10n.creationCountLabel,
-                        ),
-                        IosIconButton(
-                          icon: Lucide.Plus,
-                          size: 13,
-                          minSize: 26,
-                          onTap: count < 16
-                              ? () => state.selectCount(count + 1)
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
+                    Text(
                       l10n.creationCustomCountMaximum,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 11.5,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1391,7 +1433,10 @@ class _ImageCountOptionsState extends State<_ImageCountOptions> {
                       max,
                       (count / max).ceil(),
                     ),
-              style: Theme.of(context).textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
             ),
           ),
       ],

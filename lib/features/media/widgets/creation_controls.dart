@@ -192,6 +192,44 @@ class CreationMobileBar extends StatelessWidget {
   );
 }
 
+/// Keeps a field label and its controls on their respective reading edges,
+/// including when the controls need a second line.
+class CreationLabeledActions extends StatelessWidget {
+  const CreationLabeledActions({
+    super.key,
+    required this.label,
+    required this.actions,
+  });
+  final Widget label, actions;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final textScale = MediaQuery.textScalerOf(context).scale(13) / 13;
+      if (constraints.maxWidth < 256 * textScale) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            label,
+            const SizedBox(height: 6),
+            Align(alignment: AlignmentDirectional.centerEnd, child: actions),
+          ],
+        );
+      }
+      return Row(
+        children: [
+          Expanded(child: label),
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth * .72),
+            child: actions,
+          ),
+        ],
+      );
+    },
+  );
+}
+
 enum CreationActionTone { ghost, tonal, primary, danger }
 
 class CreationAction extends StatelessWidget {
@@ -264,7 +302,13 @@ class CreationAction extends StatelessWidget {
           ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: minHeight == null ? 0 : minHeight! - 12,
+              minHeight:
+                  (minHeight ?? (small ? 28 : 34)) -
+                  (pill
+                      ? 16
+                      : small
+                      ? 8
+                      : 12),
             ),
             child: DefaultTextStyle(
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(

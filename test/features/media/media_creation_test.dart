@@ -22,6 +22,7 @@ import 'package:Kelivo/features/media/widgets/creation_lightbox.dart';
 import 'package:Kelivo/features/media/widgets/creation_timeline.dart';
 import 'package:Kelivo/features/media/widgets/creation_waiting_card.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:Kelivo/features/media/widgets/creation_controls.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -747,6 +748,12 @@ void main() {
         tester.view.physicalSize = desktop
             ? const Size(1280, 820)
             : const Size(390, 844);
+        if (!desktop) {
+          tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+          tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+          addTearDown(tester.view.resetPadding);
+          addTearDown(tester.view.resetViewPadding);
+        }
         addTearDown(tester.view.resetDevicePixelRatio);
         addTearDown(tester.view.resetPhysicalSize);
         final (harness, settings, runner, controller) = (await tester.runAsync(
@@ -817,6 +824,40 @@ void main() {
           find.text(desktop ? '1 image' : 'Auto · 1 image'),
           findsOneWidget,
         );
+        await tester.tap(find.text(_model).hitTestable().last);
+        await tester.pumpAndSettle();
+        final search = find.byType(CreationSearchBox).hitTestable().last;
+        expect(
+          tester.getTopLeft(find.text('Test Images')).dy -
+              tester.getBottomLeft(search).dy,
+          inInclusiveRange(6.0, 20.0),
+        );
+        await tester.tapAt(const Offset(1, 1));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text(desktop ? '1 image' : 'Auto · 1 image'));
+        await tester.pumpAndSettle();
+        final custom = find.text('Custom').hitTestable();
+        expect(
+          tester.renderObject<RenderParagraph>(custom).didExceedMaxLines,
+          isFalse,
+        );
+        await tester.tap(custom);
+        await tester.pumpAndSettle();
+        await tester.runAsync(() async {
+          await tester.tap(find.byTooltip('Increase Image count'));
+          await harness.preferences.flushPendingWrites();
+        });
+        await tester.pumpAndSettle();
+        expect(controller.count, 2);
+        await tester.runAsync(() async {
+          await tester.tap(find.byTooltip('Decrease Image count'));
+          await harness.preferences.flushPendingWrites();
+        });
+        await tester.pumpAndSettle();
+        expect(controller.count, 1);
+        await tester.tapAt(const Offset(1, 1));
+        await tester.pumpAndSettle();
         await tester.tap(
           find.text(desktop ? 'More options' : 'Auto · 1 image'),
         );

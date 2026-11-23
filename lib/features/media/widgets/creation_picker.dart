@@ -47,7 +47,61 @@ Future<T?> showCreationPicker<T>(
             : Theme.of(context).colorScheme;
         final dark = cs.brightness == Brightness.dark;
         final curve = animation.drive(CurveTween(curve: handoffCurve));
+        final media = MediaQuery.of(context);
+        final availableHeight = math.max(
+          0.0,
+          media.size.height - media.viewInsets.bottom - media.padding.top,
+        );
+        final shortSheet =
+            !desktop && availableHeight < 220 * media.textScaler.scale(14) / 14;
         final content = builder(context);
+        final paddedContent = Padding(
+          padding: EdgeInsets.fromLTRB(
+            desktop ? 8 : 16,
+            4,
+            desktop ? 8 : 16,
+            desktop ? 8 : 16,
+          ),
+          child: scroll && !shortSheet
+              ? SingleChildScrollView(child: content)
+              : content,
+        );
+        final panel = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!desktop)
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 8, bottom: 9),
+                  height: 4,
+                  width: 36,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: .20),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            if (title.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  desktop ? 14 : 20,
+                  desktop ? 12 : 4,
+                  16,
+                  desktop ? 6 : 12,
+                ),
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: desktop ? cs.onSurfaceVariant : cs.onSurface,
+                    fontSize: desktop ? 12.5 : 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            if (shortSheet) paddedContent else Flexible(child: paddedContent),
+          ],
+        );
         final body = Material(
           type: MaterialType.transparency,
           textStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
@@ -56,62 +110,10 @@ Future<T?> showCreationPicker<T>(
             letterSpacing: 0,
             decoration: TextDecoration.none,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!desktop)
-                Center(
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 8, bottom: 9),
-                    height: 4,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withValues(alpha: .20),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              if (title.isNotEmpty)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    desktop ? 14 : 20,
-                    desktop ? 12 : 4,
-                    16,
-                    desktop ? 6 : 12,
-                  ),
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: desktop ? cs.onSurfaceVariant : cs.onSurface,
-                      fontSize: desktop ? 12.5 : 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              Flexible(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    desktop ? 8 : 16,
-                    4,
-                    desktop ? 8 : 16,
-                    desktop ? 8 : 16,
-                  ),
-                  child: scroll
-                      ? SingleChildScrollView(child: content)
-                      : content,
-                ),
-              ),
-            ],
-          ),
+          child: shortSheet ? SingleChildScrollView(child: panel) : panel,
         );
         if (!desktop) {
-          final media = MediaQuery.of(context);
-          final height = math.max(
-            0.0,
-            (media.size.height - media.viewInsets.bottom - media.padding.top) *
-                .86,
-          );
+          final height = shortSheet ? availableHeight : availableHeight * .86;
           return themes.wrap(
             Padding(
               padding: EdgeInsets.only(bottom: media.viewInsets.bottom),

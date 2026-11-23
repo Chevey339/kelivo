@@ -1,3 +1,4 @@
+import '../../../theme/app_semantic_colors.dart';
 import 'creation_menu.dart';
 import 'creation_controls.dart';
 import 'creation_picker.dart';
@@ -191,8 +192,10 @@ Future<List<String>?> _showRecentImages(
   final l10n = AppLocalizations.of(context)!;
   final media = context.read<MediaCreationController>();
   final screen = MediaQuery.sizeOf(context);
-  final content = SizedBox(
-    height: math.min(screen.height * (desktop ? .69 : .62), 550),
+  final content = ConstrainedBox(
+    constraints: BoxConstraints(
+      maxHeight: math.min(screen.height * (desktop ? .69 : .62), 550),
+    ),
     child: _RecentImages(
       media: media,
       desktop: desktop,
@@ -405,6 +408,7 @@ class _RecentImagesState extends State<_RecentImages> {
       _ => null,
     };
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SlidingSegmentedTabs(
@@ -425,202 +429,236 @@ class _RecentImagesState extends State<_RecentImages> {
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
         ),
-        Expanded(
-          child: _images.isEmpty && _error
-              ? Center(
-                  child: CreationAction(
-                    onPressed: _load,
-                    child: Text(l10n.creationRetry),
-                  ),
-                )
-              : _images.isEmpty && _loading
-              ? const Center(child: CreationSpinner())
-              : _images.isEmpty
-              ? Center(child: Text(l10n.creationRecentEmpty))
-              : GridView.builder(
-                  padding: EdgeInsets.zero,
-                  controller: _scroll,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: widget.desktop ? 5 : 3,
-                    crossAxisSpacing: 7,
-                    mainAxisSpacing: 7,
-                  ),
-                  itemCount: _images.length + (_loading || _error ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == _images.length) {
-                      return Center(
-                        child: _error
-                            ? CreationAction(
-                                onPressed: _load,
-                                child: Text(l10n.creationRetry),
-                              )
-                            : const CreationSpinner(),
-                      );
-                    }
-                    final item = _images[index];
-                    final selected = _selected.contains(item.path);
-                    final remote = item.thumbnailPath == null
-                        ? _remoteUri(item.path)
-                        : null;
-                    final title = item.title.trim().isNotEmpty
-                        ? item.title
-                        : item.source == RecentImageSource.chat
-                        ? l10n.creationRecentChat
-                        : l10n.creationRecentCreation;
-                    return Semantics(
-                      selected: selected,
-                      label: title,
-                      child: IosCardPress(
-                        focusable: true,
-                        onTap: () => _toggle(item.path),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: EdgeInsets.all(selected ? 2.5 : 0),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: selected ? colors.primary : null,
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                if (remote case final uri?)
-                                  ColoredBox(
-                                    color: colors.surfaceContainerHighest,
-                                    child: Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 5,
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Lucide.Image, size: 20),
-                                            Text(
-                                              uri.host,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 10,
+        Flexible(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 8.0;
+              final columns = widget.desktop ? 5 : 3;
+              final itemCount = _images.length + (_loading || _error ? 1 : 0);
+              final rows = (itemCount / columns).ceil();
+              final tile =
+                  (constraints.maxWidth - (columns - 1) * gap) / columns;
+              final height = _images.isEmpty
+                  ? 84.0
+                  : rows * tile + (rows - 1) * gap;
+              return SizedBox(
+                height: math.min(height, constraints.maxHeight),
+                child: _images.isEmpty && _error
+                    ? Center(
+                        child: CreationAction(
+                          onPressed: _load,
+                          child: Text(l10n.creationRetry),
+                        ),
+                      )
+                    : _images.isEmpty && _loading
+                    ? const Center(child: CreationSpinner())
+                    : _images.isEmpty
+                    ? Center(child: Text(l10n.creationRecentEmpty))
+                    : GridView.builder(
+                        padding: EdgeInsets.zero,
+                        controller: _scroll,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: gap,
+                          mainAxisSpacing: gap,
+                        ),
+                        itemCount: itemCount,
+                        itemBuilder: (context, index) {
+                          if (index == _images.length) {
+                            return Center(
+                              child: _error
+                                  ? CreationAction(
+                                      onPressed: _load,
+                                      child: Text(l10n.creationRetry),
+                                    )
+                                  : const CreationSpinner(),
+                            );
+                          }
+                          final item = _images[index];
+                          final selected = _selected.contains(item.path);
+                          final remote = item.thumbnailPath == null
+                              ? _remoteUri(item.path)
+                              : null;
+                          final title = item.title.trim().isNotEmpty
+                              ? item.title
+                              : item.source == RecentImageSource.chat
+                              ? l10n.creationRecentChat
+                              : l10n.creationRecentCreation;
+                          return Semantics(
+                            selected: selected,
+                            label: title,
+                            child: IosCardPress(
+                              focusable: true,
+                              onTap: () => _toggle(item.path),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: EdgeInsets.all(selected ? 2.5 : 0),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: selected ? colors.primary : null,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      if (remote case final uri?)
+                                        ColoredBox(
+                                          color: colors.surfaceContainerHighest,
+                                          child: Center(
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 5,
+                                                  ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Lucide.Image,
+                                                    size: 20,
+                                                  ),
+                                                  Text(
+                                                    uri.host,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                          ],
+                                          ),
+                                        )
+                                      else
+                                        CreationFileImage(
+                                          item.thumbnailPath ?? item.path,
+                                          cacheWidth: 240,
                                         ),
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  CreationFileImage(
-                                    item.thumbnailPath ?? item.path,
-                                    cacheWidth: 240,
-                                  ),
-                                Positioned(
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      5,
-                                      12,
-                                      5,
-                                      4,
-                                    ),
-                                    decoration: const BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Colors.transparent,
-                                          Colors.black54,
-                                        ],
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          item.source == RecentImageSource.chat
-                                              ? Lucide.MessageCircle
-                                              : Lucide.Palette,
-                                          size: 11,
-                                          color: Colors.white,
-                                        ),
-                                        const SizedBox(width: 3),
-                                        Expanded(
-                                          child: Text(
-                                            title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10.5,
-                                              fontWeight:
-                                                  AppFontWeights.semibold,
+                                      Positioned(
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            5,
+                                            12,
+                                            5,
+                                            4,
+                                          ),
+                                          decoration: const BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [
+                                                Colors.transparent,
+                                                Colors.black54,
+                                              ],
                                             ),
                                           ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                item.source ==
+                                                        RecentImageSource.chat
+                                                    ? Lucide.MessageCircle
+                                                    : Lucide.Palette,
+                                                size: 11,
+                                                color: Colors.white,
+                                              ),
+                                              const SizedBox(width: 3),
+                                              Expanded(
+                                                child: Text(
+                                                  title,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10.5,
+                                                    fontWeight:
+                                                        AppFontWeights.semibold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                      Positioned(
+                                        right: 5,
+                                        top: 5,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: selected
+                                                ? colors.primary
+                                                : Colors.black26,
+                                            border: Border.all(
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                          child: SizedBox.square(
+                                            dimension: 19,
+                                            child: selected
+                                                ? const Icon(
+                                                    Lucide.Check,
+                                                    color: Colors.white,
+                                                    size: 12,
+                                                  )
+                                                : null,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Positioned(
-                                  right: 5,
-                                  top: 5,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: selected
-                                          ? colors.primary
-                                          : Colors.black26,
-                                      border: Border.all(color: Colors.white54),
-                                    ),
-                                    child: SizedBox.square(
-                                      dimension: 19,
-                                      child: selected
-                                          ? const Icon(
-                                              Lucide.Check,
-                                              color: Colors.white,
-                                              size: 12,
-                                            )
-                                          : null,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
+              );
+            },
+          ),
         ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                _selected.isEmpty
-                    ? l10n.creationTapToSelect
-                    : l10n.creationSelectedImages(_selected.length),
-                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+        const SizedBox(height: 12),
+        CreationLabeledActions(
+          label: Text(
+            _selected.isEmpty
+                ? l10n.creationTapToSelect
+                : l10n.creationSelectedImages(_selected.length),
+            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+          ),
+          actions: Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.end,
+            children: [
+              CreationAction(
+                minHeight: widget.desktop ? 34 : 44,
+                foreground: colors.onSurfaceVariant,
+                fill: context.appColors.surfaceFill,
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  MaterialLocalizations.of(context).cancelButtonLabel,
+                ),
               ),
-            ),
-            CreationAction(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
-            ),
-            CreationAction(
-              tone: CreationActionTone.primary,
-              onPressed: _selected.isEmpty || _adding ? null : _confirm,
-              child: _adding
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CreationSpinner(radius: 7),
-                    )
-                  : Text(l10n.creationAddSelected(_selected.length)),
-            ),
-          ],
+              CreationAction(
+                minHeight: widget.desktop ? 34 : 44,
+                tone: CreationActionTone.primary,
+                onPressed: _selected.isEmpty || _adding ? null : _confirm,
+                child: _adding
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CreationSpinner(radius: 7),
+                      )
+                    : Text(l10n.creationAddSelected(_selected.length)),
+              ),
+            ],
+          ),
         ),
       ],
     );
