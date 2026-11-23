@@ -14,6 +14,8 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
 import '../../../shared/widgets/plain_text_input.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart'
+    show handoffCurve, handoffDuration;
 import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
@@ -38,12 +40,13 @@ class CreationTopicGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = MediaQuery.textScalerOf(context);
     final columns = covers ? 3 : 2;
-    final gap = covers ? (desktop ? 6.0 : 4.0) : 10.0;
+    final gap = covers ? 8.0 : 12.0;
     final captions = covers
         ? 0.0
-        : 5.0 +
-              (scale.scale(desktop ? 12.5 : 15) * 1.35).ceil() +
-              (scale.scale(desktop ? 11 : 12) * 1.35).ceil();
+        : 7.0 +
+              (scale.scale(desktop ? 12.5 : 13.5) * 1.35).ceil() +
+              2.0 +
+              (scale.scale(desktop ? 11 : 11.5) * 1.35).ceil();
     return SliverLayoutBuilder(
       builder: (context, constraints) {
         final width =
@@ -52,7 +55,7 @@ class CreationTopicGrid extends StatelessWidget {
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
             crossAxisSpacing: gap,
-            mainAxisSpacing: covers ? gap : (desktop ? 14 : 16),
+            mainAxisSpacing: covers ? gap : (desktop ? 16 : 18),
             mainAxisExtent: width + captions,
           ),
           itemCount: itemCount,
@@ -94,6 +97,7 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
     final showTools = _hover || _focused;
     final desktop = widget.desktop;
     final mode = media.topicView;
+    final list = mode == CreationTopicView.list;
     final batches = media.batchesFor(topic.id);
     final status = batches.lastOrNull?.status;
     final running = batches.any((batch) => batch.status.isActive);
@@ -113,23 +117,50 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        fontSize: desktop ? 12.5 : 15,
+        fontSize: list
+            ? (desktop ? 13.5 : 15)
+            : (widget.wide
+                  ? 15
+                  : desktop
+                  ? 12.5
+                  : 13.5),
         height: 1.35,
-        fontWeight: AppFontWeights.semibold,
+        fontWeight: list && !active
+            ? AppFontWeights.medium
+            : AppFontWeights.semibold,
         color: active ? cs.primary : cs.onSurface,
       ),
     );
+    final count = l10n.creationGenerationCount(batches.length);
+    final lastActivity = batches.lastOrNull?.createdAt ?? topic.updatedAt;
+    final today = DateTime.now();
+    final date = DateUtils.isSameDay(lastActivity, today)
+        ? l10n.sideDrawerDateToday
+        : DateUtils.isSameDay(
+            lastActivity,
+            DateTime(today.year, today.month, today.day - 1),
+          )
+        ? l10n.sideDrawerDateYesterday
+        : MaterialLocalizations.of(context).formatShortMonthDay(lastActivity);
     final subtitle = Text(
       running
           ? (batches.lastOrNull?.mode == MediaMode.video
                 ? l10n.creationWaitingVideo
                 : l10n.creationWaitingImage)
-          : l10n.creationGenerationCount(batches.length),
+          : desktop
+          ? '$count · $date'
+          : count,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        color: cs.onSurfaceVariant,
-        fontSize: desktop ? 11 : 12,
+        color: cs.onSurface.withValues(alpha: .58),
+        fontSize: list
+            ? (desktop ? 11.5 : 12)
+            : (widget.wide
+                  ? 12
+                  : desktop
+                  ? 11
+                  : 11.5),
         height: 1.35,
       ),
     );
@@ -137,33 +168,54 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
     void menu([Rect? anchor]) =>
         showCreationTopicMenu(context, topic, desktop: desktop, anchor: anchor);
 
-    Widget cover(List<GenerationItemRow?> cells) => ClipRRect(
-      borderRadius: radius,
-      child: ColoredBox(
-        color: context.appColors.surfaceFill,
-        child: _CoverMosaic(cells: cells, status: status),
-      ),
-    );
+    Widget cover(List<GenerationItemRow?> cells, {bool compact = false}) =>
+        ColoredBox(
+          color: context.appColors.surfaceFill,
+          child: _CoverMosaic(cells: cells, status: status, compact: compact),
+        );
 
-    final favoriteCover = AspectRatio(
+    final coverOnly = mode == CreationTopicView.covers;
+    final inset = desktop ? 2.5 : 0.0;
+    final innerRadius = BorderRadius.circular(radius.topLeft.x - inset);
+    final topicCover = AspectRatio(
       aspectRatio: widget.wide ? 1.6 : 1,
-      child: DecoratedBox(
+      child: AnimatedContainer(
+        duration: handoffDuration(context, 140),
+        curve: handoffCurve,
+        padding: EdgeInsets.all(inset),
         decoration: BoxDecoration(
           borderRadius: radius,
+          boxShadow: [
+            if (desktop && showTools)
+              BoxShadow(
+                color: cs.shadow.withValues(alpha: .08),
+                offset: const Offset(0, 3),
+                blurRadius: 10,
+              ),
+          ],
+        ),
+        foregroundDecoration: BoxDecoration(
+          borderRadius: radius,
           border: Border.all(
-            color: active ? cs.primary : cs.outlineVariant,
-            width: active ? 2 : 1,
+            color: active
+                ? cs.primary.withValues(alpha: .76)
+                : desktop && showTools
+                ? context.appColors.hairline
+                : Colors.transparent,
+            width: active ? 1.5 : .5,
           ),
         ),
-        child: Padding(
-          padding: EdgeInsets.all(active ? 3 : 1),
+        child: ClipRRect(
+          borderRadius: innerRadius,
           child: Stack(
             fit: StackFit.expand,
             children: [
               cover(allCells),
-              if (mode == CreationTopicView.covers && desktop)
-                Align(
-                  alignment: Alignment.bottomCenter,
+              if (coverOnly && desktop)
+                PositionedDirectional(
+                  start: 0,
+                  end: 0,
+                  bottom: 0,
                   child: CreationHoverActions(
                     visible: showTools,
                     child: DecoratedBox(
@@ -171,17 +223,25 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.black54],
+                          colors: [Colors.transparent, Color(0x99000000)],
                         ),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(5, 15, 5, 4),
+                        padding: const EdgeInsetsDirectional.fromSTEB(
+                          6,
+                          12,
+                          6,
+                          4,
+                        ),
                         child: Text(
                           title,
+                          textAlign: TextAlign.start,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 10.5,
+                            height: 1.2,
+                            fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
                         ),
@@ -190,8 +250,8 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
                   ),
                 ),
               if (running)
-                Positioned(
-                  left: 5,
+                PositionedDirectional(
+                  start: 5,
                   top: 5,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -209,19 +269,22 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
                 ),
               if (desktop)
                 PositionedDirectional(
-                  top: 3,
-                  end: 3,
+                  end: coverOnly ? 4 : 6,
+                  top: coverOnly ? 4 : 6,
                   child: CreationHoverActions(
                     visible: showTools,
                     child: DecoratedBox(
-                      decoration: const BoxDecoration(
-                        color: Color(0x5c000000),
-                        shape: BoxShape.circle,
+                      decoration: BoxDecoration(
+                        color: const Color(0x5c000000),
+                        borderRadius: BorderRadius.circular(7),
                       ),
                       child: Builder(
                         builder: (anchor) => IosIconButton(
                           icon: Lucide.Ellipsis,
-                          minSize: 26,
+                          size: 14,
+                          minSize: coverOnly ? 22 : 24,
+                          padding: EdgeInsets.zero,
+                          borderRadius: 7,
                           color: Colors.white,
                           tooltip: l10n.chatMessageWidgetMoreTooltip,
                           onTap: () => showCreationTopicMenu(
@@ -261,37 +324,29 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
               onTap: widget.onOpen,
               onLongPress: desktop ? null : menu,
               child: switch (mode) {
-                CreationTopicView.covers => favoriteCover,
+                CreationTopicView.covers => topicCover,
                 CreationTopicView.coverAndTitle => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    favoriteCover,
-                    const SizedBox(height: 5),
-                    text,
-                    subtitle,
+                    topicCover,
+                    const SizedBox(height: 7),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [text, const SizedBox(height: 2), subtitle],
+                      ),
+                    ),
                   ],
                 ),
-                CreationTopicView.list => Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox.square(
-                        dimension: 40,
-                        child: cover(allCells.take(1).toList()),
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [text, subtitle],
-                        ),
-                      ),
-                      if (running || desktop)
-                        SizedBox.square(
+                CreationTopicView.list => CreationTopicListRow(
+                  desktop: desktop,
+                  thumbnail: cover(allCells.take(1).toList(), compact: true),
+                  title: text,
+                  subtitle: subtitle,
+                  trailing: running || desktop
+                      ? SizedBox.square(
                           dimension: desktop ? 28 : 16,
                           child: Stack(
                             alignment: Alignment.center,
@@ -323,9 +378,8 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
                                 ),
                             ],
                           ),
-                        ),
-                    ],
-                  ),
+                        )
+                      : null,
                 ),
               },
             ),
@@ -336,8 +390,52 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
   }
 }
 
+class CreationTopicListRow extends StatelessWidget {
+  const CreationTopicListRow({
+    super.key,
+    required this.desktop,
+    required this.thumbnail,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+  final bool desktop;
+  final Widget thumbnail, title, subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.symmetric(horizontal: 8, vertical: desktop ? 6 : 8),
+    child: Row(
+      children: [
+        SizedBox.square(
+          dimension: desktop ? 40 : 48,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: thumbnail,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [title, const SizedBox(height: 2), subtitle],
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 4), trailing!],
+      ],
+    ),
+  );
+}
+
 class _CoverMosaic extends StatelessWidget {
-  const _CoverMosaic({required this.cells, required this.status});
+  const _CoverMosaic({
+    required this.cells,
+    required this.status,
+    required this.compact,
+  });
+  final bool compact;
 
   final List<GenerationItemRow?> cells;
   final GenerationStatus? status;
@@ -352,27 +450,32 @@ class _CoverMosaic extends StatelessWidget {
         GenerationStatus.cancelled => l10n.creationCancelled,
         _ => null,
       };
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              label == null ? Lucide.Image : Lucide.CircleAlert,
-              size: 22,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            if (label != null)
-              Padding(
-                padding: const EdgeInsets.all(4),
-                child: Text(
-                  label,
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11.5),
-                ),
+      return Semantics(
+        label: compact ? label : null,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                label == null ? Lucide.Image : Lucide.CircleAlert,
+                size: 22,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-          ],
+              if (label != null && !compact)
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Text(
+                      label,
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11.5),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       );
     }

@@ -180,12 +180,12 @@ class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
                       onDismiss: () => setState(() => _navigationOpen = false),
                     ),
                   ),
-                  Positioned(
-                    left: 0,
+                  PositionedDirectional(
+                    start: 0,
                     top: 0,
                     bottom: 0,
                     width: math.min(272, constraints.maxWidth * .78),
-                    child: rail,
+                    child: ColoredBox(color: cs.surface, child: rail),
                   ),
                 ],
               ],
@@ -228,18 +228,7 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
     final list = media.topicView == CreationTopicView.list;
     Widget topicAt(int index) {
       if (showNew && index == 0) {
-        return list
-            ? SizedBox(
-                height: 48,
-                child: Row(
-                  children: [
-                    Icon(Lucide.Plus, size: 20, color: cs.primary),
-                    const SizedBox(width: 9),
-                    Text(l10n.creationNewTopic),
-                  ],
-                ),
-              )
-            : _NewTopicCard(minimal: covers);
+        return _NewTopicCard(mode: media.topicView);
       }
       final topic = topics[index - (showNew ? 1 : 0)];
       return CreationTopicCard(
@@ -253,8 +242,8 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(color: cs.onSurface.withValues(alpha: .06)),
+        border: BorderDirectional(
+          end: BorderSide(color: context.appColors.hairline, width: .5),
         ),
       ),
       child: Column(
@@ -347,8 +336,9 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
               slivers: [
                 if (list)
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
-                    sliver: SliverList.builder(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                    sliver: SliverList.separated(
+                      separatorBuilder: (_, _) => const SizedBox(height: 4),
                       itemCount: topics.length + (showNew ? 1 : 0),
                       itemBuilder: (_, index) => topicAt(index),
                     ),
@@ -390,55 +380,84 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
 }
 
 class _NewTopicCard extends StatelessWidget {
-  const _NewTopicCard({required this.minimal});
-
-  final bool minimal;
+  const _NewTopicCard({required this.mode});
+  final CreationTopicView mode;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final media = context.watch<MediaCreationController>();
-    final radius = BorderRadius.circular(12);
+    final list = mode == CreationTopicView.list;
+    final title = Text(
+      l10n.creationNewTopic,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: list ? 13.5 : 12.5,
+        height: 1.35,
+        fontWeight: AppFontWeights.semibold,
+        color: cs.primary,
+      ),
+    );
+    final subtitle = Text(
+      media.autoTitle
+          ? l10n.creationNameAfterSending
+          : l10n.creationPromptTitle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: list ? 11.5 : 11,
+        height: 1.35,
+        color: cs.onSurface.withValues(alpha: .58),
+      ),
+    );
+    final cover = DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: .055),
+        borderRadius: BorderRadius.circular(list ? 9 : 12),
+      ),
+      child: Center(
+        child: Icon(Lucide.Plus, size: list ? 17 : 20, color: cs.primary),
+      ),
+    );
+    if (list) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: cs.primary.withValues(alpha: .065),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: CreationTopicListRow(
+          desktop: true,
+          thumbnail: cover,
+          title: title,
+          subtitle: subtitle,
+        ),
+      );
+    }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         AspectRatio(
           aspectRatio: 1,
-          child: CustomPaint(
-            foregroundPainter: _TopicOutline(cs.primary.withValues(alpha: .45)),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: .06),
-                borderRadius: radius,
+          child: Padding(
+            padding: const EdgeInsets.all(2.5),
+            child: CustomPaint(
+              foregroundPainter: _TopicOutline(
+                cs.primary.withValues(alpha: .32),
               ),
-              child: Center(child: Icon(Lucide.Plus, color: cs.primary)),
+              child: cover,
             ),
           ),
         ),
-        if (!minimal) ...[
-          const SizedBox(height: 5),
-          Text(
-            l10n.creationNewTopic,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.35,
-              fontWeight: AppFontWeights.semibold,
-              color: cs.primary,
-            ),
-          ),
-          Text(
-            media.autoTitle
-                ? l10n.creationNameAfterSending
-                : l10n.creationPromptTitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.35,
-              color: cs.onSurfaceVariant,
+        if (mode != CreationTopicView.covers) ...[
+          const SizedBox(height: 7),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [title, const SizedBox(height: 2), subtitle],
             ),
           ),
         ],

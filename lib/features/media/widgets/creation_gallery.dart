@@ -302,16 +302,16 @@ class _CreationGalleryState extends State<CreationGallery> {
                     return GridView.builder(
                       key: ValueKey((_filter, query)),
                       padding: EdgeInsets.fromLTRB(
-                        widget.desktop ? 24 : 6,
+                        widget.desktop ? 24 : 10,
                         widget.desktop ? 8 : 0,
-                        widget.desktop ? 24 : 6,
+                        widget.desktop ? 24 : 10,
                         CreationDockInset.bottomOf(context, 168),
                       ),
                       gridDelegate: !widget.desktop
                           ? const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 3,
-                              mainAxisSpacing: 3,
-                              crossAxisSpacing: 3,
+                              mainAxisSpacing: 6,
+                              crossAxisSpacing: 6,
                             )
                           : _MasonryDelegate(
                               columns: columns,
@@ -459,7 +459,7 @@ class _CreationArtworkTileState extends State<CreationArtworkTile> {
               widget.galleryTile
                   ? widget.desktop
                         ? 12
-                        : 4
+                        : 8
                   : 16,
             ),
             child: Stack(

@@ -491,14 +491,20 @@ class _RecentImagesState extends State<_RecentImages> {
                               focusable: true,
                               onTap: () => _toggle(item.path),
                               borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                padding: EdgeInsets.all(selected ? 2.5 : 0),
-                                decoration: BoxDecoration(
+                              child: AnimatedContainer(
+                                duration: handoffDuration(context, 140),
+                                curve: handoffCurve,
+                                foregroundDecoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(12),
-                                  color: selected ? colors.primary : null,
+                                  border: Border.all(
+                                    color: selected
+                                        ? colors.primary.withValues(alpha: .85)
+                                        : Colors.transparent,
+                                    width: 1.5,
+                                  ),
                                 ),
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(12),
                                   child: Stack(
                                     fit: StackFit.expand,
                                     children: [

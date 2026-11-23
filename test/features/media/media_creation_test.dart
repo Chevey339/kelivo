@@ -20,6 +20,7 @@ import 'package:Kelivo/features/media/widgets/creation_composer.dart';
 import 'package:Kelivo/features/media/widgets/creation_gallery.dart';
 import 'package:Kelivo/features/media/widgets/creation_lightbox.dart';
 import 'package:Kelivo/features/media/widgets/creation_timeline.dart';
+import 'package:Kelivo/features/media/widgets/creation_topic_card.dart';
 import 'package:Kelivo/features/media/widgets/creation_waiting_card.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
@@ -427,6 +428,71 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('A wide mountain lake').hitTestable(), findsOneWidget);
       expect(find.text('Study 30').hitTestable(), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'new and saved desktop topic rows align at large text sizes and cover actions fit the thumbnail',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1024, 680);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final media = await _pumpCreationGallery(
+        tester,
+        desktop: true,
+        count: 1,
+        locale: const Locale('tr'),
+      );
+      await tester.runAsync(() => media.setTopicView(CreationTopicView.list));
+      await tester.pumpAndSettle();
+      final rows = find.byType(CreationTopicListRow);
+      expect(rows, findsNWidgets(2));
+      final newTitle = AppLocalizations.of(
+        tester.element(rows.first),
+      )!.creationNewTopic;
+      final draftTitle = find.descendant(
+        of: rows.first,
+        matching: find.text(newTitle),
+      );
+      final savedTitle = find.descendant(
+        of: rows.last,
+        matching: find.text('Mountain trip'),
+      );
+      expect(
+        tester.getTopLeft(draftTitle).dx,
+        tester.getTopLeft(savedTitle).dx,
+      );
+      expect(
+        tester.getRect(rows.first).bottom,
+        lessThan(tester.getRect(rows.last).top),
+      );
+      await tester.runAsync(() => media.setTopicView(CreationTopicView.covers));
+      await tester.pumpAndSettle();
+      final card = find.byType(CreationTopicCard);
+      final photo = find
+          .descendant(of: card, matching: find.byType(CreationFileImage))
+          .first;
+      final photoSize = tester.getSize(photo);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(1, 1));
+      await mouse.moveTo(tester.getCenter(card));
+      await tester.pumpAndSettle();
+      final more = AppLocalizations.of(
+        tester.element(card),
+      )!.chatMessageWidgetMoreTooltip;
+      final moreButton = find
+          .descendant(of: card, matching: find.byTooltip(more))
+          .hitTestable();
+      expect(tester.getSize(moreButton).width, lessThanOrEqualTo(24));
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      expect(tester.getSize(photo), photoSize);
+      await mouse.removePointer();
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
@@ -946,6 +1012,7 @@ Future<MediaCreationController> _pumpCreationGallery(
   WidgetTester tester, {
   required bool desktop,
   int count = 2,
+  Locale locale = const Locale('en'),
   bool seedTopic = true,
   int laterBatches = 0,
 }) async {
@@ -1055,7 +1122,7 @@ Future<MediaCreationController> _pumpCreationGallery(
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
+        locale: locale,
         home: desktop
             ? const DesktopMediaCreationPage()
             : MediaCreationPage(onOpenDrawer: () {}),

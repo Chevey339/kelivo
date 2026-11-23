@@ -155,15 +155,7 @@ class DesktopNavRail extends StatelessWidget {
     return SizedBox(
       width: width,
       child: activeTab == DesktopTab.media
-          ? DecoratedBox(
-              decoration: BoxDecoration(
-                color: cs.surface,
-                border: BorderDirectional(
-                  end: BorderSide(color: cs.onSurface.withValues(alpha: .06)),
-                ),
-              ),
-              child: rail,
-            )
+          ? ColoredBox(color: cs.surface, child: rail)
           : DesktopPaneSurface(child: rail),
     );
   }

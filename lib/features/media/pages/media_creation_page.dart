@@ -260,18 +260,19 @@ class _MobileTopics extends StatelessWidget {
         if (items.isNotEmpty) ...[
           if (showFirst)
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
               sliver: SliverToBoxAdapter(child: card(items.first, wide: true)),
             ),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(
-              covers ? 6 : 16,
+              covers ? 10 : 16,
               0,
-              covers ? 6 : 16,
+              covers ? 10 : 16,
               CreationDockInset.bottomOf(context, 156),
             ),
             sliver: list
-                ? SliverList.builder(
+                ? SliverList.separated(
+                    separatorBuilder: (_, _) => const SizedBox(height: 4),
                     itemCount: items.length,
                     itemBuilder: (_, i) => card(items[i]),
                   )
