@@ -174,6 +174,7 @@ class RequestImageContext {
   int lastRequestImageCount = 0;
   final Set<String> viewImageUris;
   final activeHandles = <String>{};
+  final _generatedReferencesInRequest = <String>{};
   final compressedOwners = <String>{};
   final Future<String?> Function(ChatContextImage)? loader;
   final _byHandle = <String, ChatContextImage>{};
@@ -410,18 +411,26 @@ class RequestImageContext {
         _isExcluded(image, currentSettings.excluded)) {
       return null;
     }
-    final thisTurn =
-        image.identity.messageId == targetMessageId &&
-        image.identity.slot.startsWith('creation:');
     final latestAttachment =
         image.source == ContextImageSource.user &&
         image.identity.messageId == latestUserId &&
         activeHandles.contains(handle);
-    if (!currentSettings.allowRecall && !thisTurn && !latestAttachment) {
+    if (!currentSettings.allowRecall &&
+        !_isGeneratedImageInRequest(image) &&
+        !latestAttachment) {
       return null;
     }
     return image;
   }
+
+  // An edit uses the image produced by the conversation's own tool. Only
+  // outputs in the selected request window qualify without history recall.
+  bool _isGeneratedImageInRequest(ChatContextImage image) =>
+      image.source == ContextImageSource.assistant &&
+      image.identity.slot.startsWith('creation:') &&
+      (image.identity.messageId == targetMessageId ||
+          (_generatedReferencesInRequest.contains(image.handle) &&
+              !compressedOwners.contains(image.identity.messageId)));
 
   List<String> get currentGenerationReferenceIds => omitImages
       ? const []
@@ -640,6 +649,34 @@ class RequestImageContext {
     return added;
   }
 
+  // Keep IDs with the reply that produced them, including when the chat model
+  // accepts text only or tool replay is disabled. A cropped or compressed
+  // message then loses its hint along with the rest of its content.
+  void _identifyGeneratedOutputs(List<Map<String, dynamic>> messages) {
+    final outputs = <String, List<String>>{};
+    for (final image in images) {
+      if (image.source == ContextImageSource.assistant &&
+          image.identity.slot.startsWith('creation:') &&
+          _isRecallable(image)) {
+        (outputs[image.identity.messageId] ??= []).add(image.handle);
+      }
+    }
+    for (final message in messages.reversed) {
+      if (outputs.isEmpty) break;
+      if (message['role'] != 'assistant') continue;
+      final ids = outputs.remove(message[imageContextOwnerKey]);
+      if (ids == null) continue;
+      _generatedReferencesInRequest.addAll(ids);
+      // A tool-only reply already exposes the IDs in its tool result.
+      if (message.containsKey('tool_calls')) continue;
+      final content = message['content'];
+      if (content is String) {
+        final hint = '[Generated image IDs: ${ids.join(', ')}]';
+        message['content'] = content.isEmpty ? hint : '$content\n\n$hint';
+      }
+    }
+  }
+
   /// Runs after OCR and attachment descriptions, before any local inlining.
   /// The existing parser preserves code/literal blocks; no image regex rewrites
   /// user text. Metadata and side-channel paths resolve to the same occurrence.
@@ -648,7 +685,12 @@ class RequestImageContext {
     List<String> userPaths, {
     required bool parseMarkdownImages,
     required bool allowRemoteImages,
+    bool includeGeneratedReferences = false,
   }) async {
+    _generatedReferencesInRequest.clear();
+    if (includeGeneratedReferences && !omitImages) {
+      _identifyGeneratedOutputs(messages);
+    }
     for (final message in messages) {
       if (message['role'] == 'tool') {
         final metadata = (message['metadata'] as Map?)?.cast<String, dynamic>();

@@ -7,20 +7,22 @@ abstract final class GenerateImageTool {
   static const batchKey = 'generationBatchId';
   static const attachmentKey = 'generatedImage';
 
+  static bool acceptsReferences(Map<String, dynamic> tool) =>
+      switch (tool['function']) {
+        {
+          'name': GenerateImageTool.name,
+          'parameters': {'properties': {'image_ids': _}},
+        } =>
+          true,
+        _ => false,
+      };
+
   static Map<String, dynamic> withCurrentAttachments(
     Map<String, dynamic> tool,
     List<String> imageIds,
   ) {
-    final function = tool['function'];
-    if (imageIds.isEmpty ||
-        function is! Map<String, dynamic> ||
-        function['name'] != name ||
-        (function['parameters'] as Map?)?['properties'] is! Map ||
-        !((function['parameters'] as Map)['properties'] as Map).containsKey(
-          'image_ids',
-        )) {
-      return tool;
-    }
+    if (imageIds.isEmpty || !acceptsReferences(tool)) return tool;
+    final function = tool['function'] as Map<String, dynamic>;
     return {
       ...tool,
       'function': {

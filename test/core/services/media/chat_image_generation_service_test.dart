@@ -21,6 +21,7 @@ import 'package:Kelivo/core/services/media/media_models.dart';
 import 'package:Kelivo/core/services/tools/generate_image_tool.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -46,6 +47,8 @@ class _Paths extends PathProviderPlatform {
   @override
   Future<String?> getTemporaryPath() async => '$root/tmp';
 }
+
+class _Context extends Fake implements BuildContext {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -248,6 +251,146 @@ void main() {
       expect(
         await File(SandboxPathResolver.resolveForIo(part.uri)!).exists(),
         isTrue,
+      );
+    },
+  );
+
+  test(
+    'a text-only follow-up edits the selected previous output with recall off',
+    () async {
+      final requests = <http.Request>[];
+      final api = service(
+        runner(
+          (_, _) => MockClient((request) async {
+            requests.add(request);
+            return result();
+          }),
+        ),
+      );
+      final generated = await api.run(
+        {'prompt': 'Draw a tabby cat at the window'},
+        conversationId: conversationId,
+        context: context,
+        enabled: () => true,
+      );
+      final id =
+          jsonDecode(generated.content)['images'].single['image_id'] as String;
+      final handler = StreamChunkHandler()
+        ..handle(
+          const ToolCallStart(id: 'cat', toolName: GenerateImageTool.name),
+        )
+        ..handle(
+          ToolCallResult(
+            id: 'cat',
+            output: generated.content,
+            metadata: generated.metadata,
+          ),
+        );
+      await chat.updateMessage(
+        messageId,
+        parts: [...handler.parts, const TextPart('Here is the cat.')],
+        isStreaming: false,
+      );
+      final nextUser = await chat.addMessage(
+        conversationId: conversationId,
+        role: 'user',
+        content: 'Make it white',
+      );
+      final nextReply = await chat.addMessage(
+        conversationId: conversationId,
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      );
+      final history = await chat.imageContextHistory(
+        conversationId,
+        throughMessageId: nextUser.id,
+      );
+      final imageSettings = await chat.imageContextSettings(conversationId);
+      expect(imageSettings.allowRecall, isFalse);
+      final inputs =
+          MessageBuilderService(
+            chatService: chat,
+            contextProvider: _Context(),
+          ).buildApiMessages(
+            messages: await chat.loadSelectedContextMessages(
+              conversationId,
+              limit: 20,
+              throughRevisionId: nextUser.id,
+            ),
+            versionSelections: {},
+            currentConversation: chat.getConversation(conversationId),
+          );
+      final next = RequestImageContext(
+        images: await RequestImageContext.collectHistory(
+          history,
+          parseMarkdownImages: false,
+          allowRemoteImages: false,
+        ),
+        settings: imageSettings,
+        canImageInput: false,
+        latestUserId: nextUser.id,
+        targetMessageId: nextReply.id,
+      );
+      await next.prepareMessages(
+        inputs,
+        [],
+        parseMarkdownImages: false,
+        allowRemoteImages: false,
+        includeGeneratedReferences: true,
+      );
+      expect(inputs.last['content'], 'Make it white');
+      final originalReply = inputs.singleWhere(
+        (message) => message[imageContextOwnerKey] == messageId,
+      );
+      expect(originalReply['content'], contains(id));
+      expect(jsonEncode(inputs), isNot(contains(savedPng)));
+
+      Future<dynamic> edit() async => jsonDecode(
+        (await api.run(
+          {
+            'prompt': 'Change the coat to white',
+            'image_ids': [id],
+          },
+          conversationId: conversationId,
+          context: next,
+          enabled: () => true,
+        )).content,
+      );
+      await chat.setImageContextSettings(
+        conversationId,
+        imageSettings.exclude({next.images.single.exclusionKey}, true),
+      );
+      expect((await edit())['error'], isNotEmpty);
+      await chat.setImageContextSettings(conversationId, imageSettings);
+      await next.prepareMessages(
+        [inputs.last],
+        [],
+        parseMarkdownImages: false,
+        allowRemoteImages: false,
+        includeGeneratedReferences: true,
+      );
+
+      expect((await edit())['error'], isNotEmpty);
+      expect(requests, hasLength(1));
+      await next.prepareMessages(
+        inputs,
+        [],
+        parseMarkdownImages: false,
+        allowRemoteImages: false,
+        includeGeneratedReferences: true,
+      );
+      next.compressedOwners.add(messageId);
+      expect((await edit())['error'], isNotEmpty);
+      next.compressedOwners.clear();
+      expect((await edit())['images'], hasLength(1));
+      expect(requests.map((r) => r.url.path), [
+        '/v1/images/generations',
+        '/v1/images/edits',
+      ]);
+      expect(
+        latin1.decode(requests.last.bodyBytes),
+        contains(latin1.decode(base64Decode(savedPng))),
       );
     },
   );

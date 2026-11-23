@@ -609,6 +609,9 @@ class MessageGenerationService {
         const [],
         parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
         allowRemoteImages: imageContext.allowsRemoteUserImages,
+        includeGeneratedReferences: packed.toolDefs.any(
+          GenerateImageTool.acceptsReferences,
+        ),
       );
     }
     final imagePreview = await imageContext?.preview();
@@ -864,6 +867,9 @@ class MessageGenerationService {
         lastUserImagePaths,
         parseMarkdownImages: settings.sendMarkdownImageLinksAsImages,
         allowRemoteImages: imageContext.allowsRemoteUserImages,
+        includeGeneratedReferences: packed.toolDefs.any(
+          GenerateImageTool.acceptsReferences,
+        ),
       );
     } else {
       await messageBuilderService.inlineLocalImages(apiMessages);
