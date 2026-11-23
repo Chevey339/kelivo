@@ -620,14 +620,12 @@ void main() {
             isTrue,
             reason: modelId,
           );
-          // DeepSeek documents its server tools for Chat Completions as well,
-          // so the built-in search toggle is no longer Responses-only.
           expect(
             BuiltInToolsHelper.supportsBuiltInSearchForModel(
               cfg: chatConfig,
               modelId: modelId,
             ),
-            isTrue,
+            modelId != 'deepseek-v4-pro',
             reason: modelId,
           );
         }

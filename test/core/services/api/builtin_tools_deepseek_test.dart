@@ -103,15 +103,51 @@ void main() {
       );
     });
 
-    test('chat completions keeps web_search for v4-pro', () {
-      final payload = BuiltInToolsHelper.buildChatCompletionsTools(
-        cfg: _cfg(modelId: 'deepseek-v4-pro'),
+    test('V4 Pro Chat Completions drops search and stale Read Link', () {
+      final cfg = _cfg(
+        useResponseApi: false,
         modelId: 'deepseek-v4-pro',
-        upstreamModelId: 'deepseek-v4-pro',
+        builtInTools: const [BuiltInToolNames.search, BuiltInToolNames.readUrl],
       );
-      final types = payload.tools.map((t) => t['type']).toList();
-      expect(types, contains('web_search'));
-      expect(types, isNot(contains('deepseek_web_search')));
+      expect(
+        BuiltInToolsHelper.buildChatCompletionsTools(
+          cfg: cfg,
+          modelId: 'deepseek-v4-pro',
+          upstreamModelId: 'deepseek-v4-pro',
+        ).tools,
+        isEmpty,
+      );
+      expect(
+        BuiltInToolsHelper.supportsBuiltInSearchForModel(
+          cfg: cfg,
+          modelId: 'deepseek-v4-pro',
+        ),
+        isFalse,
+      );
+      expect(
+        BuiltInToolsHelper.modelSettingsToolNames(
+          cfg,
+          modelId: 'deepseek-v4-pro',
+        ),
+        isNot(contains(BuiltInToolNames.readUrl)),
+      );
+    });
+
+    test('V4 Pro Responses preserves web_search but drops stale Read Link', () {
+      final cfg = _cfg(
+        modelId: 'deepseek-v4-pro',
+        builtInTools: const [BuiltInToolNames.search, BuiltInToolNames.readUrl],
+      );
+      expect(
+        BuiltInToolsHelper.buildResponsesTools(
+          cfg: cfg,
+          modelId: 'deepseek-v4-pro',
+          upstreamModelId: 'deepseek-v4-pro',
+        ).tools,
+        [
+          {'type': 'web_search'},
+        ],
+      );
     });
   });
 }

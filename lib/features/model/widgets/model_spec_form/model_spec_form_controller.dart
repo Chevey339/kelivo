@@ -819,6 +819,7 @@ class ModelSpecFormController extends ChangeNotifier {
       current: currentTools,
       selected: selected,
       modelId: isNew ? '' : logicalKey,
+      upstreamModelId: spec.upstreamId,
     );
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
     if (spec.type == ModelType.embedding || builtInTools.isEmpty) {

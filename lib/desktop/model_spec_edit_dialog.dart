@@ -164,6 +164,7 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
                   ModelBuiltInToolTiles.forConfig(
                     cfg: _controller.config,
                     l10n: l10n,
+                    upstreamModelId: spec.upstreamId,
                   ).isNotEmpty;
               final sections = _visibleSections(spec, showTools);
               var section = _section;
