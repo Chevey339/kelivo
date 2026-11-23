@@ -395,7 +395,9 @@ class MainFlutterWindow: NSWindow {
     self.titlebarAppearsTransparent = true
     self.titleVisibility = .hidden
     self.styleMask.insert(.fullSizeContentView)
-    self.isMovableByWindowBackground = true
+    // The drag-and-drop plugin makes FlutterView.mouseDownCanMoveWindow true
+    // for the whole view. Our title bars start window drags explicitly.
+    self.isMovableByWindowBackground = false
     if #available(macOS 15.0, *) {
       self.isMovable = true
     }
