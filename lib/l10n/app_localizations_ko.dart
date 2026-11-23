@@ -3410,12 +3410,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get chatInputBarImageProcessing => '이미지 처리 중';
 
   @override
-  String get chatInputBarImageMode => '이미지 모드';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => '이미지 모드 끄기';
-
-  @override
   String get chatInputBarQueuedPending => '전송 대기 중';
 
   @override
@@ -3707,7 +3701,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '대화 제목을 요약하는 데 사용되며, 기본적으로 현재 채팅 모델을 따르거나 다른 모델을 지정할 수 있습니다.';
+      '기본적으로 현재 채팅 모델을 사용하거나 선택한 모델로 대화 제목을 요약합니다. 창작 주제 자동 이름 지정에도 사용됩니다.';
 
   @override
   String get titleModelThinkingTitle => '사고 활성화';
@@ -17974,4 +17968,71 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get creationLoggedResponse => '응답 정보';
+
+  @override
+  String get creationDefaultImage => '이미지 생성 모델';
+
+  @override
+  String get creationDefaultImageHelp => '창작의 이미지 모드와 채팅의 이미지 생성 도구에서 사용됩니다.';
+
+  @override
+  String get creationDefaultVideo => '비디오 생성 모델';
+
+  @override
+  String get creationDefaultVideoHelp => '창작의 비디오 모드에서 사용됩니다.';
+
+  @override
+  String get creationDefaultEnhance => '프롬프트 개선 모델';
+
+  @override
+  String get creationDefaultEnhanceHelp =>
+      '창작에서 프롬프트를 다듬습니다. 이 모델이 이미지 입력을 지원하면 참조 이미지도 함께 전송됩니다.';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return '$variable로 현재 창작 프롬프트를 삽입하세요.';
+  }
+
+  @override
+  String get creationLocalToolTitle => '이미지 생성';
+
+  @override
+  String get creationLocalToolHelp =>
+      '기본 이미지 생성 모델을 사용해 어시스턴트가 채팅에서 이미지를 그리거나 편집하도록 합니다.';
+
+  @override
+  String get creationLocalToolNeedsModel => '먼저 기본 모델에서 이미지 생성 모델을 선택하세요.';
+
+  @override
+  String creationChatSource(String title) {
+    return '채팅 · $title';
+  }
+
+  @override
+  String get creationSendToChat => '채팅으로 보내기';
+
+  @override
+  String get creationShowInConversation => '대화에서 보기';
+
+  @override
+  String get creationShowInCreation => '창작에서 보기';
+
+  @override
+  String get creationChatCancelled => '이미지 생성이 취소되었습니다';
+
+  @override
+  String get creationChatRegenerate => '다시 생성';
+
+  @override
+  String get creationChatImageUnavailable => '이미지를 사용할 수 없음';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '이미지 $count개 생성됨',
+    );
+    return '$_temp0 · $model · $ratio';
+  }
 }

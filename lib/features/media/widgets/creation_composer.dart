@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/media_creation.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
 import '../../../desktop/desktop_glass_popover.dart';
 import '../../../icons/lucide_adapter.dart';

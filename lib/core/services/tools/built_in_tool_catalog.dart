@@ -4,6 +4,7 @@ import '../../services/search/search_tool_service.dart';
 import '../../services/search/web_fetch_tool_service.dart';
 import '../../../features/home/services/local_tools_service.dart';
 import '../workspace/workspace_tools_service.dart';
+import 'generate_image_tool.dart';
 import 'view_image_tool.dart';
 
 enum BuiltInToolGroup { search, images, memory, local, workspace }
@@ -57,6 +58,11 @@ abstract final class BuiltInToolCatalog {
         ),
         group: BuiltInToolGroup.images,
       ),
+      BuiltInToolCatalogEntry(
+        name: GenerateImageTool.name,
+        defaultDefinition: GenerateImageTool.definition(allowReferences: true),
+        group: BuiltInToolGroup.images,
+      ),
     ];
 
     final memoryDefs = legacyMemoryMode
@@ -75,6 +81,7 @@ abstract final class BuiltInToolCatalog {
     }
 
     for (final name in LocalToolNames.all) {
+      if (name == GenerateImageTool.name) continue;
       if (!LocalToolsService.isAvailableOnThisPlatform(name)) continue;
       out.add(
         BuiltInToolCatalogEntry(

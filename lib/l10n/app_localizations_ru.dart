@@ -3543,13 +3543,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatInputBarImageProcessing => 'Обработка изображения';
 
   @override
-  String get chatInputBarImageMode => 'Режим изображений';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip =>
-      'Отключить режим изображений';
-
-  @override
   String get chatInputBarQueuedPending => 'В очереди на отправку';
 
   @override
@@ -3848,7 +3841,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Суммирует заголовки чатов: по умолчанию используется текущая модель чата или выбранная модель.';
+      'По умолчанию суммирует названия чатов с помощью текущей модели чата или выбранной модели. Также используется для автоматического названия тем при создании.';
 
   @override
   String get titleModelThinkingTitle => 'Включить рассуждение';
@@ -18871,4 +18864,77 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get creationLoggedResponse => 'Метаданные ответа';
+
+  @override
+  String get creationDefaultImage => 'Модель генерации изображений';
+
+  @override
+  String get creationDefaultImageHelp =>
+      'Используется для изображений в разделе «Создание» и инструмента генерации изображений в чате.';
+
+  @override
+  String get creationDefaultVideo => 'Модель генерации видео';
+
+  @override
+  String get creationDefaultVideoHelp =>
+      'Используется в режиме видео в разделе «Создание».';
+
+  @override
+  String get creationDefaultEnhance => 'Модель улучшения промптов';
+
+  @override
+  String get creationDefaultEnhanceHelp =>
+      'Улучшает промпты в разделе «Создание». Референсные изображения включаются, если модель поддерживает ввод изображений.';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return 'Используйте $variable для текущего промпта создания.';
+  }
+
+  @override
+  String get creationLocalToolTitle => 'Генерация изображений';
+
+  @override
+  String get creationLocalToolHelp =>
+      'Позволяет ассистенту рисовать или редактировать изображения в чате с помощью модели генерации изображений по умолчанию.';
+
+  @override
+  String get creationLocalToolNeedsModel =>
+      'Сначала выберите модель генерации изображений в разделе «Модели по умолчанию».';
+
+  @override
+  String creationChatSource(String title) {
+    return 'Чат · $title';
+  }
+
+  @override
+  String get creationSendToChat => 'Отправить в чат';
+
+  @override
+  String get creationShowInConversation => 'Показать в чате';
+
+  @override
+  String get creationShowInCreation => 'Показать в «Создании»';
+
+  @override
+  String get creationChatCancelled => 'Создание изображения отменено';
+
+  @override
+  String get creationChatRegenerate => 'Сгенерировать снова';
+
+  @override
+  String get creationChatImageUnavailable => 'Изображение недоступно';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Сгенерировано $count изображения',
+      many: 'Сгенерировано $count изображений',
+      few: 'Сгенерировано $count изображения',
+      one: 'Сгенерировано $count изображение',
+    );
+    return '$_temp0 · $model · $ratio';
+  }
 }

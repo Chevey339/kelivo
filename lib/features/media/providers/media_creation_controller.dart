@@ -14,18 +14,10 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/media/media_adapter_resolver.dart';
 import '../../../core/services/media/media_generation_runner.dart';
+import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/storage/attachment_file_lock.dart';
-
-class MediaModelChoice {
-  const MediaModelChoice(this.provider, this.spec, this.capabilities);
-
-  final ProviderConfig provider;
-  final ModelSpec spec;
-  final MediaCapabilities capabilities;
-  String get key => '${provider.id}::${spec.id}';
-}
 
 class CreationDraft {
   const CreationDraft({
@@ -80,9 +72,14 @@ class MediaCreationController extends ChangeNotifier {
         ..clear()
         ..addEntries(batches.map((batch) => MapEntry(batch.id, batch)));
       _batchesByTopic.clear();
+      _batchesByMessage.clear();
       for (final batch in batches) {
         final id = batch.topicId;
         if (id != null) (_batchesByTopic[id] ??= []).add(batch);
+        final message = batch.messageId;
+        if (batch.source == GenerationSource.chat && message != null) {
+          (_batchesByMessage[message] ??= []).add(batch);
+        }
       }
       notifyListeners();
     }, onError: _storageError);
@@ -116,6 +113,7 @@ class MediaCreationController extends ChangeNotifier {
   final _batchesById = <String, GenerationBatchRow>{};
   final _itemsById = <String, GenerationItemRow>{};
   final _batchesByTopic = <String, List<GenerationBatchRow>>{};
+  final _batchesByMessage = <String, List<GenerationBatchRow>>{};
   final _itemsByBatch = <String, List<GenerationItemRow>>{};
   final _drafts = <String?, CreationDraft>{};
   final _options = <MediaMode, _ComposerOptions>{};
@@ -135,6 +133,8 @@ class MediaCreationController extends ChangeNotifier {
       _topics.where((row) => row.id == id).firstOrNull;
   List<GenerationBatchRow> batchesFor(String id) =>
       _batchesByTopic[id] ?? const [];
+  List<GenerationBatchRow> chatBatchesFor(String messageId) =>
+      _batchesByMessage[messageId] ?? const [];
   List<GenerationItemRow> itemsFor(String id) => _itemsByBatch[id] ?? const [];
   List<GenerationItemRow> worksFor(String id) => [
     for (final batch in batchesFor(id)) ...itemsFor(batch.id),
@@ -179,8 +179,9 @@ class MediaCreationController extends ChangeNotifier {
 
   List<GenerationItemRow> galleryItems(
     CreationGalleryFilter filter,
-    String query,
-  ) {
+    String query, {
+    String? Function(String conversationId)? conversationTitle,
+  }) {
     final term = query.trim().toLowerCase();
     return _readyItems.where((item) {
       final matches = switch (filter) {
@@ -194,7 +195,9 @@ class MediaCreationController extends ChangeNotifier {
       final parent = batch(item.batchId);
       if (parent == null) return false;
       final title = parent.topicId == null
-          ? null
+          ? (parent.conversationId == null
+                ? null
+                : conversationTitle?.call(parent.conversationId!))
           : topic(parent.topicId!)?.title;
       return parent.prompt.toLowerCase().contains(term) ||
           (title?.toLowerCase().contains(term) ?? false);
@@ -243,25 +246,11 @@ class MediaCreationController extends ChangeNotifier {
     ProviderConfig provider,
     MediaMode mode,
   ) sync* {
-    if (!provider.enabled ||
-        provider.isOAuth && provider.oauthCredentials?.requiresLogin != false) {
-      return;
-    }
     for (final id in provider.enabledModels) {
-      final spec = ModelSpecResolver.instance.spec(provider, id);
-      final eligible = mode == MediaMode.video
-          ? spec.type == ModelType.video
-          : spec.type == ModelType.image ||
-                spec.type == ModelType.chat &&
-                    spec.output.contains(Modality.image) &&
-                    ProviderConfig.classify(
-                          provider.id,
-                          explicitType: provider.providerType,
-                        ) ==
-                        ProviderKind.google;
-      if (!eligible) continue;
-      final caps = runner.capabilities(provider, mode, id);
-      if (caps != null) yield MediaModelChoice(provider, spec, caps);
+      if (resolveMediaModel(provider, id, mode, resolver: runner.resolver)
+          case final choice?) {
+        yield choice;
+      }
     }
   }
 
@@ -275,11 +264,24 @@ class MediaCreationController extends ChangeNotifier {
         resolution: null,
         parameters: const {},
       );
-  MediaModelChoice? get model =>
-      models
-          .where((choice) => choice.key == _currentOptions.model)
-          .firstOrNull ??
-      models.firstOrNull;
+  final _selectedModels = <MediaMode, String>{};
+
+  MediaModelChoice? get model {
+    final slot = mode == MediaMode.image
+        ? CreationModelSlot.image
+        : CreationModelSlot.video;
+    for (final key in [
+      _selectedModels[mode],
+      settings.creationModelKey(slot),
+      _currentOptions.model,
+    ]) {
+      if (key == null) continue;
+      final choice = models.where((choice) => choice.key == key).firstOrNull;
+      if (choice != null) return choice;
+    }
+    return models.firstOrNull;
+  }
+
   int get count => mode == MediaMode.video ? 1 : _currentOptions.count;
   List<String> ratiosFor(String? topicId) {
     final caps = model?.capabilities;
@@ -328,8 +330,11 @@ class MediaCreationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectModel(MediaModelChoice choice) =>
-      _updateOptions(modelKey: choice.key);
+  void selectModel(MediaModelChoice choice) {
+    _selectedModels[mode] = choice.key;
+    _updateOptions(modelKey: choice.key);
+  }
+
   void selectRatio(String value) => _updateOptions(ratio: value);
   void selectCount(int value) =>
       _updateOptions(count: value.clamp(1, MediaGenerationRunner.maxCount));

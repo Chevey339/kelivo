@@ -3494,12 +3494,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarImageProcessing => 'Processing image';
 
   @override
-  String get chatInputBarImageMode => 'Image mode';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => 'Turn off image mode';
-
-  @override
   String get chatInputBarQueuedPending => 'Queued to send';
 
   @override
@@ -3795,7 +3789,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Summarizes conversation titles using the current chat model by default, or a selected model.';
+      'Summarizes conversation titles using the current chat model by default, or a selected model. Creation also uses it to name topics automatically.';
 
   @override
   String get titleModelThinkingTitle => 'Enable Thinking';
@@ -18542,4 +18536,74 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get creationLoggedResponse => 'Response metadata';
+
+  @override
+  String get creationDefaultImage => 'Image generation model';
+
+  @override
+  String get creationDefaultImageHelp =>
+      'Used for images in Creation and the image generation tool in chat.';
+
+  @override
+  String get creationDefaultVideo => 'Video generation model';
+
+  @override
+  String get creationDefaultVideoHelp => 'Used in video mode in Creation.';
+
+  @override
+  String get creationDefaultEnhance => 'Prompt enhancement model';
+
+  @override
+  String get creationDefaultEnhanceHelp =>
+      'Refines prompts in Creation. Reference images are included if this model supports image input.';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return 'Use $variable for the current creation prompt.';
+  }
+
+  @override
+  String get creationLocalToolTitle => 'Image generation';
+
+  @override
+  String get creationLocalToolHelp =>
+      'Let this assistant draw or edit images in chat using the default image generation model.';
+
+  @override
+  String get creationLocalToolNeedsModel =>
+      'Choose an image generation model in Default models first.';
+
+  @override
+  String creationChatSource(String title) {
+    return 'Chat · $title';
+  }
+
+  @override
+  String get creationSendToChat => 'Send to chat';
+
+  @override
+  String get creationShowInConversation => 'Show in conversation';
+
+  @override
+  String get creationShowInCreation => 'Show in Creation';
+
+  @override
+  String get creationChatCancelled => 'Image creation cancelled';
+
+  @override
+  String get creationChatRegenerate => 'Generate again';
+
+  @override
+  String get creationChatImageUnavailable => 'Image unavailable';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Generated $count images',
+      one: 'Generated 1 image',
+    );
+    return '$_temp0 · $model · $ratio';
+  }
 }

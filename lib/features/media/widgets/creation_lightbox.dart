@@ -14,8 +14,11 @@ import 'package:super_drag_and_drop/super_drag_and_drop.dart' as drag;
 
 import '../../../core/database/app_database.dart';
 import '../../../core/models/media_creation.dart';
+import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../desktop/desktop_context_menu.dart';
+import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
@@ -339,12 +342,12 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                       item.mode == MediaMode.image
                           ? l10n.creationSaveImage
                           : l10n.creationSaveVideo,
-                      () => _saveArtwork(context, item, desktop: false),
+                      () => saveCreationArtwork(context, item, desktop: false),
                     ),
                     _mobileAction(
                       Lucide.Share,
                       l10n.creationShare,
-                      () => _shareArtwork(context, item),
+                      () => shareCreationArtwork(context, item),
                     ),
                     if (editModel != null)
                       _mobileAction(
@@ -416,6 +419,20 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     final l10n = AppLocalizations.of(context)!;
     final topicId = batch?.topicId;
     final jump = widget.canOpenTopic && topicId != null;
+    final conversationId = batch?.conversationId;
+    final messageId = batch?.messageId;
+    final conversation = conversationId == null
+        ? null
+        : context.read<ChatService?>()?.getConversation(conversationId);
+    final jumpToChat =
+        widget.canOpenTopic && conversation != null && messageId != null;
+    void openChat() {
+      Navigator.of(context).pop();
+      ChatActionBus.instance.fireCreation(
+        OpenCreationConversation(conversationId!, messageId!),
+      );
+    }
+
     final close = _icon(
       Lucide.X,
       MaterialLocalizations.of(context).closeButtonTooltip,
@@ -434,6 +451,12 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                 label: l10n.creationShowInTopic,
                 onTap: () => _jump(topicId, item.batchId),
               ),
+            if (!desktop && jumpToChat)
+              ActionSheetItem(
+                icon: LucideIcons.externalLink,
+                label: l10n.creationShowInConversation,
+                onTap: openChat,
+              ),
             ..._artworkActions(
               context,
               _media,
@@ -443,6 +466,10 @@ class _CreationLightboxState extends State<_CreationLightbox> {
               includePrimary: false,
               onEdit: _toggleEdit,
               onDelete: () => _delete(item),
+              onSendToChat: () {
+                Navigator.of(context).pop();
+                _sendArtworkToChat(context, item);
+              },
             ),
           ],
           desktop: desktop,
@@ -466,6 +493,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     final ratio = _readRatio(batch);
     final captions = [
       if (topic != null) topic.title,
+      if (conversation != null) l10n.creationChatSource(conversation.title),
       if (batch != null) batch.modelId,
       if (ratio != 'auto') ratio,
       if (batch != null)
@@ -514,6 +542,12 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                     l10n.creationShowInTopic,
                     () => _jump(topicId, item.batchId),
                   ),
+                if (jumpToChat)
+                  _icon(
+                    LucideIcons.externalLink,
+                    l10n.creationShowInConversation,
+                    openChat,
+                  ),
                 if (editModel != null)
                   _icon(Lucide.Pencil, l10n.creationEditImage, _toggleEdit),
                 _icon(
@@ -528,12 +562,12 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                   item.mode == MediaMode.image
                       ? l10n.creationSaveImage
                       : l10n.creationSaveVideo,
-                  () => _saveArtwork(context, item, desktop: true),
+                  () => saveCreationArtwork(context, item, desktop: true),
                 ),
                 _icon(
                   Lucide.Share,
                   l10n.creationShare,
-                  () => _shareArtwork(context, item),
+                  () => shareCreationArtwork(context, item),
                 ),
                 menu,
               ],
@@ -1032,6 +1066,7 @@ List<ActionSheetItem> _artworkActions(
   required String? draftTopicId,
   required VoidCallback onEdit,
   required VoidCallback onDelete,
+  VoidCallback? onSendToChat,
 }) {
   final l10n = AppLocalizations.of(context)!;
   final image = item.mode == MediaMode.image;
@@ -1051,12 +1086,12 @@ List<ActionSheetItem> _artworkActions(
       ActionSheetItem(
         icon: Lucide.Download,
         label: image ? l10n.creationSaveImage : l10n.creationSaveVideo,
-        onTap: () => _saveArtwork(context, item, desktop: desktop),
+        onTap: () => saveCreationArtwork(context, item, desktop: desktop),
       ),
       ActionSheetItem(
         icon: Lucide.Share,
         label: l10n.creationShare,
-        onTap: () => _shareArtwork(context, item),
+        onTap: () => shareCreationArtwork(context, item),
       ),
     ],
     if (image)
@@ -1082,6 +1117,12 @@ List<ActionSheetItem> _artworkActions(
         label: l10n.creationUseReference,
         onTap: () =>
             addCreationArtworkReference(context, media, item, draftTopicId),
+      ),
+    if (image)
+      ActionSheetItem(
+        icon: Lucide.MessageCircle,
+        label: l10n.creationSendToChat,
+        onTap: onSendToChat ?? () => _sendArtworkToChat(context, item),
       ),
     ActionSheetItem(
       icon: Lucide.Trash2,
@@ -1146,7 +1187,7 @@ String _filePath(GenerationItemRow item) =>
     SandboxPathResolver.resolveForIo(item.path) ??
     (throw StateError('Creation file unavailable'));
 
-Future<void> _saveArtwork(
+Future<void> saveCreationArtwork(
   BuildContext context,
   GenerationItemRow item, {
   required bool desktop,
@@ -1192,18 +1233,20 @@ Future<void> _copyArtwork(BuildContext context, GenerationItemRow item) =>
       }
     });
 
-Future<void> _shareArtwork(BuildContext context, GenerationItemRow item) =>
-    _runArtworkAction(context, () async {
-      final box = context.findRenderObject() as RenderBox?;
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(_filePath(item), mimeType: item.mime)],
-          sharePositionOrigin: box == null
-              ? null
-              : box.localToGlobal(Offset.zero) & box.size,
-        ),
-      );
-    });
+Future<void> shareCreationArtwork(
+  BuildContext context,
+  GenerationItemRow item,
+) => _runArtworkAction(context, () async {
+  final box = context.findRenderObject() as RenderBox?;
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [XFile(_filePath(item), mimeType: item.mime)],
+      sharePositionOrigin: box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size,
+    ),
+  );
+});
 
 Future<bool> _deleteArtwork(
   BuildContext context,
@@ -1255,6 +1298,18 @@ Future<bool> _deleteArtwork(
     success = true;
   });
   return success;
+}
+
+void _sendArtworkToChat(BuildContext context, GenerationItemRow item) {
+  final file = SandboxPathResolver.resolveForIo(item.path);
+  if (file != null) {
+    ChatActionBus.instance.fireCreation(PrefillChatImage(file));
+  } else {
+    showAppSnackBar(
+      context,
+      message: AppLocalizations.of(context)!.creationActionFailed,
+    );
+  }
 }
 
 class CreationFileImage extends StatelessWidget {

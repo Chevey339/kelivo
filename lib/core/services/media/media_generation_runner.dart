@@ -24,10 +24,12 @@ import 'media_file_store.dart';
 import 'media_request.dart';
 
 class MediaGenerationTicket {
-  const MediaGenerationTicket(this.batchId, this.completed);
+  const MediaGenerationTicket._(this._job);
 
-  final String batchId;
-  final Future<GenerationStatus> completed;
+  final _MediaJob _job;
+  String get batchId => _job.id;
+  Future<GenerationStatus> get completed => _job.result.future;
+  String? get revisedPrompt => _job.revisedPrompt;
 }
 
 typedef MediaRunProgress = ({double? fraction, String? preview});
@@ -205,6 +207,12 @@ class MediaGenerationRunner extends ChangeNotifier {
         final refs = await files.snapshotReferences(id, request.references);
         request = request.copyWith(references: refs);
         _requireOpen();
+        if (canEnqueue?.call() == false) {
+          throw const MediaFailure(
+            MediaFailureKind.parameters,
+            'Creation is unavailable',
+          );
+        }
         await repository.enqueue(
           GenerationBatchRowsCompanion.insert(
             id: id,
@@ -238,7 +246,7 @@ class MediaGenerationRunner extends ChangeNotifier {
       );
       _queued.add(job);
       _drain();
-      return MediaGenerationTicket(id, job.result.future);
+      return MediaGenerationTicket._(job);
     });
   }
 
@@ -289,7 +297,7 @@ class MediaGenerationRunner extends ChangeNotifier {
         );
         _queued.add(job);
         _drain();
-        return MediaGenerationTicket(id, job.result.future);
+        return MediaGenerationTicket._(job);
       });
     } finally {
       _retrying.remove(id);
@@ -413,6 +421,7 @@ class MediaGenerationRunner extends ChangeNotifier {
                   await repository.addItem(item);
                 },
               );
+              job.revisedPrompt ??= result.revisedPrompt;
               saved++;
               ordinal++;
             } catch (_) {
@@ -687,6 +696,7 @@ class _MediaJob {
   final MediaCapabilities capabilities;
   final int replacementVersion;
   final result = Completer<GenerationStatus>();
+  String? revisedPrompt;
   final token = CancelToken();
   final log = MediaRequestLog();
   MediaTaskAccepted? remoteTask;

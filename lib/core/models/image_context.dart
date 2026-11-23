@@ -13,8 +13,11 @@ class ContextImageIdentity {
   final int imageIndex;
 
   String get key => '$messageId|$slot|$imageIndex';
-  String get handle =>
-      'img_${sha256.convert(utf8.encode(key)).toString().substring(0, 20)}';
+  String get handle {
+    // The tool result and the generated attachment can be copied into a fork.
+    final identity = slot.startsWith('creation:') ? slot : key;
+    return 'img_${sha256.convert(utf8.encode(identity)).toString().substring(0, 20)}';
+  }
 
   static ContextImageIdentity markdown(
     String messageId,

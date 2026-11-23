@@ -208,7 +208,6 @@ The suggestions array must contain 0 to 3 distinct, concise strings, each at mos
       reasoning: reasoning,
       builtInToolMode: BuiltInToolMode.none,
       skipImageParsing: true,
-      allowImagesApiRouting: false,
     );
     try {
       return parseSuggestions(result.text);

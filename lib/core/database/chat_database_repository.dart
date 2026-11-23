@@ -1829,6 +1829,7 @@ class ChatDatabaseRepository {
           uri: nextUri,
           mime: part.mime,
           assetId: part.assetId,
+          generationItemId: part.generationItemId,
           unavailable: nextUnavailable,
         ).encodePayload(),
         parseError: null,
@@ -6494,6 +6495,7 @@ ORDER BY m.message_order DESC LIMIT 20
                 uri: part.uri,
                 mime: part.mime,
                 assetId: part.assetId,
+                generationItemId: part.generationItemId,
                 unavailable: unavailable,
               ),
             );
@@ -7262,6 +7264,29 @@ ORDER BY m.message_order DESC LIMIT 20
   /// changes; the other columns never affect parts. Returns the post-update
   /// message,
   /// or null when no row matches [messageId].
+  Future<bool> waitForFinishedMessage(String messageId) async {
+    final table = _db.messageRows;
+    final row =
+        await (_db.selectOnly(table)
+              ..addColumns([table.isStreaming])
+              ..where(table.id.equals(messageId)))
+            .watchSingleOrNull()
+            .firstWhere((row) => row?.read(table.isStreaming) != true);
+    return row != null;
+  }
+
+  Future<ChatMessage?> updateFinishedMessageParts(
+    String messageId,
+    List<MessagePart> Function(List<MessagePart>) transform,
+  ) => _writeTransaction(() async {
+    final current = await getMessage(messageId);
+    if (current == null || current.isStreaming) return null;
+    final parts = transform(current.parts);
+    if (identical(parts, current.parts)) return current;
+    await markMessageAssetReferencesDirty(messageId);
+    return updateMessageFields(messageId, parts: parts);
+  });
+
   Future<ChatMessage?> updateMessageFields(
     String messageId, {
     String? content,

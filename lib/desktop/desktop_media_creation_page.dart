@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../core/database/app_database.dart';
 import '../core/models/media_creation.dart';
+import 'hotkeys/chat_action_bus.dart';
 import '../features/media/widgets/creation_gallery.dart';
 import '../features/media/widgets/creation_preferences.dart';
 import '../features/media/pages/media_creation_page.dart';
@@ -24,7 +25,14 @@ import '../theme/app_semantic_colors.dart';
 import 'widgets/desktop_pane_surface.dart';
 
 class DesktopMediaCreationPage extends StatefulWidget {
-  const DesktopMediaCreationPage({super.key});
+  const DesktopMediaCreationPage({
+    super.key,
+    this.artworkRequest,
+    this.onArtworkOpened,
+  });
+
+  final OpenCreationArtwork? artworkRequest;
+  final VoidCallback? onArtworkOpened;
 
   @override
   State<DesktopMediaCreationPage> createState() =>
@@ -36,6 +44,24 @@ class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
   bool _navigationOpen = false;
   bool _gallery = false;
   String? _highlightBatch;
+
+  @override
+  void initState() {
+    super.initState();
+    _gallery = widget.artworkRequest != null;
+  }
+
+  @override
+  void didUpdateWidget(covariant DesktopMediaCreationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.artworkRequest != null &&
+        widget.artworkRequest != oldWidget.artworkRequest) {
+      _gallery = true;
+      _topicId = null;
+      _highlightBatch = null;
+      _navigationOpen = false;
+    }
+  }
 
   void _open(String? id, {String? batch}) {
     setState(() {
@@ -108,6 +134,8 @@ class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
                   content: _gallery
                       ? CreationGallery(
                           desktop: true,
+                          artworkRequest: widget.artworkRequest,
+                          onArtworkOpened: widget.onArtworkOpened,
                           onToggleRail: toggle,
                           onOpenTopic: (id, batch) => _open(id, batch: batch),
                         )

@@ -103,6 +103,7 @@ import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
 import '../../../shared/markdown/citation_syntax.dart';
 import 'chat_surface.dart';
+import 'chat_creation_images.dart';
 import 'collapsible_user_text.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
@@ -3384,6 +3385,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       reasoningSegments: effectiveReasoningSegments,
       sourceMap: mappedVisual.sourceMap,
     );
+    final creationAttachments = widget.message.parts
+        .whereType<ImagePart>()
+        .where((part) => part.generationItemId != null)
+        .toList();
     final mediaPreview = _buildAttachmentPreview(
       context,
       parts: timelineProjection.fromParts
@@ -3391,7 +3396,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               for (final part in widget.message.parts)
                 if (part is FilePart) part,
             ]
-          : widget.message.parts,
+          : [
+              for (final part in widget.message.parts)
+                if (part is! ImagePart || part.generationItemId == null) part,
+            ],
       isDark: isDark,
       alignEnd: false,
     );
@@ -3721,6 +3729,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               }
               return widgets;
             }(),
+            ChatCreationImages(
+              messageId: widget.message.id,
+              attachments: creationAttachments,
+              streaming: widget.message.isStreaming,
+            ),
             if (showProducedFiles &&
                 _producedWorkspaceParts(widget.toolParts).isNotEmpty) ...[
               const SizedBox(height: 8),

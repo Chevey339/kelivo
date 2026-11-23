@@ -419,7 +419,9 @@ String timelineToolStepKey({
 
 /// Whether an image part starts a new render block, matching the renderer.
 bool timelineImagePartFlushesBlock(ImagePart part) =>
-    !part.unavailable && part.uri.trim().isNotEmpty;
+    part.generationItemId == null &&
+    !part.unavailable &&
+    part.uri.trim().isNotEmpty;
 
 /// Project assistant timeline blocks using the same rules as the renderer:
 /// structured parts, or mixed reasoning+tool order with content-split fallback.

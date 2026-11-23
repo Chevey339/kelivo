@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
@@ -7,6 +9,44 @@ import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'a completed tool is emitted while the following tool is pending',
+    () async {
+      final secondStarted = Completer<void>();
+      final finishSecond = Completer<String>();
+      final first = Completer<Object?>();
+      final done =
+          executeClientTools(
+            calls: [
+              emitToolCall(
+                id: 'image',
+                name: 'generate_image',
+                arguments: const {},
+              ),
+              emitToolCall(id: 'later', name: 'lookup', arguments: const {}),
+            ],
+            onToolCall: (_, _, {toolCallId}) async {
+              if (toolCallId == 'image') return 'image ready';
+              secondStarted.complete();
+              return finishSecond.future;
+            },
+            emitCalls: true,
+          ).forEach((chunk) {
+            if (chunk case ToolCallResult(id: 'image', :final output)) {
+              first.complete(output);
+            }
+          });
+      try {
+        await secondStarted.future;
+        expect(first.isCompleted, isTrue);
+        expect(await first.future, 'image ready');
+      } finally {
+        finishSecond.complete('later result');
+        await done;
+      }
+    },
+  );
+
   test('executeClientTools emits ToolCall* then ToolCallResult', () async {
     final chunks = await executeClientTools(
       calls: [

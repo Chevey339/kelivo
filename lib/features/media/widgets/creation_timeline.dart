@@ -708,6 +708,7 @@ Future<void> showCreationRequestDetails(
   BuildContext context,
   GenerationBatchRow batch, {
   required bool desktop,
+  Future<void> Function()? retry,
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final media = context.read<MediaCreationController>();
@@ -787,7 +788,11 @@ Future<void> showCreationRequestDetails(
         onPressed: () async {
           Navigator.of(dialog).pop();
           try {
-            await media.retry(batch);
+            if (retry == null) {
+              await media.retry(batch);
+            } else {
+              await retry();
+            }
           } catch (_) {
             if (context.mounted) {
               showAppSnackBar(context, message: l10n.creationActionFailed);

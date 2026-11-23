@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/health_data_type.dart';
 import '../../../core/services/browser/browser_tools_service.dart';
+import '../../../core/services/tools/generate_image_tool.dart';
 import 'calculator_service.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
@@ -14,6 +15,7 @@ typedef TextToSpeechStarter = Future<void> Function(String text);
 class LocalToolNames {
   const LocalToolNames._();
 
+  static const String generateImage = GenerateImageTool.name;
   static const String timeInfo = 'get_time_info';
   static const String clipboard = 'clipboard_tool';
   static const String textToSpeech = 'text_to_speech';
@@ -32,6 +34,7 @@ class LocalToolNames {
   static const String remindersComplete = 'reminders_complete';
 
   static const List<String> all = [
+    generateImage,
     timeInfo,
     clipboard,
     textToSpeech,
@@ -446,6 +449,8 @@ class LocalToolsService {
 
   static Map<String, dynamic> definitionFor(String name) {
     switch (name) {
+      case LocalToolNames.generateImage:
+        return GenerateImageTool.definition(allowReferences: true);
       case LocalToolNames.browser:
         return BrowserToolsService.getToolDefinition();
       case LocalToolNames.phoneControl:
@@ -486,6 +491,7 @@ class LocalToolsService {
   static List<Map<String, dynamic>> buildToolDefinitions({
     required Assistant? assistant,
     required bool supportsTools,
+    int? imageReferenceLimit,
   }) {
     if (!supportsTools || assistant == null) {
       return const <Map<String, dynamic>>[];
@@ -499,7 +505,15 @@ class LocalToolsService {
     for (final id in LocalToolNames.all) {
       if (!assistant.localToolIds.contains(id)) continue;
       if (!isAvailableOnThisPlatform(id)) continue;
-      if (id == LocalToolNames.healthSummary) {
+      if (id == LocalToolNames.generateImage) {
+        if (imageReferenceLimit != null) {
+          tools.add(
+            GenerateImageTool.definition(
+              allowReferences: imageReferenceLimit > 0,
+            ),
+          );
+        }
+      } else if (id == LocalToolNames.healthSummary) {
         tools.add(
           _healthSummaryDefinition(
             HealthDataTypeIds.intersectAvailable(

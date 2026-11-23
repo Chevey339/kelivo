@@ -253,6 +253,7 @@ bool isTimelineToolVisible({
   required bool pendingApproval,
   bool filterBuiltinSearch = true,
 }) {
+  if (toolName == LocalToolNames.generateImage) return false;
   if (filterBuiltinSearch && !toolCreatesTimelineCard(toolName)) return false;
   if (showToolCards) return true;
   if (toolName == LocalToolNames.askUser) return true;

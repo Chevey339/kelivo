@@ -3343,12 +3343,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarImageProcessing => '正在处理图片';
 
   @override
-  String get chatInputBarImageMode => '绘图模式';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
-
-  @override
   String get chatInputBarQueuedPending => '排队中';
 
   @override
@@ -3639,7 +3633,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。创作话题的自动命名也用它。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -17505,6 +17499,66 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get creationLoggedResponse => '返回信息';
+
+  @override
+  String get creationDefaultImage => '生图模型';
+
+  @override
+  String get creationDefaultImageHelp => '创作页图片模式和聊天里的「图像生成」工具使用的模型。';
+
+  @override
+  String get creationDefaultVideo => '视频模型';
+
+  @override
+  String get creationDefaultVideoHelp => '创作页视频模式使用的模型。';
+
+  @override
+  String get creationDefaultEnhance => '提示词增强模型';
+
+  @override
+  String get creationDefaultEnhanceHelp => '用于改写创作页的提示词。模型支持图片输入时，参考图会一起发送。';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return '用 $variable 插入当前创作提示词。';
+  }
+
+  @override
+  String get creationLocalToolTitle => '图像生成';
+
+  @override
+  String get creationLocalToolHelp => '让助手在对话里画图或改图，使用「默认模型」里的生图模型。';
+
+  @override
+  String get creationLocalToolNeedsModel => '先在「默认模型 › 生图模型」里选一个模型。';
+
+  @override
+  String creationChatSource(String title) {
+    return '聊天 · $title';
+  }
+
+  @override
+  String get creationSendToChat => '发送到聊天';
+
+  @override
+  String get creationShowInConversation => '在对话中查看';
+
+  @override
+  String get creationShowInCreation => '在创作中查看';
+
+  @override
+  String get creationChatCancelled => '已取消图像创建';
+
+  @override
+  String get creationChatRegenerate => '重新生成';
+
+  @override
+  String get creationChatImageUnavailable => '图像不可用';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    return '已生成 $count 张 · $model · $ratio';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20846,12 +20900,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarImageProcessing => '正在处理图片';
 
   @override
-  String get chatInputBarImageMode => '绘图模式';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
-
-  @override
   String get chatInputBarQueuedPending => '排队中';
 
   @override
@@ -21142,7 +21190,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。创作话题的自动命名也用它。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -35008,6 +35056,66 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationLoggedResponse => '返回信息';
+
+  @override
+  String get creationDefaultImage => '生图模型';
+
+  @override
+  String get creationDefaultImageHelp => '创作页图片模式和聊天里的「图像生成」工具使用的模型。';
+
+  @override
+  String get creationDefaultVideo => '视频模型';
+
+  @override
+  String get creationDefaultVideoHelp => '创作页视频模式使用的模型。';
+
+  @override
+  String get creationDefaultEnhance => '提示词增强模型';
+
+  @override
+  String get creationDefaultEnhanceHelp => '用于改写创作页的提示词。模型支持图片输入时，参考图会一起发送。';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return '用 $variable 插入当前创作提示词。';
+  }
+
+  @override
+  String get creationLocalToolTitle => '图像生成';
+
+  @override
+  String get creationLocalToolHelp => '让助手在对话里画图或改图，使用「默认模型」里的生图模型。';
+
+  @override
+  String get creationLocalToolNeedsModel => '先在「默认模型 › 生图模型」里选一个模型。';
+
+  @override
+  String creationChatSource(String title) {
+    return '聊天 · $title';
+  }
+
+  @override
+  String get creationSendToChat => '发送到聊天';
+
+  @override
+  String get creationShowInConversation => '在对话中查看';
+
+  @override
+  String get creationShowInCreation => '在创作中查看';
+
+  @override
+  String get creationChatCancelled => '已取消图像创建';
+
+  @override
+  String get creationChatRegenerate => '重新生成';
+
+  @override
+  String get creationChatImageUnavailable => '图像不可用';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    return '已生成 $count 张 · $model · $ratio';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -38359,12 +38467,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarImageProcessing => '正在處理圖片';
 
   @override
-  String get chatInputBarImageMode => '繪圖模式';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => '關閉繪圖模式';
-
-  @override
   String get chatInputBarQueuedPending => '排隊中';
 
   @override
@@ -38655,7 +38757,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用於總結對話標題，預設跟隨目前對話模型，也可指定其他模型。';
+      '用於總結對話標題，預設跟隨目前對話模型，也可指定其他模型。創作話題的自動命名也用它。';
 
   @override
   String get titleModelThinkingTitle => '是否開啟思考';
@@ -52562,4 +52664,64 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationLoggedResponse => '回應資訊';
+
+  @override
+  String get creationDefaultImage => '生圖模型';
+
+  @override
+  String get creationDefaultImageHelp => '創作頁圖片模式和聊天裡的「圖像生成」工具使用的模型。';
+
+  @override
+  String get creationDefaultVideo => '影片模型';
+
+  @override
+  String get creationDefaultVideoHelp => '創作頁影片模式使用的模型。';
+
+  @override
+  String get creationDefaultEnhance => '提示詞增強模型';
+
+  @override
+  String get creationDefaultEnhanceHelp => '用於改寫創作頁的提示詞。模型支援圖片輸入時，參考圖會一併傳送。';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return '用 $variable 插入目前創作提示詞。';
+  }
+
+  @override
+  String get creationLocalToolTitle => '圖像生成';
+
+  @override
+  String get creationLocalToolHelp => '讓助手在對話裡畫圖或改圖，使用「預設模型」裡的生圖模型。';
+
+  @override
+  String get creationLocalToolNeedsModel => '先在「預設模型 › 生圖模型」裡選一個模型。';
+
+  @override
+  String creationChatSource(String title) {
+    return '聊天 · $title';
+  }
+
+  @override
+  String get creationSendToChat => '傳送到聊天';
+
+  @override
+  String get creationShowInConversation => '在對話中查看';
+
+  @override
+  String get creationShowInCreation => '在創作中查看';
+
+  @override
+  String get creationChatCancelled => '已取消圖像建立';
+
+  @override
+  String get creationChatRegenerate => '重新生成';
+
+  @override
+  String get creationChatImageUnavailable => '圖像無法使用';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    return '已生成 $count 張 · $model · $ratio';
+  }
 }

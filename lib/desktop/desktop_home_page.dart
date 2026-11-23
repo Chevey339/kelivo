@@ -53,6 +53,8 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   bool _globalSearchActive = false;
   StreamSubscription<HotkeyAction>? _hotkeySub;
   StreamSubscription<ChatAction>? _chatActionSub;
+  StreamSubscription<CreationChatAction>? _creationActionSub;
+  OpenCreationArtwork? _artworkRequest;
   StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
   StreamSubscription<String>? _conversationOpenSub;
 
@@ -187,6 +189,16 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((_) {
       if (mounted) _selectTab(DesktopTab.settings, dismissNavigation: false);
     });
+    _creationActionSub = ChatActionBus.instance.creationStream.listen((action) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+      switch (action) {
+        case OpenCreationArtwork():
+          _artworkRequest = action;
+          _selectTab(DesktopTab.media);
+        case PrefillChatImage() || OpenCreationConversation():
+          _selectTab(DesktopTab.chat);
+      }
+    });
   }
 
   void _selectTab(
@@ -238,7 +250,10 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       ),
       DesktopTab.media => TickerMode(
         enabled: _activeTab == tab,
-        child: const DesktopMediaCreationPage(),
+        child: DesktopMediaCreationPage(
+          artworkRequest: _artworkRequest,
+          onArtworkOpened: () => setState(() => _artworkRequest = null),
+        ),
       ),
       DesktopTab.translate => const DesktopTranslatePage(
         key: ValueKey('translate_page'),
@@ -382,6 +397,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   @override
   void dispose() {
     unawaited(_conversationOpenSub?.cancel());
+    unawaited(_creationActionSub?.cancel());
     try {
       _hotkeySub?.cancel();
     } catch (_) {}

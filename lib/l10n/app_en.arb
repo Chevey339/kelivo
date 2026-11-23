@@ -1726,8 +1726,6 @@
   "audioClipPauseTooltip": "Pause",
   "audioClipPlaybackFailed": "Couldn't play this audio",
   "chatInputBarImageProcessing": "Processing image",
-  "chatInputBarImageMode": "Image mode",
-  "chatInputBarDisableImageModeTooltip": "Turn off image mode",
   "chatInputBarQueuedPending": "Queued to send",
   "chatInputBarQueuedCancel": "Cancel Queue",
   "chatInputBarInsertNewline": "Newline",
@@ -1879,7 +1877,7 @@
   "defaultModelPageChatModelTitle": "Chat Model",
   "defaultModelPageChatModelSubtitle": "Global default chat model",
   "defaultModelPageTitleModelTitle": "Title Summary Model",
-  "defaultModelPageTitleModelSubtitle": "Summarizes conversation titles using the current chat model by default, or a selected model.",
+  "defaultModelPageTitleModelSubtitle": "Summarizes conversation titles using the current chat model by default, or a selected model. Creation also uses it to name topics automatically.",
   "titleModelThinkingTitle": "Enable Thinking",
   "defaultModelPageSummaryModelTitle": "Summary Model",
   "defaultModelPageSummaryModelSubtitle": "Used for generating conversation summaries; prefer fast and cheap models",
@@ -11591,12 +11589,6 @@
   "@chatInputBarImageProcessing": {
     "description": "Tooltip over an image attachment thumbnail in the input bar while the image is still being processed."
   },
-  "@chatInputBarImageMode": {
-    "description": "Label on the chip indicating the composer is in image-generation mode."
-  },
-  "@chatInputBarDisableImageModeTooltip": {
-    "description": "Tooltip on the close button of the image-mode chip; turns image mode off."
-  },
   "@chatInputBarQueuedPending": {
     "description": "Status label on a queued input preview indicating the message is waiting to be sent."
   },
@@ -11856,7 +11848,7 @@
     "description": "Title of the model card for the model that summarizes conversation titles; also used as a task name in background-task error messages."
   },
   "@defaultModelPageTitleModelSubtitle": {
-    "description": "Subtitle explaining the title-summary model follows the current chat model by default or can be set to another model."
+    "description": "Subtitle of the title-summary model card explaining the current chat model fallback and its use when automatically naming creation topics."
   },
   "@titleModelThinkingTitle": {
     "description": "Label for a toggle controlling whether thinking/reasoning is enabled for the title-summary model."
@@ -24067,5 +24059,98 @@
   "creationLoggedResponse": "Response metadata",
   "@creationLoggedResponse": {
     "description": "Heading for response status information in creation request details."
+  },
+  "creationDefaultImage": "Image generation model",
+  "@creationDefaultImage": {
+    "description": "Title of the default model card for image creation and the generate_image tool."
+  },
+  "creationDefaultImageHelp": "Used for images in Creation and the image generation tool in chat.",
+  "@creationDefaultImageHelp": {
+    "description": "Subtitle of the default image generation model card."
+  },
+  "creationDefaultVideo": "Video generation model",
+  "@creationDefaultVideo": {
+    "description": "Title of the default model card for video creation."
+  },
+  "creationDefaultVideoHelp": "Used in video mode in Creation.",
+  "@creationDefaultVideoHelp": {
+    "description": "Subtitle of the default video generation model card."
+  },
+  "creationDefaultEnhance": "Prompt enhancement model",
+  "@creationDefaultEnhance": {
+    "description": "Title of the default model card and prompt template editor for refining creation prompts."
+  },
+  "creationDefaultEnhanceHelp": "Refines prompts in Creation. Reference images are included if this model supports image input.",
+  "@creationDefaultEnhanceHelp": {
+    "description": "Subtitle of the default prompt enhancement model card."
+  },
+  "creationEnhanceTemplateVariable": "Use {variable} for the current creation prompt.",
+  "@creationEnhanceTemplateVariable": {
+    "description": "Help under the prompt enhancement template. The variable placeholder is the literal template marker {prompt}.",
+    "placeholders": {
+      "variable": {
+        "type": "String"
+      }
+    }
+  },
+  "creationLocalToolTitle": "Image generation",
+  "@creationLocalToolTitle": {
+    "description": "Assistant local tool name and chat tools menu label for generate_image."
+  },
+  "creationLocalToolHelp": "Let this assistant draw or edit images in chat using the default image generation model.",
+  "@creationLocalToolHelp": {
+    "description": "Help below the image generation toggle in the assistant local tools tab."
+  },
+  "creationLocalToolNeedsModel": "Choose an image generation model in Default models first.",
+  "@creationLocalToolNeedsModel": {
+    "description": "Warning below the assistant image generation toggle when no usable default image model is configured."
+  },
+  "creationChatSource": "Chat · {title}",
+  "@creationChatSource": {
+    "description": "Gallery source label for an image generated inside a chat. The title is the conversation name.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "creationSendToChat": "Send to chat",
+  "@creationSendToChat": {
+    "description": "Menu item on a creation image that switches to chat and adds the image to the composer."
+  },
+  "creationShowInConversation": "Show in conversation",
+  "@creationShowInConversation": {
+    "description": "Gallery viewer action that opens the chat and scrolls to the message that generated the artwork."
+  },
+  "creationShowInCreation": "Show in Creation",
+  "@creationShowInCreation": {
+    "description": "Link below a chat-generated image opening this item in the Creation gallery."
+  },
+  "creationChatCancelled": "Image creation cancelled",
+  "@creationChatCancelled": {
+    "description": "Status line when a local chat image generation was stopped."
+  },
+  "creationChatRegenerate": "Generate again",
+  "@creationChatRegenerate": {
+    "description": "Action that retries a cancelled chat image generation with its saved prompt."
+  },
+  "creationChatImageUnavailable": "Image unavailable",
+  "@creationChatImageUnavailable": {
+    "description": "Heading of the chat image generation failure card."
+  },
+  "creationChatResultCaption": "{count, plural, one{Generated 1 image} other{Generated {count} images}} · {model} · {ratio}",
+  "@creationChatResultCaption": {
+    "description": "Caption below a chat image gallery. Count is the number of available outputs, model is the image model display name, and ratio is the aspect ratio label.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "model": {
+        "type": "String"
+      },
+      "ratio": {
+        "type": "String"
+      }
+    }
   }
 }

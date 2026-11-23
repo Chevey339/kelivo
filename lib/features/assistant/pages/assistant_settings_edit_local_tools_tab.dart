@@ -9,6 +9,12 @@ class _LocalToolsTab extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final ap = context.watch<AssistantProvider>();
     final assistant = ap.getById(assistantId)!;
+    final imageEnabled = assistant.localToolIds.contains(
+      LocalToolNames.generateImage,
+    );
+    final imageModel = resolveDefaultImageModel(
+      context.watch<SettingsProvider>(),
+    );
     final timeEnabled = assistant.localToolIds.contains(
       LocalToolNames.timeInfo,
     );
@@ -66,6 +72,18 @@ class _LocalToolsTab extends StatelessWidget {
       children: [
         SectionCard(
           children: [
+            _LocalToolRow(
+              icon: Lucide.Palette,
+              title: l10n.creationLocalToolTitle,
+              subtitle: l10n.creationLocalToolHelp,
+              warning: imageModel == null
+                  ? l10n.creationLocalToolNeedsModel
+                  : null,
+              enabled: imageEnabled,
+              onChanged: (value) =>
+                  toggleTool(LocalToolNames.generateImage, value),
+            ),
+            _iosDivider(context),
             if (LocalToolsService.isAvailableOnThisPlatform(
               LocalToolNames.browser,
             )) ...[
@@ -275,6 +293,7 @@ class _LocalToolRow extends StatelessWidget {
     required this.enabled,
     required this.onChanged,
     this.onOpenSettings,
+    this.warning,
   });
 
   final IconData icon;
@@ -283,6 +302,7 @@ class _LocalToolRow extends StatelessWidget {
   final bool enabled;
   final ValueChanged<bool> onChanged;
   final VoidCallback? onOpenSettings;
+  final String? warning;
 
   @override
   Widget build(BuildContext context) {
@@ -334,6 +354,16 @@ class _LocalToolRow extends StatelessWidget {
                             color: cs.onSurface.withValues(alpha: 0.62),
                           ),
                         ),
+                        if (warning case final text?) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            text,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.appColors.warning,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

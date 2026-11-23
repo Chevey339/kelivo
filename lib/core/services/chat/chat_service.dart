@@ -3945,6 +3945,28 @@ class ChatService extends ChangeNotifier {
     );
   }
 
+  Future<bool> updateFinishedMessageParts(
+    String messageId,
+    List<MessagePart> Function(List<MessagePart>) transform,
+  ) async {
+    if (!_initialized || _isTemporaryMessageId(messageId)) return false;
+    final message = await _repo.updateFinishedMessageParts(
+      messageId,
+      transform,
+    );
+    if (message == null) return false;
+    _toolEventsCache.remove(messageId);
+    await _synchronizeMessageAssetsBestEffort(message);
+    _replaceCachedMessage(message);
+    if (_compressionHistoryCache?.id == message.conversationId) {
+      _compressionHistoryCache = null;
+    }
+    _bumpContextRevision(message.conversationId);
+    await loadContextOperations(message.conversationId, refresh: true);
+    notifyListeners();
+    return true;
+  }
+
   /// Update message content during streaming without triggering notifyListeners.
   /// This is used for streaming updates to avoid unnecessary rebuilds of
   /// widgets watching ChatService (e.g., side_drawer).

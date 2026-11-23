@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/models/media_creation.dart';
+import '../../../core/services/chat/chat_service.dart';
+import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -22,11 +24,15 @@ class CreationGallery extends StatefulWidget {
     required this.desktop,
     required this.onOpenTopic,
     this.onToggleRail,
+    this.artworkRequest,
+    this.onArtworkOpened,
   });
 
   final bool desktop;
   final OpenCreationTopic onOpenTopic;
   final VoidCallback? onToggleRail;
+  final OpenCreationArtwork? artworkRequest;
+  final VoidCallback? onArtworkOpened;
 
   @override
   State<CreationGallery> createState() => _CreationGalleryState();
@@ -35,6 +41,17 @@ class CreationGallery extends StatefulWidget {
 class _CreationGalleryState extends State<CreationGallery> {
   CreationGalleryFilter _filter = CreationGalleryFilter.all;
   final _search = TextEditingController();
+  OpenCreationArtwork? _opened;
+
+  @override
+  void didUpdateWidget(covariant CreationGallery oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.artworkRequest != null &&
+        widget.artworkRequest != oldWidget.artworkRequest) {
+      _filter = CreationGalleryFilter.all;
+      _search.clear();
+    }
+  }
 
   @override
   void dispose() {
@@ -48,7 +65,30 @@ class _CreationGalleryState extends State<CreationGallery> {
     final media = context.watch<MediaCreationController>();
     final l10n = AppLocalizations.of(context)!;
     final query = _search.text;
-    final items = media.galleryItems(_filter, query);
+    final chat = context.read<ChatService?>();
+    String? conversationTitle(String id) => chat?.getConversation(id)?.title;
+    final items = media.galleryItems(
+      _filter,
+      query,
+      conversationTitle: conversationTitle,
+    );
+    if (widget.artworkRequest case final request? when request != _opened) {
+      final item = media.item(request.itemId);
+      if (item != null) {
+        _opened = request;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || widget.artworkRequest != request) return;
+          widget.onArtworkOpened?.call();
+          showCreationLightbox(
+            galleryContext,
+            item,
+            desktop: widget.desktop,
+            gallery: items,
+            onOpenTopic: widget.onOpenTopic,
+          );
+        });
+      }
+    }
     final colors = Theme.of(context).colorScheme;
     final tabs = SegmentedTabs(
       radioGroup: true,
@@ -181,11 +221,18 @@ class _CreationGalleryState extends State<CreationGallery> {
                       itemBuilder: (context, index) {
                         final item = items[index];
                         final batch = media.batch(item.batchId);
+                        final conversationId = batch?.conversationId;
+                        final title = conversationId == null
+                            ? null
+                            : conversationTitle(conversationId);
                         return CreationArtworkTile(
                           item: item,
                           desktop: widget.desktop,
+                          showSource: batch?.source == GenerationSource.chat,
                           sourceLabel: batch?.topicId == null
-                              ? l10n.creationRecentChat
+                              ? title != null && title.trim().isNotEmpty
+                                    ? l10n.creationChatSource(title)
+                                    : l10n.creationRecentChat
                               : media.topic(batch!.topicId!)?.title,
                           onMenu: (anchor) => showCreationArtworkMenu(
                             galleryContext,
@@ -241,6 +288,7 @@ class CreationArtworkTile extends StatefulWidget {
     this.draftTopicId,
     this.onMenu,
     this.onEdit,
+    this.showSource = false,
   });
 
   final GenerationItemRow item;
@@ -249,6 +297,7 @@ class CreationArtworkTile extends StatefulWidget {
   final String? sourceLabel, draftTopicId;
   final ValueChanged<Offset?>? onMenu;
   final VoidCallback? onEdit;
+  final bool showSource;
 
   @override
   State<CreationArtworkTile> createState() => _CreationArtworkTileState();
@@ -417,7 +466,23 @@ class _CreationArtworkTileState extends State<CreationArtworkTile> {
                     ),
                   ),
                 )
-              else if (item.favorite)
+              else if (widget.showSource && widget.sourceLabel != null)
+                PositionedDirectional(
+                  start: 6,
+                  end: 6,
+                  bottom: 6,
+                  child: Text(
+                    widget.sourceLabel!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      shadows: [Shadow(blurRadius: 6, color: Colors.black)],
+                    ),
+                  ),
+                ),
+              if (!_hovered && item.favorite)
                 const Positioned(
                   top: 7,
                   right: 7,

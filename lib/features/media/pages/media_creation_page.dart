@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/models/media_creation.dart';
+import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/segmented_tabs.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -23,9 +24,16 @@ import '../widgets/creation_timeline.dart';
 import '../widgets/creation_topic_card.dart';
 
 class MediaCreationPage extends StatefulWidget {
-  const MediaCreationPage({super.key, required this.onOpenDrawer});
+  const MediaCreationPage({
+    super.key,
+    required this.onOpenDrawer,
+    this.artworkRequest,
+    this.onArtworkOpened,
+  });
 
   final VoidCallback onOpenDrawer;
+  final OpenCreationArtwork? artworkRequest;
+  final VoidCallback? onArtworkOpened;
 
   @override
   State<MediaCreationPage> createState() => _MediaCreationPageState();
@@ -35,6 +43,23 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
   bool _searching = false;
   String _query = '';
   bool _gallery = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _gallery = widget.artworkRequest != null;
+  }
+
+  @override
+  void didUpdateWidget(covariant MediaCreationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.artworkRequest != null &&
+        widget.artworkRequest != oldWidget.artworkRequest) {
+      _gallery = true;
+      _searching = false;
+      _query = '';
+    }
+  }
 
   void _openTopic(String id, {String? batch}) {
     unawaited(
@@ -145,6 +170,8 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
               content: _gallery
                   ? CreationGallery(
                       desktop: false,
+                      artworkRequest: widget.artworkRequest,
+                      onArtworkOpened: widget.onArtworkOpened,
                       onOpenTopic: (id, batch) => _openTopic(id, batch: batch),
                     )
                   : _MobileTopics(

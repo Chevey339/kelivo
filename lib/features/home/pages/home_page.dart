@@ -25,6 +25,7 @@ import '../../chat/widgets/quote_interaction_scope.dart';
 import '../../../core/models/quote_ref.dart';
 import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
+import '../../../desktop/hotkeys/chat_action_bus.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart'
     show kIsWeb, mapEquals, ValueListenable;
@@ -176,6 +177,9 @@ class _HomePageState extends State<HomePage>
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   HomeSurface _surface = HomeSurface.chat;
+  StreamSubscription<CreationChatAction>? _creationActionSub;
+  OpenCreationArtwork? _artworkRequest;
+  int _creationNavigationSerial = 0;
   final InteractiveDrawerController _drawerController =
       InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
@@ -555,6 +559,9 @@ class _HomePageState extends State<HomePage>
     _drawerController.addListener(_onDrawerValueChanged);
 
     _chatReady = _controller.initChat();
+    _creationActionSub = ChatActionBus.instance.creationStream.listen(
+      _handleCreationAction,
+    );
     _initProcessText();
     _initIncomingShares();
 
@@ -608,6 +615,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   void dispose() {
+    unawaited(_creationActionSub?.cancel());
     try {
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
@@ -1007,7 +1015,63 @@ class _HomePageState extends State<HomePage>
 
   void _openChatSurface() {
     if (_surface != HomeSurface.chat) {
-      setState(() => _surface = HomeSurface.chat);
+      setState(() {
+        _surface = HomeSurface.chat;
+        _artworkRequest = null;
+      });
+    }
+  }
+
+  Future<void> _handleCreationAction(CreationChatAction action) async {
+    if (!mounted ||
+        _controller.isDesktopPlatform &&
+            ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    final serial = ++_creationNavigationSerial;
+    bool current() => mounted && serial == _creationNavigationSerial;
+    if (action is OpenCreationArtwork) {
+      if (_controller.isDesktopPlatform) return;
+      _openCreation();
+      setState(() => _artworkRequest = action);
+      return;
+    }
+    if (!_controller.isDesktopPlatform) {
+      final route = ModalRoute.of(context);
+      if (route != null) {
+        Navigator.of(
+          context,
+        ).popUntil((candidate) => identical(candidate, route));
+      }
+      unawaited(_drawerController.close());
+      _openChatSurface();
+    }
+    try {
+      await _chatReady;
+      await WidgetsBinding.instance.endOfFrame;
+      if (!current()) return;
+      switch (action) {
+        case PrefillChatImage(:final path):
+          if (await _controller.prefillCreationImage(path)) return;
+        case OpenCreationConversation(:final conversationId, :final messageId):
+          if (await _controller.openCreationSource(
+            conversationId: conversationId,
+            messageId: messageId,
+            stillCurrent: current,
+          )) {
+            return;
+          }
+        case OpenCreationArtwork():
+          return;
+      }
+    } catch (_) {
+      // The target conversation or image may have been removed during navigation.
+    }
+    if (mounted && current()) {
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.creationActionFailed,
+      );
     }
   }
 
@@ -1144,7 +1208,11 @@ class _HomePageState extends State<HomePage>
               )
             : null,
         body: creation
-            ? MediaCreationPage(onOpenDrawer: () => _drawerController.open())
+            ? MediaCreationPage(
+                onOpenDrawer: () => _drawerController.open(),
+                artworkRequest: _artworkRequest,
+                onArtworkOpened: () => setState(() => _artworkRequest = null),
+              )
             : _chatFindShortcuts(
                 _wrapWithDropTarget(_buildMobileBody(context, cs)),
               ),

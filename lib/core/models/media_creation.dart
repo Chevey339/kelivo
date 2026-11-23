@@ -1,5 +1,16 @@
 enum MediaMode { image, video }
 
+enum CreationModelSlot {
+  image('image_model_v1', MediaMode.image),
+  video('video_model_v1', MediaMode.video),
+  promptEnhance('prompt_enhance_model_v1', null);
+
+  const CreationModelSlot(this.settingKey, this.mode);
+
+  final String settingKey;
+  final MediaMode? mode;
+}
+
 enum GenerationTitleSource { auto, prompt, manual }
 
 enum GenerationStatus {

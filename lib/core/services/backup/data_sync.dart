@@ -133,6 +133,7 @@ List<MessagePart> _normalizeAttachmentPartUris(List<MessagePart> parts) {
             uri: uri,
             mime: part.mime,
             assetId: part.assetId,
+            generationItemId: part.generationItemId,
             unavailable: part.unavailable,
           ),
         );
@@ -177,6 +178,7 @@ List<MessagePart> _remapRestoredAttachmentPartUris(List<MessagePart> parts) {
             uri: uri,
             mime: part.mime,
             assetId: part.assetId,
+            generationItemId: part.generationItemId,
             unavailable: part.unavailable,
           ),
         );
@@ -224,6 +226,7 @@ List<MessagePart> recomputeAttachmentAvailability(
           uri: part.uri,
           mime: part.mime,
           assetId: part.assetId,
+          generationItemId: part.generationItemId,
           unavailable: unavailable,
         ),
       );

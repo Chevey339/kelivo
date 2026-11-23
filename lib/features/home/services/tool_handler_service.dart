@@ -21,6 +21,9 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/builtin_tools.dart' as native_tools;
 import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../core/services/media/chat_image_generation_service.dart';
+import '../../../core/services/media/media_generation_runner.dart';
+import '../../../core/services/media/media_models.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/browser/browser_tools_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
@@ -349,10 +352,19 @@ class ToolHandlerService {
     }
 
     // Local tools
+    final imageModel =
+        conversationId != null &&
+            !_isTemporaryConversation(conversationId) &&
+            supportsTools &&
+            (assistant?.localToolIds.contains(LocalToolNames.generateImage) ??
+                false)
+        ? resolveDefaultImageModel(settings)
+        : null;
     toolDefs.addAll(
       LocalToolsService.buildToolDefinitions(
         assistant: assistant,
         supportsTools: supportsTools,
+        imageReferenceLimit: imageModel?.capabilities.maxReferences,
       ).where(
         (definition) =>
             (definition['function'] as Map)['name'] !=
@@ -509,6 +521,15 @@ class ToolHandlerService {
     try {
       permissionChat = contextProvider.read<ChatService>();
     } catch (_) {}
+    final runner = contextProvider.read<MediaGenerationRunner?>();
+    final imageGeneration = runner == null || permissionChat == null
+        ? null
+        : ChatImageGenerationService(
+            runner: runner,
+            chat: permissionChat,
+            settings: settings,
+          );
+    final imageCalls = <(String, String), Future<ClientToolResult>>{};
     final routes =
         mcpRouteSnapshot ??
         toolSvc.captureRoutesForAssistant(
@@ -602,6 +623,41 @@ class ToolHandlerService {
       final permission = permissionFor(name, toolCallId);
       Future<Object?> execute() async {
         try {
+          if (name == LocalToolNames.generateImage) {
+            final imageContext = RequestImageContext.current;
+            final declarations = RequestToolDeclarations.current;
+            bool enabled() =>
+                assistant != null &&
+                (assistantProvider
+                        .getById(assistant.id)
+                        ?.localToolIds
+                        .contains(name) ??
+                    false);
+            if (imageGeneration == null ||
+                imageContext == null ||
+                conversationId == null ||
+                !enabled() ||
+                (declarations != null &&
+                    declarations.advertisedName(name) == null)) {
+              return ChatImageGenerationService.error(
+                'The image generation tool is unavailable.',
+              );
+            }
+            Future<ClientToolResult> run() => imageGeneration.run(
+              args,
+              conversationId: conversationId,
+              context: imageContext,
+              enabled: enabled,
+              toolCallId: toolCallId,
+            );
+            final id = toolCallId;
+            return id == null || id.isEmpty
+                ? await run()
+                : await imageCalls.putIfAbsent((
+                    imageContext.targetMessageId,
+                    id,
+                  ), run);
+          }
           if (name == ViewImageTool.name &&
               (args['image_id'] != null || args['path'] == null)) {
             if (args['path'] != null && args['image_id'] != null) {

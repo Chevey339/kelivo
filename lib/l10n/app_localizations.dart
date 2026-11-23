@@ -6364,18 +6364,6 @@ abstract class AppLocalizations {
   /// **'Processing image'**
   String get chatInputBarImageProcessing;
 
-  /// Label on the chip indicating the composer is in image-generation mode.
-  ///
-  /// In en, this message translates to:
-  /// **'Image mode'**
-  String get chatInputBarImageMode;
-
-  /// Tooltip on the close button of the image-mode chip; turns image mode off.
-  ///
-  /// In en, this message translates to:
-  /// **'Turn off image mode'**
-  String get chatInputBarDisableImageModeTooltip;
-
   /// Status label on a queued input preview indicating the message is waiting to be sent.
   ///
   /// In en, this message translates to:
@@ -6934,10 +6922,10 @@ abstract class AppLocalizations {
   /// **'Title Summary Model'**
   String get defaultModelPageTitleModelTitle;
 
-  /// Subtitle explaining the title-summary model follows the current chat model by default or can be set to another model.
+  /// Subtitle of the title-summary model card explaining the current chat model fallback and its use when automatically naming creation topics.
   ///
   /// In en, this message translates to:
-  /// **'Summarizes conversation titles using the current chat model by default, or a selected model.'**
+  /// **'Summarizes conversation titles using the current chat model by default, or a selected model. Creation also uses it to name topics automatically.'**
   String get defaultModelPageTitleModelSubtitle;
 
   /// Label for a toggle controlling whether thinking/reasoning is enabled for the title-summary model.
@@ -32447,6 +32435,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Response metadata'**
   String get creationLoggedResponse;
+
+  /// Title of the default model card for image creation and the generate_image tool.
+  ///
+  /// In en, this message translates to:
+  /// **'Image generation model'**
+  String get creationDefaultImage;
+
+  /// Subtitle of the default image generation model card.
+  ///
+  /// In en, this message translates to:
+  /// **'Used for images in Creation and the image generation tool in chat.'**
+  String get creationDefaultImageHelp;
+
+  /// Title of the default model card for video creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Video generation model'**
+  String get creationDefaultVideo;
+
+  /// Subtitle of the default video generation model card.
+  ///
+  /// In en, this message translates to:
+  /// **'Used in video mode in Creation.'**
+  String get creationDefaultVideoHelp;
+
+  /// Title of the default model card and prompt template editor for refining creation prompts.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt enhancement model'**
+  String get creationDefaultEnhance;
+
+  /// Subtitle of the default prompt enhancement model card.
+  ///
+  /// In en, this message translates to:
+  /// **'Refines prompts in Creation. Reference images are included if this model supports image input.'**
+  String get creationDefaultEnhanceHelp;
+
+  /// Help under the prompt enhancement template. The variable placeholder is the literal template marker {prompt}.
+  ///
+  /// In en, this message translates to:
+  /// **'Use {variable} for the current creation prompt.'**
+  String creationEnhanceTemplateVariable(String variable);
+
+  /// Assistant local tool name and chat tools menu label for generate_image.
+  ///
+  /// In en, this message translates to:
+  /// **'Image generation'**
+  String get creationLocalToolTitle;
+
+  /// Help below the image generation toggle in the assistant local tools tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Let this assistant draw or edit images in chat using the default image generation model.'**
+  String get creationLocalToolHelp;
+
+  /// Warning below the assistant image generation toggle when no usable default image model is configured.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an image generation model in Default models first.'**
+  String get creationLocalToolNeedsModel;
+
+  /// Gallery source label for an image generated inside a chat. The title is the conversation name.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat · {title}'**
+  String creationChatSource(String title);
+
+  /// Menu item on a creation image that switches to chat and adds the image to the composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to chat'**
+  String get creationSendToChat;
+
+  /// Gallery viewer action that opens the chat and scrolls to the message that generated the artwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in conversation'**
+  String get creationShowInConversation;
+
+  /// Link below a chat-generated image opening this item in the Creation gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in Creation'**
+  String get creationShowInCreation;
+
+  /// Status line when a local chat image generation was stopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Image creation cancelled'**
+  String get creationChatCancelled;
+
+  /// Action that retries a cancelled chat image generation with its saved prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate again'**
+  String get creationChatRegenerate;
+
+  /// Heading of the chat image generation failure card.
+  ///
+  /// In en, this message translates to:
+  /// **'Image unavailable'**
+  String get creationChatImageUnavailable;
+
+  /// Caption below a chat image gallery. Count is the number of available outputs, model is the image model display name, and ratio is the aspect ratio label.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Generated 1 image} other{Generated {count} images}} · {model} · {ratio}'**
+  String creationChatResultCaption(int count, String model, String ratio);
 }
 
 class _AppLocalizationsDelegate

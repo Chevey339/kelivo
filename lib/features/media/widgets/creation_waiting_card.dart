@@ -43,12 +43,14 @@ class CreationWaitingCard extends StatefulWidget {
     this.progress,
     this.preview,
     this.queueAhead = 0,
+    this.showStatusLabel = true,
   });
 
   final GenerationBatchRow batch;
   final double? progress;
   final String? preview;
   final int queueAhead;
+  final bool showStatusLabel;
 
   @override
   State<CreationWaitingCard> createState() => _CreationWaitingCardState();
@@ -183,25 +185,26 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
               paused: !animated,
               color: _preview == null ? null : Colors.white,
             ),
-            Positioned(
-              left: 12,
-              right: 12,
-              top: 10,
-              child: ThinkingSheen(
-                enabled: animated,
-                child: Text(
-                  label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: _preview == null
-                        ? cs.onSurfaceVariant
-                        : Colors.white,
+            if (widget.showStatusLabel)
+              Positioned(
+                left: 12,
+                right: 12,
+                top: 10,
+                child: ThinkingSheen(
+                  enabled: animated,
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _preview == null
+                          ? cs.onSurfaceVariant
+                          : Colors.white,
+                    ),
                   ),
                 ),
               ),
-            ),
             if (started != null &&
                 widget.batch.status != GenerationStatus.queued)
               Positioned(

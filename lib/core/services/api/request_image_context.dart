@@ -276,7 +276,7 @@ class RequestImageContext {
           }
           out.add(
             ChatContextImage(
-              identity: ContextImageIdentity(message.id, 'part:$ordinal'),
+              identity: _attachmentIdentity(message.id, part, ordinal),
               partOrdinal: ordinal,
               uri: uri,
               mime: mime ?? '',
@@ -358,7 +358,7 @@ class RequestImageContext {
       for (final (ordinal, part) in message.parts.indexed) {
         if (part is! ImagePart && part is! FilePart) continue;
         if (!excluded.contains(
-          ContextImageIdentity(message.id, 'part:$ordinal').key,
+          _attachmentIdentity(message.id, part, ordinal).key,
         )) {
           continue;
         }
@@ -371,6 +371,68 @@ class RequestImageContext {
     }).toList();
     return (messages: filtered, affectedRevisions: affectedRevisions);
   }
+
+  static ContextImageIdentity _attachmentIdentity(
+    String messageId,
+    MessagePart part,
+    int ordinal,
+  ) => switch (part) {
+    ImagePart(generationItemId: final itemId?) => ContextImageIdentity(
+      messageId,
+      'creation:$itemId',
+    ),
+    _ => ContextImageIdentity(messageId, 'part:$ordinal'),
+  };
+
+  String registerGeneratedImage(ImagePart part) {
+    final image = _add(
+      ChatContextImage(
+        identity: _attachmentIdentity(targetMessageId, part, 0),
+        uri: part.uri,
+        source: ContextImageSource.assistant,
+        label: 'Generated image',
+        mime: part.mime ?? '',
+      ),
+    );
+    return image.handle;
+  }
+
+  ChatContextImage? generationReference(
+    String handle, {
+    required Set<String> allowedMessages,
+    required ImageContextSettings currentSettings,
+  }) {
+    final image = _byHandle[handle];
+    if (omitImages ||
+        image == null ||
+        !allowedMessages.contains(image.identity.messageId) ||
+        !_isRecallable(image) ||
+        _isExcluded(image, currentSettings.excluded)) {
+      return null;
+    }
+    final thisTurn =
+        image.identity.messageId == targetMessageId &&
+        image.identity.slot.startsWith('creation:');
+    final latestAttachment =
+        image.source == ContextImageSource.user &&
+        image.identity.messageId == latestUserId &&
+        activeHandles.contains(handle);
+    if (!currentSettings.allowRecall && !thisTurn && !latestAttachment) {
+      return null;
+    }
+    return image;
+  }
+
+  List<String> get currentGenerationReferenceIds => omitImages
+      ? const []
+      : [
+          for (final image in images)
+            if (image.source == ContextImageSource.user &&
+                image.identity.messageId == latestUserId &&
+                activeHandles.contains(image.handle) &&
+                _isRecallable(image))
+              image.handle,
+        ];
 
   static Future<void> omitExcludedMarkdownImages(
     List<Map<String, dynamic>> messages,

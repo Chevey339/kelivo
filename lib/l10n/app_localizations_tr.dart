@@ -3519,12 +3519,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get chatInputBarImageProcessing => 'Görsel işleniyor';
 
   @override
-  String get chatInputBarImageMode => 'Görsel modu';
-
-  @override
-  String get chatInputBarDisableImageModeTooltip => 'Görsel modunu kapat';
-
-  @override
   String get chatInputBarQueuedPending => 'Gönderilmek üzere sırada';
 
   @override
@@ -3822,7 +3816,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Sohbet başlıklarını varsayılan olarak geçerli sohbet modelini kullanarak veya seçili bir modelle özetler.';
+      'Sohbet başlıklarını varsayılan olarak geçerli sohbet modeliyle veya seçilen bir modelle özetler. Oluşturma, konuları otomatik adlandırmak için de bunu kullanır.';
 
   @override
   String get titleModelThinkingTitle => 'Akıl Yürütmeyi Etkinleştir';
@@ -18651,4 +18645,75 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get creationLoggedResponse => 'Yanıt meta verileri';
+
+  @override
+  String get creationDefaultImage => 'Görsel oluşturma modeli';
+
+  @override
+  String get creationDefaultImageHelp =>
+      'Oluşturma bölümündeki görseller ve sohbetteki görsel oluşturma aracı için kullanılır.';
+
+  @override
+  String get creationDefaultVideo => 'Video oluşturma modeli';
+
+  @override
+  String get creationDefaultVideoHelp =>
+      'Oluşturma bölümündeki video modunda kullanılır.';
+
+  @override
+  String get creationDefaultEnhance => 'İstem geliştirme modeli';
+
+  @override
+  String get creationDefaultEnhanceHelp =>
+      'Oluşturma bölümündeki istemleri geliştirir. Bu model görsel girişini destekliyorsa referans görseller de gönderilir.';
+
+  @override
+  String creationEnhanceTemplateVariable(String variable) {
+    return 'Geçerli oluşturma istemi için $variable kullanın.';
+  }
+
+  @override
+  String get creationLocalToolTitle => 'Görsel oluşturma';
+
+  @override
+  String get creationLocalToolHelp =>
+      'Bu asistanın sohbette varsayılan görsel oluşturma modelini kullanarak görsel çizmesine veya düzenlemesine izin verin.';
+
+  @override
+  String get creationLocalToolNeedsModel =>
+      'Önce Varsayılan modeller bölümünde bir görsel oluşturma modeli seçin.';
+
+  @override
+  String creationChatSource(String title) {
+    return 'Sohbet · $title';
+  }
+
+  @override
+  String get creationSendToChat => 'Sohbete gönder';
+
+  @override
+  String get creationShowInConversation => 'Sohbette göster';
+
+  @override
+  String get creationShowInCreation => 'Oluşturma bölümünde göster';
+
+  @override
+  String get creationChatCancelled => 'Görsel oluşturma iptal edildi';
+
+  @override
+  String get creationChatRegenerate => 'Yeniden oluştur';
+
+  @override
+  String get creationChatImageUnavailable => 'Görsel kullanılamıyor';
+
+  @override
+  String creationChatResultCaption(int count, String model, String ratio) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count görsel oluşturuldu',
+      one: '1 görsel oluşturuldu',
+    );
+    return '$_temp0 · $model · $ratio';
+  }
 }
