@@ -1,6 +1,9 @@
+import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../../models/media_creation.dart';
+import '../../database/app_database.dart';
 
 enum MediaReferenceRole { image, firstFrame, lastFrame, platform }
 
@@ -41,6 +44,25 @@ class MediaRequest {
     this.references = const [],
     this.parameters = const {},
   });
+
+  factory MediaRequest.fromBatch(GenerationBatchRow batch) {
+    final params = jsonDecode(batch.paramsJson) as Map<String, dynamic>;
+    return MediaRequest(
+      modelId: batch.modelId,
+      mode: batch.mode,
+      prompt: batch.prompt,
+      negativePrompt: batch.negativePrompt,
+      count: params.remove('count') as int? ?? 1,
+      aspectRatio: params.remove('aspectRatio') as String? ?? 'auto',
+      durationSec: params.remove('durationSec') as int?,
+      resolution: params.remove('resolution') as String?,
+      parameters: params,
+      references: [
+        for (final row in jsonDecode(batch.referencesJson) as List)
+          MediaReference.fromJson((row as Map).cast<String, dynamic>()),
+      ],
+    );
+  }
 
   final String modelId;
   final MediaMode mode;
@@ -126,6 +148,11 @@ class MediaCapabilities {
   final List<String> sizes, qualities, formats;
   final bool supportsNegativePrompt, supportsSeed, supportsTransparent;
   final List<MediaParameter> platformOptions;
+
+  int outputLimit(int inputImages) => switch (maxCombinedInputsAndOutputs) {
+    final limit? => math.min(maxPerRequest, limit - inputImages),
+    null => maxPerRequest,
+  };
 
   List<String> ratiosFor(String? resolution) =>
       ratiosByResolution[resolution] ?? aspectRatios;

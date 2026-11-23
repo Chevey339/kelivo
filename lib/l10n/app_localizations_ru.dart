@@ -18236,17 +18236,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationSearchModels => 'Поиск моделей или провайдеров';
 
   @override
-  String get creationNoModelTitle => 'Нет доступных моделей для создания';
+  String get creationNoModelTitle => 'Моделей для изображений и видео пока нет';
 
   @override
   String get creationNoModelBody =>
-      'Включите подходящую модель в разделе «Провайдеры», чтобы начать создание.';
+      'Создание использует модели изображений и видео, настроенные в разделе «Провайдеры». Войдите по подписке или введите API-ключ для fal или другого провайдера.';
 
   @override
   String get creationEmptyTitle => 'Начните с идеи';
 
   @override
-  String get creationEmptyBody => 'Опишите, что вы хотите создать.';
+  String get creationEmptyBody =>
+      'Опишите, что нужно создать. Отправка первого запроса создаст тему для результата и последующих правок.';
 
   @override
   String get creationAddReference => 'Добавить референсное изображение';
@@ -18559,4 +18560,315 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get creationNoCommonOptions => 'У этой модели нет общих параметров.';
+
+  @override
+  String get creationGallery => 'Все работы';
+
+  @override
+  String get creationFilterAll => 'Все';
+
+  @override
+  String get creationFilterImages => 'Изображения';
+
+  @override
+  String get creationFilterVideos => 'Видео';
+
+  @override
+  String get creationFilterFavorites => 'Избранное';
+
+  @override
+  String get creationSearchGallery => 'Поиск по промптам или темам';
+
+  @override
+  String get creationGalleryEmpty => 'Работ пока нет';
+
+  @override
+  String get creationFavoritesEmpty => 'В избранном пока пусто';
+
+  @override
+  String get creationGalleryNoResults => 'Подходящих работ не найдено';
+
+  @override
+  String get creationShowInTopic => 'Показать в теме';
+
+  @override
+  String get creationFavorite => 'В избранное';
+
+  @override
+  String get creationUnfavorite => 'Убрать из избранного';
+
+  @override
+  String get creationFavorited => 'Добавлено в избранное';
+
+  @override
+  String get creationUnfavorited => 'Удалено из избранного';
+
+  @override
+  String get creationTopicDisplay => 'Отображение тем';
+
+  @override
+  String get creationCoversAndTitles => 'Обложки и названия';
+
+  @override
+  String get creationCoversOnly => 'Только обложки';
+
+  @override
+  String get creationTopicList => 'Список';
+
+  @override
+  String get creationAutoTitle => 'Автоматически называть темы';
+
+  @override
+  String get creationAutoTitleHelp =>
+      'Использовать модель для краткого названия, чтобы назвать тему по первому промпту.';
+
+  @override
+  String get creationAutoTitleOffHelp =>
+      'Использовать начало первого промпта как название.';
+
+  @override
+  String get creationCustomCount => 'Своё';
+
+  @override
+  String get creationCustomCountMaximum => 'До 16';
+
+  @override
+  String creationRequestSplit(String model, int limit, int requests) {
+    return '$model создаёт до $limit изображений за запрос. $requests запросов будут объединены в одну группу.';
+  }
+
+  @override
+  String get creationNoModelPlaceholder =>
+      'Сначала добавьте модель, которая умеет создавать медиа';
+
+  @override
+  String get creationConnectChatGPT => 'Войти в ChatGPT';
+
+  @override
+  String get creationConnectGrok => 'Войти в Grok';
+
+  @override
+  String get creationConfigureFal => 'Настроить fal';
+
+  @override
+  String get creationOtherProviders => 'Другие провайдеры';
+
+  @override
+  String get creationChooseReferenceFile => 'Выбрать файлы…';
+
+  @override
+  String get creationChooseFromLibrary => 'Выбрать из фото';
+
+  @override
+  String get creationTakeReferencePhoto => 'Сделать фото';
+
+  @override
+  String get creationPasteReference => 'Вставить изображение';
+
+  @override
+  String get creationRecentImages => 'Недавние изображения';
+
+  @override
+  String get creationReferenceDrop =>
+      'Отпустите, чтобы добавить референсные изображения';
+
+  @override
+  String get creationFirstFrameDrop => 'Отпустите, чтобы задать первый кадр';
+
+  @override
+  String get creationReferenceDropHint =>
+      'Также можно перетащить изображения прямо в раздел «Создать».';
+
+  @override
+  String get creationNoClipboardImage => 'В буфере обмена нет изображения';
+
+  @override
+  String get creationReferenceAdded => 'Добавлено в референсы';
+
+  @override
+  String creationReferenceLimitReached(int count) {
+    return 'Эта модель принимает до $count референсных изображений.';
+  }
+
+  @override
+  String creationReferenceUnsupported(String model) {
+    return '$model не поддерживает референсные изображения';
+  }
+
+  @override
+  String get creationReferenceIgnored =>
+      'Референсы останутся в черновике. Их сможет использовать модель, которая их принимает.';
+
+  @override
+  String get creationRecentChat => 'Чат';
+
+  @override
+  String get creationRecentCreation => 'Создание';
+
+  @override
+  String creationSelectedImages(int count) {
+    return 'Выбрано: $count';
+  }
+
+  @override
+  String creationAddSelected(int count) {
+    return 'Добавить ($count)';
+  }
+
+  @override
+  String get creationRecentEmpty => 'Нет недавних изображений';
+
+  @override
+  String get creationEditImage => 'Редактировать изображение';
+
+  @override
+  String get creationUseReference => 'Использовать как референс';
+
+  @override
+  String get creationEditReference => 'Редактирование с этим изображением';
+
+  @override
+  String get creationEditPrompt => 'Что изменить?';
+
+  @override
+  String get creationEditPromptExample =>
+      'Например, фон на пляже, сохранить человека и освещение';
+
+  @override
+  String get creationEditOriginalRatio => 'Исходное соотношение';
+
+  @override
+  String get creationEditNewGroup => 'Создать новую группу';
+
+  @override
+  String get creationEditHelp =>
+      'Результат редактирования появится в этой теме как новая группа.';
+
+  @override
+  String get creationEditStarted =>
+      'Редактирование начато. Результат появится внизу этой темы.';
+
+  @override
+  String get creationEditedFrom => 'Отредактировано из';
+
+  @override
+  String get creationRepeat => 'Сгенерировать ещё раз';
+
+  @override
+  String get creationDeleteBatch => 'Удалить эту группу?';
+
+  @override
+  String creationDeleteBatchBody(int count) {
+    return 'Удалить группу и её файлы ($count) с этого устройства?';
+  }
+
+  @override
+  String get creationRequestDetails => 'Детали запроса';
+
+  @override
+  String get creationNoRequestDetails => 'Детали запроса недоступны.';
+
+  @override
+  String creationReferenceSummary(int count, int limit) {
+    return 'Референсы $count / $limit';
+  }
+
+  @override
+  String get creationPrevious => 'Предыдущее творение';
+
+  @override
+  String get creationNext => 'Следующее творение';
+
+  @override
+  String get creationWaitingSketch => 'Набрасываем композицию';
+
+  @override
+  String get creationWaitingDetails => 'Прорабатываем детали';
+
+  @override
+  String get creationWaitingColor => 'Работаем над цветом и светом';
+
+  @override
+  String get creationWaitingFinish => 'Завершаем изображение';
+
+  @override
+  String get creationWaitingVideoMotion => 'Планируем движение';
+
+  @override
+  String get creationWaitingVideoFrames => 'Генерируем кадры';
+
+  @override
+  String get creationWaitingVideoFinish => 'Завершаем видео';
+
+  @override
+  String get creationWaitingLong => 'Это занимает немного больше времени';
+
+  @override
+  String get creationSuggestionPoster =>
+      'Создай минималистичный концертный постер';
+
+  @override
+  String get creationSuggestionLandscape =>
+      'Нарисуй горную деревню на рассвете';
+
+  @override
+  String get creationSuggestionProduct =>
+      'Сфотографируй керамическую чашку в мягком дневном свете';
+
+  @override
+  String get creationSuggestionIllustration =>
+      'Нарисуй лису под звёздным небом';
+
+  @override
+  String get creationSuggestionRoom =>
+      'Нарисуй уголок для чтения из тёплого дерева';
+
+  @override
+  String get creationSuggestionSticker =>
+      'Сделай набор забавных стикеров с растениями';
+
+  @override
+  String get creationSuggestionMotion =>
+      'Медленный наезд камеры на сад под дождём';
+
+  @override
+  String get creationSuggestionOcean => 'Волны, накатывающие на пляж на закате';
+
+  @override
+  String get creationWaitingDraft => 'Создаём первый черновик';
+
+  @override
+  String get creationWaitingScene => 'Готовим сцену';
+
+  @override
+  String get creationWaitingVideoRendering => 'Рендерим движение';
+
+  @override
+  String get creationWaitingVideoComposite => 'Собираем видео';
+
+  @override
+  String get creationWaitingNearlyDone => 'Почти готово';
+
+  @override
+  String creationUseGroupReferences(int count) {
+    return 'Использовать все $count как референсы';
+  }
+
+  @override
+  String get creationDownloadFailed => 'Не удалось скачать';
+
+  @override
+  String get creationAutomaticRetry => 'Автоматический повтор';
+
+  @override
+  String get creationNoAutomaticRetry => 'Ручной повтор';
+
+  @override
+  String get creationRetryHistory => 'История повторов';
+
+  @override
+  String get creationLoggedRequest => 'Метаданные запроса';
+
+  @override
+  String get creationLoggedResponse => 'Метаданные ответа';
 }

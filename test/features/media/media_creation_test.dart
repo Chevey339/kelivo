@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/database/media_repository.dart';
 import 'package:Kelivo/core/models/media_creation.dart';
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/media/media_file_store.dart';
 import 'package:Kelivo/core/services/media/media_generation_runner.dart';
@@ -12,8 +15,11 @@ import 'package:Kelivo/desktop/desktop_media_creation_page.dart';
 import 'package:Kelivo/features/media/pages/media_creation_page.dart';
 import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
 import 'package:Kelivo/features/media/widgets/creation_composer.dart';
+import 'package:Kelivo/features/media/widgets/creation_gallery.dart';
+import 'package:flutter/services.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -53,6 +59,8 @@ void main() {
       await settings.loaded;
       await settings.setProviderConfig(_provider.id, _provider);
       final directory = await Directory.systemTemp.createTemp('creation-topic');
+      SandboxPathResolver.debugSetDirs(docsDir: directory.path);
+      addTearDown(SandboxPathResolver.debugSetDirs);
       final png = base64Encode(
         image.encodePng(image.Image(width: 12, height: 8)),
       );
@@ -110,6 +118,136 @@ void main() {
         await runner.repository.itemsForBatch(batches.single.id),
         hasLength(1),
       );
+      final savedBatch = batches.single;
+      final imageRow = (await runner.repository.itemsForBatch(
+        savedBatch.id,
+      )).single;
+      final favorites = runner.repository.watchItems().firstWhere(
+        (rows) => rows.any((row) => row.id == imageRow.id && row.favorite),
+      );
+      await controller.setFavorite(imageRow.id, true);
+      await favorites;
+      expect(
+        controller
+            .galleryItems(CreationGalleryFilter.favorites, 'GARDEN')
+            .single
+            .id,
+        imageRow.id,
+      );
+      expect(
+        controller.galleryItems(CreationGalleryFilter.videos, ''),
+        isEmpty,
+      );
+      expect(
+        controller.galleryItems(CreationGalleryFilter.all, 'unmatched'),
+        isEmpty,
+      );
+      expect(controller.coverCells(id).single?.id, imageRow.id);
+      await controller.setTopicView(CreationTopicView.covers);
+      expect(controller.topicView, CreationTopicView.covers);
+      expect(
+        harness.preferences.getString(BusinessKeyRegistry.creationTopicViewKey),
+        'covers',
+      );
+
+      final repeat = (await controller.repeat(savedBatch))!;
+      expect(await repeat.completed, GenerationStatus.succeeded);
+      expect(repeat.batchId, isNot(savedBatch.id));
+      final repeated = (await runner.repository.batch(repeat.batchId))!;
+      expect(repeated.topicId, id);
+      expect(repeated.prompt, savedBatch.prompt);
+      expect(repeated.paramsJson, savedBatch.paramsJson);
+      await controller.deleteBatch(repeated);
+      expect(await runner.repository.batch(repeat.batchId), isNull);
+      expect(await runner.repository.batch(savedBatch.id), isNotNull);
+
+      final editingModel = controller.editingModel(imageRow)!;
+      final edited = (await controller.editItem(
+        imageRow,
+        editingModel,
+        prompt: 'Make the sky brighter',
+        ratio: 'auto',
+      ))!;
+      expect(await edited.completed, GenerationStatus.succeeded);
+      final editRow = (await runner.repository.batch(edited.batchId))!;
+      expect(editRow.topicId, id);
+      expect(editRow.parentItemId, imageRow.id);
+      expect(editRow.source, GenerationSource.edit);
+      expect(
+        await runner.repository.itemsForBatch(savedBatch.id),
+        hasLength(1),
+      );
+
+      final db = harness.database;
+      final now = DateTime.now();
+      await db
+          .into(db.conversationRows)
+          .insert(
+            ConversationRowsCompanion.insert(
+              id: 'history',
+              title: 'My chat',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.messageRows)
+          .insert(
+            MessageRowsCompanion.insert(
+              id: 'message',
+              conversationId: 'history',
+              role: 'user',
+              timestamp: now,
+              messageOrder: 0,
+            ),
+          );
+      const imageUris = [
+        'kelivo-file:///upload/chat.png',
+        'https://cdn.example.test/output?sig=fixture',
+      ];
+      for (final (index, uri) in imageUris.indexed) {
+        await db
+            .into(db.messagePartRows)
+            .insert(
+              MessagePartRowsCompanion.insert(
+                conversationId: 'history',
+                revisionId: 'message',
+                ordinal: index,
+                kind: 'image',
+                payload: ImagePart(uri: uri).encodePayload(),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+      }
+      final referenceImages = await runner.repository.recentImages(
+        RecentImageSource.all,
+        offset: 0,
+        limit: 10,
+      );
+      expect(referenceImages, hasLength(4));
+      expect(referenceImages.first.source, RecentImageSource.chat);
+      expect(referenceImages.first.title, 'My chat');
+      expect(
+        referenceImages
+            .where((item) => item.source == RecentImageSource.chat)
+            .map((item) => item.path),
+        unorderedEquals(imageUris),
+      );
+      expect(
+        referenceImages.where(
+          (item) => item.source == RecentImageSource.creation,
+        ),
+        hasLength(2),
+      );
+      expect(
+        await runner.repository.recentImages(
+          RecentImageSource.chat,
+          offset: 2,
+          limit: 1,
+        ),
+        isEmpty,
+      );
       await controller.deleteTopic(id);
       expect(await runner.repository.batch(batches.single.id), isNull);
       expect(await runner.repository.itemsForBatch(batches.single.id), isEmpty);
@@ -119,6 +257,120 @@ void main() {
         ).exists(),
         isFalse,
       );
+    },
+  );
+
+  testWidgets(
+    'desktop gallery opens a filtered lightbox and jumps to its topic',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1280, 820);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final (harness, settings, runner, controller, folder) = (await tester
+          .runAsync(() async {
+            final harness = await BusinessTestHarness.create();
+            final settings = SettingsProvider(harness.preferences);
+            await settings.loaded;
+            await settings.setProviderConfig(_provider.id, _provider);
+            final repository = MediaRepository(harness.database);
+            final runner = MediaGenerationRunner(
+              repository: repository,
+              files: const MediaFileStore(),
+            );
+            await runner.initialized;
+            final folder = await Directory.systemTemp.createTemp(
+              'creation-gallery-test',
+            );
+            final file = await File(
+              '${folder.path}/result.png',
+            ).writeAsBytes(image.encodePng(image.Image(width: 30, height: 30)));
+            final created = DateTime(2025, 1, 2);
+            await repository.enqueue(
+              GenerationBatchRowsCompanion.insert(
+                id: 'batch',
+                topicId: const Value('topic'),
+                providerId: _provider.id,
+                modelId: _model,
+                mode: MediaMode.image,
+                prompt: 'A wide mountain lake',
+                paramsJson: '{}',
+                referencesJson: '[]',
+                status: GenerationStatus.succeeded,
+                source: GenerationSource.workbench,
+                createdAt: created,
+              ),
+              topic: GenerationTopicRowsCompanion.insert(
+                id: 'topic',
+                title: 'Mountain trip',
+                titleSource: GenerationTitleSource.manual,
+                createdAt: created,
+                updatedAt: created,
+              ),
+            );
+            for (var index = 0; index < 2; index++) {
+              await harness.database
+                  .into(harness.database.generationItemRows)
+                  .insert(
+                    GenerationItemRowsCompanion.insert(
+                      id: 'image-$index',
+                      batchId: 'batch',
+                      ordinal: index,
+                      mode: MediaMode.image,
+                      path: file.path,
+                      mime: 'image/png',
+                      byteSize: await file.length(),
+                      status: GenerationItemStatus.ready,
+                      createdAt: created,
+                    ),
+                  );
+            }
+            final controller = MediaCreationController(
+              runner: runner,
+              settings: settings,
+              preferences: harness.preferences,
+            );
+            await repository.watchItems().first;
+            return (harness, settings, runner, controller, folder);
+          }))!;
+      addTearDown(() async {
+        controller.dispose();
+        settings.dispose();
+        await runner.shutdown();
+        runner.dispose();
+        await harness.close();
+        await folder.delete(recursive: true);
+      });
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+            ChangeNotifierProvider<MediaCreationController>.value(
+              value: controller,
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            home: const Scaffold(body: DesktopMediaCreationPage()),
+          ),
+        ),
+      );
+      await tester.tap(find.text('All creations'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CreationArtworkTile), findsNWidgets(2));
+      await tester.tap(find.byType(CreationArtworkTile).first);
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 2'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 2'), findsOneWidget);
+      await tester.tap(find.byTooltip('Show in topic'));
+      await tester.pumpAndSettle();
+      expect(find.text('A wide mountain lake'), findsOneWidget);
+      expect(find.text('Mountain trip'), findsWidgets);
+      await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 

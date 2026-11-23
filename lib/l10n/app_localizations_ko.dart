@@ -17374,16 +17374,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationSearchModels => '모델 또는 공급자 검색';
 
   @override
-  String get creationNoModelTitle => '사용 가능한 생성 모델이 없습니다';
+  String get creationNoModelTitle => '아직 이미지 또는 동영상 모델이 없습니다';
 
   @override
-  String get creationNoModelBody => '공급자에서 호환되는 모델을 활성화하면 생성을 시작할 수 있습니다.';
+  String get creationNoModelBody =>
+      '제작은 공급자에서 구성한 이미지 및 동영상 모델을 사용합니다. 구독으로 로그인하거나 fal 또는 다른 공급자의 API 키를 입력하세요.';
 
   @override
   String get creationEmptyTitle => '아이디어로 시작하세요';
 
   @override
-  String get creationEmptyBody => '생성하고 싶은 내용을 설명하세요.';
+  String get creationEmptyBody =>
+      '만들고 싶은 것을 설명하세요. 첫 프롬프트를 보내면 결과와 이후 수정을 위한 주제가 시작됩니다.';
 
   @override
   String get creationAddReference => '참조 이미지 추가';
@@ -17676,4 +17678,300 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get creationNoCommonOptions => '이 모델에는 공통 옵션이 없습니다.';
+
+  @override
+  String get creationGallery => '모든 창작물';
+
+  @override
+  String get creationFilterAll => '전체';
+
+  @override
+  String get creationFilterImages => '이미지';
+
+  @override
+  String get creationFilterVideos => '동영상';
+
+  @override
+  String get creationFilterFavorites => '즐겨찾기';
+
+  @override
+  String get creationSearchGallery => '프롬프트 또는 주제 검색';
+
+  @override
+  String get creationGalleryEmpty => '아직 창작물이 없습니다';
+
+  @override
+  String get creationFavoritesEmpty => '아직 즐겨찾기가 없습니다';
+
+  @override
+  String get creationGalleryNoResults => '일치하는 창작물이 없습니다';
+
+  @override
+  String get creationShowInTopic => '주제에서 보기';
+
+  @override
+  String get creationFavorite => '즐겨찾기';
+
+  @override
+  String get creationUnfavorite => '즐겨찾기 해제';
+
+  @override
+  String get creationFavorited => '즐겨찾기에 추가됨';
+
+  @override
+  String get creationUnfavorited => '즐겨찾기에서 제거됨';
+
+  @override
+  String get creationTopicDisplay => '주제 표시 방식';
+
+  @override
+  String get creationCoversAndTitles => '커버 + 제목';
+
+  @override
+  String get creationCoversOnly => '커버만';
+
+  @override
+  String get creationTopicList => '목록';
+
+  @override
+  String get creationAutoTitle => '주제 자동 이름 지정';
+
+  @override
+  String get creationAutoTitleHelp => '제목 요약 모델을 사용해 첫 번째 프롬프트로 주제 이름을 지정합니다.';
+
+  @override
+  String get creationAutoTitleOffHelp => '첫 번째 프롬프트의 시작 부분을 제목으로 사용합니다.';
+
+  @override
+  String get creationCustomCount => '사용자 지정';
+
+  @override
+  String get creationCustomCountMaximum => '최대 16';
+
+  @override
+  String creationRequestSplit(String model, int limit, int requests) {
+    return '$model은(는) 요청당 최대 $limit장의 이미지를 생성합니다. $requests회의 요청이 하나의 그룹으로 묶입니다.';
+  }
+
+  @override
+  String get creationNoModelPlaceholder => '먼저 미디어를 생성할 수 있는 모델을 추가하세요';
+
+  @override
+  String get creationConnectChatGPT => 'ChatGPT에 로그인';
+
+  @override
+  String get creationConnectGrok => 'Grok에 로그인';
+
+  @override
+  String get creationConfigureFal => 'fal 설정';
+
+  @override
+  String get creationOtherProviders => '기타 공급자';
+
+  @override
+  String get creationChooseReferenceFile => '파일 선택…';
+
+  @override
+  String get creationChooseFromLibrary => '사진에서 선택';
+
+  @override
+  String get creationTakeReferencePhoto => '사진 촬영';
+
+  @override
+  String get creationPasteReference => '이미지 붙여넣기';
+
+  @override
+  String get creationRecentImages => '최근 이미지';
+
+  @override
+  String get creationReferenceDrop => '놓아서 참조 이미지 추가';
+
+  @override
+  String get creationFirstFrameDrop => '놓아서 첫 프레임 설정';
+
+  @override
+  String get creationReferenceDropHint => '이미지를 만들기 화면으로 직접 끌어다 놓을 수도 있습니다.';
+
+  @override
+  String get creationNoClipboardImage => '클립보드에 이미지가 없습니다';
+
+  @override
+  String get creationReferenceAdded => '참조에 추가됨';
+
+  @override
+  String creationReferenceLimitReached(int count) {
+    return '이 모델은 최대 $count개의 참조 이미지를 지원합니다.';
+  }
+
+  @override
+  String creationReferenceUnsupported(String model) {
+    return '$model은(는) 참조 이미지를 지원하지 않습니다';
+  }
+
+  @override
+  String get creationReferenceIgnored =>
+      '참조는 초안에 남아 있습니다. 참조를 지원하는 모델을 사용하면 활용할 수 있습니다.';
+
+  @override
+  String get creationRecentChat => '채팅';
+
+  @override
+  String get creationRecentCreation => '창작';
+
+  @override
+  String creationSelectedImages(int count) {
+    return '$count개 선택됨';
+  }
+
+  @override
+  String creationAddSelected(int count) {
+    return '추가 ($count)';
+  }
+
+  @override
+  String get creationRecentEmpty => '최근 이미지가 없습니다';
+
+  @override
+  String get creationEditImage => '이미지 편집';
+
+  @override
+  String get creationUseReference => '참조로 사용';
+
+  @override
+  String get creationEditReference => '이 이미지를 참조로 편집 중';
+
+  @override
+  String get creationEditPrompt => '무엇을 변경할까요?';
+
+  @override
+  String get creationEditPromptExample => '예: 배경을 해변으로 바꾸고 인물과 조명은 유지';
+
+  @override
+  String get creationEditOriginalRatio => '원본 비율';
+
+  @override
+  String get creationEditNewGroup => '새 그룹 생성';
+
+  @override
+  String get creationEditHelp => '편집 결과는 이 주제에 새 그룹으로 표시됩니다.';
+
+  @override
+  String get creationEditStarted => '편집이 시작되었습니다. 결과는 이 주제 하단에 표시됩니다.';
+
+  @override
+  String get creationEditedFrom => '편집 원본';
+
+  @override
+  String get creationRepeat => '다시 생성';
+
+  @override
+  String get creationDeleteBatch => '이 그룹을 삭제할까요?';
+
+  @override
+  String creationDeleteBatchBody(int count) {
+    return '이 그룹과 $count개 파일을 이 기기에서 삭제할까요?';
+  }
+
+  @override
+  String get creationRequestDetails => '요청 세부 정보';
+
+  @override
+  String get creationNoRequestDetails => '사용 가능한 요청 세부 정보가 없습니다.';
+
+  @override
+  String creationReferenceSummary(int count, int limit) {
+    return '참조 $count / $limit';
+  }
+
+  @override
+  String get creationPrevious => '이전 창작물';
+
+  @override
+  String get creationNext => '다음 창작물';
+
+  @override
+  String get creationWaitingSketch => '구도 스케치 중';
+
+  @override
+  String get creationWaitingDetails => '세부 묘사 다듬는 중';
+
+  @override
+  String get creationWaitingColor => '색상과 빛 조정 중';
+
+  @override
+  String get creationWaitingFinish => '이미지 마무리 중';
+
+  @override
+  String get creationWaitingVideoMotion => '움직임 계획 중';
+
+  @override
+  String get creationWaitingVideoFrames => '프레임 생성 중';
+
+  @override
+  String get creationWaitingVideoFinish => '비디오 마무리 중';
+
+  @override
+  String get creationWaitingLong => '조금 더 걸리고 있습니다';
+
+  @override
+  String get creationSuggestionPoster => '미니멀한 콘서트 포스터 디자인';
+
+  @override
+  String get creationSuggestionLandscape => '새벽의 산간 마을을 그려 주세요';
+
+  @override
+  String get creationSuggestionProduct => '부드러운 자연광 아래 도자기 컵 촬영';
+
+  @override
+  String get creationSuggestionIllustration => '별이 빛나는 하늘 아래 여우 일러스트';
+
+  @override
+  String get creationSuggestionRoom => '따뜻한 나무색 독서 공간 스케치';
+
+  @override
+  String get creationSuggestionSticker => '재미있는 식물 스티커 세트 만들기';
+
+  @override
+  String get creationSuggestionMotion => '비 오는 정원으로 천천히 다가가는 카메라';
+
+  @override
+  String get creationSuggestionOcean => '해질녘 해변이 밀려오는 파도';
+
+  @override
+  String get creationWaitingDraft => '첫 초안 생성 중';
+
+  @override
+  String get creationWaitingScene => '장면 구성 중';
+
+  @override
+  String get creationWaitingVideoRendering => '동작 렌더링 중';
+
+  @override
+  String get creationWaitingVideoComposite => '동영상 합성 중';
+
+  @override
+  String get creationWaitingNearlyDone => '거의 완료됨';
+
+  @override
+  String creationUseGroupReferences(int count) {
+    return '모두 참조로 사용 ($count개)';
+  }
+
+  @override
+  String get creationDownloadFailed => '다운로드 실패';
+
+  @override
+  String get creationAutomaticRetry => '자동 재시도';
+
+  @override
+  String get creationNoAutomaticRetry => '수동 재시도';
+
+  @override
+  String get creationRetryHistory => '재시도 기록';
+
+  @override
+  String get creationLoggedRequest => '요청 정보';
+
+  @override
+  String get creationLoggedResponse => '응답 정보';
 }

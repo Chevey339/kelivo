@@ -63,6 +63,13 @@ Stream<MediaEvent> pollMediaTask(
       final retry = failure.retryAfter;
       final exponential = Duration(seconds: 1 << failures++);
       retryDelay = retry != null && retry > exponential ? retry : exponential;
+      final remaining = timeout - elapsed.elapsed;
+      if (remaining > Duration.zero) {
+        context.log?.retry(
+          failure,
+          retryDelay < remaining ? retryDelay : remaining,
+        );
+      }
     }
     waitBeforeRequest = true;
   }

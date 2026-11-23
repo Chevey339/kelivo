@@ -81,6 +81,46 @@ void main() {
   });
 
   test(
+    'failed generation diagnostics retain only allowlisted request fields',
+    () async {
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+        clientFactory: (_, _) => MockClient((sent) async {
+          expect(sent.headers['authorization'], 'Bearer fixture-key');
+          final body = jsonDecode(sent.body) as Map;
+          expect(body['prompt'], 'An orange cat');
+          return http.Response(
+            '{"error":{"code":"private-error-code","message":"response-private-value"}}',
+            400,
+          );
+        }),
+      );
+      addTearDown(runner.dispose);
+      final ticket = await runner.enqueue(
+        provider: provider('diagnostics'),
+        request: request,
+      );
+      expect(await ticket.completed, GenerationStatus.failed);
+      final error = (await repository.batch(ticket.batchId))!.errorJson!;
+      expect(error, isNot(contains('fixture-key')));
+      expect(error, isNot(contains('An orange cat')));
+      expect(error, isNot(contains('response-private-value')));
+      expect(error, isNot(contains('private-error-code')));
+      expect(jsonDecode(error)['request'], {
+        'method': 'POST',
+        'host': 'example.test',
+        'route': '/…/images/generations',
+        'body': {'n': 10, 'size': '1536x1024'},
+      });
+      expect(jsonDecode(error)['response'], {
+        'status': 400,
+        'body': {'kind': 'parameters'},
+      });
+    },
+  );
+
+  test(
     'one logical batch retries a rate limit, splits the count and saves files',
     () async {
       final counts = <int>[];
@@ -327,6 +367,12 @@ void main() {
     expect(submits, 1);
     expect(reads, 4);
     expect(delays.map((duration) => duration.inSeconds), [2, 1, 2, 4]);
+    final details = jsonDecode(
+      (await repository.batch(ticket.batchId))!.errorJson!,
+    );
+    final retries = (details['retries'] as List).cast<Map<String, dynamic>>();
+    expect(retries.map((attempt) => attempt['status']), [503, 503, 503]);
+    expect(retries.map((attempt) => attempt['waitMs']), [1000, 2000, 4000]);
   });
 
   test('retired hosts are excluded and Vertex AI retains Veo', () {

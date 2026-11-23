@@ -164,7 +164,7 @@ class OpenAiImagesAdapter implements MediaAdapter {
         )
         ..body = jsonEncode(body);
     }
-    final response = await context.send(httpRequest);
+    final response = await context.send(httpRequest, diagnosticBody: body);
     if (!((response.headers['content-type'] ?? '').contains(
       'text/event-stream',
     ))) {

@@ -1,3 +1,5 @@
+import '../features/media/providers/media_creation_controller.dart';
+import '../features/media/widgets/creation_preferences.dart';
 import '../features/provider/widgets/request_budget_settings.dart';
 import '../features/home/widgets/model_icon.dart';
 import '../core/models/avatar_config.dart';
@@ -160,6 +162,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   SettingsSearchItem? _searchTarget;
   int _searchNavigation = 0;
   bool _showTopicPosition = false;
+  bool _showCreationPreferences = false;
+  bool _selectFal = false;
   bool _showDetail = false;
 
   Future<void> _openSearch() async {
@@ -229,17 +233,20 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       setState(() {
         _showDetail = true;
         _selected = switch (target) {
-          DesktopSettingsNavigationTarget.topicPosition =>
+          DesktopSettingsNavigationTarget.topicPosition ||
+          DesktopSettingsNavigationTarget.creationPreferences =>
             _SettingsMenuItem.display,
           DesktopSettingsNavigationTarget.backup => _SettingsMenuItem.backup,
           DesktopSettingsNavigationTarget.mcp => _SettingsMenuItem.mcp,
-          DesktopSettingsNavigationTarget.providers =>
-            _SettingsMenuItem.providers,
+          DesktopSettingsNavigationTarget.providers ||
+          DesktopSettingsNavigationTarget.fal => _SettingsMenuItem.providers,
         };
-        if (target == DesktopSettingsNavigationTarget.topicPosition) {
-          _showTopicPosition = true;
-          _searchNavigation++;
-        }
+        _showTopicPosition =
+            target == DesktopSettingsNavigationTarget.topicPosition;
+        _showCreationPreferences =
+            target == DesktopSettingsNavigationTarget.creationPreferences;
+        _selectFal = target == DesktopSettingsNavigationTarget.fal;
+        _searchNavigation++;
       });
     });
   }
@@ -308,6 +315,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                         label:
                             (_showTopicPosition
                                 ? l10n.desktopDisplaySettingsTopicPositionTitle
+                                : _showCreationPreferences
+                                ? l10n.creationTopicDisplay
                                 : _searchTarget?.targetLabel) ??
                             switch (_searchTarget?.destination) {
                               SettingsSearchDestination.messageStyle =>
@@ -324,8 +333,13 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                       );
                     case _SettingsMenuItem.providers:
                       return _DesktopProvidersBody(
-                        key: const ValueKey('providers'),
-                        initialSelectedKey: widget.initialProviderKey,
+                        key: ValueKey((
+                          'providers',
+                          _selectFal ? _searchNavigation : 0,
+                        )),
+                        initialSelectedKey: _selectFal
+                            ? 'fal'
+                            : widget.initialProviderKey,
                       );
                     case _SettingsMenuItem.defaultModel:
                       return const DesktopDefaultModelPane(

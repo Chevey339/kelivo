@@ -31365,13 +31365,13 @@ abstract class AppLocalizations {
   /// Empty state title when no enabled provider has a model for the selected media mode.
   ///
   /// In en, this message translates to:
-  /// **'No creation models available'**
+  /// **'No image or video models yet'**
   String get creationNoModelTitle;
 
   /// Empty state help for configuring media models.
   ///
   /// In en, this message translates to:
-  /// **'Enable a compatible model in Providers to start creating.'**
+  /// **'Create uses image and video models configured in Providers. Sign in with a subscription, or enter an API key for fal or another provider.'**
   String get creationNoModelBody;
 
   /// Empty creation topic or workbench headline.
@@ -31380,10 +31380,10 @@ abstract class AppLocalizations {
   /// **'Start with an idea'**
   String get creationEmptyTitle;
 
-  /// Empty creation topic or workbench prompt guidance.
+  /// Empty creation workbench text explaining that the first prompt starts a topic and later edits are grouped there.
   ///
   /// In en, this message translates to:
-  /// **'Describe what you want to create.'**
+  /// **'Describe what to create. Sending the first prompt starts a topic for the result and later edits.'**
   String get creationEmptyBody;
 
   /// Accessible label for the creation composer action that selects an image file as a reference.
@@ -31889,6 +31889,564 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This model has no common options.'**
   String get creationNoCommonOptions;
+
+  /// Gallery destination and header listing saved image and video creations.
+  ///
+  /// In en, this message translates to:
+  /// **'All creations'**
+  String get creationGallery;
+
+  /// First filter in the Create gallery, showing every saved creation.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get creationFilterAll;
+
+  /// Filter for saved images in the Create gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get creationFilterImages;
+
+  /// Filter for saved videos in the Create gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Videos'**
+  String get creationFilterVideos;
+
+  /// Filter for starred creations in the Create gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get creationFilterFavorites;
+
+  /// Placeholder in the Create gallery search box.
+  ///
+  /// In en, this message translates to:
+  /// **'Search prompts or topics'**
+  String get creationSearchGallery;
+
+  /// Empty Create gallery title before the user has generated media.
+  ///
+  /// In en, this message translates to:
+  /// **'No creations yet'**
+  String get creationGalleryEmpty;
+
+  /// Empty message for the favorites filter in Create.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorites yet'**
+  String get creationFavoritesEmpty;
+
+  /// Create gallery message when search or filtering returns no results.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching creations'**
+  String get creationGalleryNoResults;
+
+  /// Lightbox action that opens the parent topic and scrolls to the selected item's batch.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in topic'**
+  String get creationShowInTopic;
+
+  /// Star the selected creation from its media card or lightbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get creationFavorite;
+
+  /// Remove the star from the selected creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove favorite'**
+  String get creationUnfavorite;
+
+  /// Confirmation after starring a creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to favorites'**
+  String get creationFavorited;
+
+  /// Confirmation after removing a creation's star.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed from favorites'**
+  String get creationUnfavorited;
+
+  /// Title of the Create topic display preferences and shortcut menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic display'**
+  String get creationTopicDisplay;
+
+  /// Topic display option showing artwork covers plus metadata.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers and titles'**
+  String get creationCoversAndTitles;
+
+  /// Compact topic display option showing only covers.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers only'**
+  String get creationCoversOnly;
+
+  /// Topic display option with one compact row per topic.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get creationTopicList;
+
+  /// Switch for naming a creation topic with the title summary model.
+  ///
+  /// In en, this message translates to:
+  /// **'Name topics automatically'**
+  String get creationAutoTitle;
+
+  /// Explains automatic naming in the Create topic display menu and preferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the title summary model to name a topic from its first prompt.'**
+  String get creationAutoTitleHelp;
+
+  /// Explains the fallback when automatic naming is turned off.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the beginning of the first prompt as the title.'**
+  String get creationAutoTitleOffHelp;
+
+  /// Choice after the standard quantities in the image count control.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get creationCustomCount;
+
+  /// Caption next to the custom image count stepper.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 16'**
+  String get creationCustomCountMaximum;
+
+  /// Batch count panel information showing the model name, per-request limit, and planned request count.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} produces up to {limit} images per request. {requests} requests will be grouped together.'**
+  String creationRequestSplit(String model, int limit, int requests);
+
+  /// Disabled composer placeholder when there are no eligible models.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a model that can create media first'**
+  String get creationNoModelPlaceholder;
+
+  /// Create empty-state button to open ChatGPT subscription sign-in.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to ChatGPT'**
+  String get creationConnectChatGPT;
+
+  /// Create empty-state button to open Grok subscription sign-in.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to Grok'**
+  String get creationConnectGrok;
+
+  /// Create empty-state button opening the built-in fal provider settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up fal'**
+  String get creationConfigureFal;
+
+  /// Create empty-state action opening the providers list.
+  ///
+  /// In en, this message translates to:
+  /// **'Other providers'**
+  String get creationOtherProviders;
+
+  /// Desktop reference source option to pick one or more local images.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose files…'**
+  String get creationChooseReferenceFile;
+
+  /// Mobile action to pick reference images from the photo library.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from Photos'**
+  String get creationChooseFromLibrary;
+
+  /// Mobile reference action to capture an image using the camera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get creationTakeReferencePhoto;
+
+  /// Reference source action that reads a local image from the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste image'**
+  String get creationPasteReference;
+
+  /// Picker title for recent images from creations and chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent images'**
+  String get creationRecentImages;
+
+  /// Drag overlay when dropping images into the Create workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop to add reference images'**
+  String get creationReferenceDrop;
+
+  /// Drag overlay in video mode when dropping a first-frame image.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop to set the first frame'**
+  String get creationFirstFrameDrop;
+
+  /// Supporting text at the bottom of the desktop Add references menu.
+  ///
+  /// In en, this message translates to:
+  /// **'You can also drop images onto Create.'**
+  String get creationReferenceDropHint;
+
+  /// Toast when the user invokes Paste image but the clipboard contains no supported image.
+  ///
+  /// In en, this message translates to:
+  /// **'No image on the clipboard'**
+  String get creationNoClipboardImage;
+
+  /// Toast after copying a creation or selected file into the current draft references.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to references'**
+  String get creationReferenceAdded;
+
+  /// Toast and reference picker limit information. count is the maximum number of reference images.
+  ///
+  /// In en, this message translates to:
+  /// **'This model accepts up to {count} reference images.'**
+  String creationReferenceLimitReached(int count);
+
+  /// Warning in a draft with saved references after switching to a model that cannot accept them.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} does not support reference images'**
+  String creationReferenceUnsupported(String model);
+
+  /// Help beside dimmed reference thumbnails for a model without reference input.
+  ///
+  /// In en, this message translates to:
+  /// **'Your references stay in the draft. A model that accepts them can use them.'**
+  String get creationReferenceIgnored;
+
+  /// Recent image source filter and label for pictures from conversations.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get creationRecentChat;
+
+  /// Recent image source filter and label for pictures from generation history.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get creationRecentCreation;
+
+  /// Number of selected images in the recent image picker footer.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String creationSelectedImages(int count);
+
+  /// Confirm action in the recent image picker. count is the number of selected images.
+  ///
+  /// In en, this message translates to:
+  /// **'Add ({count})'**
+  String creationAddSelected(int count);
+
+  /// Empty recent reference picker message when the selected source has no files.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent images'**
+  String get creationRecentEmpty;
+
+  /// Action and title for the creation image editor in the lightbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit image'**
+  String get creationEditImage;
+
+  /// Media action that appends an image to the open draft or sets its first frame.
+  ///
+  /// In en, this message translates to:
+  /// **'Use as reference'**
+  String get creationUseReference;
+
+  /// Selected image caption in the lightbox editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Editing with this image'**
+  String get creationEditReference;
+
+  /// Prompt field for editing a generated image.
+  ///
+  /// In en, this message translates to:
+  /// **'What should change?'**
+  String get creationEditPrompt;
+
+  /// Example placeholder in the lightbox edit prompt field.
+  ///
+  /// In en, this message translates to:
+  /// **'For example, use a beach background and keep the person and lighting'**
+  String get creationEditPromptExample;
+
+  /// Choice to match the original image's aspect ratio when editing.
+  ///
+  /// In en, this message translates to:
+  /// **'Original ratio'**
+  String get creationEditOriginalRatio;
+
+  /// Submits an edit as a new generation batch in the source topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate a new group'**
+  String get creationEditNewGroup;
+
+  /// Note below the lightbox edit options explaining where the result appears.
+  ///
+  /// In en, this message translates to:
+  /// **'The edit appears as a new group in this topic.'**
+  String get creationEditHelp;
+
+  /// Toast after submitting an edit from the lightbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Editing started. The result will appear at the bottom of this topic.'**
+  String get creationEditStarted;
+
+  /// Label identifying the source image for a generation produced by an edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edited from'**
+  String get creationEditedFrom;
+
+  /// Start a new batch using the same prompt, model parameters, and references.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate again'**
+  String get creationRepeat;
+
+  /// Title of the confirmation dialog for deleting a generation group.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this group?'**
+  String get creationDeleteBatch;
+
+  /// Confirmation text showing the number of saved result files in a generation group.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the group and its {count} files from this device?'**
+  String creationDeleteBatchBody(int count);
+
+  /// Title and action for redacted diagnostics of a failed generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Request details'**
+  String get creationRequestDetails;
+
+  /// Shown when an older failed batch has no recorded protocol details.
+  ///
+  /// In en, this message translates to:
+  /// **'No request details are available.'**
+  String get creationNoRequestDetails;
+
+  /// Label next to the reference strip. count is selected and limit is supported by the active model.
+  ///
+  /// In en, this message translates to:
+  /// **'References {count} / {limit}'**
+  String creationReferenceSummary(int count, int limit);
+
+  /// Lightbox shortcut/button for navigating to the previous creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous creation'**
+  String get creationPrevious;
+
+  /// Lightbox shortcut/button for navigating to the next creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Next creation'**
+  String get creationNext;
+
+  /// Rotating creation status after an image is started.
+  ///
+  /// In en, this message translates to:
+  /// **'Sketching the composition'**
+  String get creationWaitingSketch;
+
+  /// Rotating status during image generation after sketching.
+  ///
+  /// In en, this message translates to:
+  /// **'Refining the details'**
+  String get creationWaitingDetails;
+
+  /// Rotating status during image generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Working on colors and light'**
+  String get creationWaitingColor;
+
+  /// Rotating status near the end of image generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing the image'**
+  String get creationWaitingFinish;
+
+  /// Rotating status during video generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Planning the motion'**
+  String get creationWaitingVideoMotion;
+
+  /// Rotating status during video generation after planning.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating frames'**
+  String get creationWaitingVideoFrames;
+
+  /// Rotating status toward the end of video generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing the video'**
+  String get creationWaitingVideoFinish;
+
+  /// Rotating status after media generation takes longer than estimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking a little longer'**
+  String get creationWaitingLong;
+
+  /// Prompt suggestion in the empty Create workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Design a minimalist concert poster'**
+  String get creationSuggestionPoster;
+
+  /// Prompt suggestion in the empty Create workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Paint a mountain village at dawn'**
+  String get creationSuggestionLandscape;
+
+  /// Prompt suggestion in the empty Create workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph a ceramic cup in soft daylight'**
+  String get creationSuggestionProduct;
+
+  /// Prompt suggestion in the empty Create workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Illustrate a fox under a starry sky'**
+  String get creationSuggestionIllustration;
+
+  /// Prompt suggestion in the empty Create workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Sketch a reading nook with warm wood'**
+  String get creationSuggestionRoom;
+
+  /// Prompt suggestion in the empty Create workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Make a set of playful plant stickers'**
+  String get creationSuggestionSticker;
+
+  /// Video prompt suggestion in the empty workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'A slow push in on a rainy garden'**
+  String get creationSuggestionMotion;
+
+  /// Video prompt suggestion in the empty workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Waves rolling onto a beach at sunset'**
+  String get creationSuggestionOcean;
+
+  /// The rotating image waiting label at 20 seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating the first draft'**
+  String get creationWaitingDraft;
+
+  /// The rotating image waiting label at 25 seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Setting up the scene'**
+  String get creationWaitingScene;
+
+  /// The rotating video waiting label at 25 seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Rendering motion'**
+  String get creationWaitingVideoRendering;
+
+  /// The rotating video waiting label at 30 seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'Compositing the video'**
+  String get creationWaitingVideoComposite;
+
+  /// The rotating waiting label at 35 seconds for images and video.
+  ///
+  /// In en, this message translates to:
+  /// **'Almost done'**
+  String get creationWaitingNearlyDone;
+
+  /// Action in the generation group menu adding its ready images to the current draft. count is the number of images in the group.
+  ///
+  /// In en, this message translates to:
+  /// **'Use all {count} as references'**
+  String creationUseGroupReferences(int count);
+
+  /// Placeholder inside a partial generation group for a result that could not be saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get creationDownloadFailed;
+
+  /// Badge in creation diagnostics for errors that allow automatic retries.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic retry'**
+  String get creationAutomaticRetry;
+
+  /// Badge in creation diagnostics for errors that require a manual retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual retry'**
+  String get creationNoAutomaticRetry;
+
+  /// Heading of the list of automatic retry attempts in creation request details.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry history'**
+  String get creationRetryHistory;
+
+  /// Heading for the redacted request method, host, and route in creation request details.
+  ///
+  /// In en, this message translates to:
+  /// **'Request metadata'**
+  String get creationLoggedRequest;
+
+  /// Heading for response status information in creation request details.
+  ///
+  /// In en, this message translates to:
+  /// **'Response metadata'**
+  String get creationLoggedResponse;
 }
 
 class _AppLocalizationsDelegate

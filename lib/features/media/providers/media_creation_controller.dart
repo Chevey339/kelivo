@@ -76,7 +76,9 @@ class MediaCreationController extends ChangeNotifier {
       notifyListeners();
     }, onError: _storageError);
     _batchesSubscription = runner.repository.watchBatches().listen((batches) {
-      _batches = batches;
+      _batchesById
+        ..clear()
+        ..addEntries(batches.map((batch) => MapEntry(batch.id, batch)));
       _batchesByTopic.clear();
       for (final batch in batches) {
         final id = batch.topicId;
@@ -85,6 +87,12 @@ class MediaCreationController extends ChangeNotifier {
       notifyListeners();
     }, onError: _storageError);
     _itemsSubscription = runner.repository.watchItems().listen((items) {
+      _readyItems = items
+          .where((item) => item.status == GenerationItemStatus.ready)
+          .toList();
+      _itemsById
+        ..clear()
+        ..addEntries(items.map((item) => MapEntry(item.id, item)));
       _itemsByBatch.clear();
       for (final item in items) {
         (_itemsByBatch[item.batchId] ??= []).add(item);
@@ -104,7 +112,9 @@ class MediaCreationController extends ChangeNotifier {
   late final StreamSubscription<List<GenerationBatchRow>> _batchesSubscription;
   late final StreamSubscription<List<GenerationItemRow>> _itemsSubscription;
   List<GenerationTopicRow> _topics = const [];
-  List<GenerationBatchRow> _batches = const [];
+  List<GenerationItemRow> _readyItems = const [];
+  final _batchesById = <String, GenerationBatchRow>{};
+  final _itemsById = <String, GenerationItemRow>{};
   final _batchesByTopic = <String, List<GenerationBatchRow>>{};
   final _itemsByBatch = <String, List<GenerationItemRow>>{};
   final _drafts = <String?, CreationDraft>{};
@@ -112,7 +122,10 @@ class MediaCreationController extends ChangeNotifier {
   final _choices = <MediaMode, List<MediaModelChoice>>{};
   final _work = <String?>{};
   final _deletingTopics = <String>{};
+  final _deletingBatches = <String>{};
+  final _repeatingBatches = <String>{};
   final _namingTopics = <String>{};
+  final _lastSubmissionByTopic = <String, String>{};
   MediaMode _mode = MediaMode.image;
   bool _disposed = false;
 
@@ -133,6 +146,70 @@ class MediaCreationController extends ChangeNotifier {
   bool get autoTitle =>
       preferences.getBool(BusinessKeyRegistry.creationAutoTitleKey) ?? true;
 
+  CreationTopicView get topicView {
+    final key = preferences.getString(BusinessKeyRegistry.creationTopicViewKey);
+    return CreationTopicView.values
+            .where((value) => value.name == key)
+            .firstOrNull ??
+        CreationTopicView.coverAndTitle;
+  }
+
+  Future<void> setTopicView(CreationTopicView mode) async {
+    await preferences.setString(
+      BusinessKeyRegistry.creationTopicViewKey,
+      mode.name,
+    );
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<void> setAutoTitle(bool value) async {
+    await preferences.setBool(BusinessKeyRegistry.creationAutoTitleKey, value);
+    if (!_disposed) notifyListeners();
+  }
+
+  String? lastSubmission(String? topicId) => _lastSubmissionByTopic[topicId];
+
+  void _submitted(String id, MediaGenerationTicket ticket) {
+    _lastSubmissionByTopic[id] = ticket.batchId;
+    if (!_disposed) notifyListeners();
+  }
+
+  int get galleryCount => _readyItems.length;
+  GenerationItemRow? item(String id) => _itemsById[id];
+
+  List<GenerationItemRow> galleryItems(
+    CreationGalleryFilter filter,
+    String query,
+  ) {
+    final term = query.trim().toLowerCase();
+    return _readyItems.where((item) {
+      final matches = switch (filter) {
+        CreationGalleryFilter.all => true,
+        CreationGalleryFilter.images => item.mode == MediaMode.image,
+        CreationGalleryFilter.videos => item.mode == MediaMode.video,
+        CreationGalleryFilter.favorites => item.favorite,
+      };
+      if (!matches) return false;
+      if (term.isEmpty) return true;
+      final parent = batch(item.batchId);
+      if (parent == null) return false;
+      final title = parent.topicId == null
+          ? null
+          : topic(parent.topicId!)?.title;
+      return parent.prompt.toLowerCase().contains(term) ||
+          (title?.toLowerCase().contains(term) ?? false);
+    }).toList();
+  }
+
+  List<GenerationItemRow?> coverCells(String topicId) => [
+    for (final batch in batchesFor(topicId).reversed) ...[
+      if (batch.status.isActive) null,
+      ...itemsFor(
+        batch.id,
+      ).where((item) => item.status == GenerationItemStatus.ready),
+    ],
+  ];
+
   Iterable<GenerationTopicRow> searchTopics(String query) {
     final term = query.trim().toLowerCase();
     if (term.isEmpty) return _topics;
@@ -145,16 +222,22 @@ class MediaCreationController extends ChangeNotifier {
     );
   }
 
-  List<MediaModelChoice> get models => _choices.putIfAbsent(_mode, () {
-    final keys = {...settings.providersOrder, ...settings.providerConfigs.keys};
-    return [
-      for (final id in keys)
-        ..._modelsForProvider(
-          settings.getProviderConfig(id, defaultName: id),
-          _mode,
-        ),
-    ];
-  });
+  List<MediaModelChoice> get models => modelsFor(_mode);
+
+  List<MediaModelChoice> modelsFor(MediaMode mode) =>
+      _choices.putIfAbsent(mode, () {
+        final keys = {
+          ...settings.providersOrder,
+          ...settings.providerConfigs.keys,
+        };
+        return [
+          for (final id in keys)
+            ..._modelsForProvider(
+              settings.getProviderConfig(id, defaultName: id),
+              mode,
+            ),
+        ];
+      });
 
   Iterable<MediaModelChoice> _modelsForProvider(
     ProviderConfig provider,
@@ -399,6 +482,35 @@ class MediaCreationController extends ChangeNotifier {
     return refs.any((ref) => ref.role == MediaReferenceRole.firstFrame);
   }
 
+  int addReferencePaths(
+    String? topicId,
+    List<String> paths, {
+    MediaReferenceRole? frameRole,
+  }) {
+    final caps = model?.capabilities;
+    if (caps == null || paths.isEmpty) return 0;
+    if (mode == MediaMode.video) {
+      final role = frameRole ?? MediaReferenceRole.firstFrame;
+      if (!caps.frameRoles.contains(role)) return 0;
+      setFrame(topicId, role, paths.first);
+      return 1;
+    }
+    final existing = imageReferences(topicId);
+    final seen = existing.map((ref) => ref.path).toSet();
+    final choices = paths
+        .where(seen.add)
+        .take((caps.maxReferences - existing.length).clamp(0, 16))
+        .toList();
+    if (choices.isEmpty) return 0;
+    setReferences(topicId, [...existing, ...choices.map(MediaReference.new)]);
+    return choices.length;
+  }
+
+  void suggestPrompt(String? topicId, String prompt) {
+    updatePrompt(topicId, prompt);
+    notifyListeners();
+  }
+
   void updatePrompt(String? topicId, String value) {
     _drafts[topicId] = draftFor(topicId).copyWith(prompt: value);
   }
@@ -465,10 +577,11 @@ class MediaCreationController extends ChangeNotifier {
     _work.add(topicId);
     notifyListeners();
     try {
-      await runner.enqueue(
+      final ticket = await runner.enqueue(
         provider: choice.provider,
         request: request,
         topicId: id,
+        canEnqueue: () => !_deletingTopics.contains(id),
         newTopic: topicId == null
             ? GenerationTopicRowsCompanion.insert(
                 id: id,
@@ -482,6 +595,7 @@ class MediaCreationController extends ChangeNotifier {
             : null,
       );
       if (identical(_drafts[topicId], draft)) _drafts.remove(topicId);
+      _submitted(id, ticket);
       if (topicId == null && titleSource != null) {
         unawaited(_nameTopic(id, prompt, promptTitle, titleSource));
       }
@@ -578,6 +692,7 @@ class MediaCreationController extends ChangeNotifier {
         }
       });
       _drafts.remove(id);
+      _lastSubmissionByTopic.remove(id);
     } finally {
       _deletingTopics.remove(id);
     }
@@ -589,13 +704,136 @@ class MediaCreationController extends ChangeNotifier {
         await runner.files.deleteItem(item);
       });
 
-  Future<void> retry(GenerationBatchRow batch) async {
-    if (_deletingTopics.contains(batch.topicId)) return;
-    await runner.retry(batch.id, settings.getProviderConfig(batch.providerId));
+  Future<void> setFavorite(String itemId, bool value) =>
+      AttachmentFileLock.synchronized(
+        () => runner.repository.setFavorite(itemId, value),
+      );
+
+  Future<void> deleteBatch(GenerationBatchRow batch) async {
+    if (_deletingTopics.contains(batch.topicId) ||
+        !_deletingBatches.add(batch.id)) {
+      return;
+    }
+    try {
+      // A retry may already be writing its queued state under the file lock.
+      // Let it finish registration before cancelling the corresponding job.
+      await AttachmentFileLock.synchronized(() async {});
+      await runner.cancel(batch.id);
+      await AttachmentFileLock.synchronized(() async {
+        await runner.repository.deleteBatch(batch.id);
+        await runner.files.deleteBatch(batch.id);
+      });
+    } finally {
+      _deletingBatches.remove(batch.id);
+    }
   }
 
-  GenerationBatchRow? batch(String id) =>
-      _batches.where((batch) => batch.id == id).firstOrNull;
+  Future<MediaGenerationTicket?> repeat(GenerationBatchRow row) async {
+    final topicId = row.topicId;
+    if (topicId == null ||
+        row.status.isActive ||
+        _deletingTopics.contains(topicId) ||
+        _deletingBatches.contains(row.id) ||
+        !_repeatingBatches.add(row.id)) {
+      return null;
+    }
+    try {
+      final current = await runner.repository.batch(row.id);
+      if (current == null ||
+          _deletingBatches.contains(row.id) ||
+          _deletingTopics.contains(topicId)) {
+        return null;
+      }
+      final ticket = await runner.enqueue(
+        provider: settings.getProviderConfig(row.providerId),
+        request: MediaRequest.fromBatch(current),
+        topicId: topicId,
+        source: current.source == GenerationSource.edit
+            ? GenerationSource.edit
+            : GenerationSource.workbench,
+        parentItemId: current.parentItemId,
+        applyModelExtra: false,
+        canEnqueue: () =>
+            !_deletingTopics.contains(topicId) &&
+            !_deletingBatches.contains(row.id),
+      );
+      _submitted(topicId, ticket);
+      return ticket;
+    } finally {
+      _repeatingBatches.remove(row.id);
+    }
+  }
+
+  MediaModelChoice? editingModel(GenerationItemRow item) {
+    if (item.mode != MediaMode.image || batch(item.batchId)?.topicId == null) {
+      return null;
+    }
+    final choices = modelsFor(MediaMode.image).where(
+      (choice) =>
+          choice.capabilities.maxReferences > 0 &&
+          !choice.capabilities.platformOptions.any((field) => field.required),
+    );
+    final current = _options[MediaMode.image]?.model;
+    final original = batch(item.batchId);
+    return choices.where((choice) => choice.key == current).firstOrNull ??
+        choices
+            .where(
+              (choice) =>
+                  choice.provider.id == original?.providerId &&
+                  choice.spec.id == original?.modelId,
+            )
+            .firstOrNull ??
+        choices.firstOrNull;
+  }
+
+  Future<MediaGenerationTicket?> editItem(
+    GenerationItemRow item,
+    MediaModelChoice choice, {
+    required String prompt,
+    required String ratio,
+  }) async {
+    final topicId = batch(item.batchId)?.topicId;
+    if (topicId == null ||
+        _deletingTopics.contains(topicId) ||
+        _deletingBatches.contains(item.batchId) ||
+        prompt.trim().isEmpty) {
+      return null;
+    }
+    final ticket = await runner.enqueue(
+      provider: settings.getProviderConfig(choice.provider.id),
+      request: MediaRequest(
+        modelId: choice.spec.id,
+        mode: MediaMode.image,
+        prompt: prompt.trim(),
+        aspectRatio: ratio,
+        references: [MediaReference(item.path)],
+      ),
+      topicId: topicId,
+      source: GenerationSource.edit,
+      parentItemId: item.id,
+      canEnqueue: () =>
+          !_deletingTopics.contains(topicId) &&
+          !_deletingBatches.contains(item.batchId),
+    );
+    _submitted(topicId, ticket);
+    return ticket;
+  }
+
+  Future<void> retry(GenerationBatchRow batch) async {
+    if (_deletingTopics.contains(batch.topicId) ||
+        _deletingBatches.contains(batch.id)) {
+      return;
+    }
+    await runner.retry(
+      batch.id,
+      settings.getProviderConfig(batch.providerId),
+      canRetry: () =>
+          !_deletingTopics.contains(batch.topicId) &&
+          !_deletingBatches.contains(batch.id),
+    );
+  }
+
+  GenerationBatchRow? batch(String id) => _batchesById[id];
 
   void _settingsChanged() {
     _choices.clear();

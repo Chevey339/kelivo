@@ -19,7 +19,7 @@ import '../providers/media_creation_controller.dart';
 import 'creation_lightbox.dart';
 import 'creation_waiting_card.dart';
 
-class CreationTopicCard extends StatelessWidget {
+class CreationTopicCard extends StatefulWidget {
   const CreationTopicCard({
     super.key,
     required this.topic,
@@ -34,84 +34,208 @@ class CreationTopicCard extends StatelessWidget {
   final bool selected, desktop, wide;
 
   @override
+  State<CreationTopicCard> createState() => _CreationTopicCardState();
+}
+
+class _CreationTopicCardState extends State<CreationTopicCard> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
     final media = context.watch<MediaCreationController>();
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final topic = widget.topic;
+    final active = widget.selected;
+    final desktop = widget.desktop;
+    final mode = media.topicView;
     final batches = media.batchesFor(topic.id);
-    final cover = <GenerationItemRow?>[
-      for (final batch in batches.reversed) ...[
-        if (batch.status.isActive) null,
-        ...media
-            .itemsFor(batch.id)
-            .where((item) => item.status == GenerationItemStatus.ready),
-      ],
-    ];
-    final radius = BorderRadius.circular(wide ? 16 : 12);
+    final status = batches.lastOrNull?.status;
+    final running = batches.any((batch) => batch.status.isActive);
+    final allCells = media.coverCells(topic.id);
+    final radius = BorderRadius.circular(
+      widget.wide
+          ? 16
+          : mode == CreationTopicView.covers
+          ? 10
+          : 12,
+    );
+    final title = media.namingTopic(topic.id)
+        ? l10n.creationNaming
+        : topic.title;
+    final text = Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: desktop ? 12.5 : 15,
+        fontWeight: AppFontWeights.semibold,
+        color: active ? cs.primary : cs.onSurface,
+      ),
+    );
+    final subtitle = Text(
+      running
+          ? (batches.lastOrNull?.mode == MediaMode.video
+                ? l10n.creationWaitingVideo
+                : l10n.creationWaitingImage)
+          : l10n.creationGenerationCount(batches.length),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(color: cs.onSurfaceVariant, fontSize: desktop ? 11 : 12),
+    );
+
     void menu([Offset? anchor]) =>
         showCreationTopicMenu(context, topic, desktop: desktop, anchor: anchor);
-    return GestureDetector(
-      onSecondaryTapDown: desktop
-          ? (details) => menu(details.globalPosition)
-          : null,
-      child: IosCardPress(
-        focusable: true,
-        baseColor: Colors.transparent,
-        borderRadius: radius,
-        onTap: onOpen,
-        onLongPress: !desktop ? menu : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AspectRatio(
-              aspectRatio: wide ? 1.6 : 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: selected
-                        ? cs.primary
-                        : cs.outlineVariant.withValues(alpha: .45),
-                    width: selected ? 2 : 1,
-                  ),
-                  borderRadius: radius,
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(selected ? 3 : 1),
-                  child: ClipRRect(
-                    borderRadius: radius,
-                    child: ColoredBox(
-                      color: context.appColors.surfaceFill,
-                      child: _CoverMosaic(
-                        cells: cover,
-                        status: batches.lastOrNull?.status,
+
+    Widget cover(List<GenerationItemRow?> cells) => ClipRRect(
+      borderRadius: radius,
+      child: ColoredBox(
+        color: context.appColors.surfaceFill,
+        child: _CoverMosaic(cells: cells, status: status),
+      ),
+    );
+
+    final favoriteCover = AspectRatio(
+      aspectRatio: widget.wide ? 1.6 : 1,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(
+            color: active ? cs.primary : cs.outlineVariant,
+            width: active ? 2 : 1,
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(active ? 3 : 1),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              cover(allCells),
+              if (mode == CreationTopicView.covers && _hover)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black54],
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(5, 15, 5, 4),
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
+              if (running)
+                Positioned(
+                  left: 5,
+                  top: 5,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: cs.surface.withValues(alpha: .86),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: SizedBox.square(
+                        dimension: 11,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.7,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (_hover && desktop)
+                Positioned(
+                  top: 3,
+                  right: 3,
+                  child: IosIconButton(
+                    icon: Lucide.Ellipsis,
+                    minSize: 26,
+                    color: Colors.white,
+                    tooltip: l10n.chatMessageWidgetMoreTooltip,
+                    onTap: menu,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: desktop ? (_) => setState(() => _hover = true) : null,
+      onExit: desktop ? (_) => setState(() => _hover = false) : null,
+      child: GestureDetector(
+        onSecondaryTapDown: desktop
+            ? (details) => menu(details.globalPosition)
+            : null,
+        child: Semantics(
+          label: mode == CreationTopicView.covers ? title : null,
+          child: IosCardPress(
+            focusable: true,
+            baseColor: active && mode == CreationTopicView.list
+                ? cs.primary.withValues(alpha: .09)
+                : Colors.transparent,
+            borderRadius: radius,
+            onTap: widget.onOpen,
+            onLongPress: desktop ? null : menu,
+            child: switch (mode) {
+              CreationTopicView.covers => favoriteCover,
+              CreationTopicView.coverAndTitle => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  favoriteCover,
+                  const SizedBox(height: 5),
+                  text,
+                  subtitle,
+                ],
               ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              media.namingTopic(topic.id) ? l10n.creationNaming : topic.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: desktop ? 12.5 : 15,
-                fontWeight: AppFontWeights.semibold,
-                color: selected ? cs.primary : cs.onSurface,
+              CreationTopicView.list => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Row(
+                  children: [
+                    SizedBox.square(
+                      dimension: 40,
+                      child: cover(allCells.take(1).toList()),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [text, subtitle],
+                      ),
+                    ),
+                    if (running && !_hover)
+                      const SizedBox.square(
+                        dimension: 13,
+                        child: CircularProgressIndicator(strokeWidth: 1.7),
+                      ),
+                    if (_hover && desktop)
+                      IosIconButton(
+                        icon: Lucide.Ellipsis,
+                        minSize: 28,
+                        tooltip: l10n.chatMessageWidgetMoreTooltip,
+                        onTap: menu,
+                      ),
+                  ],
+                ),
               ),
-            ),
-            Text(
-              l10n.creationGenerationCount(batches.length),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: cs.onSurfaceVariant,
-                fontSize: desktop ? 11 : 12,
-              ),
-            ),
-          ],
+            },
+          ),
         ),
       ),
     );

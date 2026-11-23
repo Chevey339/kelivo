@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../core/models/media_creation.dart';
@@ -26,6 +24,7 @@ import '../../provider/widgets/provider_avatar.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_advanced_options.dart';
 import 'creation_lightbox.dart';
+import 'creation_reference_picker.dart';
 
 class CreationComposer extends StatefulWidget {
   const CreationComposer({
@@ -96,29 +95,119 @@ class _CreationComposerState extends State<CreationComposer> {
     }
   }
 
-  Future<void> _pickReference(int limit) async {
+  Future<void> _pickReferences(
+    BuildContext context, {
+    MediaReferenceRole? role,
+  }) async {
     final id = widget.topicId;
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-    );
-    if (!mounted || result == null) return;
-    final existing = _controller.imageReferences(id);
-    _controller.setReferences(
-      id,
-      [
-        ...existing,
-        for (final file in result.files)
-          if (file.path case final path?) MediaReference(path),
-      ].take(limit).toList(),
+    final media = _controller;
+    final model = media.model;
+    if (model == null) return;
+    final maximum = role == null
+        ? model.capabilities.maxReferences - media.imageReferences(id).length
+        : 1;
+    if (maximum <= 0) return;
+    await showCreationReferenceSources(
+      context,
+      desktop: widget.desktop,
+      limit: maximum,
+      frameRole: role,
+      onSelected: (paths) {
+        if (!mounted || widget.topicId != id || model.key != media.model?.key) {
+          return;
+        }
+        _referenceResult(
+          media.addReferencePaths(id, paths, frameRole: role),
+          expected: paths.length,
+        );
+      },
     );
   }
 
-  Future<void> _pickFrame(MediaReferenceRole role) async {
-    final id = widget.topicId;
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    if (!mounted || result?.files.firstOrNull?.path == null) return;
-    _controller.setFrame(id, role, result!.files.first.path);
+  void _referenceResult(int count, {required int expected}) {
+    final l10n = AppLocalizations.of(context)!;
+    final max = _controller.model?.capabilities.maxReferences ?? 0;
+    if (count < expected && _controller.mode == MediaMode.image) {
+      showAppSnackBar(
+        context,
+        message: l10n.creationReferenceLimitReached(max),
+      );
+    } else if (count > 0) {
+      showAppSnackBar(context, message: l10n.creationReferenceAdded);
+    }
+  }
+
+  Future<void> _paste() async {
+    final topicId = widget.topicId;
+    try {
+      final result = await readCreationClipboard();
+      if (!mounted || topicId != widget.topicId) return;
+      if (result.paths.isNotEmpty) {
+        _referenceResult(
+          _controller.addReferencePaths(topicId, result.paths),
+          expected: result.paths.length,
+        );
+      } else if (result.text case final text?) {
+        final value = _prompt.value;
+        final selection = value.selection;
+        final start = selection.isValid ? selection.start : value.text.length;
+        final end = selection.isValid ? selection.end : value.text.length;
+        final next = value.text.replaceRange(start, end, text);
+        _prompt.value = TextEditingValue(
+          text: next,
+          selection: TextSelection.collapsed(offset: start + text.length),
+        );
+        _controller.updatePrompt(topicId, next);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      showAppSnackBar(
+        context,
+        message:
+            error is MediaFailure &&
+                error.kind == MediaFailureKind.referenceTooLarge
+            ? l10n.creationReferenceTooLarge
+            : l10n.creationActionFailed,
+      );
+    }
+  }
+
+  KeyEventResult _handleDesktopKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final composing = _prompt.value.composing;
+    if (composing.isValid && !composing.isCollapsed) {
+      return KeyEventResult.ignored;
+    }
+    final keyboard = HardwareKeyboard.instance;
+    final modified = keyboard.isControlPressed || keyboard.isMetaPressed;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.keyV && modified) {
+      unawaited(_paste());
+      return KeyEventResult.handled;
+    }
+    if (key != LogicalKeyboardKey.enter &&
+        key != LogicalKeyboardKey.numpadEnter) {
+      return KeyEventResult.ignored;
+    }
+    final ctrlEnter =
+        _controller.settings.desktopSendShortcut ==
+        DesktopSendShortcut.ctrlEnter;
+    if (ctrlEnter ? modified : !modified && !keyboard.isShiftPressed) {
+      unawaited(_send());
+    } else {
+      final value = _prompt.value;
+      final selection = value.selection;
+      final start = selection.isValid ? selection.start : value.text.length;
+      final end = selection.isValid ? selection.end : value.text.length;
+      final text = value.text.replaceRange(start, end, '\n');
+      _prompt.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: start + 1),
+      );
+      _controller.updatePrompt(widget.topicId, text);
+    }
+    return KeyEventResult.handled;
   }
 
   @override
@@ -128,19 +217,32 @@ class _CreationComposerState extends State<CreationComposer> {
     final l10n = AppLocalizations.of(context)!;
     final model = state.model;
     final video = state.mode == MediaMode.video;
+    final draftPrompt = state.draftFor(widget.topicId).prompt;
+    if (draftPrompt != _prompt.text) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final text = _controller.draftFor(widget.topicId).prompt;
+        if (_prompt.text != text) {
+          _prompt.value = TextEditingValue(
+            text: text,
+            selection: TextSelection.collapsed(offset: text.length),
+          );
+        }
+      });
+    }
     final references = state.imageReferences(widget.topicId);
     final frames = state.showsFrames(widget.topicId);
     final caps = model?.capabilities;
     final aspectRatio = state.ratioFor(widget.topicId);
-    final hint = switch ((state.mode, widget.topicId == null)) {
-      (MediaMode.image, true) => l10n.creationNewImagePrompt,
-      (MediaMode.image, false) => l10n.creationImagePrompt,
-      (MediaMode.video, true) => l10n.creationNewVideoPrompt,
-      (MediaMode.video, false) => l10n.creationVideoPrompt,
-    };
+    final hint = model == null
+        ? l10n.creationNoModelPlaceholder
+        : switch ((state.mode, widget.topicId == null)) {
+            (MediaMode.image, true) => l10n.creationNewImagePrompt,
+            (MediaMode.image, false) => l10n.creationImagePrompt,
+            (MediaMode.video, true) => l10n.creationNewVideoPrompt,
+            (MediaMode.video, false) => l10n.creationVideoPrompt,
+          };
     final limit = model?.capabilities.maxReferences ?? 0;
-    final ctrlEnter =
-        state.settings.desktopSendShortcut == DesktopSendShortcut.ctrlEnter;
     final radius = BorderRadius.circular(
       widget.desktop ? AppRadii.capsule : 26,
     );
@@ -175,35 +277,25 @@ class _CreationComposerState extends State<CreationComposer> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (!video && limit > 0 && references.isNotEmpty)
-                        SizedBox(
-                          height: 42,
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                            scrollDirection: Axis.horizontal,
-                            children: [
-                              for (final ref in references)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 4),
-                                  child: Chip(
-                                    label: Text(
-                                      p.basename(ref.path),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    onDeleted: () => state.setReferences(
-                                      widget.topicId,
-                                      [...references]..remove(ref),
-                                    ),
-                                  ),
-                                ),
-                            ],
+                      if (!video && references.isNotEmpty)
+                        _ReferenceStrip(
+                          references: references,
+                          limit: limit,
+                          model:
+                              model?.spec.displayName ??
+                              l10n.creationSelectModel,
+                          onRemove: (ref) => state.setReferences(
+                            widget.topicId,
+                            [...references]..remove(ref),
                           ),
+                          onAdd: (anchor) => _pickReferences(anchor),
                         ),
                       if (frames && caps != null)
                         _VideoFrames(
                           topicId: widget.topicId,
                           capabilities: caps,
-                          onPick: _pickFrame,
+                          onPick: (anchor, role) =>
+                              _pickReferences(anchor, role: role),
                         ),
                       Padding(
                         padding: EdgeInsets.fromLTRB(
@@ -216,18 +308,15 @@ class _CreationComposerState extends State<CreationComposer> {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Expanded(
-                              child: CallbackShortcuts(
-                                bindings: {
-                                  if (widget.desktop)
-                                    SingleActivator(
-                                      LogicalKeyboardKey.enter,
-                                      control: ctrlEnter,
-                                    ): () =>
-                                        unawaited(_send()),
-                                },
+                              child: Focus(
+                                canRequestFocus: false,
+                                onKeyEvent: widget.desktop
+                                    ? _handleDesktopKey
+                                    : null,
                                 child: TextField(
                                   controller: _prompt,
                                   focusNode: _focus,
+                                  enabled: model != null,
                                   minLines: 1,
                                   maxLines: 6,
                                   style: TextStyle(
@@ -289,19 +378,22 @@ class _CreationComposerState extends State<CreationComposer> {
                         child: Row(
                           children: [
                             if (limit > 0)
-                              IosIconButton(
-                                icon: LucideIcons.imagePlus,
-                                size: 17,
-                                minSize: 30,
-                                tooltip: l10n.creationAddReference,
-                                enabled: video
-                                    ? caps?.frameRoles.isNotEmpty == true
-                                    : references.length < limit,
-                                onTap: video
-                                    ? () => _pickFrame(
-                                        MediaReferenceRole.firstFrame,
-                                      )
-                                    : () => _pickReference(limit),
+                              Builder(
+                                builder: (anchor) => IosIconButton(
+                                  icon: LucideIcons.imagePlus,
+                                  size: 17,
+                                  minSize: 30,
+                                  tooltip: l10n.creationAddReference,
+                                  enabled: video
+                                      ? caps?.frameRoles.isNotEmpty == true
+                                      : references.length < limit,
+                                  onTap: () => _pickReferences(
+                                    anchor,
+                                    role: video
+                                        ? MediaReferenceRole.firstFrame
+                                        : null,
+                                  ),
+                                ),
                               ),
                             const SizedBox(width: 2),
                             SizedBox(
@@ -766,17 +858,7 @@ class _ParameterOptions extends StatelessWidget {
           ),
         ],
         if (ratio && count) const SizedBox(height: 12),
-        if (count) ...[
-          Text(l10n.creationCountLabel),
-          const SizedBox(height: 6),
-          SegmentedTabs(
-            height: 36,
-            radioGroup: true,
-            tabs: [for (var i = 1; i <= 4; i++) SegmentedTab(label: '$i')],
-            index: state.count - 1,
-            onChanged: (index) => state.selectCount(index + 1),
-          ),
-        ],
+        if (count) _ImageCountOptions(topicId: topicId),
         if (duration && caps != null && caps.durations.isNotEmpty) ...[
           if (ratio) const SizedBox(height: 12),
           Text(l10n.creationDuration),
@@ -826,6 +908,191 @@ class _ParameterOptions extends StatelessWidget {
           CreationAdvancedOptions(topicId: topicId),
         ],
       ],
+    );
+  }
+}
+
+class _ImageCountOptions extends StatefulWidget {
+  const _ImageCountOptions({this.topicId});
+
+  final String? topicId;
+
+  @override
+  State<_ImageCountOptions> createState() => _ImageCountOptionsState();
+}
+
+class _ImageCountOptionsState extends State<_ImageCountOptions> {
+  bool _custom = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<MediaCreationController>();
+    final l10n = AppLocalizations.of(context)!;
+    final count = state.count;
+    final custom = _custom || count > 4;
+    final model = state.model;
+    final max =
+        model?.capabilities.outputLimit(
+          state.imageReferences(widget.topicId).length,
+        ) ??
+        1;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(l10n.creationCountLabel),
+        const SizedBox(height: 6),
+        SegmentedTabs(
+          height: 36,
+          radioGroup: true,
+          tabs: [
+            for (var i = 1; i <= 4; i++) SegmentedTab(label: '$i'),
+            SegmentedTab(label: l10n.creationCustomCount),
+          ],
+          index: custom ? 4 : count - 1,
+          onChanged: (index) {
+            setState(() => _custom = index == 4);
+            if (index != 4) state.selectCount(index + 1);
+          },
+        ),
+        if (custom)
+          Row(
+            children: [
+              IosIconButton(
+                icon: Lucide.Minus,
+                minSize: 34,
+                onTap: count > 1 ? () => state.selectCount(count - 1) : null,
+              ),
+              Text('$count'),
+              IosIconButton(
+                icon: Lucide.Plus,
+                minSize: 34,
+                onTap: count < 16 ? () => state.selectCount(count + 1) : null,
+              ),
+              const Spacer(),
+              Text(
+                l10n.creationCustomCountMaximum,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        if (model != null && max > 0 && count > max)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              l10n.creationRequestSplit(
+                model.spec.displayName,
+                max,
+                (count / max).ceil(),
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ReferenceStrip extends StatelessWidget {
+  const _ReferenceStrip({
+    required this.references,
+    required this.limit,
+    required this.model,
+    required this.onRemove,
+    required this.onAdd,
+  });
+
+  final List<MediaReference> references;
+  final int limit;
+  final String model;
+  final ValueChanged<MediaReference> onRemove;
+  final ValueChanged<BuildContext> onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
+    final unavailable = limit == 0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 1),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 56,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final reference in references)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox.square(
+                            dimension: 56,
+                            child: Opacity(
+                              opacity: unavailable ? .45 : 1,
+                              child: CreationFileImage(
+                                reference.path,
+                                cacheWidth: 140,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 1,
+                          right: 1,
+                          child: IosIconButton(
+                            icon: Lucide.X,
+                            size: 13,
+                            minSize: 21,
+                            color: Colors.white,
+                            tooltip: MaterialLocalizations.of(
+                              context,
+                            ).deleteButtonTooltip,
+                            onTap: () => onRemove(reference),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (references.length < limit)
+                  Builder(
+                    builder: (anchor) => SizedBox.square(
+                      dimension: 56,
+                      child: IosCardPress(
+                        onTap: () => onAdd(anchor),
+                        borderRadius: BorderRadius.circular(12),
+                        baseColor: colors.surfaceContainerHighest.withValues(
+                          alpha: .5,
+                        ),
+                        child: const Icon(Lucide.Plus, size: 20),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            unavailable
+                ? l10n.creationReferenceUnsupported(model)
+                : l10n.creationReferenceSummary(references.length, limit),
+            style: TextStyle(
+              fontSize: 11.5,
+              color: unavailable
+                  ? context.appColors.warning
+                  : colors.onSurfaceVariant,
+            ),
+          ),
+          if (unavailable)
+            Text(
+              l10n.creationReferenceIgnored,
+              style: TextStyle(fontSize: 11.5, color: colors.onSurfaceVariant),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -883,7 +1150,7 @@ class _VideoFrames extends StatelessWidget {
 
   final String? topicId;
   final MediaCapabilities capabilities;
-  final ValueChanged<MediaReferenceRole> onPick;
+  final void Function(BuildContext, MediaReferenceRole) onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -904,7 +1171,7 @@ class _VideoFrames extends StatelessWidget {
                   ? l10n.creationFirstFrame
                   : l10n.creationLastFrame,
               value: state.frame(topicId, role),
-              onPick: () => onPick(role),
+              onPick: () => onPick(context, role),
               onRemove: () => state.setFrame(topicId, role, null),
             ),
             const SizedBox(width: 8),

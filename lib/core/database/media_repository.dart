@@ -145,6 +145,93 @@ class MediaRepository {
     )..where((row) => row.id.equals(id))).go();
   }
 
+  Future<void> setFavorite(String id, bool favorite) async {
+    _requireWritable();
+    await (_db.update(_db.generationItemRows)
+          ..where((row) => row.id.equals(id)))
+        .write(GenerationItemRowsCompanion(favorite: Value(favorite)));
+  }
+
+  Future<void> deleteBatch(String id) => _db.transaction(() async {
+    _requireWritable();
+    final existing = await batch(id);
+    if (existing == null) return;
+    await (_db.delete(
+      _db.generationBatchRows,
+    )..where((row) => row.id.equals(id))).go();
+    final topicId = existing.topicId;
+    if (topicId == null) return;
+    final newest =
+        await (_db.select(_db.generationBatchRows)
+              ..where((row) => row.topicId.equals(topicId))
+              ..orderBy([(row) => OrderingTerm.desc(row.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
+    final topic = await (_db.select(
+      _db.generationTopicRows,
+    )..where((row) => row.id.equals(topicId))).getSingleOrNull();
+    if (topic != null) {
+      await (_db.update(
+        _db.generationTopicRows,
+      )..where((row) => row.id.equals(topicId))).write(
+        GenerationTopicRowsCompanion(
+          updatedAt: Value(newest?.createdAt ?? topic.createdAt),
+        ),
+      );
+    }
+  });
+
+  Future<List<RecentMediaImage>> recentImages(
+    RecentImageSource source, {
+    required int offset,
+    required int limit,
+  }) async {
+    final rows = await _db
+        .customSelect(
+          r"""
+      SELECT path, thumbnail, title, source
+      FROM (
+        SELECT i.path, i.thumbnail_path AS thumbnail, COALESCE(t.title, '') AS title,
+               'creation' AS source, i.created_at AS time, i.id AS tie
+        FROM generation_item_rows AS i
+        JOIN generation_batch_rows AS b ON b.id = i.batch_id
+        LEFT JOIN generation_topic_rows AS t ON t.id = b.topic_id
+        WHERE ? IN ('all', 'creation') AND i.mode = 'image' AND i.status = 'ready'
+        UNION ALL
+        SELECT COALESCE(a.path, json_extract(p.payload, '$.uri')) AS path,
+               a.thumbnail_path AS thumbnail, c.title, 'chat' AS source,
+               p.created_at AS time, CAST(p.part_id AS TEXT) AS tie
+        FROM message_part_rows AS p
+        JOIN conversation_rows AS c ON c.id = p.conversation_id
+        LEFT JOIN asset_rows AS a
+          ON a.id = CASE WHEN json_valid(p.payload) THEN json_extract(p.payload, '$.assetId') END
+        WHERE ? IN ('all', 'chat') AND p.kind = 'image' AND json_valid(p.payload)
+          AND COALESCE(json_extract(p.payload, '$.unavailable'), 0) = 0
+      )
+      WHERE path IS NOT NULL AND length(path) > 0
+        AND path NOT LIKE 'data:%'
+      ORDER BY time DESC, source, tie DESC
+      LIMIT ? OFFSET ?
+      """,
+          variables: [
+            Variable.withString(source.name),
+            Variable.withString(source.name),
+            Variable.withInt(limit),
+            Variable.withInt(offset),
+          ],
+        )
+        .get();
+    return [
+      for (final row in rows)
+        RecentMediaImage(
+          path: row.read<String>('path'),
+          title: row.read<String>('title'),
+          source: RecentImageSource.values.byName(row.read<String>('source')),
+          thumbnailPath: row.readNullable<String>('thumbnail'),
+        ),
+    ];
+  }
+
   Future<bool> get hasCreations async {
     final result = await _db
         .customSelect(

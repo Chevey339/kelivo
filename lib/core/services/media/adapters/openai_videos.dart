@@ -83,7 +83,9 @@ class OpenAiVideosAdapter implements MediaAdapter {
         ),
       );
     }
-    final created = await readMediaJson(await context.send(submitted));
+    final created = await readMediaJson(
+      await context.send(submitted, diagnosticBody: payload),
+    );
     final id = Uri.encodeComponent(requireMediaTaskId(created['id']));
     yield* pollMediaTask(
       context,

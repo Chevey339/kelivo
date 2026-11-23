@@ -34,6 +34,7 @@ final class BusinessKeyRegistry {
   static const mediaEntrySeenKey = 'media_entry_seen_v1';
   static const creationComposerKey = 'creation_composer_v1';
   static const creationAutoTitleKey = 'creation_auto_title_v1';
+  static const creationTopicViewKey = 'creation_topic_view_v1';
 
   static const localOnlyKeys = <String>{
     'window_width_v1',
@@ -76,6 +77,7 @@ final class BusinessKeyRegistry {
     mediaEntrySeenKey,
     creationComposerKey,
     creationAutoTitleKey,
+    creationTopicViewKey,
     'desktop_scheduled_tasks_v1',
     'scheduled_task_results_v1',
     'current_assistant_id_v1',

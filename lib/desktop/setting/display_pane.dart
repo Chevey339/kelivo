@@ -190,6 +190,13 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowFlutterLogging(),
                 ],
               ),
+              if (context.watch<MediaCreationController?>() != null) ...[
+                const SizedBox(height: 16),
+                _SettingsCard(
+                  title: l10n.creationTitle,
+                  children: const [CreationPreferences(desktop: true)],
+                ),
+              ],
             ],
           ),
         ),

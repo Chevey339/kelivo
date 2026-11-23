@@ -1,3 +1,4 @@
+import '../../media/widgets/creation_preferences.dart';
 import '../widgets/settings_search_target.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'mobile_background_settings_page.dart';
@@ -335,7 +336,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               ),
             ],
           ),
-          // Inline cards replaced by sheet-triggering rows above.
+          const CreationPreferences(desktop: false),
         ],
       ),
     );

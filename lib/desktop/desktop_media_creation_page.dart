@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/database/app_database.dart';
+import '../core/models/media_creation.dart';
+import '../features/media/widgets/creation_gallery.dart';
+import '../features/media/widgets/creation_preferences.dart';
 import '../features/media/pages/media_creation_page.dart';
 import '../features/media/providers/media_creation_controller.dart';
 import '../features/media/widgets/creation_composer.dart';
@@ -29,10 +34,23 @@ class DesktopMediaCreationPage extends StatefulWidget {
 class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
   String? _topicId;
   bool _navigationOpen = false;
+  bool _gallery = false;
+  String? _highlightBatch;
 
-  void _open(String? id) {
+  void _open(String? id, {String? batch}) {
     setState(() {
       _topicId = id;
+      _highlightBatch = batch;
+      _gallery = false;
+      _navigationOpen = false;
+    });
+  }
+
+  void _showGallery() {
+    setState(() {
+      _gallery = true;
+      _topicId = null;
+      _highlightBatch = null;
       _navigationOpen = false;
     });
   }
@@ -45,27 +63,66 @@ class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 720;
-        final rail = _CreationTopicRail(active: _topicId, onOpen: _open);
+        final rail = _CreationTopicRail(
+          active: _topicId,
+          gallery: _gallery,
+          onOpen: _open,
+          onOpenGallery: _showGallery,
+        );
+        final toggle = compact
+            ? () => setState(() => _navigationOpen = !_navigationOpen)
+            : null;
+        final activeBatch = _topicId == null
+            ? null
+            : media
+                  .batchesFor(_topicId!)
+                  .reversed
+                  .where((batch) => batch.status.isActive)
+                  .firstOrNull;
+        Widget shortcuts(Widget child) => CallbackShortcuts(
+          bindings: {
+            if (_navigationOpen)
+              const SingleActivator(LogicalKeyboardKey.escape): () =>
+                  setState(() => _navigationOpen = false)
+            else if (activeBatch != null)
+              const SingleActivator(LogicalKeyboardKey.escape): () =>
+                  unawaited(media.runner.cancel(activeBatch.id)),
+          },
+          child: Focus(autofocus: true, child: child),
+        );
         final body = ColoredBox(
           color: cs.surface,
           child: Column(
             children: [
-              _CreationHeader(
-                key: ValueKey(_topicId),
-                topic: topic,
-                onDeleted: () => _open(null),
-                onToggleRail: compact
-                    ? () => setState(() => _navigationOpen = !_navigationOpen)
-                    : null,
-              ),
+              if (!_gallery)
+                _CreationHeader(
+                  key: ValueKey(_topicId),
+                  topic: topic,
+                  onDeleted: () => _open(null),
+                  onToggleRail: toggle,
+                ),
               Expanded(
                 child: CreationComposerStack(
                   desktop: true,
-                  content: CreationTimeline(topicId: _topicId, desktop: true),
+                  topicId: _topicId,
+                  content: _gallery
+                      ? CreationGallery(
+                          desktop: true,
+                          onToggleRail: toggle,
+                          onOpenTopic: (id, batch) => _open(id, batch: batch),
+                        )
+                      : CreationTimeline(
+                          key: ValueKey((_topicId, _highlightBatch)),
+                          topicId: _topicId,
+                          desktop: true,
+                          highlightBatchId: _highlightBatch,
+                        ),
                   composer: CreationComposer(
                     topicId: _topicId,
                     desktop: true,
-                    onSent: _open,
+                    onSent: (id) {
+                      if (id != _topicId) _open(id);
+                    },
                   ),
                 ),
               ),
@@ -73,32 +130,36 @@ class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
           ),
         );
         if (!compact) {
-          return Row(
-            children: [
-              SizedBox(width: 272, child: rail),
-              Expanded(child: body),
-            ],
+          return shortcuts(
+            Row(
+              children: [
+                SizedBox(width: 272, child: rail),
+                Expanded(child: body),
+              ],
+            ),
           );
         }
-        return Stack(
-          children: [
-            Positioned.fill(child: body),
-            if (_navigationOpen) ...[
-              Positioned.fill(
-                child: ModalBarrier(
-                  color: cs.scrim.withValues(alpha: .2),
-                  onDismiss: () => setState(() => _navigationOpen = false),
+        return shortcuts(
+          Stack(
+            children: [
+              Positioned.fill(child: body),
+              if (_navigationOpen) ...[
+                Positioned.fill(
+                  child: ModalBarrier(
+                    color: cs.scrim.withValues(alpha: .2),
+                    onDismiss: () => setState(() => _navigationOpen = false),
+                  ),
                 ),
-              ),
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: math.min(272, constraints.maxWidth * .78),
-                child: rail,
-              ),
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: math.min(272, constraints.maxWidth * .78),
+                  child: rail,
+                ),
+              ],
             ],
-          ],
+          ),
         );
       },
     );
@@ -106,9 +167,16 @@ class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
 }
 
 class _CreationTopicRail extends StatefulWidget {
-  const _CreationTopicRail({required this.active, required this.onOpen});
+  const _CreationTopicRail({
+    required this.active,
+    required this.gallery,
+    required this.onOpen,
+    required this.onOpenGallery,
+  });
   final String? active;
+  final bool gallery;
   final ValueChanged<String?> onOpen;
+  final VoidCallback onOpenGallery;
 
   @override
   State<_CreationTopicRail> createState() => _CreationTopicRailState();
@@ -123,7 +191,29 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final topics = media.searchTopics(_query).toList();
-    final showNew = widget.active == null && _query.trim().isEmpty;
+    final showNew =
+        !widget.gallery && widget.active == null && _query.trim().isEmpty;
+    final covers = media.topicView == CreationTopicView.covers;
+    final list = media.topicView == CreationTopicView.list;
+    Widget topicAt(int index) {
+      if (showNew && index == 0) {
+        return list
+            ? ListTile(
+                leading: const Icon(Lucide.Plus),
+                title: Text(l10n.creationNewTopic),
+              )
+            : _NewTopicCard(minimal: covers);
+      }
+      final topic = topics[index - (showNew ? 1 : 0)];
+      return CreationTopicCard(
+        key: ValueKey(topic.id),
+        topic: topic,
+        desktop: true,
+        selected: topic.id == widget.active,
+        onOpen: () => widget.onOpen(topic.id),
+      );
+    }
+
     return DesktopPaneSurface(
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -183,14 +273,68 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-              child: Text(
-                l10n.creationTopicCount(topics.length),
-                style: TextStyle(
-                  color: cs.onSurfaceVariant,
-                  fontSize: 12,
-                  fontWeight: AppFontWeights.semibold,
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+              child: IosCardPress(
+                focusable: true,
+                onTap: widget.onOpenGallery,
+                borderRadius: BorderRadius.circular(11),
+                baseColor: widget.gallery
+                    ? cs.primary.withValues(alpha: .1)
+                    : Colors.transparent,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.layoutGrid,
+                      size: 17,
+                      color: widget.gallery ? cs.primary : cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.creationGallery,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: widget.gallery ? cs.primary : cs.onSurface,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${media.galleryCount}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.creationTopicCount(topics.length),
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 12,
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                  ),
+                  Builder(
+                    builder: (anchor) => IosIconButton(
+                      icon: creationTopicViewIcon(media.topicView),
+                      size: 16,
+                      minSize: 28,
+                      tooltip: l10n.creationTopicDisplay,
+                      onTap: () =>
+                          showCreationDisplayMenu(anchor, desktop: true),
+                    ),
+                  ),
+                ],
               ),
             ),
             if (topics.isEmpty)
@@ -203,26 +347,23 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
                 ),
               ),
             Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.fromLTRB(14, 2, 14, 18),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 14,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: .75,
-                ),
-                itemCount: topics.length + (showNew ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (showNew && index == 0) return const _NewTopicCard();
-                  final topic = topics[index - (showNew ? 1 : 0)];
-                  return CreationTopicCard(
-                    topic: topic,
-                    desktop: true,
-                    selected: topic.id == widget.active,
-                    onOpen: () => widget.onOpen(topic.id),
-                  );
-                },
-              ),
+              child: list
+                  ? ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 2, 12, 18),
+                      itemCount: topics.length + (showNew ? 1 : 0),
+                      itemBuilder: (_, index) => topicAt(index),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(14, 2, 14, 18),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: covers ? 3 : 2,
+                        mainAxisSpacing: covers ? 6 : 14,
+                        crossAxisSpacing: covers ? 6 : 10,
+                        childAspectRatio: covers ? 1 : .75,
+                      ),
+                      itemCount: topics.length + (showNew ? 1 : 0),
+                      itemBuilder: (_, index) => topicAt(index),
+                    ),
             ),
           ],
         ),
@@ -232,7 +373,9 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
 }
 
 class _NewTopicCard extends StatelessWidget {
-  const _NewTopicCard();
+  const _NewTopicCard({required this.minimal});
+
+  final bool minimal;
 
   @override
   Widget build(BuildContext context) {
@@ -256,25 +399,27 @@ class _NewTopicCard extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 5),
-        Text(
-          l10n.creationNewTopic,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: AppFontWeights.semibold,
-            color: cs.primary,
+        if (!minimal) ...[
+          const SizedBox(height: 5),
+          Text(
+            l10n.creationNewTopic,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: AppFontWeights.semibold,
+              color: cs.primary,
+            ),
           ),
-        ),
-        Text(
-          media.autoTitle
-              ? l10n.creationNameAfterSending
-              : l10n.creationPromptTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-        ),
+          Text(
+            media.autoTitle
+                ? l10n.creationNameAfterSending
+                : l10n.creationPromptTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
+        ],
       ],
     );
   }

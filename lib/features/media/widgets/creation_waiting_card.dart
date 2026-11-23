@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ui' show ImageFilter;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, compute, Uint8List;
 import 'package:intl/intl.dart';
 
 import '../../../core/database/app_database.dart';
@@ -38,11 +41,13 @@ class CreationWaitingCard extends StatefulWidget {
     super.key,
     required this.batch,
     this.progress,
+    this.preview,
     this.queueAhead = 0,
   });
 
   final GenerationBatchRow batch;
   final double? progress;
+  final String? preview;
   final int queueAhead;
 
   @override
@@ -54,11 +59,18 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
   Timer? _timer;
   bool _visible = true;
   bool _foreground = true;
+  Future<Uint8List?>? _preview;
+
+  void _decodePreview() {
+    final value = widget.preview;
+    _preview = value == null ? null : compute(_previewBytes, value);
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _decodePreview();
     _foreground =
         WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
@@ -81,6 +93,7 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
   @override
   void didUpdateWidget(covariant CreationWaitingCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.preview != widget.preview) _decodePreview();
     _syncTimer();
   }
 
@@ -89,10 +102,18 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
         _foreground &&
         _visible &&
         widget.batch.startedAt != null &&
-        widget.progress == null;
+        widget.batch.status == GenerationStatus.running &&
+        (widget.progress == null ||
+            DateTime.now().difference(widget.batch.startedAt!).inSeconds < 50);
     if (needsTick) {
       _timer ??= Timer.periodic(const Duration(milliseconds: 500), (_) {
-        if (mounted) setState(() {});
+        if (!mounted) return;
+        setState(() {});
+        if (widget.progress != null &&
+            DateTime.now().difference(widget.batch.startedAt!).inSeconds >=
+                50) {
+          _syncTimer();
+        }
       });
     } else {
       _timer?.cancel();
@@ -112,18 +133,14 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final started = widget.batch.startedAt;
-    final percent =
-        widget.progress ??
-        (started == null
-            ? .03
-            : creationFakeProgress(DateTime.now().difference(started)) / 100);
+    final elapsed = started == null
+        ? Duration.zero
+        : DateTime.now().difference(started);
+    final percent = widget.progress ?? creationFakeProgress(elapsed) / 100;
     final label = switch (widget.batch.status) {
       GenerationStatus.queued => l10n.creationQueuePosition(widget.queueAhead),
       GenerationStatus.downloading => l10n.creationDownloading,
-      _ =>
-        widget.batch.mode == MediaMode.image
-            ? l10n.creationWaitingImage
-            : l10n.creationWaitingVideo,
+      _ => creationWaitingText(l10n, widget.batch.mode, elapsed),
     };
     final animated =
         _foreground && _visible && !MediaQuery.disableAnimationsOf(context);
@@ -137,7 +154,35 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CreationDotField(progress: percent, paused: !animated),
+            if (_preview case final future?)
+              FutureBuilder<Uint8List?>(
+                future: future,
+                builder: (context, snapshot) {
+                  final bytes = snapshot.data;
+                  if (bytes == null) return const SizedBox.shrink();
+                  return Opacity(
+                    opacity: .7,
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                      child: Transform.scale(
+                        scale: 1.25,
+                        child: Image.memory(
+                          bytes,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          filterQuality: FilterQuality.low,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            CreationDotField(
+              progress: percent,
+              paused: !animated,
+              color: _preview == null ? null : Colors.white,
+            ),
             Positioned(
               left: 12,
               right: 12,
@@ -148,7 +193,12 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
                   label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _preview == null
+                        ? cs.onSurfaceVariant
+                        : Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -204,16 +254,59 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
   }
 }
 
+Uint8List? _previewBytes(String value) {
+  try {
+    return base64Decode(value);
+  } on FormatException {
+    return null;
+  }
+}
+
+String creationWaitingText(
+  AppLocalizations l10n,
+  MediaMode mode,
+  Duration elapsed,
+) {
+  final seconds = elapsed.inSeconds;
+  final video = mode == MediaMode.video;
+  if (seconds < 10) {
+    return video ? l10n.creationWaitingVideo : l10n.creationWaitingImage;
+  }
+  if (seconds < 20) {
+    return video ? l10n.creationWaitingVideoMotion : l10n.creationWaitingSketch;
+  }
+  if (seconds < 25) {
+    return video ? l10n.creationWaitingVideoFrames : l10n.creationWaitingDraft;
+  }
+  if (seconds < 30) {
+    return video
+        ? l10n.creationWaitingVideoRendering
+        : l10n.creationWaitingScene;
+  }
+  if (seconds < 35) {
+    return video
+        ? l10n.creationWaitingVideoComposite
+        : l10n.creationWaitingDetails;
+  }
+  if (seconds < 40) return l10n.creationWaitingNearlyDone;
+  if (seconds < 50) {
+    return video ? l10n.creationWaitingVideoFinish : l10n.creationWaitingFinish;
+  }
+  return l10n.creationWaitingLong;
+}
+
 class CreationDotField extends StatelessWidget {
   const CreationDotField({
     super.key,
     required this.progress,
     this.thumbnail = false,
     this.paused = false,
+    this.color,
   });
 
   final double progress;
   final bool thumbnail, paused;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +318,7 @@ class CreationDotField extends StatelessWidget {
         initialValue: .4,
         builder: (context, animation) => CustomPaint(
           painter: _Dots(
-            color: cs.primary,
+            color: color ?? cs.primary,
             progress: progress,
             spacing: thumbnail ? 6 : 40 / 3,
             animation: animation,

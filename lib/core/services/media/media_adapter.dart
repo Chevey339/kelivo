@@ -42,6 +42,95 @@ MediaFailure classifyMediaFailure(Object error) {
   );
 }
 
+/// Request diagnostics retain only protocol metadata and allowlisted fields.
+class MediaRequestLog {
+  Map<String, Object?>? _request;
+  Map<String, Object?>? _response;
+  final _retries = <Map<String, Object?>>[];
+
+  void start(http.BaseRequest request, Map<String, dynamic>? payload) {
+    const knownSegments = {
+      'images',
+      'generations',
+      'edits',
+      'videos',
+      'tasks',
+      'contents',
+      'services',
+      'aigc',
+      'video',
+      'submit',
+      'status',
+      'requests',
+      'image-synthesis',
+      'generation',
+      'video-synthesis',
+      'content',
+    };
+    final route = request.url.pathSegments
+        .map((part) {
+          if (knownSegments.contains(part)) return part;
+          if (part.endsWith(':generateContent')) return ':generateContent';
+          if (part.endsWith(':predict')) return ':predict';
+          if (part.endsWith(':predictLongRunning')) {
+            return ':predictLongRunning';
+          }
+          return '…';
+        })
+        .take(10)
+        .join('/');
+    final body = <String, Object?>{};
+    if (payload != null) {
+      for (final key in [
+        'n',
+        'count',
+        'partial_images',
+        'duration',
+        'seconds',
+      ]) {
+        final value = payload[key];
+        if (value is int && value >= 0 && value <= 60) body[key] = value;
+      }
+      if (payload['size'] case final String size
+          when RegExp(r'^(auto|[0-9]{2,4}x[0-9]{2,4})$').hasMatch(size)) {
+        body['size'] = size;
+      }
+      for (final key in ['stream', 'watermark']) {
+        if (payload[key] case final bool value) body[key] = value;
+      }
+    }
+    _request = {
+      'method': request.method,
+      'host': request.url.host,
+      'route': '/$route',
+      if (body.isNotEmpty) 'body': body,
+    };
+    _response = null;
+  }
+
+  void response(int status, {MediaFailureKind? errorKind}) {
+    _response = {
+      'status': status,
+      if (errorKind != null) 'body': {'kind': errorKind.name},
+    };
+  }
+
+  void retry(MediaFailure failure, Duration wait) {
+    _retries.add({
+      'at': DateTime.now().toIso8601String(),
+      'kind': failure.kind.name,
+      if (failure.statusCode case final status?) 'status': status,
+      'waitMs': wait.inMilliseconds,
+    });
+  }
+
+  Map<String, Object?> toJson() => {
+    if (_request != null) 'request': _request,
+    if (_response != null) 'response': _response,
+    if (_retries.isNotEmpty) 'retries': _retries,
+  };
+}
+
 class MediaContext {
   const MediaContext({
     required this.provider,
@@ -50,6 +139,7 @@ class MediaContext {
     required this.cancelToken,
     required this.requestId,
     this.delay = Future<void>.delayed,
+    this.log,
   });
 
   final ProviderConfig provider;
@@ -58,6 +148,7 @@ class MediaContext {
   final CancelToken cancelToken;
   final String requestId;
   final Future<void> Function(Duration) delay;
+  final MediaRequestLog? log;
 
   Uri endpoint(String path, {String? base}) => Uri.parse(
     '${(base ?? provider.baseUrl).replaceFirst(RegExp(r'/+$'), '')}/$path',
@@ -98,16 +189,23 @@ class MediaContext {
     return payload;
   }
 
-  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+  Future<http.StreamedResponse> send(
+    http.BaseRequest request, {
+    Map<String, dynamic>? diagnosticBody,
+  }) async {
     final cancellation = cancelToken.cancelError;
     if (cancellation != null) throw cancellation;
     request.followRedirects = false;
+    log?.start(request, diagnosticBody);
     final response = await client.send(request);
+    log?.response(response.statusCode);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response;
     }
     final body = await response.stream.bytesToString();
-    throw mediaHttpFailure(response, body);
+    final failure = mediaHttpFailure(response, body);
+    log?.response(response.statusCode, errorKind: failure.kind);
+    throw failure;
   }
 
   Future<Map<String, dynamic>> jsonRequest(
@@ -118,7 +216,7 @@ class MediaContext {
   }) async {
     final request = http.Request(method, url)..headers.addAll(headers);
     if (body != null) request.body = jsonEncode(body);
-    return readMediaJson(await send(request));
+    return readMediaJson(await send(request, diagnosticBody: body));
   }
 }
 
@@ -165,17 +263,23 @@ MediaFailure mediaResponseFailure(
     400 || 404 || 405 || 415 || 422 => MediaFailureKind.parameters,
     _ => MediaFailureKind.invalidResponse,
   };
-  // Provider errors can echo a signed link or a submitted credential. Store
-  // only the protocol status and simple machine-readable error code.
-  final safeCode =
-      RegExp(r'^[a-z0-9_\-.]{1,80}$').hasMatch(code) && !code.startsWith('sk-')
-      ? code
-      : null;
+  const knownCodes = {
+    'content_policy_violation',
+    'content_filter',
+    'invalid_size',
+    'invalid_request_error',
+    'model_not_found',
+    'rate_limit',
+    'rate_limit_exceeded',
+    'insufficient_quota',
+    'overloaded_error',
+    'server_error',
+  };
   return MediaFailure(
     kind,
     [
       if (statusCode != null) 'HTTP $statusCode',
-      if (safeCode != null) safeCode,
+      if (knownCodes.contains(code)) code,
     ].join(' · '),
     statusCode: statusCode,
     retryAfter: retryAfter,

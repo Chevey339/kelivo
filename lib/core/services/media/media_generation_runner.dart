@@ -16,6 +16,7 @@ import '../api/chat_api_helpers.dart';
 import '../auth/provider_oauth_service.dart';
 import '../mobile_background.dart';
 import '../network/provider_http_client.dart';
+import '../network/request_logger.dart';
 import '../storage/attachment_file_lock.dart';
 import 'media_adapter.dart';
 import 'media_adapter_resolver.dart';
@@ -173,23 +174,33 @@ class MediaGenerationRunner extends ChangeNotifier {
     String? parentItemId,
     String? conversationId,
     String? messageId,
+    bool applyModelExtra = true,
+    bool Function()? canEnqueue,
   }) async {
     await initialized;
     _requireOpen();
     final caps = _validate(provider, request);
-    final extra = request.parameters['extra'];
-    request = request.copyWith(
-      parameters: {
-        ...request.parameters,
-        'extra': MediaAdapterResolver.overrides(
-          provider,
-          request.modelId,
-        ).requestExtra(extra is Map<String, dynamic> ? extra : const {}),
-      },
-    );
+    if (applyModelExtra) {
+      final extra = request.parameters['extra'];
+      request = request.copyWith(
+        parameters: {
+          ...request.parameters,
+          'extra': MediaAdapterResolver.overrides(
+            provider,
+            request.modelId,
+          ).requestExtra(extra is Map<String, dynamic> ? extra : const {}),
+        },
+      );
+    }
     final id = _uuid.v4();
     final now = DateTime.now();
     return AttachmentFileLock.synchronized(() async {
+      if (canEnqueue?.call() == false) {
+        throw const MediaFailure(
+          MediaFailureKind.parameters,
+          'Creation is unavailable',
+        );
+      }
       try {
         final refs = await files.snapshotReferences(id, request.references);
         request = request.copyWith(references: refs);
@@ -233,14 +244,17 @@ class MediaGenerationRunner extends ChangeNotifier {
 
   Future<MediaGenerationTicket?> retry(
     String id,
-    ProviderConfig provider,
-  ) async {
+    ProviderConfig provider, {
+    bool Function()? canRetry,
+  }) async {
     await initialized;
     _requireOpen();
     if (!_retrying.add(id)) return null;
     try {
       return await AttachmentFileLock.synchronized(() async {
-        if (_active.containsKey(id) || _queued.any((job) => job.id == id)) {
+        if (canRetry?.call() == false ||
+            _active.containsKey(id) ||
+            _queued.any((job) => job.id == id)) {
           return null;
         }
         final batch = await repository.batch(id);
@@ -254,22 +268,7 @@ class MediaGenerationRunner extends ChangeNotifier {
             }.contains(batch.status)) {
           return null;
         }
-        final params = jsonDecode(batch.paramsJson) as Map<String, dynamic>;
-        final request = MediaRequest(
-          modelId: batch.modelId,
-          mode: batch.mode,
-          prompt: batch.prompt,
-          negativePrompt: batch.negativePrompt,
-          count: params.remove('count') as int? ?? 1,
-          aspectRatio: params.remove('aspectRatio') as String? ?? 'auto',
-          durationSec: params.remove('durationSec') as int?,
-          resolution: params.remove('resolution') as String?,
-          parameters: params,
-          references: [
-            for (final row in jsonDecode(batch.referencesJson) as List)
-              MediaReference.fromJson((row as Map).cast<String, dynamic>()),
-          ],
-        );
+        final request = MediaRequest.fromBatch(batch);
         final caps = _validate(provider, request);
         _requireOpen();
         await repository.updateBatch(
@@ -373,14 +372,9 @@ class MediaGenerationRunner extends ChangeNotifier {
             : apiKeyForRequest(job.provider, job.request.modelId);
         for (var attempt = saved; attempt < job.request.count;) {
           _checkCancelled(job);
-          final maxCombined = job.capabilities.maxCombinedInputsAndOutputs;
-          var requestCap = job.capabilities.maxPerRequest;
-          if (maxCombined != null) {
-            requestCap = math.min(
-              requestCap,
-              maxCombined - job.request.inputImages.length,
-            );
-          }
+          final requestCap = job.capabilities.outputLimit(
+            job.request.inputImages.length,
+          );
           final count = math.min(requestCap, job.request.count - attempt);
           final request = job.request.copyWith(count: count);
           final context = MediaContext(
@@ -390,6 +384,7 @@ class MediaGenerationRunner extends ChangeNotifier {
             cancelToken: job.token,
             requestId: _uuid.v4(),
             delay: _delay,
+            log: job.log,
           );
           final results = await _requestWithRetry(
             job,
@@ -430,6 +425,10 @@ class MediaGenerationRunner extends ChangeNotifier {
           }
           attempt += count;
           if (attempt < job.request.count) {
+            if (_progress[job.id] case (:final fraction, preview: String _)) {
+              _progress[job.id] = (fraction: fraction, preview: null);
+              if (!_disposed) notifyListeners();
+            }
             await _updateActiveBatch(
               job,
               const GenerationBatchRowsCompanion(
@@ -540,10 +539,12 @@ class MediaGenerationRunner extends ChangeNotifier {
         if (accepted || !failure.retryable || retry == 3) throw failure;
         final interval = Duration(seconds: 1 << retry);
         final retryAfter = failure.retryAfter;
+        final wait = retryAfter != null && retryAfter > interval
+            ? retryAfter
+            : interval;
+        job.log.retry(failure, wait);
         await Future.any<void>([
-          _delay(
-            retryAfter != null && retryAfter > interval ? retryAfter : interval,
-          ),
+          _delay(wait),
           job.token.whenCancel.then<void>((error) => throw error),
         ]);
       }
@@ -602,6 +603,10 @@ class MediaGenerationRunner extends ChangeNotifier {
     GenerationStatus status, [
     MediaFailure? error,
   ]) async {
+    final diagnostics = error == null
+        ? null
+        : jsonEncode({...error.toJson(), ...job.log.toJson()});
+    if (diagnostics != null) RequestLogger.logLine('[Media] $diagnostics');
     try {
       status = await AttachmentFileLock.synchronized(() async {
         if (!repository.canWrite ||
@@ -613,7 +618,7 @@ class MediaGenerationRunner extends ChangeNotifier {
           GenerationBatchRowsCompanion(
             status: Value(status),
             finishedAt: Value(DateTime.now()),
-            errorJson: Value(error == null ? null : jsonEncode(error.toJson())),
+            errorJson: Value(diagnostics),
           ),
         );
         return status;
@@ -683,6 +688,7 @@ class _MediaJob {
   final int replacementVersion;
   final result = Completer<GenerationStatus>();
   final token = CancelToken();
+  final log = MediaRequestLog();
   MediaTaskAccepted? remoteTask;
   String get backgroundId => 'creation-$id';
 }

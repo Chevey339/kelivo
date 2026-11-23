@@ -1,34 +1,82 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/models/media_creation.dart';
+import '../../../core/models/provider_oauth.dart';
+import '../../../core/services/media/media_request.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/action_sheet.dart';
+import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
+import '../../chat/widgets/chat_suggestion_bubbles.dart';
+import '../../provider/pages/provider_detail_page.dart';
 import '../../provider/pages/providers_page.dart';
+import '../../provider/widgets/oauth_login_panel.dart';
+import '../../settings/widgets/custom_theme_widgets.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_lightbox.dart';
+import 'creation_gallery.dart';
 import 'creation_waiting_card.dart';
 
-class CreationTimeline extends StatelessWidget {
+class CreationTimeline extends StatefulWidget {
   const CreationTimeline({
     super.key,
     required this.topicId,
     required this.desktop,
+    this.highlightBatchId,
   });
 
   final String? topicId;
+  final String? highlightBatchId;
   final bool desktop;
+
+  @override
+  State<CreationTimeline> createState() => _CreationTimelineState();
+}
+
+class _CreationTimelineState extends State<CreationTimeline> {
+  final _scroll = ItemScrollController();
+  String? _lastSeenRequest;
+  String? _pendingScroll;
+  bool _observed = false;
+  String? get topicId => widget.topicId;
+  bool get desktop => widget.desktop;
+
+  void _jump(String batchId, List<GenerationBatchRow> batches) {
+    final index = batches.reversed.toList().indexWhere(
+      (batch) => batch.id == batchId,
+    );
+    if (index < 0 || !_scroll.isAttached) return;
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    if (reduce) {
+      _scroll.jumpTo(index: index, alignment: .20);
+    } else {
+      unawaited(
+        _scroll.scrollTo(
+          index: index,
+          alignment: .20,
+          duration: const Duration(milliseconds: 260),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,9 +84,36 @@ class CreationTimeline extends StatelessWidget {
     final batches = topicId == null
         ? const <GenerationBatchRow>[]
         : media.batchesFor(topicId!);
-    if (batches.isEmpty) return CreationEmptyState(desktop: desktop);
-    return ListView.builder(
+    final requested = media.lastSubmission(topicId);
+    if (_observed && requested != _lastSeenRequest) _pendingScroll = requested;
+    _lastSeenRequest = requested;
+    _observed = true;
+    final pending = _pendingScroll;
+    if (pending != null && batches.any((batch) => batch.id == pending)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _pendingScroll != pending || !_scroll.isAttached) {
+          return;
+        }
+        _pendingScroll = null;
+        final id = topicId;
+        if (id != null) _jump(pending, media.batchesFor(id));
+      });
+    }
+    if (batches.isEmpty) {
+      return CreationEmptyState(desktop: desktop, topicId: topicId);
+    }
+    final highlight = widget.highlightBatchId;
+    final target = highlight == null
+        ? -1
+        : batches.reversed.toList().indexWhere(
+            (batch) => batch.id == highlight,
+          );
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    return ScrollablePositionedList.builder(
       key: ValueKey(topicId),
+      itemScrollController: _scroll,
+      initialScrollIndex: target < 0 ? 0 : target,
+      initialAlignment: target < 0 ? 0 : .28,
       reverse: true,
       padding: EdgeInsets.fromLTRB(
         desktop ? 32 : 14,
@@ -56,7 +131,8 @@ class CreationTimeline extends StatelessWidget {
               batch.createdAt,
               batches[sourceIndex - 1].createdAt,
             );
-        return Align(
+        final group = Align(
+          key: ValueKey(batch.id),
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -75,72 +151,194 @@ class CreationTimeline extends StatelessWidget {
                   ),
                   if (!batch.status.isActive &&
                       batch.status != GenerationStatus.succeeded)
-                    _BatchFailure(batch: batch),
+                    _BatchFailure(batch: batch, desktop: widget.desktop),
                 ],
               ),
             ),
           ),
         );
+        if (highlight == batch.id && !reduced) {
+          return group
+              .animate(key: ValueKey(highlight))
+              .custom(
+                duration: const Duration(milliseconds: 1600),
+                begin: .08,
+                end: 0,
+                builder: (context, value, child) => ColoredBox(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: value),
+                  child: child,
+                ),
+              );
+        }
+        return group;
       },
     );
   }
 }
 
 class CreationEmptyState extends StatelessWidget {
-  const CreationEmptyState({super.key, this.desktop = false});
+  const CreationEmptyState({super.key, this.desktop = false, this.topicId});
 
   final bool desktop;
+  final String? topicId;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final missing = context.watch<MediaCreationController>().model == null;
+    final media = context.watch<MediaCreationController>();
+    final missing = media.model == null;
+    final video = media.mode == MediaMode.video;
+    final suggestions = video
+        ? [
+            l10n.creationSuggestionMotion,
+            l10n.creationSuggestionOcean,
+            l10n.creationSuggestionLandscape,
+            l10n.creationSuggestionProduct,
+          ]
+        : [
+            l10n.creationSuggestionPoster,
+            l10n.creationSuggestionLandscape,
+            l10n.creationSuggestionProduct,
+            l10n.creationSuggestionIllustration,
+            l10n.creationSuggestionRoom,
+            l10n.creationSuggestionSticker,
+          ];
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 12, 28, 124),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              missing ? Lucide.KeyRound : Lucide.Palette,
-              size: 36,
-              color: cs.onSurfaceVariant,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              missing ? l10n.creationNoModelTitle : l10n.creationEmptyTitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: AppFontWeights.semibold,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(28, 16, 28, 155),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                missing
+                    ? Lucide.KeyRound
+                    : video
+                    ? LucideIcons.video
+                    : Lucide.Palette,
+                size: desktop ? 56 : 48,
+                color: cs.onSurfaceVariant,
+                weight: 1.4,
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              missing ? l10n.creationNoModelBody : l10n.creationEmptyBody,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
-            if (missing) ...[
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () {
-                  if (desktop) {
-                    DesktopSettingsNavigationBus.instance.openProviders();
-                  } else {
-                    Navigator.of(context).push<void>(
-                      MaterialPageRoute(builder: (_) => const ProvidersPage()),
-                    );
-                  }
-                },
-                child: Text(l10n.settingsPageProviders),
+              const SizedBox(height: 14),
+              Text(
+                missing ? l10n.creationNoModelTitle : l10n.creationEmptyTitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: AppFontWeights.semibold,
+                ),
               ),
+              const SizedBox(height: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Text(
+                  missing ? l10n.creationNoModelBody : l10n.creationEmptyBody,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 13,
+                    height: 1.6,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 15),
+              if (missing)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if (!video)
+                      OutlinedButton.icon(
+                        icon: const Icon(Lucide.Image, size: 15),
+                        label: Text(l10n.creationConnectChatGPT),
+                        onPressed: () => _login(
+                          context,
+                          OAuthProvider.chatgpt,
+                          l10n.creationConnectChatGPT,
+                        ),
+                      ),
+                    OutlinedButton.icon(
+                      icon: const Icon(Lucide.Image, size: 15),
+                      label: Text(l10n.creationConnectGrok),
+                      onPressed: () => _login(
+                        context,
+                        OAuthProvider.grok,
+                        l10n.creationConnectGrok,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      icon: ProviderAvatar(
+                        providerKey: 'fal',
+                        displayName: 'fal',
+                        size: 16,
+                      ),
+                      label: Text(l10n.creationConfigureFal),
+                      onPressed: () => _provider(context, fal: true),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Lucide.Settings, size: 15),
+                      label: Text(l10n.creationOtherProviders),
+                      onPressed: () => _provider(context),
+                    ),
+                  ],
+                )
+              else
+                ChatSuggestionBubbles(
+                  suggestions: suggestions,
+                  alignment: WrapAlignment.center,
+                  maxSuggestions: desktop ? 6 : 4,
+                  onTap: (value) => media.suggestPrompt(topicId, value),
+                ),
             ],
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _login(
+    BuildContext context,
+    OAuthProvider provider,
+    String label,
+  ) async {
+    final panel = OAuthLoginPanel(provider: provider, autoStart: true);
+    if (desktop) {
+      await showAppDialog<void>(
+        context,
+        maxWidth: 560,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: panel,
+        ),
+      );
+    } else {
+      await showFormSheet<void>(
+        context,
+        builder: (_) => FormSheet(title: label, children: [panel]),
+      );
+    }
+  }
+
+  void _provider(BuildContext context, {bool fal = false}) {
+    if (desktop) {
+      final navigation = DesktopSettingsNavigationBus.instance;
+      if (fal) {
+        navigation.openFal();
+      } else {
+        navigation.openProviders();
+      }
+      return;
+    }
+    final page = fal
+        ? const ProviderDetailPage(keyName: 'fal', displayName: 'fal')
+        : const ProvidersPage();
+    Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => page));
   }
 }
 
@@ -225,21 +423,30 @@ class _BatchHeaderState extends State<_BatchHeader> {
                   MaterialLocalizations.of(context).cancelButtonLabel,
                 ),
               )
-            else
-              IosIconButton(
-                icon: Lucide.Copy,
-                size: 16,
-                tooltip: l10n.creationCopyPrompt,
-                onTap: () async {
-                  await Clipboard.setData(ClipboardData(text: batch.prompt));
-                  if (context.mounted) {
-                    showAppSnackBar(
-                      context,
-                      message: l10n.creationOptionCopied,
-                    );
-                  }
-                },
+            else ...[
+              if (widget.desktop) ...[
+                IosIconButton(
+                  icon: Lucide.RotateCcw,
+                  size: 16,
+                  tooltip: l10n.creationRepeat,
+                  onTap: _repeat,
+                ),
+                IosIconButton(
+                  icon: Lucide.Copy,
+                  size: 16,
+                  tooltip: l10n.creationCopyPrompt,
+                  onTap: _copy,
+                ),
+              ],
+              Builder(
+                builder: (anchor) => IosIconButton(
+                  icon: Lucide.Ellipsis,
+                  size: 16,
+                  tooltip: l10n.chatMessageWidgetMoreTooltip,
+                  onTap: () => _menu(anchor),
+                ),
               ),
+            ],
           ],
         ),
         const SizedBox(height: 4),
@@ -268,11 +475,375 @@ class _BatchHeaderState extends State<_BatchHeader> {
             if (p.duration case final duration?)
               _Tag(l10n.creationDurationSeconds(duration)),
             if (p.resolution case final resolution?) _Tag(resolution),
+            if (batch.parentItemId case final parent?)
+              _EditedFromTag(
+                item: media.item(parent),
+                desktop: widget.desktop,
+                draftTopicId: batch.topicId,
+              ),
+            if (_referenceCount(batch) case final count when count > 0)
+              _Tag(
+                l10n.creationImagesCount(count),
+                leading: const Icon(Lucide.Image, size: 13),
+              ),
           ],
         ),
       ],
     );
   }
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.batch.prompt));
+    if (mounted) {
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.creationOptionCopied,
+      );
+    }
+  }
+
+  Future<void> _repeat() async {
+    final media = context.read<MediaCreationController>();
+    try {
+      await media.repeat(widget.batch);
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.creationActionFailed,
+        );
+      }
+    }
+  }
+
+  Future<void> _menu(BuildContext anchor) async {
+    final l10n = AppLocalizations.of(context)!;
+    final batch = widget.batch;
+    final media = context.read<MediaCreationController>();
+    final images = media
+        .itemsFor(batch.id)
+        .where(
+          (item) =>
+              item.mode == MediaMode.image &&
+              item.status == GenerationItemStatus.ready,
+        )
+        .toList();
+    final choices = [
+      ActionSheetItem(
+        icon: Lucide.RotateCcw,
+        label: l10n.creationRepeat,
+        onTap: _repeat,
+      ),
+      ActionSheetItem(
+        icon: Lucide.Copy,
+        label: l10n.creationCopyPrompt,
+        onTap: _copy,
+      ),
+      if (images.isNotEmpty)
+        ActionSheetItem(
+          icon: LucideIcons.imagePlus,
+          label: l10n.creationUseGroupReferences(images.length),
+          onTap: () {
+            if (!mounted) return;
+            final count = media.addReferencePaths(batch.topicId, [
+              for (final item in images) item.path,
+            ]);
+            showAppSnackBar(
+              context,
+              message: count > 0
+                  ? l10n.creationReferenceAdded
+                  : l10n.creationReferenceLimitReached(
+                      media.model?.capabilities.maxReferences ?? 0,
+                    ),
+            );
+          },
+        ),
+      if (batch.status == GenerationStatus.failed ||
+          batch.status == GenerationStatus.partial)
+        ActionSheetItem(
+          icon: Lucide.FileText,
+          label: l10n.creationRequestDetails,
+          onTap: () => showCreationRequestDetails(
+            context,
+            batch,
+            desktop: widget.desktop,
+          ),
+        ),
+      ActionSheetItem(
+        icon: Lucide.Trash2,
+        label: l10n.creationDeleteBatch,
+        destructive: true,
+        onTap: _delete,
+      ),
+    ];
+    if (!widget.desktop) {
+      await showMobileActionSheet(context, items: choices);
+      return;
+    }
+    final box = anchor.findRenderObject() as RenderBox;
+    await showDesktopContextMenuAt(
+      context,
+      globalPosition: box.localToGlobal(box.size.bottomCenter(Offset.zero)),
+      items: [
+        for (final item in choices)
+          DesktopContextMenuItem(
+            icon: item.icon,
+            label: item.label,
+            onTap: item.onTap,
+            danger: item.destructive,
+          ),
+      ],
+    );
+  }
+
+  Future<void> _delete() async {
+    final l10n = AppLocalizations.of(context)!;
+    final media = context.read<MediaCreationController>();
+    final count = media.itemsFor(widget.batch.id).length;
+    final confirmed = await showAppDialog<bool>(
+      context,
+      maxWidth: 380,
+      child: Builder(
+        builder: (dialog) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.creationDeleteBatch,
+                style: Theme.of(dialog).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(l10n.creationDeleteBatchBody(count)),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialog).pop(false),
+                    child: Text(
+                      MaterialLocalizations.of(dialog).cancelButtonLabel,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(dialog).pop(true),
+                    child: Text(l10n.chatHistoryPageDelete),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await media.deleteBatch(widget.batch);
+    } catch (_) {
+      if (mounted) showAppSnackBar(context, message: l10n.creationActionFailed);
+    }
+  }
+}
+
+class _EditedFromTag extends StatelessWidget {
+  const _EditedFromTag({
+    required this.item,
+    required this.desktop,
+    required this.draftTopicId,
+  });
+
+  final GenerationItemRow? item;
+  final bool desktop;
+  final String? draftTopicId;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = item;
+    final l10n = AppLocalizations.of(context)!;
+    final time = source == null
+        ? null
+        : MaterialLocalizations.of(
+            context,
+          ).formatTimeOfDay(TimeOfDay.fromDateTime(source.createdAt));
+    final tag = _Tag(
+      time == null
+          ? l10n.creationEditedFrom
+          : '${l10n.creationEditedFrom} $time',
+      leading: source == null
+          ? null
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: SizedBox.square(
+                dimension: 16,
+                child: CreationMediaCover(source),
+              ),
+            ),
+    );
+    return source == null
+        ? tag
+        : IosCardPress(
+            focusable: true,
+            onTap: () => showCreationLightbox(
+              context,
+              source,
+              desktop: desktop,
+              draftTopicId: draftTopicId,
+            ),
+            borderRadius: BorderRadius.circular(7),
+            child: tag,
+          );
+  }
+}
+
+int _referenceCount(GenerationBatchRow batch) {
+  try {
+    return MediaRequest.fromBatch(batch).references.length;
+  } catch (_) {
+    return 0;
+  }
+}
+
+Future<void> showCreationRequestDetails(
+  BuildContext context,
+  GenerationBatchRow batch, {
+  required bool desktop,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  final media = context.read<MediaCreationController>();
+  final details = _requestDetails(batch);
+  const json = JsonEncoder.withIndent('  ');
+  final copyText = details.isEmpty
+      ? l10n.creationNoRequestDetails
+      : json.convert(details);
+  final cs = Theme.of(context).colorScheme;
+  final provider = media.settings.getProviderConfig(batch.providerId);
+  final model = ModelSpecResolver.instance.spec(provider, batch.modelId);
+  final kind = details['kind'];
+  final retryable = MediaFailureKind.values
+      .where((value) => value.name == kind)
+      .any((value) => MediaFailure(value, '').retryable);
+  Widget code(String title, Object data) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      const SizedBox(height: 4),
+      DecoratedBox(
+        decoration: BoxDecoration(
+          color: cs.onSurface.withValues(alpha: .05),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: SelectableText(
+            json.convert(data),
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+          ),
+        ),
+      ),
+    ],
+  );
+  final content = Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: 10,
+    children: [
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          if (kind is String)
+            _Tag(kind, leading: const Icon(Lucide.CircleAlert, size: 12)),
+          _Tag(
+            retryable
+                ? l10n.creationAutomaticRetry
+                : l10n.creationNoAutomaticRetry,
+          ),
+          _Tag(model.displayName),
+          _Tag(provider.name),
+        ],
+      ),
+      Text(details['message']?.toString() ?? l10n.creationNoRequestDetails),
+      if (details['retries'] case final List retries)
+        code(l10n.creationRetryHistory, retries),
+      if (details['request'] case final Map request)
+        code(l10n.creationLoggedRequest, request),
+      if (details['response'] case final Map response)
+        code(l10n.creationLoggedResponse, response),
+    ],
+  );
+  Widget actions(BuildContext dialog) => Row(
+    mainAxisAlignment: MainAxisAlignment.end,
+    children: [
+      TextButton(
+        onPressed: () async {
+          await Clipboard.setData(ClipboardData(text: copyText));
+          if (dialog.mounted) {
+            showAppSnackBar(dialog, message: l10n.creationOptionCopied);
+          }
+        },
+        child: Text(MaterialLocalizations.of(dialog).copyButtonLabel),
+      ),
+      TextButton(
+        onPressed: () async {
+          Navigator.of(dialog).pop();
+          try {
+            await media.retry(batch);
+          } catch (_) {
+            if (context.mounted) {
+              showAppSnackBar(context, message: l10n.creationActionFailed);
+            }
+          }
+        },
+        child: Text(l10n.creationRetry),
+      ),
+    ],
+  );
+  if (!desktop) {
+    await showFormSheet<void>(
+      context,
+      builder: (dialog) => FormSheet(
+        title: l10n.creationRequestDetails,
+        actions: actions(dialog),
+        children: [content],
+      ),
+    );
+    return;
+  }
+  await showAppDialog<void>(
+    context,
+    maxWidth: 560,
+    child: Builder(
+      builder: (dialog) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.creationRequestDetails,
+              style: Theme.of(dialog).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Flexible(child: SingleChildScrollView(child: content)),
+            const SizedBox(height: 8),
+            actions(dialog),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Map<String, Object?> _requestDetails(GenerationBatchRow batch) {
+  try {
+    if (jsonDecode(batch.errorJson ?? '{}')
+        case final Map<String, dynamic> value) {
+      return value;
+    }
+  } on FormatException {
+    // The failure may have no structured details.
+  }
+  return const {};
 }
 
 class _Tag extends StatelessWidget {
@@ -329,7 +900,10 @@ class _BatchResults extends StatelessWidget {
     final pending = batch.status.isActive
         ? (params.count - visible.length).clamp(0, 16)
         : 0;
-    final total = pending + visible.length;
+    final missing = batch.status == GenerationStatus.partial
+        ? (params.count - visible.length).clamp(0, 16)
+        : 0;
+    final total = pending + visible.length + missing;
     if (total == 0) return const SizedBox.shrink();
     final requestedRatio =
         params.ratio == 'auto' && batch.mode == MediaMode.video
@@ -369,17 +943,15 @@ class _BatchResults extends StatelessWidget {
                 width: width,
                 child: AspectRatio(
                   aspectRatio: _itemRatio(item, requestedRatio).clamp(.3, 4),
-                  child: GestureDetector(
-                    onTap: () =>
-                        showCreationLightbox(context, item, desktop: desktop),
-                    child: Hero(
-                      tag: 'creation:${item.id}',
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: CreationMediaCover(item),
-                      ),
-                    ),
-                  ),
+                  child: _artwork(context, item),
+                ),
+              ),
+            for (var index = 0; index < missing; index++)
+              SizedBox(
+                width: width,
+                child: AspectRatio(
+                  aspectRatio: ratio.clamp(.3, 4),
+                  child: _DownloadFailure(batch: batch),
                 ),
               ),
             for (var index = 0; index < pending; index++)
@@ -393,6 +965,9 @@ class _BatchResults extends StatelessWidget {
                     builder: (context, _) => CreationWaitingCard(
                       batch: batch,
                       progress: media.runner.progressFor(batch.id)?.fraction,
+                      preview: index == 0
+                          ? media.runner.progressFor(batch.id)?.preview
+                          : null,
                       queueAhead: media.runner.queueAhead(batch.id),
                     ),
                   ),
@@ -403,11 +978,93 @@ class _BatchResults extends StatelessWidget {
       },
     );
   }
+
+  Widget _artwork(BuildContext context, GenerationItemRow item) {
+    final tile = CreationArtworkTile(
+      key: ValueKey(item.id),
+      item: item,
+      desktop: desktop,
+      draftTopicId: batch.topicId,
+      onOpen: () => showCreationLightbox(
+        context,
+        item,
+        desktop: desktop,
+        draftTopicId: batch.topicId,
+      ),
+    );
+    if (MediaQuery.disableAnimationsOf(context) ||
+        DateTime.now().difference(item.createdAt) >
+            const Duration(seconds: 2)) {
+      return tile;
+    }
+    return tile
+        .animate()
+        .fadeIn(duration: const Duration(milliseconds: 700))
+        .blurXY(begin: 18, end: 0)
+        .scale(begin: const Offset(1.04, 1.04), end: const Offset(1, 1));
+  }
+}
+
+class _DownloadFailure extends StatelessWidget {
+  const _DownloadFailure({required this.batch});
+
+  final GenerationBatchRow batch;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final media = context.read<MediaCreationController>();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.errorContainer.withValues(alpha: .4),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.cloudOff, color: colors.error, size: 22),
+                const SizedBox(height: 4),
+                Text(
+                  _requestDetails(batch)['kind'] ==
+                          MediaFailureKind.download.name
+                      ? l10n.creationDownloadFailed
+                      : l10n.creationPartial,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      await media.retry(batch);
+                    } catch (_) {
+                      if (context.mounted) {
+                        showAppSnackBar(
+                          context,
+                          message: l10n.creationActionFailed,
+                        );
+                      }
+                    }
+                  },
+                  child: Text(l10n.creationRetry),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _BatchFailure extends StatelessWidget {
-  const _BatchFailure({required this.batch});
+  const _BatchFailure({required this.batch, required this.desktop});
   final GenerationBatchRow batch;
+  final bool desktop;
 
   @override
   Widget build(BuildContext context) {
@@ -451,6 +1108,17 @@ class _BatchFailure extends StatelessWidget {
                   ),
                 ),
               ),
+              if (danger)
+                IosIconButton(
+                  icon: Lucide.FileText,
+                  minSize: 30,
+                  tooltip: l10n.creationRequestDetails,
+                  onTap: () => showCreationRequestDetails(
+                    context,
+                    batch,
+                    desktop: desktop,
+                  ),
+                ),
               TextButton.icon(
                 onPressed: () async {
                   try {

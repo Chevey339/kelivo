@@ -18,3 +18,22 @@ enum GenerationStatus {
 enum GenerationSource { workbench, edit, chat }
 
 enum GenerationItemStatus { pending, ready, failed }
+
+enum CreationTopicView { coverAndTitle, covers, list }
+
+enum CreationGalleryFilter { all, images, videos, favorites }
+
+enum RecentImageSource { all, creation, chat }
+
+class RecentMediaImage {
+  const RecentMediaImage({
+    required this.path,
+    required this.title,
+    required this.source,
+    this.thumbnailPath,
+  });
+
+  final String path, title;
+  final RecentImageSource source;
+  final String? thumbnailPath;
+}

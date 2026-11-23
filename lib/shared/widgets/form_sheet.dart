@@ -15,6 +15,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 Future<T?> showFormSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
+  Color? backgroundColor,
 }) {
   return showModalBottomSheet<T>(
     context: context,
@@ -22,7 +23,7 @@ Future<T?> showFormSheet<T>(
     sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
         ? AnimationStyle.noAnimation
         : null,
-    backgroundColor: context.overlaySurface,
+    backgroundColor: backgroundColor ?? context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
