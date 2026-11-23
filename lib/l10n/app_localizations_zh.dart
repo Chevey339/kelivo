@@ -17675,6 +17675,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get creationNoVideoModels => '还没有能生成视频的模型';
+
+  @override
+  String get creationFrameSources => '从最近的图片、文件或剪贴板添加';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model 只支持首帧';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -35348,6 +35356,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationNoVideoModels => '还没有能生成视频的模型';
+
+  @override
+  String get creationFrameSources => '从最近的图片、文件或剪贴板添加';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model 只支持首帧';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -53078,4 +53094,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationNoVideoModels => '尚無影片生成模型';
+
+  @override
+  String get creationFrameSources => '從最近的圖片、檔案或剪貼簿新增';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model 僅支援首幀';
+  }
 }

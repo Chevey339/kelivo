@@ -6690,5 +6690,7 @@
   "creationNoMatchingTopics": "没有匹配的话题",
   "creationAllTopicCount": "全部话题 {count}",
   "creationNoImageModels": "还没有能生成图片的模型",
-  "creationNoVideoModels": "还没有能生成视频的模型"
+  "creationNoVideoModels": "还没有能生成视频的模型",
+  "creationFrameSources": "从最近的图片、文件或剪贴板添加",
+  "creationFrameModelFirstOnly": "{model} 只支持首帧"
 }

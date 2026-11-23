@@ -32735,6 +32735,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No video generation models yet'**
   String get creationNoVideoModels;
+
+  /// Second line beside the first and last video frame slots in the Creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add from recent images, files, or the clipboard'**
+  String get creationFrameSources;
+
+  /// First line beside the video frame slot when the selected model only accepts the first frame.
+  ///
+  /// In en, this message translates to:
+  /// **'{model} supports the first frame only'**
+  String creationFrameModelFirstOnly(String model);
 }
 
 class _AppLocalizationsDelegate

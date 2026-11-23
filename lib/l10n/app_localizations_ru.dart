@@ -19065,4 +19065,13 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get creationNoVideoModels => 'Моделей генерации видео пока нет';
+
+  @override
+  String get creationFrameSources =>
+      'Добавить из недавних изображений, файлов или буфера обмена';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model поддерживает только первый кадр';
+  }
 }

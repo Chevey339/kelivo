@@ -24325,5 +24325,18 @@
   },
   "@creationNoVideoModels": {
     "description": "Creation empty-state heading when the current video mode has no available model, but the other mode is configured."
+  },
+  "creationFrameSources": "Add from recent images, files, or the clipboard",
+  "@creationFrameSources": {
+    "description": "Second line beside the first and last video frame slots in the Creation composer."
+  },
+  "creationFrameModelFirstOnly": "{model} supports the first frame only",
+  "@creationFrameModelFirstOnly": {
+    "description": "First line beside the video frame slot when the selected model only accepts the first frame.",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
   }
 }

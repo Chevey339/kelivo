@@ -5433,5 +5433,7 @@
   "creationNoMatchingTopics": "일치하는 주제 없음",
   "creationAllTopicCount": "전체 주제 {count}",
   "creationNoImageModels": "아직 이미지 생성 모델이 없습니다",
-  "creationNoVideoModels": "아직 동영상 생성 모델이 없습니다"
+  "creationNoVideoModels": "아직 동영상 생성 모델이 없습니다",
+  "creationFrameSources": "최근 이미지, 파일 또는 클립보드에서 추가",
+  "creationFrameModelFirstOnly": "{model}은(는) 첫 프레임만 지원합니다"
 }

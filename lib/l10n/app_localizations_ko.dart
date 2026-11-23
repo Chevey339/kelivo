@@ -18158,4 +18158,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get creationNoVideoModels => '아직 동영상 생성 모델이 없습니다';
+
+  @override
+  String get creationFrameSources => '최근 이미지, 파일 또는 클립보드에서 추가';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model은(는) 첫 프레임만 지원합니다';
+  }
 }

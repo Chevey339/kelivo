@@ -5433,5 +5433,7 @@
   "creationNoMatchingTopics": "Нет подходящих тем",
   "creationAllTopicCount": "Все темы {count}",
   "creationNoImageModels": "Моделей генерации изображений пока нет",
-  "creationNoVideoModels": "Моделей генерации видео пока нет"
+  "creationNoVideoModels": "Моделей генерации видео пока нет",
+  "creationFrameSources": "Добавить из недавних изображений, файлов или буфера обмена",
+  "creationFrameModelFirstOnly": "{model} поддерживает только первый кадр"
 }

@@ -5433,5 +5433,7 @@
   "creationNoMatchingTopics": "沒有符合的主題",
   "creationAllTopicCount": "全部主題 {count}",
   "creationNoImageModels": "尚無圖片生成模型",
-  "creationNoVideoModels": "尚無影片生成模型"
+  "creationNoVideoModels": "尚無影片生成模型",
+  "creationFrameSources": "從最近的圖片、檔案或剪貼簿新增",
+  "creationFrameModelFirstOnly": "{model} 僅支援首幀"
 }

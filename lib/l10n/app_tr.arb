@@ -5433,5 +5433,7 @@
   "creationNoMatchingTopics": "Eşleşen konu yok",
   "creationAllTopicCount": "Tüm konular {count}",
   "creationNoImageModels": "Henüz görsel oluşturma modeli yok",
-  "creationNoVideoModels": "Henüz video oluşturma modeli yok"
+  "creationNoVideoModels": "Henüz video oluşturma modeli yok",
+  "creationFrameSources": "Son görsellerden, dosyalardan veya panodan ekle",
+  "creationFrameModelFirstOnly": "{model} yalnızca ilk kareyi destekler"
 }

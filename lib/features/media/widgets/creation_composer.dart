@@ -475,6 +475,7 @@ class _CreationComposerState extends State<CreationComposer> {
                               ),
                             if (frames && caps != null)
                               _VideoFrames(
+                                desktop: widget.desktop,
                                 topicId: widget.topicId,
                                 capabilities: caps,
                                 onPick: (anchor, role) =>
@@ -1361,11 +1362,13 @@ class _FrameToggle extends StatelessWidget {
 class _VideoFrames extends StatelessWidget {
   const _VideoFrames({
     required this.topicId,
+    required this.desktop,
     required this.capabilities,
     required this.onPick,
   });
 
   final String? topicId;
+  final bool desktop;
   final MediaCapabilities capabilities;
   final void Function(BuildContext, MediaReferenceRole) onPick;
 
@@ -1377,13 +1380,18 @@ class _VideoFrames extends StatelessWidget {
     final hasLast = capabilities.frameRoles.contains(
       MediaReferenceRole.lastFrame,
     );
-    final style = TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant);
+    final style = TextStyle(
+      fontSize: 11.5,
+      height: 1.4,
+      color: cs.onSurface.withValues(alpha: .42),
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
       child: Row(
         children: [
           for (final role in capabilities.frameRoles) ...[
             _FrameSlot(
+              desktop: desktop,
               label: role == MediaReferenceRole.firstFrame
                   ? l10n.creationFirstFrame
                   : l10n.creationLastFrame,
@@ -1394,11 +1402,21 @@ class _VideoFrames extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Text(
-              hasLast
-                  ? l10n.creationFirstFrameRequired
-                  : l10n.creationFirstFrameOnly,
-              style: style,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  hasLast
+                      ? l10n.creationFirstFrameRequired
+                      : l10n.creationFrameModelFirstOnly(
+                          state.model!.spec.displayName,
+                        ),
+                  style: style,
+                ),
+                const SizedBox(height: 2),
+                Text(l10n.creationFrameSources, style: style),
+              ],
             ),
           ),
         ],
@@ -1407,91 +1425,135 @@ class _VideoFrames extends StatelessWidget {
   }
 }
 
-class _FrameSlot extends StatelessWidget {
+class _FrameSlot extends StatefulWidget {
   const _FrameSlot({
+    required this.desktop,
     required this.label,
     required this.value,
     required this.onPick,
     required this.onRemove,
   });
-
+  final bool desktop;
   final String label;
   final MediaReference? value;
   final VoidCallback onPick, onRemove;
+  @override
+  State<_FrameSlot> createState() => _FrameSlotState();
+}
 
+class _FrameSlotState extends State<_FrameSlot> {
+  bool _hover = false, _focus = false;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final radius = BorderRadius.circular(12);
-    return SizedBox.square(
-      dimension: 56,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: IosCardPress(
-              focusable: true,
-              borderRadius: radius,
-              border: Border.all(color: cs.outlineVariant),
-              baseColor: context.appColors.surfaceFill,
-              onTap: onPick,
-              child: ClipRRect(
-                borderRadius: radius,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (value case final reference?)
-                      CreationFileImage(reference.path)
-                    else
-                      Align(
-                        alignment: const Alignment(0, -.25),
-                        child: Icon(
-                          Lucide.Plus,
-                          size: 18,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        width: double.infinity,
-                        color: value == null
-                            ? Colors.transparent
-                            : Colors.black54,
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            color: value == null
-                                ? cs.onSurfaceVariant
-                                : Colors.white,
-                            fontWeight: AppFontWeights.semibold,
-                          ),
-                        ),
-                      ),
+    final value = widget.value;
+    final color = _hover || _focus
+        ? cs.primary
+        : cs.onSurface.withValues(alpha: .42);
+    final remove = value != null && (!widget.desktop || _hover || _focus);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (v) => setState(() => _focus = v),
+        child: SizedBox.square(
+          dimension: 56,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Semantics(
+                  button: true,
+                  label: widget.label,
+                  child: IosCardPress(
+                    focusable: true,
+                    borderRadius: radius,
+                    baseColor: Colors.transparent,
+                    onTap: widget.onPick,
+                    border: Border.all(
+                      color: _hover || _focus
+                          ? cs.primary
+                          : cs.onSurface.withValues(
+                              alpha: value == null ? .12 : .06,
+                            ),
+                      width: value == null ? 1.5 : 1,
                     ),
-                  ],
+                    child: ClipRRect(
+                      borderRadius: radius,
+                      child: value == null
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Lucide.Plus, size: 16, color: color),
+                                const SizedBox(height: 3),
+                                Text(
+                                  widget.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                CreationFileImage(value.path),
+                                Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: Container(
+                                    width: double.infinity,
+                                    color: Colors.black.withValues(alpha: .45),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Text(
+                                      widget.label,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (remove)
+                PositionedDirectional(
+                  top: 3,
+                  end: 3,
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IosIconButton(
+                      icon: Lucide.X,
+                      size: 11,
+                      minSize: 18,
+                      padding: EdgeInsets.zero,
+                      color: Colors.white,
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).deleteButtonTooltip,
+                      onTap: widget.onRemove,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          if (value != null)
-            PositionedDirectional(
-              top: 0,
-              end: 0,
-              child: IosIconButton(
-                icon: Lucide.X,
-                size: 12,
-                minSize: 20,
-                color: Colors.white,
-                tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
-                onTap: onRemove,
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

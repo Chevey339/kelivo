@@ -18843,4 +18843,13 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get creationNoVideoModels => 'Henüz video oluşturma modeli yok';
+
+  @override
+  String get creationFrameSources =>
+      'Son görsellerden, dosyalardan veya panodan ekle';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model yalnızca ilk kareyi destekler';
+  }
 }

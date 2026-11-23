@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:video_player/video_player.dart';
@@ -13,6 +14,8 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
+import 'creation_slider.dart';
 
 class CreationVideoPlayer extends StatefulWidget {
   const CreationVideoPlayer({
@@ -85,17 +88,22 @@ class _CreationVideoPlayerState extends State<CreationVideoPlayer> {
       return _VideoSurface(
         player: player,
         onFullScreen: () => Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            fullscreenDialog: true,
-            builder: (context) => Scaffold(
-              backgroundColor: Colors.black,
-              body: SafeArea(
+          PageRouteBuilder<void>(
+            transitionDuration: handoffDuration(context, 220),
+            reverseTransitionDuration: handoffDuration(context, 220),
+            pageBuilder: (context, _, _) => ColoredBox(
+              color: Colors.black,
+              child: SafeArea(
                 child: _VideoSurface(
                   player: player,
                   expanded: true,
                   onFullScreen: () => Navigator.of(context).pop(),
                 ),
               ),
+            ),
+            transitionsBuilder: (_, animation, _, child) => FadeTransition(
+              opacity: animation.drive(CurveTween(curve: handoffCurve)),
+              child: child,
             ),
           ),
         ),
@@ -112,7 +120,10 @@ class _CreationVideoPlayerState extends State<CreationVideoPlayer> {
             widget.cover,
             Center(
               child: _loading
-                  ? const CircularProgressIndicator(color: Colors.white)
+                  ? CupertinoActivityIndicator(
+                      color: Colors.white,
+                      animating: !MediaQuery.disableAnimationsOf(context),
+                    )
                   : IosIconButton(
                       icon: Lucide.Play,
                       minSize: 52,
@@ -148,75 +159,127 @@ class _VideoSurface extends StatelessWidget {
         final duration = value.duration.inMilliseconds;
         final position = value.position.inMilliseconds.clamp(0, duration);
         final muted = value.volume == 0;
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Center(
-              child: AspectRatio(
-                aspectRatio: value.aspectRatio,
-                child: VideoPlayer(player),
-              ),
-            ),
-            PositionedDirectional(
-              start: 8,
-              end: 8,
-              bottom: 8,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                  child: ColoredBox(
-                    color: Colors.black.withValues(alpha: .45),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Row(
-                        children: [
-                          _button(
-                            value.isPlaying ? Lucide.Pause : Lucide.Play,
-                            value.isPlaying
-                                ? l10n.creationPauseVideo
-                                : l10n.creationPlayVideo,
-                            value.isPlaying ? player.pause : player.play,
+        final toggle = value.isPlaying ? player.pause : player.play;
+        final playLabel = value.isPlaying
+            ? l10n.creationPauseVideo
+            : l10n.creationPlayVideo;
+        final play = _button(
+          value.isPlaying ? Lucide.Pause : Lucide.Play,
+          playLabel,
+          toggle,
+        );
+        final mute = _button(
+          muted ? LucideIcons.volumeX : Lucide.Volume2,
+          muted ? l10n.creationUnmuteVideo : l10n.creationMuteVideo,
+          () => player.setVolume(muted ? 1 : 0),
+        );
+        final full = _button(
+          expanded ? Lucide.Minimize2 : Lucide.Maximize2,
+          expanded ? l10n.creationExitFullScreen : l10n.creationFullScreen,
+          onFullScreen,
+        );
+        final seek = CreationSlider(
+          label: l10n.creationVideo,
+          formatValue: (v) => creationVideoTime(v.round()),
+          thumb: false,
+          activeColor: Colors.white,
+          trackColor: Colors.white24,
+          max: duration > 0 ? duration.toDouble() : 1,
+          value: position.toDouble(),
+          onChanged: duration == 0
+              ? null
+              : (next) => unawaited(
+                  player.seekTo(Duration(milliseconds: next.round())),
+                ),
+        );
+        return Center(
+          child: AspectRatio(
+            aspectRatio: value.aspectRatio,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  excludeFromSemantics: true,
+                  onTap: toggle,
+                  child: VideoPlayer(player),
+                ),
+                if (!value.isPlaying)
+                  Center(
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        color: Colors.black45,
+                        shape: BoxShape.circle,
+                      ),
+                      child: IosIconButton(
+                        icon: Lucide.Play,
+                        size: 24,
+                        minSize: 52,
+                        color: Colors.white,
+                        tooltip: playLabel,
+                        onTap: toggle,
+                      ),
+                    ),
+                  ),
+                PositionedDirectional(
+                  start: 12,
+                  end: 12,
+                  bottom: 12,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: ColoredBox(
+                        color: Colors.black.withValues(alpha: .45),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
                           ),
-                          _time(value.position),
-                          Expanded(
-                            child: Slider(
-                              max: duration > 0 ? duration.toDouble() : 1,
-                              value: position.toDouble(),
-                              onChanged: duration == 0
-                                  ? null
-                                  : (position) => unawaited(
-                                      player.seekTo(
-                                        Duration(
-                                          milliseconds: position.round(),
-                                        ),
-                                      ),
+                          child: LayoutBuilder(
+                            builder: (context, box) {
+                              if (box.maxWidth < 245) {
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    seek,
+                                    Wrap(
+                                      alignment: WrapAlignment.center,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      children: [
+                                        play,
+                                        _time(value.position),
+                                        _time(value.duration),
+                                        mute,
+                                        full,
+                                      ],
                                     ),
-                            ),
+                                  ],
+                                );
+                              }
+                              return Row(
+                                children: [
+                                  play,
+                                  _time(value.position),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: seek),
+                                  const SizedBox(width: 8),
+                                  _time(value.duration),
+                                  mute,
+                                  full,
+                                ],
+                              );
+                            },
                           ),
-                          _time(value.duration),
-                          _button(
-                            muted ? LucideIcons.volumeX : Lucide.Volume2,
-                            muted
-                                ? l10n.creationUnmuteVideo
-                                : l10n.creationMuteVideo,
-                            () => player.setVolume(muted ? 1 : 0),
-                          ),
-                          _button(
-                            expanded ? Lucide.Minimize2 : Lucide.Maximize2,
-                            expanded
-                                ? l10n.creationExitFullScreen
-                                : l10n.creationFullScreen,
-                            onFullScreen,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -234,7 +297,12 @@ class _VideoSurface extends StatelessWidget {
 
   Widget _time(Duration duration) => Text(
     creationVideoTime(duration.inMilliseconds),
-    style: const TextStyle(color: Colors.white, fontSize: 11),
+    style: const TextStyle(
+      color: Colors.white,
+      fontSize: 12,
+      decoration: TextDecoration.none,
+      fontFeatures: [FontFeature.tabularFigures()],
+    ),
   );
 }
 

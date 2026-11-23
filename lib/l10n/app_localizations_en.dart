@@ -18732,4 +18732,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get creationNoVideoModels => 'No video generation models yet';
+
+  @override
+  String get creationFrameSources =>
+      'Add from recent images, files, or the clipboard';
+
+  @override
+  String creationFrameModelFirstOnly(String model) {
+    return '$model supports the first frame only';
+  }
 }
