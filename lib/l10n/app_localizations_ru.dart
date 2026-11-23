@@ -18762,11 +18762,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationRepeat => 'Сгенерировать ещё раз';
 
   @override
-  String get creationDeleteBatch => 'Удалить эту группу?';
+  String get creationDeleteBatch => 'Удалить группу';
 
   @override
   String creationDeleteBatchBody(int count) {
-    return 'Удалить группу и её файлы ($count) с этого устройства?';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Удалить эту группу и её $count файла с этого устройства?',
+      many: 'Удалить эту группу и её $count файлов с этого устройства?',
+      few: 'Удалить эту группу и её $count файла с этого устройства?',
+      one: 'Удалить эту группу и её файл с этого устройства?',
+      zero: 'Удалить эту запись генерации с этого устройства?',
+    );
+    return '$_temp0';
   }
 
   @override

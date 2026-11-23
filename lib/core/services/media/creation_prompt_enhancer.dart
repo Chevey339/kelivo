@@ -24,6 +24,14 @@ abstract final class CreationPromptEnhancer {
       config: provider,
       modelId: model.id,
       messages: [
+        const {
+          'role': 'system',
+          'content':
+              'Follow the requested rewrite instructions. When they leave '
+              'a short phrase or name ambiguous, preserve it as written. '
+              'Use a specific identity only when the request or reference '
+              'identifies the subject or asks you to choose one.',
+        },
         {
           'role': 'user',
           'content': again

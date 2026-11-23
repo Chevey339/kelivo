@@ -17,6 +17,7 @@ import 'package:Kelivo/features/chat/widgets/chat_creation_images.dart';
 import 'package:Kelivo/features/media/pages/media_creation_page.dart';
 import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
 import 'package:Kelivo/features/media/widgets/creation_composer.dart';
+import 'package:Kelivo/features/media/widgets/creation_enhancement_panel.dart';
 import 'package:Kelivo/features/media/widgets/creation_gallery.dart';
 import 'package:Kelivo/features/media/widgets/creation_lightbox.dart';
 import 'package:Kelivo/features/media/widgets/creation_timeline.dart';
@@ -838,6 +839,85 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
+
+  testWidgets(
+    'iOS topic supports canceling and completing an edge swipe with its draft',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final media = await _pumpCreationGallery(tester, desktop: false);
+      final title = find.text('Mountain trip');
+      await tester.tap(title.first);
+      await tester.pumpAndSettle();
+      final timeline = find.byType(CreationTimeline);
+      final route = ModalRoute.of(tester.element(timeline))!;
+      expect(route.popGestureEnabled, isTrue);
+      media.updatePrompt('topic', 'Keep this draft');
+      Future<void> swipe(double distance) async {
+        final drag = await tester.startGesture(const Offset(2, 320));
+        await drag.moveBy(const Offset(22, 0));
+        await tester.pump();
+        await drag.moveBy(Offset(distance, 0));
+        await tester.pump(const Duration(milliseconds: 160));
+        expect(route.popGestureInProgress, isTrue);
+        await drag.up();
+        await tester.pumpAndSettle();
+      }
+
+      await swipe(36);
+      expect(timeline, findsOneWidget);
+      await swipe(295);
+      expect(timeline, findsNothing);
+      await tester.tap(title.first);
+      await tester.pumpAndSettle();
+      expect(find.text('Keep this draft'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets('the rewrite panel can be dismissed at its trailing edge', (
+    tester,
+  ) async {
+    var cancelled = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: 300,
+              child: MediaQuery(
+                data: const MediaQueryData(
+                  disableAnimations: true,
+                  textScaler: TextScaler.linear(1.6),
+                ),
+                child: CreationEnhancementPanel(
+                  desktop: false,
+                  original: 'Cup',
+                  modelName: 'An unusually long model name',
+                  spans: null,
+                  onClose: () => cancelled = true,
+                  onAgain: () {},
+                  onApply: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final bounds = tester.getRect(find.byType(CreationEnhancementPanel));
+    final close = tester.getRect(find.byTooltip('Close'));
+    expect(close.width, greaterThanOrEqualTo(44));
+    await tester.tapAt(Offset(bounds.right - 15, close.center.dy));
+    expect(cancelled, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final chat in [false, true]) {
     testWidgets(

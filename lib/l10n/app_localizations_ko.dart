@@ -17873,11 +17873,17 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationRepeat => '다시 생성';
 
   @override
-  String get creationDeleteBatch => '이 그룹을 삭제할까요?';
+  String get creationDeleteBatch => '그룹 삭제';
 
   @override
   String creationDeleteBatchBody(int count) {
-    return '이 그룹과 $count개 파일을 이 기기에서 삭제할까요?';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '이 기기에서 이 그룹과 파일 $count개를 삭제할까요?',
+      zero: '이 기기에서 이 생성 기록을 삭제할까요?',
+    );
+    return '$_temp0';
   }
 
   @override

@@ -13,6 +13,7 @@ import '../../../theme/app_font_weights.dart';
 class CreationEnhancementPanel extends StatefulWidget {
   const CreationEnhancementPanel({
     super.key,
+    required this.desktop,
     required this.original,
     required this.modelName,
     required this.spans,
@@ -21,6 +22,7 @@ class CreationEnhancementPanel extends StatefulWidget {
     required this.onApply,
   });
 
+  final bool desktop;
   final String original, modelName;
   final List<CreationPromptSpan>? spans;
   final VoidCallback onClose, onAgain, onApply;
@@ -75,34 +77,40 @@ class _CreationEnhancementPanelState extends State<CreationEnhancementPanel> {
                   color: colors.primary,
                 ),
               ),
-              Flexible(
-                child: Text(
-                  spans == null
-                      ? l10n.creationEnhanceLoading
-                      : l10n.creationEnhanceResult,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: AppFontWeights.semibold,
-                  ),
+              Expanded(
+                child: Wrap(
+                  spacing: 7,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      spans == null
+                          ? l10n.creationEnhanceLoading
+                          : l10n.creationEnhanceResult,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                    Text(
+                      widget.modelName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Flexible(
-                child: Text(
-                  widget.modelName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              const Spacer(),
               IosIconButton(
                 icon: Lucide.X,
-                minSize: 26,
+                minSize: widget.desktop ? 32 : 44,
+                visualSize: 28,
+                padding: EdgeInsets.zero,
                 size: 14,
                 tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                 onTap: widget.onClose,

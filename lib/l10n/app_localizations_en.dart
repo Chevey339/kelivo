@@ -18438,11 +18438,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creationRepeat => 'Generate again';
 
   @override
-  String get creationDeleteBatch => 'Delete this group?';
+  String get creationDeleteBatch => 'Delete group';
 
   @override
   String creationDeleteBatchBody(int count) {
-    return 'Delete the group and its $count files from this device?';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete this group and its $count files from this device?',
+      one: 'Delete this group and its file from this device?',
+      zero: 'Delete this generation record from this device?',
+    );
+    return '$_temp0';
   }
 
   @override

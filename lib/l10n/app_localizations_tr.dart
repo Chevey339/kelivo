@@ -18546,11 +18546,18 @@ class AppLocalizationsTr extends AppLocalizations {
   String get creationRepeat => 'Tekrar oluştur';
 
   @override
-  String get creationDeleteBatch => 'Bu grup silinsin mi?';
+  String get creationDeleteBatch => 'Grubu sil';
 
   @override
   String creationDeleteBatchBody(int count) {
-    return 'Grup ve $count dosyası bu cihazdan silinsin mi?';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Bu grup ve $count dosyası bu cihazdan silinsin mi?',
+      one: 'Bu grup ve dosyası bu cihazdan silinsin mi?',
+      zero: 'Bu üretim kaydı bu cihazdan silinsin mi?',
+    );
+    return '$_temp0';
   }
 
   @override

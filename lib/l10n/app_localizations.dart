@@ -32250,16 +32250,16 @@ abstract class AppLocalizations {
   /// **'Generate again'**
   String get creationRepeat;
 
-  /// Title of the confirmation dialog for deleting a generation group.
+  /// Destructive action in the generation group menu and title of its confirmation dialog.
   ///
   /// In en, this message translates to:
-  /// **'Delete this group?'**
+  /// **'Delete group'**
   String get creationDeleteBatch;
 
-  /// Confirmation text showing the number of saved result files in a generation group.
+  /// Confirmation before deleting a generation group from this device. The count is the number of stored result files. A failed group can have none.
   ///
   /// In en, this message translates to:
-  /// **'Delete the group and its {count} files from this device?'**
+  /// **'{count, plural, =0{Delete this generation record from this device?} one{Delete this group and its file from this device?} other{Delete this group and its {count} files from this device?}}'**
   String creationDeleteBatchBody(int count);
 
   /// Title and action for redacted diagnostics of a failed generation.

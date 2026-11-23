@@ -86,7 +86,11 @@ void main() {
         );
         expect(rewrite, 'Paint a copper sky.');
         final body = received.last;
-        final messages = jsonEncode(body['messages']);
+        final turns = body['messages'] as List;
+        expect(turns.first['role'], 'system');
+        expect(turns.first['content'], contains('preserve it as written'));
+        expect(turns.last['role'], 'user');
+        final messages = jsonEncode(turns);
         expect(messages, contains('Rewrite this: Clouds at dusk'));
         expect(messages.contains('data:image/png;base64,'), vision);
         expect(messages.contains('distinct rewrite'), !vision);

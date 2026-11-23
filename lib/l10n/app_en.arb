@@ -23919,13 +23919,13 @@
   "@creationRepeat": {
     "description": "Start a new batch using the same prompt, model parameters, and references."
   },
-  "creationDeleteBatch": "Delete this group?",
+  "creationDeleteBatch": "Delete group",
   "@creationDeleteBatch": {
-    "description": "Title of the confirmation dialog for deleting a generation group."
+    "description": "Destructive action in the generation group menu and title of its confirmation dialog."
   },
-  "creationDeleteBatchBody": "Delete the group and its {count} files from this device?",
+  "creationDeleteBatchBody": "{count, plural, =0{Delete this generation record from this device?} one{Delete this group and its file from this device?} other{Delete this group and its {count} files from this device?}}",
   "@creationDeleteBatchBody": {
-    "description": "Confirmation text showing the number of saved result files in a generation group.",
+    "description": "Confirmation before deleting a generation group from this device. The count is the number of stored result files. A failed group can have none.",
     "placeholders": {
       "count": {
         "type": "int"

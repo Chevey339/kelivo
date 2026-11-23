@@ -17404,11 +17404,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationRepeat => '再来一次';
 
   @override
-  String get creationDeleteBatch => '删除这一组？';
+  String get creationDeleteBatch => '删除这组作品';
 
   @override
   String creationDeleteBatchBody(int count) {
-    return '会同时删除这一组里的 $count 个文件，无法恢复。';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '将从此设备删除这一组及其中的 $count 个文件，无法恢复。',
+      zero: '确定从此设备删除这条生成记录吗？',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -35136,11 +35142,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get creationRepeat => '再来一次';
 
   @override
-  String get creationDeleteBatch => '删除这一组？';
+  String get creationDeleteBatch => '删除这组作品';
 
   @override
   String creationDeleteBatchBody(int count) {
-    return '会同时删除这一组里的 $count 个文件，无法恢复。';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '将从此设备删除这一组及其中的 $count 个文件，无法恢复。',
+      zero: '确定从此设备删除这条生成记录吗？',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -52919,11 +52931,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationRepeat => '再來一次';
 
   @override
-  String get creationDeleteBatch => '刪除這一組？';
+  String get creationDeleteBatch => '刪除群組';
 
   @override
   String creationDeleteBatchBody(int count) {
-    return '會同時刪除這一組裡的 $count 個檔案，無法復原。';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '要從此裝置刪除這個群組及其中的 $count 個檔案嗎？',
+      zero: '要從此裝置刪除這筆生成記錄嗎？',
+    );
+    return '$_temp0';
   }
 
   @override

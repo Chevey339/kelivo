@@ -989,10 +989,14 @@ Future<void> showCreationRequestDetails(
         code(l10n.creationLoggedResponse, response),
     ],
   );
-  Widget actions(BuildContext dialog) => Row(
-    mainAxisAlignment: MainAxisAlignment.end,
+  Widget actions(BuildContext dialog) => Wrap(
+    alignment: WrapAlignment.end,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    spacing: 8,
+    runSpacing: 6,
     children: [
       CreationAction(
+        minHeight: desktop ? null : 44,
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: copyText));
           if (dialog.mounted) {
@@ -1002,6 +1006,8 @@ Future<void> showCreationRequestDetails(
         child: Text(MaterialLocalizations.of(dialog).copyButtonLabel),
       ),
       CreationAction(
+        minHeight: desktop ? null : 44,
+        tone: CreationActionTone.tonal,
         onPressed: () async {
           Navigator.of(dialog).pop();
           try {

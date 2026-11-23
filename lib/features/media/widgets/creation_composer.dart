@@ -447,6 +447,7 @@ class _CreationComposerState extends State<CreationComposer> {
                             if (enhancement != null)
                               CreationEnhancementPanel(
                                 key: ValueKey(enhancement.requestId),
+                                desktop: widget.desktop,
                                 original: enhancement.original,
                                 modelName: enhancement.modelName,
                                 spans: enhancement.spans,

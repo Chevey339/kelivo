@@ -65,26 +65,9 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
   void _openTopic(String id, {String? batch}) {
     unawaited(
       Navigator.of(context).push<void>(
-        PageRouteBuilder(
-          transitionDuration: handoffDuration(context, 380),
-          reverseTransitionDuration: handoffDuration(context, 380),
-          pageBuilder: (_, _, _) =>
+        MaterialPageRoute<void>(
+          builder: (_) =>
               _MobileTopicPage(topicId: id, highlightBatchId: batch),
-          transitionsBuilder: (_, animation, _, child) => FadeTransition(
-            opacity: animation,
-            child: AnimatedBuilder(
-              animation: animation,
-              child: child,
-              builder: (context, child) => Transform.translate(
-                offset: Offset(
-                  (Directionality.of(context) == TextDirection.rtl ? -40 : 40) *
-                      (1 - handoffCurve.transform(animation.value)),
-                  0,
-                ),
-                child: child,
-              ),
-            ),
-          ),
         ),
       ),
     );
