@@ -8,7 +8,7 @@ import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/ios_form_text_field.dart';
 import '../../../../shared/widgets/ios_tactile.dart';
-import '../../../../shared/widgets/segmented_tabs.dart';
+import '../../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../../shared/widgets/snackbar.dart';
 import 'model_spec_form_controller.dart';
 import 'spec_field_header.dart';
@@ -99,7 +99,7 @@ class BasicSection extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-              child: SegmentedTabs(
+              child: SlidingSegmentedTabs(
                 tabs: [
                   for (final type in types)
                     SegmentedTab(

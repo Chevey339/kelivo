@@ -5435,5 +5435,10 @@
   "creationNoImageModels": "尚無圖片生成模型",
   "creationNoVideoModels": "尚無影片生成模型",
   "creationFrameSources": "從最近的圖片、檔案或剪貼簿新增",
-  "creationFrameModelFirstOnly": "{model} 僅支援首幀"
+  "creationFrameModelFirstOnly": "{model} 僅支援首幀",
+  "creationSubscriptionLogin": "訂閱登入",
+  "creationModelReferenceLimit": "參考圖最多 {count} 張",
+  "creationTextOnlyImage": "文生圖",
+  "creationTextOnlyVideo": "文生影片",
+  "creationCustomCountLabel": "自訂張數"
 }

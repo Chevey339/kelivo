@@ -6692,5 +6692,10 @@
   "creationNoImageModels": "还没有能生成图片的模型",
   "creationNoVideoModels": "还没有能生成视频的模型",
   "creationFrameSources": "从最近的图片、文件或剪贴板添加",
-  "creationFrameModelFirstOnly": "{model} 只支持首帧"
+  "creationFrameModelFirstOnly": "{model} 只支持首帧",
+  "creationSubscriptionLogin": "订阅登录",
+  "creationModelReferenceLimit": "参考图最多 {count} 张",
+  "creationTextOnlyImage": "文生图",
+  "creationTextOnlyVideo": "文生视频",
+  "creationCustomCountLabel": "自定义张数"
 }

@@ -25,6 +25,7 @@ class SlidingSegmentedTabs extends StatelessWidget {
     this.compact = false,
     this.iconOnly = false,
     this.expand = true,
+    this.allowReselect = false,
     this.backgroundColor,
     this.selectedColor,
     this.foregroundColor,
@@ -36,6 +37,7 @@ class SlidingSegmentedTabs extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final double height;
   final bool compact, iconOnly, expand;
+  final bool allowReselect;
   final Color? backgroundColor,
       selectedColor,
       foregroundColor,
@@ -64,7 +66,7 @@ class SlidingSegmentedTabs extends StatelessWidget {
                 baseColor: Colors.transparent,
                 borderRadius: BorderRadius.circular(radius - inset),
                 onTap: () {
-                  if (i == index) return;
+                  if (i == index && !allowReselect) return;
                   Haptics.light();
                   onChanged(i);
                 },

@@ -5435,5 +5435,10 @@
   "creationNoImageModels": "Моделей генерации изображений пока нет",
   "creationNoVideoModels": "Моделей генерации видео пока нет",
   "creationFrameSources": "Добавить из недавних изображений, файлов или буфера обмена",
-  "creationFrameModelFirstOnly": "{model} поддерживает только первый кадр"
+  "creationFrameModelFirstOnly": "{model} поддерживает только первый кадр",
+  "creationSubscriptionLogin": "Подписка",
+  "creationModelReferenceLimit": "До {count} референсов",
+  "creationTextOnlyImage": "Текст в изображение",
+  "creationTextOnlyVideo": "Текст в видео",
+  "creationCustomCountLabel": "Своё количество"
 }

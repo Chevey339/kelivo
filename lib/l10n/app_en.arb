@@ -24338,5 +24338,30 @@
         "type": "String"
       }
     }
+  },
+  "creationSubscriptionLogin": "Subscription",
+  "@creationSubscriptionLogin": {
+    "description": "Short provider group label for subscription sign-in in the Creation model picker."
+  },
+  "creationModelReferenceLimit": "Up to {count} references",
+  "@creationModelReferenceLimit": {
+    "description": "Second line of a Creation model choice, showing the number of reference images supported.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationTextOnlyImage": "Text to image",
+  "@creationTextOnlyImage": {
+    "description": "Subtitle of an image generation model that does not accept reference images."
+  },
+  "creationTextOnlyVideo": "Text to video",
+  "@creationTextOnlyVideo": {
+    "description": "Subtitle of a video generation model that does not accept a reference frame."
+  },
+  "creationCustomCountLabel": "Custom count",
+  "@creationCustomCountLabel": {
+    "description": "Label beside the custom output count stepper in the Creation composer."
   }
 }

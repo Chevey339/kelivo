@@ -19074,4 +19074,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String creationFrameModelFirstOnly(String model) {
     return '$model поддерживает только первый кадр';
   }
+
+  @override
+  String get creationSubscriptionLogin => 'Подписка';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return 'До $count референсов';
+  }
+
+  @override
+  String get creationTextOnlyImage => 'Текст в изображение';
+
+  @override
+  String get creationTextOnlyVideo => 'Текст в видео';
+
+  @override
+  String get creationCustomCountLabel => 'Своё количество';
 }

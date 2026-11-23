@@ -6,8 +6,10 @@ import '../../../core/models/media_creation.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/form_sheet.dart';
-import '../../settings/widgets/custom_theme_widgets.dart';
+import '../../../shared/widgets/plain_text_input.dart';
+import '../../../theme/app_semantic_colors.dart';
+import '../../media/widgets/creation_controls.dart';
+import '../../media/widgets/creation_picker.dart';
 import 'model_select_sheet.dart';
 
 ({IconData icon, String title, String subtitle}) creationDefaultModelLabels(
@@ -63,17 +65,16 @@ Future<void> editCreationEnhancePrompt(
     onSave: (value) => Navigator.of(dialog).pop(value),
   );
   final value = desktop
-      ? await showAppDialog<String>(
+      ? await showCreationDialog<String>(
           context,
           maxWidth: 560,
           child: Builder(builder: editor),
         )
-      : await showFormSheet<String>(
+      : await showCreationPicker<String>(
           context,
-          builder: (sheet) => FormSheet(
-            title: l10n.creationDefaultEnhance,
-            children: [editor(sheet)],
-          ),
+          desktop: false,
+          title: l10n.creationDefaultEnhance,
+          builder: editor,
         );
   if (value != null && context.mounted) {
     await settings.setPromptEnhancePrompt(value);
@@ -115,13 +116,18 @@ class _EnhancePromptEditorState extends State<_EnhancePromptEditor> {
         children: [
           if (widget.title case final title?)
             Text(title, style: Theme.of(context).textTheme.titleMedium),
-          TextField(
+          Text(
+            l10n.defaultModelPagePromptLabel,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          PlainTextInput(
             controller: _text,
             minLines: 4,
             maxLines: 8,
-            decoration: InputDecoration(
-              labelText: l10n.defaultModelPagePromptLabel,
-              border: const OutlineInputBorder(),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: context.appColors.surfaceFill,
+              borderRadius: BorderRadius.circular(10),
             ),
           ),
           Text(
@@ -132,12 +138,13 @@ class _EnhancePromptEditorState extends State<_EnhancePromptEditor> {
             alignment: WrapAlignment.end,
             spacing: 8,
             children: [
-              TextButton(
+              CreationAction(
                 onPressed: () =>
                     _text.text = SettingsProvider.defaultPromptEnhancePrompt,
                 child: Text(l10n.defaultModelPageResetDefault),
               ),
-              FilledButton(
+              CreationAction(
+                tone: CreationActionTone.primary,
                 onPressed: () => widget.onSave(_text.text),
                 child: Text(l10n.defaultModelPageSave),
               ),

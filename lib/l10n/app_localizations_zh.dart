@@ -17683,6 +17683,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String creationFrameModelFirstOnly(String model) {
     return '$model 只支持首帧';
   }
+
+  @override
+  String get creationSubscriptionLogin => '订阅登录';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return '参考图最多 $count 张';
+  }
+
+  @override
+  String get creationTextOnlyImage => '文生图';
+
+  @override
+  String get creationTextOnlyVideo => '文生视频';
+
+  @override
+  String get creationCustomCountLabel => '自定义张数';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -35364,6 +35381,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String creationFrameModelFirstOnly(String model) {
     return '$model 只支持首帧';
   }
+
+  @override
+  String get creationSubscriptionLogin => '订阅登录';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return '参考图最多 $count 张';
+  }
+
+  @override
+  String get creationTextOnlyImage => '文生图';
+
+  @override
+  String get creationTextOnlyVideo => '文生视频';
+
+  @override
+  String get creationCustomCountLabel => '自定义张数';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -53102,4 +53136,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String creationFrameModelFirstOnly(String model) {
     return '$model 僅支援首幀';
   }
+
+  @override
+  String get creationSubscriptionLogin => '訂閱登入';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return '參考圖最多 $count 張';
+  }
+
+  @override
+  String get creationTextOnlyImage => '文生圖';
+
+  @override
+  String get creationTextOnlyVideo => '文生影片';
+
+  @override
+  String get creationCustomCountLabel => '自訂張數';
 }

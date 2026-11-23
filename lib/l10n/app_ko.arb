@@ -5435,5 +5435,10 @@
   "creationNoImageModels": "아직 이미지 생성 모델이 없습니다",
   "creationNoVideoModels": "아직 동영상 생성 모델이 없습니다",
   "creationFrameSources": "최근 이미지, 파일 또는 클립보드에서 추가",
-  "creationFrameModelFirstOnly": "{model}은(는) 첫 프레임만 지원합니다"
+  "creationFrameModelFirstOnly": "{model}은(는) 첫 프레임만 지원합니다",
+  "creationSubscriptionLogin": "구독",
+  "creationModelReferenceLimit": "최대 {count}개 참조",
+  "creationTextOnlyImage": "텍스트에서 이미지로",
+  "creationTextOnlyVideo": "텍스트에서 비디오로",
+  "creationCustomCountLabel": "사용자 지정 개수"
 }

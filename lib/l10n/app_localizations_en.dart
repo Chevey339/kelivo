@@ -18741,4 +18741,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String creationFrameModelFirstOnly(String model) {
     return '$model supports the first frame only';
   }
+
+  @override
+  String get creationSubscriptionLogin => 'Subscription';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return 'Up to $count references';
+  }
+
+  @override
+  String get creationTextOnlyImage => 'Text to image';
+
+  @override
+  String get creationTextOnlyVideo => 'Text to video';
+
+  @override
+  String get creationCustomCountLabel => 'Custom count';
 }

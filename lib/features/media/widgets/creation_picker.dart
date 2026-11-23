@@ -229,3 +229,74 @@ class _PickerPosition extends SingleChildLayoutDelegate {
   bool shouldRelayout(_PickerPosition old) =>
       old.anchor != anchor || old.width != width || old.direction != direction;
 }
+
+Future<T?> showCreationDialog<T>(
+  BuildContext context, {
+  required Widget child,
+  double maxWidth = 420,
+}) {
+  final duration = handoffDuration(context, 220);
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black.withValues(alpha: .32),
+    transitionDuration: duration,
+    pageBuilder: (ctx, _, _) {
+      final cs = Theme.of(ctx).colorScheme;
+      final radius = BorderRadius.circular(18);
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            16 + MediaQuery.viewInsetsOf(ctx).bottom,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: maxWidth,
+                maxHeight: MediaQuery.sizeOf(ctx).height * .86,
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: ctx.appColors.surfaceCard,
+                  borderRadius: radius,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: .24),
+                      offset: const Offset(0, 24),
+                      blurRadius: 64,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: radius,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    textStyle: Theme.of(ctx).textTheme.bodyMedium!.copyWith(
+                      color: cs.onSurface,
+                      letterSpacing: 0,
+                    ),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (_, animation, _, child) {
+      final curve = animation.drive(CurveTween(curve: handoffCurve));
+      return FadeTransition(
+        opacity: curve,
+        child: ScaleTransition(
+          scale: Tween(begin: .98, end: 1.0).animate(curve),
+          child: child,
+        ),
+      );
+    },
+  );
+}

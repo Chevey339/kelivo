@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:flutter/material.dart' show Theme;
 
 /// System text editing and selection with only the chrome supplied by the parent.
@@ -20,6 +21,7 @@ class PlainTextInput extends StatelessWidget {
     this.textInputAction,
     this.textCapitalization = TextCapitalization.none,
     this.keyboardType,
+    this.inputFormatters,
     this.prefix,
     this.suffix,
     this.decoration,
@@ -38,6 +40,7 @@ class PlainTextInput extends StatelessWidget {
   final TextInputAction? textInputAction;
   final TextCapitalization textCapitalization;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final Widget? prefix, suffix;
   final BoxDecoration? decoration;
   final Color? cursorColor;
@@ -62,6 +65,7 @@ class PlainTextInput extends StatelessWidget {
       minLines: minLines,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       textInputAction: textInputAction,
       textCapitalization: textCapitalization,
       style: textStyle,

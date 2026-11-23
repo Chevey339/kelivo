@@ -9,7 +9,11 @@ import 'package:provider/provider.dart';
 import '../../../core/services/media/media_request.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/ios_form_text_field.dart';
+import '../../../shared/widgets/plain_text_input.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
+import '../../../theme/app_semantic_colors.dart';
+import 'creation_controls.dart';
+import 'creation_slider.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
@@ -253,9 +257,10 @@ class _PlatformInput extends StatelessWidget {
     return Row(
       children: [
         Flexible(
-          child: OutlinedButton.icon(
+          child: CreationAction(
+            tone: CreationActionTone.tonal,
             icon: const Icon(Lucide.Image, size: 15),
-            label: Text(
+            child: Text(
               path == null
                   ? l10n.creationSelectPlatformImage
                   : p.basename(path),
@@ -328,7 +333,9 @@ class _NumericOption extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Slider(
+          child: CreationSlider(
+            label: field.key,
+            formatValue: (v) => v.toStringAsFixed(2),
             min: minimum,
             max: maximum,
             divisions: ((maximum - minimum) / step).round().clamp(1, 200),
@@ -356,21 +363,18 @@ class _Choices extends StatelessWidget {
   final ValueChanged<String?> onChanged;
 
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 6,
-    runSpacing: 4,
-    children: [
-      for (final item in values)
-        ChoiceChip(
-          selected: value == item || value == null && item == 'auto',
-          showCheckmark: false,
-          label: Text(display(item)),
-          visualDensity: VisualDensity.compact,
-          onSelected: (selected) =>
-              onChanged(selected && item != 'auto' ? item : null),
-        ),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final index = values.indexOf(value ?? 'auto');
+    return SlidingSegmentedTabs(
+      height: 36,
+      expand: values.length <= 4,
+      allowReselect: true,
+      index: index,
+      tabs: [for (final v in values) SegmentedTab(label: display(v))],
+      onChanged: (i) =>
+          onChanged(i == index || values[i] == 'auto' ? null : values[i]),
+    );
+  }
 }
 
 class _Option extends StatelessWidget {
@@ -444,17 +448,22 @@ class _OptionTextState extends State<_OptionText> {
   }
 
   @override
-  Widget build(BuildContext context) => IosFormTextField(
-    label: '',
-    hintText: widget.hint,
+  Widget build(BuildContext context) => PlainTextInput(
     controller: _text,
-    outerPadding: EdgeInsets.zero,
-    inlineLabel: false,
+    placeholder: widget.hint,
     minLines: widget.lines,
     maxLines: widget.lines + (widget.lines > 1 ? 2 : 0),
     keyboardType: widget.keyboardType,
     inputFormatters: widget.inputFormatters,
-    textStyle: widget.mono ? const TextStyle(fontFamily: 'monospace') : null,
     onChanged: widget.onChanged,
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    style: TextStyle(
+      fontSize: 13,
+      fontFamily: widget.mono ? 'monospace' : null,
+    ),
+    decoration: BoxDecoration(
+      color: context.appColors.surfaceFill,
+      borderRadius: BorderRadius.circular(10),
+    ),
   );
 }

@@ -5435,5 +5435,10 @@
   "creationNoImageModels": "Henüz görsel oluşturma modeli yok",
   "creationNoVideoModels": "Henüz video oluşturma modeli yok",
   "creationFrameSources": "Son görsellerden, dosyalardan veya panodan ekle",
-  "creationFrameModelFirstOnly": "{model} yalnızca ilk kareyi destekler"
+  "creationFrameModelFirstOnly": "{model} yalnızca ilk kareyi destekler",
+  "creationSubscriptionLogin": "Abonelik",
+  "creationModelReferenceLimit": "En fazla {count} referans",
+  "creationTextOnlyImage": "Metinden görsel",
+  "creationTextOnlyVideo": "Metinden video",
+  "creationCustomCountLabel": "Özel sayı"
 }

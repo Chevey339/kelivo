@@ -32747,6 +32747,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{model} supports the first frame only'**
   String creationFrameModelFirstOnly(String model);
+
+  /// Short provider group label for subscription sign-in in the Creation model picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription'**
+  String get creationSubscriptionLogin;
+
+  /// Second line of a Creation model choice, showing the number of reference images supported.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {count} references'**
+  String creationModelReferenceLimit(int count);
+
+  /// Subtitle of an image generation model that does not accept reference images.
+  ///
+  /// In en, this message translates to:
+  /// **'Text to image'**
+  String get creationTextOnlyImage;
+
+  /// Subtitle of a video generation model that does not accept a reference frame.
+  ///
+  /// In en, this message translates to:
+  /// **'Text to video'**
+  String get creationTextOnlyVideo;
+
+  /// Label beside the custom output count stepper in the Creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom count'**
+  String get creationCustomCountLabel;
 }
 
 class _AppLocalizationsDelegate

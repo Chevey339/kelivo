@@ -9,8 +9,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../media/widgets/creation_controls.dart';
 import '../widgets/model_spec_form/advanced_section.dart';
 import '../widgets/model_spec_form/basic_section.dart';
 import '../widgets/model_spec_form/builtin_tools_section.dart';
@@ -116,70 +117,94 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: cs.surface,
-      appBar: AppBar(
-        leadingWidth: 52,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: IosIconButton(
-            icon: Lucide.ArrowLeft,
-            size: 22,
-            semanticLabel: l10n.settingsPageBackButton,
-            minSize: 44,
-            onTap: () => Navigator.of(context).maybePop(),
-          ),
-        ),
-        title: Text(
-          widget.isNew
-              ? l10n.modelDetailSheetAddModel
-              : l10n.modelDetailSheetEditModel,
-          style: const TextStyle(fontSize: 16),
-        ),
-        actions: [
-          IosIconButton(
-            key: const ValueKey('model-spec-save'),
-            icon: widget.isNew ? Lucide.Plus : Lucide.Check,
-            size: 22,
-            minSize: 44,
-            tooltip: widget.isNew
-                ? l10n.modelDetailSheetAddButton
-                : l10n.modelDetailSheetConfirmButton,
-            semanticLabel: widget.isNew
-                ? l10n.modelDetailSheetAddButton
-                : l10n.modelDetailSheetConfirmButton,
-            onTap: _save,
-          ),
-        ],
-      ),
-      body: ListenableBuilder(
-        listenable: _controller,
-        builder: (context, _) {
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: SegmentedTabs(
-                  tabs: [
-                    SegmentedTab(label: l10n.modelDetailSheetBasicTab),
-                    SegmentedTab(
-                      label: _controller.spec.type.isMedia
-                          ? l10n.creationParameters
-                          : l10n.reasoningLevelSheetTitle,
+      body: SafeArea(
+        child: ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 52),
+                    child: Row(
+                      children: [
+                        IosIconButton(
+                          icon: Lucide.ArrowLeft,
+                          size: 22,
+                          minSize: 44,
+                          semanticLabel: l10n.settingsPageBackButton,
+                          onTap: () => Navigator.of(context).maybePop(),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.isNew
+                                    ? l10n.modelDetailSheetAddModel
+                                    : l10n.modelDetailSheetEditModel,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (_controller.spec.id.isNotEmpty)
+                                Text(
+                                  _controller.spec.id,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        CreationAction(
+                          key: const ValueKey('model-spec-save'),
+                          foreground: cs.primary,
+                          onPressed: _save,
+                          child: Text(
+                            widget.isNew
+                                ? l10n.modelDetailSheetAddButton
+                                : l10n.defaultModelPageSave,
+                          ),
+                        ),
+                      ],
                     ),
-                    SegmentedTab(label: l10n.modelDetailSheetAdvancedTab),
-                  ],
-                  index: _tab,
-                  onChanged: (index) => setState(() => _tab = index),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-                  children: _tabChildren(l10n),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: SlidingSegmentedTabs(
+                    tabs: [
+                      SegmentedTab(label: l10n.modelDetailSheetBasicTab),
+                      SegmentedTab(
+                        label: _controller.spec.type.isMedia
+                            ? l10n.creationParameters
+                            : l10n.reasoningLevelSheetTitle,
+                      ),
+                      SegmentedTab(label: l10n.modelDetailSheetAdvancedTab),
+                    ],
+                    index: _tab,
+                    onChanged: (index) => setState(() => _tab = index),
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                    children: _tabChildren(l10n),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

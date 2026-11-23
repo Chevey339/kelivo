@@ -18166,4 +18166,21 @@ class AppLocalizationsKo extends AppLocalizations {
   String creationFrameModelFirstOnly(String model) {
     return '$model은(는) 첫 프레임만 지원합니다';
   }
+
+  @override
+  String get creationSubscriptionLogin => '구독';
+
+  @override
+  String creationModelReferenceLimit(int count) {
+    return '최대 $count개 참조';
+  }
+
+  @override
+  String get creationTextOnlyImage => '텍스트에서 이미지로';
+
+  @override
+  String get creationTextOnlyVideo => '텍스트에서 비디오로';
+
+  @override
+  String get creationCustomCountLabel => '사용자 지정 개수';
 }

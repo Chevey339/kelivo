@@ -16,10 +16,12 @@ import '../../../core/services/media/creation_prompt_enhancer.dart';
 import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
 import 'creation_picker.dart';
+import 'creation_ratio_grid.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
@@ -654,6 +656,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                                   ? l10n.creationVideoModels
                                                   : l10n.creationImageModels,
                                               content: (close) => _ModelOptions(
+                                                autofocus: widget.desktop,
                                                 onSelected: (value) {
                                                   state.selectModel(value);
                                                   close();
@@ -692,7 +695,8 @@ class _CreationComposerState extends State<CreationComposer> {
                                         onTap: (anchor) => _showPicker(
                                           anchor,
                                           width: 320,
-                                          title: l10n.creationParameters,
+                                          title:
+                                              '${l10n.creationParameters} · ${model.spec.displayName}',
                                           content: (_) => _ParameterOptions(
                                             ratio: true,
                                             count: !video,
@@ -710,17 +714,18 @@ class _CreationComposerState extends State<CreationComposer> {
                                         label: aspectRatio == 'auto'
                                             ? l10n.creationAuto
                                             : aspectRatio,
-                                        leading: const Icon(
-                                          Lucide.Square,
-                                          size: 15,
+                                        leading: CreationRatioGlyph(
+                                          aspectRatio,
+                                          size: 14,
                                         ),
                                         onTap: (anchor) => _showPicker(
                                           anchor,
                                           width: 300,
                                           title: l10n.creationAspectRatio,
-                                          content: (_) => _ParameterOptions(
+                                          content: (close) => _ParameterOptions(
                                             ratio: true,
                                             topicId: widget.topicId,
+                                            afterRatio: close,
                                           ),
                                         ),
                                       ),
@@ -737,12 +742,13 @@ class _CreationComposerState extends State<CreationComposer> {
                                           ),
                                           onTap: (anchor) => _showPicker(
                                             anchor,
-                                            width: 320,
+                                            width: 280,
                                             title: l10n.creationDuration,
-                                            content: (_) =>
-                                                const _ParameterOptions(
-                                                  duration: true,
-                                                ),
+                                            content: (_) => _ParameterOptions(
+                                              duration: true,
+                                              resolution: true,
+                                              topicId: widget.topicId,
+                                            ),
                                           ),
                                         ),
                                       if (state.resolutionFor(widget.topicId)
@@ -753,10 +759,11 @@ class _CreationComposerState extends State<CreationComposer> {
                                           label: resolution,
                                           onTap: (anchor) => _showPicker(
                                             anchor,
-                                            width: 260,
+                                            width: 280,
                                             title: l10n.creationResolution,
                                             content: (_) => _ParameterOptions(
                                               resolution: true,
+                                              duration: true,
                                               topicId: widget.topicId,
                                             ),
                                           ),
@@ -792,10 +799,10 @@ class _CreationComposerState extends State<CreationComposer> {
                                             anchor,
                                             width: 260,
                                             title: l10n.creationCountLabel,
-                                            content: (_) =>
-                                                const _ParameterOptions(
-                                                  count: true,
-                                                ),
+                                            content: (_) => _ParameterOptions(
+                                              count: true,
+                                              topicId: widget.topicId,
+                                            ),
                                           ),
                                         ),
                                       _ComposerChip(
@@ -938,7 +945,8 @@ class _ComposerChip extends StatelessWidget {
 }
 
 class _ModelOptions extends StatefulWidget {
-  const _ModelOptions({required this.onSelected});
+  const _ModelOptions({required this.onSelected, required this.autofocus});
+  final bool autofocus;
   final ValueChanged<MediaModelChoice> onSelected;
 
   @override
@@ -968,10 +976,20 @@ class _ModelOptionsState extends State<_ModelOptions> {
       children: [
         CreationSearchBox(
           hint: l10n.creationSearchModels,
+          autofocus: widget.autofocus,
           onChanged: (value) =>
               setState(() => _query = value.trim().toLowerCase()),
         ),
         const SizedBox(height: 8),
+        if (groups.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Text(
+              l10n.providerDetailPageNoModelsTitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+          ),
         ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 320),
           child: ListView(
@@ -981,8 +999,16 @@ class _ModelOptionsState extends State<_ModelOptions> {
                 Padding(
                   padding: const EdgeInsets.all(6),
                   child: Text(
-                    models.first.provider.name,
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    [
+                      models.first.provider.name,
+                      if (models.first.provider.isOAuth)
+                        l10n.creationSubscriptionLogin,
+                    ].join(' · '),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface.withValues(alpha: .42),
+                    ),
                   ),
                 ),
                 for (final model in models)
@@ -990,7 +1016,9 @@ class _ModelOptionsState extends State<_ModelOptions> {
                     onTap: () => widget.onSelected(model),
                     focusable: true,
                     baseColor: state.model?.key == model.key
-                        ? cs.primary.withValues(alpha: .12)
+                        ? cs.primary.withValues(
+                            alpha: cs.brightness == Brightness.dark ? .16 : .12,
+                          )
                         : Colors.transparent,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -1006,19 +1034,84 @@ class _ModelOptionsState extends State<_ModelOptions> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            model.spec.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      model.spec.displayName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  if (model.spec.type == ModelType.chat)
+                                    Padding(
+                                      padding: const EdgeInsetsDirectional.only(
+                                        start: 5,
+                                      ),
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: context.appColors.surfaceFill,
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 2,
+                                          ),
+                                          child: Text(
+                                            l10n.creationChatModelBadge,
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              color: cs.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              Text(
+                                [
+                                  if (model.spec.displayName != model.spec.id)
+                                    model.spec.id,
+                                  if (model.provider.isOAuth)
+                                    l10n.creationSubscriptionLogin,
+                                  if (state.mode == MediaMode.video) ...[
+                                    if (model.capabilities.durations.isNotEmpty)
+                                      model.capabilities.durations
+                                          .map(
+                                            (v) =>
+                                                l10n.creationDurationSeconds(v),
+                                          )
+                                          .join(' / '),
+                                    if (model.capabilities.frameRoles.isEmpty)
+                                      l10n.creationTextOnlyVideo,
+                                  ] else
+                                    model.capabilities.maxReferences > 0
+                                        ? l10n.creationModelReferenceLimit(
+                                            model.capabilities.maxReferences,
+                                          )
+                                        : l10n.creationTextOnlyImage,
+                                ].join(' · '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        if (model.spec.type == ModelType.chat) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            l10n.creationChatModelBadge,
-                            style: TextStyle(fontSize: 11, color: cs.primary),
-                          ),
-                        ],
                         if (state.model?.key == model.key)
                           Icon(Lucide.Check, size: 16, color: cs.primary),
                       ],
@@ -1042,9 +1135,11 @@ class _ParameterOptions extends StatelessWidget {
     this.frames = false,
     this.advanced = false,
     this.topicId,
+    this.afterRatio,
   });
 
   final bool ratio, count, duration, resolution, frames, advanced;
+  final VoidCallback? afterRatio;
   final String? topicId;
 
   @override
@@ -1059,24 +1154,21 @@ class _ParameterOptions extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (ratio && ratios.isNotEmpty) ...[
-          Text(l10n.creationAspectRatio),
-          const SizedBox(height: 6),
-          SlidingSegmentedTabs(
-            height: 36,
-            expand: ratios.length <= 4,
-
-            tabs: [
-              for (final value in ratios)
-                SegmentedTab(
-                  label: value == 'auto' ? l10n.creationAuto : value,
-                ),
-            ],
-            index: ratios.indexOf(state.ratioFor(topicId)),
-            onChanged: (index) => state.selectRatio(ratios[index]),
+          if (advanced) ...[
+            Text(l10n.creationAspectRatio),
+            const SizedBox(height: 6),
+          ],
+          CreationRatioGrid(
+            values: ratios,
+            selected: state.ratioFor(topicId),
+            onChanged: (ratio) {
+              state.selectRatio(ratio);
+              afterRatio?.call();
+            },
           ),
         ],
         if (ratio && count) const SizedBox(height: 12),
-        if (count) _ImageCountOptions(topicId: topicId),
+        if (count) _ImageCountOptions(topicId: topicId, showLabel: advanced),
         if (duration && caps != null && caps.durations.isNotEmpty) ...[
           if (ratio) const SizedBox(height: 12),
           Text(l10n.creationDuration),
@@ -1107,18 +1199,26 @@ class _ParameterOptions extends StatelessWidget {
         ],
         if (frames && caps != null && caps.frameRoles.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: _FrameToggle(
-              label: caps.frameRoles.contains(MediaReferenceRole.lastFrame)
-                  ? l10n.creationFirstLastFrame
-                  : l10n.creationFirstFrame,
-              selected: state.showsFrames(topicId),
-              onTap: caps.requiresFirstFrame
-                  ? null
-                  : () =>
-                        state.showFrames(topicId, !state.showsFrames(topicId)),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  caps.frameRoles.contains(MediaReferenceRole.lastFrame)
+                      ? l10n.creationFirstLastFrame
+                      : l10n.creationFirstFrame,
+                ),
+              ),
+              IosSwitch(
+                value: state.showsFrames(topicId),
+                onChanged: caps.requiresFirstFrame
+                    ? null
+                    : (enabled) => state.showFrames(topicId, enabled),
+                width: 40,
+                height: 24,
+                animationDuration: handoffDuration(context, 220),
+                animationCurve: handoffCurve,
+              ),
+            ],
           ),
         ],
         if (advanced) ...[
@@ -1131,7 +1231,8 @@ class _ParameterOptions extends StatelessWidget {
 }
 
 class _ImageCountOptions extends StatefulWidget {
-  const _ImageCountOptions({this.topicId});
+  const _ImageCountOptions({this.topicId, required this.showLabel});
+  final bool showLabel;
 
   final String? topicId;
 
@@ -1157,8 +1258,10 @@ class _ImageCountOptionsState extends State<_ImageCountOptions> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.creationCountLabel),
-        const SizedBox(height: 6),
+        if (widget.showLabel) ...[
+          Text(l10n.creationCountLabel),
+          const SizedBox(height: 6),
+        ],
         SlidingSegmentedTabs(
           height: 36,
 
@@ -1173,41 +1276,156 @@ class _ImageCountOptionsState extends State<_ImageCountOptions> {
           },
         ),
         if (custom)
-          Row(
-            children: [
-              IosIconButton(
-                icon: Lucide.Minus,
-                minSize: 34,
-                onTap: count > 1 ? () => state.selectCount(count - 1) : null,
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: context.appColors.surfaceFill,
+                borderRadius: BorderRadius.circular(10),
               ),
-              Text('$count'),
-              IosIconButton(
-                icon: Lucide.Plus,
-                minSize: 34,
-                onTap: count < 16 ? () => state.selectCount(count + 1) : null,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.creationCustomCountLabel,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: context.appColors.surfaceCard,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IosIconButton(
+                          icon: Lucide.Minus,
+                          size: 13,
+                          minSize: 26,
+                          onTap: count > 1
+                              ? () => state.selectCount(count - 1)
+                              : null,
+                        ),
+                        _CountInput(
+                          value: count,
+                          onChanged: state.selectCount,
+                          label: l10n.creationCountLabel,
+                        ),
+                        IosIconButton(
+                          icon: Lucide.Plus,
+                          size: 13,
+                          minSize: 26,
+                          onTap: count < 16
+                              ? () => state.selectCount(count + 1)
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      l10n.creationCustomCountMaximum,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const Spacer(),
-              Text(
-                l10n.creationCustomCountMaximum,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+            ),
           ),
-        if (model != null && max > 0 && count > max)
+        if (model != null && max > 0)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              l10n.creationRequestSplit(
-                model.spec.displayName,
-                max,
-                (count / max).ceil(),
-              ),
+              count <= max
+                  ? '${model.spec.displayName} · ${l10n.creationMaxPerRequest} ${l10n.creationImagesCount(max)}'
+                  : l10n.creationRequestSplit(
+                      model.spec.displayName,
+                      max,
+                      (count / max).ceil(),
+                    ),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
       ],
     );
   }
+}
+
+class _CountInput extends StatefulWidget {
+  const _CountInput({
+    required this.value,
+    required this.onChanged,
+    required this.label,
+  });
+  final int value;
+  final ValueChanged<int> onChanged;
+  final String label;
+  @override
+  State<_CountInput> createState() => _CountInputState();
+}
+
+class _CountInputState extends State<_CountInput> {
+  late final _text = TextEditingController(text: widget.value.toString());
+  void _write(int value) {
+    final text = value.toString();
+    if (_text.text != text) {
+      _text.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
+  }
+
+  @override
+  void didUpdateWidget(_CountInput old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) _write(widget.value);
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 32,
+    child: Focus(
+      canRequestFocus: false,
+      onFocusChange: (focused) {
+        if (!focused) _write(widget.value);
+      },
+      child: Semantics(
+        label: widget.label,
+        child: PlainTextInput(
+          controller: _text,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(2),
+          ],
+          onChanged: (entry) {
+            final value = int.tryParse(entry);
+            if (value == null) return;
+            final bounded = value.clamp(1, 16);
+            widget.onChanged(bounded);
+            if (value != bounded) _write(bounded);
+          },
+        ),
+      ),
+    ),
+  );
 }
 
 class _ReferenceStrip extends StatelessWidget {

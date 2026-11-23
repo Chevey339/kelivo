@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/models/media_creation.dart';
-import '../../../../core/services/media/adapters/native_image_size.dart';
+import '../../../../core/services/media/adapters/native_image_size.dart'
+    show standardImageRatios, imageFormats;
+import '../../../media/widgets/creation_ratio_grid.dart';
+import '../../../media/widgets/creation_controls.dart';
 import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../../shared/widgets/ios_form_text_field.dart';
+import '../../../../shared/widgets/plain_text_input.dart';
 import '../../../../shared/widgets/ios_switch.dart';
 import '../../../../shared/widgets/ios_tactile.dart';
 import '../../../../shared/widgets/section_card.dart';
@@ -78,7 +81,8 @@ class MediaOptionsSection extends StatelessWidget {
                   ),
                 ),
                 if (known)
-                  TextButton(
+                  CreationAction(
+                    small: true,
                     onPressed: controller.resetMedia,
                     child: Text(l10n.modelSpecFormReset),
                   ),
@@ -217,15 +221,17 @@ class MediaOptionsSection extends StatelessWidget {
           _Field(
             title: l10n.creationExtraJson,
             help: l10n.creationExtraJsonHint,
-            child: IosFormTextField(
-              label: '',
-              inlineLabel: false,
+            child: PlainTextInput(
               controller: controller.mediaExtraController,
-              hintText: '{ }',
+              placeholder: '{ }',
               minLines: 3,
               maxLines: 8,
-              textStyle: const TextStyle(fontFamily: 'monospace'),
-              outerPadding: EdgeInsets.zero,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: context.appColors.surfaceFill,
+                borderRadius: BorderRadius.circular(10),
+              ),
               onChanged: controller.mediaExtraChanged,
             ),
           ),
@@ -290,65 +296,55 @@ class _Choices<T> extends StatelessWidget {
       runSpacing: 5,
       children: [
         for (final value in values)
-          FilterChip(
-            selected: active.contains(value),
-            showCheckmark: false,
-            avatar: ratioIcons ? _RatioIcon(value: value.toString()) : null,
-            label: Text(label(value)),
-            labelStyle: TextStyle(
-              fontSize: 12.5,
-              color: active.contains(value)
-                  ? colors.primary
-                  : colors.onSurfaceVariant,
+          Semantics(
+            checked: active.contains(value),
+            child: IosCardPress(
+              focusable: true,
+              baseColor: active.contains(value)
+                  ? colors.primary.withValues(alpha: .10)
+                  : context.appColors.surfaceFill,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(
+                color: active.contains(value)
+                    ? colors.primary.withValues(alpha: .35)
+                    : Colors.transparent,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (ratioIcons) ...[
+                    CreationRatioGlyph(value.toString(), size: 13),
+                    const SizedBox(width: 5),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label(value),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: active.contains(value)
+                            ? colors.primary
+                            : colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              onTap: () {
+                final selected = !active.contains(value);
+                if (!selected && !allowEmpty && active.length == 1) return;
+                onChange(
+                  values
+                      .where(
+                        (item) =>
+                            item == value ? selected : active.contains(item),
+                      )
+                      .toList(),
+                );
+              },
             ),
-            backgroundColor: colors.surfaceContainerHigh,
-            selectedColor: colors.primary.withValues(alpha: .1),
-            visualDensity: VisualDensity.compact,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            side: BorderSide(
-              color: active.contains(value)
-                  ? colors.primary.withValues(alpha: .35)
-                  : Colors.transparent,
-            ),
-            onSelected: (selected) {
-              if (!selected && !allowEmpty && active.length == 1) return;
-              onChange(
-                values
-                    .where(
-                      (item) =>
-                          item == value ? selected : active.contains(item),
-                    )
-                    .toList(),
-              );
-            },
           ),
       ],
-    );
-  }
-}
-
-class _RatioIcon extends StatelessWidget {
-  const _RatioIcon({required this.value});
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    if (value == 'auto') return const Icon(LucideIcons.proportions, size: 13);
-    final dimensions = imageDimensions(value, 1024);
-    final ratio = dimensions.width / dimensions.height;
-    return Center(
-      child: Container(
-        width: ratio >= 1 ? 14 : 14 * ratio,
-        height: ratio <= 1 ? 14 : 14 / ratio,
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
     );
   }
 }
