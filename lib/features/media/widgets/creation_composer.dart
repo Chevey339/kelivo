@@ -23,6 +23,7 @@ import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/design_tokens.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../providers/media_creation_controller.dart';
+import 'creation_lightbox.dart';
 
 class CreationComposer extends StatefulWidget {
   const CreationComposer({
@@ -100,7 +101,7 @@ class _CreationComposerState extends State<CreationComposer> {
       allowMultiple: true,
     );
     if (!mounted || result == null) return;
-    final existing = _controller.draftFor(id).references;
+    final existing = _controller.imageReferences(id);
     _controller.setReferences(
       id,
       [
@@ -111,13 +112,24 @@ class _CreationComposerState extends State<CreationComposer> {
     );
   }
 
+  Future<void> _pickFrame(MediaReferenceRole role) async {
+    final id = widget.topicId;
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (!mounted || result?.files.firstOrNull?.path == null) return;
+    _controller.setFrame(id, role, result!.files.first.path);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<MediaCreationController>();
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final model = state.model;
-    final draft = state.draftFor(widget.topicId);
+    final video = state.mode == MediaMode.video;
+    final references = state.imageReferences(widget.topicId);
+    final frames = state.showsFrames(widget.topicId);
+    final caps = model?.capabilities;
+    final aspectRatio = state.ratioFor(widget.topicId);
     final hint = switch ((state.mode, widget.topicId == null)) {
       (MediaMode.image, true) => l10n.creationNewImagePrompt,
       (MediaMode.image, false) => l10n.creationImagePrompt,
@@ -157,18 +169,18 @@ class _CreationComposerState extends State<CreationComposer> {
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final compact = !widget.desktop || constraints.maxWidth < 530;
+                  final compact = !widget.desktop || constraints.maxWidth < 650;
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (draft.references.isNotEmpty)
+                      if (!video && references.isNotEmpty)
                         SizedBox(
                           height: 42,
                           child: ListView(
                             padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
                             scrollDirection: Axis.horizontal,
                             children: [
-                              for (final ref in draft.references)
+                              for (final ref in references)
                                 Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: Chip(
@@ -178,12 +190,18 @@ class _CreationComposerState extends State<CreationComposer> {
                                     ),
                                     onDeleted: () => state.setReferences(
                                       widget.topicId,
-                                      [...draft.references]..remove(ref),
+                                      [...references]..remove(ref),
                                     ),
                                   ),
                                 ),
                             ],
                           ),
+                        ),
+                      if (frames && caps != null)
+                        _VideoFrames(
+                          topicId: widget.topicId,
+                          capabilities: caps,
+                          onPick: _pickFrame,
                         ),
                       Padding(
                         padding: EdgeInsets.fromLTRB(
@@ -237,9 +255,7 @@ class _CreationComposerState extends State<CreationComposer> {
                               builder: (context, value, _) {
                                 final enabled =
                                     value.text.trim().isNotEmpty &&
-                                    model != null &&
-                                    draft.references.length <= limit &&
-                                    !state.submitting(widget.topicId);
+                                    state.canSubmit(widget.topicId);
                                 return IosCardPress(
                                   focusable: true,
                                   borderRadius: BorderRadius.circular(99),
@@ -275,8 +291,14 @@ class _CreationComposerState extends State<CreationComposer> {
                               size: 17,
                               minSize: 30,
                               tooltip: l10n.creationAddReference,
-                              enabled: draft.references.length < limit,
-                              onTap: () => _pickReference(limit),
+                              enabled: video
+                                  ? caps?.frameRoles.isNotEmpty == true
+                                  : references.length < limit,
+                              onTap: video
+                                  ? () => _pickFrame(
+                                      MediaReferenceRole.firstFrame,
+                                    )
+                                  : () => _pickReference(limit),
                             ),
                             const SizedBox(width: 2),
                             SizedBox(
@@ -319,7 +341,9 @@ class _CreationComposerState extends State<CreationComposer> {
                                 onTap: (anchor) => _showPicker(
                                   anchor,
                                   width: 340,
-                                  title: l10n.creationSelectModel,
+                                  title: video
+                                      ? l10n.creationVideoModels
+                                      : l10n.creationImageModels,
                                   content: (close) => _ModelOptions(
                                     onSelected: (value) {
                                       state.selectModel(value);
@@ -333,51 +357,119 @@ class _CreationComposerState extends State<CreationComposer> {
                               if (compact)
                                 Flexible(
                                   child: _ComposerChip(
-                                    label:
-                                        '${state.ratio == 'auto' ? l10n.creationAuto : state.ratio} · ${l10n.creationImagesCount(state.count)}',
+                                    label: [
+                                      aspectRatio == 'auto'
+                                          ? l10n.creationAuto
+                                          : aspectRatio,
+                                      if (!video)
+                                        l10n.creationImagesCount(state.count),
+                                      if (state.duration case final int duration
+                                          when video)
+                                        l10n.creationDurationSeconds(duration),
+                                    ].join(' · '),
                                     leading: const Icon(
                                       Lucide.SlidersHorizontal,
                                       size: 15,
                                     ),
+                                    trailing: frames ? LucideIcons.film : null,
                                     onTap: (anchor) => _showPicker(
                                       anchor,
                                       width: 320,
                                       title: l10n.creationParameters,
-                                      content: (_) => const _ParameterOptions(
+                                      content: (_) => _ParameterOptions(
                                         ratio: true,
-                                        count: true,
+                                        count: !video,
+                                        duration: video,
+                                        resolution: video,
+                                        frames: video,
+                                        topicId: widget.topicId,
                                       ),
                                     ),
                                   ),
                                 )
                               else ...[
                                 _ComposerChip(
-                                  label: state.ratio == 'auto'
+                                  maxWidth: 84,
+                                  label: aspectRatio == 'auto'
                                       ? l10n.creationAuto
-                                      : state.ratio,
+                                      : aspectRatio,
                                   leading: const Icon(Lucide.Square, size: 15),
                                   onTap: (anchor) => _showPicker(
                                     anchor,
                                     width: 300,
                                     title: l10n.creationAspectRatio,
-                                    content: (_) =>
-                                        const _ParameterOptions(ratio: true),
+                                    content: (_) => _ParameterOptions(
+                                      ratio: true,
+                                      topicId: widget.topicId,
+                                    ),
                                   ),
                                 ),
-                                _ComposerChip(
-                                  label: l10n.creationImagesCount(state.count),
-                                  leading: const Icon(
-                                    LucideIcons.images,
-                                    size: 15,
+                                if (state.duration case final int duration
+                                    when video)
+                                  _ComposerChip(
+                                    maxWidth: 110,
+                                    label: l10n.creationDurationSeconds(
+                                      duration,
+                                    ),
+                                    leading: const Icon(Lucide.Timer, size: 15),
+                                    onTap: (anchor) => _showPicker(
+                                      anchor,
+                                      width: 320,
+                                      title: l10n.creationDuration,
+                                      content: (_) => const _ParameterOptions(
+                                        duration: true,
+                                      ),
+                                    ),
                                   ),
-                                  onTap: (anchor) => _showPicker(
-                                    anchor,
-                                    width: 260,
-                                    title: l10n.creationCountLabel,
-                                    content: (_) =>
-                                        const _ParameterOptions(count: true),
+                                if (state.resolutionFor(widget.topicId)
+                                    case final String resolution when video)
+                                  _ComposerChip(
+                                    maxWidth: 72,
+                                    label: resolution,
+                                    onTap: (anchor) => _showPicker(
+                                      anchor,
+                                      width: 260,
+                                      title: l10n.creationResolution,
+                                      content: (_) => _ParameterOptions(
+                                        resolution: true,
+                                        topicId: widget.topicId,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                if (video &&
+                                    caps?.frameRoles.isNotEmpty == true)
+                                  _FrameToggle(
+                                    label:
+                                        caps!.frameRoles.contains(
+                                          MediaReferenceRole.lastFrame,
+                                        )
+                                        ? l10n.creationFirstLastFrame
+                                        : l10n.creationFirstFrame,
+                                    selected: frames,
+                                    onTap: caps.requiresFirstFrame
+                                        ? null
+                                        : () => state.showFrames(
+                                            widget.topicId,
+                                            !frames,
+                                          ),
+                                  ),
+                                if (!video)
+                                  _ComposerChip(
+                                    label: l10n.creationImagesCount(
+                                      state.count,
+                                    ),
+                                    leading: const Icon(
+                                      LucideIcons.images,
+                                      size: 15,
+                                    ),
+                                    onTap: (anchor) => _showPicker(
+                                      anchor,
+                                      width: 260,
+                                      title: l10n.creationCountLabel,
+                                      content: (_) =>
+                                          const _ParameterOptions(count: true),
+                                    ),
+                                  ),
                               ],
                             ],
                           ],
@@ -431,6 +523,7 @@ class _ComposerChip extends StatelessWidget {
     this.leading,
     this.trailing,
     this.strong = false,
+    this.maxWidth,
     required this.onTap,
   });
 
@@ -438,12 +531,13 @@ class _ComposerChip extends StatelessWidget {
   final Widget? leading;
   final IconData? trailing;
   final bool strong;
+  final double? maxWidth;
   final ValueChanged<BuildContext> onTap;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return IosCardPress(
+    final chip = IosCardPress(
       focusable: true,
       baseColor: Colors.transparent,
       borderRadius: BorderRadius.circular(15),
@@ -477,6 +571,12 @@ class _ComposerChip extends StatelessWidget {
         ),
       ),
     );
+    return maxWidth == null
+        ? chip
+        : ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth!),
+            child: chip,
+          );
   }
 }
 
@@ -574,14 +674,25 @@ class _ModelOptionsState extends State<_ModelOptions> {
 }
 
 class _ParameterOptions extends StatelessWidget {
-  const _ParameterOptions({this.ratio = false, this.count = false});
-  final bool ratio, count;
+  const _ParameterOptions({
+    this.ratio = false,
+    this.count = false,
+    this.duration = false,
+    this.resolution = false,
+    this.frames = false,
+    this.topicId,
+  });
+
+  final bool ratio, count, duration, resolution, frames;
+  final String? topicId;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<MediaCreationController>();
     final l10n = AppLocalizations.of(context)!;
-    final ratios = state.model?.capabilities.aspectRatios ?? const ['auto'];
+    final caps = state.model?.capabilities;
+    final ratios = state.ratiosFor(topicId);
+    final resolutions = state.resolutionsFor(topicId);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -599,7 +710,7 @@ class _ParameterOptions extends StatelessWidget {
                   label: value == 'auto' ? l10n.creationAuto : value,
                 ),
             ],
-            index: ratios.indexOf(state.ratio),
+            index: ratios.indexOf(state.ratioFor(topicId)),
             onChanged: (index) => state.selectRatio(ratios[index]),
           ),
         ],
@@ -615,7 +726,234 @@ class _ParameterOptions extends StatelessWidget {
             onChanged: (index) => state.selectCount(index + 1),
           ),
         ],
+        if (duration && caps != null && caps.durations.isNotEmpty) ...[
+          if (ratio) const SizedBox(height: 12),
+          Text(l10n.creationDuration),
+          const SizedBox(height: 6),
+          SegmentedTabs(
+            height: 36,
+            expand: caps.durations.length <= 4,
+            radioGroup: true,
+            tabs: [
+              for (final value in caps.durations)
+                SegmentedTab(label: l10n.creationDurationSeconds(value)),
+            ],
+            index: caps.durations.indexOf(state.duration!),
+            onChanged: (index) => state.selectDuration(caps.durations[index]),
+          ),
+        ],
+        if (resolution && resolutions.isNotEmpty) ...[
+          if (ratio || duration) const SizedBox(height: 12),
+          Text(l10n.creationResolution),
+          const SizedBox(height: 6),
+          SegmentedTabs(
+            height: 36,
+            radioGroup: true,
+            tabs: [for (final value in resolutions) SegmentedTab(label: value)],
+            index: resolutions.indexOf(state.resolutionFor(topicId)!),
+            onChanged: (index) => state.selectResolution(resolutions[index]),
+          ),
+        ],
+        if (frames && caps != null && caps.frameRoles.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: _FrameToggle(
+              label: caps.frameRoles.contains(MediaReferenceRole.lastFrame)
+                  ? l10n.creationFirstLastFrame
+                  : l10n.creationFirstFrame,
+              selected: state.showsFrames(topicId),
+              onTap: caps.requiresFirstFrame
+                  ? null
+                  : () =>
+                        state.showFrames(topicId, !state.showsFrames(topicId)),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _FrameToggle extends StatelessWidget {
+  const _FrameToggle({required this.label, required this.selected, this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final foreground = selected ? cs.primary : cs.onSurfaceVariant;
+    return Semantics(
+      toggled: selected,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 158),
+        child: IosCardPress(
+          focusable: true,
+          borderRadius: BorderRadius.circular(15),
+          baseColor: selected
+              ? cs.primary.withValues(alpha: .08)
+              : Colors.transparent,
+          onTap: onTap,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(LucideIcons.film, size: 15, color: foreground),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12.5, color: foreground),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoFrames extends StatelessWidget {
+  const _VideoFrames({
+    required this.topicId,
+    required this.capabilities,
+    required this.onPick,
+  });
+
+  final String? topicId;
+  final MediaCapabilities capabilities;
+  final ValueChanged<MediaReferenceRole> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<MediaCreationController>();
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final hasLast = capabilities.frameRoles.contains(
+      MediaReferenceRole.lastFrame,
+    );
+    final style = TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      child: Row(
+        children: [
+          for (final role in capabilities.frameRoles) ...[
+            _FrameSlot(
+              label: role == MediaReferenceRole.firstFrame
+                  ? l10n.creationFirstFrame
+                  : l10n.creationLastFrame,
+              value: state.frame(topicId, role),
+              onPick: () => onPick(role),
+              onRemove: () => state.setFrame(topicId, role, null),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Text(
+              hasLast
+                  ? l10n.creationFirstFrameRequired
+                  : l10n.creationFirstFrameOnly,
+              style: style,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FrameSlot extends StatelessWidget {
+  const _FrameSlot({
+    required this.label,
+    required this.value,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final String label;
+  final MediaReference? value;
+  final VoidCallback onPick, onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(12);
+    return SizedBox.square(
+      dimension: 56,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: IosCardPress(
+              focusable: true,
+              borderRadius: radius,
+              border: Border.all(color: cs.outlineVariant),
+              baseColor: context.appColors.surfaceFill,
+              onTap: onPick,
+              child: ClipRRect(
+                borderRadius: radius,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (value case final reference?)
+                      CreationFileImage(reference.path)
+                    else
+                      Align(
+                        alignment: const Alignment(0, -.25),
+                        child: Icon(
+                          Lucide.Plus,
+                          size: 18,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        width: double.infinity,
+                        color: value == null
+                            ? Colors.transparent
+                            : Colors.black54,
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: value == null
+                                ? cs.onSurfaceVariant
+                                : Colors.white,
+                            fontWeight: AppFontWeights.semibold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (value != null)
+            PositionedDirectional(
+              top: 0,
+              end: 0,
+              child: IosIconButton(
+                icon: Lucide.X,
+                size: 12,
+                minSize: 20,
+                color: Colors.white,
+                tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
+                onTap: onRemove,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

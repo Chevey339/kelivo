@@ -7,6 +7,7 @@ import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/media/media_file_store.dart';
 import 'package:Kelivo/core/services/media/media_generation_runner.dart';
+import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:Kelivo/desktop/desktop_media_creation_page.dart';
 import 'package:Kelivo/features/media/pages/media_creation_page.dart';
 import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
@@ -29,6 +30,14 @@ final _provider = ProviderConfig(
   enabled: true,
   apiKey: 'fixture',
   models: [_model],
+);
+final _videoProvider = ProviderConfig(
+  id: 'video-fixture',
+  name: 'Video fixture',
+  baseUrl: 'https://api.x.ai/v1',
+  enabled: true,
+  apiKey: 'fixture',
+  models: const ['grok-imagine-video-1.5'],
 );
 
 void main() {
@@ -129,6 +138,7 @@ void main() {
             final settings = SettingsProvider(harness.preferences);
             await settings.loaded;
             await settings.setProviderConfig(_provider.id, _provider);
+            await settings.setProviderConfig(_videoProvider.id, _videoProvider);
             final runner = MediaGenerationRunner(
               repository: MediaRepository(harness.database),
               files: const MediaFileStore(),
@@ -168,6 +178,31 @@ void main() {
           find.text(desktop ? '1 image' : 'Auto · 1 image'),
           findsOneWidget,
         );
+        await tester.runAsync(() async {
+          controller.setMode(MediaMode.video);
+          controller.selectDuration(8);
+          controller.selectResolution('720p');
+          controller.showFrames(null, true);
+          await harness.preferences.flushPendingWrites();
+        });
+        await tester.pump();
+        expect(
+          find.text(desktop ? '8 seconds' : 'Auto · 8 seconds'),
+          findsOneWidget,
+        );
+        expect(find.text('First frame'), findsOneWidget);
+        expect(find.text('Last frame'), findsOneWidget);
+        expect(controller.canSubmit(null), isFalse);
+        await tester.runAsync(() async {
+          controller.selectResolution('1080p');
+          controller.setFrame(null, MediaReferenceRole.lastFrame, '/last.png');
+          await harness.preferences.flushPendingWrites();
+        });
+        expect(controller.resolutionFor(null), '720p');
+        expect(controller.canSubmit(null), isFalse);
+        controller.setFrame(null, MediaReferenceRole.firstFrame, '/first.png');
+        await tester.pump();
+        expect(controller.canSubmit(null), isTrue);
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.runAsync(() async {
           controller.dispose();

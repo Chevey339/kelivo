@@ -18262,6 +18262,72 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationCountLabel => 'Количество изображений';
 
   @override
+  String get creationDuration => 'Длительность';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds секунды',
+      many: '$seconds секунд',
+      few: '$seconds секунды',
+      one: '$seconds секунда',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationResolution => 'Разрешение';
+
+  @override
+  String get creationFirstLastFrame => 'Первый и последний кадры';
+
+  @override
+  String get creationFirstFrame => 'Первый кадр';
+
+  @override
+  String get creationLastFrame => 'Последний кадр';
+
+  @override
+  String get creationFirstFrameRequired =>
+      'Выберите первый кадр. Последний кадр необязателен.';
+
+  @override
+  String get creationFirstFrameOnly =>
+      'Эта модель поддерживает только первый кадр.';
+
+  @override
+  String get creationImageModels => 'Модели изображений';
+
+  @override
+  String get creationVideoModels => 'Модели видео';
+
+  @override
+  String get creationPlayVideo => 'Воспроизвести видео';
+
+  @override
+  String get creationPauseVideo => 'Пауза';
+
+  @override
+  String get creationMuteVideo => 'Без звука';
+
+  @override
+  String get creationUnmuteVideo => 'Включить звук';
+
+  @override
+  String get creationOpenVideo => 'Открыть в системном плеере';
+
+  @override
+  String get creationFullScreen => 'Полный экран';
+
+  @override
+  String get creationExitFullScreen => 'Выйти из полноэкранного режима';
+
+  @override
+  String get creationSaveVideo => 'Сохранить видео';
+
+  @override
   String get creationParameters => 'Параметры генерации';
 
   @override

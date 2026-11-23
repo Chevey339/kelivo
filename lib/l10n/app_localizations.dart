@@ -31410,6 +31410,114 @@ abstract class AppLocalizations {
   /// **'Image count'**
   String get creationCountLabel;
 
+  /// Title of the duration picker in the video creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get creationDuration;
+
+  /// Video clip duration shown in the composer or a generation group.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds, plural, one{1 second} other{{seconds} seconds}}'**
+  String creationDurationSeconds(int seconds);
+
+  /// Title of the resolution picker in the video creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolution'**
+  String get creationResolution;
+
+  /// Switch for choosing first and last video reference frames.
+  ///
+  /// In en, this message translates to:
+  /// **'First and last frames'**
+  String get creationFirstLastFrame;
+
+  /// Video composer toggle and slot label for the starting image.
+  ///
+  /// In en, this message translates to:
+  /// **'First frame'**
+  String get creationFirstFrame;
+
+  /// Video composer slot label for the ending image.
+  ///
+  /// In en, this message translates to:
+  /// **'Last frame'**
+  String get creationLastFrame;
+
+  /// Hint for video models that require a first frame when a last frame is attached.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a first frame. The last frame is optional.'**
+  String get creationFirstFrameRequired;
+
+  /// Hint for video models that accept only a first frame.
+  ///
+  /// In en, this message translates to:
+  /// **'This model supports a first frame.'**
+  String get creationFirstFrameOnly;
+
+  /// Title of the image model picker in Creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Image models'**
+  String get creationImageModels;
+
+  /// Title of the video model picker in Creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Video models'**
+  String get creationVideoModels;
+
+  /// Play button tooltip in the embedded generated video player.
+  ///
+  /// In en, this message translates to:
+  /// **'Play video'**
+  String get creationPlayVideo;
+
+  /// Pause button tooltip in the embedded generated video player.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause video'**
+  String get creationPauseVideo;
+
+  /// Mute button tooltip in the embedded generated video player.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get creationMuteVideo;
+
+  /// Unmute button tooltip in the embedded generated video player.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get creationUnmuteVideo;
+
+  /// Action on a video cover that opens the file in the operating system player.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in system player'**
+  String get creationOpenVideo;
+
+  /// Button tooltip to play a generated video in a full-window view.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen'**
+  String get creationFullScreen;
+
+  /// Button tooltip to close the full-window generated video player.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit full screen'**
+  String get creationExitFullScreen;
+
+  /// Menu action to save a generated video to a file or the photo library.
+  ///
+  /// In en, this message translates to:
+  /// **'Save video'**
+  String get creationSaveVideo;
+
   /// Compact mobile composer action opening all generation parameters.
   ///
   /// In en, this message translates to:

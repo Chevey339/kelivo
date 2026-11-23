@@ -31,7 +31,6 @@ import '../../../shared/widgets/optional_shader_mask.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
-// import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart' show sha256;
 import '../../home/widgets/file_processing_indicator.dart';

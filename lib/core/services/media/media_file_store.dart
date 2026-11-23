@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data' show BytesBuilder;
 
+import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as image;
@@ -14,6 +17,7 @@ import '../../database/app_database.dart';
 import '../../models/media_creation.dart';
 import '../../models/request_budget.dart';
 import '../storage/attachment_file_lock.dart';
+import 'media_polling.dart';
 import 'media_request.dart';
 
 class MediaFileStore {
@@ -129,19 +133,39 @@ class MediaFileStore {
           'Unsupported image data',
         );
       }
+      final videoMime = mode == MediaMode.video
+          ? await _videoMime(pending)
+          : null;
+      if (mode == MediaMode.video && videoMime == null) {
+        throw const MediaFailure(
+          MediaFailureKind.download,
+          'Unsupported video data',
+        );
+      }
+      final cover = mode == MediaMode.video && result.previewUrl != null
+          ? await _readCover(batch, id, result, downloadClient)
+          : null;
       return await AttachmentFileLock.synchronized(() async {
         try {
-          final mime = info?.mime ?? result.mime;
-          final ext = AppDirectories.extFromMime(mime);
+          final mime = info?.mime ?? videoMime ?? result.mime;
+          final ext = switch (mime) {
+            'video/mp4' => 'mp4',
+            'video/webm' => 'webm',
+            _ => AppDirectories.extFromMime(mime),
+          };
           final stored = await pending.rename(p.join(batch.path, '$id.$ext'));
           output = stored;
-          if (info != null) {
+          final thumbnailBytes =
+              info?.thumbnail ??
+              cover?.thumbnail ??
+              (mode == MediaMode.video ? await _extractFrame(stored) : null);
+          if (thumbnailBytes != null) {
             final thumbs = await Directory(
               p.join(batch.path, 'thumbs'),
             ).create(recursive: true);
             thumbnail = await File(
               p.join(thumbs.path, '$id.jpg'),
-            ).writeAsBytes(info.thumbnail, flush: true);
+            ).writeAsBytes(thumbnailBytes, flush: true);
           }
           final item = GenerationItemRow(
             id: id,
@@ -154,8 +178,9 @@ class MediaFileStore {
               null => null,
             },
             mime: mime,
-            width: info?.width,
-            height: info?.height,
+            width: info?.width ?? result.width ?? cover?.width,
+            height: info?.height ?? result.height ?? cover?.height,
+            durationMs: result.durationMs,
             byteSize: await stored.length(),
             revisedPrompt: result.revisedPrompt,
             favorite: false,
@@ -177,20 +202,140 @@ class MediaFileStore {
     }
   }
 
+  static Future<Uint8List?> _extractFrame(File video) async {
+    try {
+      if (Platform.isLinux) return await _extractLinuxFrame(video);
+      return await FcNativeVideoThumbnail()
+          .saveThumbnailToBytes(
+            srcFile: video.path,
+            width: 440,
+            height: 440,
+            quality: 84,
+          )
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // The downloaded video remains available when its codec has no thumbnail.
+      return null;
+    }
+  }
+
+  static Future<Uint8List?> _extractLinuxFrame(File video) async {
+    final process = await Process.start('ffmpeg', [
+      '-nostdin',
+      '-loglevel',
+      'error',
+      '-i',
+      video.path,
+      '-frames:v',
+      '1',
+      '-vf',
+      'scale=440:440:force_original_aspect_ratio=decrease',
+      '-f',
+      'image2pipe',
+      '-vcodec',
+      'mjpeg',
+      'pipe:1',
+    ]);
+    final timeout = Timer(const Duration(seconds: 8), process.kill);
+    try {
+      final (_, bytes, code) = await (
+        process.stderr.drain<void>(),
+        process.stdout.fold(
+          BytesBuilder(copy: false),
+          (output, chunk) => output..add(chunk),
+        ),
+        process.exitCode,
+      ).wait;
+      return code == 0 && bytes.isNotEmpty ? bytes.takeBytes() : null;
+    } finally {
+      timeout.cancel();
+    }
+  }
+
+  static Future<_ImageInfo?> _readCover(
+    Directory batch,
+    String id,
+    MediaResult result,
+    http.Client client,
+  ) async {
+    final pending = File(p.join(batch.path, '$id.cover.part'));
+    try {
+      await _download(
+        client,
+        result.previewUrl!,
+        result.previewHeaders,
+        pending,
+      );
+      return await compute(_imageInfo, pending.path);
+    } catch (_) {
+      return null;
+    } finally {
+      await _delete(pending);
+    }
+  }
+
+  static Future<String?> _videoMime(File file) async {
+    final handle = await file.open();
+    try {
+      final bytes = await handle.read(12);
+      if (bytes.length < 12) return null;
+      if (ascii.decode(bytes.sublist(4, 8), allowInvalid: true) == 'ftyp') {
+        return 'video/mp4';
+      }
+      if (bytes[0] == 0x1a &&
+          bytes[1] == 0x45 &&
+          bytes[2] == 0xdf &&
+          bytes[3] == 0xa3) {
+        return 'video/webm';
+      }
+      return null;
+    } finally {
+      await handle.close();
+    }
+  }
+
   static Future<void> _download(
     http.Client client,
     Uri url,
     Map<String, String> headers,
     File file,
   ) async {
-    if (url.host.isEmpty ||
-        !const {'http', 'https'}.contains(url.scheme) ||
-        url.userInfo.isNotEmpty) {
-      throw const MediaFailure(MediaFailureKind.download, 'Invalid media URL');
+    var current = url;
+    var auth = headers;
+    late http.StreamedResponse response;
+    for (var hops = 0; ; hops++) {
+      if (mediaResultUri(current.toString()) == null) {
+        throw const MediaFailure(
+          MediaFailureKind.download,
+          'Invalid media URL',
+        );
+      }
+      final request = http.Request('GET', current)
+        ..followRedirects = false
+        ..headers.addAll(auth);
+      response = await client.send(request);
+      final location = response.headers['location'];
+      if (location == null ||
+          !const {301, 302, 303, 307, 308}.contains(response.statusCode)) {
+        break;
+      }
+      await response.stream.listen(null).cancel();
+      final next = current.resolve(location);
+      if (hops == 4 || current.scheme == 'https' && next.scheme != 'https') {
+        throw const MediaFailure(
+          MediaFailureKind.download,
+          'Invalid media redirect',
+        );
+      }
+      if (mediaResultUri(next.toString()) == null) {
+        throw const MediaFailure(
+          MediaFailureKind.download,
+          'Invalid media URL',
+        );
+      }
+      if (current.origin != next.origin) auth = const {};
+      current = next;
     }
-    final request = http.Request('GET', url)..headers.addAll(headers);
-    if (headers.isNotEmpty) request.followRedirects = false;
-    final response = await client.send(request);
     if (response.statusCode < 200 ||
         response.statusCode >= 300 ||
         (response.contentLength ?? 0) > _maxFileBytes) {

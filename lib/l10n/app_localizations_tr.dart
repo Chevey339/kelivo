@@ -18055,6 +18055,69 @@ class AppLocalizationsTr extends AppLocalizations {
   String get creationCountLabel => 'Görsel sayısı';
 
   @override
+  String get creationDuration => 'Süre';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds saniye',
+      one: '$seconds saniye',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationResolution => 'Çözünürlük';
+
+  @override
+  String get creationFirstLastFrame => 'İlk ve son kareler';
+
+  @override
+  String get creationFirstFrame => 'İlk kare';
+
+  @override
+  String get creationLastFrame => 'Son kare';
+
+  @override
+  String get creationFirstFrameRequired =>
+      'Bir ilk kare seçin. Son kare isteğe bağlıdır.';
+
+  @override
+  String get creationFirstFrameOnly => 'Bu model bir ilk kareyi destekler.';
+
+  @override
+  String get creationImageModels => 'Görsel modelleri';
+
+  @override
+  String get creationVideoModels => 'Video modelleri';
+
+  @override
+  String get creationPlayVideo => 'Videoyu oynat';
+
+  @override
+  String get creationPauseVideo => 'Videoyu duraklat';
+
+  @override
+  String get creationMuteVideo => 'Sessize al';
+
+  @override
+  String get creationUnmuteVideo => 'Sesi aç';
+
+  @override
+  String get creationOpenVideo => 'Sistem oynatıcısında aç';
+
+  @override
+  String get creationFullScreen => 'Tam ekran';
+
+  @override
+  String get creationExitFullScreen => 'Tam ekrandan çık';
+
+  @override
+  String get creationSaveVideo => 'Videoyu kaydet';
+
+  @override
   String get creationParameters => 'Oluşturma seçenekleri';
 
   @override

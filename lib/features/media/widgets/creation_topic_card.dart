@@ -167,7 +167,7 @@ class _CoverMosaic extends StatelessWidget {
             if (item == null)
               const CreationDotField(progress: .4, thumbnail: true)
             else
-              CreationFileImage(item.thumbnailPath ?? item.path),
+              CreationMediaCover(item, playOverlay: false, thumbnail: true),
             if (index == 3 && cells.length > 4)
               ColoredBox(
                 color: Colors.black.withValues(alpha: .42),

@@ -473,7 +473,7 @@ bool _isImageModelId(String id) {
 
 bool _isVideoModelId(String id) => _matches(
   id,
-  r'^(?:grok-imagine-video|veo-|sora-|doubao-seedance-|seedance-|kling|hailuo|wan.*-(?:t2v|i2v|r2v)(?:-|$)|minimax.*video)',
+  r'^(?:grok-imagine-video|veo-|sora-|doubao-seedance-|seedance-|kling|hailuo|wan.*-(?:t2v|i2v|r2v|kf2v|video)(?:-|$)|minimax(?:.*video|-h3))',
 );
 
 bool _matches(String id, String pattern) {

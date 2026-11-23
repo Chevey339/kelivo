@@ -4,12 +4,14 @@ import 'dart:ui';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/models/media_creation.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -17,6 +19,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../providers/media_creation_controller.dart';
+import 'creation_video_player.dart';
 
 Future<void> showCreationLightbox(
   BuildContext context,
@@ -136,6 +139,8 @@ class _CreationLightbox extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final batch = controller.batch(item.batchId);
+    final video = item.mode == MediaMode.video;
+    final saveTitle = video ? l10n.creationSaveVideo : l10n.creationSaveImage;
     Widget icon(IconData icon, String title, VoidCallback onTap) =>
         IosIconButton(
           icon: icon,
@@ -175,7 +180,7 @@ class _CreationLightbox extends StatelessWidget {
                     if (desktop) ...[
                       icon(
                         Lucide.Download,
-                        l10n.creationSaveImage,
+                        saveTitle,
                         () => _perform(context, _save),
                       ),
                       icon(
@@ -205,19 +210,17 @@ class _CreationLightbox extends StatelessWidget {
                       },
                       itemBuilder: (_) => [
                         if (!desktop) ...[
-                          PopupMenuItem(
-                            value: 'save',
-                            child: Text(l10n.creationSaveImage),
-                          ),
+                          PopupMenuItem(value: 'save', child: Text(saveTitle)),
                           PopupMenuItem(
                             value: 'share',
                             child: Text(l10n.creationShare),
                           ),
                         ],
-                        PopupMenuItem(
-                          value: 'copy',
-                          child: Text(l10n.creationCopyImage),
-                        ),
+                        if (!video)
+                          PopupMenuItem(
+                            value: 'copy',
+                            child: Text(l10n.creationCopyImage),
+                          ),
                         PopupMenuItem(
                           value: 'delete',
                           child: Text(l10n.creationDeleteItem),
@@ -238,14 +241,23 @@ class _CreationLightbox extends StatelessWidget {
                     horizontal: 16,
                     vertical: 12,
                   ),
-                  child: InteractiveViewer(
-                    minScale: 1,
-                    maxScale: 4,
-                    child: Hero(
-                      tag: 'creation:${item.id}',
-                      child: CreationFileImage(item.path, fit: BoxFit.contain),
-                    ),
-                  ),
+                  child: video
+                      ? CreationVideoPlayer(
+                          key: ValueKey(item.id),
+                          item: item,
+                          cover: CreationMediaCover(item, playOverlay: false),
+                        )
+                      : InteractiveViewer(
+                          minScale: 1,
+                          maxScale: 4,
+                          child: Hero(
+                            tag: 'creation:${item.id}',
+                            child: CreationFileImage(
+                              item.path,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -259,7 +271,7 @@ class _CreationLightbox extends StatelessWidget {
     final box = context.findRenderObject()! as RenderBox;
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(path)],
+        files: [XFile(path, mimeType: item.mime)],
         sharePositionOrigin: box.localToGlobal(Offset.zero) & box.size,
       ),
     );
@@ -285,5 +297,86 @@ class CreationFileImage extends StatelessWidget {
             height: double.infinity,
             errorBuilder: (_, _, _) => placeholder,
           );
+  }
+}
+
+class CreationMediaCover extends StatelessWidget {
+  const CreationMediaCover(
+    this.item, {
+    super.key,
+    this.playOverlay = true,
+    this.thumbnail = false,
+  });
+
+  final GenerationItemRow item;
+  final bool playOverlay;
+  final bool thumbnail;
+
+  @override
+  Widget build(BuildContext context) {
+    if (item.mode == MediaMode.image) {
+      return CreationFileImage(
+        thumbnail ? item.thumbnailPath ?? item.path : item.path,
+      );
+    }
+    final l10n = AppLocalizations.of(context)!;
+    return Semantics(
+      label: l10n.creationVideo,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (item.thumbnailPath case final path?)
+            CreationFileImage(path)
+          else
+            ColoredBox(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: playOverlay
+                  ? null
+                  : const Center(child: Icon(LucideIcons.video, size: 22)),
+            ),
+          if (playOverlay) ...[
+            Center(
+              child: ClipOval(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: SizedBox.square(
+                    dimension: 48,
+                    child: ColoredBox(
+                      color: Colors.black.withValues(alpha: .36),
+                      child: const Icon(
+                        Lucide.Play,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (item.durationMs case final duration?)
+              PositionedDirectional(
+                start: 8,
+                top: 8,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    child: Text(
+                      creationVideoTime(duration),
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
   }
 }

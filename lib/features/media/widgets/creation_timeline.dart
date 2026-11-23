@@ -265,6 +265,9 @@ class _BatchHeaderState extends State<_BatchHeader> {
             if (p.ratio != 'auto') _Tag(p.ratio),
             if (batch.mode == MediaMode.image)
               _Tag(l10n.creationImagesCount(p.count)),
+            if (p.duration case final duration?)
+              _Tag(l10n.creationDurationSeconds(duration)),
+            if (p.resolution case final resolution?) _Tag(resolution),
           ],
         ),
       ],
@@ -328,9 +331,13 @@ class _BatchResults extends StatelessWidget {
         : 0;
     final total = pending + visible.length;
     if (total == 0) return const SizedBox.shrink();
+    final requestedRatio =
+        params.ratio == 'auto' && batch.mode == MediaMode.video
+        ? 16 / 9
+        : _ratio(params.ratio);
     final ratio = visible.isEmpty
-        ? _ratio(params.ratio)
-        : _itemRatio(visible.first);
+        ? requestedRatio
+        : _itemRatio(visible.first, requestedRatio);
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = !desktop || constraints.maxWidth < 400;
@@ -361,7 +368,7 @@ class _BatchResults extends StatelessWidget {
               SizedBox(
                 width: width,
                 child: AspectRatio(
-                  aspectRatio: _itemRatio(item).clamp(.3, 4),
+                  aspectRatio: _itemRatio(item, requestedRatio).clamp(.3, 4),
                   child: GestureDetector(
                     onTap: () =>
                         showCreationLightbox(context, item, desktop: desktop),
@@ -369,7 +376,7 @@ class _BatchResults extends StatelessWidget {
                       tag: 'creation:${item.id}',
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: CreationFileImage(item.path),
+                        child: CreationMediaCover(item),
                       ),
                     ),
                   ),
@@ -468,7 +475,9 @@ class _BatchFailure extends StatelessWidget {
   }
 }
 
-({int count, String ratio}) _parameters(GenerationBatchRow row) {
+({int count, String ratio, int? duration, String? resolution}) _parameters(
+  GenerationBatchRow row,
+) {
   try {
     final params = jsonDecode(row.paramsJson);
     if (params is Map) {
@@ -479,12 +488,18 @@ class _BatchFailure extends StatelessWidget {
         ratio: params['aspectRatio'] is String
             ? params['aspectRatio'] as String
             : 'auto',
+        duration: params['durationSec'] is int
+            ? params['durationSec'] as int
+            : null,
+        resolution: params['resolution'] is String
+            ? params['resolution'] as String
+            : null,
       );
     }
   } on FormatException {
     // Render an older or damaged row with ordinary tile dimensions.
   }
-  return (count: 1, ratio: 'auto');
+  return (count: 1, ratio: 'auto', duration: null, resolution: null);
 }
 
 double _ratio(String value) {
@@ -499,7 +514,7 @@ double _ratio(String value) {
   return parts[0]! / parts[1]!;
 }
 
-double _itemRatio(GenerationItemRow item) =>
+double _itemRatio(GenerationItemRow item, double fallback) =>
     (item.width ?? 0) > 0 && (item.height ?? 0) > 0
     ? item.width! / item.height!
-    : 1;
+    : fallback;

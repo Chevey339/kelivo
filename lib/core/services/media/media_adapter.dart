@@ -1,19 +1,45 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dio/dio.dart' show CancelToken;
+import 'package:dio/dio.dart' show CancelToken, DioException;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../providers/settings_provider.dart';
 import '../api/chat_api_helpers.dart';
+import '../auth/provider_oauth_service.dart';
 import '../custom_request_merger.dart';
 import 'media_request.dart';
 
 abstract interface class MediaAdapter {
   MediaCapabilities capabilities(ProviderConfig provider, String modelId);
   Stream<MediaEvent> generate(MediaContext context, MediaRequest request);
+}
+
+MediaFailure classifyMediaFailure(Object error) {
+  if (error is MediaFailure) return error;
+  if (error is ProviderOAuthException) {
+    return MediaFailure(
+      MediaFailureKind.login,
+      error.kind.name,
+      statusCode: error.statusCode,
+    );
+  }
+  if (error is http.ClientException ||
+      error is SocketException ||
+      error is DioException ||
+      error is TimeoutException) {
+    return const MediaFailure(
+      MediaFailureKind.network,
+      'Media request could not connect',
+    );
+  }
+  return const MediaFailure(
+    MediaFailureKind.invalidResponse,
+    'Unexpected media response',
+  );
 }
 
 class MediaContext {
@@ -23,6 +49,7 @@ class MediaContext {
     required this.apiKey,
     required this.cancelToken,
     required this.requestId,
+    this.delay = Future<void>.delayed,
   });
 
   final ProviderConfig provider;
@@ -30,6 +57,7 @@ class MediaContext {
   final String apiKey;
   final CancelToken cancelToken;
   final String requestId;
+  final Future<void> Function(Duration) delay;
 
   Uri endpoint(String path, {String? base}) => Uri.parse(
     '${(base ?? provider.baseUrl).replaceFirst(RegExp(r'/+$'), '')}/$path',
@@ -55,15 +83,16 @@ class MediaContext {
 
   Map<String, dynamic> body(
     MediaRequest request,
-    Map<String, dynamic> generated,
-  ) {
+    Map<String, dynamic> generated, {
+    bool includeExtra = true,
+  }) {
     final payload = {...generated};
     CustomRequestMerger.applyBody(
       payload,
       customBody(provider, request.modelId),
     );
     final extra = request.parameters['extra'];
-    if (extra is Map) {
+    if (includeExtra && extra is Map) {
       CustomRequestMerger.applyBody(payload, Map<String, dynamic>.from(extra));
     }
     return payload;
@@ -72,6 +101,7 @@ class MediaContext {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final cancellation = cancelToken.cancelError;
     if (cancellation != null) throw cancellation;
+    request.followRedirects = false;
     final response = await client.send(request);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response;

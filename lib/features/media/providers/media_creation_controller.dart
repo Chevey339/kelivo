@@ -27,21 +27,36 @@ class MediaModelChoice {
 }
 
 class CreationDraft {
-  const CreationDraft({this.prompt = '', this.references = const []});
+  const CreationDraft({
+    this.prompt = '',
+    this.references = const [],
+    this.videoFrames = false,
+  });
 
   final String prompt;
   final List<MediaReference> references;
+  final bool videoFrames;
 
-  CreationDraft copyWith({String? prompt, List<MediaReference>? references}) =>
-      CreationDraft(
-        prompt: prompt ?? this.prompt,
-        references: references == null
-            ? this.references
-            : List.unmodifiable(references),
-      );
+  CreationDraft copyWith({
+    String? prompt,
+    List<MediaReference>? references,
+    bool? videoFrames,
+  }) => CreationDraft(
+    prompt: prompt ?? this.prompt,
+    references: references == null
+        ? this.references
+        : List.unmodifiable(references),
+    videoFrames: videoFrames ?? this.videoFrames,
+  );
 }
 
-typedef _ComposerOptions = ({String? model, String ratio, int count});
+typedef _ComposerOptions = ({
+  String? model,
+  String ratio,
+  int count,
+  int? duration,
+  String? resolution,
+});
 
 class MediaCreationController extends ChangeNotifier {
   MediaCreationController({
@@ -155,18 +170,48 @@ class MediaCreationController extends ChangeNotifier {
   }
 
   _ComposerOptions get _currentOptions =>
-      _options[_mode] ?? (model: null, ratio: 'auto', count: 1);
+      _options[_mode] ??
+      (model: null, ratio: 'auto', count: 1, duration: null, resolution: null);
   MediaModelChoice? get model =>
       models
           .where((choice) => choice.key == _currentOptions.model)
           .firstOrNull ??
       models.firstOrNull;
   int get count => mode == MediaMode.video ? 1 : _currentOptions.count;
-  String get ratio {
-    final ratios = model?.capabilities.aspectRatios ?? const ['auto'];
+  List<String> ratiosFor(String? topicId) {
+    final caps = model?.capabilities;
+    if (caps == null ||
+        (caps.framesUseAutomaticRatio && showsFrames(topicId))) {
+      return const ['auto'];
+    }
+    return caps.ratiosFor(resolutionFor(topicId));
+  }
+
+  String ratioFor(String? topicId) {
+    final ratios = ratiosFor(topicId);
     return ratios.contains(_currentOptions.ratio)
         ? _currentOptions.ratio
         : ratios.first;
+  }
+
+  int? get duration {
+    final choices = model?.capabilities.durations ?? const <int>[];
+    final value = _currentOptions.duration;
+    return choices.contains(value) ? value : choices.firstOrNull;
+  }
+
+  List<String> resolutionsFor(String? topicId) =>
+      model?.capabilities.resolutionsFor(
+        hasLastFrame:
+            showsFrames(topicId) &&
+            frame(topicId, MediaReferenceRole.lastFrame) != null,
+      ) ??
+      const [];
+
+  String? resolutionFor(String? topicId) {
+    final choices = resolutionsFor(topicId);
+    final value = _currentOptions.resolution;
+    return choices.contains(value) ? value : choices.firstOrNull;
   }
 
   void setMode(MediaMode mode) {
@@ -176,26 +221,86 @@ class MediaCreationController extends ChangeNotifier {
   }
 
   void selectModel(MediaModelChoice choice) =>
-      _updateOptions((model: choice.key, ratio: ratio, count: count));
-  void selectRatio(String value) =>
-      _updateOptions((model: model?.key, ratio: value, count: count));
-  void selectCount(int value) => _updateOptions((
-    model: model?.key,
-    ratio: ratio,
-    count: value.clamp(1, MediaGenerationRunner.maxCount),
-  ));
+      _updateOptions(modelKey: choice.key);
+  void selectRatio(String value) => _updateOptions(ratio: value);
+  void selectCount(int value) =>
+      _updateOptions(count: value.clamp(1, MediaGenerationRunner.maxCount));
+  void selectDuration(int value) => _updateOptions(duration: value);
+  void selectResolution(String value) => _updateOptions(resolution: value);
+
+  List<MediaReference> imageReferences(String? topicId) => draftFor(
+    topicId,
+  ).references.where((ref) => ref.role == MediaReferenceRole.image).toList();
+
+  bool showsFrames(String? topicId) {
+    final caps = model?.capabilities;
+    return mode == MediaMode.video &&
+        caps != null &&
+        caps.frameRoles.isNotEmpty &&
+        (caps.requiresFirstFrame || draftFor(topicId).videoFrames);
+  }
+
+  MediaReference? frame(String? topicId, MediaReferenceRole role) =>
+      draftFor(topicId).references.where((ref) => ref.role == role).firstOrNull;
+
+  void showFrames(String? topicId, bool value) {
+    _drafts[topicId] = draftFor(topicId).copyWith(videoFrames: value);
+    notifyListeners();
+  }
+
+  void setFrame(String? topicId, MediaReferenceRole role, String? path) {
+    final draft = draftFor(topicId);
+    _drafts[topicId] = draft.copyWith(
+      videoFrames: true,
+      references: [
+        for (final ref in draft.references)
+          if (ref.role != role) ref,
+        if (path != null) MediaReference(path, role: role),
+      ],
+    );
+    notifyListeners();
+  }
+
+  List<MediaReference> _effectiveReferences(String? topicId) {
+    if (mode == MediaMode.image) return imageReferences(topicId);
+    if (!showsFrames(topicId)) return const [];
+    return [
+      for (final role in model!.capabilities.frameRoles)
+        if (frame(topicId, role) case final value?) value,
+    ];
+  }
+
+  bool canSubmit(String? topicId) {
+    final caps = model?.capabilities;
+    if (caps == null ||
+        submitting(topicId) ||
+        _deletingTopics.contains(topicId)) {
+      return false;
+    }
+    final refs = _effectiveReferences(topicId);
+    if (mode == MediaMode.image) return refs.length <= caps.maxReferences;
+    if (!showsFrames(topicId)) return !caps.requiresFirstFrame;
+    return refs.any((ref) => ref.role == MediaReferenceRole.firstFrame);
+  }
 
   void updatePrompt(String? topicId, String value) {
     _drafts[topicId] = draftFor(topicId).copyWith(prompt: value);
   }
 
   void setReferences(String? topicId, List<MediaReference> references) {
-    _drafts[topicId] = draftFor(topicId).copyWith(references: references);
+    final draft = draftFor(topicId);
+    _drafts[topicId] = draft.copyWith(
+      references: [
+        for (final ref in draft.references)
+          if (ref.role != MediaReferenceRole.image) ref,
+        ...references,
+      ],
+    );
     notifyListeners();
   }
 
   Future<String?> submit(String? topicId) async {
-    if (_deletingTopics.contains(topicId) || submitting(topicId)) return null;
+    if (!canSubmit(topicId)) return null;
     final choice = model;
     final draft = draftFor(topicId);
     final prompt = draft.prompt.trim();
@@ -205,8 +310,10 @@ class MediaCreationController extends ChangeNotifier {
       mode: mode,
       prompt: prompt,
       count: count,
-      aspectRatio: ratio,
-      references: draft.references,
+      aspectRatio: ratioFor(topicId),
+      durationSec: duration,
+      resolution: resolutionFor(topicId),
+      references: _effectiveReferences(topicId),
     );
     final id = topicId ?? const Uuid().v4();
     final now = DateTime.now();
@@ -354,8 +461,20 @@ class MediaCreationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _updateOptions(_ComposerOptions options) {
-    _options[_mode] = options;
+  void _updateOptions({
+    String? modelKey,
+    String? ratio,
+    int? count,
+    int? duration,
+    String? resolution,
+  }) {
+    _options[_mode] = (
+      model: modelKey ?? model?.key,
+      ratio: ratio ?? _currentOptions.ratio,
+      count: count ?? _currentOptions.count,
+      duration: duration ?? _currentOptions.duration,
+      resolution: resolution ?? _currentOptions.resolution,
+    );
     notifyListeners();
     unawaited(
       preferences
@@ -367,6 +486,8 @@ class MediaCreationController extends ChangeNotifier {
                   'model': entry.value.model,
                   'ratio': entry.value.ratio,
                   'count': entry.value.count,
+                  'duration': entry.value.duration,
+                  'resolution': entry.value.resolution,
                 },
             }),
           )
@@ -394,6 +515,12 @@ class MediaCreationController extends ChangeNotifier {
                       MediaGenerationRunner.maxCount,
                     )
                   : 1,
+              duration: value['duration'] is int
+                  ? value['duration'] as int
+                  : null,
+              resolution: value['resolution'] is String
+                  ? value['resolution'] as String
+                  : null,
             ),
       };
     } on FormatException {

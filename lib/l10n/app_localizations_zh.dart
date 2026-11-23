@@ -16958,6 +16958,62 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationCountLabel => '张数';
 
   @override
+  String get creationDuration => '时长';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get creationResolution => '分辨率';
+
+  @override
+  String get creationFirstLastFrame => '首尾帧';
+
+  @override
+  String get creationFirstFrame => '首帧';
+
+  @override
+  String get creationLastFrame => '尾帧';
+
+  @override
+  String get creationFirstFrameRequired => '首帧必填，尾帧可选。';
+
+  @override
+  String get creationFirstFrameOnly => '此模型只支持首帧。';
+
+  @override
+  String get creationImageModels => '图片模型';
+
+  @override
+  String get creationVideoModels => '视频模型';
+
+  @override
+  String get creationPlayVideo => '播放视频';
+
+  @override
+  String get creationPauseVideo => '暂停视频';
+
+  @override
+  String get creationMuteVideo => '静音';
+
+  @override
+  String get creationUnmuteVideo => '取消静音';
+
+  @override
+  String get creationOpenVideo => '用系统播放器打开';
+
+  @override
+  String get creationFullScreen => '全屏';
+
+  @override
+  String get creationExitFullScreen => '退出全屏';
+
+  @override
+  String get creationSaveVideo => '保存视频';
+
+  @override
   String get creationParameters => '生成参数';
 
   @override
@@ -33998,6 +34054,62 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationCountLabel => '张数';
+
+  @override
+  String get creationDuration => '时长';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get creationResolution => '分辨率';
+
+  @override
+  String get creationFirstLastFrame => '首尾帧';
+
+  @override
+  String get creationFirstFrame => '首帧';
+
+  @override
+  String get creationLastFrame => '尾帧';
+
+  @override
+  String get creationFirstFrameRequired => '首帧必填，尾帧可选。';
+
+  @override
+  String get creationFirstFrameOnly => '此模型只支持首帧。';
+
+  @override
+  String get creationImageModels => '图片模型';
+
+  @override
+  String get creationVideoModels => '视频模型';
+
+  @override
+  String get creationPlayVideo => '播放视频';
+
+  @override
+  String get creationPauseVideo => '暂停视频';
+
+  @override
+  String get creationMuteVideo => '静音';
+
+  @override
+  String get creationUnmuteVideo => '取消静音';
+
+  @override
+  String get creationOpenVideo => '用系统播放器打开';
+
+  @override
+  String get creationFullScreen => '全屏';
+
+  @override
+  String get creationExitFullScreen => '退出全屏';
+
+  @override
+  String get creationSaveVideo => '保存视频';
 
   @override
   String get creationParameters => '生成参数';
@@ -51091,6 +51203,62 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationCountLabel => '張數';
+
+  @override
+  String get creationDuration => '時長';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String get creationResolution => '解析度';
+
+  @override
+  String get creationFirstLastFrame => '首尾幀';
+
+  @override
+  String get creationFirstFrame => '首幀';
+
+  @override
+  String get creationLastFrame => '尾幀';
+
+  @override
+  String get creationFirstFrameRequired => '首幀必填，尾幀可選。';
+
+  @override
+  String get creationFirstFrameOnly => '此模型只支援首幀。';
+
+  @override
+  String get creationImageModels => '圖片模型';
+
+  @override
+  String get creationVideoModels => '影片模型';
+
+  @override
+  String get creationPlayVideo => '播放影片';
+
+  @override
+  String get creationPauseVideo => '暫停影片';
+
+  @override
+  String get creationMuteVideo => '靜音';
+
+  @override
+  String get creationUnmuteVideo => '取消靜音';
+
+  @override
+  String get creationOpenVideo => '用系統播放器開啟';
+
+  @override
+  String get creationFullScreen => '全螢幕';
+
+  @override
+  String get creationExitFullScreen => '退出全螢幕';
+
+  @override
+  String get creationSaveVideo => '儲存影片';
 
   @override
   String get creationParameters => '生成參數';

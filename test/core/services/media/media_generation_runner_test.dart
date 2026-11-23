@@ -8,6 +8,8 @@ import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/media/media_file_store.dart';
 import 'package:Kelivo/core/services/media/media_generation_runner.dart';
+import 'package:Kelivo/core/services/media/media_adapter_resolver.dart';
+import 'package:Kelivo/core/services/media/adapters/veo_video.dart';
 import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:drift/native.dart';
@@ -35,6 +37,7 @@ class _HeldEnqueueRepository extends MediaRepository {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final png = base64Encode(image.encodePng(image.Image(width: 12, height: 8)));
   const model = 'gpt-image-2';
   late AppDatabase database;
@@ -233,6 +236,114 @@ void main() {
       ),
     );
     expect(await Directory(p.join(root.path, 'generations')).exists(), isFalse);
+  });
+
+  test(
+    'video content follows a signed redirect without forwarding auth',
+    () async {
+      var submits = 0;
+      final gateway = provider('gateway').copyWith(models: ['sora-2']);
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+        delay: (_) async {},
+        clientFactory: (_, _) => MockClient((sent) async {
+          if (sent.method == 'POST') {
+            submits++;
+            return http.Response('{"id":"video-job","status":"queued"}', 200);
+          }
+          if (sent.url.path == '/v1/videos/video-job') {
+            return http.Response('{"status":"completed","seconds":"8"}', 200);
+          }
+          if (sent.url.path.endsWith('/content')) {
+            expect(sent.headers['authorization'], 'Bearer fixture-key');
+            return http.Response(
+              '',
+              302,
+              headers: {'location': 'https://cdn.test/movie.mp4'},
+            );
+          }
+          expect(sent.url.host, 'cdn.test');
+          expect(sent.headers['authorization'], isNull);
+          return http.Response.bytes([
+            0,
+            0,
+            0,
+            12,
+            ...ascii.encode('ftypmp42'),
+          ], 200);
+        }),
+      );
+      addTearDown(runner.dispose);
+      final ticket = await runner.enqueue(
+        provider: gateway,
+        request: const MediaRequest(
+          modelId: 'sora-2',
+          mode: MediaMode.video,
+          prompt: 'A scene',
+          aspectRatio: '16:9',
+          durationSec: 8,
+          resolution: '720p',
+        ),
+      );
+      expect(await ticket.completed, GenerationStatus.succeeded);
+      expect(submits, 1);
+      final item = (await repository.itemsForBatch(ticket.batchId)).single;
+      expect(item.mime, 'video/mp4');
+      expect(item.path, endsWith('.mp4'));
+      expect((item.width, item.height, item.durationMs), (1280, 720, 8000));
+    },
+  );
+
+  test('remote poll errors do not submit a second generation job', () async {
+    var submits = 0;
+    var reads = 0;
+    final delays = <Duration>[];
+    final gateway = provider('gateway').copyWith(models: ['sora-2']);
+    final runner = MediaGenerationRunner(
+      repository: repository,
+      files: files,
+      delay: (duration) async => delays.add(duration),
+      clientFactory: (_, _) => MockClient((sent) async {
+        if (sent.method == 'POST') {
+          submits++;
+          return http.Response('{"id":"video-job","status":"queued"}', 200);
+        }
+        reads++;
+        return http.Response('{"error":{"code":"overload"}}', 503);
+      }),
+    );
+    addTearDown(runner.dispose);
+    final ticket = await runner.enqueue(
+      provider: gateway,
+      request: const MediaRequest(
+        modelId: 'sora-2',
+        mode: MediaMode.video,
+        prompt: 'A scene',
+        aspectRatio: '16:9',
+      ),
+    );
+    expect(await ticket.completed, GenerationStatus.failed);
+    expect(submits, 1);
+    expect(reads, 4);
+    expect(delays.map((duration) => duration.inSeconds), [2, 1, 2, 4]);
+  });
+
+  test('retired hosts are excluded and Vertex AI retains Veo', () {
+    const resolver = MediaAdapterResolver();
+    final openai = provider(
+      'openai',
+    ).copyWith(baseUrl: 'https://api.openai.com/v1');
+    expect(resolver.resolve(openai, MediaMode.video), isNull);
+    final gemini = provider('gemini').copyWith(
+      providerType: ProviderKind.google,
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    );
+    expect(resolver.resolve(gemini, MediaMode.video), isNull);
+    expect(
+      resolver.resolve(gemini.copyWith(vertexAI: true), MediaMode.video),
+      isA<VeoVideoAdapter>(),
+    );
   });
 
   test('unfinished rows are marked interrupted on startup', () async {

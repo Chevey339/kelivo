@@ -17398,6 +17398,67 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationCountLabel => '이미지 수';
 
   @override
+  String get creationDuration => '길이';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds초',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationResolution => '해상도';
+
+  @override
+  String get creationFirstLastFrame => '첫 프레임 및 마지막 프레임';
+
+  @override
+  String get creationFirstFrame => '첫 프레임';
+
+  @override
+  String get creationLastFrame => '마지막 프레임';
+
+  @override
+  String get creationFirstFrameRequired => '첫 프레임을 선택하세요. 마지막 프레임은 선택 사항입니다.';
+
+  @override
+  String get creationFirstFrameOnly => '이 모델은 첫 프레임을 지원합니다.';
+
+  @override
+  String get creationImageModels => '이미지 모델';
+
+  @override
+  String get creationVideoModels => '비디오 모델';
+
+  @override
+  String get creationPlayVideo => '비디오 재생';
+
+  @override
+  String get creationPauseVideo => '비디오 일시정지';
+
+  @override
+  String get creationMuteVideo => '음소거';
+
+  @override
+  String get creationUnmuteVideo => '음소거 해제';
+
+  @override
+  String get creationOpenVideo => '시스템 플레이어에서 열기';
+
+  @override
+  String get creationFullScreen => '전체 화면';
+
+  @override
+  String get creationExitFullScreen => '전체 화면 종료';
+
+  @override
+  String get creationSaveVideo => '비디오 저장';
+
+  @override
   String get creationParameters => '생성 옵션';
 
   @override

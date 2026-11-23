@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:dio/dio.dart' show CancelToken, DioException;
+import 'package:dio/dio.dart' show CancelToken;
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -15,6 +14,7 @@ import '../../models/media_creation.dart';
 import '../../providers/settings_provider.dart';
 import '../api/chat_api_helpers.dart';
 import '../auth/provider_oauth_service.dart';
+import '../mobile_background.dart';
 import '../network/provider_http_client.dart';
 import '../storage/attachment_file_lock.dart';
 import 'media_adapter.dart';
@@ -40,14 +40,17 @@ class MediaGenerationRunner extends ChangeNotifier {
     this.resolver = const MediaAdapterResolver(),
     MediaHttpClientFactory? clientFactory,
     Future<void> Function(Duration)? delay,
+    MobileBackgroundCoordinator? background,
   }) : _client = clientFactory ?? _defaultClient,
-       _delay = delay ?? Future<void>.delayed;
+       _delay = delay ?? Future<void>.delayed,
+       _background = background ?? MobileBackgroundCoordinator.instance;
 
   final MediaRepository repository;
   final MediaFileStore files;
   final MediaAdapterResolver resolver;
   final MediaHttpClientFactory _client;
   final Future<void> Function(Duration) _delay;
+  final MobileBackgroundCoordinator _background;
   final _queued = <_MediaJob>[];
   final _active = <String, _MediaJob>{};
   final _progress = <String, MediaRunProgress>{};
@@ -93,14 +96,36 @@ class MediaGenerationRunner extends ChangeNotifier {
         request.count < 1 ||
         request.count > maxCount ||
         request.prompt.trim().isEmpty ||
-        !caps.aspectRatios.contains(request.aspectRatio) ||
+        !caps.ratiosFor(request.resolution).contains(request.aspectRatio) ||
         request.references.length > caps.maxReferences) {
       throw const MediaFailure(
         MediaFailureKind.parameters,
         'Invalid generation request',
       );
     }
+    if (request.mode == MediaMode.video && !_validVideoRequest(request, caps)) {
+      throw const MediaFailure(
+        MediaFailureKind.parameters,
+        'Invalid video settings or frame selection',
+      );
+    }
     return caps;
+  }
+
+  static bool _validVideoRequest(MediaRequest request, MediaCapabilities caps) {
+    final roles = request.references.map((reference) => reference.role).toSet();
+    final first = roles.contains(MediaReferenceRole.firstFrame);
+    final last = roles.contains(MediaReferenceRole.lastFrame);
+    return request.count == 1 &&
+        (request.durationSec == null ||
+            caps.durations.contains(request.durationSec)) &&
+        (request.resolution == null ||
+            caps
+                .resolutionsFor(hasLastFrame: last)
+                .contains(request.resolution)) &&
+        roles.length == request.references.length &&
+        roles.every(caps.frameRoles.contains) &&
+        (first || !caps.requiresFirstFrame && !last);
   }
 
   Future<MediaGenerationTicket> enqueue({
@@ -191,6 +216,8 @@ class MediaGenerationRunner extends ChangeNotifier {
           negativePrompt: batch.negativePrompt,
           count: params.remove('count') as int? ?? 1,
           aspectRatio: params.remove('aspectRatio') as String? ?? 'auto',
+          durationSec: params.remove('durationSec') as int?,
+          resolution: params.remove('resolution') as String?,
           parameters: params,
           references: [
             for (final row in jsonDecode(batch.referencesJson) as List)
@@ -270,6 +297,19 @@ class MediaGenerationRunner extends ChangeNotifier {
           startedAt: Value(DateTime.now()),
         ),
       );
+      if (job.request.mode == MediaMode.video) {
+        await _background.start(
+          id: job.backgroundId,
+          conversationId: '',
+          title: job.provider.name,
+          keepAliveOnly: true,
+          cancel: () => cancel(job.id),
+        );
+        _background.update(
+          job.backgroundId,
+          phase: BackgroundTaskPhase.generating,
+        );
+      }
       final raw = _client(job.provider, job.token);
       try {
         final adapter = resolver.resolve(job.provider, job.request.mode)!;
@@ -294,6 +334,7 @@ class MediaGenerationRunner extends ChangeNotifier {
             apiKey: apiKey,
             cancelToken: job.token,
             requestId: _uuid.v4(),
+            delay: _delay,
           );
           final results = await _requestWithRetry(
             job,
@@ -363,7 +404,7 @@ class MediaGenerationRunner extends ChangeNotifier {
                   ),
       );
     } catch (error) {
-      final status = _closing
+      final status = _closing || _background.wasInterrupted(job.backgroundId)
           ? GenerationStatus.interrupted
           : job.token.isCancelled
           ? GenerationStatus.cancelled
@@ -373,9 +414,15 @@ class MediaGenerationRunner extends ChangeNotifier {
       await _finish(
         job,
         status,
-        job.token.isCancelled ? null : _failure(error),
+        job.token.isCancelled ? null : classifyMediaFailure(error),
       );
     } finally {
+      if (job.remoteTask case MediaTaskAccepted(
+        cancelUrl: final url?,
+        :final cancelHeaders,
+      ) when job.token.isCancelled) {
+        unawaited(_cancelRemote(job.provider, url, cancelHeaders));
+      }
       _active.remove(job.id);
       _progress.remove(job.id);
       if (!_disposed) notifyListeners();
@@ -391,15 +438,22 @@ class MediaGenerationRunner extends ChangeNotifier {
     required int completed,
   }) async {
     for (var retry = 0; ; retry++) {
+      var accepted = false;
       try {
         _checkCancelled(job);
         List<MediaResult>? results;
         await for (final event in adapter.generate(context, request)) {
+          if (event is MediaTaskAccepted) {
+            job.remoteTask = event;
+            accepted = true;
+          }
           _checkCancelled(job);
           final previous = _progress[job.id];
           switch (event) {
             case MediaOutput(results: final values):
               results = values;
+            case MediaTaskAccepted():
+              break;
             case MediaProgress(:final fraction):
               _progress[job.id] = (
                 fraction:
@@ -424,8 +478,8 @@ class MediaGenerationRunner extends ChangeNotifier {
         return results;
       } catch (error) {
         _checkCancelled(job);
-        final failure = _failure(error);
-        if (!failure.retryable || retry == 3) throw failure;
+        final failure = classifyMediaFailure(error);
+        if (accepted || !failure.retryable || retry == 3) throw failure;
         final interval = Duration(seconds: 1 << retry);
         final retryAfter = failure.retryAfter;
         await Future.any<void>([
@@ -438,28 +492,28 @@ class MediaGenerationRunner extends ChangeNotifier {
     }
   }
 
-  static MediaFailure _failure(Object error) {
-    if (error is MediaFailure) return error;
-    if (error is ProviderOAuthException) {
-      return MediaFailure(
-        MediaFailureKind.login,
-        error.kind.name,
-        statusCode: error.statusCode,
-      );
+  Future<void> _cancelRemote(
+    ProviderConfig provider,
+    Uri url,
+    Map<String, String> headers,
+  ) async {
+    final token = CancelToken();
+    http.Client? client;
+    try {
+      client = _client(provider, token);
+      final request = http.Request('DELETE', url)
+        ..followRedirects = false
+        ..headers.addAll(headers);
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 5));
+      await response.stream.listen(null).cancel();
+    } catch (_) {
+      // A provider can accept cancellation only while its task is queued.
+    } finally {
+      token.cancel();
+      client?.close();
     }
-    if (error is http.ClientException ||
-        error is SocketException ||
-        error is DioException ||
-        error is TimeoutException) {
-      return const MediaFailure(
-        MediaFailureKind.network,
-        'Media request could not connect',
-      );
-    }
-    return const MediaFailure(
-      MediaFailureKind.invalidResponse,
-      'Unexpected media response',
-    );
   }
 
   void _checkCancelled(_MediaJob job) {
@@ -515,6 +569,16 @@ class MediaGenerationRunner extends ChangeNotifier {
       );
       status = GenerationStatus.failed;
     }
+    if (job.request.mode == MediaMode.video) {
+      final outcome = switch (status) {
+        GenerationStatus.succeeded ||
+        GenerationStatus.partial => BackgroundTaskOutcome.completed,
+        GenerationStatus.cancelled => BackgroundTaskOutcome.cancelled,
+        GenerationStatus.interrupted => BackgroundTaskOutcome.interrupted,
+        _ => BackgroundTaskOutcome.failed,
+      };
+      await _background.finish(job.backgroundId, outcome);
+    }
     job.result.complete(status);
   }
 
@@ -560,4 +624,6 @@ class _MediaJob {
   final int replacementVersion;
   final result = Completer<GenerationStatus>();
   final token = CancelToken();
+  MediaTaskAccepted? remoteTask;
+  String get backgroundId => 'creation-$id';
 }

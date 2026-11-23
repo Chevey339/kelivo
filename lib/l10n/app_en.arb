@@ -23297,6 +23297,83 @@
   "@creationCountLabel": {
     "description": "Heading of the number of images picker."
   },
+  "creationDuration": "Duration",
+  "@creationDuration": {
+    "description": "Title of the duration picker in the video creation composer."
+  },
+  "creationDurationSeconds": "{seconds, plural, one{1 second} other{{seconds} seconds}}",
+  "@creationDurationSeconds": {
+    "description": "Video clip duration shown in the composer or a generation group.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "creationResolution": "Resolution",
+  "@creationResolution": {
+    "description": "Title of the resolution picker in the video creation composer."
+  },
+  "creationFirstLastFrame": "First and last frames",
+  "@creationFirstLastFrame": {
+    "description": "Switch for choosing first and last video reference frames."
+  },
+  "creationFirstFrame": "First frame",
+  "@creationFirstFrame": {
+    "description": "Video composer toggle and slot label for the starting image."
+  },
+  "creationLastFrame": "Last frame",
+  "@creationLastFrame": {
+    "description": "Video composer slot label for the ending image."
+  },
+  "creationFirstFrameRequired": "Choose a first frame. The last frame is optional.",
+  "@creationFirstFrameRequired": {
+    "description": "Hint for video models that require a first frame when a last frame is attached."
+  },
+  "creationFirstFrameOnly": "This model supports a first frame.",
+  "@creationFirstFrameOnly": {
+    "description": "Hint for video models that accept only a first frame."
+  },
+  "creationImageModels": "Image models",
+  "@creationImageModels": {
+    "description": "Title of the image model picker in Creation."
+  },
+  "creationVideoModels": "Video models",
+  "@creationVideoModels": {
+    "description": "Title of the video model picker in Creation."
+  },
+  "creationPlayVideo": "Play video",
+  "@creationPlayVideo": {
+    "description": "Play button tooltip in the embedded generated video player."
+  },
+  "creationPauseVideo": "Pause video",
+  "@creationPauseVideo": {
+    "description": "Pause button tooltip in the embedded generated video player."
+  },
+  "creationMuteVideo": "Mute",
+  "@creationMuteVideo": {
+    "description": "Mute button tooltip in the embedded generated video player."
+  },
+  "creationUnmuteVideo": "Unmute",
+  "@creationUnmuteVideo": {
+    "description": "Unmute button tooltip in the embedded generated video player."
+  },
+  "creationOpenVideo": "Open in system player",
+  "@creationOpenVideo": {
+    "description": "Action on a video cover that opens the file in the operating system player."
+  },
+  "creationFullScreen": "Full screen",
+  "@creationFullScreen": {
+    "description": "Button tooltip to play a generated video in a full-window view."
+  },
+  "creationExitFullScreen": "Exit full screen",
+  "@creationExitFullScreen": {
+    "description": "Button tooltip to close the full-window generated video player."
+  },
+  "creationSaveVideo": "Save video",
+  "@creationSaveVideo": {
+    "description": "Menu action to save a generated video to a file or the photo library."
+  },
   "creationParameters": "Generation options",
   "@creationParameters": {
     "description": "Compact mobile composer action opening all generation parameters."

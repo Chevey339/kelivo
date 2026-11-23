@@ -12,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'video_fixture.dart';
+
 void main() {
   const model = 'grok-imagine-image';
   const adapter = XaiImageAdapter();
@@ -72,6 +74,47 @@ void main() {
       final result = (events.single as MediaOutput).results.single;
       expect(result.url?.host, 'result.test');
       expect(result.revisedPrompt, 'Detail');
+    });
+  }
+
+  for (final oauth in [null, OAuthProvider.grok]) {
+    test('Grok video polls the proper media origin under $oauth', () async {
+      const model = 'grok-imagine-video-1.5';
+      final provider = videoProvider(
+        'https://api.x.ai/v1',
+        model,
+      ).copyWith(oauthProvider: oauth);
+      var attempts = 0;
+      final client = MockClient((request) async {
+        expect(
+          request.url.host,
+          oauth == null ? 'api.x.ai' : 'cli-chat-proxy.grok.com',
+        );
+        if (request.method == 'POST') {
+          expect(request.url.path, '/v1/videos/generations');
+          final body = jsonDecode(request.body) as Map;
+          expect(body['duration'], 8);
+          expect(body['resolution'], '720p');
+          return videoJson({'request_id': 'video-job'});
+        }
+        expect(request.url.path, '/v1/videos/video-job');
+        if (attempts++ == 0) {
+          return videoJson({
+            'error': {'code': 'overload'},
+          }, 503);
+        }
+        return videoJson({
+          'status': 'done',
+          'video': {'url': 'https://vidgen.x.ai/clip.mp4', 'duration': 7.9},
+        });
+      });
+      final events = await const XaiVideoAdapter()
+          .generate(videoContext(provider, client), videoRequest(model))
+          .toList();
+      expect(attempts, 2);
+      final result = events.whereType<MediaOutput>().single.results.single;
+      expect(result.durationMs, 7900);
+      expect(result.downloadHeaders, isEmpty);
     });
   }
 }

@@ -83,7 +83,9 @@ dependencies:
   archive: ^4.5.2
   xml: ^6.5.0
   open_filex: ^4.5.0
-  easy_image_viewer: ^1.4.6
+  video_player: ^2.14.1
+  video_player_win: 3.3.1
+  fc_native_video_thumbnail: 2.1.1
   share_plus: ^12.0.2
   pretty_qr_code: ^3.5.0
   mobile_scanner: ^7.0.1

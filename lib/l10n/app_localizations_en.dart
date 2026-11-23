@@ -17949,6 +17949,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creationCountLabel => 'Image count';
 
   @override
+  String get creationDuration => 'Duration';
+
+  @override
+  String creationDurationSeconds(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds seconds',
+      one: '1 second',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationResolution => 'Resolution';
+
+  @override
+  String get creationFirstLastFrame => 'First and last frames';
+
+  @override
+  String get creationFirstFrame => 'First frame';
+
+  @override
+  String get creationLastFrame => 'Last frame';
+
+  @override
+  String get creationFirstFrameRequired =>
+      'Choose a first frame. The last frame is optional.';
+
+  @override
+  String get creationFirstFrameOnly => 'This model supports a first frame.';
+
+  @override
+  String get creationImageModels => 'Image models';
+
+  @override
+  String get creationVideoModels => 'Video models';
+
+  @override
+  String get creationPlayVideo => 'Play video';
+
+  @override
+  String get creationPauseVideo => 'Pause video';
+
+  @override
+  String get creationMuteVideo => 'Mute';
+
+  @override
+  String get creationUnmuteVideo => 'Unmute';
+
+  @override
+  String get creationOpenVideo => 'Open in system player';
+
+  @override
+  String get creationFullScreen => 'Full screen';
+
+  @override
+  String get creationExitFullScreen => 'Exit full screen';
+
+  @override
+  String get creationSaveVideo => 'Save video';
+
+  @override
   String get creationParameters => 'Generation options';
 
   @override

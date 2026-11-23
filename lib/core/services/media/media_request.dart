@@ -26,6 +26,8 @@ class MediaRequest {
     this.negativePrompt,
     this.count = 1,
     this.aspectRatio = 'auto',
+    this.durationSec,
+    this.resolution,
     this.references = const [],
     this.parameters = const {},
   });
@@ -36,6 +38,8 @@ class MediaRequest {
   final String? negativePrompt;
   final int count;
   final String aspectRatio;
+  final int? durationSec;
+  final String? resolution;
   final List<MediaReference> references;
   final Map<String, dynamic> parameters;
 
@@ -47,6 +51,8 @@ class MediaRequest {
         negativePrompt: negativePrompt,
         count: count ?? this.count,
         aspectRatio: aspectRatio,
+        durationSec: durationSec,
+        resolution: resolution,
         references: references ?? this.references,
         parameters: parameters,
       );
@@ -55,7 +61,12 @@ class MediaRequest {
     ...parameters,
     'count': count,
     'aspectRatio': aspectRatio,
+    if (durationSec != null) 'durationSec': durationSec,
+    if (resolution != null) 'resolution': resolution,
   };
+
+  MediaReference? frame(MediaReferenceRole role) =>
+      references.where((reference) => reference.role == role).firstOrNull;
 }
 
 class MediaCapabilities {
@@ -64,12 +75,32 @@ class MediaCapabilities {
     this.maxPerRequest = 1,
     this.maxReferences = 0,
     this.nativeProgress = false,
+    this.durations = const [],
+    this.resolutions = const [],
+    this.resolutionsWithLastFrame,
+    this.frameRoles = const [],
+    this.ratiosByResolution = const {},
+    this.framesUseAutomaticRatio = false,
+    this.requiresFirstFrame = false,
   });
 
   final List<String> aspectRatios;
   final int maxPerRequest;
   final int maxReferences;
   final bool nativeProgress;
+  final List<int> durations;
+  final List<String> resolutions;
+  final List<String>? resolutionsWithLastFrame;
+  final List<MediaReferenceRole> frameRoles;
+  final Map<String, List<String>> ratiosByResolution;
+  final bool framesUseAutomaticRatio;
+  final bool requiresFirstFrame;
+
+  List<String> ratiosFor(String? resolution) =>
+      ratiosByResolution[resolution] ?? aspectRatios;
+
+  List<String> resolutionsFor({required bool hasLastFrame}) =>
+      (hasLastFrame ? resolutionsWithLastFrame : null) ?? resolutions;
 }
 
 class MediaResult {
@@ -81,6 +112,10 @@ class MediaResult {
     this.revisedPrompt,
     this.previewUrl,
     this.downloadHeaders = const {},
+    this.previewHeaders = const {},
+    this.width,
+    this.height,
+    this.durationMs,
   }) : assert(bytes != null || base64 != null || url != null);
 
   final String mime;
@@ -90,6 +125,10 @@ class MediaResult {
   final String? revisedPrompt;
   final Uri? previewUrl;
   final Map<String, String> downloadHeaders;
+  final Map<String, String> previewHeaders;
+  final int? width;
+  final int? height;
+  final int? durationMs;
 }
 
 sealed class MediaEvent {
@@ -109,6 +148,13 @@ class MediaPreview extends MediaEvent {
 class MediaOutput extends MediaEvent {
   const MediaOutput(this.results);
   final List<MediaResult> results;
+}
+
+class MediaTaskAccepted extends MediaEvent {
+  const MediaTaskAccepted({this.cancelUrl, this.cancelHeaders = const {}});
+
+  final Uri? cancelUrl;
+  final Map<String, String> cancelHeaders;
 }
 
 enum MediaFailureKind {

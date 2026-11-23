@@ -97,6 +97,8 @@ If Kelivo is useful to you, you can also [support the project on WeChat](docx/sp
 | Linux | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | AppImage, DEB, RPM, tar.gz | x86_64 |
 | HarmonyOS | [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos) | Maintained in a separate repository | — |
 
+Linux uses the system player for video playback. Install `ffmpeg` for video covers with AppImage or tar.gz builds.
+
 The [download page](https://kelivo.psycheas.top/downloads) on the website lists the same builds.
 
 ## 🧭 Getting Started
