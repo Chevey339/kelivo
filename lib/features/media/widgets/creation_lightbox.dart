@@ -1,8 +1,12 @@
+import 'creation_menu.dart';
+import 'creation_controls.dart';
+import 'creation_picker.dart';
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/services.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -22,13 +26,12 @@ import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
-import '../../../shared/widgets/form_sheet.dart';
+import '../../../shared/widgets/plain_text_input.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
-import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
+import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/sandbox_path_resolver.dart';
-import '../../settings/widgets/custom_theme_widgets.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_video_player.dart';
 
@@ -46,7 +49,7 @@ Future<void> showCreationLightbox(
 }) async {
   final media = context.read<MediaCreationController>();
   if (SandboxPathResolver.resolveForIo(item.path) == null) {
-    showAppSnackBar(
+    showCreationToast(
       context,
       message: AppLocalizations.of(context)!.creationActionFailed,
     );
@@ -109,7 +112,23 @@ class _CreationLightbox extends StatefulWidget {
   State<_CreationLightbox> createState() => _CreationLightboxState();
 }
 
-class _CreationLightboxState extends State<_CreationLightbox> {
+class _CreationLightboxState extends State<_CreationLightbox>
+    with SingleTickerProviderStateMixin {
+  final _stageKey = GlobalKey();
+  late final _zoomAnimation = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+  )..addListener(_tickZoom);
+  Matrix4Tween? _zoomTween;
+  void _tickZoom() {
+    final tween = _zoomTween;
+    if (tween != null) {
+      _transform.value = tween.transform(
+        handoffCurve.transform(_zoomAnimation.value),
+      );
+    }
+  }
+
   final _transform = TransformationController();
   final _editFocus = FocusNode();
   final _thumbs = ScrollController();
@@ -138,6 +157,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
 
   @override
   void dispose() {
+    _zoomAnimation.dispose();
     _transform.dispose();
     _editFocus.removeListener(_editFocusChanged);
     _editFocus.dispose();
@@ -153,8 +173,15 @@ class _CreationLightboxState extends State<_CreationLightbox> {
 
   void _scrollThumb({bool animated = true}) {
     if (!_thumbs.hasClients) return;
-    final target = (_index * 58.0 - _thumbs.position.viewportDimension / 2 + 24)
-        .clamp(0.0, _thumbs.position.maxScrollExtent);
+    final side = desktop ? 48.0 : 44.0;
+    var center = 14 + side / 2;
+    for (var i = 0; i < _index; i++) {
+      center += side + (_deck[i].batchId == _deck[i + 1].batchId ? 5 : 13);
+    }
+    final target = (center - _thumbs.position.viewportDimension / 2).clamp(
+      0.0,
+      _thumbs.position.maxScrollExtent,
+    );
     if (!animated || MediaQuery.disableAnimationsOf(context)) {
       _thumbs.jumpTo(target);
     } else {
@@ -168,6 +195,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
 
   void _switch(int index) {
     if (index < 0 || index >= _deck.length || index == _index) return;
+    _zoomAnimation.stop();
     _transform.value = Matrix4.identity();
     setState(() {
       _index = index;
@@ -194,16 +222,24 @@ class _CreationLightboxState extends State<_CreationLightbox> {
 
   void _zoom(TapUpDetails details) {
     if (!desktop) return;
-    final point = details.localPosition;
-    if (_transform.value.getMaxScaleOnAxis() > 1.1) {
-      _transform.value = Matrix4.identity();
+    final box = _stageKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final point = box.globalToLocal(details.globalPosition);
+    final target = Matrix4.identity();
+    if (_transform.value.getMaxScaleOnAxis() <= 1.1) {
+      target
+        ..setEntry(0, 0, 1.8)
+        ..setEntry(1, 1, 1.8)
+        ..setEntry(0, 3, -point.dx * .8)
+        ..setEntry(1, 3, -point.dy * .8);
+    }
+    _zoomAnimation.stop();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _transform.value = target;
       return;
     }
-    _transform.value = Matrix4.identity()
-      ..setEntry(0, 0, 1.8)
-      ..setEntry(1, 1, 1.8)
-      ..setEntry(0, 3, -point.dx * .8)
-      ..setEntry(1, 3, -point.dy * .8);
+    _zoomTween = Matrix4Tween(begin: _transform.value.clone(), end: target);
+    _zoomAnimation.forward(from: 0);
   }
 
   Future<void> _toggleEdit() async {
@@ -214,26 +250,18 @@ class _CreationLightboxState extends State<_CreationLightbox> {
       setState(() => _editing = !_editing);
       return;
     }
-    final batchId = await showFormSheet<String>(
+    final batchId = await showCreationPicker<String>(
       context,
-      backgroundColor: const Color(0xff1c1c1e),
-      builder: (sheet) => Theme(
-        data: ThemeData.from(
-          colorScheme: const ColorScheme.dark(surface: Color(0xff1c1c1e)),
-        ),
-        child: FormSheet(
-          title: AppLocalizations.of(context)!.creationEditImage,
-          children: [
-            _CreationEditForm(
-              media: _media,
-              item: source,
-              model: model,
-              focus: _editFocus,
-              desktop: false,
-              onSubmitted: (id) => Navigator.of(sheet).pop(id),
-            ),
-          ],
-        ),
+      desktop: false,
+      darkSheet: true,
+      title: AppLocalizations.of(context)!.creationEditImage,
+      builder: (sheet) => _CreationEditForm(
+        media: _media,
+        item: source,
+        model: model,
+        focus: _editFocus,
+        desktop: false,
+        onSubmitted: (id) => Navigator.of(sheet).pop(id),
       ),
     );
     if (batchId != null) _finishEdit(source, batchId);
@@ -243,7 +271,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     if (!mounted) return;
     final topicId = _media.batch(source.batchId)?.topicId;
     final l10n = AppLocalizations.of(context)!;
-    showAppSnackBar(context, message: l10n.creationEditStarted);
+    showCreationToast(context, message: l10n.creationEditStarted);
     if (widget.canOpenTopic && topicId != null) {
       _jump(topicId, id);
     } else {
@@ -258,6 +286,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
       Navigator.of(context).pop();
       return;
     }
+    _zoomAnimation.stop();
     _transform.value = Matrix4.identity();
     setState(() {
       _index = _index.clamp(0, _deck.length - 1);
@@ -274,92 +303,127 @@ class _CreationLightboxState extends State<_CreationLightbox> {
       final l10n = AppLocalizations.of(context)!;
       final editModel = _media.editingModel(item);
       void favorite() => toggleCreationArtworkFavorite(context, _media, item);
-      final body = SafeArea(
-        child: Column(
-          children: [
-            _header(context, item, batch, editModel, favorite),
-            Expanded(
+      final stage = Column(
+        children: [
+          _header(context, item, batch, editModel, favorite),
+          Expanded(child: _canvas(context, item)),
+          if (!desktop && batch != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(15, 3, 15, 8),
+              child: Text(
+                batch.prompt,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ),
+          if (_deck.length > 1) _thumbnailStrip(),
+          if (desktop && _deck.length > 1)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: _counter(),
+            ),
+          if (!desktop)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 6, 7),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Expanded(child: _canvas(context, item)),
-                  if (_editing && editModel != null)
-                    SizedBox(
-                      width: (MediaQuery.sizeOf(context).width * .44).clamp(
-                        230.0,
-                        360.0,
-                      ),
-                      child: ColoredBox(
-                        color: const Color(0xff1c1c1e),
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(16),
-                          child: _CreationEditForm(
-                            key: ValueKey(item.id),
-                            media: _media,
-                            item: item,
-                            model: editModel,
-                            focus: _editFocus,
-                            desktop: true,
-                            onClose: () => setState(() => _editing = false),
-                            onSubmitted: (id) => _finishEdit(item, id),
-                          ),
-                        ),
-                      ),
+                  _mobileAction(
+                    item.favorite ? LucideIcons.starOff : LucideIcons.star,
+                    item.favorite
+                        ? l10n.creationUnfavorite
+                        : l10n.creationFavorite,
+                    favorite,
+                  ),
+                  _mobileAction(
+                    Lucide.Download,
+                    item.mode == MediaMode.image
+                        ? l10n.creationSaveImage
+                        : l10n.creationSaveVideo,
+                    () => saveCreationArtwork(context, item, desktop: false),
+                  ),
+                  _mobileAction(
+                    Lucide.Share,
+                    l10n.creationShare,
+                    () => shareCreationArtwork(context, item),
+                  ),
+                  if (editModel != null)
+                    _mobileAction(
+                      Lucide.Pencil,
+                      l10n.creationEditImage,
+                      _toggleEdit,
+                    ),
+                  if (item.mode == MediaMode.image)
+                    _mobileAction(
+                      LucideIcons.send,
+                      l10n.creationSendToChat,
+                      () {
+                        Navigator.of(context).pop();
+                        _sendArtworkToChat(context, item);
+                      },
                     ),
                 ],
               ),
             ),
-            if (!desktop && batch != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(15, 3, 15, 8),
-                child: Text(
-                  batch.prompt,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ],
+      );
+      final narrow = MediaQuery.sizeOf(context).width < 960;
+      final panel = desktop && _editing && editModel != null
+          ? _EditPanelIn(
+              child: SizedBox(
+                width:
+                    (narrow
+                            ? MediaQuery.sizeOf(context).width
+                            : MediaQuery.sizeOf(context).width * .40)
+                        .clamp(220.0, 360.0),
+                child: ColoredBox(
+                  color: const Color(0xff1c1c1e),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _CreationEditForm(
+                      key: ValueKey(item.id),
+                      media: _media,
+                      item: item,
+                      model: editModel,
+                      focus: _editFocus,
+                      desktop: true,
+                      onClose: () => setState(() => _editing = false),
+                      onSubmitted: (id) => _finishEdit(item, id),
+                    ),
+                  ),
                 ),
               ),
-            if (_deck.length > 1) _thumbnailStrip(),
-            if (desktop && _deck.length > 1)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 7),
-                child: _counter(),
+            )
+          : null;
+      final body = SafeArea(
+        child: panel == null
+            ? stage
+            : narrow
+            ? Stack(
+                children: [
+                  Positioned.fill(child: stage),
+                  Positioned.fill(
+                    child: ModalBarrier(
+                      color: Colors.black38,
+                      onDismiss: () => setState(() => _editing = false),
+                    ),
+                  ),
+                  PositionedDirectional(
+                    end: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: panel,
+                  ),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: stage),
+                  panel,
+                ],
               ),
-            if (!desktop)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(6, 4, 6, 7),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _mobileAction(
-                      item.favorite ? LucideIcons.starOff : LucideIcons.star,
-                      item.favorite
-                          ? l10n.creationUnfavorite
-                          : l10n.creationFavorite,
-                      favorite,
-                    ),
-                    _mobileAction(
-                      Lucide.Download,
-                      item.mode == MediaMode.image
-                          ? l10n.creationSaveImage
-                          : l10n.creationSaveVideo,
-                      () => saveCreationArtwork(context, item, desktop: false),
-                    ),
-                    _mobileAction(
-                      Lucide.Share,
-                      l10n.creationShare,
-                      () => shareCreationArtwork(context, item),
-                    ),
-                    if (editModel != null)
-                      _mobileAction(
-                        Lucide.Pencil,
-                        l10n.creationEditImage,
-                        _toggleEdit,
-                      ),
-                  ],
-                ),
-              ),
-          ],
-        ),
       );
       return CallbackShortcuts(
         bindings: {
@@ -382,12 +446,15 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                 : Colors.black.withValues(
                     alpha: 1 - (_dragOffset.dy / 320).clamp(0.0, .55),
                   ),
-            child: desktop
-                ? BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                    child: body,
-                  )
-                : body,
+            child: AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle.light,
+              child: desktop
+                  ? BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: body,
+                    )
+                  : body,
+            ),
           ),
         ),
       );
@@ -433,6 +500,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
       );
     }
 
+    final compactTools = desktop && MediaQuery.sizeOf(context).width < 680;
     final close = _icon(
       Lucide.X,
       MaterialLocalizations.of(context).closeButtonTooltip,
@@ -445,13 +513,13 @@ class _CreationLightboxState extends State<_CreationLightbox> {
         () => _showArtworkMenu(
           anchor,
           [
-            if (!desktop && jump)
+            if ((!desktop || compactTools) && jump)
               ActionSheetItem(
                 icon: LucideIcons.externalLink,
                 label: l10n.creationShowInTopic,
                 onTap: () => _jump(topicId, item.batchId),
               ),
-            if (!desktop && jumpToChat)
+            if ((!desktop || compactTools) && jumpToChat)
               ActionSheetItem(
                 icon: LucideIcons.externalLink,
                 label: l10n.creationShowInConversation,
@@ -463,7 +531,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
               item,
               desktop: desktop,
               draftTopicId: widget.draftTopicId,
-              includePrimary: false,
+              includePrimary: compactTools,
               onEdit: _toggleEdit,
               onDelete: () => _delete(item),
               onSendToChat: () {
@@ -491,6 +559,32 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     }
     final topic = topicId == null ? null : _media.topic(topicId);
     final ratio = _readRatio(batch);
+    if (compactTools) {
+      return Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          Platform.isMacOS ? 75 : 8,
+          8,
+          8,
+          0,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                batch?.prompt ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 13.5),
+              ),
+            ),
+            if (editModel != null)
+              _icon(Lucide.Pencil, l10n.creationEditImage, _toggleEdit),
+            menu,
+            close,
+          ],
+        ),
+      );
+    }
     final captions = [
       if (topic != null) topic.title,
       if (conversation != null) l10n.creationChatSource(conversation.title),
@@ -537,10 +631,15 @@ class _CreationLightboxState extends State<_CreationLightbox> {
             child: Row(
               children: [
                 if (jump)
-                  _icon(
-                    LucideIcons.externalLink,
-                    l10n.creationShowInTopic,
-                    () => _jump(topicId, item.batchId),
+                  Tooltip(
+                    message: l10n.creationShowInTopic,
+                    child: CreationAction(
+                      small: true,
+                      foreground: Colors.white,
+                      icon: const Icon(LucideIcons.externalLink, size: 15),
+                      onPressed: () => _jump(topicId, item.batchId),
+                      child: Text(l10n.creationShowInTopic),
+                    ),
                   ),
                 if (jumpToChat)
                   _icon(
@@ -549,7 +648,15 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                     openChat,
                   ),
                 if (editModel != null)
-                  _icon(Lucide.Pencil, l10n.creationEditImage, _toggleEdit),
+                  CreationAction(
+                    small: true,
+                    pill: true,
+                    fill: _editing ? Colors.white : Colors.transparent,
+                    foreground: _editing ? Colors.black : Colors.white,
+                    icon: const Icon(Lucide.Pencil, size: 14),
+                    onPressed: _toggleEdit,
+                    child: Text(l10n.creationEditImage),
+                  ),
                 _icon(
                   item.favorite ? LucideIcons.starOff : LucideIcons.star,
                   item.favorite
@@ -594,6 +701,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
             minScale: 1,
             maxScale: 4,
             onInteractionStart: (details) {
+              _zoomAnimation.stop();
               _dragStart = details.focalPoint;
               _swipeX = 0;
             },
@@ -631,24 +739,77 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                 }
               }
             },
-            child: GestureDetector(
-              onTapUp: _zoom,
-              child: CreationDragOut(
-                item: item,
-                enabled: desktop,
-                child: Hero(
-                  tag: 'creation:${item.id}',
-                  child: CreationFileImage(item.path, fit: BoxFit.contain),
+            child: Stack(
+              key: _stageKey,
+              fit: StackFit.expand,
+              children: [
+                if (desktop)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                Center(
+                  child: GestureDetector(
+                    onTapUp: _zoom,
+                    child: CreationDragOut(
+                      item: item,
+                      enabled: desktop,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(desktop ? 6 : 4),
+                          boxShadow: desktop
+                              ? const [
+                                  BoxShadow(
+                                    color: Colors.black54,
+                                    offset: Offset(0, 20),
+                                    blurRadius: 60,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(desktop ? 6 : 4),
+                          child: Hero(
+                            tag: 'creation:${item.id}',
+                            child: CreationFileImage(
+                              item.path,
+                              fit: BoxFit.contain,
+                              fill: false,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           );
+    Widget arrow(IconData icon, String tip, VoidCallback? tap) => SizedBox(
+      width: MediaQuery.sizeOf(context).width < 650 ? 44 : 72,
+      child: Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .08),
+            shape: BoxShape.circle,
+          ),
+          child: IosIconButton(
+            icon: icon,
+            tooltip: tip,
+            minSize: 40,
+            size: 20,
+            color: Colors.white,
+            onTap: tap,
+          ),
+        ),
+      ),
+    );
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: desktop ? 10 : 0, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
       child: Row(
         children: [
           if (nav)
-            _icon(
+            arrow(
               Lucide.ChevronLeft,
               l10n.creationPrevious,
               _index > 0 ? () => _switch(_index - 1) : null,
@@ -663,7 +824,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
             ),
           ),
           if (nav)
-            _icon(
+            arrow(
               Lucide.ChevronRight,
               l10n.creationNext,
               _index + 1 < _deck.length ? () => _switch(_index + 1) : null,
@@ -677,7 +838,14 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     final size = desktop ? 48.0 : 44.0;
     return SizedBox(
       height: size + 4,
-      child: ListView.builder(
+      child: ListView.separated(
+        shrinkWrap: true,
+        separatorBuilder: (_, i) => _deck[i].batchId == _deck[i + 1].batchId
+            ? const SizedBox(width: 5)
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+                child: Container(width: 1, color: Colors.white24),
+              ),
         controller: _thumbs,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -687,13 +855,6 @@ class _CreationLightboxState extends State<_CreationLightbox> {
           child: Container(
             width: size,
             height: size,
-            margin: EdgeInsets.only(
-              right:
-                  index + 1 < _deck.length &&
-                      _deck[index + 1].batchId != _deck[index].batchId
-                  ? 12
-                  : 5,
-            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(9),
               border: Border.all(
@@ -718,6 +879,8 @@ class _CreationLightboxState extends State<_CreationLightbox> {
       Flexible(
         child: IosCardPress(
           onTap: onTap,
+          focusable: true,
+          baseColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -745,6 +908,20 @@ String _readRatio(GenerationBatchRow? batch) {
     return 'auto';
   } on TypeError {
     return 'auto';
+  }
+}
+
+class _EditPanelIn extends StatelessWidget {
+  const _EditPanelIn({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    final duration = handoffDuration(context, 320);
+    if (duration == Duration.zero) return child;
+    return child
+        .animate()
+        .fadeIn(duration: duration, curve: handoffCurve)
+        .moveX(begin: 40, end: 0, duration: duration, curve: handoffCurve);
   }
 }
 
@@ -823,7 +1000,7 @@ class _CreationEditFormState extends State<_CreationEditForm> {
       if (mounted && ticket != null) widget.onSubmitted(ticket.batchId);
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(
+        showCreationToast(
           context,
           message: AppLocalizations.of(context)!.creationActionFailed,
         );
@@ -866,16 +1043,14 @@ class _CreationEditFormState extends State<_CreationEditForm> {
           .take(4),
     ];
     final selected = options.contains(_ratio) ? _ratio! : initial;
-    final colors = Theme.of(context).colorScheme;
+    const colors = ColorScheme.dark(
+      surface: Color(0xff1c1c1e),
+      primary: Colors.white,
+      onSurface: Colors.white,
+      onSurfaceVariant: Colors.white70,
+    );
     return Theme(
-      data: widget.desktop
-          ? ThemeData.from(
-              colorScheme: const ColorScheme.dark(
-                surface: Color(0xff1c1c1e),
-                primary: Colors.white,
-              ),
-            )
-          : Theme.of(context),
+      data: Theme.of(context).copyWith(colorScheme: colors),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -932,24 +1107,34 @@ class _CreationEditFormState extends State<_CreationEditForm> {
             ],
           ),
           const SizedBox(height: 14),
-          TextField(
+          Text(
+            l10n.creationEditPrompt,
+            style: const TextStyle(fontSize: 13, color: Colors.white70),
+          ),
+          const SizedBox(height: 6),
+          PlainTextInput(
             controller: _prompt,
             focusNode: widget.focus,
-            onChanged: (_) => setState(() {}),
             minLines: 4,
             maxLines: 5,
-            decoration: InputDecoration(
-              labelText: l10n.creationEditPrompt,
-              hintText: l10n.creationEditPromptExample,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+            onChanged: (_) => setState(() {}),
+            placeholder: l10n.creationEditPromptExample,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            placeholderStyle: const TextStyle(color: Colors.white38),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
           const SizedBox(height: 12),
-          SegmentedTabs(
-            expand: options.length <= 3,
-            radioGroup: true,
+          SlidingSegmentedTabs(
+            backgroundColor: Colors.white.withValues(alpha: .08),
+            selectedColor: const Color(0xfff5f5f5),
+            selectedForegroundColor: const Color(0xff111111),
+            foregroundColor: Colors.white70,
+            expand: true,
+
             index: options.indexOf(selected),
             tabs: [
               for (final value in options)
@@ -972,18 +1157,16 @@ class _CreationEditFormState extends State<_CreationEditForm> {
             ),
           ),
           const SizedBox(height: 16),
-          FilledButton.icon(
-            style: widget.desktop
-                ? FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                  )
-                : null,
+          CreationAction(
+            tone: CreationActionTone.primary,
+            fill: Colors.white,
+            foreground: Colors.black,
+            minHeight: 44,
             onPressed: _busy || _prompt.text.trim().isEmpty
                 ? null
                 : () => _send(selected),
             icon: const Icon(LucideIcons.sparkles, size: 16),
-            label: Text(l10n.creationEditNewGroup),
+            child: Text(l10n.creationEditNewGroup),
           ),
         ],
       ),
@@ -1035,14 +1218,19 @@ Future<void> _showArtworkMenu(
   Offset? anchor,
 }) {
   if (!desktop) {
-    return showMobileActionSheet(context, title: title, items: items);
+    return showCreationActions(
+      context,
+      title: title,
+      items: items,
+      darkSheet: ModalRoute.of(context)?.opaque == false,
+    );
   }
   final render = context.findRenderObject() as RenderBox?;
   final position =
       anchor ??
       render?.localToGlobal(render.size.bottomCenter(Offset.zero)) ??
       Offset.zero;
-  return showDesktopContextMenuAt(
+  return showCreationMenu(
     context,
     globalPosition: position,
     items: [
@@ -1107,7 +1295,7 @@ List<ActionSheetItem> _artworkActions(
         onTap: () async {
           await Clipboard.setData(ClipboardData(text: batch.prompt));
           if (context.mounted) {
-            showAppSnackBar(context, message: l10n.creationOptionCopied);
+            showCreationToast(context, message: l10n.creationOptionCopied);
           }
         },
       ),
@@ -1141,7 +1329,7 @@ Future<void> _runArtworkAction(
     await action();
   } catch (_) {
     if (context.mounted) {
-      showAppSnackBar(
+      showCreationToast(
         context,
         message: AppLocalizations.of(context)!.creationActionFailed,
       );
@@ -1157,7 +1345,7 @@ void addCreationArtworkReference(
 ) {
   final changed = media.addReferencePaths(topicId, [item.path]) > 0;
   final l10n = AppLocalizations.of(context)!;
-  showAppSnackBar(
+  showCreationToast(
     context,
     message: changed
         ? l10n.creationReferenceAdded
@@ -1176,7 +1364,7 @@ Future<void> toggleCreationArtworkFavorite(
   await media.setFavorite(item.id, value);
   if (context.mounted) {
     final l10n = AppLocalizations.of(context)!;
-    showAppSnackBar(
+    showCreationToast(
       context,
       message: value ? l10n.creationFavorited : l10n.creationUnfavorited,
     );
@@ -1206,7 +1394,7 @@ Future<void> saveCreationArtwork(
     }
   }
   if (context.mounted) {
-    showAppSnackBar(
+    showCreationToast(
       context,
       message: AppLocalizations.of(context)!.creationOptionSaved,
     );
@@ -1226,7 +1414,7 @@ Future<void> _copyArtwork(BuildContext context, GenerationItemRow item) =>
       };
       await clipboard.write([DataWriterItem()..add(format(bytes))]);
       if (context.mounted) {
-        showAppSnackBar(
+        showCreationToast(
           context,
           message: AppLocalizations.of(context)!.creationOptionCopied,
         );
@@ -1254,7 +1442,7 @@ Future<bool> _deleteArtwork(
   GenerationItemRow item,
 ) async {
   final l10n = AppLocalizations.of(context)!;
-  final yes = await showAppDialog<bool>(
+  final yes = await showCreationDialog<bool>(
     context,
     maxWidth: 380,
     child: Builder(
@@ -1274,13 +1462,13 @@ Future<bool> _deleteArtwork(
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton(
+                CreationAction(
                   onPressed: () => Navigator.of(dialog).pop(false),
                   child: Text(
                     MaterialLocalizations.of(dialog).cancelButtonLabel,
                   ),
                 ),
-                TextButton(
+                CreationAction(
                   onPressed: () => Navigator.of(dialog).pop(true),
                   child: Text(l10n.chatHistoryPageDelete),
                 ),
@@ -1305,7 +1493,7 @@ void _sendArtworkToChat(BuildContext context, GenerationItemRow item) {
   if (file != null) {
     ChatActionBus.instance.fireCreation(PrefillChatImage(file));
   } else {
-    showAppSnackBar(
+    showCreationToast(
       context,
       message: AppLocalizations.of(context)!.creationActionFailed,
     );
@@ -1318,10 +1506,12 @@ class CreationFileImage extends StatelessWidget {
     super.key,
     this.fit = BoxFit.cover,
     this.cacheWidth,
+    this.fill = true,
   });
 
   final String path;
   final BoxFit fit;
+  final bool fill;
   final int? cacheWidth;
 
   @override
@@ -1334,8 +1524,8 @@ class CreationFileImage extends StatelessWidget {
             File(file),
             cacheWidth: cacheWidth,
             fit: fit,
-            width: double.infinity,
-            height: double.infinity,
+            width: fill ? double.infinity : null,
+            height: fill ? double.infinity : null,
             errorBuilder: (_, _, _) => placeholder,
           );
   }

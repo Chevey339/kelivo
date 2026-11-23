@@ -1,3 +1,5 @@
+import 'creation_menu.dart';
+import 'creation_picker.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -19,16 +21,15 @@ import '../../../desktop/desktop_settings_navigation_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
-import '../../../shared/widgets/form_sheet.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/snackbar.dart';
+import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'creation_controls.dart';
 import '../../provider/pages/provider_detail_page.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../provider/widgets/oauth_login_panel.dart';
-import '../../settings/widgets/custom_theme_widgets.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_lightbox.dart';
@@ -119,7 +120,7 @@ class _CreationTimelineState extends State<CreationTimeline> {
         desktop ? 32 : 14,
         14,
         desktop ? 32 : 14,
-        160,
+        196,
       ),
       itemCount: batches.length,
       itemBuilder: (context, index) {
@@ -172,9 +173,39 @@ class _CreationTimelineState extends State<CreationTimeline> {
                 ),
               );
         }
-        return group;
+        return _BatchEntrance(
+          key: ValueKey(batch.id),
+          createdAt: batch.createdAt,
+          child: group,
+        );
       },
     );
+  }
+}
+
+class _BatchEntrance extends StatefulWidget {
+  const _BatchEntrance({
+    super.key,
+    required this.createdAt,
+    required this.child,
+  });
+  final DateTime createdAt;
+  final Widget child;
+  @override
+  State<_BatchEntrance> createState() => _BatchEntranceState();
+}
+
+class _BatchEntranceState extends State<_BatchEntrance> {
+  late final bool _newBatch =
+      DateTime.now().difference(widget.createdAt) < const Duration(seconds: 2);
+  @override
+  Widget build(BuildContext context) {
+    final duration = handoffDuration(context, 360);
+    if (!_newBatch || duration == Duration.zero) return widget.child;
+    return widget.child
+        .animate()
+        .fadeIn(duration: duration, curve: handoffCurve)
+        .moveY(begin: 10, end: 0, duration: duration, curve: handoffCurve);
   }
 }
 
@@ -345,7 +376,7 @@ class CreationEmptyState extends StatelessWidget {
   ) async {
     final panel = OAuthLoginPanel(provider: provider, autoStart: true);
     if (desktop) {
-      await showAppDialog<void>(
+      await showCreationDialog<void>(
         context,
         maxWidth: 560,
         child: SingleChildScrollView(
@@ -354,9 +385,11 @@ class CreationEmptyState extends StatelessWidget {
         ),
       );
     } else {
-      await showFormSheet<void>(
+      await showCreationPicker<void>(
         context,
-        builder: (_) => FormSheet(title: label, children: [panel]),
+        desktop: false,
+        title: label,
+        builder: (_) => panel,
       );
     }
   }
@@ -426,6 +459,7 @@ class _BatchHeader extends StatefulWidget {
 
 class _BatchHeaderState extends State<_BatchHeader> {
   bool _expanded = false;
+  bool _hover = false, _focus = false;
 
   @override
   Widget build(BuildContext context) {
@@ -434,104 +468,113 @@ class _BatchHeaderState extends State<_BatchHeader> {
     final cs = Theme.of(context).colorScheme;
     final media = context.read<MediaCreationController>();
     final p = _parameters(batch);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    final visible = !widget.desktop || _hover || _focus;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Focus(
+        onFocusChange: (f) => setState(() => _focus = f),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _expanded = !_expanded),
-                child: Text(
-                  batch.prompt,
-                  maxLines: _expanded ? null : 2,
-                  overflow: _expanded ? null : TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14.5, height: 1.55),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Text(
+                      batch.prompt,
+                      maxLines: _expanded ? null : 2,
+                      overflow: _expanded ? null : TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14.5, height: 1.55),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            if (batch.status.isActive)
-              TextButton.icon(
-                onPressed: () => media.runner.cancel(batch.id),
-                icon: const Icon(Lucide.Square, size: 13),
-                label: Text(
-                  MaterialLocalizations.of(context).cancelButtonLabel,
-                ),
-              )
-            else ...[
-              if (widget.desktop) ...[
-                IosIconButton(
-                  icon: Lucide.RotateCcw,
-                  size: 16,
-                  tooltip: l10n.creationRepeat,
-                  onTap: _repeat,
-                ),
-                IosIconButton(
-                  icon: Lucide.Copy,
-                  size: 16,
-                  tooltip: l10n.creationCopyPrompt,
-                  onTap: _copy,
-                ),
+                if (batch.status.isActive)
+                  CreationAction(
+                    small: true,
+                    onPressed: () => media.runner.cancel(batch.id),
+                    icon: const Icon(Lucide.Square, size: 13),
+                    child: Text(
+                      MaterialLocalizations.of(context).cancelButtonLabel,
+                    ),
+                  )
+                else if (visible) ...[
+                  if (widget.desktop) ...[
+                    IosIconButton(
+                      icon: Lucide.RotateCcw,
+                      size: 16,
+                      tooltip: l10n.creationRepeat,
+                      onTap: _repeat,
+                    ),
+                    IosIconButton(
+                      icon: Lucide.Copy,
+                      size: 16,
+                      tooltip: l10n.creationCopyPrompt,
+                      onTap: _copy,
+                    ),
+                  ],
+                  Builder(
+                    builder: (anchor) => IosIconButton(
+                      icon: Lucide.Ellipsis,
+                      size: 16,
+                      tooltip: l10n.chatMessageWidgetMoreTooltip,
+                      onTap: () => _menu(anchor),
+                    ),
+                  ),
+                ],
               ],
-              Builder(
-                builder: (anchor) => IosIconButton(
-                  icon: Lucide.Ellipsis,
-                  size: 16,
-                  tooltip: l10n.chatMessageWidgetMoreTooltip,
-                  onTap: () => _menu(anchor),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 5,
+              runSpacing: 5,
+              children: [
+                Text(
+                  MaterialLocalizations.of(
+                    context,
+                  ).formatTimeOfDay(TimeOfDay.fromDateTime(batch.createdAt)),
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                 ),
-              ),
-            ],
+                _Tag(
+                  batch.modelId,
+                  leading: ProviderAvatar(
+                    providerKey: batch.providerId,
+                    displayName: batch.providerId,
+                    size: 15,
+                  ),
+                ),
+                if (p.ratio != 'auto') _Tag(p.ratio),
+                if (batch.mode == MediaMode.image)
+                  _Tag(l10n.creationImagesCount(p.count)),
+                if (p.duration case final duration?)
+                  _Tag(l10n.creationDurationSeconds(duration)),
+                if (p.resolution case final resolution?) _Tag(resolution),
+                if (batch.parentItemId case final parent?)
+                  _EditedFromTag(
+                    item: media.item(parent),
+                    desktop: widget.desktop,
+                    draftTopicId: batch.topicId,
+                  ),
+                if (_referenceCount(batch) case final count when count > 0)
+                  _Tag(
+                    l10n.creationImagesCount(count),
+                    leading: const Icon(Lucide.Image, size: 13),
+                  ),
+              ],
+            ),
           ],
         ),
-        const SizedBox(height: 4),
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 5,
-          runSpacing: 5,
-          children: [
-            Text(
-              MaterialLocalizations.of(
-                context,
-              ).formatTimeOfDay(TimeOfDay.fromDateTime(batch.createdAt)),
-              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-            ),
-            _Tag(
-              batch.modelId,
-              leading: ProviderAvatar(
-                providerKey: batch.providerId,
-                displayName: batch.providerId,
-                size: 15,
-              ),
-            ),
-            if (p.ratio != 'auto') _Tag(p.ratio),
-            if (batch.mode == MediaMode.image)
-              _Tag(l10n.creationImagesCount(p.count)),
-            if (p.duration case final duration?)
-              _Tag(l10n.creationDurationSeconds(duration)),
-            if (p.resolution case final resolution?) _Tag(resolution),
-            if (batch.parentItemId case final parent?)
-              _EditedFromTag(
-                item: media.item(parent),
-                desktop: widget.desktop,
-                draftTopicId: batch.topicId,
-              ),
-            if (_referenceCount(batch) case final count when count > 0)
-              _Tag(
-                l10n.creationImagesCount(count),
-                leading: const Icon(Lucide.Image, size: 13),
-              ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 
   Future<void> _copy() async {
     await Clipboard.setData(ClipboardData(text: widget.batch.prompt));
     if (mounted) {
-      showAppSnackBar(
+      showCreationToast(
         context,
         message: AppLocalizations.of(context)!.creationOptionCopied,
       );
@@ -544,7 +587,7 @@ class _BatchHeaderState extends State<_BatchHeader> {
       await media.repeat(widget.batch);
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(
+        showCreationToast(
           context,
           message: AppLocalizations.of(context)!.creationActionFailed,
         );
@@ -584,7 +627,7 @@ class _BatchHeaderState extends State<_BatchHeader> {
             final count = media.addReferencePaths(batch.topicId, [
               for (final item in images) item.path,
             ]);
-            showAppSnackBar(
+            showCreationToast(
               context,
               message: count > 0
                   ? l10n.creationReferenceAdded
@@ -613,11 +656,11 @@ class _BatchHeaderState extends State<_BatchHeader> {
       ),
     ];
     if (!widget.desktop) {
-      await showMobileActionSheet(context, items: choices);
+      await showCreationActions(context, items: choices);
       return;
     }
     final box = anchor.findRenderObject() as RenderBox;
-    await showDesktopContextMenuAt(
+    await showCreationMenu(
       context,
       globalPosition: box.localToGlobal(box.size.bottomCenter(Offset.zero)),
       items: [
@@ -636,7 +679,7 @@ class _BatchHeaderState extends State<_BatchHeader> {
     final l10n = AppLocalizations.of(context)!;
     final media = context.read<MediaCreationController>();
     final count = media.itemsFor(widget.batch.id).length;
-    final confirmed = await showAppDialog<bool>(
+    final confirmed = await showCreationDialog<bool>(
       context,
       maxWidth: 380,
       child: Builder(
@@ -656,13 +699,13 @@ class _BatchHeaderState extends State<_BatchHeader> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  CreationAction(
                     onPressed: () => Navigator.of(dialog).pop(false),
                     child: Text(
                       MaterialLocalizations.of(dialog).cancelButtonLabel,
                     ),
                   ),
-                  TextButton(
+                  CreationAction(
                     onPressed: () => Navigator.of(dialog).pop(true),
                     child: Text(l10n.chatHistoryPageDelete),
                   ),
@@ -677,7 +720,9 @@ class _BatchHeaderState extends State<_BatchHeader> {
     try {
       await media.deleteBatch(widget.batch);
     } catch (_) {
-      if (mounted) showAppSnackBar(context, message: l10n.creationActionFailed);
+      if (mounted) {
+        showCreationToast(context, message: l10n.creationActionFailed);
+      }
     }
   }
 }
@@ -789,7 +834,10 @@ Future<void> showCreationRequestDetails(
         runSpacing: 6,
         children: [
           if (kind is String)
-            _Tag(kind, leading: const Icon(Lucide.CircleAlert, size: 12)),
+            _Tag(
+              l10n.creationFailureCategory(kind),
+              leading: const Icon(Lucide.CircleAlert, size: 12),
+            ),
           _Tag(
             retryable
                 ? l10n.creationAutomaticRetry
@@ -811,16 +859,16 @@ Future<void> showCreationRequestDetails(
   Widget actions(BuildContext dialog) => Row(
     mainAxisAlignment: MainAxisAlignment.end,
     children: [
-      TextButton(
+      CreationAction(
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: copyText));
           if (dialog.mounted) {
-            showAppSnackBar(dialog, message: l10n.creationOptionCopied);
+            showCreationToast(dialog, message: l10n.creationOptionCopied);
           }
         },
         child: Text(MaterialLocalizations.of(dialog).copyButtonLabel),
       ),
-      TextButton(
+      CreationAction(
         onPressed: () async {
           Navigator.of(dialog).pop();
           try {
@@ -831,7 +879,7 @@ Future<void> showCreationRequestDetails(
             }
           } catch (_) {
             if (context.mounted) {
-              showAppSnackBar(context, message: l10n.creationActionFailed);
+              showCreationToast(context, message: l10n.creationActionFailed);
             }
           }
         },
@@ -840,17 +888,19 @@ Future<void> showCreationRequestDetails(
     ],
   );
   if (!desktop) {
-    await showFormSheet<void>(
+    await showCreationPicker<void>(
       context,
-      builder: (dialog) => FormSheet(
-        title: l10n.creationRequestDetails,
-        actions: actions(dialog),
-        children: [content],
+      desktop: false,
+      title: l10n.creationRequestDetails,
+      builder: (dialog) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [content, const SizedBox(height: 12), actions(dialog)],
       ),
     );
     return;
   }
-  await showAppDialog<void>(
+  await showCreationDialog<void>(
     context,
     maxWidth: 560,
     child: Builder(
@@ -1116,13 +1166,13 @@ class _DownloadFailure extends StatelessWidget {
                       : l10n.creationPartial,
                   style: const TextStyle(fontSize: 12),
                 ),
-                TextButton(
+                CreationAction(
                   onPressed: () async {
                     try {
                       await media.retry(batch);
                     } catch (_) {
                       if (context.mounted) {
-                        showAppSnackBar(
+                        showCreationToast(
                           context,
                           message: l10n.creationActionFailed,
                         );
@@ -1159,63 +1209,108 @@ class _BatchFailure extends StatelessWidget {
     final danger =
         batch.status == GenerationStatus.failed ||
         batch.status == GenerationStatus.partial;
+    final details = _requestDetails(batch);
+    final kind = details['kind']?.toString();
+    final reason = danger
+        ? details['message']?.toString() ?? l10n.creationNoRequestDetails
+        : batch.status == GenerationStatus.cancelled
+        ? l10n.creationCancelledHelp
+        : l10n.creationInterruptedHelp;
+    final ink = danger ? cs.error : cs.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: DecoratedBox(
+      child: Container(
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: danger
               ? cs.error.withValues(alpha: .08)
               : context.appColors.surfaceFill,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              Icon(
-                danger ? Lucide.CircleAlert : Lucide.Square,
-                size: 20,
-                color: danger ? cs.error : cs.onSurfaceVariant,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: ink.withValues(alpha: .14),
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: AppFontWeights.semibold,
+              child: Icon(
+                danger
+                    ? Lucide.CircleAlert
+                    : batch.status == GenerationStatus.interrupted
+                    ? LucideIcons.circleX
+                    : Lucide.Square,
+                size: 18,
+                color: ink,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    danger && kind != null
+                        ? '$title · ${l10n.creationFailureCategory(kind)}'
+                        : title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ),
-              if (danger)
-                IosIconButton(
-                  icon: Lucide.FileText,
-                  minSize: 30,
-                  tooltip: l10n.creationRequestDetails,
-                  onTap: () => showCreationRequestDetails(
-                    context,
-                    batch,
-                    desktop: desktop,
+                  const SizedBox(height: 4),
+                  Text(
+                    reason,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.5,
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              TextButton.icon(
-                onPressed: () async {
-                  try {
-                    await media.retry(batch);
-                  } catch (_) {
-                    if (context.mounted) {
-                      showAppSnackBar(
-                        context,
-                        message: l10n.creationActionFailed,
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Lucide.RotateCcw, size: 15),
-                label: Text(l10n.creationRetry),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 5,
+                    children: [
+                      CreationAction(
+                        tone: CreationActionTone.tonal,
+                        small: true,
+                        icon: const Icon(Lucide.RotateCcw, size: 14),
+                        child: Text(l10n.creationRetry),
+                        onPressed: () async {
+                          try {
+                            await media.retry(batch);
+                          } catch (_) {
+                            if (context.mounted) {
+                              showCreationToast(
+                                context,
+                                message: l10n.creationActionFailed,
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      if (danger)
+                        CreationAction(
+                          small: true,
+                          icon: const Icon(Lucide.FileText, size: 14),
+                          child: Text(l10n.creationRequestDetails),
+                          onPressed: () => showCreationRequestDetails(
+                            context,
+                            batch,
+                            desktop: desktop,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

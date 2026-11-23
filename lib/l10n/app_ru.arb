@@ -5440,5 +5440,8 @@
   "creationModelReferenceLimit": "До {count} референсов",
   "creationTextOnlyImage": "Текст в изображение",
   "creationTextOnlyVideo": "Текст в видео",
-  "creationCustomCountLabel": "Своё количество"
+  "creationCustomCountLabel": "Своё количество",
+  "creationFailureCategory": "{kind, select, network{Сетевое подключение} rateLimited{Превышен лимит запросов} server{Ошибка провайдера} rejected{Запрос отклонён} login{Требуется вход} parameters{Неверные параметры} referenceTooLarge{Слишком большой референс} download{Ошибка загрузки} invalidResponse{Неверный ответ} other{Ошибка генерации}}",
+  "creationInterruptedHelp": "Приложение закрылось до завершения этого запроса. Ваш промпт и настройки сохранены.",
+  "creationCancelledHelp": "Ваш промпт и настройки сохранены. Вы можете сгенерировать снова в любое время."
 }

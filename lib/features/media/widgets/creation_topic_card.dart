@@ -1,3 +1,6 @@
+import 'creation_menu.dart';
+import 'creation_controls.dart';
+import 'creation_picker.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -9,12 +12,11 @@ import '../../../desktop/desktop_context_menu.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
-import '../../../shared/widgets/ios_form_text_field.dart';
+import '../../../shared/widgets/plain_text_input.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/snackbar.dart';
+import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
-import '../../settings/widgets/custom_theme_widgets.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_lightbox.dart';
 import 'creation_waiting_card.dart';
@@ -149,10 +151,7 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
                       padding: const EdgeInsets.all(5),
                       child: SizedBox.square(
                         dimension: 11,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.7,
-                          color: cs.primary,
-                        ),
+                        child: CreationSpinner(radius: 6, color: cs.primary),
                       ),
                     ),
                   ),
@@ -222,7 +221,7 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
                     if (running && !_hover)
                       const SizedBox.square(
                         dimension: 13,
-                        child: CircularProgressIndicator(strokeWidth: 1.7),
+                        child: CreationSpinner(radius: 6),
                       ),
                     if (_hover && desktop)
                       IosIconButton(
@@ -359,7 +358,7 @@ Future<void> showCreationTopicMenu(
       destructive: true,
       onTap: () async {
         final media = context.read<MediaCreationController>();
-        final confirmed = await showAppDialog<bool>(
+        final confirmed = await showCreationDialog<bool>(
           context,
           maxWidth: 380,
           child: Builder(
@@ -379,13 +378,13 @@ Future<void> showCreationTopicMenu(
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
+                      CreationAction(
                         onPressed: () => Navigator.of(context).pop(false),
                         child: Text(
                           MaterialLocalizations.of(context).cancelButtonLabel,
                         ),
                       ),
-                      TextButton(
+                      CreationAction(
                         onPressed: () => Navigator.of(context).pop(true),
                         child: Text(l10n.chatHistoryPageDelete),
                       ),
@@ -402,18 +401,18 @@ Future<void> showCreationTopicMenu(
           if (context.mounted) onDeleted?.call();
         } catch (_) {
           if (context.mounted) {
-            showAppSnackBar(context, message: l10n.creationActionFailed);
+            showCreationToast(context, message: l10n.creationActionFailed);
           }
         }
       },
     ),
   ];
   if (!desktop) {
-    await showMobileActionSheet(context, title: topic.title, items: actions);
+    await showCreationActions(context, title: topic.title, items: actions);
     return;
   }
   final render = context.findRenderObject() as RenderBox?;
-  await showDesktopContextMenuAt(
+  await showCreationMenu(
     context,
     globalPosition:
         anchor ??
@@ -439,35 +438,72 @@ Future<void> renameCreationTopic(
   if (!context.mounted) return;
   final l10n = AppLocalizations.of(context)!;
   final media = context.read<MediaCreationController>();
-  final name = TextEditingController(text: topic.title);
-  try {
-    final selected = await showAppDialog<String>(
-      context,
-      maxWidth: 380,
-      child: Builder(
-        builder: (context) => Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IosFormTextField(
-                label: l10n.creationRenameTopic,
-                controller: name,
-                autofocus: true,
-                inlineLabel: false,
-                onSubmitted: (value) => Navigator.of(context).pop(value),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(name.text),
-                child: Text(MaterialLocalizations.of(context).saveButtonLabel),
-              ),
-            ],
+  final selected = await showCreationDialog<String>(
+    context,
+    maxWidth: 380,
+    child: _RenameTopicForm(
+      title: topic.title,
+      label: l10n.creationRenameTopic,
+    ),
+  );
+  if (selected != null && context.mounted) {
+    await media.renameTopic(topic.id, selected);
+  }
+}
+
+class _RenameTopicForm extends StatefulWidget {
+  const _RenameTopicForm({required this.title, required this.label});
+  final String title, label;
+  @override
+  State<_RenameTopicForm> createState() => _RenameTopicFormState();
+}
+
+class _RenameTopicFormState extends State<_RenameTopicForm> {
+  late final _name = TextEditingController(text: widget.title);
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(18),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          widget.label,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 12),
+        PlainTextInput(
+          controller: _name,
+          autofocus: true,
+          onSubmitted: (v) => Navigator.of(context).pop(v),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: context.appColors.surfaceFill,
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
-      ),
-    );
-    if (selected != null) await media.renameTopic(topic.id, selected);
-  } finally {
-    name.dispose();
-  }
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            CreationAction(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+            ),
+            CreationAction(
+              tone: CreationActionTone.primary,
+              onPressed: () => Navigator.of(context).pop(_name.text),
+              child: Text(MaterialLocalizations.of(context).saveButtonLabel),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 }

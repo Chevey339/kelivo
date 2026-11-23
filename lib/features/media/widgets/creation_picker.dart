@@ -4,6 +4,9 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../theme/app_semantic_colors.dart';
+import '../../../shared/widgets/action_sheet.dart' show ActionSheetItem;
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../icons/lucide_adapter.dart';
 
 /// Parameter controls share one responsive route. The desktop placement is in
 /// the navigator overlay's coordinates, including when the tab has a side rail.
@@ -14,6 +17,7 @@ Future<T?> showCreationPicker<T>(
   required WidgetBuilder builder,
   double width = 320,
   bool scroll = true,
+  bool darkSheet = false,
 }) {
   final nav = Navigator.of(anchor);
   final box = anchor.findRenderObject()! as RenderBox;
@@ -38,7 +42,9 @@ Future<T?> showCreationPicker<T>(
           });
           return const SizedBox.shrink();
         }
-        final cs = Theme.of(context).colorScheme;
+        final cs = darkSheet
+            ? const ColorScheme.dark(surface: Color(0xff1c1c1e))
+            : Theme.of(context).colorScheme;
         final dark = cs.brightness == Brightness.dark;
         final curve = animation.drive(CurveTween(curve: handoffCurve));
         final content = builder(context);
@@ -120,7 +126,9 @@ Future<T?> showCreationPicker<T>(
                     width: double.infinity,
                     constraints: BoxConstraints(maxHeight: height),
                     decoration: BoxDecoration(
-                      color: dark
+                      color: darkSheet
+                          ? const Color(0xff1c1c1e)
+                          : dark
                           ? Color.alphaBlend(
                               cs.onSurface.withValues(alpha: .055),
                               cs.surface,
@@ -299,4 +307,104 @@ Future<T?> showCreationDialog<T>(
       );
     },
   );
+}
+
+Future<void> showCreationActions(
+  BuildContext context, {
+  String? title,
+  required List<ActionSheetItem> items,
+  bool darkSheet = false,
+}) async {
+  final selected = await showCreationPicker<ActionSheetItem>(
+    context,
+    desktop: false,
+    title: title ?? '',
+    darkSheet: darkSheet,
+    builder: (sheet) {
+      final cs = darkSheet
+          ? const ColorScheme.dark()
+          : Theme.of(sheet).colorScheme;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final item in items) ...[
+            if (item.startsGroup)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+                child: ColoredBox(
+                  color: cs.onSurface.withValues(alpha: .08),
+                  child: const SizedBox(height: 1),
+                ),
+              ),
+            if (item.groupLabel case final label?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+              ),
+            Semantics(
+              selected: item.checked,
+              button: true,
+              child: IosCardPress(
+                key: item.key,
+                focusable: true,
+                onTap: () => Navigator.of(sheet).pop(item),
+                baseColor: item.checked
+                    ? cs.primary.withValues(
+                        alpha: cs.brightness == Brightness.dark ? .16 : .12,
+                      )
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 52),
+                  child: Row(
+                    children: [
+                      Icon(
+                        item.icon,
+                        size: 20,
+                        color: item.destructive ? cs.error : cs.onSurface,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              item.label,
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                color: item.destructive
+                                    ? cs.error
+                                    : cs.onSurface,
+                              ),
+                            ),
+                            if (item.subtitle case final subtitle?)
+                              Text(
+                                subtitle,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (item.checked)
+                        Icon(Lucide.Check, size: 17, color: cs.primary),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      );
+    },
+  );
+  if (context.mounted) selected?.onTap();
 }

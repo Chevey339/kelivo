@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -135,13 +136,16 @@ class CreationAction extends StatelessWidget {
     this.small = false,
     this.pill = false,
     this.foreground,
+    this.fill,
+    this.minHeight,
   });
   final VoidCallback? onPressed;
   final Widget child;
   final Widget? icon;
   final CreationActionTone tone;
   final bool small, pill;
-  final Color? foreground;
+  final Color? foreground, fill;
+  final double? minHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -154,14 +158,16 @@ class CreationAction extends StatelessWidget {
           CreationActionTone.tonal => pill ? cs.onSurface : cs.primary,
           CreationActionTone.ghost => cs.onSurfaceVariant,
         };
-    final background = switch (tone) {
-      CreationActionTone.primary => cs.primary,
-      CreationActionTone.tonal =>
-        cs.brightness == Brightness.dark && pill
-            ? cs.onSurface.withValues(alpha: .08)
-            : cs.primary.withValues(alpha: .09),
-      _ => Colors.transparent,
-    };
+    final background =
+        fill ??
+        switch (tone) {
+          CreationActionTone.primary => cs.primary,
+          CreationActionTone.tonal =>
+            cs.brightness == Brightness.dark && pill
+                ? cs.onSurface.withValues(alpha: .08)
+                : cs.primary.withValues(alpha: .09),
+          _ => Colors.transparent,
+        };
     return Semantics(
       button: true,
       enabled: onPressed != null,
@@ -188,24 +194,29 @@ class CreationAction extends StatelessWidget {
                 ? 4
                 : 6,
           ),
-          child: DefaultTextStyle(
-            style: DefaultTextStyle.of(context).style.copyWith(
-              fontSize: small ? 12.5 : 13,
-              fontWeight: pill ? FontWeight.w500 : FontWeight.w600,
-              color: color,
-              height: 1.35,
-              decoration: TextDecoration.none,
-              letterSpacing: 0,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: minHeight == null ? 0 : minHeight! - 12,
             ),
-            child: IconTheme(
-              data: IconThemeData(size: small ? 14 : 16, color: color),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon != null) ...[icon!, const SizedBox(width: 6)],
-                  Flexible(child: child),
-                ],
+            child: DefaultTextStyle(
+              style: DefaultTextStyle.of(context).style.copyWith(
+                fontSize: small ? 12.5 : 13,
+                fontWeight: pill ? FontWeight.w500 : FontWeight.w600,
+                color: color,
+                height: 1.35,
+                decoration: TextDecoration.none,
+                letterSpacing: 0,
+              ),
+              child: IconTheme(
+                data: IconThemeData(size: small ? 14 : 16, color: color),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (icon != null) ...[icon!, const SizedBox(width: 6)],
+                    Flexible(child: child),
+                  ],
+                ),
               ),
             ),
           ),
@@ -213,4 +224,16 @@ class CreationAction extends StatelessWidget {
       ),
     );
   }
+}
+
+class CreationSpinner extends StatelessWidget {
+  const CreationSpinner({super.key, this.radius = 9, this.color});
+  final double radius;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) => CupertinoActivityIndicator(
+    radius: radius,
+    color: color,
+    animating: !MediaQuery.disableAnimationsOf(context),
+  );
 }

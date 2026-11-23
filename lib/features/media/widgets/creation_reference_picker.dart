@@ -1,3 +1,6 @@
+import 'creation_menu.dart';
+import 'creation_controls.dart';
+import 'creation_picker.dart';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -17,14 +20,12 @@ import '../../../desktop/desktop_context_menu.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
-import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
-import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
+import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/app_directories.dart';
 import '../../home/services/composer_clipboard.dart';
-import '../../settings/widgets/custom_theme_widgets.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_lightbox.dart';
 
@@ -84,7 +85,7 @@ Future<void> showCreationReferenceSources(
     final data = await readCreationClipboard();
     if (!context.mounted) return;
     if (data.paths.isEmpty) {
-      showAppSnackBar(context, message: l10n.creationNoClipboardImage);
+      showCreationToast(context, message: l10n.creationNoClipboardImage);
     } else {
       onSelected(data.paths);
     }
@@ -95,7 +96,7 @@ Future<void> showCreationReferenceSources(
       await action();
     } catch (_) {
       if (context.mounted) {
-        showAppSnackBar(context, message: l10n.creationActionFailed);
+        showCreationToast(context, message: l10n.creationActionFailed);
       }
     }
   }
@@ -126,7 +127,7 @@ Future<void> showCreationReferenceSources(
     ),
   ];
   if (!desktop) {
-    await showMobileActionSheet(
+    await showCreationActions(
       context,
       title: l10n.creationAddReference,
       items: items,
@@ -134,7 +135,7 @@ Future<void> showCreationReferenceSources(
     return;
   }
   final box = context.findRenderObject() as RenderBox?;
-  await showDesktopContextMenuAt(
+  await showCreationMenu(
     context,
     globalPosition: box == null
         ? Offset.zero
@@ -203,13 +204,15 @@ Future<List<String>?> _showRecentImages(
     ),
   );
   if (!desktop) {
-    return showFormSheet<List<String>>(
+    return showCreationPicker<List<String>>(
       context,
-      builder: (_) =>
-          FormSheet(title: l10n.creationRecentImages, children: [content]),
+      desktop: false,
+      title: l10n.creationRecentImages,
+      scroll: false,
+      builder: (_) => content,
     );
   }
-  return showAppDialog<List<String>>(
+  return showCreationDialog<List<String>>(
     context,
     maxWidth: 560,
     child: Padding(
@@ -222,7 +225,7 @@ Future<List<String>?> _showRecentImages(
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
-          content,
+          Flexible(child: content),
         ],
       ),
     ),
@@ -382,7 +385,7 @@ class _RecentImagesState extends State<_RecentImages> {
       }
       if (!mounted) return;
       setState(() => _adding = false);
-      showAppSnackBar(
+      showCreationToast(
         context,
         message: AppLocalizations.of(context)!.creationDownloadFailed,
       );
@@ -407,10 +410,10 @@ class _RecentImagesState extends State<_RecentImages> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedTabs(
+        SlidingSegmentedTabs(
           index: _source.index,
           height: 34,
-          radioGroup: true,
+
           tabs: [
             SegmentedTab(label: l10n.creationFilterAll),
             SegmentedTab(label: l10n.creationRecentCreation),
@@ -428,13 +431,13 @@ class _RecentImagesState extends State<_RecentImages> {
         Expanded(
           child: _images.isEmpty && _error
               ? Center(
-                  child: TextButton(
+                  child: CreationAction(
                     onPressed: _load,
                     child: Text(l10n.creationRetry),
                   ),
                 )
               : _images.isEmpty && _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: CreationSpinner())
               : _images.isEmpty
               ? Center(child: Text(l10n.creationRecentEmpty))
               : GridView.builder(
@@ -449,11 +452,11 @@ class _RecentImagesState extends State<_RecentImages> {
                     if (index == _images.length) {
                       return Center(
                         child: _error
-                            ? TextButton(
+                            ? CreationAction(
                                 onPressed: _load,
                                 child: Text(l10n.creationRetry),
                               )
-                            : const CircularProgressIndicator(),
+                            : const CreationSpinner(),
                       );
                     }
                     final item = _images[index];
@@ -603,16 +606,17 @@ class _RecentImagesState extends State<_RecentImages> {
                 style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
               ),
             ),
-            TextButton(
+            CreationAction(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
             ),
-            FilledButton(
+            CreationAction(
+              tone: CreationActionTone.primary,
               onPressed: _selected.isEmpty || _adding ? null : _confirm,
               child: _adding
                   ? const SizedBox.square(
                       dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CreationSpinner(radius: 7),
                     )
                   : Text(l10n.creationAddSelected(_selected.length)),
             ),

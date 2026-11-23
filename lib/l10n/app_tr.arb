@@ -5440,5 +5440,8 @@
   "creationModelReferenceLimit": "En fazla {count} referans",
   "creationTextOnlyImage": "Metinden görsel",
   "creationTextOnlyVideo": "Metinden video",
-  "creationCustomCountLabel": "Özel sayı"
+  "creationCustomCountLabel": "Özel sayı",
+  "creationFailureCategory": "{kind, select, network{Ağ bağlantısı} rateLimited{İstek sınırı} server{Sağlayıcı hatası} rejected{İstek reddedildi} login{Giriş gerekli} parameters{Geçersiz parametreler} referenceTooLarge{Referans çok büyük} download{İndirme başarısız} invalidResponse{Geçersiz yanıt} other{Oluşturma hatası}}",
+  "creationInterruptedHelp": "Bu istek tamamlanmadan uygulama kapandı. İstem ve ayarlarınız kaydedildi.",
+  "creationCancelledHelp": "İstem ve ayarlarınız kaydedildi. İstediğiniz zaman yeniden oluşturabilirsiniz."
 }

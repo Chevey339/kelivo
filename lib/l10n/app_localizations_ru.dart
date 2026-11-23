@@ -19091,4 +19091,29 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get creationCustomCountLabel => 'Своё количество';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': 'Сетевое подключение',
+      'rateLimited': 'Превышен лимит запросов',
+      'server': 'Ошибка провайдера',
+      'rejected': 'Запрос отклонён',
+      'login': 'Требуется вход',
+      'parameters': 'Неверные параметры',
+      'referenceTooLarge': 'Слишком большой референс',
+      'download': 'Ошибка загрузки',
+      'invalidResponse': 'Неверный ответ',
+      'other': 'Ошибка генерации',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp =>
+      'Приложение закрылось до завершения этого запроса. Ваш промпт и настройки сохранены.';
+
+  @override
+  String get creationCancelledHelp =>
+      'Ваш промпт и настройки сохранены. Вы можете сгенерировать снова в любое время.';
 }

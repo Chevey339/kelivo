@@ -448,14 +448,14 @@ class _CreationArtworkTileState extends State<CreationArtworkTile> {
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black54],
+                        colors: [Colors.transparent, Color(0x5c000000)],
                       ),
                     ),
                     padding: const EdgeInsets.fromLTRB(5, 38, 5, 5),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final width = constraints.maxWidth;
-                        final size = width < 140 ? 26.0 : 30.0;
+                        final size = width < 150 ? 26.0 : 30.0;
                         Widget button(
                           IconData icon,
                           String label,

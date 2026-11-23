@@ -1,3 +1,5 @@
+import 'creation_menu.dart';
+import 'creation_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +16,7 @@ import '../../../shared/widgets/action_sheet.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../theme/app_font_weights.dart';
 import '../providers/media_creation_controller.dart';
 
@@ -113,7 +115,7 @@ Future<void> showCreationDisplayMenu(
     ),
   ];
   if (!desktop) {
-    await showMobileActionSheet(
+    await showCreationActions(
       context,
       title: l10n.creationDisplayAndGames,
       items: items,
@@ -124,10 +126,10 @@ Future<void> showCreationDisplayMenu(
   final anchor = render == null
       ? Offset.zero
       : render.localToGlobal(render.size.bottomCenter(Offset.zero));
-  await showDesktopContextMenuAt(
+  await showCreationMenu(
     context,
     globalPosition: anchor,
-    compact: true,
+
     items: [
       for (final choice in items)
         DesktopContextMenuItem(
@@ -167,11 +169,11 @@ class CreationPreferences extends StatelessWidget {
           children: [
             _preferenceRow(
               l10n.creationTopicDisplay,
-              SegmentedTabs(
+              SlidingSegmentedTabs(
                 height: 30,
                 compact: true,
                 expand: false,
-                radioGroup: true,
+
                 index: choice.index,
                 tabs: [
                   for (final mode in CreationTopicView.values)
@@ -238,7 +240,7 @@ class CreationPreferences extends StatelessWidget {
           SectionCard(
             children: [
               IosCardPress(
-                onTap: () => showMobileActionSheet(
+                onTap: () => showCreationActions(
                   context,
                   title: l10n.creationTopicDisplay,
                   items: [
@@ -267,7 +269,7 @@ class CreationPreferences extends StatelessWidget {
                 icon: LucideIcons.wandSparkles,
               ),
               IosCardPress(
-                onTap: () => showMobileActionSheet(
+                onTap: () => showCreationActions(
                   context,
                   title: l10n.creationWaitGame,
                   items: _gameOptions(l10n, media),

@@ -18758,4 +18758,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get creationCustomCountLabel => 'Custom count';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': 'Network connection',
+      'rateLimited': 'Rate limit',
+      'server': 'Provider error',
+      'rejected': 'Request rejected',
+      'login': 'Sign-in required',
+      'parameters': 'Invalid parameters',
+      'referenceTooLarge': 'Reference too large',
+      'download': 'Download failed',
+      'invalidResponse': 'Invalid response',
+      'other': 'Generation error',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp =>
+      'The app closed before this request finished. Your prompt and settings are saved.';
+
+  @override
+  String get creationCancelledHelp =>
+      'Your prompt and settings are saved. You can generate again at any time.';
 }

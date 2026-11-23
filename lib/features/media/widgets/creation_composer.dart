@@ -23,7 +23,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
-import '../../../shared/widgets/snackbar.dart';
+import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../provider/widgets/provider_avatar.dart';
@@ -110,7 +110,7 @@ class _CreationComposerState extends State<CreationComposer> {
     } catch (error) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        showAppSnackBar(
+        showCreationToast(
           context,
           message: switch (error) {
             MediaFailure(kind: MediaFailureKind.referenceTooLarge) =>
@@ -155,12 +155,12 @@ class _CreationComposerState extends State<CreationComposer> {
     final l10n = AppLocalizations.of(context)!;
     final max = _controller.model?.capabilities.maxReferences ?? 0;
     if (count < expected && _controller.mode == MediaMode.image) {
-      showAppSnackBar(
+      showCreationToast(
         context,
         message: l10n.creationReferenceLimitReached(max),
       );
     } else if (count > 0) {
-      showAppSnackBar(context, message: l10n.creationReferenceAdded);
+      showCreationToast(context, message: l10n.creationReferenceAdded);
     }
   }
 
@@ -190,7 +190,7 @@ class _CreationComposerState extends State<CreationComposer> {
     } catch (error) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
-      showAppSnackBar(
+      showCreationToast(
         context,
         message:
             error is MediaFailure &&
@@ -231,7 +231,7 @@ class _CreationComposerState extends State<CreationComposer> {
     if (original.trim().isEmpty) return;
     final selected = resolvePromptEnhancementModel(media.settings);
     if (selected == null) {
-      showAppSnackBar(
+      showCreationToast(
         context,
         message: l10n.creationEnhanceNeedsModel,
         actionLabel: l10n.creationDefaultEnhance,
@@ -310,7 +310,7 @@ class _CreationComposerState extends State<CreationComposer> {
     } catch (_) {
       if (!mounted || !current()) return;
       _dismissEnhancement();
-      showAppSnackBar(context, message: l10n.creationActionFailed);
+      showCreationToast(context, message: l10n.creationActionFailed);
     }
   }
 
@@ -464,6 +464,7 @@ class _CreationComposerState extends State<CreationComposer> {
                               ),
                             if (!video && references.isNotEmpty)
                               _ReferenceStrip(
+                                desktop: widget.desktop,
                                 references: references,
                                 limit: limit,
                                 model:
@@ -1430,107 +1431,194 @@ class _CountInputState extends State<_CountInput> {
 
 class _ReferenceStrip extends StatelessWidget {
   const _ReferenceStrip({
+    required this.desktop,
     required this.references,
     required this.limit,
     required this.model,
     required this.onRemove,
     required this.onAdd,
   });
-
+  final bool desktop;
   final List<MediaReference> references;
   final int limit;
   final String model;
   final ValueChanged<MediaReference> onRemove;
   final ValueChanged<BuildContext> onAdd;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final colors = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final unavailable = limit == 0;
+    final style = TextStyle(
+      fontSize: 11.5,
+      height: 1.4,
+      color: unavailable
+          ? context.appColors.warning
+          : cs.onSurface.withValues(alpha: .42),
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 1),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 56,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (final reference in references)
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 6),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: SizedBox.square(
-                            dimension: 56,
-                            child: Opacity(
-                              opacity: unavailable ? .45 : 1,
-                              child: CreationFileImage(
-                                reference.path,
-                                cacheWidth: 140,
-                              ),
-                            ),
-                          ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final ref in references)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 6),
+                child: _ReferenceTile(
+                  key: ValueKey(ref.path),
+                  ref: ref,
+                  desktop: desktop,
+                  unavailable: unavailable,
+                  onRemove: () => onRemove(ref),
+                ),
+              ),
+            if (references.length < limit)
+              Builder(
+                builder: (anchor) => CustomPaint(
+                  foregroundPainter: _AddRefBorder(
+                    cs.onSurface.withValues(alpha: .23),
+                  ),
+                  child: IosCardPress(
+                    focusable: true,
+                    baseColor: Colors.transparent,
+                    onTap: () => onAdd(anchor),
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox.square(
+                      dimension: 56,
+                      child: Center(
+                        child: Icon(
+                          Lucide.Plus,
+                          size: 16,
+                          color: cs.onSurfaceVariant,
                         ),
-                        Positioned(
-                          top: 1,
-                          right: 1,
-                          child: IosIconButton(
-                            icon: Lucide.X,
-                            size: 13,
-                            minSize: 21,
-                            color: Colors.white,
-                            tooltip: MaterialLocalizations.of(
-                              context,
-                            ).deleteButtonTooltip,
-                            onTap: () => onRemove(reference),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                if (references.length < limit)
-                  Builder(
-                    builder: (anchor) => SizedBox.square(
-                      dimension: 56,
-                      child: IosCardPress(
-                        onTap: () => onAdd(anchor),
-                        borderRadius: BorderRadius.circular(12),
-                        baseColor: colors.surfaceContainerHighest.withValues(
-                          alpha: .5,
-                        ),
-                        child: const Icon(Lucide.Plus, size: 20),
+                ),
+              ),
+            const SizedBox(width: 10),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: desktop ? 240 : 165),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    unavailable
+                        ? l10n.creationReferenceUnsupported(model)
+                        : l10n.creationReferenceSummary(
+                            references.length,
+                            limit,
+                          ),
+                    style: style,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    unavailable ? l10n.creationReferenceIgnored : model,
+                    style: style,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReferenceTile extends StatefulWidget {
+  const _ReferenceTile({
+    super.key,
+    required this.ref,
+    required this.desktop,
+    required this.unavailable,
+    required this.onRemove,
+  });
+  final MediaReference ref;
+  final bool desktop, unavailable;
+  final VoidCallback onRemove;
+  @override
+  State<_ReferenceTile> createState() => _ReferenceTileState();
+}
+
+class _ReferenceTileState extends State<_ReferenceTile> {
+  bool _hover = false, _focused = false;
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Focus(
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox.square(
+            dimension: 56,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CreationFileImage(widget.ref.path, cacheWidth: 140),
+                if (widget.unavailable)
+                  ColoredBox(color: cs.surface.withValues(alpha: .55)),
+                if (!widget.desktop || _hover || _focused)
+                  PositionedDirectional(
+                    top: 3,
+                    end: 3,
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black54,
+                      ),
+                      child: IosIconButton(
+                        icon: Lucide.X,
+                        size: 11,
+                        minSize: 18,
+                        padding: EdgeInsets.zero,
+                        color: Colors.white,
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).deleteButtonTooltip,
+                        onTap: widget.onRemove,
                       ),
                     ),
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            unavailable
-                ? l10n.creationReferenceUnsupported(model)
-                : l10n.creationReferenceSummary(references.length, limit),
-            style: TextStyle(
-              fontSize: 11.5,
-              color: unavailable
-                  ? context.appColors.warning
-                  : colors.onSurfaceVariant,
-            ),
-          ),
-          if (unavailable)
-            Text(
-              l10n.creationReferenceIgnored,
-              style: TextStyle(fontSize: 11.5, color: colors.onSurfaceVariant),
-            ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _AddRefBorder extends CustomPainter {
+  const _AddRefBorder(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(.75),
+          const Radius.circular(12),
+        ),
+      );
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    for (final part in path.computeMetrics()) {
+      for (double i = 0; i < part.length; i += 7) {
+        canvas.drawPath(part.extractPath(i, i + 4), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_AddRefBorder old) => old.color != color;
 }
 
 class _FrameToggle extends StatelessWidget {

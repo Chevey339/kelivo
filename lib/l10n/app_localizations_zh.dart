@@ -17700,6 +17700,29 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get creationCustomCountLabel => '自定义张数';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': '网络连接',
+      'rateLimited': '请求频率限制',
+      'server': '供应商错误',
+      'rejected': '请求被拒绝',
+      'login': '需要登录',
+      'parameters': '参数无效',
+      'referenceTooLarge': '参考图过大',
+      'download': '下载失败',
+      'invalidResponse': '响应无效',
+      'other': '生成错误',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp => '这个任务在应用关闭时还没有完成，提示词和参数都保留着。';
+
+  @override
+  String get creationCancelledHelp => '提示词和参数都保留着，可以随时重新生成。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -35398,6 +35421,29 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationCustomCountLabel => '自定义张数';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': '网络连接',
+      'rateLimited': '请求频率限制',
+      'server': '供应商错误',
+      'rejected': '请求被拒绝',
+      'login': '需要登录',
+      'parameters': '参数无效',
+      'referenceTooLarge': '参考图过大',
+      'download': '下载失败',
+      'invalidResponse': '响应无效',
+      'other': '生成错误',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp => '这个任务在应用关闭时还没有完成，提示词和参数都保留着。';
+
+  @override
+  String get creationCancelledHelp => '提示词和参数都保留着，可以随时重新生成。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -53153,4 +53199,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationCustomCountLabel => '自訂張數';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': '網路連線',
+      'rateLimited': '請求頻率限制',
+      'server': '供應商錯誤',
+      'rejected': '請求被拒絕',
+      'login': '需要登入',
+      'parameters': '參數無效',
+      'referenceTooLarge': '參考圖過大',
+      'download': '下載失敗',
+      'invalidResponse': '回應無效',
+      'other': '生成錯誤',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp => '這個任務在應用程式關閉時尚未完成，提示詞和設定都保留著。';
+
+  @override
+  String get creationCancelledHelp => '提示詞和設定都保留著，可以隨時重新生成。';
 }

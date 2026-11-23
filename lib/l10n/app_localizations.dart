@@ -32777,6 +32777,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Custom count'**
   String get creationCustomCountLabel;
+
+  /// User-facing cause for an unsuccessful generation, shared by the failure card and request details. Keep all select keys.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}'**
+  String creationFailureCategory(String kind);
+
+  /// Explanation on an interrupted generation card.
+  ///
+  /// In en, this message translates to:
+  /// **'The app closed before this request finished. Your prompt and settings are saved.'**
+  String get creationInterruptedHelp;
+
+  /// Explanation below a cancelled generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your prompt and settings are saved. You can generate again at any time.'**
+  String get creationCancelledHelp;
 }
 
 class _AppLocalizationsDelegate

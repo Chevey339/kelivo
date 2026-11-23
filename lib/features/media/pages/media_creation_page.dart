@@ -10,7 +10,7 @@ import '../../../core/models/media_creation.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
-import '../../../shared/widgets/snackbar.dart';
+import '../widgets/creation_toast.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/thinking_sheen.dart';
@@ -486,7 +486,7 @@ class _CreationComposerStackState extends State<CreationComposerStack> {
         );
         if (paths.isEmpty) return;
         final added = media.addReferencePaths(widget.topicId, paths);
-        showAppSnackBar(
+        showCreationToast(
           context,
           message: added > 0
               ? l10n.creationReferenceAdded

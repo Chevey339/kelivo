@@ -5440,5 +5440,8 @@
   "creationModelReferenceLimit": "494bb1c79e890c5515dca04e5847553715e8c396a8e0b36f18dceab007923329",
   "creationTextOnlyImage": "dd4f90c35553e7df9aaf36189cb53dc5ab8f5aee248bbb6ae5fb18d1194627ac",
   "creationTextOnlyVideo": "4d98a1a3e790c17770190bd3839a6201be7910f9851519df34c4c70bf5b17798",
-  "creationCustomCountLabel": "6821cca6d922c725f8e88b679faebb8e902b800883809bc44398fe447712ca62"
+  "creationCustomCountLabel": "6821cca6d922c725f8e88b679faebb8e902b800883809bc44398fe447712ca62",
+  "creationFailureCategory": "34ae0b2c1f6444d10c80c65f8c8ae3eb0ba7e13bf934600230341cabcb7695bf",
+  "creationInterruptedHelp": "f7ca86e129b7daf1321d1fb0778872569f5e15ed32e4171641010fce75481157",
+  "creationCancelledHelp": "8b95eaa141bf68e5e614b4ccf75675a2b4a0580c85b674db7970bb641b3d32ef"
 }

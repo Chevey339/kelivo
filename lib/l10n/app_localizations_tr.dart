@@ -18869,4 +18869,29 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get creationCustomCountLabel => 'Özel sayı';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': 'Ağ bağlantısı',
+      'rateLimited': 'İstek sınırı',
+      'server': 'Sağlayıcı hatası',
+      'rejected': 'İstek reddedildi',
+      'login': 'Giriş gerekli',
+      'parameters': 'Geçersiz parametreler',
+      'referenceTooLarge': 'Referans çok büyük',
+      'download': 'İndirme başarısız',
+      'invalidResponse': 'Geçersiz yanıt',
+      'other': 'Oluşturma hatası',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp =>
+      'Bu istek tamamlanmadan uygulama kapandı. İstem ve ayarlarınız kaydedildi.';
+
+  @override
+  String get creationCancelledHelp =>
+      'İstem ve ayarlarınız kaydedildi. İstediğiniz zaman yeniden oluşturabilirsiniz.';
 }

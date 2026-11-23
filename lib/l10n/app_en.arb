@@ -24363,5 +24363,22 @@
   "creationCustomCountLabel": "Custom count",
   "@creationCustomCountLabel": {
     "description": "Label beside the custom output count stepper in the Creation composer."
+  },
+  "creationFailureCategory": "{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}",
+  "@creationFailureCategory": {
+    "description": "User-facing cause for an unsuccessful generation, shared by the failure card and request details. Keep all select keys.",
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "creationInterruptedHelp": "The app closed before this request finished. Your prompt and settings are saved.",
+  "@creationInterruptedHelp": {
+    "description": "Explanation on an interrupted generation card."
+  },
+  "creationCancelledHelp": "Your prompt and settings are saved. You can generate again at any time.",
+  "@creationCancelledHelp": {
+    "description": "Explanation below a cancelled generation."
   }
 }

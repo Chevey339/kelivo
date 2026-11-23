@@ -18183,4 +18183,29 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get creationCustomCountLabel => '사용자 지정 개수';
+
+  @override
+  String creationFailureCategory(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'network': '네트워크 연결',
+      'rateLimited': '요청 한도 초과',
+      'server': '공급자 오류',
+      'rejected': '요청 거부됨',
+      'login': '로그인 필요',
+      'parameters': '잘못된 매개변수',
+      'referenceTooLarge': '참조 이미지 너무 큼',
+      'download': '다운로드 실패',
+      'invalidResponse': '잘못된 응답',
+      'other': '생성 오류',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get creationInterruptedHelp =>
+      '이 요청이 완료되기 전에 앱이 종료되었습니다. 프롬프트와 설정은 저장되어 있습니다.';
+
+  @override
+  String get creationCancelledHelp =>
+      '프롬프트와 설정은 저장되어 있습니다. 언제든지 다시 생성할 수 있습니다.';
 }
