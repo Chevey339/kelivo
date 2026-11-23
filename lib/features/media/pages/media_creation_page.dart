@@ -9,7 +9,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/models/media_creation.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -17,6 +17,7 @@ import '../../../shared/widgets/thinking_sheen.dart';
 import '../../../theme/app_font_weights.dart';
 import '../providers/media_creation_controller.dart';
 import '../widgets/creation_composer.dart';
+import '../widgets/creation_controls.dart';
 import '../widgets/creation_gallery.dart';
 import '../widgets/creation_preferences.dart';
 import '../widgets/creation_reference_picker.dart';
@@ -65,8 +66,8 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
     unawaited(
       Navigator.of(context).push<void>(
         PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 380),
-          reverseTransitionDuration: const Duration(milliseconds: 260),
+          transitionDuration: handoffDuration(context, 380),
+          reverseTransitionDuration: handoffDuration(context, 380),
           pageBuilder: (_, _, _) =>
               _MobileTopicPage(topicId: id, highlightBatchId: batch),
           transitionsBuilder: (_, animation, _, child) => FadeTransition(
@@ -76,7 +77,8 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
               child: child,
               builder: (context, child) => Transform.translate(
                 offset: Offset(
-                  40 * (1 - Curves.easeOutCubic.transform(animation.value)),
+                  (Directionality.of(context) == TextDirection.rtl ? -40 : 40) *
+                      (1 - handoffCurve.transform(animation.value)),
                   0,
                 ),
                 child: child,
@@ -93,95 +95,92 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
     final media = context.watch<MediaCreationController>();
     final l10n = AppLocalizations.of(context)!;
     final topics = media.searchTopics(_query).toList();
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 52,
-        leading: IosIconButton(
-          icon: _searching ? Lucide.ArrowLeft : Lucide.Menu,
-          minSize: 44,
-          tooltip: _searching
-              ? MaterialLocalizations.of(context).backButtonTooltip
-              : MaterialLocalizations.of(context).showMenuTooltip,
-          onTap: _searching
-              ? () => setState(() {
-                  _searching = false;
-                  _query = '';
-                })
-              : widget.onOpenDrawer,
-        ),
-        title: _searching
-            ? TextField(
-                autofocus: true,
-                onChanged: (value) => setState(() => _query = value),
-                decoration: InputDecoration(
-                  hintText: l10n.creationSearchTopics,
-                  isDense: true,
-                ),
-              )
-            : Text(
-                l10n.creationTitle,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: AppFontWeights.semibold,
-                ),
+    final searchHint = _gallery
+        ? l10n.creationSearchGallery
+        : l10n.creationSearchTopics;
+    return CreationSurface(
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            CreationMobileBar(
+              searching: _searching,
+              leading: IosIconButton(
+                icon: _searching ? Lucide.ArrowLeft : Lucide.Menu,
+                minSize: 44,
+                tooltip: _searching
+                    ? MaterialLocalizations.of(context).backButtonTooltip
+                    : MaterialLocalizations.of(context).showMenuTooltip,
+                onTap: _searching
+                    ? () => setState(() {
+                        _searching = false;
+                        _query = '';
+                      })
+                    : widget.onOpenDrawer,
               ),
-        actions: [
-          if (!_searching && !_gallery)
-            IosIconButton(
-              icon: Lucide.Search,
-              tooltip: l10n.creationSearchTopics,
-              minSize: 44,
-              onTap: () => setState(() => _searching = true),
-            ),
-          if (!_searching && !_gallery)
-            Builder(
-              builder: (anchor) => IosIconButton(
-                icon: creationTopicViewIcon(media.topicView),
-                tooltip: l10n.creationDisplayAndGames,
-                minSize: 40,
-                onTap: () => showCreationDisplayMenu(anchor, desktop: false),
-              ),
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 7),
-            child: SegmentedTabs(
-              index: _gallery ? 1 : 0,
-              height: 36,
-              radioGroup: true,
-              tabs: [
-                SegmentedTab(label: l10n.creationTopics),
-                SegmentedTab(label: l10n.creationGallery),
-              ],
-              onChanged: (index) => setState(() {
-                _gallery = index == 1;
-                _searching = false;
-                _query = '';
-              }),
-            ),
-          ),
-          Expanded(
-            child: CreationComposerStack(
-              desktop: false,
-              composer: CreationComposer(desktop: false, onSent: _openTopic),
-              content: _gallery
-                  ? CreationGallery(
-                      desktop: false,
-                      artworkRequest: widget.artworkRequest,
-                      onArtworkOpened: widget.onArtworkOpened,
-                      onOpenTopic: (id, batch) => _openTopic(id, batch: batch),
+              title: _searching
+                  ? CreationSearchBox(
+                      hint: searchHint,
+                      mobile: true,
+                      autofocus: true,
+                      onChanged: (value) => setState(() => _query = value),
                     )
-                  : _MobileTopics(
-                      items: topics,
-                      display: media.topicView,
-                      onOpen: _openTopic,
+                  : Text(
+                      l10n.creationTitle,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+              trailing: _searching
+                  ? null
+                  : IosIconButton(
+                      icon: Lucide.Search,
+                      size: 20,
+                      minSize: 44,
+                      tooltip: searchHint,
+                      onTap: () => setState(() => _searching = true),
                     ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: SlidingSegmentedTabs(
+                index: _gallery ? 1 : 0,
+                height: 38,
+                tabs: [
+                  SegmentedTab(label: l10n.creationTopics),
+                  SegmentedTab(label: l10n.creationGallery),
+                ],
+                onChanged: (index) => setState(() {
+                  _gallery = index == 1;
+                  _searching = false;
+                  _query = '';
+                }),
+              ),
+            ),
+            Expanded(
+              child: CreationComposerStack(
+                desktop: false,
+                composer: CreationComposer(desktop: false, onSent: _openTopic),
+                content: _gallery
+                    ? CreationGallery(
+                        desktop: false,
+                        mobileQuery: _query,
+                        artworkRequest: widget.artworkRequest,
+                        onArtworkOpened: widget.onArtworkOpened,
+                        onOpenTopic: (id, batch) =>
+                            _openTopic(id, batch: batch),
+                      )
+                    : _MobileTopics(
+                        query: _query,
+                        items: topics,
+                        display: media.topicView,
+                        onOpen: _openTopic,
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -190,17 +189,28 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
 class _MobileTopics extends StatelessWidget {
   const _MobileTopics({
     required this.items,
+    required this.query,
     required this.display,
     required this.onOpen,
   });
 
+  final String query;
   final List<GenerationTopicRow> items;
   final CreationTopicView display;
   final ValueChanged<String> onOpen;
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const CreationEmptyState();
+    if (items.isEmpty) {
+      if (query.trim().isEmpty) return const CreationEmptyState();
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(AppLocalizations.of(context)!.creationNoMatchingTopics),
+        ),
+      );
+    }
     final l10n = AppLocalizations.of(context)!;
     final covers = display == CreationTopicView.covers;
     final list = display == CreationTopicView.list;
@@ -217,13 +227,31 @@ class _MobileTopics extends StatelessWidget {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           sliver: SliverToBoxAdapter(
-            child: Text(
-              l10n.creationTopicCount(items.length),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 13,
-                fontWeight: AppFontWeights.semibold,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.creationAllTopicCount(items.length),
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: .42),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Builder(
+                  builder: (anchor) => IosIconButton(
+                    icon: creationTopicViewIcon(display),
+                    size: 18,
+                    minSize: 36,
+                    tooltip: l10n.creationDisplayAndGames,
+                    onTap: () =>
+                        showCreationDisplayMenu(anchor, desktop: false),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -274,64 +302,80 @@ class _MobileTopicPage extends StatelessWidget {
     final topic = state.topic(topicId);
     final name = topic?.title ?? '';
     final naming = state.namingTopic(topicId) || name.isEmpty;
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 52,
-        centerTitle: true,
-        leading: IosIconButton(
-          icon: Lucide.ArrowLeft,
-          minSize: 44,
-          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          onTap: () => Navigator.of(context).maybePop(),
+    return CreationSurface(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ThinkingSheen(
-              enabled: naming,
-              child: Text(
-                naming ? l10n.creationNaming : name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: AppFontWeights.semibold,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              CreationMobileBar(
+                leading: IosIconButton(
+                  icon: Lucide.ArrowLeft,
+                  minSize: 44,
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  onTap: () => Navigator.of(context).maybePop(),
+                ),
+                title: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ThinkingSheen(
+                      enabled: naming,
+                      child: Text(
+                        naming ? l10n.creationNaming : name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: AppFontWeights.semibold,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      l10n.creationGenerationCount(
+                        state.batchesFor(topicId).length,
+                      ),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                trailing: topic == null
+                    ? null
+                    : IosIconButton(
+                        icon: Lucide.Ellipsis,
+                        minSize: 42,
+                        tooltip: l10n.chatMessageWidgetMoreTooltip,
+                        onTap: () => showCreationTopicMenu(
+                          context,
+                          topic,
+                          desktop: false,
+                          onDeleted: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+              ),
+              Expanded(
+                child: CreationComposerStack(
+                  desktop: false,
+                  topicId: topicId,
+                  composer: CreationComposer(
+                    topicId: topicId,
+                    desktop: false,
+                    onSent: (_) {},
+                  ),
+                  content: CreationTimeline(
+                    topicId: topicId,
+                    desktop: false,
+                    highlightBatchId: highlightBatchId,
+                  ),
                 ),
               ),
-            ),
-            Text(
-              l10n.creationGenerationCount(state.batchesFor(topicId).length),
-              style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-        actions: [
-          if (topic != null)
-            IosIconButton(
-              icon: Lucide.Ellipsis,
-              minSize: 42,
-              tooltip: l10n.chatMessageWidgetMoreTooltip,
-              onTap: () => showCreationTopicMenu(
-                context,
-                topic,
-                desktop: false,
-                onDeleted: () => Navigator.of(context).pop(),
-              ),
-            ),
-        ],
-      ),
-      body: CreationComposerStack(
-        desktop: false,
-        topicId: topicId,
-        composer: CreationComposer(
-          topicId: topicId,
-          desktop: false,
-          onSent: (_) {},
-        ),
-        content: CreationTimeline(
-          topicId: topicId,
-          desktop: false,
-          highlightBatchId: highlightBatchId,
+            ],
+          ),
         ),
       ),
     );

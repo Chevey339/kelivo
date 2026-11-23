@@ -412,7 +412,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             locale: const Locale('en'),
-            home: const Scaffold(body: DesktopMediaCreationPage()),
+            home: const DesktopMediaCreationPage(),
           ),
         ),
       );
@@ -642,7 +642,7 @@ void main() {
               supportedLocales: AppLocalizations.supportedLocales,
               locale: const Locale('en'),
               home: desktop
-                  ? const Scaffold(body: DesktopMediaCreationPage())
+                  ? const DesktopMediaCreationPage()
                   : MediaCreationPage(onOpenDrawer: () {}),
             ),
           ),

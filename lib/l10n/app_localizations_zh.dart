@@ -17658,6 +17658,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String creationGameCompleted(int score) {
     return '生成好了 · $score 分';
   }
+
+  @override
+  String get creationNoSelectableModels => '没有可用模型';
+
+  @override
+  String get creationNoMatchingTopics => '没有匹配的话题';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return '全部话题 $count';
+  }
+
+  @override
+  String get creationNoImageModels => '还没有能生成图片的模型';
+
+  @override
+  String get creationNoVideoModels => '还没有能生成视频的模型';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -35314,6 +35331,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String creationGameCompleted(int score) {
     return '生成好了 · $score 分';
   }
+
+  @override
+  String get creationNoSelectableModels => '没有可用模型';
+
+  @override
+  String get creationNoMatchingTopics => '没有匹配的话题';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return '全部话题 $count';
+  }
+
+  @override
+  String get creationNoImageModels => '还没有能生成图片的模型';
+
+  @override
+  String get creationNoVideoModels => '还没有能生成视频的模型';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -53027,4 +53061,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String creationGameCompleted(int score) {
     return '生成好了 · $score 分';
   }
+
+  @override
+  String get creationNoSelectableModels => '沒有可用模型';
+
+  @override
+  String get creationNoMatchingTopics => '沒有符合的主題';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return '全部主題 $count';
+  }
+
+  @override
+  String get creationNoImageModels => '尚無圖片生成模型';
+
+  @override
+  String get creationNoVideoModels => '尚無影片生成模型';
 }

@@ -18715,4 +18715,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String creationGameCompleted(int score) {
     return 'Creation ready · $score';
   }
+
+  @override
+  String get creationNoSelectableModels => 'No models available';
+
+  @override
+  String get creationNoMatchingTopics => 'No matching topics';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return 'All topics $count';
+  }
+
+  @override
+  String get creationNoImageModels => 'No image generation models yet';
+
+  @override
+  String get creationNoVideoModels => 'No video generation models yet';
 }

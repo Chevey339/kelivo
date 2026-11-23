@@ -6685,5 +6685,10 @@
   "creationGameScore": "得分：{score}",
   "creationGamePaused": "已暂停 · {score} 分",
   "creationGameEnded": "游戏结束 · {score} 分",
-  "creationGameCompleted": "生成好了 · {score} 分"
+  "creationGameCompleted": "生成好了 · {score} 分",
+  "creationNoSelectableModels": "没有可用模型",
+  "creationNoMatchingTopics": "没有匹配的话题",
+  "creationAllTopicCount": "全部话题 {count}",
+  "creationNoImageModels": "还没有能生成图片的模型",
+  "creationNoVideoModels": "还没有能生成视频的模型"
 }

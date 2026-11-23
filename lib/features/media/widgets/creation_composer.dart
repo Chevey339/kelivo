@@ -15,22 +15,22 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/media/creation_prompt_enhancer.dart';
 import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
-import '../../../desktop/desktop_glass_popover.dart';
+import 'creation_picker.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/form_sheet.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
-import '../../../theme/design_tokens.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../model/pages/default_model_page.dart';
 import '../../settings/widgets/settings_search_target.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_advanced_options.dart';
+import 'creation_controls.dart';
+import '../../../shared/widgets/plain_text_input.dart';
 import 'creation_enhancement_panel.dart';
 import 'creation_lightbox.dart';
 import 'creation_reference_picker.dart';
@@ -404,400 +404,446 @@ class _CreationComposerState extends State<CreationComposer> {
     }
     final enhancement = _enhancement;
     final limit = model?.capabilities.maxReferences ?? 0;
-    final radius = BorderRadius.circular(
-      widget.desktop ? AppRadii.capsule : 26,
-    );
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: [
-            BoxShadow(
-              color: cs.shadow.withValues(alpha: .07),
-              offset: const Offset(0, 8),
-              blurRadius: 28,
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+    final radius = BorderRadius.circular(widget.desktop ? 28 : 26);
+    final unavailable =
+        model == null &&
+        state.modelsFor(video ? MediaMode.image : MediaMode.video).isEmpty;
+    return ExcludeFocus(
+      excluding: unavailable,
+      child: IgnorePointer(
+        ignoring: unavailable,
+        child: Opacity(
+          opacity: unavailable ? .6 : 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: radius,
-                color: context.appColors.surfaceCard.withValues(alpha: .93),
-                border: Border.all(
-                  color: cs.outlineVariant.withValues(alpha: .65),
-                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.shadow.withValues(alpha: .07),
+                    offset: const Offset(0, 8),
+                    blurRadius: 28,
+                  ),
+                ],
               ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = !widget.desktop || constraints.maxWidth < 650;
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (enhancement != null)
-                        CreationEnhancementPanel(
-                          key: ValueKey(enhancement.requestId),
-                          original: enhancement.original,
-                          modelName: enhancement.modelName,
-                          spans: enhancement.spans,
-                          onClose: _dismissEnhancement,
-                          onAgain: () => _enhance(again: true),
-                          onApply: _applyEnhancement,
-                        ),
-                      if (!video && references.isNotEmpty)
-                        _ReferenceStrip(
-                          references: references,
-                          limit: limit,
-                          model:
-                              model?.spec.displayName ??
-                              l10n.creationSelectModel,
-                          onRemove: (ref) => state.setReferences(
-                            widget.topicId,
-                            [...references]..remove(ref),
-                          ),
-                          onAdd: (anchor) => _pickReferences(anchor),
-                        ),
-                      if (frames && caps != null)
-                        _VideoFrames(
-                          topicId: widget.topicId,
-                          capabilities: caps,
-                          onPick: (anchor, role) =>
-                              _pickReferences(anchor, role: role),
-                        ),
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          compact ? 18 : 20,
-                          10,
-                          10,
-                          2,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: Focus(
-                                canRequestFocus: false,
-                                onKeyEvent: widget.desktop
-                                    ? _handleDesktopKey
-                                    : null,
-                                child: TextField(
-                                  controller: _prompt,
-                                  focusNode: _focus,
-                                  enabled: model != null,
-                                  minLines: 1,
-                                  maxLines: 6,
-                                  style: TextStyle(
-                                    fontSize: compact ? 16 : 15,
-                                    height: 1.5,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: hint,
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    filled: false,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 5,
-                                    ),
-                                  ),
-                                  textCapitalization:
-                                      TextCapitalization.sentences,
-                                  onChanged: (value) {
-                                    _dismissEnhancement();
-                                    state.updatePrompt(widget.topicId, value);
-                                  },
-                                ),
-                              ),
-                            ),
-                            ValueListenableBuilder(
-                              valueListenable: _prompt,
-                              builder: (context, value, _) => IosIconButton(
-                                icon: Lucide.WandSparkles,
-                                tooltip: l10n.creationEnhance,
-                                minSize: 34,
-                                enabled:
-                                    model != null &&
-                                    value.text.trim().isNotEmpty,
-                                onTap: () => _enhance(),
-                              ),
-                            ),
-                            ValueListenableBuilder(
-                              valueListenable: _prompt,
-                              builder: (context, value, _) {
-                                final enabled =
-                                    value.text.trim().isNotEmpty &&
-                                    state.canSubmit(widget.topicId);
-                                return IosCardPress(
-                                  focusable: true,
-                                  borderRadius: BorderRadius.circular(99),
-                                  baseColor: enabled
-                                      ? cs.primary
-                                      : context.appColors.surfaceFill,
-                                  onTap: enabled ? _send : null,
-                                  child: Tooltip(
-                                    message: l10n.creationGenerate,
-                                    child: SizedBox.square(
-                                      dimension: compact ? 36 : 34,
-                                      child: Icon(
-                                        Lucide.ArrowUp,
-                                        size: 19,
-                                        color: enabled
-                                            ? cs.onPrimary
-                                            : cs.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
+              child: ClipRRect(
+                borderRadius: radius,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: radius,
+                      color: context.appColors.surfaceCard.withValues(
+                        alpha: .93,
+                      ),
+                      border: Border.all(
+                        color: cs.onSurface.withValues(
+                          alpha: cs.brightness == Brightness.dark ? .14 : .11,
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
-                        child: Row(
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact =
+                            !widget.desktop || constraints.maxWidth < 650;
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (limit > 0)
-                              Builder(
-                                builder: (anchor) => IosIconButton(
-                                  icon: LucideIcons.imagePlus,
-                                  size: 17,
-                                  minSize: 30,
-                                  tooltip: l10n.creationAddReference,
-                                  enabled: video
-                                      ? caps?.frameRoles.isNotEmpty == true
-                                      : references.length < limit,
-                                  onTap: () => _pickReferences(
-                                    anchor,
-                                    role: video
-                                        ? MediaReferenceRole.firstFrame
-                                        : null,
-                                  ),
-                                ),
+                            if (enhancement != null)
+                              CreationEnhancementPanel(
+                                key: ValueKey(enhancement.requestId),
+                                original: enhancement.original,
+                                modelName: enhancement.modelName,
+                                spans: enhancement.spans,
+                                onClose: _dismissEnhancement,
+                                onAgain: () => _enhance(again: true),
+                                onApply: _applyEnhancement,
                               ),
-                            const SizedBox(width: 2),
-                            SizedBox(
-                              width: compact
-                                  ? 65
-                                  : video
-                                  ? 104
-                                  : 126,
-                              child: SegmentedTabs(
-                                height: 30,
-                                compact: true,
-                                iconOnly: compact,
-                                radioGroup: true,
-                                index: state.mode.index,
-                                tabs: [
-                                  SegmentedTab(
-                                    label: l10n.creationImage,
-                                    icon: Lucide.Image,
-                                  ),
-                                  SegmentedTab(
-                                    label: l10n.creationVideo,
-                                    icon: LucideIcons.video,
-                                  ),
-                                ],
-                                onChanged: (index) =>
-                                    state.setMode(MediaMode.values[index]),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: _ComposerChip(
-                                label:
+                            if (!video && references.isNotEmpty)
+                              _ReferenceStrip(
+                                references: references,
+                                limit: limit,
+                                model:
                                     model?.spec.displayName ??
                                     l10n.creationSelectModel,
-                                strong: true,
-                                maxWidth: 190,
-                                leading: model == null
-                                    ? null
-                                    : ProviderAvatar(
-                                        providerKey: model.provider.id,
-                                        displayName: model.provider.name,
-                                        size: 16,
+                                onRemove: (ref) => state.setReferences(
+                                  widget.topicId,
+                                  [...references]..remove(ref),
+                                ),
+                                onAdd: (anchor) => _pickReferences(anchor),
+                              ),
+                            if (frames && caps != null)
+                              _VideoFrames(
+                                topicId: widget.topicId,
+                                capabilities: caps,
+                                onPick: (anchor, role) =>
+                                    _pickReferences(anchor, role: role),
+                              ),
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                compact ? 18 : 20,
+                                10,
+                                10,
+                                2,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Expanded(
+                                    child: Focus(
+                                      canRequestFocus: false,
+                                      onKeyEvent: widget.desktop
+                                          ? _handleDesktopKey
+                                          : null,
+                                      child: PlainTextInput(
+                                        controller: _prompt,
+                                        focusNode: _focus,
+                                        enabled: model != null,
+                                        minLines: 1,
+                                        maxLines: 6,
+                                        style: TextStyle(
+                                          fontSize: compact ? 16 : 15,
+                                          height: 1.5,
+                                        ),
+                                        placeholder: hint,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 5,
+                                        ),
+                                        textCapitalization:
+                                            TextCapitalization.sentences,
+                                        onChanged: (value) {
+                                          _dismissEnhancement();
+                                          state.updatePrompt(
+                                            widget.topicId,
+                                            value,
+                                          );
+                                        },
                                       ),
-                                trailing: Lucide.ChevronDown,
-                                onTap: (anchor) => _showPicker(
-                                  anchor,
-                                  width: 340,
-                                  title: video
-                                      ? l10n.creationVideoModels
-                                      : l10n.creationImageModels,
-                                  content: (close) => _ModelOptions(
-                                    onSelected: (value) {
-                                      state.selectModel(value);
-                                      close();
+                                    ),
+                                  ),
+                                  ValueListenableBuilder(
+                                    valueListenable: _prompt,
+                                    builder: (context, value, _) =>
+                                        IosIconButton(
+                                          icon: Lucide.WandSparkles,
+                                          tooltip: l10n.creationEnhance,
+                                          minSize: 34,
+                                          enabled:
+                                              model != null &&
+                                              value.text.trim().isNotEmpty,
+                                          onTap: () => _enhance(),
+                                        ),
+                                  ),
+                                  ValueListenableBuilder(
+                                    valueListenable: _prompt,
+                                    builder: (context, value, _) {
+                                      final enabled =
+                                          value.text.trim().isNotEmpty &&
+                                          state.canSubmit(widget.topicId);
+                                      return IosCardPress(
+                                        focusable: true,
+                                        borderRadius: BorderRadius.circular(99),
+                                        baseColor: enabled
+                                            ? cs.primary
+                                            : context.appColors.surfaceFill,
+                                        onTap: enabled ? _send : null,
+                                        child: Tooltip(
+                                          message: l10n.creationGenerate,
+                                          child: SizedBox.square(
+                                            dimension: compact ? 36 : 34,
+                                            child: Icon(
+                                              Lucide.ArrowUp,
+                                              size: 19,
+                                              color: enabled
+                                                  ? cs.onPrimary
+                                                  : cs.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
+                                      );
                                     },
                                   ),
-                                ),
+                                ],
                               ),
                             ),
-                            if (model != null) ...[
-                              if (compact)
-                                Flexible(
-                                  child: _ComposerChip(
-                                    label: [
-                                      aspectRatio == 'auto'
-                                          ? l10n.creationAuto
-                                          : aspectRatio,
-                                      if (!video)
-                                        l10n.creationImagesCount(state.count),
-                                      if (state.duration case final int duration
-                                          when video)
-                                        l10n.creationDurationSeconds(duration),
-                                    ].join(' · '),
-                                    leading: const Icon(
-                                      Lucide.SlidersHorizontal,
-                                      size: 15,
-                                    ),
-                                    trailing: frames ? LucideIcons.film : null,
-                                    onTap: (anchor) => _showPicker(
-                                      anchor,
-                                      width: 320,
-                                      title: l10n.creationParameters,
-                                      content: (_) => _ParameterOptions(
-                                        ratio: true,
-                                        count: !video,
-                                        duration: video,
-                                        resolution: video,
-                                        frames: video,
-                                        advanced: true,
-                                        topicId: widget.topicId,
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+                              child: Row(
+                                children: [
+                                  Builder(
+                                    builder: (anchor) => IosIconButton(
+                                      icon: LucideIcons.imagePlus,
+                                      size: 17,
+                                      minSize: 30,
+                                      tooltip: l10n.creationAddReference,
+                                      enabled:
+                                          limit > 0 &&
+                                          (video
+                                              ? caps?.frameRoles.isNotEmpty ==
+                                                    true
+                                              : references.length < limit),
+                                      onTap: () => _pickReferences(
+                                        anchor,
+                                        role: video
+                                            ? MediaReferenceRole.firstFrame
+                                            : null,
                                       ),
                                     ),
                                   ),
-                                )
-                              else ...[
-                                _ComposerChip(
-                                  maxWidth: 84,
-                                  label: aspectRatio == 'auto'
-                                      ? l10n.creationAuto
-                                      : aspectRatio,
-                                  leading: const Icon(Lucide.Square, size: 15),
-                                  onTap: (anchor) => _showPicker(
-                                    anchor,
-                                    width: 300,
-                                    title: l10n.creationAspectRatio,
-                                    content: (_) => _ParameterOptions(
-                                      ratio: true,
-                                      topicId: widget.topicId,
-                                    ),
-                                  ),
-                                ),
-                                if (state.duration case final int duration
-                                    when video)
-                                  _ComposerChip(
-                                    maxWidth: 96,
-                                    label: l10n.creationDurationSeconds(
-                                      duration,
-                                    ),
-                                    leading: const Icon(Lucide.Timer, size: 15),
-                                    onTap: (anchor) => _showPicker(
-                                      anchor,
-                                      width: 320,
-                                      title: l10n.creationDuration,
-                                      content: (_) => const _ParameterOptions(
-                                        duration: true,
+                                  const SizedBox(width: 2),
+                                  SizedBox(
+                                    width: compact ? 64 : 132,
+                                    child: SlidingSegmentedTabs(
+                                      height: 30,
+                                      compact: true,
+                                      iconOnly: compact,
+
+                                      index: state.mode.index,
+                                      tabs: [
+                                        SegmentedTab(
+                                          label: l10n.creationImage,
+                                          icon: Lucide.Image,
+                                        ),
+                                        SegmentedTab(
+                                          label: l10n.creationVideo,
+                                          icon: LucideIcons.video,
+                                        ),
+                                      ],
+                                      onChanged: (index) => state.setMode(
+                                        MediaMode.values[index],
                                       ),
                                     ),
                                   ),
-                                if (state.resolutionFor(widget.topicId)
-                                    case final String resolution when video)
-                                  _ComposerChip(
-                                    maxWidth: 72,
-                                    label: resolution,
-                                    onTap: (anchor) => _showPicker(
-                                      anchor,
-                                      width: 260,
-                                      title: l10n.creationResolution,
-                                      content: (_) => _ParameterOptions(
-                                        resolution: true,
-                                        topicId: widget.topicId,
+                                  if (!compact)
+                                    Container(
+                                      height: 16,
+                                      width: 1,
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                      color: cs.onSurface.withValues(
+                                        alpha: .11,
                                       ),
                                     ),
+                                  const SizedBox(width: 2),
+                                  Flexible(
+                                    child: _ComposerChip(
+                                      label:
+                                          model?.spec.displayName ??
+                                          l10n.creationNoSelectableModels,
+                                      strong: true,
+                                      maxWidth: 190,
+                                      leading: model == null
+                                          ? null
+                                          : ProviderAvatar(
+                                              providerKey: model.provider.id,
+                                              displayName: model.provider.name,
+                                              size: 16,
+                                            ),
+                                      trailing: model == null
+                                          ? null
+                                          : Lucide.ChevronDown,
+                                      onTap: model == null
+                                          ? null
+                                          : (anchor) => _showPicker(
+                                              anchor,
+                                              width: 340,
+                                              title: video
+                                                  ? l10n.creationVideoModels
+                                                  : l10n.creationImageModels,
+                                              content: (close) => _ModelOptions(
+                                                onSelected: (value) {
+                                                  state.selectModel(value);
+                                                  close();
+                                                },
+                                              ),
+                                            ),
+                                    ),
                                   ),
-                                if (video &&
-                                    caps?.frameRoles.isNotEmpty == true)
-                                  _FrameToggle(
-                                    label:
-                                        caps!.frameRoles.contains(
-                                          MediaReferenceRole.lastFrame,
-                                        )
-                                        ? l10n.creationFirstLastFrame
-                                        : l10n.creationFirstFrame,
-                                    selected: frames,
-                                    onTap: caps.requiresFirstFrame
-                                        ? null
-                                        : () => state.showFrames(
-                                            widget.topicId,
-                                            !frames,
+                                  if (model != null) ...[
+                                    if (compact)
+                                      _ComposerChip(
+                                        maxWidth: (constraints.maxWidth - 170)
+                                            .clamp(80.0, 300.0),
+                                        label: [
+                                          aspectRatio == 'auto'
+                                              ? l10n.creationAuto
+                                              : aspectRatio,
+                                          if (!video)
+                                            l10n.creationImagesCount(
+                                              state.count,
+                                            ),
+                                          if (state.duration
+                                              case final int duration
+                                              when video)
+                                            l10n.creationDurationSeconds(
+                                              duration,
+                                            ),
+                                        ].join(' · '),
+                                        leading: const Icon(
+                                          Lucide.SlidersHorizontal,
+                                          size: 15,
+                                        ),
+                                        trailing: frames
+                                            ? LucideIcons.film
+                                            : null,
+                                        onTap: (anchor) => _showPicker(
+                                          anchor,
+                                          width: 320,
+                                          title: l10n.creationParameters,
+                                          content: (_) => _ParameterOptions(
+                                            ratio: true,
+                                            count: !video,
+                                            duration: video,
+                                            resolution: video,
+                                            frames: video,
+                                            advanced: true,
+                                            topicId: widget.topicId,
                                           ),
-                                  ),
-                                if (!video)
-                                  _ComposerChip(
-                                    maxWidth: 100,
-                                    label: l10n.creationImagesCount(
-                                      state.count,
-                                    ),
-                                    leading: const Icon(
-                                      LucideIcons.images,
-                                      size: 15,
-                                    ),
-                                    onTap: (anchor) => _showPicker(
-                                      anchor,
-                                      width: 260,
-                                      title: l10n.creationCountLabel,
-                                      content: (_) =>
-                                          const _ParameterOptions(count: true),
-                                    ),
-                                  ),
-                                _ComposerChip(
-                                  maxWidth: 109,
-                                  label: l10n.creationMoreOptions,
-                                  leading: Badge(
-                                    isLabelVisible: state.hasAdvancedOptions(
-                                      widget.topicId,
-                                    ),
-                                    backgroundColor: cs.primary,
-                                    smallSize: 5,
-                                    child: const Icon(
-                                      Lucide.SlidersHorizontal,
-                                      size: 15,
-                                    ),
-                                  ),
-                                  onTap: (anchor) => _showPicker(
-                                    anchor,
-                                    width: 360,
-                                    title: l10n.creationMoreOptions,
-                                    content: (_) => ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        maxHeight:
-                                            (MediaQuery.sizeOf(context).height -
-                                                    144)
-                                                .clamp(160.0, 500.0),
-                                      ),
-                                      child: SingleChildScrollView(
-                                        child: CreationAdvancedOptions(
-                                          topicId: widget.topicId,
+                                        ),
+                                      )
+                                    else ...[
+                                      _ComposerChip(
+                                        maxWidth: 84,
+                                        label: aspectRatio == 'auto'
+                                            ? l10n.creationAuto
+                                            : aspectRatio,
+                                        leading: const Icon(
+                                          Lucide.Square,
+                                          size: 15,
+                                        ),
+                                        onTap: (anchor) => _showPicker(
+                                          anchor,
+                                          width: 300,
+                                          title: l10n.creationAspectRatio,
+                                          content: (_) => _ParameterOptions(
+                                            ratio: true,
+                                            topicId: widget.topicId,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
+                                      if (state.duration case final int duration
+                                          when video)
+                                        _ComposerChip(
+                                          maxWidth: 96,
+                                          label: l10n.creationDurationSeconds(
+                                            duration,
+                                          ),
+                                          leading: const Icon(
+                                            Lucide.Timer,
+                                            size: 15,
+                                          ),
+                                          onTap: (anchor) => _showPicker(
+                                            anchor,
+                                            width: 320,
+                                            title: l10n.creationDuration,
+                                            content: (_) =>
+                                                const _ParameterOptions(
+                                                  duration: true,
+                                                ),
+                                          ),
+                                        ),
+                                      if (state.resolutionFor(widget.topicId)
+                                          case final String resolution
+                                          when video)
+                                        _ComposerChip(
+                                          maxWidth: 72,
+                                          label: resolution,
+                                          onTap: (anchor) => _showPicker(
+                                            anchor,
+                                            width: 260,
+                                            title: l10n.creationResolution,
+                                            content: (_) => _ParameterOptions(
+                                              resolution: true,
+                                              topicId: widget.topicId,
+                                            ),
+                                          ),
+                                        ),
+                                      if (video &&
+                                          caps?.frameRoles.isNotEmpty == true)
+                                        _FrameToggle(
+                                          label:
+                                              caps!.frameRoles.contains(
+                                                MediaReferenceRole.lastFrame,
+                                              )
+                                              ? l10n.creationFirstLastFrame
+                                              : l10n.creationFirstFrame,
+                                          selected: frames,
+                                          onTap: caps.requiresFirstFrame
+                                              ? null
+                                              : () => state.showFrames(
+                                                  widget.topicId,
+                                                  !frames,
+                                                ),
+                                        ),
+                                      if (!video)
+                                        _ComposerChip(
+                                          maxWidth: 100,
+                                          label: l10n.creationImagesCount(
+                                            state.count,
+                                          ),
+                                          leading: const Icon(
+                                            LucideIcons.images,
+                                            size: 15,
+                                          ),
+                                          onTap: (anchor) => _showPicker(
+                                            anchor,
+                                            width: 260,
+                                            title: l10n.creationCountLabel,
+                                            content: (_) =>
+                                                const _ParameterOptions(
+                                                  count: true,
+                                                ),
+                                          ),
+                                        ),
+                                      _ComposerChip(
+                                        maxWidth: 109,
+                                        label: l10n.creationMoreOptions,
+                                        leading: Badge(
+                                          isLabelVisible: state
+                                              .hasAdvancedOptions(
+                                                widget.topicId,
+                                              ),
+                                          backgroundColor: cs.primary,
+                                          smallSize: 5,
+                                          child: const Icon(
+                                            Lucide.SlidersHorizontal,
+                                            size: 15,
+                                          ),
+                                        ),
+                                        onTap: (anchor) => _showPicker(
+                                          anchor,
+                                          width: 360,
+                                          title: l10n.creationMoreOptions,
+                                          content: (_) => ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                              maxHeight:
+                                                  (MediaQuery.sizeOf(
+                                                            context,
+                                                          ).height -
+                                                          144)
+                                                      .clamp(160.0, 500.0),
+                                            ),
+                                            child: SingleChildScrollView(
+                                              child: CreationAdvancedOptions(
+                                                topicId: widget.topicId,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ],
+                              ),
+                            ),
                           ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -812,27 +858,12 @@ class _CreationComposerState extends State<CreationComposer> {
     required String title,
     required Widget Function(VoidCallback) content,
   }) {
-    if (!widget.desktop) {
-      return showFormSheet<void>(
-        anchor,
-        builder: (context) => FormSheet(
-          title: title,
-          children: [content(() => Navigator.of(context).pop())],
-        ),
-      );
-    }
-    final box = anchor.findRenderObject()! as RenderBox;
-    final overlay = Overlay.of(anchor).context.findRenderObject()! as RenderBox;
-    return showDesktopGlassPopover(
+    return showCreationPicker<void>(
       anchor,
-      anchorRect: box.localToGlobal(Offset.zero, ancestor: overlay) & box.size,
+      desktop: widget.desktop,
       width: width,
-      builder: (context, handle) => DesktopGlassPanel(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: content(() => unawaited(handle.close())),
-        ),
-      ),
+      title: title,
+      builder: (context) => content(() => Navigator.of(context).pop()),
     );
   }
 }
@@ -852,7 +883,7 @@ class _ComposerChip extends StatelessWidget {
   final IconData? trailing;
   final bool strong;
   final double? maxWidth;
-  final ValueChanged<BuildContext> onTap;
+  final ValueChanged<BuildContext>? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -862,32 +893,37 @@ class _ComposerChip extends StatelessWidget {
       baseColor: Colors.transparent,
       borderRadius: BorderRadius.circular(15),
       padding: const EdgeInsets.symmetric(horizontal: 7),
-      onTap: () => onTap(context),
+      onTap: onTap == null ? null : () => onTap!(context),
       child: SizedBox(
         height: 30,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (leading != null) ...[leading!, const SizedBox(width: 5)],
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: strong
-                      ? AppFontWeights.semibold
-                      : AppFontWeights.medium,
-                  color: strong ? cs.onSurface : cs.onSurfaceVariant,
+        child: LayoutBuilder(
+          builder: (context, bounds) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (leading != null && bounds.maxWidth >= 35) ...[
+                leading!,
+                const SizedBox(width: 5),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: strong
+                        ? AppFontWeights.semibold
+                        : AppFontWeights.medium,
+                    color: strong ? cs.onSurface : cs.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-            if (trailing != null) ...[
-              const SizedBox(width: 3),
-              Icon(trailing, size: 13, color: cs.onSurfaceVariant),
+              if (trailing != null && bounds.maxWidth >= 60) ...[
+                const SizedBox(width: 3),
+                Icon(trailing, size: 13, color: cs.onSurfaceVariant),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -929,12 +965,8 @@ class _ModelOptionsState extends State<_ModelOptions> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          decoration: InputDecoration(
-            hintText: l10n.creationSearchModels,
-            prefixIcon: const Icon(Lucide.Search, size: 16),
-            isDense: true,
-          ),
+        CreationSearchBox(
+          hint: l10n.creationSearchModels,
           onChanged: (value) =>
               setState(() => _query = value.trim().toLowerCase()),
         ),
@@ -1028,10 +1060,10 @@ class _ParameterOptions extends StatelessWidget {
         if (ratio && ratios.isNotEmpty) ...[
           Text(l10n.creationAspectRatio),
           const SizedBox(height: 6),
-          SegmentedTabs(
+          SlidingSegmentedTabs(
             height: 36,
             expand: ratios.length <= 4,
-            radioGroup: true,
+
             tabs: [
               for (final value in ratios)
                 SegmentedTab(
@@ -1048,10 +1080,10 @@ class _ParameterOptions extends StatelessWidget {
           if (ratio) const SizedBox(height: 12),
           Text(l10n.creationDuration),
           const SizedBox(height: 6),
-          SegmentedTabs(
+          SlidingSegmentedTabs(
             height: 36,
             expand: caps.durations.length <= 4,
-            radioGroup: true,
+
             tabs: [
               for (final value in caps.durations)
                 SegmentedTab(label: l10n.creationDurationSeconds(value)),
@@ -1064,9 +1096,9 @@ class _ParameterOptions extends StatelessWidget {
           if (ratio || duration) const SizedBox(height: 12),
           Text(l10n.creationResolution),
           const SizedBox(height: 6),
-          SegmentedTabs(
+          SlidingSegmentedTabs(
             height: 36,
-            radioGroup: true,
+
             tabs: [for (final value in resolutions) SegmentedTab(label: value)],
             index: resolutions.indexOf(state.resolutionFor(topicId)!),
             onChanged: (index) => state.selectResolution(resolutions[index]),
@@ -1126,9 +1158,9 @@ class _ImageCountOptionsState extends State<_ImageCountOptions> {
       children: [
         Text(l10n.creationCountLabel),
         const SizedBox(height: 6),
-        SegmentedTabs(
+        SlidingSegmentedTabs(
           height: 36,
-          radioGroup: true,
+
           tabs: [
             for (var i = 1; i <= 4; i++) SegmentedTab(label: '$i'),
             SegmentedTab(label: l10n.creationCustomCount),

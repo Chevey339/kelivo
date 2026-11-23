@@ -24300,5 +24300,30 @@
         "type": "int"
       }
     }
+  },
+  "creationNoSelectableModels": "No models available",
+  "@creationNoSelectableModels": {
+    "description": "Compact disabled model label in the Creation composer when no image or video models are available."
+  },
+  "creationNoMatchingTopics": "No matching topics",
+  "@creationNoMatchingTopics": {
+    "description": "Shown in the Creation topic list when a search has no matching titles or prompts."
+  },
+  "creationAllTopicCount": "All topics {count}",
+  "@creationAllTopicCount": {
+    "description": "Heading above the mobile Creation topic list. The count is the number of topics in the list.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationNoImageModels": "No image generation models yet",
+  "creationNoVideoModels": "No video generation models yet",
+  "@creationNoImageModels": {
+    "description": "Creation empty-state heading when the current image mode has no available model, but the other mode is configured."
+  },
+  "@creationNoVideoModels": {
+    "description": "Creation empty-state heading when the current video mode has no available model, but the other mode is configured."
   }
 }

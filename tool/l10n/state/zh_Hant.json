@@ -5428,5 +5428,10 @@
   "creationGameScore": "3146a428e6b1a64a1752690af3de62e7c4a06e06935db5cca12720e469091bd7",
   "creationGamePaused": "9e30a8d005a9fffcbb866c3d24ff1484e51c1cdad3688ea388e558d0b88dcd8c",
   "creationGameEnded": "1424194a20525250bf9caf648bf61ead4711a544acb6df28fd99cd44fe3a01ed",
-  "creationGameCompleted": "a14ffb538a21eb94de5225902dd076a7857e664b5b73df5fedf28d68d20ab51c"
+  "creationGameCompleted": "a14ffb538a21eb94de5225902dd076a7857e664b5b73df5fedf28d68d20ab51c",
+  "creationNoSelectableModels": "95fdf0f8e313087c37909646358631b31e041d6a5c90d0a63fea681931e147a4",
+  "creationNoMatchingTopics": "d802291d7595abbcceb6e980f25783ca0a531dcf47791ae1f6cb5ab208d9a8cf",
+  "creationAllTopicCount": "44849e8a1256b94b3c3994964cae757ae21d76a213915349f01c73367fb067df",
+  "creationNoImageModels": "624180192854170eef7884f14d7369440fb93d8651e87a5d0dfab217137f784a",
+  "creationNoVideoModels": "38a46974d7c98c12277869983823a650a5cda29cc36ababa647428f92edb002b"
 }

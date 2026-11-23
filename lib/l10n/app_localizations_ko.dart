@@ -18141,4 +18141,21 @@ class AppLocalizationsKo extends AppLocalizations {
   String creationGameCompleted(int score) {
     return '생성 완료 · $score';
   }
+
+  @override
+  String get creationNoSelectableModels => '사용 가능한 모델 없음';
+
+  @override
+  String get creationNoMatchingTopics => '일치하는 주제 없음';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return '전체 주제 $count';
+  }
+
+  @override
+  String get creationNoImageModels => '아직 이미지 생성 모델이 없습니다';
+
+  @override
+  String get creationNoVideoModels => '아직 동영상 생성 모델이 없습니다';
 }

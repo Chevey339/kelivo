@@ -5428,5 +5428,10 @@
   "creationGameScore": "Счёт: {score}",
   "creationGamePaused": "Пауза · {score}",
   "creationGameEnded": "Игра окончена · {score}",
-  "creationGameCompleted": "Готово · {score}"
+  "creationGameCompleted": "Готово · {score}",
+  "creationNoSelectableModels": "Нет доступных моделей",
+  "creationNoMatchingTopics": "Нет подходящих тем",
+  "creationAllTopicCount": "Все темы {count}",
+  "creationNoImageModels": "Моделей генерации изображений пока нет",
+  "creationNoVideoModels": "Моделей генерации видео пока нет"
 }

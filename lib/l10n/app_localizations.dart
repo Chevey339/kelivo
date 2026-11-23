@@ -32705,6 +32705,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Creation ready · {score}'**
   String creationGameCompleted(int score);
+
+  /// Compact disabled model label in the Creation composer when no image or video models are available.
+  ///
+  /// In en, this message translates to:
+  /// **'No models available'**
+  String get creationNoSelectableModels;
+
+  /// Shown in the Creation topic list when a search has no matching titles or prompts.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching topics'**
+  String get creationNoMatchingTopics;
+
+  /// Heading above the mobile Creation topic list. The count is the number of topics in the list.
+  ///
+  /// In en, this message translates to:
+  /// **'All topics {count}'**
+  String creationAllTopicCount(int count);
+
+  /// Creation empty-state heading when the current image mode has no available model, but the other mode is configured.
+  ///
+  /// In en, this message translates to:
+  /// **'No image generation models yet'**
+  String get creationNoImageModels;
+
+  /// Creation empty-state heading when the current video mode has no available model, but the other mode is configured.
+  ///
+  /// In en, this message translates to:
+  /// **'No video generation models yet'**
+  String get creationNoVideoModels;
 }
 
 class _AppLocalizationsDelegate

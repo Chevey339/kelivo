@@ -250,9 +250,24 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       ),
       DesktopTab.media => TickerMode(
         enabled: _activeTab == tab,
-        child: DesktopMediaCreationPage(
-          artworkRequest: _artworkRequest,
-          onArtworkOpened: () => setState(() => _artworkRequest = null),
+        child: ColoredBox(
+          color: Theme.of(context).colorScheme.surface,
+          child: Column(
+            children: [
+              if (defaultTargetPlatform == TargetPlatform.macOS &&
+                  !ResponsiveHelper.isMobile(context))
+                const SizedBox(
+                  height: 38,
+                  child: DragToMoveArea(child: SizedBox.expand()),
+                ),
+              Expanded(
+                child: DesktopMediaCreationPage(
+                  artworkRequest: _artworkRequest,
+                  onArtworkOpened: () => setState(() => _artworkRequest = null),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       DesktopTab.translate => const DesktopTranslatePage(

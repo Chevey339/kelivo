@@ -13,10 +13,12 @@ import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../theme/app_font_weights.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_lightbox.dart';
+import 'creation_controls.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class CreationGallery extends StatefulWidget {
   const CreationGallery({
@@ -24,11 +26,13 @@ class CreationGallery extends StatefulWidget {
     required this.desktop,
     required this.onOpenTopic,
     this.onToggleRail,
+    this.mobileQuery = '',
     this.artworkRequest,
     this.onArtworkOpened,
   });
 
   final bool desktop;
+  final String mobileQuery;
   final OpenCreationTopic onOpenTopic;
   final VoidCallback? onToggleRail;
   final OpenCreationArtwork? artworkRequest;
@@ -41,6 +45,7 @@ class CreationGallery extends StatefulWidget {
 class _CreationGalleryState extends State<CreationGallery> {
   CreationGalleryFilter _filter = CreationGalleryFilter.all;
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
   OpenCreationArtwork? _opened;
 
   @override
@@ -56,6 +61,7 @@ class _CreationGalleryState extends State<CreationGallery> {
   @override
   void dispose() {
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -64,7 +70,7 @@ class _CreationGalleryState extends State<CreationGallery> {
     final galleryContext = context;
     final media = context.watch<MediaCreationController>();
     final l10n = AppLocalizations.of(context)!;
-    final query = _search.text;
+    final query = widget.desktop ? _search.text : widget.mobileQuery;
     final chat = context.read<ChatService?>();
     String? conversationTitle(String id) => chat?.getConversation(id)?.title;
     final items = media.galleryItems(
@@ -90,29 +96,25 @@ class _CreationGalleryState extends State<CreationGallery> {
       }
     }
     final colors = Theme.of(context).colorScheme;
-    final tabs = SegmentedTabs(
-      radioGroup: true,
-      height: 32,
+    final labels = [
+      l10n.creationFilterAll,
+      l10n.creationFilterImages,
+      l10n.creationFilterVideos,
+      l10n.creationFilterFavorites,
+    ];
+    void setFilter(int index) =>
+        setState(() => _filter = CreationGalleryFilter.values[index]);
+    final tabs = SlidingSegmentedTabs(
+      height: 28,
+      compact: true,
       index: _filter.index,
-      tabs: [
-        SegmentedTab(label: l10n.creationFilterAll),
-        SegmentedTab(label: l10n.creationFilterImages),
-        SegmentedTab(label: l10n.creationFilterVideos),
-        SegmentedTab(label: l10n.creationFilterFavorites),
-      ],
-      onChanged: (index) =>
-          setState(() => _filter = CreationGalleryFilter.values[index]),
+      tabs: [for (final label in labels) SegmentedTab(label: label)],
+      onChanged: setFilter,
     );
-    final search = TextField(
+    final search = CreationSearchBox(
       controller: _search,
-      decoration: InputDecoration(
-        hintText: l10n.creationSearchGallery,
-        prefixIcon: const Icon(Lucide.Search, size: 16),
-        isDense: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(11)),
-        contentPadding: const EdgeInsets.symmetric(vertical: 7, horizontal: 9),
-      ),
-      style: const TextStyle(fontSize: 13),
+      focusNode: _searchFocus,
+      hint: l10n.creationSearchGallery,
       onChanged: (_) => setState(() {}),
     );
     final title = Text(
@@ -124,66 +126,143 @@ class _CreationGalleryState extends State<CreationGallery> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(widget.desktop ? 24 : 16, 8, 16, 5),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              if (widget.desktop && constraints.maxWidth >= 620) {
+        if (widget.desktop)
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(24, 0, 16, 0),
+            child: LayoutBuilder(
+              builder: (context, box) {
+                final heading = Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.onToggleRail case final toggle?)
+                      IosIconButton(
+                        icon: Lucide.panelLeft,
+                        tooltip: l10n.creationTopics,
+                        onTap: toggle,
+                      ),
+                    Flexible(child: title),
+                  ],
+                );
+                if (box.maxWidth < 540) {
+                  return Column(
+                    children: [
+                      SizedBox(
+                        height: 48,
+                        child: Row(
+                          children: [
+                            Flexible(child: heading),
+                            const SizedBox(width: 12),
+                            Expanded(flex: 2, child: search),
+                          ],
+                        ),
+                      ),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: SizedBox(width: 210, child: tabs),
+                      ),
+                    ],
+                  );
+                }
                 return SizedBox(
-                  height: 38,
+                  height: 52,
                   child: Row(
                     children: [
-                      if (widget.onToggleRail case final toggle?)
-                        IosIconButton(
-                          icon: Lucide.panelLeft,
-                          tooltip: l10n.creationTopics,
-                          onTap: toggle,
-                        ),
-                      Flexible(child: title),
+                      Flexible(child: heading),
                       const SizedBox(width: 12),
-                      Flexible(flex: 2, child: tabs),
+                      SizedBox(width: 195, child: tabs),
                       const Spacer(),
-                      SizedBox(width: 220, child: search),
+                      ListenableBuilder(
+                        listenable: _searchFocus,
+                        child: search,
+                        builder: (context, child) => AnimatedContainer(
+                          duration: handoffDuration(context, 200),
+                          curve: handoffCurve,
+                          width: box.maxWidth < 670
+                              ? 162
+                              : _searchFocus.hasFocus
+                              ? 280
+                              : 220,
+                          child: child,
+                        ),
+                      ),
                     ],
                   ),
                 );
-              }
-              return Column(
-                children: [
-                  if (widget.desktop)
-                    Row(
-                      children: [
-                        if (widget.onToggleRail case final toggle?)
-                          IosIconButton(
-                            icon: Lucide.panelLeft,
-                            tooltip: l10n.creationTopics,
-                            onTap: toggle,
+              },
+            ),
+          )
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Row(
+              children: [
+                for (final (i, label) in labels.indexed)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 6),
+                    child: Semantics(
+                      selected: _filter.index == i,
+                      button: true,
+                      child: IosCardPress(
+                        baseColor: _filter.index == i
+                            ? colors.onSurface
+                            : context.appColors.surfaceFill,
+                        duration: handoffDuration(context, 160),
+                        focusable: true,
+                        borderRadius: BorderRadius.circular(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        onTap: () => setFilter(i),
+                        child: SizedBox(
+                          height: 32,
+                          child: Row(
+                            children: [
+                              if (i == 3) ...[
+                                Icon(
+                                  LucideIcons.star,
+                                  size: 13,
+                                  color: _filter.index == i
+                                      ? colors.surface
+                                      : colors.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 5),
+                              ],
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: _filter.index == i
+                                      ? colors.surface
+                                      : colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
-                        Flexible(child: title),
-                      ],
+                        ),
+                      ),
                     ),
-                  tabs,
-                  const SizedBox(height: 8),
-                  search,
-                ],
-              );
-            },
+                  ),
+              ],
+            ),
           ),
-        ),
         Expanded(
           child: items.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.only(bottom: 110),
-                  child: Center(
+              ? SingleChildScrollView(
+                  padding: EdgeInsets.only(
+                    top: widget.desktop ? 96 : 48,
+                    bottom: 140,
+                  ),
+                  child: Align(
+                    alignment: Alignment.topCenter,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           _filter == CreationGalleryFilter.favorites
-                              ? LucideIcons.star
-                              : LucideIcons.images,
-                          color: colors.onSurfaceVariant,
-                          size: 47,
+                              ? LucideIcons.star300
+                              : LucideIcons.images300,
+                          color: colors.onSurface.withValues(alpha: .42),
+                          size: widget.desktop ? 56 : 48,
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -194,7 +273,10 @@ class _CreationGalleryState extends State<CreationGallery> {
                               : media.galleryCount == 0
                               ? l10n.creationGalleryEmpty
                               : l10n.creationGalleryNoResults,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -203,20 +285,28 @@ class _CreationGalleryState extends State<CreationGallery> {
               : LayoutBuilder(
                   builder: (context, constraints) {
                     final columns = widget.desktop
-                        ? (constraints.maxWidth ~/ 215).clamp(2, 5)
-                        : 2;
+                        ? ((constraints.maxWidth - 48) ~/ 170).clamp(2, 4)
+                        : 3;
                     return GridView.builder(
                       key: ValueKey((_filter, query)),
                       padding: EdgeInsets.fromLTRB(
-                        widget.desktop ? 24 : 14,
-                        12,
-                        widget.desktop ? 24 : 14,
+                        widget.desktop ? 24 : 6,
+                        widget.desktop ? 8 : 0,
+                        widget.desktop ? 24 : 6,
                         168,
                       ),
-                      gridDelegate: _MasonryDelegate(
-                        columns: columns,
-                        ratios: [for (final item in items) _galleryRatio(item)],
-                      ),
+                      gridDelegate: !widget.desktop
+                          ? const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              mainAxisSpacing: 3,
+                              crossAxisSpacing: 3,
+                            )
+                          : _MasonryDelegate(
+                              columns: columns,
+                              ratios: [
+                                for (final item in items) _galleryRatio(item),
+                              ],
+                            ),
                       itemCount: items.length,
                       itemBuilder: (context, index) {
                         final item = items[index];
@@ -227,6 +317,7 @@ class _CreationGalleryState extends State<CreationGallery> {
                             : conversationTitle(conversationId);
                         return CreationArtworkTile(
                           item: item,
+                          galleryTile: true,
                           desktop: widget.desktop,
                           showSource: batch?.source == GenerationSource.chat,
                           sourceLabel: batch?.topicId == null
@@ -283,6 +374,7 @@ class CreationArtworkTile extends StatefulWidget {
     super.key,
     required this.item,
     required this.desktop,
+    this.galleryTile = false,
     required this.onOpen,
     this.sourceLabel,
     this.draftTopicId,
@@ -293,6 +385,7 @@ class CreationArtworkTile extends StatefulWidget {
 
   final GenerationItemRow item;
   final bool desktop;
+  final bool galleryTile;
   final VoidCallback onOpen;
   final String? sourceLabel, draftTopicId;
   final ValueChanged<Offset?>? onMenu;
@@ -336,7 +429,13 @@ class _CreationArtworkTileState extends State<CreationArtworkTile> {
             : null,
         onLongPress: widget.desktop ? null : openMenu,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(widget.desktop ? 16 : 14),
+          borderRadius: BorderRadius.circular(
+            widget.galleryTile
+                ? widget.desktop
+                      ? 12
+                      : 4
+                : 16,
+          ),
           child: Stack(
             fit: StackFit.expand,
             children: [

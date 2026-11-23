@@ -5428,5 +5428,10 @@
   "creationGameScore": "Puan {score}",
   "creationGamePaused": "Duraklatıldı · {score}",
   "creationGameEnded": "Oyun bitti · {score}",
-  "creationGameCompleted": "Oluşturma hazır · {score}"
+  "creationGameCompleted": "Oluşturma hazır · {score}",
+  "creationNoSelectableModels": "Kullanılabilir model yok",
+  "creationNoMatchingTopics": "Eşleşen konu yok",
+  "creationAllTopicCount": "Tüm konular {count}",
+  "creationNoImageModels": "Henüz görsel oluşturma modeli yok",
+  "creationNoVideoModels": "Henüz video oluşturma modeli yok"
 }

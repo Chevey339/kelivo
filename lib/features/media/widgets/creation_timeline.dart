@@ -24,7 +24,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
-import '../../chat/widgets/chat_suggestion_bubbles.dart';
+import 'creation_controls.dart';
 import '../../provider/pages/provider_detail_page.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../provider/widgets/oauth_login_panel.dart';
@@ -206,9 +206,15 @@ class CreationEmptyState extends StatelessWidget {
             l10n.creationSuggestionRoom,
             l10n.creationSuggestionSticker,
           ];
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(28, 16, 28, 155),
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        desktop ? 32 : 16,
+        desktop ? 96 : 48,
+        desktop ? 32 : 16,
+        155,
+      ),
+      child: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
           child: Column(
@@ -216,24 +222,31 @@ class CreationEmptyState extends StatelessWidget {
             children: [
               Icon(
                 missing
-                    ? Lucide.KeyRound
+                    ? LucideIcons.keyRound300
                     : video
-                    ? LucideIcons.video
-                    : Lucide.Palette,
+                    ? LucideIcons.video300
+                    : LucideIcons.palette300,
                 size: desktop ? 56 : 48,
-                color: cs.onSurfaceVariant,
-                weight: 1.4,
+                color: cs.onSurface.withValues(alpha: .42),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Text(
-                missing ? l10n.creationNoModelTitle : l10n.creationEmptyTitle,
+                !missing
+                    ? l10n.creationEmptyTitle
+                    : media
+                          .modelsFor(video ? MediaMode.image : MediaMode.video)
+                          .isEmpty
+                    ? l10n.creationNoModelTitle
+                    : video
+                    ? l10n.creationNoVideoModels
+                    : l10n.creationNoImageModels,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: AppFontWeights.semibold,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 400),
                 child: Text(
@@ -246,54 +259,77 @@ class CreationEmptyState extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 15),
+              SizedBox(height: desktop ? 22 : 20),
               if (missing)
                 Wrap(
                   alignment: WrapAlignment.center,
                   spacing: 8,
-                  runSpacing: 6,
+                  runSpacing: 8,
                   children: [
                     if (!video)
-                      OutlinedButton.icon(
-                        icon: const Icon(Lucide.Image, size: 15),
-                        label: Text(l10n.creationConnectChatGPT),
+                      CreationAction(
+                        tone: CreationActionTone.tonal,
+                        pill: true,
+                        icon: const ProviderAvatar(
+                          providerKey: 'chatgpt',
+                          displayName: 'ChatGPT',
+                          size: 16,
+                        ),
+                        child: Text(l10n.creationConnectChatGPT),
                         onPressed: () => _login(
                           context,
                           OAuthProvider.chatgpt,
                           l10n.creationConnectChatGPT,
                         ),
                       ),
-                    OutlinedButton.icon(
-                      icon: const Icon(Lucide.Image, size: 15),
-                      label: Text(l10n.creationConnectGrok),
+                    CreationAction(
+                      tone: CreationActionTone.tonal,
+                      pill: true,
+                      icon: const ProviderAvatar(
+                        providerKey: 'grok',
+                        displayName: 'Grok',
+                        size: 16,
+                      ),
+                      child: Text(l10n.creationConnectGrok),
                       onPressed: () => _login(
                         context,
                         OAuthProvider.grok,
                         l10n.creationConnectGrok,
                       ),
                     ),
-                    OutlinedButton.icon(
+                    CreationAction(
+                      tone: CreationActionTone.tonal,
+                      pill: true,
                       icon: ProviderAvatar(
                         providerKey: 'fal',
                         displayName: 'fal',
                         size: 16,
                       ),
-                      label: Text(l10n.creationConfigureFal),
+                      child: Text(l10n.creationConfigureFal),
                       onPressed: () => _provider(context, fal: true),
                     ),
-                    TextButton.icon(
+                    CreationAction(
+                      pill: true,
                       icon: const Icon(Lucide.Settings, size: 15),
-                      label: Text(l10n.creationOtherProviders),
+                      child: Text(l10n.creationOtherProviders),
                       onPressed: () => _provider(context),
                     ),
                   ],
                 )
               else
-                ChatSuggestionBubbles(
-                  suggestions: suggestions,
+                Wrap(
                   alignment: WrapAlignment.center,
-                  maxSuggestions: desktop ? 6 : 4,
-                  onTap: (value) => media.suggestPrompt(topicId, value),
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final value in suggestions.take(desktop ? 6 : 4))
+                      CreationAction(
+                        tone: CreationActionTone.tonal,
+                        pill: true,
+                        onPressed: () => media.suggestPrompt(topicId, value),
+                        child: Text(value),
+                      ),
+                  ],
                 ),
             ],
           ),

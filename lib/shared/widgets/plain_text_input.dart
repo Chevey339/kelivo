@@ -18,6 +18,7 @@ class PlainTextInput extends StatelessWidget {
     this.onChanged,
     this.onSubmitted,
     this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
     this.keyboardType,
     this.prefix,
     this.suffix,
@@ -35,6 +36,7 @@ class PlainTextInput extends StatelessWidget {
   final int? minLines, maxLines;
   final ValueChanged<String>? onChanged, onSubmitted;
   final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
   final TextInputType? keyboardType;
   final Widget? prefix, suffix;
   final BoxDecoration? decoration;
@@ -61,13 +63,14 @@ class PlainTextInput extends StatelessWidget {
       maxLines: maxLines,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
+      textCapitalization: textCapitalization,
       style: textStyle,
       placeholder: placeholder,
       placeholderStyle: textStyle
           .copyWith(color: scheme.onSurface.withValues(alpha: .42))
           .merge(placeholderStyle),
       cursorColor: cursorColor ?? scheme.primary,
-      decoration: decoration,
+      decoration: decoration ?? const BoxDecoration(),
       padding: padding,
       prefix: prefix,
       suffix: suffix,

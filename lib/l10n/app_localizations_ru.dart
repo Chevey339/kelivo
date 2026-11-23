@@ -19048,4 +19048,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String creationGameCompleted(int score) {
     return 'Готово · $score';
   }
+
+  @override
+  String get creationNoSelectableModels => 'Нет доступных моделей';
+
+  @override
+  String get creationNoMatchingTopics => 'Нет подходящих тем';
+
+  @override
+  String creationAllTopicCount(int count) {
+    return 'Все темы $count';
+  }
+
+  @override
+  String get creationNoImageModels => 'Моделей генерации изображений пока нет';
+
+  @override
+  String get creationNoVideoModels => 'Моделей генерации видео пока нет';
 }

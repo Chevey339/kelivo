@@ -22,7 +22,8 @@ import '../shared/widgets/ios_tactile.dart';
 import '../shared/widgets/thinking_sheen.dart';
 import '../theme/app_font_weights.dart';
 import '../theme/app_semantic_colors.dart';
-import 'widgets/desktop_pane_surface.dart';
+import '../features/media/widgets/creation_controls.dart';
+import '../shared/widgets/plain_text_input.dart';
 
 class DesktopMediaCreationPage extends StatefulWidget {
   const DesktopMediaCreationPage({
@@ -86,110 +87,112 @@ class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
     final media = context.watch<MediaCreationController>();
     final cs = Theme.of(context).colorScheme;
     final topic = _topicId == null ? null : media.topic(_topicId!);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 720;
-        final rail = _CreationTopicRail(
-          active: _topicId,
-          gallery: _gallery,
-          onOpen: _open,
-          onOpenGallery: _showGallery,
-        );
-        final toggle = compact
-            ? () => setState(() => _navigationOpen = !_navigationOpen)
-            : null;
-        final activeBatch = _topicId == null
-            ? null
-            : media
-                  .batchesFor(_topicId!)
-                  .reversed
-                  .where((batch) => batch.status.isActive)
-                  .firstOrNull;
-        Widget shortcuts(Widget child) => CallbackShortcuts(
-          bindings: {
-            if (_navigationOpen)
-              const SingleActivator(LogicalKeyboardKey.escape): () =>
-                  setState(() => _navigationOpen = false)
-            else if (activeBatch != null)
-              const SingleActivator(LogicalKeyboardKey.escape): () =>
-                  unawaited(media.runner.cancel(activeBatch.id)),
-          },
-          child: Focus(autofocus: true, child: child),
-        );
-        final body = ColoredBox(
-          color: cs.surface,
-          child: Column(
-            children: [
-              if (!_gallery)
-                _CreationHeader(
-                  key: ValueKey(_topicId),
-                  topic: topic,
-                  onDeleted: () => _open(null),
-                  onToggleRail: toggle,
-                ),
-              Expanded(
-                child: CreationComposerStack(
-                  desktop: true,
-                  topicId: _topicId,
-                  content: _gallery
-                      ? CreationGallery(
-                          desktop: true,
-                          artworkRequest: widget.artworkRequest,
-                          onArtworkOpened: widget.onArtworkOpened,
-                          onToggleRail: toggle,
-                          onOpenTopic: (id, batch) => _open(id, batch: batch),
-                        )
-                      : CreationTimeline(
-                          key: ValueKey((_topicId, _highlightBatch)),
-                          topicId: _topicId,
-                          desktop: true,
-                          highlightBatchId: _highlightBatch,
-                        ),
-                  composer: CreationComposer(
-                    topicId: _topicId,
+    return CreationSurface(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 720;
+          final rail = _CreationTopicRail(
+            active: _topicId,
+            gallery: _gallery,
+            onOpen: _open,
+            onOpenGallery: _showGallery,
+          );
+          final toggle = compact
+              ? () => setState(() => _navigationOpen = !_navigationOpen)
+              : null;
+          final activeBatch = _topicId == null
+              ? null
+              : media
+                    .batchesFor(_topicId!)
+                    .reversed
+                    .where((batch) => batch.status.isActive)
+                    .firstOrNull;
+          Widget shortcuts(Widget child) => CallbackShortcuts(
+            bindings: {
+              if (_navigationOpen)
+                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                    setState(() => _navigationOpen = false)
+              else if (activeBatch != null)
+                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                    unawaited(media.runner.cancel(activeBatch.id)),
+            },
+            child: Focus(autofocus: true, child: child),
+          );
+          final body = ColoredBox(
+            color: cs.surface,
+            child: Column(
+              children: [
+                if (!_gallery)
+                  _CreationHeader(
+                    key: ValueKey(_topicId),
+                    topic: topic,
+                    onDeleted: () => _open(null),
+                    onToggleRail: toggle,
+                  ),
+                Expanded(
+                  child: CreationComposerStack(
                     desktop: true,
-                    onSent: (id) {
-                      if (id != _topicId) _open(id);
-                    },
+                    topicId: _topicId,
+                    content: _gallery
+                        ? CreationGallery(
+                            desktop: true,
+                            artworkRequest: widget.artworkRequest,
+                            onArtworkOpened: widget.onArtworkOpened,
+                            onToggleRail: toggle,
+                            onOpenTopic: (id, batch) => _open(id, batch: batch),
+                          )
+                        : CreationTimeline(
+                            key: ValueKey((_topicId, _highlightBatch)),
+                            topicId: _topicId,
+                            desktop: true,
+                            highlightBatchId: _highlightBatch,
+                          ),
+                    composer: CreationComposer(
+                      topicId: _topicId,
+                      desktop: true,
+                      onSent: (id) {
+                        if (id != _topicId) _open(id);
+                      },
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        );
-        if (!compact) {
-          return shortcuts(
-            Row(
-              children: [
-                SizedBox(width: 272, child: rail),
-                Expanded(child: body),
               ],
             ),
           );
-        }
-        return shortcuts(
-          Stack(
-            children: [
-              Positioned.fill(child: body),
-              if (_navigationOpen) ...[
-                Positioned.fill(
-                  child: ModalBarrier(
-                    color: cs.scrim.withValues(alpha: .2),
-                    onDismiss: () => setState(() => _navigationOpen = false),
+          if (!compact) {
+            return shortcuts(
+              Row(
+                children: [
+                  SizedBox(width: 272, child: rail),
+                  Expanded(child: body),
+                ],
+              ),
+            );
+          }
+          return shortcuts(
+            Stack(
+              children: [
+                Positioned.fill(child: body),
+                if (_navigationOpen) ...[
+                  Positioned.fill(
+                    child: ModalBarrier(
+                      color: cs.scrim.withValues(alpha: .2),
+                      onDismiss: () => setState(() => _navigationOpen = false),
+                    ),
                   ),
-                ),
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: math.min(272, constraints.maxWidth * .78),
-                  child: rail,
-                ),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: math.min(272, constraints.maxWidth * .78),
+                    child: rail,
+                  ),
+                ],
               ],
-            ],
-          ),
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -226,9 +229,15 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
     Widget topicAt(int index) {
       if (showNew && index == 0) {
         return list
-            ? ListTile(
-                leading: const Icon(Lucide.Plus),
-                title: Text(l10n.creationNewTopic),
+            ? SizedBox(
+                height: 48,
+                child: Row(
+                  children: [
+                    Icon(Lucide.Plus, size: 20, color: cs.primary),
+                    const SizedBox(width: 9),
+                    Text(l10n.creationNewTopic),
+                  ],
+                ),
               )
             : _NewTopicCard(minimal: covers);
       }
@@ -242,147 +251,112 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
       );
     }
 
-    return DesktopPaneSurface(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(color: cs.outlineVariant.withValues(alpha: .5)),
-          ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: cs.onSurface.withValues(alpha: .06)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 12, 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 34,
-                      child: TextField(
-                        style: const TextStyle(fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: l10n.creationSearchTopics,
-                          prefixIcon: const Icon(Lucide.Search, size: 16),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 30,
-                          ),
-                          isDense: true,
-                          filled: true,
-                          fillColor: context.appColors.surfaceFill,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(11),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(11),
-                            borderSide: BorderSide(
-                              color: cs.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                        onChanged: (value) => setState(() => _query = value),
-                      ),
-                    ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 12, 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: CreationSearchBox(
+                    hint: l10n.creationSearchTopics,
+                    onChanged: (value) => setState(() => _query = value),
                   ),
-                  const SizedBox(width: 6),
-                  IosIconButton(
-                    icon: Lucide.SquarePen,
-                    size: 18,
-                    minSize: 32,
-                    tooltip: l10n.creationNewTopic,
-                    onTap: () => widget.onOpen(null),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
-              child: IosCardPress(
-                focusable: true,
-                onTap: widget.onOpenGallery,
-                borderRadius: BorderRadius.circular(11),
-                baseColor: widget.gallery
-                    ? cs.primary.withValues(alpha: .1)
-                    : Colors.transparent,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.layoutGrid,
-                      size: 17,
-                      color: widget.gallery ? cs.primary : cs.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.creationGallery,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          color: widget.gallery ? cs.primary : cs.onSurface,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '${media.galleryCount}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
                 ),
-              ),
+                const SizedBox(width: 6),
+                IosIconButton(
+                  icon: Lucide.SquarePen,
+                  size: 18,
+                  minSize: 32,
+                  tooltip: l10n.creationNewTopic,
+                  onTap: () => widget.onOpen(null),
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+            child: IosCardPress(
+              focusable: true,
+              onTap: widget.onOpenGallery,
+              borderRadius: BorderRadius.circular(11),
+              baseColor: widget.gallery
+                  ? cs.primary.withValues(alpha: .1)
+                  : Colors.transparent,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: Row(
                 children: [
+                  Icon(
+                    LucideIcons.layoutGrid,
+                    size: 17,
+                    color: widget.gallery ? cs.primary : cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      l10n.creationTopicCount(topics.length),
+                      l10n.creationGallery,
                       style: TextStyle(
-                        color: cs.onSurfaceVariant,
-                        fontSize: 12,
-                        fontWeight: AppFontWeights.semibold,
+                        fontSize: 13.5,
+                        color: widget.gallery ? cs.primary : cs.onSurface,
                       ),
                     ),
                   ),
-                  Builder(
-                    builder: (anchor) => IosIconButton(
-                      icon: creationTopicViewIcon(media.topicView),
-                      size: 16,
-                      minSize: 28,
-                      tooltip: l10n.creationDisplayAndGames,
-                      onTap: () =>
-                          showCreationDisplayMenu(anchor, desktop: true),
-                    ),
+                  Text(
+                    '${media.galleryCount}',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
             ),
-            if (topics.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Text(
-                  l10n.creationTopicsEmpty,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.creationTopicCount(topics.length),
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
                 ),
-              ),
-            Expanded(
-              child: list
-                  ? ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(12, 2, 12, 18),
+                Builder(
+                  builder: (anchor) => IosIconButton(
+                    icon: creationTopicViewIcon(media.topicView),
+                    size: 16,
+                    minSize: 28,
+                    tooltip: l10n.creationDisplayAndGames,
+                    onTap: () => showCreationDisplayMenu(anchor, desktop: true),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                if (list)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
+                    sliver: SliverList.builder(
                       itemCount: topics.length + (showNew ? 1 : 0),
                       itemBuilder: (_, index) => topicAt(index),
-                    )
-                  : GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(14, 2, 14, 18),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 0),
+                    sliver: SliverGrid.builder(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: covers ? 3 : 2,
                         mainAxisSpacing: covers ? 6 : 14,
@@ -392,9 +366,28 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
                       itemCount: topics.length + (showNew ? 1 : 0),
                       itemBuilder: (_, index) => topicAt(index),
                     ),
+                  ),
+                if (topics.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        _query.trim().isEmpty
+                            ? l10n.creationTopicsEmpty
+                            : l10n.creationNoMatchingTopics,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: cs.onSurface.withValues(alpha: .42),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SliverPadding(padding: EdgeInsets.only(bottom: 18)),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -544,16 +537,27 @@ class _CreationHeaderState extends State<_CreationHeader> {
             if (_editing && topic != null)
               Flexible(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 300),
+                  constraints: const BoxConstraints(
+                    maxWidth: 300,
+                    minHeight: 32,
+                  ),
                   child: CallbackShortcuts(
                     bindings: {
                       const SingleActivator(LogicalKeyboardKey.escape): () =>
                           setState(() => _editing = false),
                     },
-                    child: TextField(
+                    child: PlainTextInput(
                       controller: _title,
+                      decoration: BoxDecoration(
+                        color: context.appColors.surfaceFill,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: cs.primary, width: 1.5),
+                      ),
                       autofocus: true,
-                      decoration: const InputDecoration(isDense: true),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
                       onSubmitted: (value) async {
                         setState(() => _editing = false);
                         await media.renameTopic(topic.id, value);
@@ -565,7 +569,7 @@ class _CreationHeaderState extends State<_CreationHeader> {
             else
               Flexible(
                 child: GestureDetector(
-                  onTap: _edit,
+                  onTap: naming || topic == null ? null : _edit,
                   child: ThinkingSheen(
                     enabled: naming,
                     child: Text(

@@ -5428,5 +5428,10 @@
   "creationGameScore": "得分：{score}",
   "creationGamePaused": "已暫停 · {score} 分",
   "creationGameEnded": "遊戲結束 · {score} 分",
-  "creationGameCompleted": "生成好了 · {score} 分"
+  "creationGameCompleted": "生成好了 · {score} 分",
+  "creationNoSelectableModels": "沒有可用模型",
+  "creationNoMatchingTopics": "沒有符合的主題",
+  "creationAllTopicCount": "全部主題 {count}",
+  "creationNoImageModels": "尚無圖片生成模型",
+  "creationNoVideoModels": "尚無影片生成模型"
 }
