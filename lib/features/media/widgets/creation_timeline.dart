@@ -53,7 +53,12 @@ class CreationTimeline extends StatefulWidget {
   State<CreationTimeline> createState() => _CreationTimelineState();
 }
 
-class _CreationTimelineState extends State<CreationTimeline> {
+class _CreationTimelineState extends State<CreationTimeline>
+    with SingleTickerProviderStateMixin {
+  late final _highlightFade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
   final _scroll = ItemScrollController();
   final _positions = ItemPositionsListener.create();
   String? _lastSeenRequest, _pendingSubmission;
@@ -101,6 +106,7 @@ class _CreationTimelineState extends State<CreationTimeline> {
 
   @override
   void dispose() {
+    _highlightFade.dispose();
     _positions.itemPositions.removeListener(_placeTimeline);
     super.dispose();
   }
@@ -128,7 +134,12 @@ class _CreationTimelineState extends State<CreationTimeline> {
         !_initialPlacement &&
         !_followEnd &&
         !MediaQuery.disableAnimationsOf(context);
-    if (_initialPlacement) setState(() => _initialPlacement = false);
+    if (_initialPlacement) {
+      setState(() => _initialPlacement = false);
+      if (found >= 0 && !MediaQuery.disableAnimationsOf(context)) {
+        _highlightFade.reverse(from: 1);
+      }
+    }
     _followEnd = false;
     _pendingSubmission = null;
     final viewportHeight = context.size!.height;
@@ -230,19 +241,17 @@ class _CreationTimelineState extends State<CreationTimeline> {
               ),
             );
             if (highlight == batch.id && !reduced) {
-              return group
-                  .animate(key: ValueKey(highlight))
-                  .custom(
-                    duration: const Duration(milliseconds: 1600),
-                    begin: .08,
-                    end: 0,
-                    builder: (context, value, child) => ColoredBox(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: value),
-                      child: child,
-                    ),
-                  );
+              return AnimatedBuilder(
+                key: ValueKey(batch.id),
+                animation: _highlightFade,
+                child: group,
+                builder: (context, child) => ColoredBox(
+                  color: Theme.of(context).colorScheme.primary.withValues(
+                    alpha: .08 * _highlightFade.value,
+                  ),
+                  child: child,
+                ),
+              );
             }
             return _BatchEntrance(
               key: ValueKey(batch.id),

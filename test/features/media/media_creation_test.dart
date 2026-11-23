@@ -451,6 +451,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('A wide mountain lake').hitTestable(), findsOneWidget);
       expect(find.text('Study 30').hitTestable(), findsNothing);
+      final timeline = tester.state(find.byType(CreationTimeline));
+      tester.view.physicalSize = const Size(690, 820);
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(CreationTimeline)), same(timeline));
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

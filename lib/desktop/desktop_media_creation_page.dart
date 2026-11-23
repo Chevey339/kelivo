@@ -159,21 +159,18 @@ class _DesktopMediaCreationPageState extends State<DesktopMediaCreationPage> {
               ],
             ),
           );
-          if (!compact) {
-            return shortcuts(
-              Row(
-                children: [
-                  SizedBox(width: 272, child: rail),
-                  Expanded(child: body),
-                ],
-              ),
-            );
-          }
           return shortcuts(
             Stack(
               children: [
-                Positioned.fill(child: body),
-                if (_navigationOpen) ...[
+                Positioned.fill(
+                  child: Row(
+                    children: [
+                      if (!compact) SizedBox(width: 272, child: rail),
+                      Expanded(child: body),
+                    ],
+                  ),
+                ),
+                if (compact && _navigationOpen) ...[
                   Positioned.fill(
                     child: ModalBarrier(
                       color: cs.scrim.withValues(alpha: .2),

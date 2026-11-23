@@ -1020,17 +1020,17 @@ class ChatScrollController {
   ///
   /// Direct index positioning: distant targets do not build or animate
   /// through every intermediate message.
-  Future<void> scrollToMessageId({
+  Future<bool> scrollToMessageId({
     required String targetId,
     required int targetIndex,
     bool Function()? isCurrent,
   }) async {
     try {
       if (!_scrollController.hasClients || !_messageListController.isAttached) {
-        return;
+        return false;
       }
-      if (targetIndex < 0) return;
-      if (targetIndex >= _messageListController.numberOfItems) return;
+      if (targetIndex < 0) return false;
+      if (targetIndex >= _messageListController.numberOfItems) return false;
       _cancelProgrammaticNavigation(stopDrivenScroll: true);
       final request = ++_indexedNavigationRequest;
       _messageListController.jumpToItem(
@@ -1046,14 +1046,17 @@ class ChatScrollController {
             !_scrollController.hasClients ||
             !_messageListController.isAttached ||
             targetIndex >= _messageListController.numberOfItems) {
-          return;
+          return false;
         }
         _correctMessageReveal(targetIndex, 0);
         final estimated = _messageListController.extentForIndex(targetIndex).$2;
         if (!estimated && pass > 0) break;
       }
       _lastJumpUserMessageId = targetId;
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void beginSourceNavigation() {

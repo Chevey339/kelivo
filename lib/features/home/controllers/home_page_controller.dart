@@ -201,6 +201,9 @@ class HomePageController extends ChangeNotifier {
   /// transitions check it to discard their pre-commit work.
   int _switchSerial = 0;
   int _messageJumpSerial = 0;
+  // A committed conversation switch resets scrolling, but still belongs to
+  // the source link that initiated it. Only a new navigation supersedes it.
+  int _sourceNavigationIntent = 0;
   bool _messageJumpInProgress = false;
   bool _findingMessage = false;
   final findViewportSnapshot = SnapshotController();
@@ -288,9 +291,9 @@ class HomePageController extends ChangeNotifier {
   bool _isGlobalSearchMode = false;
   String _globalSearchQuery = '';
 
-  // Message-level spotlight target after selecting a global search result
+  // Shared by search and artwork jumps so recycling a row cannot replay it.
   String? _spotlightMessageId;
-  int _spotlightToken = 0;
+  late final AnimationController _spotlightFade;
 
   // Input bar measurement
   double _inputBarHeight = 72;
@@ -703,7 +706,7 @@ class HomePageController extends ChangeNotifier {
   bool get isGlobalSearchMode => _isGlobalSearchMode;
   String get globalSearchQuery => _globalSearchQuery;
   String? get spotlightMessageId => _spotlightMessageId;
-  int get spotlightToken => _spotlightToken;
+  Animation<double> get spotlightOpacity => _spotlightFade.view;
   UserMessageEditState? get userMessageEditState => _userMessageEditState;
   bool get isUserMessageEditActive => _userMessageEditState != null;
 
@@ -790,6 +793,17 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _initializeAnimations() {
+    _spotlightFade =
+        AnimationController(
+          vsync: _vsync,
+          duration: const Duration(milliseconds: 1200),
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.dismissed &&
+              _spotlightMessageId != null) {
+            _spotlightMessageId = null;
+            notifyListeners();
+          }
+        });
     _convoFadeController = AnimationController(
       vsync: _vsync,
       duration: const Duration(milliseconds: 180),
@@ -1402,18 +1416,24 @@ class HomePageController extends ChangeNotifier {
     required String messageId,
     String? surfaceKey,
   }) async {
-    await switchConversationAnimated(conversationId);
-    // Wait one extra frame so the new conversation's indexed message list is
-    // attached before resolving the target.
-    try {
-      await WidgetsBinding.instance.endOfFrame;
-    } catch (_) {}
-    if (messageId.isNotEmpty) {
-      await scrollToMessageId(messageId, surfaceKey: surfaceKey);
-      _spotlightMessageId = messageId;
-      _spotlightToken++;
-      notifyListeners();
+    if (await _switchForSourceJump(conversationId) && messageId.isNotEmpty) {
+      await scrollToMessageId(
+        messageId,
+        surfaceKey: surfaceKey,
+        spotlight: true,
+      );
     }
+  }
+
+  Future<bool> _switchForSourceJump(String conversationId) async {
+    final switching = switchConversationAnimated(conversationId);
+    final intent = _sourceNavigationIntent;
+    await switching;
+    // The new conversation's indexed message list is attached on the next frame.
+    await WidgetsBinding.instance.endOfFrame;
+    return !_composerDisposed &&
+        intent == _sourceNavigationIntent &&
+        currentConversation?.id == conversationId;
   }
 
   Future<bool> openCreationSource({
@@ -1421,38 +1441,45 @@ class HomePageController extends ChangeNotifier {
     required String messageId,
     required bool Function() stillCurrent,
   }) async {
+    _cancelMessageJump();
+    final intent = _sourceNavigationIntent;
     final message = (await _chatService.loadMessagesByIds([
       messageId,
     ])).firstOrNull;
-    if (message == null ||
+    if (_composerDisposed ||
+        intent != _sourceNavigationIntent ||
+        message == null ||
         message.conversationId != conversationId ||
         !stillCurrent()) {
       return false;
     }
-    await switchConversationAnimated(conversationId);
-    if (!stillCurrent() || currentConversation?.id != conversationId) {
+    if (!await _switchForSourceJump(conversationId) || !stillCurrent()) {
       return false;
     }
-    final visible = await _chatController.loadUntilMessageVisible(messageId);
-    if (!stillCurrent() || currentConversation?.id != conversationId) {
-      return false;
-    }
-    if (!visible) {
-      await setSelectedVersion(message.groupId ?? message.id, message.version);
-      if (!stillCurrent() ||
-          currentConversation?.id != conversationId ||
-          versionSelections[message.groupId ?? message.id] != message.version) {
-        return false;
-      }
-    }
-    await scrollToMessageId(messageId, stillCurrent: stillCurrent);
-    if (!stillCurrent() || currentConversation?.id != conversationId) {
-      return false;
+    final groupId = message.groupId ?? message.id;
+    return scrollToMessageId(
+      messageId,
+      stillCurrent: stillCurrent,
+      spotlight: true,
+      selectMissingRevision: (current) async {
+        await setSelectedVersion(
+          groupId,
+          message.version,
+          stillCurrent: current,
+        );
+        return versionSelections[groupId] == message.version;
+      },
+    );
+  }
+
+  void _showSpotlight(String messageId) {
+    if (!_context.mounted ||
+        MediaQuery.maybeDisableAnimationsOf(_context) == true) {
+      return;
     }
     _spotlightMessageId = messageId;
-    _spotlightToken++;
+    _spotlightFade.reverse(from: 1);
     notifyListeners();
-    return true;
   }
 
   Future<void> initChat() async {
@@ -2009,6 +2036,7 @@ class HomePageController extends ChangeNotifier {
       _appendPendingBrowserTaskDraft(id);
       return;
     }
+    _spotlightFade.reset();
     // Invalidate in-flight select-all / toggle / invert for the prior chat.
     _selectionEpoch++;
     if (_composerDrafts == null) _exitUserMessageEdit(clearDraft: true);
@@ -3285,7 +3313,11 @@ class HomePageController extends ChangeNotifier {
   // Public Methods - Version Management
   // ============================================================================
 
-  Future<void> setSelectedVersion(String groupId, int version) async {
+  Future<void> setSelectedVersion(
+    String groupId,
+    int version, {
+    bool Function()? stillCurrent,
+  }) async {
     final conversationId = currentConversation?.id;
     if (conversationId == null) return;
     if (!_context.mounted) return;
@@ -3295,7 +3327,11 @@ class HomePageController extends ChangeNotifier {
       conversationId: conversationId,
       groups: {groupId},
     );
-    if (approved == null || currentConversation?.id != conversationId) return;
+    if (approved == null ||
+        currentConversation?.id != conversationId ||
+        stillCurrent?.call() == false) {
+      return;
+    }
     await _chatController.setSelectedVersion(
       groupId,
       version,
@@ -3953,6 +3989,7 @@ class HomePageController extends ChangeNotifier {
       _chatController.loadAllCollapsedMessagesForCurrentConversation();
 
   void _cancelMessageJump() {
+    _sourceNavigationIntent++;
     if (_messageJumpInProgress) _chatController.cancelPendingWindowLoad();
     _resetMessageJump();
   }
@@ -3964,6 +4001,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   int _beginMessageJump({bool finding = false}) {
+    _sourceNavigationIntent++;
     if (_messageJumpInProgress) _chatController.cancelPendingWindowLoad();
     _findingMessage = finding;
     if (!finding) findViewportSnapshot.allowSnapshotting = false;
@@ -3989,11 +4027,13 @@ class HomePageController extends ChangeNotifier {
 
   // Jumps use the collapsed index and bounded window reads, without relying
   // on a cached full message-order skeleton.
-  Future<void> scrollToMessageId(
+  Future<bool> scrollToMessageId(
     String targetId, {
+    bool spotlight = false,
     bool useRikkaTransition = false,
     String? surfaceKey,
     bool Function()? stillCurrent,
+    Future<bool> Function(bool Function() current)? selectMissingRevision,
     VoidCallback? beforeScroll,
     RevealMessageMatch? revealMatch,
   }) async {
@@ -4011,7 +4051,7 @@ class HomePageController extends ChangeNotifier {
       } else {
         _messageJumpTransitionController.value = 1.0;
       }
-      if (!current()) return;
+      if (!current()) return false;
       final needsWindow =
           _chatController.indexOfCollapsedMessageId(targetId) < 0;
       if (revealMatch != null) {
@@ -4019,43 +4059,53 @@ class HomePageController extends ChangeNotifier {
         if (!needsWindow) {
           beforeScroll?.call();
           if (await revealMatch(current, waitForMount: false) || !current()) {
-            return;
+            return current();
           }
         }
         // Mounting a distant message can take several layouts. Keep displaying
         // the previous viewport until the glyph (or fallback row) is in place.
         findViewportSnapshot.allowSnapshotting = true;
         await WidgetsBinding.instance.endOfFrame;
-        if (!current()) return;
+        if (!current()) return false;
       }
       if (needsWindow) {
-        final loaded = await _viewModel.loadUntilMessageVisible(targetId);
-        if (!loaded || !current()) return;
+        if (!await _viewModel.loadUntilMessageVisible(targetId)) {
+          if (!current() || selectMissingRevision == null) return false;
+          final selected = await selectMissingRevision(current);
+          if (!selected || !current()) return false;
+          if (!await _viewModel.loadUntilMessageVisible(targetId)) return false;
+        }
+        if (!current()) return false;
         try {
           await WidgetsBinding.instance.endOfFrame;
         } catch (_) {}
       }
-      if (!current()) return;
+      if (!current()) return false;
       final index = _chatController.indexOfCollapsedMessageId(targetId);
-      if (index < 0) return;
+      if (index < 0) return false;
       if (beforeScroll != null && (needsWindow || revealMatch == null)) {
         beforeScroll();
         await WidgetsBinding.instance.endOfFrame;
-        if (!current()) return;
+        if (!current()) return false;
       }
-      await _scrollCtrl.scrollToMessageId(
+      final reached = await _scrollCtrl.scrollToMessageId(
         targetId: targetId,
         targetIndex: index,
         isCurrent: current,
       );
-      if (!current()) return;
+      if (!current()) return false;
       if (revealMatch != null) {
-        await revealMatch(current, waitForMount: true);
-      } else if (surfaceKey != null && conversationId != null) {
+        return await revealMatch(current, waitForMount: true) && current();
+      }
+      if (!reached) return false;
+      if (surfaceKey != null && conversationId != null) {
         uiSearchNavigation.reveal(conversationId, targetId, surfaceKey);
       }
+      if (spotlight) _showSpotlight(targetId);
+      return true;
     } on TickerCanceled {
       // A newer navigation owns the animation and its visibility.
+      return false;
     } finally {
       if (useRikkaTransition && _ownsMessageJump(serial)) {
         try {
@@ -4477,6 +4527,7 @@ class HomePageController extends ChangeNotifier {
     _viewModel.resetFileProcessingIndicator();
     _viewModel.onBackgroundTaskError = null;
     _ocrService.onError = null;
+    _spotlightFade.dispose();
     _convoFadeController.dispose();
     _messageJumpTransitionController.dispose();
     findViewportSnapshot.dispose();

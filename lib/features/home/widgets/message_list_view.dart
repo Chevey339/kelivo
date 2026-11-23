@@ -131,7 +131,7 @@ class MessageListView extends StatefulWidget {
     this.streamingContentNotifier,
     this.conversationFind,
     this.spotlightMessageId,
-    this.spotlightToken = 0,
+    this.spotlightOpacity = const AlwaysStoppedAnimation(0),
     this.removingSlotIds = const <String>{},
     this.onVersionChange,
     this.onRegenerateMessage,
@@ -229,9 +229,8 @@ class MessageListView extends StatefulWidget {
   final String? spotlightMessageId;
   final ConversationFindController? conversationFind;
 
-  /// Incremented each time a new spotlight is triggered. Used as an animation key
-  /// so re-selecting the same message re-triggers the pulse.
-  final int spotlightToken;
+  /// Progress belongs to the jump, so remounting a row resumes the same fade.
+  final Animation<double> spotlightOpacity;
 
   /// Slots currently fading out ahead of their deletion. The slot data stays
   /// in [messages] until the removal animation completes.
@@ -2444,17 +2443,12 @@ class _MessageListViewState extends State<MessageListView> {
           if (widget.spotlightMessageId == message.id)
             Positioned.fill(
               child: IgnorePointer(
-                child: TweenAnimationBuilder<double>(
-                  key: ValueKey('spotlight-${widget.spotlightToken}'),
-                  tween: Tween<double>(begin: 1, end: 0),
-                  duration: const Duration(milliseconds: 1200),
-                  curve: Curves.easeOut,
-                  builder: (context, opacity, _) => DecoratedBox(
+                child: FadeTransition(
+                  opacity: widget.spotlightOpacity,
+                  child: const DecoratedBox(
                     decoration: BoxDecoration(
-                      color: const Color(
-                        0xFFFFA726,
-                      ).withValues(alpha: opacity * .30),
-                      borderRadius: BorderRadius.circular(4),
+                      color: Color(0x4DFFA726),
+                      borderRadius: BorderRadius.all(Radius.circular(4)),
                     ),
                   ),
                 ),

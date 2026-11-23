@@ -1646,7 +1646,7 @@ class _HomePageState extends State<HomePage>
       streamingContentNotifier: _controller.streamingContentNotifier,
       conversationFind: _find,
       spotlightMessageId: _controller.spotlightMessageId,
-      spotlightToken: _controller.spotlightToken,
+      spotlightOpacity: _controller.spotlightOpacity,
       removingSlotIds: _controller.removingSlotIds,
       hasMoreBefore: _controller.chatController.hasMoreBefore,
       isLoadingWindow: _controller.isLoadingWindow,
