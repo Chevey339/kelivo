@@ -361,7 +361,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
             ? null
             : () => ImageViewerPage(
                 images: [part.uri],
-                initialIndex: 0,
+                enableTapGestures: false,
               ).open(context),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),

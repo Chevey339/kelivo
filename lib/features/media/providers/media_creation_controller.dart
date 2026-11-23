@@ -403,12 +403,6 @@ class MediaCreationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool hasAdvancedOptions(String? topicId) =>
-      parameters.isNotEmpty ||
-      draftFor(
-        topicId,
-      ).platformImages.keys.any((entry) => entry.$1 == model?.key);
-
   Map<String, dynamic>? get extraParameters {
     final raw = parameters['extra'];
     if (raw is! String || raw.trim().isEmpty) return const {};

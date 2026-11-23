@@ -465,10 +465,7 @@ class _CreationArtworkTileState extends State<CreationArtworkTile> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Hero(
-                  tag: 'creation:${item.id}',
-                  child: CreationMediaCover(item),
-                ),
+                CreationMediaCover(item),
                 if (widget.desktop)
                   Align(
                     alignment: Alignment.bottomCenter,

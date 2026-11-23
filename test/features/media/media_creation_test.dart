@@ -338,6 +338,29 @@ void main() {
       await tester.tap(find.byType(CreationArtworkTile).first);
       await tester.pumpAndSettle();
       expect(find.text('1 / 2'), findsOneWidget);
+      final stage = find.byType(InteractiveViewer);
+      final transform = tester
+          .widget<InteractiveViewer>(stage)
+          .transformationController!;
+      await tester.tapAt(tester.getCenter(stage));
+      await tester.pumpAndSettle();
+      expect(transform.value.isIdentity(), isTrue);
+      await tester.tapAt(tester.getTopLeft(stage) + const Offset(2, 2));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 2'), findsOneWidget);
+      await tester.tap(find.byTooltip('Close').hitTestable());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Hero && w.tag.toString().startsWith('creation:'),
+          skipOffstage: false,
+        ),
+        findsNothing,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(CreationArtworkTile).first);
+      await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
       expect(find.text('2 / 2'), findsOneWidget);

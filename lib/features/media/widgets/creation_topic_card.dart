@@ -365,7 +365,10 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
                                   child: Builder(
                                     builder: (anchor) => IosIconButton(
                                       icon: Lucide.Ellipsis,
+                                      size: 15,
+                                      visualSize: 22,
                                       minSize: 28,
+                                      padding: EdgeInsets.zero,
                                       tooltip:
                                           l10n.chatMessageWidgetMoreTooltip,
                                       onTap: () => showCreationTopicMenu(

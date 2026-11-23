@@ -69,13 +69,8 @@ Future<void> showCreationLightbox(
         PageRouteBuilder<_LightboxDestination>(
           opaque: false,
           barrierColor: desktop ? Colors.black.withValues(alpha: .9) : null,
-          barrierLabel: MaterialLocalizations.of(
-            context,
-          ).modalBarrierDismissLabel,
-          barrierDismissible: desktop,
-          transitionDuration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 200),
+          transitionDuration: handoffDuration(context, 200),
+          reverseTransitionDuration: handoffDuration(context, 160),
           pageBuilder: (_, _, _) => _CreationLightbox(
             item: item,
             deck: deck,
@@ -117,23 +112,7 @@ class _CreationLightbox extends StatefulWidget {
   State<_CreationLightbox> createState() => _CreationLightboxState();
 }
 
-class _CreationLightboxState extends State<_CreationLightbox>
-    with SingleTickerProviderStateMixin {
-  final _stageKey = GlobalKey();
-  late final _zoomAnimation = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 320),
-  )..addListener(_tickZoom);
-  Matrix4Tween? _zoomTween;
-  void _tickZoom() {
-    final tween = _zoomTween;
-    if (tween != null) {
-      _transform.value = tween.transform(
-        handoffCurve.transform(_zoomAnimation.value),
-      );
-    }
-  }
-
+class _CreationLightboxState extends State<_CreationLightbox> {
   final _transform = TransformationController();
   final _editFocus = FocusNode();
   final _thumbs = ScrollController();
@@ -162,7 +141,6 @@ class _CreationLightboxState extends State<_CreationLightbox>
 
   @override
   void dispose() {
-    _zoomAnimation.dispose();
     _transform.dispose();
     _editFocus.removeListener(_editFocusChanged);
     _editFocus.dispose();
@@ -202,7 +180,6 @@ class _CreationLightboxState extends State<_CreationLightbox>
 
   void _switch(int index) {
     if (index < 0 || index >= _deck.length || index == _index) return;
-    _zoomAnimation.stop();
     _transform.value = Matrix4.identity();
     setState(() {
       _index = index;
@@ -225,28 +202,6 @@ class _CreationLightboxState extends State<_CreationLightbox>
     Navigator.of(
       context,
     ).pop<_LightboxDestination>((topicId: topicId, batchId: batchId));
-  }
-
-  void _zoom(TapUpDetails details) {
-    if (!desktop) return;
-    final box = _stageKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final point = box.globalToLocal(details.globalPosition);
-    final target = Matrix4.identity();
-    if (_transform.value.getMaxScaleOnAxis() <= 1.1) {
-      target
-        ..setEntry(0, 0, 1.8)
-        ..setEntry(1, 1, 1.8)
-        ..setEntry(0, 3, -point.dx * .8)
-        ..setEntry(1, 3, -point.dy * .8);
-    }
-    _zoomAnimation.stop();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _transform.value = target;
-      return;
-    }
-    _zoomTween = Matrix4Tween(begin: _transform.value.clone(), end: target);
-    _zoomAnimation.forward(from: 0);
   }
 
   Future<void> _toggleEdit() async {
@@ -293,7 +248,6 @@ class _CreationLightboxState extends State<_CreationLightbox>
       Navigator.of(context).pop();
       return;
     }
-    _zoomAnimation.stop();
     _transform.value = Matrix4.identity();
     setState(() {
       _index = _index.clamp(0, _deck.length - 1);
@@ -840,37 +794,30 @@ class _CreationLightboxState extends State<_CreationLightbox>
     final knownSize =
         width != null && width > 0 && height != null && height > 0;
     final radius = BorderRadius.circular(desktop ? 6 : 4);
-    final image = MouseRegion(
-      cursor: desktop ? SystemMouseCursors.zoomIn : MouseCursor.defer,
-      child: GestureDetector(
-        onTapUp: desktop ? _zoom : null,
-        child: CreationDragOut(
-          item: item,
-          enabled: desktop,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              boxShadow: desktop
-                  ? const [
-                      BoxShadow(
-                        color: Colors.black54,
-                        offset: Offset(0, 20),
-                        blurRadius: 60,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: ClipRRect(
-              borderRadius: radius,
-              child: Hero(
-                tag: 'creation:${item.id}',
-                child: CreationFileImage(
-                  item.path,
-                  fit: BoxFit.contain,
-                  fill: knownSize,
-                ),
-              ),
-            ),
+    final image = CreationDragOut(
+      item: item,
+      enabled: desktop,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: desktop
+              ? const [
+                  BoxShadow(
+                    color: Colors.black54,
+                    offset: Offset(0, 20),
+                    blurRadius: 60,
+                  ),
+                ]
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: CreationFileImage(
+            item.path,
+            key: ValueKey(item.id),
+            fit: BoxFit.contain,
+            fill: knownSize,
+            fadeOnCacheHit: true,
           ),
         ),
       ),
@@ -897,7 +844,6 @@ class _CreationLightboxState extends State<_CreationLightbox>
         minScale: 1,
         maxScale: 4,
         onInteractionStart: (d) {
-          _zoomAnimation.stop();
           _dragStart = d.focalPoint;
           _trackingPage =
               !desktop && _transform.value.getMaxScaleOnAxis() <= 1.02;
@@ -917,21 +863,12 @@ class _CreationLightboxState extends State<_CreationLightbox>
         onInteractionEnd: (_) {
           if (_trackingPage) _endPageDrag();
         },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (desktop)
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => Navigator.of(context).pop(),
-              ),
-            if (knownSize)
-              Center(
-                child: AspectRatio(aspectRatio: width / height, child: image),
-              )
-            else
-              FittedBox(fit: BoxFit.contain, child: image),
-          ],
+        child: SizedBox.expand(
+          child: knownSize
+              ? Center(
+                  child: AspectRatio(aspectRatio: width / height, child: image),
+                )
+              : FittedBox(fit: BoxFit.contain, child: image),
         ),
       );
     }
@@ -972,7 +909,6 @@ class _CreationLightboxState extends State<_CreationLightbox>
                 ? const EdgeInsets.only(top: 8, bottom: 12)
                 : EdgeInsets.zero,
             child: ClipRect(
-              key: _stageKey,
               child: TweenAnimationBuilder<Offset>(
                 tween: Tween(end: _dragOffset),
                 duration: _dragOffset == Offset.zero
@@ -1042,7 +978,7 @@ class _CreationLightboxState extends State<_CreationLightbox>
                 borderRadius: BorderRadius.circular(7),
                 child: Opacity(
                   opacity: index == _index ? 1 : .55,
-                  child: CreationMediaCover(_deck[index]),
+                  child: CreationMediaCover(_deck[index], thumbnail: true),
                 ),
               ),
             ),
@@ -1672,11 +1608,13 @@ class CreationFileImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.cacheWidth,
     this.fill = true,
+    this.fadeOnCacheHit = false,
   });
 
   final String path;
   final BoxFit fit;
   final bool fill;
+  final bool fadeOnCacheHit;
   final int? cacheWidth;
 
   @override
@@ -1687,6 +1625,18 @@ class CreationFileImage extends StatelessWidget {
         ? placeholder
         : Image.file(
             File(file),
+            key: ValueKey((file, cacheWidth)),
+            frameBuilder: MediaQuery.disableAnimationsOf(context)
+                ? null
+                : (context, child, frame, synchronous) {
+                    if (frame == null || (synchronous && !fadeOnCacheHit)) {
+                      return child;
+                    }
+                    return child.animate().fadeIn(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                    );
+                  },
             cacheWidth: cacheWidth,
             fit: fit,
             width: fill ? double.infinity : null,

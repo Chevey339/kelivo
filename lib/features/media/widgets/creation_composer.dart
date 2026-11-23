@@ -711,9 +711,6 @@ class _CreationComposerState extends State<CreationComposer> {
                                               duration,
                                             ),
                                         ].join(' · '),
-                                        modified: state.hasAdvancedOptions(
-                                          widget.topicId,
-                                        ),
                                         leading: const Icon(
                                           Lucide.SlidersHorizontal,
                                           size: 15,
@@ -841,9 +838,6 @@ class _CreationComposerState extends State<CreationComposer> {
                                           Lucide.SlidersHorizontal,
                                           size: 14,
                                         ),
-                                        modified: state.hasAdvancedOptions(
-                                          widget.topicId,
-                                        ),
                                         onTap: (anchor) => _showPicker(
                                           anchor,
                                           width: 360,
@@ -908,7 +902,6 @@ class _ComposerChip extends StatelessWidget {
     this.leading,
     this.trailing,
     this.strong = false,
-    this.modified = false,
     this.maxWidth,
     required this.onTap,
   });
@@ -916,7 +909,7 @@ class _ComposerChip extends StatelessWidget {
   final String label;
   final Widget? leading;
   final IconData? trailing;
-  final bool strong, modified;
+  final bool strong;
   final double? maxWidth;
   final ValueChanged<BuildContext>? onTap;
 
@@ -962,31 +955,11 @@ class _ComposerChip extends StatelessWidget {
         ),
       ),
     );
-    final control = modified
-        ? Stack(
-            children: [
-              chip,
-              PositionedDirectional(
-                end: 6,
-                top: 6,
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: cs.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const SizedBox.square(dimension: 5),
-                  ),
-                ),
-              ),
-            ],
-          )
-        : chip;
     return maxWidth == null
-        ? control
+        ? chip
         : ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth!),
-            child: control,
+            child: chip,
           );
   }
 }
