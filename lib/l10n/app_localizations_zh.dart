@@ -17100,6 +17100,115 @@ class AppLocalizationsZh extends AppLocalizations {
   String creationTopicCount(int count) {
     return '话题 $count';
   }
+
+  @override
+  String get creationMoreOptions => '更多';
+
+  @override
+  String get creationImageSize => '尺寸';
+
+  @override
+  String get creationQuality => '质量';
+
+  @override
+  String get creationLowQuality => '低';
+
+  @override
+  String get creationMediumQuality => '中';
+
+  @override
+  String get creationHighQuality => '高';
+
+  @override
+  String get creationNegativePrompt => '负向提示词';
+
+  @override
+  String get creationSeed => '种子';
+
+  @override
+  String get creationTransparentBackground => '透明背景';
+
+  @override
+  String get creationOutputFormat => '输出格式';
+
+  @override
+  String get creationExtraJson => '额外参数（JSON）';
+
+  @override
+  String get creationExtraJsonHint => '每次请求都会带上这些值。可在「更多」中临时修改。';
+
+  @override
+  String get creationModelKnown => '默认值来自 Kelivo 内置的模型资料。改过的项只影响这个模型。';
+
+  @override
+  String get creationModelUnknown => 'Kelivo 没有这个模型的资料，先按常见参数填好了，可以对照平台文档修改。';
+
+  @override
+  String get creationMaxPerRequest => '单次最多生成';
+
+  @override
+  String get creationMaxPerRequestHelp => '超过此数量时会拆成多次请求，结果放在同一组。';
+
+  @override
+  String get creationReferenceLimit => '参考图';
+
+  @override
+  String get creationReferenceLimitHelp => '设为 0 时，创作页将隐藏添加参考图及编辑入口。';
+
+  @override
+  String get creationRatioHelp => '创作页只显示勾选的比例。选「自动」时由模型决定。';
+
+  @override
+  String get creationMediaOther => '其他';
+
+  @override
+  String get creationEnableOptionHelp => '在「更多」中显示此控件。';
+
+  @override
+  String get creationImageTypeHelp => '图像模型出现在创作页和「图像生成」工具中。';
+
+  @override
+  String get creationVideoTypeHelp => '视频模型出现在创作页中。';
+
+  @override
+  String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 创建后粘贴到这里';
+
+  @override
+  String get creationFalCatalogHint =>
+      'fal 的模型列表和每个模型的参数由 Kelivo 内置，「获取」会补回被移除的模型。';
+
+  @override
+  String get creationFalModelId => '模型 ID';
+
+  @override
+  String get creationOpenAiMediaPaths => '图像 /images/generations · 视频 /videos';
+
+  @override
+  String get creationSelectPlatformImage => '选择图片';
+
+  @override
+  String get creationPlatformOptions => '模型特有参数';
+
+  @override
+  String get creationParameterRequired => '必填';
+
+  @override
+  String get creationBackground => '背景';
+
+  @override
+  String get creationOpaqueBackground => '不透明';
+
+  @override
+  String get creationTransparentOption => '透明';
+
+  @override
+  String get creationChatModelBadge => '聊天模型';
+
+  @override
+  String get creationCommonOptions => '通用参数';
+
+  @override
+  String get creationNoCommonOptions => '此模型没有可用的通用参数。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -34198,6 +34307,115 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String creationTopicCount(int count) {
     return '话题 $count';
   }
+
+  @override
+  String get creationMoreOptions => '更多';
+
+  @override
+  String get creationImageSize => '尺寸';
+
+  @override
+  String get creationQuality => '质量';
+
+  @override
+  String get creationLowQuality => '低';
+
+  @override
+  String get creationMediumQuality => '中';
+
+  @override
+  String get creationHighQuality => '高';
+
+  @override
+  String get creationNegativePrompt => '负向提示词';
+
+  @override
+  String get creationSeed => '种子';
+
+  @override
+  String get creationTransparentBackground => '透明背景';
+
+  @override
+  String get creationOutputFormat => '输出格式';
+
+  @override
+  String get creationExtraJson => '额外参数（JSON）';
+
+  @override
+  String get creationExtraJsonHint => '每次请求都会带上这些值。可在「更多」中临时修改。';
+
+  @override
+  String get creationModelKnown => '默认值来自 Kelivo 内置的模型资料。改过的项只影响这个模型。';
+
+  @override
+  String get creationModelUnknown => 'Kelivo 没有这个模型的资料，先按常见参数填好了，可以对照平台文档修改。';
+
+  @override
+  String get creationMaxPerRequest => '单次最多生成';
+
+  @override
+  String get creationMaxPerRequestHelp => '超过此数量时会拆成多次请求，结果放在同一组。';
+
+  @override
+  String get creationReferenceLimit => '参考图';
+
+  @override
+  String get creationReferenceLimitHelp => '设为 0 时，创作页将隐藏添加参考图及编辑入口。';
+
+  @override
+  String get creationRatioHelp => '创作页只显示勾选的比例。选「自动」时由模型决定。';
+
+  @override
+  String get creationMediaOther => '其他';
+
+  @override
+  String get creationEnableOptionHelp => '在「更多」中显示此控件。';
+
+  @override
+  String get creationImageTypeHelp => '图像模型出现在创作页和「图像生成」工具中。';
+
+  @override
+  String get creationVideoTypeHelp => '视频模型出现在创作页中。';
+
+  @override
+  String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 创建后粘贴到这里';
+
+  @override
+  String get creationFalCatalogHint =>
+      'fal 的模型列表和每个模型的参数由 Kelivo 内置，「获取」会补回被移除的模型。';
+
+  @override
+  String get creationFalModelId => '模型 ID';
+
+  @override
+  String get creationOpenAiMediaPaths => '图像 /images/generations · 视频 /videos';
+
+  @override
+  String get creationSelectPlatformImage => '选择图片';
+
+  @override
+  String get creationPlatformOptions => '模型特有参数';
+
+  @override
+  String get creationParameterRequired => '必填';
+
+  @override
+  String get creationBackground => '背景';
+
+  @override
+  String get creationOpaqueBackground => '不透明';
+
+  @override
+  String get creationTransparentOption => '透明';
+
+  @override
+  String get creationChatModelBadge => '聊天模型';
+
+  @override
+  String get creationCommonOptions => '通用参数';
+
+  @override
+  String get creationNoCommonOptions => '此模型没有可用的通用参数。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -51347,4 +51565,113 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String creationTopicCount(int count) {
     return '話題 $count';
   }
+
+  @override
+  String get creationMoreOptions => '更多選項';
+
+  @override
+  String get creationImageSize => '圖片尺寸';
+
+  @override
+  String get creationQuality => '品質';
+
+  @override
+  String get creationLowQuality => '低';
+
+  @override
+  String get creationMediumQuality => '中';
+
+  @override
+  String get creationHighQuality => '高';
+
+  @override
+  String get creationNegativePrompt => '負向提示詞';
+
+  @override
+  String get creationSeed => '種子';
+
+  @override
+  String get creationTransparentBackground => '透明背景';
+
+  @override
+  String get creationOutputFormat => '輸出格式';
+
+  @override
+  String get creationExtraJson => '額外參數（JSON）';
+
+  @override
+  String get creationExtraJsonHint => '每次請求都會帶上這些值。可在「更多選項」中臨時修改。';
+
+  @override
+  String get creationModelKnown => '預設值來自 Kelivo 內建的模型資料。改動只影響這個模型。';
+
+  @override
+  String get creationModelUnknown => 'Kelivo 沒有這個模型的資料，已先按常見參數填好，可對照平台文件修改。';
+
+  @override
+  String get creationMaxPerRequest => '單次最多生成';
+
+  @override
+  String get creationMaxPerRequestHelp => '超過此數量時會拆成多次請求，結果放在同一組。';
+
+  @override
+  String get creationReferenceLimit => '參考圖';
+
+  @override
+  String get creationReferenceLimitHelp => '設為 0 時，創作頁將隱藏新增參考圖及編輯入口。';
+
+  @override
+  String get creationRatioHelp => '創作頁只顯示勾選的比例。選「自動」時由模型決定。';
+
+  @override
+  String get creationMediaOther => '其他選項';
+
+  @override
+  String get creationEnableOptionHelp => '在「更多選項」中顯示此控制項。';
+
+  @override
+  String get creationImageTypeHelp => '圖像模型會出現在創作頁和「圖像生成」工具中。';
+
+  @override
+  String get creationVideoTypeHelp => '影片模型會出現在創作頁中。';
+
+  @override
+  String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 建立後貼到這裡';
+
+  @override
+  String get creationFalCatalogHint =>
+      'fal 的模型列表和每個模型的參數由 Kelivo 內建，「取得」會補回被移除的模型。';
+
+  @override
+  String get creationFalModelId => '模型 ID';
+
+  @override
+  String get creationOpenAiMediaPaths => '圖像 /images/generations · 影片 /videos';
+
+  @override
+  String get creationSelectPlatformImage => '選擇圖片';
+
+  @override
+  String get creationPlatformOptions => '模型特有參數';
+
+  @override
+  String get creationParameterRequired => '必填';
+
+  @override
+  String get creationBackground => '背景';
+
+  @override
+  String get creationOpaqueBackground => '不透明';
+
+  @override
+  String get creationTransparentOption => '透明';
+
+  @override
+  String get creationChatModelBadge => '聊天模型';
+
+  @override
+  String get creationCommonOptions => '通用參數';
+
+  @override
+  String get creationNoCommonOptions => '此模型沒有可用的通用參數。';
 }

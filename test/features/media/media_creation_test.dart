@@ -178,6 +178,16 @@ void main() {
           find.text(desktop ? '1 image' : 'Auto · 1 image'),
           findsOneWidget,
         );
+        await tester.tap(
+          find.text(desktop ? 'More options' : 'Auto · 1 image'),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Extra parameters (JSON)'), findsOneWidget);
+        expect(find.text('Quality'), findsOneWidget);
+        expect(find.text('Background'), findsOneWidget);
+        expect(find.text('Negative prompt'), findsNothing);
+        await tester.tapAt(const Offset(1, 1));
+        await tester.pumpAndSettle();
         await tester.runAsync(() async {
           controller.setMode(MediaMode.video);
           controller.selectDuration(8);

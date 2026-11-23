@@ -2,7 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
+import '../../../../core/models/media_creation.dart';
 import '../../../../core/models/model_spec.dart';
+import '../../../../core/services/media/adapters/native_image_size.dart';
+import '../../../../core/services/media/media_adapter_resolver.dart';
+import '../../../../core/services/media/media_model_overrides.dart';
+import '../../../../core/services/media/media_request.dart';
 import '../../../../core/models/image_generation_options.dart';
 import '../../../../core/models/request_budget.dart';
 import '../../../../core/models/avatar_config.dart';
@@ -32,6 +37,12 @@ class ModelSpecFormController extends ChangeNotifier {
        isNew = isNew {
     avatar = isNew ? null : config.modelAvatar(modelKey);
     final override = isNew ? null : config.modelOverrides[modelKey];
+    media = MediaModelOverrides.fromJson(
+      override is Map ? override['media'] : null,
+    );
+    mediaExtraController = TextEditingController(
+      text: _encodePatch(media.extra),
+    );
     requestBudget = RequestBudgetOverrides.fromJson(
       override is Map ? override['requestBudget'] : null,
     );
@@ -135,6 +146,48 @@ class ModelSpecFormController extends ChangeNotifier {
     _imageGenerationTouched = true;
     notifyListeners();
   }
+
+  late MediaModelOverrides media;
+  late final TextEditingController mediaExtraController;
+  bool _mediaTouched = false;
+
+  MediaMode get mediaMode =>
+      spec.type == ModelType.video ? MediaMode.video : MediaMode.image;
+  String get _mediaId => apiModelIdController.text.trim();
+
+  bool get hasMediaModelData =>
+      const MediaAdapterResolver().hasModelData(_config, mediaMode, _mediaId);
+
+  MediaCapabilities get mediaDefaults =>
+      const MediaAdapterResolver()
+          .resolve(_config, mediaMode, modelId: _mediaId)
+          ?.capabilities(_config, _mediaId) ??
+      const MediaCapabilities(aspectRatios: standardImageRatios);
+
+  MediaCapabilities get mediaCapabilities =>
+      media.apply(mediaDefaults, video: mediaMode == MediaMode.video);
+
+  void setMediaValue(String key, Object? value) {
+    media = MediaModelOverrides.fromJson({...media.toJson(), key: value});
+    _mediaTouched = true;
+    notifyListeners();
+  }
+
+  void resetMedia() {
+    media = const MediaModelOverrides();
+    mediaExtraController.clear();
+    _mediaTouched = true;
+    notifyListeners();
+  }
+
+  void mediaExtraChanged(String _) {
+    _mediaTouched = true;
+  }
+
+  bool get _validMediaExtra =>
+      !spec.type.isMedia ||
+      mediaExtraController.text.trim().isEmpty ||
+      _tryParseJsonObject(mediaExtraController.text.trim()) != null;
 
   late ModelSpec base;
   late Map<ModelSpecField, SpecSource> sources;
@@ -579,6 +632,7 @@ class ModelSpecFormController extends ChangeNotifier {
   }
 
   String? validate(AppLocalizations l10n) {
+    if (!_validMediaExtra) return l10n.modelSpecFormInvalidJson;
     final apiModelId = apiModelIdController.text.trim();
     if (apiModelId.isEmpty || apiModelId.length < 2) {
       return l10n.modelDetailSheetInvalidIdError;
@@ -649,6 +703,13 @@ class ModelSpecFormController extends ChangeNotifier {
         final options = imageGeneration.toJson();
         if (options.isNotEmpty) payload['imageGeneration'] = options;
       }
+      if (_mediaTouched && spec.type.isMedia) {
+        final data = media.toJson()..remove('extra');
+        final extra = _tryParseJsonObject(mediaExtraController.text.trim());
+        if (extra != null && extra.isNotEmpty) data['extra'] = extra;
+        payload.remove('media');
+        if (data.isNotEmpty) payload['media'] = data;
+      }
       final overrides = Map<String, dynamic>.from(current.modelOverrides);
       overrides[key] = payload;
       await settings.setProviderConfig(
@@ -669,6 +730,7 @@ class ModelSpecFormController extends ChangeNotifier {
 
   @override
   void dispose() {
+    mediaExtraController.dispose();
     apiModelIdController.dispose();
     displayNameController.dispose();
     contextWindowController.dispose();
@@ -786,6 +848,7 @@ class ModelSpecFormController extends ChangeNotifier {
   }
 
   bool _hasValidDraft() {
+    if (!_validMediaExtra) return false;
     final apiModelId = apiModelIdController.text.trim();
     if (apiModelId.isEmpty || apiModelId.length < 2) return false;
     if (_invalidNumber(contextWindowController.text) ||

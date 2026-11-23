@@ -1,7 +1,11 @@
+import '../../core/models/media_creation.dart';
+import '../../core/providers/settings_provider.dart';
+import '../../core/services/media/media_adapter_resolver.dart';
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/models/model_spec.dart';
@@ -319,6 +323,24 @@ class ModelTagWrap extends StatelessWidget {
 }
 
 /// Capsule row used by desktop model lists.
+ModelSpec mediaCapsuleModel(ProviderConfig provider, ModelSpec model) {
+  if (!model.type.isMedia) return model;
+  final video = model.type == ModelType.video;
+  final caps = const MediaAdapterResolver().capabilities(
+    provider,
+    video ? MediaMode.video : MediaMode.image,
+    model.id,
+  );
+  return model.copyWith(
+    input: [
+      Modality.text,
+      if (caps != null && caps.maxReferences > 0) Modality.image,
+    ],
+    output: [if (video) Modality.video else Modality.image],
+    abilities: const [],
+  );
+}
+
 class ModelCapsulesRow extends StatelessWidget {
   const ModelCapsulesRow({
     super.key,
@@ -444,7 +466,7 @@ class ModelCapsulesRow extends StatelessWidget {
       caps.add(
         labeledCapsule(
           label: '$outputLabel: $videoLabel',
-          icon: Icon(Lucide.FileVideo, size: iconSize, color: cs.tertiary),
+          icon: Icon(LucideIcons.video, size: iconSize, color: cs.tertiary),
           color: cs.tertiary,
         ),
       );
@@ -501,7 +523,7 @@ class ModelCapsulesRow extends StatelessWidget {
     }
 
     final contextWindow = model.contextWindow;
-    if (contextWindow != null) {
+    if (contextWindow != null && !model.type.isMedia) {
       caps.add(
         labeledCapsule(
           label: contextLabel,

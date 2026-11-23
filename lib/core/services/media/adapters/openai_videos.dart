@@ -29,6 +29,8 @@ class OpenAiVideosAdapter implements MediaAdapter {
       maxReferences: 1,
       frameRoles: const [MediaReferenceRole.firstFrame],
       nativeProgress: true,
+      supportsNegativePrompt: !isSora,
+      supportsSeed: !isSora,
     );
   }
 
@@ -46,10 +48,13 @@ class OpenAiVideosAdapter implements MediaAdapter {
       if (request.durationSec case final duration?)
         'seconds': duration.toString(),
       if (_size(model, request) case final size?) 'size': size,
-      if (request.negativePrompt != null || extra is Map && extra.isNotEmpty)
+      if (request.negativePrompt != null ||
+          request.parameters['seed'] is int ||
+          extra is Map && extra.isNotEmpty)
         'metadata': {
           if (request.negativePrompt case final negative?)
             'negative_prompt': negative,
+          if (request.parameters['seed'] case final int seed) 'seed': seed,
           if (extra is Map) ...Map<String, dynamic>.from(extra),
         },
     }, includeExtra: false);
@@ -100,17 +105,19 @@ class OpenAiVideosAdapter implements MediaAdapter {
             .map(int.tryParse)
             .toList();
         final meta = data['metadata'];
-        return MediaResult(
-          mime: 'video/mp4',
-          url: context.endpoint('videos/$id/content'),
-          downloadHeaders: authHeaders,
-          previewUrl: mediaResultUri(
-            meta is Map ? meta['thumbnail_url'] : null,
+        return [
+          MediaResult(
+            mime: 'video/mp4',
+            url: context.endpoint('videos/$id/content'),
+            downloadHeaders: authHeaders,
+            previewUrl: mediaResultUri(
+              meta is Map ? meta['thumbnail_url'] : null,
+            ),
+            durationMs: videoDurationMs(data['seconds'] ?? request.durationSec),
+            width: dimensions?.length == 2 ? dimensions!.first : null,
+            height: dimensions?.length == 2 ? dimensions!.last : null,
           ),
-          durationMs: videoDurationMs(data['seconds'] ?? request.durationSec),
-          width: dimensions?.length == 2 ? dimensions!.first : null,
-          height: dimensions?.length == 2 ? dimensions!.last : null,
-        );
+        ];
       },
     );
   }

@@ -9,6 +9,7 @@ import '../features/model/widgets/model_spec_form/basic_section.dart';
 import '../features/model/widgets/model_spec_form/builtin_tools_section.dart';
 import '../features/model/widgets/model_spec_form/limits_pricing_section.dart';
 import '../features/model/widgets/model_spec_form/modality_ability_section.dart';
+import '../features/model/widgets/model_spec_form/media_options_section.dart';
 import '../features/model/widgets/model_spec_form/model_spec_form_controller.dart';
 import '../features/model/widgets/model_spec_form/reasoning_section.dart';
 import '../features/model/widgets/model_spec_form/strategy_section.dart';
@@ -75,6 +76,7 @@ Future<bool?> _openDialog(
 enum _SpecSection {
   basic,
   modalities,
+  media,
   reasoning,
   strategy,
   limits,
@@ -112,6 +114,9 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
       modelKey: widget.modelKey,
       isNew: widget.isNew,
     );
+    if (!widget.isNew && _controller.spec.type.isMedia) {
+      _section = _SpecSection.media;
+    }
   }
 
   @override
@@ -244,6 +249,7 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
       _SpecSection.modalities => ModalityAbilitySection(
         controller: _controller,
       ),
+      _SpecSection.media => MediaOptionsSection(controller: _controller),
       _SpecSection.reasoning => ReasoningSection(controller: _controller),
       _SpecSection.strategy => StrategySection(controller: _controller),
       _SpecSection.limits => LimitsPricingSection(controller: _controller),
@@ -253,6 +259,13 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
   }
 
   List<_SpecSection> _visibleSections(ModelSpec spec, bool showTools) {
+    if (spec.type.isMedia) {
+      return const [
+        _SpecSection.basic,
+        _SpecSection.media,
+        _SpecSection.advanced,
+      ];
+    }
     return [
       _SpecSection.basic,
       _SpecSection.modalities,
@@ -277,6 +290,7 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
     return switch (section) {
       _SpecSection.basic => l10n.modelDetailSheetBasicTab,
       _SpecSection.modalities => l10n.modelSpecFormModalitiesSection,
+      _SpecSection.media => l10n.creationParameters,
       _SpecSection.reasoning => l10n.modelSpecFormReasoningSection,
       _SpecSection.strategy => l10n.modelSpecFormStrategySection,
       _SpecSection.limits => l10n.modelSpecFormLimitsPricingSection,

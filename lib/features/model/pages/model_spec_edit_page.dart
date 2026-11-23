@@ -1,3 +1,4 @@
+import '../widgets/model_spec_form/media_options_section.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -79,6 +80,7 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
       modelKey: widget.modelKey,
       isNew: widget.isNew,
     );
+    if (!widget.isNew && _controller.spec.type.isMedia) _tab = 1;
   }
 
   @override
@@ -158,7 +160,11 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
                 child: SegmentedTabs(
                   tabs: [
                     SegmentedTab(label: l10n.modelDetailSheetBasicTab),
-                    SegmentedTab(label: l10n.reasoningLevelSheetTitle),
+                    SegmentedTab(
+                      label: _controller.spec.type.isMedia
+                          ? l10n.creationParameters
+                          : l10n.reasoningLevelSheetTitle,
+                    ),
                     SegmentedTab(label: l10n.modelDetailSheetAdvancedTab),
                   ],
                   index: _tab,
@@ -181,7 +187,9 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
   List<Widget> _tabChildren(AppLocalizations l10n) {
     switch (_tab) {
       case 1:
-        return _reasoningTab(l10n);
+        return _controller.spec.type.isMedia
+            ? [MediaOptionsSection(controller: _controller)]
+            : _reasoningTab(l10n);
       case 2:
         return _advancedTab(l10n);
       default:
@@ -193,10 +201,12 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
     return [
       IosSectionHeader(text: l10n.modelDetailSheetBasicTab, first: true),
       SectionCard(child: BasicSection(controller: _controller)),
-      IosSectionHeader(text: l10n.modelDetailSheetInputModesLabel),
-      SectionCard(child: ModalityAbilitySection(controller: _controller)),
-      IosSectionHeader(text: l10n.modelSpecFormLimitsSection),
-      SectionCard(child: LimitsPricingSection(controller: _controller)),
+      if (!_controller.spec.type.isMedia) ...[
+        IosSectionHeader(text: l10n.modelDetailSheetInputModesLabel),
+        SectionCard(child: ModalityAbilitySection(controller: _controller)),
+        IosSectionHeader(text: l10n.modelSpecFormLimitsSection),
+        SectionCard(child: LimitsPricingSection(controller: _controller)),
+      ],
     ];
   }
 

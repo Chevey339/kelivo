@@ -526,6 +526,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
     // _p(zh ? '阶跃星辰' : 'StepFun', 'StepFun', enabled: false, models: 0),
     // _p('MiniMax', 'MiniMax', enabled: true, models: 0),
     _p(l10n.providersPageByteDanceName, 'ByteDance', enabled: false, models: 0),
+    _p('fal', 'fal', enabled: false, models: 0),
     // _p(zh ? '豆包' : 'Doubao', 'Doubao', enabled: true, models: 0),
     // _p(zh ? '阿里云' : 'Alibaba Cloud', 'Alibaba Cloud', enabled: true, models: 0),
     // _p('Meta', 'Meta', enabled: false, models: 0),

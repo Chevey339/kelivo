@@ -150,12 +150,16 @@ class XaiVideoAdapter implements MediaAdapter {
             'Video URL missing',
           );
         }
-        return MediaResult(
-          mime: 'video/mp4',
-          url: url,
-          durationMs: videoDurationMs(video['duration'] ?? request.durationSec),
-          previewUrl: mediaResultUri(video['cover_url']),
-        );
+        return [
+          MediaResult(
+            mime: 'video/mp4',
+            url: url,
+            durationMs: videoDurationMs(
+              video['duration'] ?? request.durationSec,
+            ),
+            previewUrl: mediaResultUri(video['cover_url']),
+          ),
+        ];
       },
       progress: (data) => mediaPercent(data['progress']),
     );

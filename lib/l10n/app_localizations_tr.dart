@@ -18222,4 +18222,124 @@ class AppLocalizationsTr extends AppLocalizations {
   String creationTopicCount(int count) {
     return 'Konular $count';
   }
+
+  @override
+  String get creationMoreOptions => 'Diğer seçenekler';
+
+  @override
+  String get creationImageSize => 'Görsel boyutu';
+
+  @override
+  String get creationQuality => 'Kalite';
+
+  @override
+  String get creationLowQuality => 'Düşük';
+
+  @override
+  String get creationMediumQuality => 'Orta';
+
+  @override
+  String get creationHighQuality => 'Yüksek';
+
+  @override
+  String get creationNegativePrompt => 'Negatif istem';
+
+  @override
+  String get creationSeed => 'Tohum';
+
+  @override
+  String get creationTransparentBackground => 'Şeffaf arka plan';
+
+  @override
+  String get creationOutputFormat => 'Çıktı formatı';
+
+  @override
+  String get creationExtraJson => 'Ek parametreler (JSON)';
+
+  @override
+  String get creationExtraJsonHint =>
+      'Bu değerler her istekle birlikte gönderilir. Diğer seçenekler bölümünde geçici olarak değiştirebilirsiniz.';
+
+  @override
+  String get creationModelKnown =>
+      'Varsayılanlar Kelivo’nun yerleşik model verilerinden gelir. Değişiklikler yalnızca bu modeli etkiler.';
+
+  @override
+  String get creationModelUnknown =>
+      'Kelivo yaygın parametreleri doldurdu. Sağlayıcınızın belgelerine göre bunları düzenleyebilirsiniz.';
+
+  @override
+  String get creationMaxPerRequest => 'İstek başına en fazla';
+
+  @override
+  String get creationMaxPerRequestHelp =>
+      'Daha büyük gruplar birden çok isteğe bölünür ve tek bir grupta tutulur.';
+
+  @override
+  String get creationReferenceLimit => 'Referans görseller';
+
+  @override
+  String get creationReferenceLimitHelp =>
+      'Bu model için referans görselleri ve düzenlemeyi gizlemek üzere sıfıra ayarlayın.';
+
+  @override
+  String get creationRatioHelp =>
+      'Oluştur bölümünde kullanılabilir oranları seçin. Otomatik, modelin karar vermesini sağlar.';
+
+  @override
+  String get creationMediaOther => 'Diğer seçenekler';
+
+  @override
+  String get creationEnableOptionHelp =>
+      'Bu kontrolü Diğer seçenekler bölümünde göster.';
+
+  @override
+  String get creationImageTypeHelp =>
+      'Görsel modelleri Oluştur bölümünde ve Görsel Oluşturma aracında görünür.';
+
+  @override
+  String get creationVideoTypeHelp =>
+      'Video modelleri Oluştur bölümünde görünür.';
+
+  @override
+  String get creationFalKeyHint =>
+      'fal.ai › Dashboard › API Keys bölümünde bir anahtar oluşturun';
+
+  @override
+  String get creationFalCatalogHint =>
+      'Kelivo, fal’ın modellerini ve parametrelerini içerir. Getir, kaldırılan modelleri geri yükler.';
+
+  @override
+  String get creationFalModelId => 'model ID';
+
+  @override
+  String get creationOpenAiMediaPaths =>
+      'Görsel /images/generations · Video /videos';
+
+  @override
+  String get creationSelectPlatformImage => 'Görsel seç';
+
+  @override
+  String get creationPlatformOptions => 'Modele özgü seçenekler';
+
+  @override
+  String get creationParameterRequired => 'Gerekli';
+
+  @override
+  String get creationBackground => 'Arka plan';
+
+  @override
+  String get creationOpaqueBackground => 'Opak';
+
+  @override
+  String get creationTransparentOption => 'Şeffaf';
+
+  @override
+  String get creationChatModelBadge => 'Sohbet modeli';
+
+  @override
+  String get creationCommonOptions => 'Genel seçenekler';
+
+  @override
+  String get creationNoCommonOptions => 'Bu modelin genel seçeneği yok.';
 }

@@ -12,6 +12,7 @@ import '../../../core/models/media_creation.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/media/media_adapter_resolver.dart';
 import '../../../core/services/media/media_generation_runner.dart';
 import '../../../core/services/media/media_request.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
@@ -31,22 +32,26 @@ class CreationDraft {
     this.prompt = '',
     this.references = const [],
     this.videoFrames = false,
+    this.platformImages = const {},
   });
 
   final String prompt;
   final List<MediaReference> references;
   final bool videoFrames;
+  final Map<(String, String), String> platformImages;
 
   CreationDraft copyWith({
     String? prompt,
     List<MediaReference>? references,
     bool? videoFrames,
+    Map<(String, String), String>? platformImages,
   }) => CreationDraft(
     prompt: prompt ?? this.prompt,
     references: references == null
         ? this.references
         : List.unmodifiable(references),
     videoFrames: videoFrames ?? this.videoFrames,
+    platformImages: platformImages ?? this.platformImages,
   );
 }
 
@@ -56,6 +61,7 @@ typedef _ComposerOptions = ({
   int count,
   int? duration,
   String? resolution,
+  Map<String, Map<String, dynamic>> parameters,
 });
 
 class MediaCreationController extends ChangeNotifier {
@@ -162,7 +168,14 @@ class MediaCreationController extends ChangeNotifier {
       final spec = ModelSpecResolver.instance.spec(provider, id);
       final eligible = mode == MediaMode.video
           ? spec.type == ModelType.video
-          : spec.type == ModelType.image;
+          : spec.type == ModelType.image ||
+                spec.type == ModelType.chat &&
+                    spec.output.contains(Modality.image) &&
+                    ProviderConfig.classify(
+                          provider.id,
+                          explicitType: provider.providerType,
+                        ) ==
+                        ProviderKind.google;
       if (!eligible) continue;
       final caps = runner.capabilities(provider, mode, id);
       if (caps != null) yield MediaModelChoice(provider, spec, caps);
@@ -171,7 +184,14 @@ class MediaCreationController extends ChangeNotifier {
 
   _ComposerOptions get _currentOptions =>
       _options[_mode] ??
-      (model: null, ratio: 'auto', count: 1, duration: null, resolution: null);
+      (
+        model: null,
+        ratio: 'auto',
+        count: 1,
+        duration: null,
+        resolution: null,
+        parameters: const {},
+      );
   MediaModelChoice? get model =>
       models
           .where((choice) => choice.key == _currentOptions.model)
@@ -191,7 +211,7 @@ class MediaCreationController extends ChangeNotifier {
     final ratios = ratiosFor(topicId);
     return ratios.contains(_currentOptions.ratio)
         ? _currentOptions.ratio
-        : ratios.first;
+        : ratios.firstOrNull ?? 'auto';
   }
 
   int? get duration {
@@ -200,13 +220,18 @@ class MediaCreationController extends ChangeNotifier {
     return choices.contains(value) ? value : choices.firstOrNull;
   }
 
-  List<String> resolutionsFor(String? topicId) =>
-      model?.capabilities.resolutionsFor(
-        hasLastFrame:
-            showsFrames(topicId) &&
-            frame(topicId, MediaReferenceRole.lastFrame) != null,
-      ) ??
-      const [];
+  List<String> resolutionsFor(String? topicId) {
+    final caps = model?.capabilities;
+    if (caps == null) return const [];
+    final candidates = caps.resolutionsFor(
+      hasLastFrame:
+          showsFrames(topicId) &&
+          frame(topicId, MediaReferenceRole.lastFrame) != null,
+    );
+    return candidates
+        .where((value) => caps.ratiosFor(value).isNotEmpty)
+        .toList();
+  }
 
   String? resolutionFor(String? topicId) {
     final choices = resolutionsFor(topicId);
@@ -227,6 +252,60 @@ class MediaCreationController extends ChangeNotifier {
       _updateOptions(count: value.clamp(1, MediaGenerationRunner.maxCount));
   void selectDuration(int value) => _updateOptions(duration: value);
   void selectResolution(String value) => _updateOptions(resolution: value);
+
+  Map<String, dynamic> get parameters =>
+      _currentOptions.parameters[model?.key] ?? const {};
+
+  void setParameter(String field, Object? value) {
+    final key = model?.key;
+    if (key == null) return;
+    final update = {...parameters};
+    if (value == null || value == '') {
+      update.remove(field);
+    } else {
+      update[field] = value;
+    }
+    _updateOptions(parameters: {..._currentOptions.parameters, key: update});
+  }
+
+  String? platformImage(String? topicId, String field) {
+    final key = model?.key;
+    return key == null ? null : draftFor(topicId).platformImages[(key, field)];
+  }
+
+  void setPlatformImage(
+    String? topicId,
+    String modelKey,
+    String field,
+    String? path,
+  ) {
+    final draft = draftFor(topicId);
+    final images = {...draft.platformImages};
+    if (path == null) {
+      images.remove((modelKey, field));
+    } else {
+      images[(modelKey, field)] = path;
+    }
+    _drafts[topicId] = draft.copyWith(platformImages: images);
+    notifyListeners();
+  }
+
+  bool hasAdvancedOptions(String? topicId) =>
+      parameters.isNotEmpty ||
+      draftFor(
+        topicId,
+      ).platformImages.keys.any((entry) => entry.$1 == model?.key);
+
+  Map<String, dynamic>? get extraParameters {
+    final raw = parameters['extra'];
+    if (raw is! String || raw.trim().isEmpty) return const {};
+    try {
+      final parsed = jsonDecode(raw);
+      return parsed is Map<String, dynamic> ? parsed : null;
+    } on FormatException {
+      return null;
+    }
+  }
 
   List<MediaReference> imageReferences(String? topicId) => draftFor(
     topicId,
@@ -261,24 +340,61 @@ class MediaCreationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<MediaReference> _effectiveReferences(String? topicId) {
-    if (mode == MediaMode.image) return imageReferences(topicId);
-    if (!showsFrames(topicId)) return const [];
-    return [
-      for (final role in model!.capabilities.frameRoles)
+  List<MediaReference> _effectiveReferences(
+    String? topicId,
+    MediaCapabilities caps,
+  ) => [
+    if (mode == MediaMode.image && caps.maxReferences > 0)
+      ...imageReferences(topicId),
+    if (mode == MediaMode.video && showsFrames(topicId))
+      for (final role in caps.frameRoles)
         if (frame(topicId, role) case final value?) value,
-    ];
-  }
+    for (final option in caps.platformOptions)
+      if (option.type == MediaParameterType.image)
+        if (platformImage(topicId, option.key) case final path?)
+          MediaReference(
+            path,
+            role: MediaReferenceRole.platform,
+            parameterKey: option.key,
+          ),
+  ];
 
   bool canSubmit(String? topicId) {
-    final caps = model?.capabilities;
-    if (caps == null ||
+    final selected = model;
+    final caps = selected?.capabilities;
+    if (selected == null ||
+        caps == null ||
         submitting(topicId) ||
-        _deletingTopics.contains(topicId)) {
+        _deletingTopics.contains(topicId) ||
+        ratiosFor(topicId).isEmpty ||
+        extraParameters == null ||
+        (caps.supportsSeed &&
+            parameters['seed'] != null &&
+            int.tryParse(parameters['seed'].toString()) == null)) {
       return false;
     }
-    final refs = _effectiveReferences(topicId);
-    if (mode == MediaMode.image) return refs.length <= caps.maxReferences;
+    final defaults = MediaAdapterResolver.overrides(
+      selected.provider,
+      selected.spec.id,
+    ).extra;
+    if (caps.platformOptions.any(
+      (field) =>
+          field.type == MediaParameterType.image &&
+          field.required &&
+          platformImage(topicId, field.key) == null &&
+          extraParameters?[field.key] is! String &&
+          defaults[field.key] is! String,
+    )) {
+      return false;
+    }
+    final refs = _effectiveReferences(
+      topicId,
+      caps,
+    ).where((ref) => ref.role != MediaReferenceRole.platform);
+    if (mode == MediaMode.image) {
+      return refs.length <= caps.maxReferences &&
+          (refs.isNotEmpty || !caps.requiresReference);
+    }
     if (!showsFrames(topicId)) return !caps.requiresFirstFrame;
     return refs.any((ref) => ref.role == MediaReferenceRole.firstFrame);
   }
@@ -305,15 +421,40 @@ class MediaCreationController extends ChangeNotifier {
     final draft = draftFor(topicId);
     final prompt = draft.prompt.trim();
     if (choice == null || prompt.isEmpty) return null;
+    final caps = choice.capabilities;
+    final options = parameters;
     final request = MediaRequest(
       modelId: choice.spec.id,
       mode: mode,
       prompt: prompt,
+      negativePrompt:
+          caps.supportsNegativePrompt &&
+              options['negativePrompt'] is String &&
+              (options['negativePrompt'] as String).trim().isNotEmpty
+          ? (options['negativePrompt'] as String).trim()
+          : null,
       count: count,
       aspectRatio: ratioFor(topicId),
       durationSec: duration,
       resolution: resolutionFor(topicId),
-      references: _effectiveReferences(topicId),
+      references: _effectiveReferences(topicId, caps),
+      parameters: {
+        if (caps.sizes.contains(options['size'])) 'size': options['size'],
+        if (caps.qualities.contains(options['quality']))
+          'quality': options['quality'],
+        if (caps.formats.contains(options['format']))
+          'format': options['format'],
+        if (caps.supportsTransparent && options['background'] is String)
+          'background': options['background'],
+        if (caps.supportsSeed && options['seed'] != null)
+          'seed': int.parse(options['seed'].toString()),
+        for (final field in caps.platformOptions)
+          if (field.type != MediaParameterType.image &&
+              options[field.key] != null)
+            field.key: options[field.key],
+        if (extraParameters case final extra? when extra.isNotEmpty)
+          'extra': extra,
+      },
     );
     final id = topicId ?? const Uuid().v4();
     final now = DateTime.now();
@@ -467,6 +608,7 @@ class MediaCreationController extends ChangeNotifier {
     int? count,
     int? duration,
     String? resolution,
+    Map<String, Map<String, dynamic>>? parameters,
   }) {
     _options[_mode] = (
       model: modelKey ?? model?.key,
@@ -474,6 +616,7 @@ class MediaCreationController extends ChangeNotifier {
       count: count ?? _currentOptions.count,
       duration: duration ?? _currentOptions.duration,
       resolution: resolution ?? _currentOptions.resolution,
+      parameters: parameters ?? _currentOptions.parameters,
     );
     notifyListeners();
     unawaited(
@@ -488,6 +631,8 @@ class MediaCreationController extends ChangeNotifier {
                   'count': entry.value.count,
                   'duration': entry.value.duration,
                   'resolution': entry.value.resolution,
+                  if (entry.value.parameters.isNotEmpty)
+                    'parameters': entry.value.parameters,
                 },
             }),
           )
@@ -521,6 +666,12 @@ class MediaCreationController extends ChangeNotifier {
               resolution: value['resolution'] is String
                   ? value['resolution'] as String
                   : null,
+              parameters: {
+                if (value['parameters'] case final Map<String, dynamic> sets)
+                  for (final entry in sets.entries)
+                    if (entry.value case final Map<String, dynamic> values)
+                      entry.key: values,
+              },
             ),
       };
     } on FormatException {

@@ -45,6 +45,53 @@ void main() {
     l10n = await AppLocalizations.delegate.load(const Locale('en'));
   });
 
+  test('media settings save per model and reset to adapter defaults', () async {
+    const id = 'gpt-image-2';
+    final cfg = _cfg(
+      models: const [id],
+      overrides: const {
+        id: {'keepThis': true},
+      },
+    );
+    final settings = await _settings(cfg);
+    addTearDown(settings.dispose);
+    final form = ModelSpecFormController(
+      config: cfg,
+      modelKey: id,
+      isNew: false,
+    );
+    addTearDown(form.dispose);
+    expect(form.hasMediaModelData, isTrue);
+    final defaultLimit = form.mediaCapabilities.maxReferences;
+    form.setMediaValue('maxReferences', 0);
+    form.setMediaValue('aspectRatios', ['1:1', '3:2']);
+    form.mediaExtraController.text = '[]';
+    form.mediaExtraChanged('[]');
+    expect(form.validate(l10n), l10n.modelSpecFormInvalidJson);
+    form.mediaExtraController.text = '{"render":{"strength":4}}';
+    expect(form.validate(l10n), isNull);
+    expect(await form.save(settings), isTrue);
+    final saved = settings.getProviderConfig(cfg.id);
+    final reopened = ModelSpecFormController(
+      config: saved,
+      modelKey: id,
+      isNew: false,
+    );
+    addTearDown(reopened.dispose);
+    expect(reopened.mediaCapabilities.maxReferences, 0);
+    expect(reopened.mediaCapabilities.aspectRatios, ['1:1', '3:2']);
+    expect(reopened.media.extra, {
+      'render': {'strength': 4},
+    });
+    reopened.resetMedia();
+    expect(reopened.mediaCapabilities.maxReferences, defaultLimit);
+    expect(await reopened.save(settings), isTrue);
+    final restored =
+        settings.getProviderConfig(cfg.id).modelOverrides[id] as Map;
+    expect(restored['keepThis'], isTrue);
+    expect(restored.containsKey('media'), isFalse);
+  });
+
   test(
     'speed tiers persist as a model override and reset to inheritance',
     () async {

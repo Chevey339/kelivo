@@ -464,7 +464,8 @@ bool _isImageModelId(String id) {
       id.startsWith('imagen-') ||
       id.startsWith('flux') ||
       id.startsWith('kolors') ||
-      _matches(id, r'^wan.*-(?:t2i|i2i)(?:-|$)') ||
+      id == 'z-image-turbo' ||
+      _matches(id, r'^wan.*-(?:t2i|i2i|image|imageedit)(?:-|$)') ||
       id.startsWith('agnes-image-') ||
       id == 'sensenova-u1-fast' ||
       id == 'dall-e-2' ||

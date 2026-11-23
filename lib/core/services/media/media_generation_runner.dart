@@ -86,7 +86,7 @@ class MediaGenerationRunner extends ChangeNotifier {
     ProviderConfig provider,
     MediaMode mode,
     String id,
-  ) => resolver.resolve(provider, mode)?.capabilities(provider, id);
+  ) => resolver.capabilities(provider, mode, id);
 
   MediaCapabilities _validate(ProviderConfig provider, MediaRequest request) {
     final caps = capabilities(provider, request.mode, request.modelId);
@@ -96,11 +96,45 @@ class MediaGenerationRunner extends ChangeNotifier {
         request.count < 1 ||
         request.count > maxCount ||
         request.prompt.trim().isEmpty ||
-        !caps.ratiosFor(request.resolution).contains(request.aspectRatio) ||
-        request.references.length > caps.maxReferences) {
+        (!caps.ratiosFor(request.resolution).contains(request.aspectRatio) &&
+            !(request.mode == MediaMode.video &&
+                request.aspectRatio == 'auto' &&
+                caps.framesUseAutomaticRatio &&
+                request.frame(MediaReferenceRole.firstFrame) != null)) ||
+        request.inputImages.length > caps.maxReferences ||
+        caps.requiresReference && request.inputImages.isEmpty ||
+        (caps.maxCombinedInputsAndOutputs ?? 32) <=
+            request.inputImages.length) {
       throw const MediaFailure(
         MediaFailureKind.parameters,
         'Invalid generation request',
+      );
+    }
+    final platformImages = {
+      for (final field in caps.platformOptions)
+        if (field.type == MediaParameterType.image) field.key: field,
+    };
+    final suppliedImages = request.references
+        .where((ref) => ref.role == MediaReferenceRole.platform)
+        .map((ref) => ref.parameterKey)
+        .toList();
+    final modelExtra = MediaAdapterResolver.overrides(
+      provider,
+      request.modelId,
+    ).extra;
+    final requestExtra = request.parameters['extra'];
+    if (suppliedImages.any((key) => !platformImages.containsKey(key)) ||
+        suppliedImages.length != suppliedImages.toSet().length ||
+        platformImages.values.any(
+          (field) =>
+              field.required &&
+              !suppliedImages.contains(field.key) &&
+              !(requestExtra is Map && requestExtra[field.key] is String) &&
+              modelExtra[field.key] is! String,
+        )) {
+      throw const MediaFailure(
+        MediaFailureKind.parameters,
+        'Invalid platform image input',
       );
     }
     if (request.mode == MediaMode.video && !_validVideoRequest(request, caps)) {
@@ -113,7 +147,9 @@ class MediaGenerationRunner extends ChangeNotifier {
   }
 
   static bool _validVideoRequest(MediaRequest request, MediaCapabilities caps) {
-    final roles = request.references.map((reference) => reference.role).toSet();
+    final roles = request.inputImages
+        .map((reference) => reference.role)
+        .toSet();
     final first = roles.contains(MediaReferenceRole.firstFrame);
     final last = roles.contains(MediaReferenceRole.lastFrame);
     return request.count == 1 &&
@@ -123,7 +159,7 @@ class MediaGenerationRunner extends ChangeNotifier {
             caps
                 .resolutionsFor(hasLastFrame: last)
                 .contains(request.resolution)) &&
-        roles.length == request.references.length &&
+        roles.length == request.inputImages.length &&
         roles.every(caps.frameRoles.contains) &&
         (first || !caps.requiresFirstFrame && !last);
   }
@@ -141,6 +177,16 @@ class MediaGenerationRunner extends ChangeNotifier {
     await initialized;
     _requireOpen();
     final caps = _validate(provider, request);
+    final extra = request.parameters['extra'];
+    request = request.copyWith(
+      parameters: {
+        ...request.parameters,
+        'extra': MediaAdapterResolver.overrides(
+          provider,
+          request.modelId,
+        ).requestExtra(extra is Map<String, dynamic> ? extra : const {}),
+      },
+    );
     final id = _uuid.v4();
     final now = DateTime.now();
     return AttachmentFileLock.synchronized(() async {
@@ -312,7 +358,11 @@ class MediaGenerationRunner extends ChangeNotifier {
       }
       final raw = _client(job.provider, job.token);
       try {
-        final adapter = resolver.resolve(job.provider, job.request.mode)!;
+        final adapter = resolver.resolve(
+          job.provider,
+          job.request.mode,
+          modelId: job.request.modelId,
+        )!;
         final auth = ProviderOAuthService.instance.authenticatedClient(
           raw,
           job.provider,
@@ -323,10 +373,15 @@ class MediaGenerationRunner extends ChangeNotifier {
             : apiKeyForRequest(job.provider, job.request.modelId);
         for (var attempt = saved; attempt < job.request.count;) {
           _checkCancelled(job);
-          final count = math.min(
-            job.capabilities.maxPerRequest,
-            job.request.count - attempt,
-          );
+          final maxCombined = job.capabilities.maxCombinedInputsAndOutputs;
+          var requestCap = job.capabilities.maxPerRequest;
+          if (maxCombined != null) {
+            requestCap = math.min(
+              requestCap,
+              maxCombined - job.request.inputImages.length,
+            );
+          }
+          final count = math.min(requestCap, job.request.count - attempt);
           final request = job.request.copyWith(count: count);
           final context = MediaContext(
             provider: job.provider,
@@ -419,9 +474,12 @@ class MediaGenerationRunner extends ChangeNotifier {
     } finally {
       if (job.remoteTask case MediaTaskAccepted(
         cancelUrl: final url?,
+        :final cancelMethod,
         :final cancelHeaders,
       ) when job.token.isCancelled) {
-        unawaited(_cancelRemote(job.provider, url, cancelHeaders));
+        unawaited(
+          _cancelRemote(job.provider, url, cancelMethod, cancelHeaders),
+        );
       }
       _active.remove(job.id);
       _progress.remove(job.id);
@@ -495,13 +553,14 @@ class MediaGenerationRunner extends ChangeNotifier {
   Future<void> _cancelRemote(
     ProviderConfig provider,
     Uri url,
+    String method,
     Map<String, String> headers,
   ) async {
     final token = CancelToken();
     http.Client? client;
     try {
       client = _client(provider, token);
-      final request = http.Request('DELETE', url)
+      final request = http.Request(method, url)
         ..followRedirects = false
         ..headers.addAll(headers);
       final response = await client

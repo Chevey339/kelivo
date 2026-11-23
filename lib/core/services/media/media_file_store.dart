@@ -59,7 +59,11 @@ class MediaFileStore {
       final target = p.join(refs.path, '$index$safeExt');
       await file.copy(target);
       stored.add(
-        MediaReference(_portable(batch, target), role: references[index].role),
+        MediaReference(
+          _portable(batch, target),
+          role: references[index].role,
+          parameterKey: references[index].parameterKey,
+        ),
       );
     }
     return stored;

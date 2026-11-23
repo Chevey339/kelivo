@@ -18439,4 +18439,124 @@ class AppLocalizationsRu extends AppLocalizations {
   String creationTopicCount(int count) {
     return 'Темы $count';
   }
+
+  @override
+  String get creationMoreOptions => 'Дополнительно';
+
+  @override
+  String get creationImageSize => 'Размер изображения';
+
+  @override
+  String get creationQuality => 'Качество';
+
+  @override
+  String get creationLowQuality => 'Низкое';
+
+  @override
+  String get creationMediumQuality => 'Среднее';
+
+  @override
+  String get creationHighQuality => 'Высокое';
+
+  @override
+  String get creationNegativePrompt => 'Негативный промпт';
+
+  @override
+  String get creationSeed => 'Сид';
+
+  @override
+  String get creationTransparentBackground => 'Прозрачный фон';
+
+  @override
+  String get creationOutputFormat => 'Формат вывода';
+
+  @override
+  String get creationExtraJson => 'Дополнительные параметры (JSON)';
+
+  @override
+  String get creationExtraJsonHint =>
+      'Эти значения отправляются с каждым запросом. Их можно переопределить в разделе «Дополнительно».';
+
+  @override
+  String get creationModelKnown =>
+      'Значения по умолчанию взяты из встроенных данных о моделях Kelivo. Изменения применяются только к этой модели.';
+
+  @override
+  String get creationModelUnknown =>
+      'Kelivo заполнил общие параметры. Их можно настроить по документации вашего провайдера.';
+
+  @override
+  String get creationMaxPerRequest => 'Максимум за запрос';
+
+  @override
+  String get creationMaxPerRequestHelp =>
+      'Большие пакеты разбиваются на несколько запросов и объединяются в одну группу.';
+
+  @override
+  String get creationReferenceLimit => 'Референсные изображения';
+
+  @override
+  String get creationReferenceLimitHelp =>
+      'Установите 0, чтобы скрыть референсные изображения и редактирование для этой модели.';
+
+  @override
+  String get creationRatioHelp =>
+      'Выберите пропорции, доступные в разделе «Создание». «Авто» позволяет модели решить самостоятельно.';
+
+  @override
+  String get creationMediaOther => 'Другие параметры';
+
+  @override
+  String get creationEnableOptionHelp =>
+      'Показывать этот элемент управления в разделе «Дополнительно».';
+
+  @override
+  String get creationImageTypeHelp =>
+      'Модели изображений отображаются в разделе «Создание» и в инструменте «Генерация изображений».';
+
+  @override
+  String get creationVideoTypeHelp =>
+      'Видеомодели отображаются в разделе «Создание».';
+
+  @override
+  String get creationFalKeyHint =>
+      'Создайте ключ в fal.ai › Dashboard › API Keys';
+
+  @override
+  String get creationFalCatalogHint =>
+      'Kelivo включает модели и параметры fal. «Получить» восстановит удалённые модели.';
+
+  @override
+  String get creationFalModelId => 'ID модели';
+
+  @override
+  String get creationOpenAiMediaPaths =>
+      'Изображения /images/generations · Видео /videos';
+
+  @override
+  String get creationSelectPlatformImage => 'Выбрать изображение';
+
+  @override
+  String get creationPlatformOptions => 'Параметры модели';
+
+  @override
+  String get creationParameterRequired => 'Обязательно';
+
+  @override
+  String get creationBackground => 'Фон';
+
+  @override
+  String get creationOpaqueBackground => 'Непрозрачный';
+
+  @override
+  String get creationTransparentOption => 'Прозрачный';
+
+  @override
+  String get creationChatModelBadge => 'Модель чата';
+
+  @override
+  String get creationCommonOptions => 'Общие параметры';
+
+  @override
+  String get creationNoCommonOptions => 'У этой модели нет общих параметров.';
 }

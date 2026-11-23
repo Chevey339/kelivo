@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../core/models/media_creation.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/media/media_request.dart';
 import '../../../desktop/desktop_glass_popover.dart';
@@ -23,6 +24,7 @@ import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/design_tokens.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../providers/media_creation_controller.dart';
+import 'creation_advanced_options.dart';
 import 'creation_lightbox.dart';
 
 class CreationComposer extends StatefulWidget {
@@ -173,7 +175,7 @@ class _CreationComposerState extends State<CreationComposer> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (!video && references.isNotEmpty)
+                      if (!video && limit > 0 && references.isNotEmpty)
                         SizedBox(
                           height: 42,
                           child: ListView(
@@ -286,23 +288,28 @@ class _CreationComposerState extends State<CreationComposer> {
                         padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
                         child: Row(
                           children: [
-                            IosIconButton(
-                              icon: LucideIcons.imagePlus,
-                              size: 17,
-                              minSize: 30,
-                              tooltip: l10n.creationAddReference,
-                              enabled: video
-                                  ? caps?.frameRoles.isNotEmpty == true
-                                  : references.length < limit,
-                              onTap: video
-                                  ? () => _pickFrame(
-                                      MediaReferenceRole.firstFrame,
-                                    )
-                                  : () => _pickReference(limit),
-                            ),
+                            if (limit > 0)
+                              IosIconButton(
+                                icon: LucideIcons.imagePlus,
+                                size: 17,
+                                minSize: 30,
+                                tooltip: l10n.creationAddReference,
+                                enabled: video
+                                    ? caps?.frameRoles.isNotEmpty == true
+                                    : references.length < limit,
+                                onTap: video
+                                    ? () => _pickFrame(
+                                        MediaReferenceRole.firstFrame,
+                                      )
+                                    : () => _pickReference(limit),
+                              ),
                             const SizedBox(width: 2),
                             SizedBox(
-                              width: compact ? 65 : 142,
+                              width: compact
+                                  ? 65
+                                  : video
+                                  ? 104
+                                  : 126,
                               child: SegmentedTabs(
                                 height: 30,
                                 compact: true,
@@ -330,6 +337,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                     model?.spec.displayName ??
                                     l10n.creationSelectModel,
                                 strong: true,
+                                maxWidth: 190,
                                 leading: model == null
                                     ? null
                                     : ProviderAvatar(
@@ -382,6 +390,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                         duration: video,
                                         resolution: video,
                                         frames: video,
+                                        advanced: true,
                                         topicId: widget.topicId,
                                       ),
                                     ),
@@ -407,7 +416,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                 if (state.duration case final int duration
                                     when video)
                                   _ComposerChip(
-                                    maxWidth: 110,
+                                    maxWidth: 96,
                                     label: l10n.creationDurationSeconds(
                                       duration,
                                     ),
@@ -455,6 +464,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                   ),
                                 if (!video)
                                   _ComposerChip(
+                                    maxWidth: 100,
                                     label: l10n.creationImagesCount(
                                       state.count,
                                     ),
@@ -470,6 +480,39 @@ class _CreationComposerState extends State<CreationComposer> {
                                           const _ParameterOptions(count: true),
                                     ),
                                   ),
+                                _ComposerChip(
+                                  maxWidth: 109,
+                                  label: l10n.creationMoreOptions,
+                                  leading: Badge(
+                                    isLabelVisible: state.hasAdvancedOptions(
+                                      widget.topicId,
+                                    ),
+                                    backgroundColor: cs.primary,
+                                    smallSize: 5,
+                                    child: const Icon(
+                                      Lucide.SlidersHorizontal,
+                                      size: 15,
+                                    ),
+                                  ),
+                                  onTap: (anchor) => _showPicker(
+                                    anchor,
+                                    width: 360,
+                                    title: l10n.creationMoreOptions,
+                                    content: (_) => ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxHeight:
+                                            (MediaQuery.sizeOf(context).height -
+                                                    144)
+                                                .clamp(160.0, 500.0),
+                                      ),
+                                      child: SingleChildScrollView(
+                                        child: CreationAdvancedOptions(
+                                          topicId: widget.topicId,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ],
                           ],
@@ -659,6 +702,13 @@ class _ModelOptionsState extends State<_ModelOptions> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (model.spec.type == ModelType.chat) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            l10n.creationChatModelBadge,
+                            style: TextStyle(fontSize: 11, color: cs.primary),
+                          ),
+                        ],
                         if (state.model?.key == model.key)
                           Icon(Lucide.Check, size: 16, color: cs.primary),
                       ],
@@ -680,10 +730,11 @@ class _ParameterOptions extends StatelessWidget {
     this.duration = false,
     this.resolution = false,
     this.frames = false,
+    this.advanced = false,
     this.topicId,
   });
 
-  final bool ratio, count, duration, resolution, frames;
+  final bool ratio, count, duration, resolution, frames, advanced;
   final String? topicId;
 
   @override
@@ -697,7 +748,7 @@ class _ParameterOptions extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (ratio) ...[
+        if (ratio && ratios.isNotEmpty) ...[
           Text(l10n.creationAspectRatio),
           const SizedBox(height: 6),
           SegmentedTabs(
@@ -769,6 +820,10 @@ class _ParameterOptions extends StatelessWidget {
                         state.showFrames(topicId, !state.showsFrames(topicId)),
             ),
           ),
+        ],
+        if (advanced) ...[
+          const Divider(height: 24),
+          CreationAdvancedOptions(topicId: topicId),
         ],
       ],
     );

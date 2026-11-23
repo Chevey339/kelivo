@@ -167,7 +167,7 @@ void main() {
       expect(next.displayName, 'B');
       expect(next.type, ModelType.image);
       expect(next.input, const [Modality.image]);
-      expect(next.output, const [Modality.audio]);
+      expect(next.output, const [Modality.image]);
       expect(next.abilities, const [ModelAbility.tool]);
       expect(next.reasoning.canDisable, isTrue);
       expect(next.sampling, SamplingPolicy.onlyWhenReasoningOff);

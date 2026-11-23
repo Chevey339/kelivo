@@ -7,6 +7,7 @@ import '../features/provider/utils/provider_test_failure.dart';
 import '../features/provider/widgets/provider_test_details.dart';
 import '../features/provider/utils/provider_url_editor.dart';
 import '../features/provider/widgets/provider_input_row.dart';
+import '../features/provider/widgets/fal_catalog_notice.dart';
 import '../features/provider/widgets/provider_base_url_field.dart';
 import '../features/provider/widgets/provider_icon_picker.dart';
 import '../features/provider/widgets/provider_sponsor_card.dart';

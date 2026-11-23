@@ -109,14 +109,18 @@ class ArkVideoAdapter implements MediaAdapter {
             'Video URL missing',
           );
         }
-        return MediaResult(
-          mime: 'video/mp4',
-          url: url,
-          previewUrl: mediaResultUri(
-            content?['first_frame_url'] ?? content?['cover_url'],
+        return [
+          MediaResult(
+            mime: 'video/mp4',
+            url: url,
+            previewUrl: mediaResultUri(
+              content?['first_frame_url'] ?? content?['cover_url'],
+            ),
+            durationMs: videoDurationMs(
+              data['duration'] ?? request.durationSec,
+            ),
           ),
-          durationMs: videoDurationMs(data['duration'] ?? request.durationSec),
-        );
+        ];
       },
     );
   }

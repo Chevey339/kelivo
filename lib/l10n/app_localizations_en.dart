@@ -18117,4 +18117,122 @@ class AppLocalizationsEn extends AppLocalizations {
   String creationTopicCount(int count) {
     return 'Topics $count';
   }
+
+  @override
+  String get creationMoreOptions => 'More options';
+
+  @override
+  String get creationImageSize => 'Image size';
+
+  @override
+  String get creationQuality => 'Quality';
+
+  @override
+  String get creationLowQuality => 'Low';
+
+  @override
+  String get creationMediumQuality => 'Medium';
+
+  @override
+  String get creationHighQuality => 'High';
+
+  @override
+  String get creationNegativePrompt => 'Negative prompt';
+
+  @override
+  String get creationSeed => 'Seed';
+
+  @override
+  String get creationTransparentBackground => 'Transparent background';
+
+  @override
+  String get creationOutputFormat => 'Output format';
+
+  @override
+  String get creationExtraJson => 'Extra parameters (JSON)';
+
+  @override
+  String get creationExtraJsonHint =>
+      'These values are sent with each request. You can override them in More options.';
+
+  @override
+  String get creationModelKnown =>
+      'Defaults come from Kelivo’s built-in model data. Changes apply to this model only.';
+
+  @override
+  String get creationModelUnknown =>
+      'Kelivo filled in common parameters. You can adjust them using your provider’s documentation.';
+
+  @override
+  String get creationMaxPerRequest => 'Maximum per request';
+
+  @override
+  String get creationMaxPerRequestHelp =>
+      'Larger batches are split into multiple requests and kept in one group.';
+
+  @override
+  String get creationReferenceLimit => 'Reference images';
+
+  @override
+  String get creationReferenceLimitHelp =>
+      'Set to zero to hide reference images and editing for this model.';
+
+  @override
+  String get creationRatioHelp =>
+      'Select the ratios available in Create. Auto lets the model decide.';
+
+  @override
+  String get creationMediaOther => 'Other options';
+
+  @override
+  String get creationEnableOptionHelp => 'Show this control in More options.';
+
+  @override
+  String get creationImageTypeHelp =>
+      'Image models appear in Create and in the Image Generation tool.';
+
+  @override
+  String get creationVideoTypeHelp => 'Video models appear in Create.';
+
+  @override
+  String get creationFalKeyHint =>
+      'Create a key in fal.ai › Dashboard › API Keys';
+
+  @override
+  String get creationFalCatalogHint =>
+      'Kelivo includes fal’s models and parameters. Fetch restores removed models.';
+
+  @override
+  String get creationFalModelId => 'model ID';
+
+  @override
+  String get creationOpenAiMediaPaths =>
+      'Image /images/generations · Video /videos';
+
+  @override
+  String get creationSelectPlatformImage => 'Choose image';
+
+  @override
+  String get creationPlatformOptions => 'Model-specific options';
+
+  @override
+  String get creationParameterRequired => 'Required';
+
+  @override
+  String get creationBackground => 'Background';
+
+  @override
+  String get creationOpaqueBackground => 'Opaque';
+
+  @override
+  String get creationTransparentOption => 'Transparent';
+
+  @override
+  String get creationChatModelBadge => 'Chat model';
+
+  @override
+  String get creationCommonOptions => 'Common options';
+
+  @override
+  String get creationNoCommonOptions => 'This model has no common options.';
 }

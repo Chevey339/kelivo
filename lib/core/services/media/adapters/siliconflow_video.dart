@@ -98,14 +98,16 @@ class SiliconFlowVideoAdapter implements MediaAdapter {
             'Video URL missing',
           );
         }
-        return MediaResult(
-          mime: 'video/mp4',
-          url: url,
-          previewUrl: mediaResultUri(video?['cover_url']),
-          durationMs: videoDurationMs(
-            video?['duration'] ?? request.durationSec,
+        return [
+          MediaResult(
+            mime: 'video/mp4',
+            url: url,
+            previewUrl: mediaResultUri(video?['cover_url']),
+            durationMs: videoDurationMs(
+              video?['duration'] ?? request.durationSec,
+            ),
           ),
-        );
+        ];
       },
     );
   }

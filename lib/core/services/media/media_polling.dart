@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'media_adapter.dart';
@@ -6,40 +7,51 @@ import 'media_request.dart';
 Stream<MediaEvent> pollMediaTask(
   MediaContext context, {
   required Future<Map<String, dynamic>> Function() poll,
-  required MediaResult? Function(Map<String, dynamic>) result,
+  required FutureOr<List<MediaResult>?> Function(Map<String, dynamic>) result,
   MediaTaskAccepted accepted = const MediaTaskAccepted(),
   double? Function(Map<String, dynamic>)? progress,
   Map<String, dynamic>? initial,
 }) async* {
   yield accepted;
   var response = initial;
+  var waitBeforeRequest = initial == null;
   var interval = 2;
   var failures = 0;
   Duration? retryDelay;
   final elapsed = Stopwatch()..start();
   const timeout = Duration(minutes: 15);
+
+  Future<T> withinDeadline<T>(Future<T> Function() request) => Future.any<T>([
+    request(),
+    context.cancelToken.whenCancel.then((error) => throw error),
+  ]).timeout(timeout - elapsed.elapsed);
+
   while (elapsed.elapsed < timeout) {
     if (context.cancelToken.cancelError case final error?) throw error;
-    if (response != null) {
-      final output = result(response);
+    if (waitBeforeRequest) {
+      final backoff = retryDelay ?? Duration(seconds: interval);
+      final untilDeadline = timeout - elapsed.elapsed;
+      if (untilDeadline.inMicroseconds <= 0) break;
+      await _wait(context, backoff < untilDeadline ? backoff : untilDeadline);
+      if (elapsed.elapsed >= timeout) break;
+    }
+    try {
+      if (response == null) {
+        response = await withinDeadline(poll);
+        interval = math.min(interval + 1, 8);
+        failures = 0;
+      }
+      final current = response!;
+      // Keep the last status while retrieving the completed result. A transient
+      // result fetch must never submit another generation.
+      final output = await withinDeadline(() async => result(current));
       if (output != null) {
-        yield MediaOutput([output]);
+        yield MediaOutput(output);
         return;
       }
-      final fraction = progress?.call(response);
+      final fraction = progress?.call(current);
       if (fraction != null) yield MediaProgress(fraction);
-    }
-    final backoff = retryDelay ?? Duration(seconds: interval);
-    final untilDeadline = timeout - elapsed.elapsed;
-    if (untilDeadline.inMicroseconds <= 0) break;
-    await _wait(context, backoff < untilDeadline ? backoff : untilDeadline);
-    final pollWindow = timeout - elapsed.elapsed;
-    if (pollWindow.inMicroseconds <= 0) break;
-    try {
-      response = await Future.any<Map<String, dynamic>>([
-        poll(),
-        context.cancelToken.whenCancel.then((error) => throw error),
-      ]).timeout(pollWindow);
+      response = null;
       failures = 0;
       retryDelay = null;
     } catch (error) {
@@ -51,10 +63,8 @@ Stream<MediaEvent> pollMediaTask(
       final retry = failure.retryAfter;
       final exponential = Duration(seconds: 1 << failures++);
       retryDelay = retry != null && retry > exponential ? retry : exponential;
-      response = null;
-      continue;
     }
-    interval = math.min(interval + 1, 8);
+    waitBeforeRequest = true;
   }
   throw const MediaFailure(MediaFailureKind.network, 'Generation timed out');
 }

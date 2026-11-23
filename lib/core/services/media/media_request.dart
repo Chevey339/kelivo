@@ -2,19 +2,29 @@ import 'dart:typed_data';
 
 import '../../models/media_creation.dart';
 
-enum MediaReferenceRole { image, firstFrame, lastFrame }
+enum MediaReferenceRole { image, firstFrame, lastFrame, platform }
 
 class MediaReference {
-  const MediaReference(this.path, {this.role = MediaReferenceRole.image});
+  const MediaReference(
+    this.path, {
+    this.role = MediaReferenceRole.image,
+    this.parameterKey,
+  });
 
   final String path;
   final MediaReferenceRole role;
+  final String? parameterKey;
 
-  Map<String, Object?> toJson() => {'path': path, 'role': role.name};
+  Map<String, Object?> toJson() => {
+    'path': path,
+    'role': role.name,
+    if (parameterKey != null) 'parameterKey': parameterKey,
+  };
 
   factory MediaReference.fromJson(Map<String, dynamic> json) => MediaReference(
     json['path'] as String,
     role: MediaReferenceRole.values.byName(json['role'] as String),
+    parameterKey: json['parameterKey'] as String?,
   );
 }
 
@@ -43,19 +53,22 @@ class MediaRequest {
   final List<MediaReference> references;
   final Map<String, dynamic> parameters;
 
-  MediaRequest copyWith({int? count, List<MediaReference>? references}) =>
-      MediaRequest(
-        modelId: modelId,
-        mode: mode,
-        prompt: prompt,
-        negativePrompt: negativePrompt,
-        count: count ?? this.count,
-        aspectRatio: aspectRatio,
-        durationSec: durationSec,
-        resolution: resolution,
-        references: references ?? this.references,
-        parameters: parameters,
-      );
+  MediaRequest copyWith({
+    int? count,
+    List<MediaReference>? references,
+    Map<String, dynamic>? parameters,
+  }) => MediaRequest(
+    modelId: modelId,
+    mode: mode,
+    prompt: prompt,
+    negativePrompt: negativePrompt,
+    count: count ?? this.count,
+    aspectRatio: aspectRatio,
+    durationSec: durationSec,
+    resolution: resolution,
+    references: references ?? this.references,
+    parameters: parameters ?? this.parameters,
+  );
 
   Map<String, Object?> get storedParameters => {
     ...parameters,
@@ -67,6 +80,10 @@ class MediaRequest {
 
   MediaReference? frame(MediaReferenceRole role) =>
       references.where((reference) => reference.role == role).firstOrNull;
+
+  Iterable<MediaReference> get inputImages => references.where(
+    (reference) => reference.role != MediaReferenceRole.platform,
+  );
 }
 
 class MediaCapabilities {
@@ -82,6 +99,15 @@ class MediaCapabilities {
     this.ratiosByResolution = const {},
     this.framesUseAutomaticRatio = false,
     this.requiresFirstFrame = false,
+    this.requiresReference = false,
+    this.maxCombinedInputsAndOutputs,
+    this.sizes = const [],
+    this.qualities = const [],
+    this.formats = const [],
+    this.supportsNegativePrompt = false,
+    this.supportsSeed = false,
+    this.supportsTransparent = false,
+    this.platformOptions = const [],
   });
 
   final List<String> aspectRatios;
@@ -95,12 +121,39 @@ class MediaCapabilities {
   final Map<String, List<String>> ratiosByResolution;
   final bool framesUseAutomaticRatio;
   final bool requiresFirstFrame;
+  final bool requiresReference;
+  final int? maxCombinedInputsAndOutputs;
+  final List<String> sizes, qualities, formats;
+  final bool supportsNegativePrompt, supportsSeed, supportsTransparent;
+  final List<MediaParameter> platformOptions;
 
   List<String> ratiosFor(String? resolution) =>
       ratiosByResolution[resolution] ?? aspectRatios;
 
   List<String> resolutionsFor({required bool hasLastFrame}) =>
       (hasLastFrame ? resolutionsWithLastFrame : null) ?? resolutions;
+}
+
+enum MediaParameterType { enumeration, integer, number, boolean, string, image }
+
+class MediaParameter {
+  const MediaParameter(
+    this.key,
+    this.type, {
+    this.choices = const [],
+    this.minimum,
+    this.maximum,
+    this.step,
+    this.defaultValue,
+    this.required = false,
+  });
+
+  final String key;
+  final MediaParameterType type;
+  final List<String> choices;
+  final num? minimum, maximum, step;
+  final Object? defaultValue;
+  final bool required;
 }
 
 class MediaResult {
@@ -151,9 +204,14 @@ class MediaOutput extends MediaEvent {
 }
 
 class MediaTaskAccepted extends MediaEvent {
-  const MediaTaskAccepted({this.cancelUrl, this.cancelHeaders = const {}});
+  const MediaTaskAccepted({
+    this.cancelUrl,
+    this.cancelMethod = 'DELETE',
+    this.cancelHeaders = const {},
+  });
 
   final Uri? cancelUrl;
+  final String cancelMethod;
   final Map<String, String> cancelHeaders;
 }
 

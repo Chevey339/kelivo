@@ -84,6 +84,8 @@ class DashScopeVideoAdapter implements MediaAdapter {
         if (last) MediaReferenceRole.lastFrame,
       ],
       requiresFirstFrame: model.contains('-i2v') || model.contains('kf2v'),
+      supportsNegativePrompt: true,
+      supportsSeed: true,
     );
   }
 
@@ -148,6 +150,7 @@ class DashScopeVideoAdapter implements MediaAdapter {
             'last_frame_url': await mediaReferenceDataUri(last),
         },
         'parameters': {
+          if (request.parameters['seed'] case final int seed) 'seed': seed,
           if (size != null)
             'size': size
           else
@@ -195,13 +198,15 @@ class DashScopeVideoAdapter implements MediaAdapter {
           );
         }
         final usage = data['usage'] as Map?;
-        return MediaResult(
-          mime: 'video/mp4',
-          url: url,
-          durationMs: videoDurationMs(
-            usage?['output_video_duration'] ?? request.durationSec,
+        return [
+          MediaResult(
+            mime: 'video/mp4',
+            url: url,
+            durationMs: videoDurationMs(
+              usage?['output_video_duration'] ?? request.durationSec,
+            ),
           ),
-        );
+        ];
       },
     );
   }

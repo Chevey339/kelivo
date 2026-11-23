@@ -50,6 +50,7 @@ class BrandAssets {
         MapEntry(RegExp(r'tencent'), 'hunyuan-color.svg'),
         MapEntry(RegExp(r'aliyun|阿里云|百炼'), 'alibabacloud-color.svg'),
         MapEntry(RegExp(r'bytedance|火山'), 'bytedance-color.svg'),
+        MapEntry(RegExp(r'^fal$|queue\.fal\.run'), 'fal-color.svg'),
         MapEntry(RegExp(r'silicon|硅基'), 'siliconflow-color.svg'),
         MapEntry(RegExp(r'aihubmix'), 'aihubmix-color.svg'),
         MapEntry(RegExp(r'ollama'), 'ollama.svg'),
@@ -178,6 +179,11 @@ class BrandAssets {
       id: 'bytedance',
       label: 'ByteDance',
       asset: 'assets/icons/bytedance-color.svg',
+    ),
+    BrandIconOption(
+      id: 'fal',
+      label: 'fal',
+      asset: 'assets/icons/fal-color.svg',
     ),
     BrandIconOption(
       id: 'siliconflow',

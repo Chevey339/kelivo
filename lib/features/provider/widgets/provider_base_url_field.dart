@@ -195,7 +195,10 @@ class ProviderRequestUrlPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final url = resolveRequestUrl(config);
+    final l10n = AppLocalizations.of(context)!;
+    final url = config.isFal
+        ? '${config.baseUrl.replaceFirst(RegExp(r'/+$'), '')}/{${l10n.creationFalModelId}}'
+        : resolveRequestUrl(config);
     final source = base ?? config.baseUrl;
     var split = 0;
     while (split < source.length &&
@@ -207,8 +210,7 @@ class ProviderRequestUrlPreview extends StatelessWidget {
       TextSpan(
         children: [
           TextSpan(
-            text:
-                '${AppLocalizations.of(context)!.providerDetailPageRequestUrlLabel} ',
+            text: '${l10n.providerDetailPageRequestUrlLabel} ',
             style: TextStyle(color: cs.onSurface.withValues(alpha: 0.5)),
           ),
           TextSpan(
@@ -226,6 +228,16 @@ class ProviderRequestUrlPreview extends StatelessWidget {
               fontWeight: AppFontWeights.semibold,
             ),
           ),
+          if (!config.isFal &&
+              ProviderConfig.classify(
+                    config.id,
+                    explicitType: config.providerType,
+                  ) ==
+                  ProviderKind.openai)
+            TextSpan(
+              text: '\n${l10n.creationOpenAiMediaPaths}',
+              style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
+            ),
         ],
       ),
       style: const TextStyle(fontSize: 12, height: 1.4),

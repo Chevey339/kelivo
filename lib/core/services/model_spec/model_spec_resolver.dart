@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../models/model_spec.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
+import '../media/fal_model_catalog.dart';
 import '../model_catalog/catalog_entry.dart';
 import '../model_catalog/model_catalog_service.dart';
 import 'model_defaults_guesser.dart';
@@ -314,6 +315,23 @@ class ModelSpecResolver {
     sources[ModelSpecField.dynamicWebSearch] = SpecSource.guess;
     sources[ModelSpecField.remoteImageUrls] = SpecSource.guess;
     sources[ModelSpecField.promptCacheControl] = SpecSource.guess;
+    if (cfg.isFal) {
+      final fal = falModels[upstreamId];
+      final video = fal?.video ?? type == ModelType.video;
+      base = base.copyWith(
+        displayName: displayName ?? fal?.name ?? modelKey,
+        type: video ? ModelType.video : ModelType.image,
+        input: [
+          Modality.text,
+          if ((fal?.capabilities.maxReferences ?? 1) > 0) Modality.image,
+        ],
+        output: [if (video) Modality.video else Modality.image],
+        abilities: const [],
+      );
+      sources[ModelSpecField.type] = fal == null
+          ? SpecSource.guess
+          : SpecSource.catalog;
+    }
     final discovered = _ollama.lookup(cfg, upstreamId);
     if (discovered != null) {
       base = discovered.applyTo(base);
@@ -409,22 +427,21 @@ class ModelSpecResolver {
     required CatalogMatch? match,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
-    if (guess.type != ModelType.chat) {
-      sources[ModelSpecField.type] = SpecSource.guess;
-      return guess.type;
-    }
     if (match != null) {
       final outs = match.model.outputModalities;
       sources[ModelSpecField.type] = SpecSource.catalog;
-      if (outs.contains('video') && !outs.contains('text')) {
+      if (outs.contains('video') &&
+          !outs.contains('text') &&
+          (guess.type == ModelType.chat || guess.type == ModelType.video)) {
         return ModelType.video;
       }
       if (outs.contains('image') &&
           !outs.contains('text') &&
+          (guess.type == ModelType.chat || guess.type == ModelType.image) &&
           !id.toLowerCase().split('/').last.startsWith('gemini-')) {
         return ModelType.image;
       }
-      return ModelType.chat;
+      if (guess.type == ModelType.chat) return guess.type;
     }
     sources[ModelSpecField.type] = SpecSource.guess;
     return guess.type;

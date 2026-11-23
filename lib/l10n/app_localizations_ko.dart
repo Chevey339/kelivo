@@ -17560,4 +17560,120 @@ class AppLocalizationsKo extends AppLocalizations {
   String creationTopicCount(int count) {
     return '주제 $count';
   }
+
+  @override
+  String get creationMoreOptions => '추가 옵션';
+
+  @override
+  String get creationImageSize => '이미지 크기';
+
+  @override
+  String get creationQuality => '품질';
+
+  @override
+  String get creationLowQuality => '낮음';
+
+  @override
+  String get creationMediumQuality => '보통';
+
+  @override
+  String get creationHighQuality => '높음';
+
+  @override
+  String get creationNegativePrompt => '네거티브 프롬프트';
+
+  @override
+  String get creationSeed => '시드';
+
+  @override
+  String get creationTransparentBackground => '투명 배경';
+
+  @override
+  String get creationOutputFormat => '출력 형식';
+
+  @override
+  String get creationExtraJson => '추가 매개변수 (JSON)';
+
+  @override
+  String get creationExtraJsonHint =>
+      '이 값들은 매 요청마다 전송됩니다. 추가 옵션에서 일시적으로 변경할 수 있습니다.';
+
+  @override
+  String get creationModelKnown =>
+      '기본값은 Kelivo에 내장된 모델 데이터에서 가져옵니다. 변경 사항은 이 모델에만 적용됩니다.';
+
+  @override
+  String get creationModelUnknown =>
+      'Kelivo에 이 모델의 정보가 없어 일반적인 매개변수로 채웠습니다. 공급자 문서를 참고하여 수정할 수 있습니다.';
+
+  @override
+  String get creationMaxPerRequest => '요청당 최대 생성 수';
+
+  @override
+  String get creationMaxPerRequestHelp =>
+      '이 수를 초과하면 여러 요청으로 나뉘며 결과는 같은 그룹에 표시됩니다.';
+
+  @override
+  String get creationReferenceLimit => '참조 이미지';
+
+  @override
+  String get creationReferenceLimitHelp =>
+      '0으로 설정하면 이 모델의 참조 이미지 추가 및 편집 기능이 숨겨집니다.';
+
+  @override
+  String get creationRatioHelp => '생성 페이지에는 선택한 비율만 표시됩니다. 자동을 선택하면 모델이 결정합니다.';
+
+  @override
+  String get creationMediaOther => '기타 옵션';
+
+  @override
+  String get creationEnableOptionHelp => '추가 옵션에 이 컨트롤을 표시합니다.';
+
+  @override
+  String get creationImageTypeHelp => '이미지 모델은 생성 페이지와 이미지 생성 도구에 표시됩니다.';
+
+  @override
+  String get creationVideoTypeHelp => '비디오 모델은 생성 페이지에 표시됩니다.';
+
+  @override
+  String get creationFalKeyHint =>
+      'fal.ai › Dashboard › API Keys에서 키를 생성한 후 여기에 붙여넣으세요';
+
+  @override
+  String get creationFalCatalogHint =>
+      'fal의 모델 목록과 각 모델의 매개변수는 Kelivo에 내장되어 있으며, 가져오기를 하면 제거된 모델이 복원됩니다.';
+
+  @override
+  String get creationFalModelId => '모델 ID';
+
+  @override
+  String get creationOpenAiMediaPaths =>
+      '이미지 /images/generations · 비디오 /videos';
+
+  @override
+  String get creationSelectPlatformImage => '이미지 선택';
+
+  @override
+  String get creationPlatformOptions => '모델별 매개변수';
+
+  @override
+  String get creationParameterRequired => '필수';
+
+  @override
+  String get creationBackground => '배경';
+
+  @override
+  String get creationOpaqueBackground => '불투명';
+
+  @override
+  String get creationTransparentOption => '투명';
+
+  @override
+  String get creationChatModelBadge => '채팅 모델';
+
+  @override
+  String get creationCommonOptions => '공통 옵션';
+
+  @override
+  String get creationNoCommonOptions => '이 모델에는 공통 옵션이 없습니다.';
 }

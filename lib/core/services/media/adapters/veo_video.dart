@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import '../../../providers/settings_provider.dart';
 import '../../api/chat_api_helpers.dart';
 import '../../api/providers/google_vertex.dart';
 import '../media_adapter.dart';
 import '../media_polling.dart';
 import '../media_request.dart';
+import 'google_media_route.dart';
 
 class VeoVideoAdapter implements MediaAdapter {
   const VeoVideoAdapter();
@@ -18,6 +17,8 @@ class VeoVideoAdapter implements MediaAdapter {
       durations: const [4, 6, 8],
       resolutions: const ['720p', '1080p'],
       maxReferences: supportsLast ? 2 : 1,
+      supportsNegativePrompt: true,
+      supportsSeed: true,
       frameRoles: [
         MediaReferenceRole.firstFrame,
         if (supportsLast) MediaReferenceRole.lastFrame,
@@ -36,41 +37,9 @@ class VeoVideoAdapter implements MediaAdapter {
       provider,
       request.modelId,
     ).replaceFirst(RegExp(r'^models/'), '');
-    final String base;
-    final Map<String, String> auth;
-    if (vertex) {
-      final project = _project(provider);
-      final location = (provider.location ?? '').trim();
-      final region = location.isEmpty ? 'us-central1' : location;
-      if (project.isEmpty ||
-          !_resourceSegment.hasMatch(project) ||
-          !_resourceSegment.hasMatch(region)) {
-        throw const MediaFailure(
-          MediaFailureKind.parameters,
-          'Vertex AI needs a project and region',
-        );
-      }
-      final token = (provider.serviceAccountJson ?? '').trim().isEmpty
-          ? context.apiKey
-          : await maybeVertexAccessToken(
-              provider,
-            ).timeout(const Duration(seconds: 45));
-      if (token == null || token.isEmpty) {
-        throw const MediaFailure(
-          MediaFailureKind.login,
-          'Vertex AI credentials unavailable',
-        );
-      }
-      final host = region == 'global'
-          ? 'aiplatform.googleapis.com'
-          : '$region-aiplatform.googleapis.com';
-      base =
-          'https://$host/v1/projects/$project/locations/$region/publishers/google';
-      auth = {'Authorization': 'Bearer $token'};
-    } else {
-      base = provider.baseUrl;
-      auth = {'x-goog-api-key': context.apiKey};
-    }
+    final GoogleMediaRoute(:base, :auth) = await GoogleMediaRoute.resolve(
+      context,
+    );
 
     final first = request.frame(MediaReferenceRole.firstFrame);
     final last = request.frame(MediaReferenceRole.lastFrame);
@@ -97,12 +66,13 @@ class VeoVideoAdapter implements MediaAdapter {
             'resolution': resolution,
           if (request.negativePrompt case final negative?)
             'negativePrompt': negative,
+          if (request.parameters['seed'] case final int seed) 'seed': seed,
         },
       }),
     );
     final operation = requireMediaTaskId(launched['name']);
     final operationParts = operation.split('/');
-    if (!operationParts.every(_resourceSegment.hasMatch)) {
+    if (!operationParts.every(GoogleMediaRoute.segment.hasMatch)) {
       throw const MediaFailure(
         MediaFailureKind.invalidResponse,
         'Invalid Veo task name',
@@ -151,42 +121,22 @@ class VeoVideoAdapter implements MediaAdapter {
         final attachAuth =
             url != null &&
             (vertex ? shouldAttachVertexMediaAuth(url) : url.origin == origin);
-        return MediaResult(
-          mime: 'video/mp4',
-          base64: bytes is String ? bytes : null,
-          url: url,
-          downloadHeaders: attachAuth ? auth : const {},
-          durationMs: videoDurationMs(request.durationSec),
-        );
+        return [
+          MediaResult(
+            mime: 'video/mp4',
+            base64: bytes is String ? bytes : null,
+            url: url,
+            downloadHeaders: attachAuth ? auth : const {},
+            durationMs: videoDurationMs(request.durationSec),
+          ),
+        ];
       },
     );
   }
 
-  static final _resourceSegment = RegExp(r'^[A-Za-z0-9_][A-Za-z0-9_.-]*$');
-
-  static String _project(ProviderConfig provider) {
-    final project = (provider.projectId ?? '').trim();
-    if (project.isNotEmpty) return project;
-    try {
-      if (jsonDecode(provider.serviceAccountJson ?? '') case {
-        'project_id': final String id,
-      }) {
-        return id.trim();
-      }
-    } on FormatException {
-      // Project can also be set explicitly in the provider.
-    }
-    return '';
-  }
-
   static Future<Map<String, String>> _encodedImage(MediaReference image) async {
-    final data = await mediaReferenceDataUri(image);
-    final semicolon = data.indexOf(';');
-    final comma = data.indexOf(',');
-    return {
-      'mimeType': data.substring(5, semicolon),
-      'bytesBase64Encoded': data.substring(comma + 1),
-    };
+    final data = await googleImageInput(image);
+    return {'mimeType': data.mime, 'bytesBase64Encoded': data.base64};
   }
 
   static Uri? _videoUri(Object? value) {

@@ -31673,6 +31673,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Topics {count}'**
   String creationTopicCount(int count);
+
+  /// Tooltip and title for advanced controls in the creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get creationMoreOptions;
+
+  /// Image size control in the creation generation options.
+  ///
+  /// In en, this message translates to:
+  /// **'Image size'**
+  String get creationImageSize;
+
+  /// Image rendering quality control in the creation generation options.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality'**
+  String get creationQuality;
+
+  /// Choice for a low rendering quality in the creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get creationLowQuality;
+
+  /// Choice for medium rendering quality in the creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get creationMediumQuality;
+
+  /// Choice for high rendering quality in the creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get creationHighQuality;
+
+  /// Control for what the user wants to avoid in a generated image or video.
+  ///
+  /// In en, this message translates to:
+  /// **'Negative prompt'**
+  String get creationNegativePrompt;
+
+  /// Numeric seed input for repeatable image or video generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Seed'**
+  String get creationSeed;
+
+  /// Toggle requesting transparency in generated images.
+  ///
+  /// In en, this message translates to:
+  /// **'Transparent background'**
+  String get creationTransparentBackground;
+
+  /// Choice of encoding for the generated image file.
+  ///
+  /// In en, this message translates to:
+  /// **'Output format'**
+  String get creationOutputFormat;
+
+  /// Text field label for a JSON object merged into the provider request.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra parameters (JSON)'**
+  String get creationExtraJson;
+
+  /// Description beneath the model editor's extra JSON input.
+  ///
+  /// In en, this message translates to:
+  /// **'These values are sent with each request. You can override them in More options.'**
+  String get creationExtraJsonHint;
+
+  /// Status banner in the generation options section when Kelivo knows the model schema.
+  ///
+  /// In en, this message translates to:
+  /// **'Defaults come from Kelivo’s built-in model data. Changes apply to this model only.'**
+  String get creationModelKnown;
+
+  /// Status banner for a manually added media model without a built-in schema.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo filled in common parameters. You can adjust them using your provider’s documentation.'**
+  String get creationModelUnknown;
+
+  /// Model editor field for the number of images a single API request can produce.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum per request'**
+  String get creationMaxPerRequest;
+
+  /// Explains automatic batching in the media model options editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Larger batches are split into multiple requests and kept in one group.'**
+  String get creationMaxPerRequestHelp;
+
+  /// Model editor field for the maximum number of input images accepted by this model.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference images'**
+  String get creationReferenceLimit;
+
+  /// Explains the effect of zero reference images in the media model editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Set to zero to hide reference images and editing for this model.'**
+  String get creationReferenceLimitHelp;
+
+  /// Explains the selected aspect ratio choices in the media model editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the ratios available in Create. Auto lets the model decide.'**
+  String get creationRatioHelp;
+
+  /// Heading for the extra capability switches in the media model editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Other options'**
+  String get creationMediaOther;
+
+  /// Supporting text under capability switches when editing a media model.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this control in More options.'**
+  String get creationEnableOptionHelp;
+
+  /// Help under the image model type. Ordinary chat model pickers exclude this model type.
+  ///
+  /// In en, this message translates to:
+  /// **'Image models appear in Create and in the Image Generation tool.'**
+  String get creationImageTypeHelp;
+
+  /// Help under the video model type. Ordinary chat model pickers exclude this model type.
+  ///
+  /// In en, this message translates to:
+  /// **'Video models appear in Create.'**
+  String get creationVideoTypeHelp;
+
+  /// Placeholder in the API key field for the built-in fal provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a key in fal.ai › Dashboard › API Keys'**
+  String get creationFalKeyHint;
+
+  /// Information card above the fal model list on mobile and desktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo includes fal’s models and parameters. Fetch restores removed models.'**
+  String get creationFalCatalogHint;
+
+  /// Placeholder segment in the built-in fal provider's request URL preview.
+  ///
+  /// In en, this message translates to:
+  /// **'model ID'**
+  String get creationFalModelId;
+
+  /// Additional endpoint hint under the API base URL in OpenAI-compatible provider settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Image /images/generations · Video /videos'**
+  String get creationOpenAiMediaPaths;
+
+  /// Button for the provider-specific file parameter in More options.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose image'**
+  String get creationSelectPlatformImage;
+
+  /// Section label for the schema-driven options in the creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Model-specific options'**
+  String get creationPlatformOptions;
+
+  /// Label for a provider-specific field that must be filled before generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get creationParameterRequired;
+
+  /// Background choice group for image generation in the composer More options panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Background'**
+  String get creationBackground;
+
+  /// Choice requesting an opaque background for a generated image.
+  ///
+  /// In en, this message translates to:
+  /// **'Opaque'**
+  String get creationOpaqueBackground;
+
+  /// Choice requesting a transparent background for a generated image.
+  ///
+  /// In en, this message translates to:
+  /// **'Transparent'**
+  String get creationTransparentOption;
+
+  /// Badge in the Create model picker for a chat model that also generates images.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat model'**
+  String get creationChatModelBadge;
+
+  /// Heading above the shared provider-independent controls in the composer More options panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Common options'**
+  String get creationCommonOptions;
+
+  /// Message under Common options in the composer when the current model exposes only model-specific or JSON options.
+  ///
+  /// In en, this message translates to:
+  /// **'This model has no common options.'**
+  String get creationNoCommonOptions;
 }
 
 class _AppLocalizationsDelegate

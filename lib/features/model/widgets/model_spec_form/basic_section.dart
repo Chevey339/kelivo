@@ -37,13 +37,17 @@ class BasicSection extends StatelessWidget {
           explicitType: controller.config.providerType,
         );
         final types = [
-          ModelType.chat,
-          ModelType.embedding,
+          if (!controller.config.isFal) ...[
+            ModelType.chat,
+            ModelType.embedding,
+          ],
           if (kind != ProviderKind.claude || spec.type.isMedia) ...[
             ModelType.image,
             ModelType.video,
           ],
         ];
+        if (!types.contains(spec.type)) types.add(spec.type);
+        final media = spec.type.isMedia;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -84,7 +88,12 @@ class BasicSection extends StatelessWidget {
             const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelDetailSheetModelTypeLabel,
-              source: controller.sourceOf(ModelSpecField.type),
+              source:
+                  media &&
+                      controller.hasMediaModelData &&
+                      !controller.isOverridden(ModelSpecField.type)
+                  ? SpecSource.catalog
+                  : controller.sourceOf(ModelSpecField.type),
               overridden: controller.isOverridden(ModelSpecField.type),
               onReset: () => controller.reset(ModelSpecField.type),
             ),
@@ -107,6 +116,19 @@ class BasicSection extends StatelessWidget {
                 onChanged: (index) => controller.setType(types[index]),
               ),
             ),
+            if (media)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Text(
+                  spec.type == ModelType.video
+                      ? l10n.creationVideoTypeHelp
+                      : l10n.creationImageTypeHelp,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
           ],
         );
       },
