@@ -1,3 +1,4 @@
+import 'creation_reference_actions.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
 
@@ -575,11 +576,11 @@ class _CreationArtworkTileState extends State<CreationArtworkTile> {
                                       button(
                                         LucideIcons.imagePlus,
                                         l10n.creationUseReference,
-                                        () => addCreationArtworkReference(
+                                        () => addCreationReferences(
                                           context,
                                           media,
-                                          item,
                                           widget.draftTopicId,
+                                          [item.path],
                                         ),
                                       ),
                                     Builder(

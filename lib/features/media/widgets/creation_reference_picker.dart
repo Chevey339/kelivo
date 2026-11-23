@@ -421,7 +421,7 @@ class _RecentImagesState extends State<_RecentImages> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 9),
           child: Text(
-            frame ?? l10n.creationReferenceLimitReached(widget.limit),
+            frame ?? l10n.creationReferenceSlotsAvailable(widget.limit),
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
         ),
@@ -438,6 +438,7 @@ class _RecentImagesState extends State<_RecentImages> {
               : _images.isEmpty
               ? Center(child: Text(l10n.creationRecentEmpty))
               : GridView.builder(
+                  padding: EdgeInsets.zero,
                   controller: _scroll,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: widget.desktop ? 5 : 3,
@@ -599,7 +600,9 @@ class _RecentImagesState extends State<_RecentImages> {
           children: [
             Expanded(
               child: Text(
-                l10n.creationSelectedImages(_selected.length),
+                _selected.isEmpty
+                    ? l10n.creationTapToSelect
+                    : l10n.creationSelectedImages(_selected.length),
                 style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
               ),
             ),

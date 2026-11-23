@@ -10,6 +10,7 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/database/business_settings_router.dart';
 import '../../../core/models/media_creation.dart';
 import '../../../core/models/model_spec.dart';
+import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/media/media_adapter_resolver.dart';
@@ -18,6 +19,14 @@ import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/storage/attachment_file_lock.dart';
+
+enum CreationReferenceResult {
+  added,
+  alreadyAdded,
+  limitReached,
+  unsupported,
+  empty,
+}
 
 class CreationDraft {
   const CreationDraft({
@@ -503,28 +512,51 @@ class MediaCreationController extends ChangeNotifier {
     return refs.any((ref) => ref.role == MediaReferenceRole.firstFrame);
   }
 
-  int addReferencePaths(
+  CreationReferenceResult addReferencePaths(
     String? topicId,
     List<String> paths, {
     MediaReferenceRole? frameRole,
   }) {
+    if (paths.isEmpty) return CreationReferenceResult.empty;
     final caps = model?.capabilities;
-    if (caps == null || paths.isEmpty) return 0;
+    if (caps == null) return CreationReferenceResult.unsupported;
     if (mode == MediaMode.video) {
       final role = frameRole ?? MediaReferenceRole.firstFrame;
-      if (!caps.frameRoles.contains(role)) return 0;
+      if (!caps.frameRoles.contains(role)) {
+        return CreationReferenceResult.unsupported;
+      }
+      final current = frame(topicId, role);
+      if (showsFrames(topicId) &&
+          current != null &&
+          SandboxPathResolver.dedupeKey(current.path) ==
+              SandboxPathResolver.dedupeKey(paths.first)) {
+        return CreationReferenceResult.alreadyAdded;
+      }
       setFrame(topicId, role, paths.first);
-      return 1;
+      return CreationReferenceResult.added;
     }
+    if (caps.maxReferences == 0) return CreationReferenceResult.unsupported;
     final existing = imageReferences(topicId);
-    final seen = existing.map((ref) => ref.path).toSet();
-    final choices = paths
-        .where(seen.add)
-        .take((caps.maxReferences - existing.length).clamp(0, 16))
+    final seen = existing
+        .map((ref) => SandboxPathResolver.dedupeKey(ref.path))
+        .toSet();
+    final unique = paths
+        .where((path) => seen.add(SandboxPathResolver.dedupeKey(path)))
         .toList();
-    if (choices.isEmpty) return 0;
-    setReferences(topicId, [...existing, ...choices.map(MediaReference.new)]);
-    return choices.length;
+    if (unique.isEmpty) return CreationReferenceResult.alreadyAdded;
+    final available = (caps.maxReferences - existing.length).clamp(
+      0,
+      caps.maxReferences,
+    );
+    if (available > 0) {
+      setReferences(topicId, [
+        ...existing,
+        ...unique.take(available).map(MediaReference.new),
+      ]);
+    }
+    return unique.length > available
+        ? CreationReferenceResult.limitReached
+        : CreationReferenceResult.added;
   }
 
   void suggestPrompt(String? topicId, String prompt) {

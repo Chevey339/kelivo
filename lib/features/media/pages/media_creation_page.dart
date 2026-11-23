@@ -1,3 +1,4 @@
+import '../widgets/creation_reference_actions.dart';
 import 'dart:async';
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -10,7 +11,6 @@ import '../../../core/models/media_creation.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
-import '../widgets/creation_toast.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/thinking_sheen.dart';
@@ -481,15 +481,7 @@ class _CreationComposerStackState extends State<CreationComposerStack> {
           details.files.map((file) => file.path),
         );
         if (paths.isEmpty) return;
-        final added = media.addReferencePaths(widget.topicId, paths);
-        showCreationToast(
-          context,
-          message: added > 0
-              ? l10n.creationReferenceAdded
-              : l10n.creationReferenceLimitReached(
-                  media.model?.capabilities.maxReferences ?? 0,
-                ),
-        );
+        addCreationReferences(context, media, widget.topicId, paths);
       },
       child: stack,
     );

@@ -12,6 +12,7 @@ import 'package:Kelivo/core/services/media/media_file_store.dart';
 import 'package:Kelivo/core/services/media/media_generation_runner.dart';
 import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:Kelivo/desktop/desktop_media_creation_page.dart';
+import 'package:Kelivo/desktop/hotkeys/chat_action_bus.dart';
 import 'package:Kelivo/features/chat/widgets/chat_creation_images.dart';
 import 'package:Kelivo/features/media/pages/media_creation_page.dart';
 import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
@@ -328,96 +329,7 @@ void main() {
       tester.view.physicalSize = const Size(1280, 820);
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetPhysicalSize);
-      final (harness, settings, runner, controller, folder) = (await tester
-          .runAsync(() async {
-            final harness = await BusinessTestHarness.create();
-            final settings = SettingsProvider(harness.preferences);
-            await settings.loaded;
-            await settings.setProviderConfig(_provider.id, _provider);
-            final repository = MediaRepository(harness.database);
-            final runner = MediaGenerationRunner(
-              repository: repository,
-              files: const MediaFileStore(),
-            );
-            await runner.initialized;
-            final folder = await Directory.systemTemp.createTemp(
-              'creation-gallery-test',
-            );
-            final file = await File(
-              '${folder.path}/result.png',
-            ).writeAsBytes(image.encodePng(image.Image(width: 30, height: 30)));
-            final created = DateTime(2025, 1, 2);
-            await repository.enqueue(
-              GenerationBatchRowsCompanion.insert(
-                id: 'batch',
-                topicId: const Value('topic'),
-                providerId: _provider.id,
-                modelId: _model,
-                mode: MediaMode.image,
-                prompt: 'A wide mountain lake',
-                paramsJson: '{}',
-                referencesJson: '[]',
-                status: GenerationStatus.succeeded,
-                source: GenerationSource.workbench,
-                createdAt: created,
-              ),
-              topic: GenerationTopicRowsCompanion.insert(
-                id: 'topic',
-                title: 'Mountain trip',
-                titleSource: GenerationTitleSource.manual,
-                createdAt: created,
-                updatedAt: created,
-              ),
-            );
-            for (var index = 0; index < 2; index++) {
-              await harness.database
-                  .into(harness.database.generationItemRows)
-                  .insert(
-                    GenerationItemRowsCompanion.insert(
-                      id: 'image-$index',
-                      batchId: 'batch',
-                      ordinal: index,
-                      mode: MediaMode.image,
-                      path: file.path,
-                      mime: 'image/png',
-                      byteSize: await file.length(),
-                      status: GenerationItemStatus.ready,
-                      createdAt: created,
-                    ),
-                  );
-            }
-            final controller = MediaCreationController(
-              runner: runner,
-              settings: settings,
-              preferences: harness.preferences,
-            );
-            await repository.watchItems().first;
-            return (harness, settings, runner, controller, folder);
-          }))!;
-      addTearDown(() async {
-        controller.dispose();
-        settings.dispose();
-        await runner.shutdown();
-        runner.dispose();
-        await harness.close();
-        await folder.delete(recursive: true);
-      });
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-            ChangeNotifierProvider<MediaCreationController>.value(
-              value: controller,
-            ),
-          ],
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            locale: const Locale('en'),
-            home: const DesktopMediaCreationPage(),
-          ),
-        ),
-      );
+      await _pumpCreationGallery(tester, desktop: true);
       await tester.tap(find.text('All creations'));
       await tester.pumpAndSettle();
       expect(find.byType(CreationArtworkTile), findsNWidgets(2));
@@ -473,6 +385,106 @@ void main() {
       expect(opacity(), 0);
       expect(tester.getRect(tile), tileBounds);
       await mouse.removePointer();
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'single artwork lightbox returns a reference to its ${desktop ? 'desktop' : 'mobile'} topic draft',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = desktop
+            ? const Size(1280, 820)
+            : const Size(390, 844);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        final media = await _pumpCreationGallery(
+          tester,
+          desktop: desktop,
+          count: 1,
+        );
+        await tester.tap(find.text('Mountain trip').first);
+        await tester.pumpAndSettle();
+        final tile = find.byType(CreationArtworkTile).first;
+        await tester.tap(tile);
+        await tester.pumpAndSettle();
+        expect(find.text('1 / 1'), findsOneWidget);
+        final thumbnail = find.bySemanticsLabel('Tab 1 of 1');
+        expect(thumbnail, findsOneWidget);
+        if (desktop) {
+          expect(find.byTooltip('Previous creation'), findsOneWidget);
+          expect(find.byTooltip('Next creation'), findsOneWidget);
+        } else {
+          expect(tester.getTopLeft(thumbnail).dx, 16);
+        }
+        await tester.tap(find.byTooltip('More').hitTestable().last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Use as reference'));
+        await tester.pumpAndSettle();
+        expect(find.text('1 / 1'), findsNothing);
+        expect(media.imageReferences('topic'), hasLength(1));
+        final path = media.imageReferences('topic').single.path;
+        expect(
+          media.addReferencePaths('topic', [path]),
+          CreationReferenceResult.alreadyAdded,
+        );
+        expect(media.imageReferences(null), isEmpty);
+        final remove = find.byTooltip('Delete');
+        if (desktop) {
+          final mouse = await tester.createGesture(
+            kind: PointerDeviceKind.mouse,
+          );
+          final ref = find.byKey(ValueKey(path));
+          await mouse.addPointer(location: const Offset(0, 0));
+          await mouse.moveTo(tester.getCenter(ref));
+          await tester.pumpAndSettle();
+          final position = tester.getCenter(remove.hitTestable().last);
+          await mouse.moveTo(position);
+          await mouse.down(position);
+          await mouse.up();
+          await mouse.removePointer();
+        } else {
+          await tester.tap(remove.hitTestable().last);
+        }
+        await tester.pumpAndSettle();
+        expect(media.imageReferences('topic'), isEmpty);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets(
+    'mobile lightbox follows a horizontal swipe and a downward dismissal',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      await _pumpCreationGallery(tester, desktop: false);
+      await tester.tap(find.text('Mountain trip').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(CreationArtworkTile).first);
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 2'), findsOneWidget);
+      final viewport = find.byType(InteractiveViewer);
+      final drag = await tester.startGesture(tester.getCenter(viewport));
+      await drag.moveBy(const Offset(-30, 0));
+      await tester.pump();
+      await drag.moveBy(const Offset(-95, 0));
+      await tester.pumpAndSettle();
+      final chrome = find.ancestor(
+        of: find.text('1 / 2'),
+        matching: find.byType(AnimatedOpacity),
+      );
+      expect(tester.widget<AnimatedOpacity>(chrome.first).opacity, 0);
+      await drag.up();
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 2'), findsOneWidget);
+      await tester.drag(viewport, const Offset(0, 170));
+      await tester.pumpAndSettle();
+      expect(viewport, findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
@@ -644,6 +656,25 @@ void main() {
           expect(find.text('Image created'), findsNothing);
         }
         expect(images, findsNWidgets(chat ? 1 : 3));
+        if (chat) {
+          final events = <CreationChatAction>[];
+          final subscription = ChatActionBus.instance.creationStream.listen(
+            events.add,
+          );
+          addTearDown(subscription.cancel);
+          final path = tester.widget<CreationFileImage>(images.first).path;
+          await tester.tap(images.first);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('More').hitTestable().last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Use as reference'));
+          await tester.pumpAndSettle();
+          expect(
+            events.whereType<PrefillChatImage>().single.path,
+            SandboxPathResolver.resolveForIo(path),
+          );
+          expect(controller.imageReferences(null), isEmpty);
+        }
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
@@ -773,4 +804,106 @@ void main() {
       },
     );
   }
+}
+
+Future<MediaCreationController> _pumpCreationGallery(
+  WidgetTester tester, {
+  required bool desktop,
+  int count = 2,
+}) async {
+  final (harness, settings, runner, controller, folder) = (await tester
+      .runAsync(() async {
+        final harness = await BusinessTestHarness.create();
+        final settings = SettingsProvider(harness.preferences);
+        await settings.loaded;
+        await settings.setProviderConfig(_provider.id, _provider);
+        final repository = MediaRepository(harness.database);
+        final runner = MediaGenerationRunner(
+          repository: repository,
+          files: const MediaFileStore(),
+        );
+        await runner.initialized;
+        final folder = await Directory.systemTemp.createTemp(
+          'creation-gallery-test',
+        );
+        final file = await File(
+          '${folder.path}/result.png',
+        ).writeAsBytes(image.encodePng(image.Image(width: 30, height: 30)));
+        final created = DateTime(2025, 1, 2);
+        await repository.enqueue(
+          GenerationBatchRowsCompanion.insert(
+            id: 'batch',
+            topicId: const Value('topic'),
+            providerId: _provider.id,
+            modelId: _model,
+            mode: MediaMode.image,
+            prompt: 'A wide mountain lake',
+            paramsJson: '{}',
+            referencesJson: '[]',
+            status: GenerationStatus.succeeded,
+            source: GenerationSource.workbench,
+            createdAt: created,
+          ),
+          topic: GenerationTopicRowsCompanion.insert(
+            id: 'topic',
+            title: 'Mountain trip',
+            titleSource: GenerationTitleSource.manual,
+            createdAt: created,
+            updatedAt: created,
+          ),
+        );
+        for (var index = 0; index < count; index++) {
+          await harness.database
+              .into(harness.database.generationItemRows)
+              .insert(
+                GenerationItemRowsCompanion.insert(
+                  id: 'image-$index',
+                  batchId: 'batch',
+                  ordinal: index,
+                  mode: MediaMode.image,
+                  width: const Value(30),
+                  height: const Value(30),
+                  path: file.path,
+                  mime: 'image/png',
+                  byteSize: await file.length(),
+                  status: GenerationItemStatus.ready,
+                  createdAt: created,
+                ),
+              );
+        }
+        final controller = MediaCreationController(
+          runner: runner,
+          settings: settings,
+          preferences: harness.preferences,
+        );
+        await repository.watchItems().first;
+        return (harness, settings, runner, controller, folder);
+      }))!;
+  addTearDown(() async {
+    controller.dispose();
+    settings.dispose();
+    await runner.shutdown();
+    runner.dispose();
+    await harness.close();
+    await folder.delete(recursive: true);
+  });
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+        ChangeNotifierProvider<MediaCreationController>.value(
+          value: controller,
+        ),
+      ],
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('en'),
+        home: desktop
+            ? const DesktopMediaCreationPage()
+            : MediaCreationPage(onOpenDrawer: () {}),
+      ),
+    ),
+  );
+  return controller;
 }

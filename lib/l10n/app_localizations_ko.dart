@@ -17793,6 +17793,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationReferenceAdded => '참조에 추가됨';
 
   @override
+  String get creationReferenceAlreadyAdded => '이미 참조에 추가됨';
+
+  @override
   String creationReferenceLimitReached(int count) {
     return '이 모델은 최대 $count개의 참조 이미지를 지원합니다.';
   }
@@ -17811,6 +17814,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get creationRecentCreation => '창작';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return '최대 $count개 더 선택 가능';
+  }
+
+  @override
+  String get creationTapToSelect => '이미지를 탭하여 선택하세요';
 
   @override
   String creationSelectedImages(int count) {
@@ -17851,6 +17862,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get creationEditStarted => '편집이 시작되었습니다. 결과는 이 주제 하단에 표시됩니다.';
+
+  @override
+  String get creationEditedResult => '편집 결과';
 
   @override
   String get creationEditedFrom => '편집 원본';

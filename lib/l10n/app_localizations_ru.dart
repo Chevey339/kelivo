@@ -18679,6 +18679,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationReferenceAdded => 'Добавлено в референсы';
 
   @override
+  String get creationReferenceAlreadyAdded => 'Уже в ваших референсах';
+
+  @override
   String creationReferenceLimitReached(int count) {
     return 'Эта модель принимает до $count референсных изображений.';
   }
@@ -18697,6 +18700,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get creationRecentCreation => 'Создание';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return 'Можно выбрать ещё до $count';
+  }
+
+  @override
+  String get creationTapToSelect => 'Нажмите на изображение, чтобы выбрать его';
 
   @override
   String creationSelectedImages(int count) {
@@ -18740,6 +18751,9 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get creationEditStarted =>
       'Редактирование начато. Результат появится внизу этой темы.';
+
+  @override
+  String get creationEditedResult => 'Изменённый результат';
 
   @override
   String get creationEditedFrom => 'Отредактировано из';

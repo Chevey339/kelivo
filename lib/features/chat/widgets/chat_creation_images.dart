@@ -494,6 +494,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
                   context,
                   item,
                   desktop: desktop,
+                  fromChat: true,
                   gallery: [
                     for (final value in slots)
                       if (value.item case final artwork?) artwork,

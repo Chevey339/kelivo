@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 
 import '../../../icons/lucide_adapter.dart';
@@ -39,7 +40,12 @@ class CreationSurface extends StatelessWidget {
         ),
         child: IconTheme(
           data: IconThemeData(color: cs.onSurface, size: 18),
-          child: ColoredBox(color: cs.surface, child: child),
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: theme.brightness == Brightness.dark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark,
+            child: ColoredBox(color: cs.surface, child: child),
+          ),
         ),
       ),
     );

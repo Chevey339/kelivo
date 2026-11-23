@@ -18355,6 +18355,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creationReferenceAdded => 'Added to references';
 
   @override
+  String get creationReferenceAlreadyAdded => 'Already in your references';
+
+  @override
   String creationReferenceLimitReached(int count) {
     return 'This model accepts up to $count reference images.';
   }
@@ -18373,6 +18376,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get creationRecentCreation => 'Create';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return 'Choose up to $count more';
+  }
+
+  @override
+  String get creationTapToSelect => 'Tap an image to select it';
 
   @override
   String creationSelectedImages(int count) {
@@ -18416,6 +18427,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get creationEditStarted =>
       'Editing started. The result will appear at the bottom of this topic.';
+
+  @override
+  String get creationEditedResult => 'Edited result';
 
   @override
   String get creationEditedFrom => 'Edited from';

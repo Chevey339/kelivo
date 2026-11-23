@@ -17325,6 +17325,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationReferenceAdded => '已添加为参考图';
 
   @override
+  String get creationReferenceAlreadyAdded => '所选图片已经在参考图里了';
+
+  @override
   String creationReferenceLimitReached(int count) {
     return '当前模型最多支持 $count 张参考图。';
   }
@@ -17342,6 +17345,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get creationRecentCreation => '创作';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return '还可以选择 $count 张参考图';
+  }
+
+  @override
+  String get creationTapToSelect => '点图片选择';
 
   @override
   String creationSelectedImages(int count) {
@@ -17382,6 +17393,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get creationEditStarted => '已开始编辑，结果会出现在这个话题底部。';
+
+  @override
+  String get creationEditedResult => '编辑结果';
 
   @override
   String get creationEditedFrom => '编辑自';
@@ -35049,6 +35063,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get creationReferenceAdded => '已添加为参考图';
 
   @override
+  String get creationReferenceAlreadyAdded => '所选图片已经在参考图里了';
+
+  @override
   String creationReferenceLimitReached(int count) {
     return '当前模型最多支持 $count 张参考图。';
   }
@@ -35066,6 +35083,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationRecentCreation => '创作';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return '还可以选择 $count 张参考图';
+  }
+
+  @override
+  String get creationTapToSelect => '点图片选择';
 
   @override
   String creationSelectedImages(int count) {
@@ -35106,6 +35131,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationEditStarted => '已开始编辑，结果会出现在这个话题底部。';
+
+  @override
+  String get creationEditedResult => '编辑结果';
 
   @override
   String get creationEditedFrom => '编辑自';
@@ -52824,6 +52852,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationReferenceAdded => '已新增為參考圖';
 
   @override
+  String get creationReferenceAlreadyAdded => '所選圖片已在參考圖中';
+
+  @override
   String creationReferenceLimitReached(int count) {
     return '目前模型最多支援 $count 張參考圖。';
   }
@@ -52841,6 +52872,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationRecentCreation => '創作';
+
+  @override
+  String creationReferenceSlotsAvailable(int count) {
+    return '還可選擇 $count 張參考圖';
+  }
+
+  @override
+  String get creationTapToSelect => '點選圖片即可選取';
 
   @override
   String creationSelectedImages(int count) {
@@ -52881,6 +52920,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationEditStarted => '已開始編輯，結果會出現在這個話題底部。';
+
+  @override
+  String get creationEditedResult => '編輯結果';
 
   @override
   String get creationEditedFrom => '編輯自';

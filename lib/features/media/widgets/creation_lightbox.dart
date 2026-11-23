@@ -1,3 +1,4 @@
+import 'creation_reference_actions.dart';
 import 'creation_menu.dart';
 import 'creation_controls.dart';
 import 'creation_picker.dart';
@@ -33,6 +34,7 @@ import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../providers/media_creation_controller.dart';
+import '../../provider/widgets/provider_avatar.dart';
 import 'creation_video_player.dart';
 
 typedef OpenCreationTopic = void Function(String topicId, String batchId);
@@ -46,6 +48,7 @@ Future<void> showCreationLightbox(
   String? draftTopicId,
   OpenCreationTopic? onOpenTopic,
   bool startEditing = false,
+  bool fromChat = false,
 }) async {
   final media = context.read<MediaCreationController>();
   if (SandboxPathResolver.resolveForIo(item.path) == null) {
@@ -81,6 +84,7 @@ Future<void> showCreationLightbox(
             draftTopicId: draftTopicId,
             canOpenTopic: gallery != null && onOpenTopic != null,
             startEditing: startEditing,
+            fromChat: fromChat,
           ),
           transitionsBuilder: (_, animation, _, child) =>
               FadeTransition(opacity: animation, child: child),
@@ -99,13 +103,14 @@ class _CreationLightbox extends StatefulWidget {
     required this.desktop,
     required this.canOpenTopic,
     required this.startEditing,
+    required this.fromChat,
     this.draftTopicId,
   });
 
   final GenerationItemRow item;
   final List<GenerationItemRow> deck;
   final MediaCreationController controller;
-  final bool desktop, canOpenTopic, startEditing;
+  final bool desktop, canOpenTopic, startEditing, fromChat;
   final String? draftTopicId;
 
   @override
@@ -139,7 +144,7 @@ class _CreationLightboxState extends State<_CreationLightbox>
   bool _editing = false;
   Offset _dragStart = Offset.zero;
   Offset _dragOffset = Offset.zero;
-  double _swipeX = 0;
+  bool _trackingPage = false;
 
   @override
   void initState() {
@@ -174,9 +179,11 @@ class _CreationLightboxState extends State<_CreationLightbox>
   void _scrollThumb({bool animated = true}) {
     if (!_thumbs.hasClients) return;
     final side = desktop ? 48.0 : 44.0;
-    var center = 14 + side / 2;
+    var center = (desktop ? 14 : 16) + side / 2;
     for (var i = 0; i < _index; i++) {
-      center += side + (_deck[i].batchId == _deck[i + 1].batchId ? 5 : 13);
+      center +=
+          side +
+          (_deck[i].batchId == _deck[i + 1].batchId ? (desktop ? 8 : 6) : 13);
     }
     final target = (center - _thumbs.position.viewportDimension / 2).clamp(
       0.0,
@@ -303,69 +310,114 @@ class _CreationLightboxState extends State<_CreationLightbox>
       final l10n = AppLocalizations.of(context)!;
       final editModel = _media.editingModel(item);
       void favorite() => toggleCreationArtworkFavorite(context, _media, item);
+      Widget chrome(Widget child) => desktop
+          ? child
+          : IgnorePointer(
+              ignoring: _dragOffset != Offset.zero,
+              child: AnimatedOpacity(
+                opacity: _dragOffset == Offset.zero ? 1 : 0,
+                duration: handoffDuration(context, 160),
+                child: child,
+              ),
+            );
       final stage = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _header(context, item, batch, editModel, favorite),
+          chrome(
+            LayoutBuilder(
+              builder: (context, constraints) => _header(
+                context,
+                item,
+                batch,
+                editModel,
+                favorite,
+                constraints.maxWidth,
+              ),
+            ),
+          ),
           Expanded(child: _canvas(context, item)),
-          if (!desktop && batch != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(15, 3, 15, 8),
-              child: Text(
-                batch.prompt,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-            ),
-          if (_deck.length > 1) _thumbnailStrip(),
-          if (desktop && _deck.length > 1)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 7),
-              child: _counter(),
-            ),
-          if (!desktop)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(6, 4, 6, 7),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _mobileAction(
-                    item.favorite ? LucideIcons.starOff : LucideIcons.star,
-                    item.favorite
-                        ? l10n.creationUnfavorite
-                        : l10n.creationFavorite,
-                    favorite,
-                  ),
-                  _mobileAction(
-                    Lucide.Download,
-                    item.mode == MediaMode.image
-                        ? l10n.creationSaveImage
-                        : l10n.creationSaveVideo,
-                    () => saveCreationArtwork(context, item, desktop: false),
-                  ),
-                  _mobileAction(
-                    Lucide.Share,
-                    l10n.creationShare,
-                    () => shareCreationArtwork(context, item),
-                  ),
-                  if (editModel != null)
-                    _mobileAction(
-                      Lucide.Pencil,
-                      l10n.creationEditImage,
-                      _toggleEdit,
+          chrome(
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: desktop
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.stretch,
+              children: [
+                if (!desktop && batch != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+                    child: Text(
+                      batch.prompt,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        height: 1.55,
+                      ),
                     ),
-                  if (item.mode == MediaMode.image)
-                    _mobileAction(
-                      LucideIcons.send,
-                      l10n.creationSendToChat,
-                      () {
-                        Navigator.of(context).pop();
-                        _sendArtworkToChat(context, item);
-                      },
+                  ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: desktop ? 4 : 8),
+                  child: _thumbnailStrip(),
+                ),
+                if (desktop)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 18),
+                    child: _counter(),
+                  ),
+                if (!desktop)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _mobileAction(
+                          item.favorite
+                              ? LucideIcons.starOff
+                              : LucideIcons.star,
+                          item.favorite
+                              ? l10n.creationUnfavorite
+                              : l10n.creationFavorite,
+                          favorite,
+                        ),
+                        _mobileAction(
+                          Lucide.Download,
+                          item.mode == MediaMode.image
+                              ? l10n.creationSaveImage
+                              : l10n.creationSaveVideo,
+                          () => saveCreationArtwork(
+                            context,
+                            item,
+                            desktop: false,
+                          ),
+                        ),
+                        _mobileAction(
+                          Lucide.Share,
+                          l10n.creationShare,
+                          () => shareCreationArtwork(context, item),
+                        ),
+                        if (editModel != null)
+                          _mobileAction(
+                            Lucide.Pencil,
+                            l10n.creationEditImage,
+                            _toggleEdit,
+                          ),
+                        if (item.mode == MediaMode.image)
+                          _mobileAction(
+                            LucideIcons.send,
+                            l10n.creationSendToChat,
+                            () {
+                              Navigator.of(context).pop();
+                              _sendArtworkToChat(context, item);
+                            },
+                          ),
+                      ],
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
+          ),
         ],
       );
       final narrow = MediaQuery.sizeOf(context).width < 960;
@@ -461,19 +513,26 @@ class _CreationLightboxState extends State<_CreationLightbox>
     },
   );
 
-  Widget _icon(IconData icon, String label, VoidCallback? onTap) =>
-      IosIconButton(
-        icon: icon,
-        tooltip: label,
-        color: Colors.white,
-        size: 17,
-        minSize: 34,
-        onTap: onTap,
-      );
+  Widget _icon(
+    IconData icon,
+    String label,
+    VoidCallback? onTap, {
+    Color color = Colors.white,
+  }) => IosIconButton(
+    icon: icon,
+    tooltip: label,
+    color: color,
+    size: 17,
+    minSize: 34,
+    onTap: onTap,
+  );
 
   Widget _counter() => Text(
     '${_index + 1} / ${_deck.length}',
-    style: const TextStyle(color: Colors.white70, fontSize: 12),
+    style: TextStyle(
+      color: desktop ? Colors.white54 : Colors.white70,
+      fontSize: desktop ? 12 : 14,
+    ),
   );
 
   Widget _header(
@@ -482,6 +541,7 @@ class _CreationLightboxState extends State<_CreationLightbox>
     GenerationBatchRow? batch,
     MediaModelChoice? editModel,
     VoidCallback favorite,
+    double availableWidth,
   ) {
     final l10n = AppLocalizations.of(context)!;
     final topicId = batch?.topicId;
@@ -500,7 +560,10 @@ class _CreationLightboxState extends State<_CreationLightbox>
       );
     }
 
-    final compactTools = desktop && MediaQuery.sizeOf(context).width < 680;
+    final toolbarScale = MediaQuery.textScalerOf(context).scale(13) / 13;
+    final compactTools =
+        desktop &&
+        (availableWidth < 680 || availableWidth / toolbarScale < 680);
     final close = _icon(
       Lucide.X,
       MaterialLocalizations.of(context).closeButtonTooltip,
@@ -533,6 +596,23 @@ class _CreationLightboxState extends State<_CreationLightbox>
               draftTopicId: widget.draftTopicId,
               includePrimary: compactTools,
               onEdit: _toggleEdit,
+              onUseAsReference: () {
+                if (widget.fromChat) {
+                  Navigator.of(context).pop();
+                  _sendArtworkToChat(context, item);
+                  return;
+                }
+                final result = addCreationReferences(
+                  context,
+                  _media,
+                  widget.draftTopicId,
+                  [item.path],
+                );
+                if (result == CreationReferenceResult.added ||
+                    result == CreationReferenceResult.alreadyAdded) {
+                  Navigator.of(context).pop();
+                }
+              },
               onDelete: () => _delete(item),
               onSendToChat: () {
                 Navigator.of(context).pop();
@@ -560,76 +640,98 @@ class _CreationLightboxState extends State<_CreationLightbox>
     final topic = topicId == null ? null : _media.topic(topicId);
     final ratio = _readRatio(batch);
     if (compactTools) {
-      return Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(
-          Platform.isMacOS ? 75 : 8,
-          8,
-          8,
-          0,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                batch?.prompt ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 13.5),
+      return ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(
+            Platform.isMacOS ? 75 : 8,
+            8,
+            8,
+            0,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  batch?.prompt ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                ),
               ),
-            ),
-            if (editModel != null)
-              _icon(Lucide.Pencil, l10n.creationEditImage, _toggleEdit),
-            menu,
-            close,
-          ],
+              _toolCapsule([
+                if (editModel != null)
+                  _icon(Lucide.Pencil, l10n.creationEditImage, _toggleEdit),
+                menu,
+              ]),
+              const SizedBox(width: 8),
+              _toolCapsule([close]),
+            ],
+          ),
         ),
       );
     }
+    final material = MaterialLocalizations.of(context);
     final captions = [
       if (topic != null) topic.title,
       if (conversation != null) l10n.creationChatSource(conversation.title),
       if (batch != null) batch.modelId,
-      if (ratio != 'auto') ratio,
+      ratio != 'auto' ? ratio : _artworkRatio(item, l10n),
+      if (batch != null) material.formatCompactDate(batch.createdAt),
       if (batch != null)
-        MaterialLocalizations.of(context).formatCompactDate(batch.createdAt),
-      if (batch?.source == GenerationSource.edit) l10n.creationEditImage,
+        material.formatTimeOfDay(TimeOfDay.fromDateTime(batch.createdAt)),
+      if (batch?.source == GenerationSource.edit) l10n.creationEditedResult,
     ];
-    return Padding(
-      padding: EdgeInsets.fromLTRB(Platform.isMacOS ? 90 : 12, 8, 12, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  batch?.prompt ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13.5,
-                    fontWeight: AppFontWeights.semibold,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(Platform.isMacOS ? 90 : 20, 10, 14, 0),
+        child: Row(
+          spacing: 12,
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    batch?.prompt ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
                   ),
-                ),
-                Text(
-                  captions.join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white54, fontSize: 11.5),
-                ),
-              ],
+                  Row(
+                    children: [
+                      if (batch != null) ...[
+                        ProviderAvatar(
+                          providerKey: batch.providerId,
+                          displayName: batch.providerId,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      Expanded(
+                        child: Text(
+                          captions.join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xf2303032),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: Row(
-              children: [
+            if (jump || jumpToChat)
+              _toolCapsule([
                 if (jump)
                   Tooltip(
                     message: l10n.creationShowInTopic,
@@ -647,226 +749,301 @@ class _CreationLightboxState extends State<_CreationLightbox>
                     l10n.creationShowInConversation,
                     openChat,
                   ),
-                if (editModel != null)
-                  CreationAction(
-                    small: true,
-                    pill: true,
-                    fill: _editing ? Colors.white : Colors.transparent,
-                    foreground: _editing ? Colors.black : Colors.white,
-                    icon: const Icon(Lucide.Pencil, size: 14),
-                    onPressed: _toggleEdit,
-                    child: Text(l10n.creationEditImage),
-                  ),
-                _icon(
-                  item.favorite ? LucideIcons.starOff : LucideIcons.star,
-                  item.favorite
-                      ? l10n.creationUnfavorite
-                      : l10n.creationFavorite,
-                  favorite,
+              ]),
+            _toolCapsule([
+              if (editModel != null)
+                CreationAction(
+                  small: true,
+                  pill: true,
+                  fill: _editing ? Colors.white : Colors.transparent,
+                  foreground: _editing ? Colors.black : Colors.white,
+                  icon: const Icon(Lucide.Pencil, size: 14),
+                  onPressed: _toggleEdit,
+                  child: Text(l10n.creationEditImage),
                 ),
-                _icon(
-                  Lucide.Download,
-                  item.mode == MediaMode.image
-                      ? l10n.creationSaveImage
-                      : l10n.creationSaveVideo,
-                  () => saveCreationArtwork(context, item, desktop: true),
-                ),
-                _icon(
-                  Lucide.Share,
-                  l10n.creationShare,
-                  () => shareCreationArtwork(context, item),
-                ),
-                menu,
-              ],
-            ),
-          ),
-          close,
-        ],
+              _icon(
+                LucideIcons.star,
+                item.favorite ? l10n.creationUnfavorite : l10n.creationFavorite,
+                favorite,
+                color: item.favorite ? const Color(0xffffd86b) : Colors.white,
+              ),
+              _icon(
+                Lucide.Download,
+                item.mode == MediaMode.image
+                    ? l10n.creationSaveImage
+                    : l10n.creationSaveVideo,
+                () => saveCreationArtwork(context, item, desktop: true),
+              ),
+              _icon(
+                Lucide.Share,
+                l10n.creationShare,
+                () => shareCreationArtwork(context, item),
+              ),
+              menu,
+            ]),
+            _toolCapsule([close]),
+          ],
+        ),
       ),
     );
   }
 
+  Widget _toolCapsule(List<Widget> children) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: const Color(0xf2303032),
+      borderRadius: BorderRadius.circular(99),
+      border: Border.all(color: Colors.white12),
+      boxShadow: const [
+        BoxShadow(color: Colors.black26, blurRadius: 18, offset: Offset(0, 6)),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 2,
+        children: children,
+      ),
+    ),
+  );
+
+  void _updatePageDrag(Offset position) {
+    final delta = position - _dragStart;
+    final horizontal = delta.dx.abs() > delta.dy.abs();
+    final offset = horizontal
+        ? Offset(
+            (delta.dx < 0 && _index == _deck.length - 1 ||
+                    delta.dx > 0 && _index == 0)
+                ? delta.dx * .2
+                : delta.dx,
+            0,
+          )
+        : Offset(0, delta.dy.clamp(0.0, double.infinity));
+    if (_dragOffset != offset) setState(() => _dragOffset = offset);
+  }
+
+  void _endPageDrag() {
+    final offset = _dragOffset;
+    _trackingPage = false;
+    if (offset.dy > 100) {
+      Navigator.of(context).pop();
+      return;
+    }
+    if (offset == Offset.zero) return;
+    setState(() => _dragOffset = Offset.zero);
+    if (offset.dx.abs() > 55) _switch(_index + (offset.dx < 0 ? 1 : -1));
+  }
+
   Widget _canvas(BuildContext context, GenerationItemRow item) {
     final l10n = AppLocalizations.of(context)!;
-    final nav = desktop && _deck.length > 1;
-    final view = item.mode == MediaMode.video
-        ? CreationVideoPlayer(
-            key: ValueKey(item.id),
-            item: item,
-            cover: CreationMediaCover(item, playOverlay: false),
-          )
-        : InteractiveViewer(
-            key: ValueKey(item.id),
-            transformationController: _transform,
-            minScale: 1,
-            maxScale: 4,
-            onInteractionStart: (details) {
-              _zoomAnimation.stop();
-              _dragStart = details.focalPoint;
-              _swipeX = 0;
-            },
-            onInteractionUpdate: (details) {
-              if (desktop) return;
-              if (details.pointerCount > 1 ||
-                  _transform.value.getMaxScaleOnAxis() > 1.02) {
-                _swipeX = 0;
-                if (_dragOffset != Offset.zero) {
-                  setState(() => _dragOffset = Offset.zero);
-                }
-                return;
-              }
-              final offset = details.focalPoint - _dragStart;
-              _swipeX = offset.dx.abs() > offset.dy.abs() ? offset.dx : 0;
-              if (offset.dy > 0 && offset.dy > offset.dx.abs()) {
-                setState(() => _dragOffset = Offset(0, offset.dy));
-              } else if (_dragOffset != Offset.zero) {
-                setState(() => _dragOffset = Offset.zero);
-              }
-            },
-            onInteractionEnd: (_) {
-              if (desktop) return;
-              final down = _dragOffset.dy;
-              final horizontal = _swipeX;
-              _swipeX = 0;
-              if (down > 110) {
-                Navigator.of(context).pop();
-              } else {
-                if (_dragOffset != Offset.zero) {
-                  setState(() => _dragOffset = Offset.zero);
-                }
-                if (horizontal.abs() > 60) {
-                  _switch(_index + (horizontal < 0 ? 1 : -1));
-                }
-              }
-            },
-            child: Stack(
-              key: _stageKey,
-              fit: StackFit.expand,
-              children: [
-                if (desktop)
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.of(context).pop(),
-                  ),
-                Center(
-                  child: GestureDetector(
-                    onTapUp: _zoom,
-                    child: CreationDragOut(
-                      item: item,
-                      enabled: desktop,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(desktop ? 6 : 4),
-                          boxShadow: desktop
-                              ? const [
-                                  BoxShadow(
-                                    color: Colors.black54,
-                                    offset: Offset(0, 20),
-                                    blurRadius: 60,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(desktop ? 6 : 4),
-                          child: Hero(
-                            tag: 'creation:${item.id}',
-                            child: CreationFileImage(
-                              item.path,
-                              fit: BoxFit.contain,
-                              fill: false,
-                            ),
-                          ),
-                        ),
+    final width = item.width, height = item.height;
+    final knownSize =
+        width != null && width > 0 && height != null && height > 0;
+    final radius = BorderRadius.circular(desktop ? 6 : 4);
+    final image = MouseRegion(
+      cursor: desktop ? SystemMouseCursors.zoomIn : MouseCursor.defer,
+      child: GestureDetector(
+        onTapUp: desktop ? _zoom : null,
+        child: CreationDragOut(
+          item: item,
+          enabled: desktop,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              boxShadow: desktop
+                  ? const [
+                      BoxShadow(
+                        color: Colors.black54,
+                        offset: Offset(0, 20),
+                        blurRadius: 60,
                       ),
-                    ),
-                  ),
-                ),
-              ],
+                    ]
+                  : null,
             ),
-          );
-    Widget arrow(IconData icon, String tip, VoidCallback? tap) => SizedBox(
-      width: MediaQuery.sizeOf(context).width < 650 ? 44 : 72,
-      child: Center(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .08),
-            shape: BoxShape.circle,
-          ),
-          child: IosIconButton(
-            icon: icon,
-            tooltip: tip,
-            minSize: 40,
-            size: 20,
-            color: Colors.white,
-            onTap: tap,
+            child: ClipRRect(
+              borderRadius: radius,
+              child: Hero(
+                tag: 'creation:${item.id}',
+                child: CreationFileImage(
+                  item.path,
+                  fit: BoxFit.contain,
+                  fill: knownSize,
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-      child: Row(
-        children: [
-          if (nav)
-            arrow(
-              Lucide.ChevronLeft,
-              l10n.creationPrevious,
-              _index > 0 ? () => _switch(_index - 1) : null,
+    Widget view;
+    if (item.mode == MediaMode.video) {
+      view = CreationVideoPlayer(
+        key: ValueKey(item.id),
+        item: item,
+        cover: CreationMediaCover(item, playOverlay: false),
+      );
+      if (!desktop) {
+        view = GestureDetector(
+          onPanStart: (d) => _dragStart = d.globalPosition,
+          onPanUpdate: (d) => _updatePageDrag(d.globalPosition),
+          onPanEnd: (_) => _endPageDrag(),
+          onPanCancel: _endPageDrag,
+          child: view,
+        );
+      }
+    } else {
+      view = InteractiveViewer(
+        transformationController: _transform,
+        minScale: 1,
+        maxScale: 4,
+        onInteractionStart: (d) {
+          _zoomAnimation.stop();
+          _dragStart = d.focalPoint;
+          _trackingPage =
+              !desktop && _transform.value.getMaxScaleOnAxis() <= 1.02;
+        },
+        onInteractionUpdate: (d) {
+          if (!_trackingPage) return;
+          if (d.pointerCount > 1 ||
+              _transform.value.getMaxScaleOnAxis() > 1.02) {
+            _trackingPage = false;
+            if (_dragOffset != Offset.zero) {
+              setState(() => _dragOffset = Offset.zero);
+            }
+            return;
+          }
+          _updatePageDrag(d.focalPoint);
+        },
+        onInteractionEnd: (_) {
+          if (_trackingPage) _endPageDrag();
+        },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (desktop)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.of(context).pop(),
+              ),
+            if (knownSize)
+              Center(
+                child: AspectRatio(aspectRatio: width / height, child: image),
+              )
+            else
+              FittedBox(fit: BoxFit.contain, child: image),
+          ],
+        ),
+      );
+    }
+    Widget arrow(IconData icon, String label, VoidCallback? tap) => SizedBox(
+      width: MediaQuery.sizeOf(context).width < 650 ? 44 : 72,
+      child: Center(
+        child: Opacity(
+          opacity: tap == null ? .25 : 1,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: Color(0x14ffffff),
+              shape: BoxShape.circle,
             ),
-          Expanded(
-            child: Transform.translate(
-              offset: _dragOffset * .6,
-              child: Transform.scale(
-                scale: 1 - (_dragOffset.dy / 600).clamp(0.0, .25),
+            child: IosIconButton(
+              icon: icon,
+              color: Colors.white,
+              tooltip: label,
+              minSize: 40,
+              size: 20,
+              enabled: tap != null,
+              onTap: tap,
+            ),
+          ),
+        ),
+      ),
+    );
+    return Row(
+      children: [
+        if (desktop)
+          arrow(
+            Lucide.ChevronLeft,
+            l10n.creationPrevious,
+            _index > 0 ? () => _switch(_index - 1) : null,
+          ),
+        Expanded(
+          child: Padding(
+            padding: desktop
+                ? const EdgeInsets.only(top: 8, bottom: 12)
+                : EdgeInsets.zero,
+            child: ClipRect(
+              key: _stageKey,
+              child: TweenAnimationBuilder<Offset>(
+                tween: Tween(end: _dragOffset),
+                duration: _dragOffset == Offset.zero
+                    ? handoffDuration(context, 300)
+                    : Duration.zero,
+                curve: handoffCurve,
+                builder: (context, offset, child) => Transform.translate(
+                  offset: offset,
+                  child: Transform.scale(
+                    scale: 1 - (offset.dy / 1200).clamp(0.0, .24),
+                    child: child,
+                  ),
+                ),
                 child: view,
               ),
             ),
           ),
-          if (nav)
-            arrow(
-              Lucide.ChevronRight,
-              l10n.creationNext,
-              _index + 1 < _deck.length ? () => _switch(_index + 1) : null,
-            ),
-        ],
-      ),
+        ),
+        if (desktop)
+          arrow(
+            Lucide.ChevronRight,
+            l10n.creationNext,
+            _index + 1 < _deck.length ? () => _switch(_index + 1) : null,
+          ),
+      ],
     );
   }
 
   Widget _thumbnailStrip() {
     final size = desktop ? 48.0 : 44.0;
     return SizedBox(
-      height: size + 4,
+      height: size,
       child: ListView.separated(
-        shrinkWrap: true,
+        shrinkWrap: desktop,
         separatorBuilder: (_, i) => _deck[i].batchId == _deck[i + 1].batchId
-            ? const SizedBox(width: 5)
+            ? SizedBox(width: desktop ? 8 : 6)
             : Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
                 child: Container(width: 1, color: Colors.white24),
               ),
         controller: _thumbs,
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: EdgeInsets.symmetric(horizontal: desktop ? 14 : 16),
         itemCount: _deck.length,
-        itemBuilder: (context, index) => GestureDetector(
-          onTap: () => _switch(index),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(
-                color: index == _index ? Colors.white : Colors.transparent,
-                width: 2,
+        itemBuilder: (context, index) => Semantics(
+          button: true,
+          selected: index == _index,
+          label: MaterialLocalizations.of(
+            context,
+          ).tabLabel(tabIndex: index + 1, tabCount: _deck.length),
+          child: IosCardPress(
+            focusable: true,
+            baseColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            onTap: () => _switch(index),
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(
+                  color: index == _index ? Colors.white : Colors.transparent,
+                  width: 2,
+                ),
               ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(7),
-              child: Opacity(
-                opacity: index == _index ? 1 : .55,
-                child: CreationMediaCover(_deck[index]),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: Opacity(
+                  opacity: index == _index ? 1 : .55,
+                  child: CreationMediaCover(_deck[index]),
+                ),
               ),
             ),
           ),
@@ -898,6 +1075,13 @@ class _CreationLightboxState extends State<_CreationLightbox>
           ),
         ),
       );
+}
+
+String _artworkRatio(GenerationItemRow item, AppLocalizations l10n) {
+  final w = item.width, h = item.height;
+  if (w == null || h == null || w <= 0 || h <= 0) return l10n.creationAuto;
+  final divisor = w.gcd(h);
+  return '${w ~/ divisor}:${h ~/ divisor}';
 }
 
 String _readRatio(GenerationBatchRow? batch) {
@@ -1250,6 +1434,7 @@ List<ActionSheetItem> _artworkActions(
   required VoidCallback onEdit,
   required VoidCallback onDelete,
   VoidCallback? onSendToChat,
+  VoidCallback? onUseAsReference,
 }) {
   final l10n = AppLocalizations.of(context)!;
   final image = item.mode == MediaMode.image;
@@ -1298,8 +1483,11 @@ List<ActionSheetItem> _artworkActions(
       ActionSheetItem(
         icon: LucideIcons.imagePlus,
         label: l10n.creationUseReference,
-        onTap: () =>
-            addCreationArtworkReference(context, media, item, draftTopicId),
+        onTap:
+            onUseAsReference ??
+            () => addCreationReferences(context, media, draftTopicId, [
+              item.path,
+            ]),
       ),
     if (image)
       ActionSheetItem(
@@ -1330,24 +1518,6 @@ Future<void> _runArtworkAction(
       );
     }
   }
-}
-
-void addCreationArtworkReference(
-  BuildContext context,
-  MediaCreationController media,
-  GenerationItemRow item,
-  String? topicId,
-) {
-  final changed = media.addReferencePaths(topicId, [item.path]) > 0;
-  final l10n = AppLocalizations.of(context)!;
-  showCreationToast(
-    context,
-    message: changed
-        ? l10n.creationReferenceAdded
-        : l10n.creationReferenceLimitReached(
-            media.model?.capabilities.maxReferences ?? 0,
-          ),
-  );
 }
 
 Future<void> toggleCreationArtworkFavorite(

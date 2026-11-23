@@ -1,3 +1,4 @@
+import 'creation_reference_actions.dart';
 import 'creation_menu.dart';
 import 'creation_picker.dart';
 import 'dart:async';
@@ -672,17 +673,9 @@ class _BatchGroupState extends State<_BatchGroup> {
           label: l10n.creationUseGroupReferences(images.length),
           onTap: () {
             if (!mounted) return;
-            final count = media.addReferencePaths(batch.topicId, [
+            addCreationReferences(context, media, batch.topicId, [
               for (final item in images) item.path,
             ]);
-            showCreationToast(
-              context,
-              message: count > 0
-                  ? l10n.creationReferenceAdded
-                  : l10n.creationReferenceLimitReached(
-                      media.model?.capabilities.maxReferences ?? 0,
-                    ),
-            );
           },
         ),
       if (batch.status == GenerationStatus.failed ||

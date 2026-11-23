@@ -1,3 +1,4 @@
+import 'creation_reference_actions.dart';
 import 'dart:async';
 import 'dart:ui';
 
@@ -143,25 +144,9 @@ class _CreationComposerState extends State<CreationComposer> {
         if (!mounted || widget.topicId != id || model.key != media.model?.key) {
           return;
         }
-        _referenceResult(
-          media.addReferencePaths(id, paths, frameRole: role),
-          expected: paths.length,
-        );
+        addCreationReferences(this.context, media, id, paths, frameRole: role);
       },
     );
-  }
-
-  void _referenceResult(int count, {required int expected}) {
-    final l10n = AppLocalizations.of(context)!;
-    final max = _controller.model?.capabilities.maxReferences ?? 0;
-    if (count < expected && _controller.mode == MediaMode.image) {
-      showCreationToast(
-        context,
-        message: l10n.creationReferenceLimitReached(max),
-      );
-    } else if (count > 0) {
-      showCreationToast(context, message: l10n.creationReferenceAdded);
-    }
   }
 
   Future<void> _paste() async {
@@ -170,10 +155,7 @@ class _CreationComposerState extends State<CreationComposer> {
       final result = await readCreationClipboard();
       if (!mounted || topicId != widget.topicId) return;
       if (result.paths.isNotEmpty) {
-        _referenceResult(
-          _controller.addReferencePaths(topicId, result.paths),
-          expected: result.paths.length,
-        );
+        addCreationReferences(context, _controller, topicId, result.paths);
       } else if (result.text case final text?) {
         _dismissEnhancement();
         final value = _prompt.value;
