@@ -1329,7 +1329,7 @@ void main() {
       desktopTopicsOnly: false,
       globalSearchMode: true,
     );
-    final field = find.byType(TextField);
+    final field = find.byType(EditableText);
     final spinner = find.byType(CircularProgressIndicator);
     await tester.enterText(field, 'first');
     await tester.testTextInput.receiveAction(TextInputAction.search);

@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import '../../../core/models/sidebar_layout.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/segmented_tabs.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/sidebar_entry_labels.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
@@ -116,12 +116,12 @@ class SidebarEntriesEditor extends StatelessWidget {
             );
             final control = SizedBox(
               width: math.min(controlWidth, width),
-              child: SegmentedTabs(
+              child: SlidingSegmentedTabs(
                 key: ValueKey(('sidebar-visibility', entry)),
                 height: controlHeight,
                 compact: true,
                 expand: width >= controlWidth,
-                radioGroup: true,
+
                 backgroundColor: context.appColors.surfaceFill,
                 tabs: [for (final label in labels) SegmentedTab(label: label)],
                 index: entries[entry]!.index,

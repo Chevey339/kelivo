@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/plain_text_input.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
@@ -36,6 +38,35 @@ class _MobileSidebarSearchState extends State<MobileSidebarSearch> {
   double _swipe = 0;
   bool _switched = false;
 
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_refresh);
+    widget.controller.addListener(_refresh);
+  }
+
+  @override
+  void didUpdateWidget(MobileSidebarSearch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_refresh);
+      widget.focusNode.addListener(_refresh);
+    }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_refresh);
+      widget.controller.addListener(_refresh);
+    }
+  }
+
+  void _refresh() => setState(() {});
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_refresh);
+    widget.controller.removeListener(_refresh);
+    super.dispose();
+  }
+
   void _toggleMode() {
     widget.onToggleMode();
     Haptics.light();
@@ -45,9 +76,15 @@ class _MobileSidebarSearchState extends State<MobileSidebarSearch> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final empty = widget.controller.text.trim().isEmpty;
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(16),
-      borderSide: BorderSide.none,
+    final centered = empty && !widget.focusNode.hasFocus;
+    final glyph = widget.globalSearch ? Lucide.Database : Lucide.Search;
+    final modeButton = IosIconButton(
+      icon: glyph,
+      size: 16,
+      minSize: 30,
+      tooltip: widget.swipeTip,
+      color: cs.onSurface.withValues(alpha: .55),
+      onTap: _toggleMode,
     );
     return Column(
       children: [
@@ -75,56 +112,37 @@ class _MobileSidebarSearchState extends State<MobileSidebarSearch> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    TextField(
-                      focusNode: widget.focusNode,
-                      controller: widget.controller,
-                      textInputAction: widget.globalSearch
-                          ? TextInputAction.search
-                          : TextInputAction.done,
-                      onSubmitted: widget.globalSearch
-                          ? (_) => widget.onSubmit()
-                          : null,
-                      decoration: InputDecoration(
-                        hintText: empty ? '' : widget.hint,
-                        filled: true,
-                        fillColor: context.appColors.surfaceFill.withValues(
-                          alpha: .8,
-                        ),
-                        isDense: true,
-                        isCollapsed: true,
-                        prefixIcon: Padding(
-                          padding: const EdgeInsets.only(left: 6, right: 2),
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: _toggleMode,
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 210),
-                                switchInCurve: Curves.easeOutBack,
-                                switchOutCurve: Curves.easeIn,
-                                transitionBuilder: (child, animation) =>
-                                    FadeTransition(
-                                      opacity: animation,
-                                      child: ScaleTransition(
-                                        scale: animation,
-                                        child: child,
-                                      ),
-                                    ),
-                                child: Icon(
-                                  widget.globalSearch
-                                      ? Lucide.Database
-                                      : Lucide.botMessageSquare,
-                                  key: ValueKey(widget.globalSearch),
-                                  color: cs.onSurface.withValues(alpha: .72),
-                                  size: 16,
-                                ),
-                              ),
-                            ),
+                    SizedBox(
+                      height: 44,
+                      child: PlainTextInput(
+                        focusNode: widget.focusNode,
+                        controller: widget.controller,
+                        textInputAction: widget.globalSearch
+                            ? TextInputAction.search
+                            : TextInputAction.done,
+                        onSubmitted: widget.globalSearch
+                            ? (_) => widget.onSubmit()
+                            : null,
+                        decoration: BoxDecoration(
+                          color: context.appColors.surfaceFill.withValues(
+                            alpha: .8,
                           ),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        prefixIconConstraints: const BoxConstraints(),
-                        suffixIcon:
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 10,
+                        ),
+                        placeholder: centered ? null : widget.hint,
+                        prefix: centered
+                            ? null
+                            : Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  start: 6,
+                                ),
+                                child: modeButton,
+                              ),
+                        suffix:
                             widget.globalSearch &&
                                 widget.controller.text.isNotEmpty
                             ? Padding(
@@ -138,33 +156,29 @@ class _MobileSidebarSearchState extends State<MobileSidebarSearch> {
                                 ),
                               )
                             : null,
-                        suffixIconConstraints: const BoxConstraints(),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        border: border,
-                        enabledBorder: border,
-                        focusedBorder: border,
+                        style: TextStyle(color: cs.onSurface, fontSize: 14),
                       ),
-                      textAlignVertical: TextAlignVertical.center,
-                      style: TextStyle(color: cs.onSurface, fontSize: 14),
                     ),
-                    if (empty)
-                      IgnorePointer(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: Text(
-                            widget.hint,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: cs.onSurface.withValues(alpha: .55),
-                              fontSize: 14,
+                    if (centered)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          modeButton,
+                          Flexible(
+                            child: GestureDetector(
+                              onTap: widget.focusNode.requestFocus,
+                              child: Text(
+                                widget.hint,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: cs.onSurface.withValues(alpha: .55),
+                                  fontSize: 14,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                   ],
                 ),
@@ -180,8 +194,8 @@ class _MobileSidebarSearchState extends State<MobileSidebarSearch> {
         ListenableBuilder(
           listenable: widget.focusNode,
           builder: (context, _) => AnimatedSize(
-            duration: const Duration(milliseconds: 140),
-            curve: Curves.easeOutCubic,
+            duration: handoffDuration(context, 140),
+            curve: handoffCurve,
             child: widget.focusNode.hasFocus
                 ? Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),

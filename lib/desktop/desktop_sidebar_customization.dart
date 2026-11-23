@@ -10,6 +10,7 @@ import '../l10n/app_localizations.dart';
 import '../shared/widgets/ios_settings_rows.dart';
 import '../shared/widgets/ios_tactile.dart';
 import '../shared/widgets/section_card.dart';
+import '../shared/widgets/sliding_segmented_tabs.dart';
 import '../shared/widgets/sidebar_entry_labels.dart';
 import '../theme/app_font_weights.dart';
 import 'desktop_context_menu.dart';
@@ -101,7 +102,7 @@ class DesktopSidebarCustomization extends StatelessWidget {
                           ).animate(
                             CurvedAnimation(
                               parent: animation,
-                              curve: Curves.easeOutCubic,
+                              curve: handoffCurve,
                             ),
                           ),
                       child: child,
