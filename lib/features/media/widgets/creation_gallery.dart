@@ -262,7 +262,7 @@ class _CreationGalleryState extends State<CreationGallery> {
               ? SingleChildScrollView(
                   padding: EdgeInsets.only(
                     top: widget.desktop ? 96 : 48,
-                    bottom: 140,
+                    bottom: CreationDockInset.bottomOf(context, 140),
                   ),
                   child: Align(
                     alignment: Alignment.topCenter,
@@ -305,7 +305,7 @@ class _CreationGalleryState extends State<CreationGallery> {
                         widget.desktop ? 24 : 6,
                         widget.desktop ? 8 : 0,
                         widget.desktop ? 24 : 6,
-                        168,
+                        CreationDockInset.bottomOf(context, 168),
                       ),
                       gridDelegate: !widget.desktop
                           ? const SliverGridDelegateWithFixedCrossAxisCount(

@@ -389,6 +389,47 @@ void main() {
     },
   );
 
+  testWidgets(
+    'long topics open at the latest batch and gallery links reveal the original batch',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1280, 820);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final media = await _pumpCreationGallery(
+        tester,
+        desktop: true,
+        count: 1,
+        laterBatches: 30,
+      );
+      await tester.tap(find.text('Mountain trip'));
+      await tester.pumpAndSettle();
+      expect(find.text('Study 30').hitTestable(), findsOneWidget);
+      expect(find.text('A wide mountain lake').hitTestable(), findsNothing);
+      media.addReferencePaths('topic', [media.worksFor('topic').single.path]);
+      final composer = find.byType(CreationComposer);
+      await tester.enterText(
+        find.descendant(of: composer, matching: find.byType(EditableText)),
+        List.filled(6, 'a longer draft').join('\n'),
+      );
+      await tester.pumpAndSettle();
+      final latest = find.byKey(const ValueKey('later-30')).first;
+      expect(
+        tester.getRect(latest).bottom,
+        lessThanOrEqualTo(tester.getRect(composer).top),
+      );
+      await tester.tap(find.text('All creations'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(CreationArtworkTile).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Show in topic'));
+      await tester.pumpAndSettle();
+      expect(find.text('A wide mountain lake').hitTestable(), findsOneWidget);
+      expect(find.text('Study 30').hitTestable(), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   for (final desktop in [false, true]) {
     testWidgets(
       'single artwork lightbox returns a reference to its ${desktop ? 'desktop' : 'mobile'} topic draft',
@@ -397,6 +438,12 @@ void main() {
         tester.view.physicalSize = desktop
             ? const Size(1280, 820)
             : const Size(390, 844);
+        if (!desktop) {
+          tester.view.padding = const FakeViewPadding(bottom: 34);
+          tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+          addTearDown(tester.view.resetPadding);
+          addTearDown(tester.view.resetViewPadding);
+        }
         addTearDown(tester.view.resetDevicePixelRatio);
         addTearDown(tester.view.resetPhysicalSize);
         final media = await _pumpCreationGallery(
@@ -406,6 +453,13 @@ void main() {
         );
         await tester.tap(find.text('Mountain trip').first);
         await tester.pumpAndSettle();
+        final timeline = tester.getRect(find.byType(CreationTimeline));
+        final prompt = tester.getRect(find.text('A wide mountain lake'));
+        expect(
+          prompt.top - timeline.top,
+          lessThan(76),
+          reason: 'Short topics start below the header',
+        );
         final tile = find.byType(CreationArtworkTile).first;
         await tester.tap(tile);
         await tester.pumpAndSettle();
@@ -423,6 +477,11 @@ void main() {
         await tester.tap(find.text('Use as reference'));
         await tester.pumpAndSettle();
         expect(find.text('1 / 1'), findsNothing);
+        expect(
+          tester.getRect(find.text('A wide mountain lake')).top,
+          prompt.top,
+          reason: 'Adding a reference must not move a short conversation down',
+        );
         expect(media.imageReferences('topic'), hasLength(1));
         final path = media.imageReferences('topic').single.path;
         expect(
@@ -810,6 +869,7 @@ Future<MediaCreationController> _pumpCreationGallery(
   WidgetTester tester, {
   required bool desktop,
   int count = 2,
+  int laterBatches = 0,
 }) async {
   final (harness, settings, runner, controller, folder) = (await tester
       .runAsync(() async {
@@ -828,7 +888,7 @@ Future<MediaCreationController> _pumpCreationGallery(
         );
         final file = await File(
           '${folder.path}/result.png',
-        ).writeAsBytes(image.encodePng(image.Image(width: 30, height: 30)));
+        ).writeAsBytes(image.encodePng(image.Image(width: 30, height: 17)));
         final created = DateTime(2025, 1, 2);
         await repository.enqueue(
           GenerationBatchRowsCompanion.insert(
@@ -862,7 +922,7 @@ Future<MediaCreationController> _pumpCreationGallery(
                   ordinal: index,
                   mode: MediaMode.image,
                   width: const Value(30),
-                  height: const Value(30),
+                  height: const Value(17),
                   path: file.path,
                   mime: 'image/png',
                   byteSize: await file.length(),
@@ -870,6 +930,23 @@ Future<MediaCreationController> _pumpCreationGallery(
                   createdAt: created,
                 ),
               );
+        }
+        for (var i = 1; i <= laterBatches; i++) {
+          await repository.enqueue(
+            GenerationBatchRowsCompanion.insert(
+              id: 'later-$i',
+              topicId: const Value('topic'),
+              providerId: _provider.id,
+              modelId: _model,
+              mode: MediaMode.image,
+              prompt: 'Study $i',
+              paramsJson: '{}',
+              referencesJson: '[]',
+              status: GenerationStatus.cancelled,
+              source: GenerationSource.workbench,
+              createdAt: created.add(Duration(minutes: i)),
+            ),
+          );
         }
         final controller = MediaCreationController(
           runner: runner,

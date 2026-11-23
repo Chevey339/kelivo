@@ -52,6 +52,28 @@ class CreationSurface extends StatelessWidget {
   }
 }
 
+/// The floating composer includes its bottom safe area in this extent.
+class CreationDockInset extends InheritedWidget {
+  const CreationDockInset({
+    super.key,
+    required this.height,
+    required super.child,
+  });
+  final double height;
+
+  static double bottomOf(BuildContext context, double minimum) {
+    final dock = context
+        .dependOnInheritedWidgetOfExactType<CreationDockInset>();
+    return dock == null || dock.height + 8 < minimum
+        ? minimum
+        : dock.height + 8;
+  }
+
+  @override
+  bool updateShouldNotify(CreationDockInset oldWidget) =>
+      height != oldWidget.height;
+}
+
 /// Fades controls without changing the measured size of their row or tile.
 class CreationHoverActions extends StatelessWidget {
   const CreationHoverActions({

@@ -55,28 +55,107 @@ class CreationTimeline extends StatefulWidget {
 
 class _CreationTimelineState extends State<CreationTimeline> {
   final _scroll = ItemScrollController();
-  String? _lastSeenRequest;
-  String? _pendingScroll;
-  bool _observed = false;
+  final _positions = ItemPositionsListener.create();
+  String? _lastSeenRequest, _pendingSubmission;
+  bool _initialPlacement = true;
   String? get topicId => widget.topicId;
   bool get desktop => widget.desktop;
+  double _footerHeight = 0;
+  bool _followEnd = false;
 
-  void _jump(String batchId, List<GenerationBatchRow> batches) {
-    final index = batches.reversed.toList().indexWhere(
-      (batch) => batch.id == batchId,
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final height = CreationDockInset.bottomOf(context, desktop ? 196 : 176);
+    if (_footerHeight > 0 && height > _footerHeight && topicId != null) {
+      final last = context
+          .read<MediaCreationController>()
+          .batchesFor(topicId!)
+          .length;
+      _followEnd = _positions.itemPositions.value.any(
+        (p) =>
+            p.index == last &&
+            p.itemTrailingEdge <= 1.01 &&
+            p.itemTrailingEdge > 0,
+      );
+    }
+    _footerHeight = height;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _positions.itemPositions.addListener(_placeTimeline);
+  }
+
+  @override
+  void didUpdateWidget(CreationTimeline previous) {
+    super.didUpdateWidget(previous);
+    if (previous.topicId != topicId ||
+        previous.highlightBatchId != widget.highlightBatchId) {
+      _initialPlacement = true;
+      _lastSeenRequest = null;
+      _pendingSubmission = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _positions.itemPositions.removeListener(_placeTimeline);
+    super.dispose();
+  }
+
+  void _placeTimeline() {
+    if (!mounted || !_scroll.isAttached || topicId == null) return;
+    final submitted = _pendingSubmission;
+    if (!_initialPlacement && submitted == null && !_followEnd) return;
+    final batches = context.read<MediaCreationController>().batchesFor(
+      topicId!,
     );
-    if (index < 0 || !_scroll.isAttached) return;
-    final reduce = MediaQuery.disableAnimationsOf(context);
-    if (reduce) {
-      _scroll.jumpTo(index: index, alignment: .20);
-    } else {
+    final visible = _positions.itemPositions.value;
+    if (batches.isEmpty || visible.isEmpty || context.size == null) return;
+    if (submitted != null && !batches.any((b) => b.id == submitted)) return;
+    final highlight = _initialPlacement && submitted == null
+        ? widget.highlightBatchId
+        : null;
+    final found = highlight == null
+        ? -1
+        : batches.indexWhere((b) => b.id == highlight);
+    final last = batches.length;
+    final index = found < 0 ? last : found;
+    final current = visible.where((item) => item.index == index).firstOrNull;
+    final animate =
+        !_initialPlacement &&
+        !_followEnd &&
+        !MediaQuery.disableAnimationsOf(context);
+    if (_initialPlacement) setState(() => _initialPlacement = false);
+    _followEnd = false;
+    _pendingSubmission = null;
+    final viewportHeight = context.size!.height;
+    if (current != null) {
+      // The position notification can still describe the previous dock height.
+      // The footer starts at the same place as the composer expands.
+      final footerBottom =
+          current.itemLeadingEdge + _footerHeight / viewportHeight;
+      final inPlace = index == last
+          ? footerBottom > 0 && footerBottom <= 1.001
+          : current.itemLeadingEdge >= -.001 && current.itemLeadingEdge <= .5;
+      if (inPlace) return;
+    }
+    final alignment = index == last
+        ? (1 - _footerHeight / viewportHeight).clamp(0.0, 1.0)
+        : .10;
+    if (animate) {
       unawaited(
         _scroll.scrollTo(
           index: index,
-          alignment: .20,
+          alignment: alignment,
           duration: const Duration(milliseconds: 260),
+          curve: handoffCurve,
         ),
       );
+    } else {
+      _scroll.jumpTo(index: index, alignment: alignment);
     }
   }
 
@@ -86,99 +165,93 @@ class _CreationTimelineState extends State<CreationTimeline> {
     final batches = topicId == null
         ? const <GenerationBatchRow>[]
         : media.batchesFor(topicId!);
-    final requested = media.lastSubmission(topicId);
-    if (_observed && requested != _lastSeenRequest) _pendingScroll = requested;
-    _lastSeenRequest = requested;
-    _observed = true;
-    final pending = _pendingScroll;
-    if (pending != null && batches.any((batch) => batch.id == pending)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _pendingScroll != pending || !_scroll.isAttached) {
-          return;
-        }
-        _pendingScroll = null;
-        final id = topicId;
-        if (id != null) _jump(pending, media.batchesFor(id));
-      });
-    }
     if (batches.isEmpty) {
       return CreationEmptyState(desktop: desktop, topicId: topicId);
     }
+    final requested = media.lastSubmission(topicId);
+    if (!_initialPlacement && requested != _lastSeenRequest) {
+      _pendingSubmission = requested;
+    }
+    _lastSeenRequest = requested;
+    if (_initialPlacement || _followEnd || _pendingSubmission != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _placeTimeline());
+    }
     final highlight = widget.highlightBatchId;
-    final target = highlight == null
-        ? -1
-        : batches.reversed.toList().indexWhere(
-            (batch) => batch.id == highlight,
-          );
     final reduced = MediaQuery.disableAnimationsOf(context);
-    return ScrollablePositionedList.builder(
-      key: ValueKey(topicId),
-      itemScrollController: _scroll,
-      initialScrollIndex: target < 0 ? 0 : target,
-      initialAlignment: target < 0 ? 0 : .28,
-      reverse: true,
-      padding: EdgeInsets.fromLTRB(
-        desktop ? 32 : 14,
-        14,
-        desktop ? 32 : 14,
-        196,
-      ),
-      itemCount: batches.length,
-      itemBuilder: (context, index) {
-        final sourceIndex = batches.length - 1 - index;
-        final batch = batches[sourceIndex];
-        final showDate =
-            sourceIndex == 0 ||
-            !DateUtils.isSameDay(
-              batch.createdAt,
-              batches[sourceIndex - 1].createdAt,
-            );
-        final group = Align(
-          key: ValueKey(batch.id),
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 30),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (showDate) _DateDivider(date: batch.createdAt),
-                  _BatchGroup(
-                    batch: batch,
-                    desktop: desktop,
-                    results: _BatchResults(
-                      batch: batch,
-                      items: media.itemsFor(batch.id),
-                      desktop: desktop,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return IgnorePointer(
+      ignoring: _initialPlacement,
+      child: Opacity(
+        opacity: _initialPlacement ? 0 : 1,
+        child: ScrollablePositionedList.builder(
+          key: ValueKey(topicId),
+          itemScrollController: _scroll,
+          itemPositionsListener: _positions,
+          padding: EdgeInsets.fromLTRB(
+            desktop ? 32 : 14,
+            12,
+            desktop ? 32 : 14,
+            0,
           ),
-        );
-        if (highlight == batch.id && !reduced) {
-          return group
-              .animate(key: ValueKey(highlight))
-              .custom(
-                duration: const Duration(milliseconds: 1600),
-                begin: .08,
-                end: 0,
-                builder: (context, value, child) => ColoredBox(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: value),
-                  child: child,
+          itemCount: batches.length + 1,
+          itemBuilder: (context, sourceIndex) {
+            if (sourceIndex == batches.length) {
+              return SizedBox(height: _footerHeight);
+            }
+            final batch = batches[sourceIndex];
+            final showDate =
+                sourceIndex == 0 ||
+                !DateUtils.isSameDay(
+                  batch.createdAt,
+                  batches[sourceIndex - 1].createdAt,
+                );
+            final group = Align(
+              key: ValueKey(batch.id),
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 30),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (showDate) _DateDivider(date: batch.createdAt),
+                      _BatchGroup(
+                        batch: batch,
+                        desktop: desktop,
+                        results: _BatchResults(
+                          batch: batch,
+                          items: media.itemsFor(batch.id),
+                          desktop: desktop,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              );
-        }
-        return _BatchEntrance(
-          key: ValueKey(batch.id),
-          createdAt: batch.createdAt,
-          child: group,
-        );
-      },
+              ),
+            );
+            if (highlight == batch.id && !reduced) {
+              return group
+                  .animate(key: ValueKey(highlight))
+                  .custom(
+                    duration: const Duration(milliseconds: 1600),
+                    begin: .08,
+                    end: 0,
+                    builder: (context, value, child) => ColoredBox(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: value),
+                      child: child,
+                    ),
+                  );
+            }
+            return _BatchEntrance(
+              key: ValueKey(batch.id),
+              createdAt: batch.createdAt,
+              child: group,
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -242,7 +315,7 @@ class CreationEmptyState extends StatelessWidget {
         desktop ? 32 : 16,
         desktop ? 96 : 48,
         desktop ? 32 : 16,
-        155,
+        CreationDockInset.bottomOf(context, 155),
       ),
       child: Align(
         alignment: Alignment.topCenter,

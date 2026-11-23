@@ -265,7 +265,7 @@ class _MobileTopics extends StatelessWidget {
             covers ? 6 : 16,
             0,
             covers ? 6 : 16,
-            156,
+            CreationDockInset.bottomOf(context, 156),
           ),
           sliver: list
               ? SliverList.builder(
@@ -396,7 +396,28 @@ class CreationComposerStack extends StatefulWidget {
 }
 
 class _CreationComposerStackState extends State<CreationComposerStack> {
-  bool _hover = false;
+  bool _hover = false, _measurePending = false;
+  final _dockKey = GlobalKey();
+  double _dockHeight = 0;
+
+  void _measureDock() {
+    if (_measurePending) return;
+    _measurePending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measurePending = false;
+      if (!mounted) return;
+      final size = _dockKey.currentContext?.size;
+      if (size != null && size.height != _dockHeight) {
+        setState(() => _dockHeight = size.height);
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _measureDock();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -407,7 +428,9 @@ class _CreationComposerStackState extends State<CreationComposerStack> {
     final desktop = widget.desktop;
     final stack = Stack(
       children: [
-        Positioned.fill(child: widget.content),
+        Positioned.fill(
+          child: CreationDockInset(height: _dockHeight, child: widget.content),
+        ),
         Positioned(
           left: 0,
           right: 0,
@@ -429,12 +452,21 @@ class _CreationComposerStackState extends State<CreationComposerStack> {
           left: desktop ? 24 : 10,
           right: desktop ? 24 : 10,
           bottom: 0,
-          child: SafeArea(
-            top: false,
-            minimum: const EdgeInsets.only(bottom: 12),
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: widget.composer,
+          child: NotificationListener<SizeChangedLayoutNotification>(
+            onNotification: (_) {
+              _measureDock();
+              return false;
+            },
+            child: SizeChangedLayoutNotifier(
+              key: _dockKey,
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 12),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: widget.composer,
+                ),
+              ),
             ),
           ),
         ),
