@@ -121,6 +121,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
       : [widget.item];
   late int _index = _deck.indexWhere((item) => item.id == widget.item.id);
   bool _editing = false;
+  bool _zoomed = false;
   Offset _dragStart = Offset.zero;
   Offset _dragOffset = Offset.zero;
   bool _trackingPage = false;
@@ -128,6 +129,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
   @override
   void initState() {
     super.initState();
+    if (desktop) _transform.addListener(_scaleChanged);
     _editFocus.addListener(_editFocusChanged);
     if (widget.startEditing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -141,6 +143,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
 
   @override
   void dispose() {
+    _transform.removeListener(_scaleChanged);
     _transform.dispose();
     _editFocus.removeListener(_editFocusChanged);
     _editFocus.dispose();
@@ -151,6 +154,11 @@ class _CreationLightboxState extends State<_CreationLightbox> {
   MediaCreationController get _media => widget.controller;
   bool get desktop => widget.desktop;
   GenerationItemRow get _item => _media.item(_deck[_index].id) ?? _deck[_index];
+
+  void _scaleChanged() {
+    final zoomed = !_atFitScale;
+    if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
+  }
 
   void _editFocusChanged() => setState(() {});
 
@@ -187,6 +195,14 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     });
     _scrollThumb();
   }
+
+  void _dismissPreview() {
+    if (ModalRoute.of(context)?.isCurrent == true) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  bool get _atFitScale => _transform.value.getMaxScaleOnAxis() <= 1.000001;
 
   void _escape() {
     if (_editFocus.hasFocus) {
@@ -274,7 +290,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                 child: child,
               ),
             );
-      final stage = Column(
+      final contents = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           chrome(
@@ -372,6 +388,17 @@ class _CreationLightboxState extends State<_CreationLightbox> {
               ],
             ),
           ),
+        ],
+      );
+      final stage = Stack(
+        fit: StackFit.expand,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            excludeFromSemantics: true,
+            onTap: _dismissPreview,
+          ),
+          contents,
         ],
       );
       final narrow = MediaQuery.sizeOf(context).width < 960;
@@ -794,30 +821,36 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     final knownSize =
         width != null && width > 0 && height != null && height > 0;
     final radius = BorderRadius.circular(desktop ? 6 : 4);
-    final image = CreationDragOut(
-      item: item,
-      enabled: desktop,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: desktop
-              ? const [
-                  BoxShadow(
-                    color: Colors.black54,
-                    offset: Offset(0, 20),
-                    blurRadius: 60,
-                  ),
-                ]
-              : null,
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: CreationFileImage(
-            item.path,
-            key: ValueKey(item.id),
-            fit: BoxFit.contain,
-            fill: knownSize,
-            fadeOnCacheHit: true,
+    final image = IgnorePointer(
+      // The native source also registers a long-press recognizer. Keep its
+      // snapshot and image mounted, but let the viewer own every zoomed drag.
+      ignoring: desktop && _zoomed,
+      child: CreationDragOut(
+        item: item,
+        enabled: desktop,
+        canDrag: () => _atFitScale,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: desktop
+                ? const [
+                    BoxShadow(
+                      color: Colors.black54,
+                      offset: Offset(0, 20),
+                      blurRadius: 60,
+                    ),
+                  ]
+                : null,
+          ),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: CreationFileImage(
+              item.path,
+              key: ValueKey(item.id),
+              fit: BoxFit.contain,
+              fill: knownSize,
+              fadeOnCacheHit: true,
+            ),
           ),
         ),
       ),
@@ -922,7 +955,14 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                     child: child,
                   ),
                 ),
-                child: view,
+                child: item.mode == MediaMode.image
+                    ? GestureDetector(
+                        excludeFromSemantics: true,
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _dismissPreview,
+                        child: view,
+                      )
+                    : view,
               ),
             ),
           ),
@@ -941,44 +981,52 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     final size = desktop ? 48.0 : 44.0;
     return SizedBox(
       height: size,
-      child: ListView.separated(
-        shrinkWrap: desktop,
-        separatorBuilder: (_, i) => _deck[i].batchId == _deck[i + 1].batchId
-            ? SizedBox(width: desktop ? 8 : 6)
-            : Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-                child: Container(width: 1, color: Colors.white24),
-              ),
-        controller: _thumbs,
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: desktop ? 14 : 16),
-        itemCount: _deck.length,
-        itemBuilder: (context, index) => Semantics(
-          button: true,
-          selected: index == _index,
-          label: MaterialLocalizations.of(
-            context,
-          ).tabLabel(tabIndex: index + 1, tabCount: _deck.length),
-          child: IosCardPress(
-            focusable: true,
-            baseColor: Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
-            onTap: () => _switch(index),
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(
-                  color: index == _index ? Colors.white : Colors.transparent,
-                  width: 2,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: _dismissPreview,
+        child: ListView.separated(
+          shrinkWrap: desktop,
+          separatorBuilder: (_, i) => _deck[i].batchId == _deck[i + 1].batchId
+              ? SizedBox(width: desktop ? 8 : 6)
+              : Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 9,
+                  ),
+                  child: Container(width: 1, color: Colors.white24),
                 ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(7),
-                child: Opacity(
-                  opacity: index == _index ? 1 : .55,
-                  child: CreationMediaCover(_deck[index], thumbnail: true),
+          controller: _thumbs,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: desktop ? 14 : 16),
+          itemCount: _deck.length,
+          itemBuilder: (context, index) => Semantics(
+            button: true,
+            selected: index == _index,
+            label: MaterialLocalizations.of(
+              context,
+            ).tabLabel(tabIndex: index + 1, tabCount: _deck.length),
+            child: IosCardPress(
+              focusable: true,
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(9),
+              onTap: () => _switch(index),
+              child: Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(
+                    color: index == _index ? Colors.white : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: Opacity(
+                    opacity: index == _index ? 1 : .55,
+                    child: CreationMediaCover(_deck[index], thumbnail: true),
+                  ),
                 ),
               ),
             ),
@@ -1050,11 +1098,13 @@ class CreationDragOut extends StatelessWidget {
     super.key,
     required this.item,
     required this.enabled,
+    required this.canDrag,
     required this.child,
   });
 
   final GenerationItemRow item;
   final bool enabled;
+  final ValueGetter<bool> canDrag;
   final Widget child;
 
   @override
@@ -1068,7 +1118,10 @@ class CreationDragOut extends StatelessWidget {
         return drag.DragItem(suggestedName: p.basename(path))
           ..add(drag.Formats.fileUri(Uri.file(path)));
       },
-      child: drag.DraggableWidget(child: child),
+      child: drag.DraggableWidget(
+        isLocationDraggable: (_) => canDrag(),
+        child: child,
+      ),
     );
   }
 }

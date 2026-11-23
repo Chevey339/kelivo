@@ -296,7 +296,7 @@ class ImageViewerPage extends StatefulWidget {
     this.imageProviders = const <String, ImageProvider>{},
     this.heroTags,
     this.initialPreview,
-    this.enableTapGestures = true,
+    this.dismissOnTap = false,
   }) : assert(heroTags == null || heroTags.length == images.length);
 
   final List<String> images; // local paths, http urls, or data urls
@@ -304,7 +304,7 @@ class ImageViewerPage extends StatefulWidget {
   final ImageViewerDraftMode? draft;
   final Map<String, ImageProvider> imageProviders;
   final List<Object>? heroTags;
-  final bool enableTapGestures;
+  final bool dismissOnTap;
 
   /// The already visible thumbnail supplies both the first frame and its aspect ratio.
   final ({ImageProvider provider, Size size})? initialPreview;
@@ -586,7 +586,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     if (!mounted) return;
     setState(() {
       _currentImageZoomed = zoomed;
-      if (zoomed && widget.enableTapGestures) _chromeVisible = false;
+      if (zoomed && !widget.dismissOnTap) _chromeVisible = false;
       _zoomBadgeVisible = _isDesktop;
     });
     _syncSystemChrome();
@@ -1587,6 +1587,9 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   Widget _buildPagedImageStage(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
+      onTap: widget.dismissOnTap
+          ? () => Navigator.of(context).maybePop()
+          : null,
       onVerticalDragStart: _currentImageZoomed
           ? null
           : _handleVerticalDragStart,
@@ -1752,7 +1755,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
               final scale = _zoomCtrls[i].value.getMaxScaleOnAxis();
               final canPan = scale > 1.01;
               final handleTaps =
-                  widget.enableTapGestures && !_failedImages.contains(src);
+                  !widget.dismissOnTap && !_failedImages.contains(src);
               return Listener(
                 onPointerSignal: (event) {
                   if (_isDesktop && event is PointerScrollEvent) {

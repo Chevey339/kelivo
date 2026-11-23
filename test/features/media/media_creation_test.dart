@@ -26,6 +26,7 @@ import 'package:Kelivo/features/media/widgets/creation_waiting_card.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
+import 'package:super_drag_and_drop/super_drag_and_drop.dart' as drag;
 import 'package:Kelivo/features/media/widgets/creation_controls.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -469,15 +470,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('1 / 2'), findsOneWidget);
       final stage = find.byType(InteractiveViewer);
-      final transform = tester
-          .widget<InteractiveViewer>(stage)
-          .transformationController!;
-      await tester.tapAt(tester.getCenter(stage));
+      await tester.tapAt(tester.getCenter(find.byTooltip('Previous creation')));
       await tester.pumpAndSettle();
-      expect(transform.value.isIdentity(), isTrue);
-      await tester.tapAt(tester.getTopLeft(stage) + const Offset(2, 2));
-      await tester.pumpAndSettle();
-      expect(find.text('1 / 2'), findsOneWidget);
+      expect(stage, findsOneWidget);
+      for (final point in [
+        tester.getCenter(stage),
+        tester.getTopLeft(stage) + const Offset(2, 2),
+      ]) {
+        await tester.tapAt(point);
+        await tester.pumpAndSettle();
+        expect(stage, findsNothing);
+        await tester.tap(find.byType(CreationArtworkTile).first);
+        await tester.pumpAndSettle();
+      }
       await tester.tap(find.byTooltip('Close').hitTestable());
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
@@ -731,6 +736,14 @@ void main() {
           expect(find.byTooltip('Next creation'), findsOneWidget);
         } else {
           expect(tester.getTopLeft(thumbnail).dx, 16);
+          await tester.tapAt(tester.getCenter(thumbnail) + const Offset(95, 0));
+          await tester.pumpAndSettle();
+          expect(find.byType(InteractiveViewer), findsNothing);
+          await tester.tap(tile);
+          await tester.pumpAndSettle();
+          await tester.tap(thumbnail);
+          await tester.pumpAndSettle();
+          expect(find.byType(InteractiveViewer), findsOneWidget);
         }
         await tester.tap(find.byTooltip('More').hitTestable().last);
         await tester.pumpAndSettle();
@@ -774,6 +787,52 @@ void main() {
     );
   }
 
+  testWidgets('zoomed desktop panning keeps the artwork in the viewer', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 820);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await _pumpCreationGallery(tester, desktop: true);
+    await tester.tap(find.text('All creations'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(CreationArtworkTile).first);
+    await tester.pumpAndSettle();
+    final stage = find.byType(InteractiveViewer);
+    final center = tester.getCenter(stage);
+    final controller = tester
+        .widget<InteractiveViewer>(stage)
+        .transformationController!;
+    final dragSource = tester.widget<drag.DraggableWidget>(
+      find.descendant(of: stage, matching: find.byType(drag.DraggableWidget)),
+    );
+    expect(dragSource.isLocationDraggable(center), isTrue);
+    controller.value = Matrix4.identity()
+      ..translateByDouble(-160, -100, 0, 1)
+      ..scaleByDouble(2, 2, 1, 1);
+    expect(dragSource.isLocationDraggable(center), isFalse);
+    final pan = await tester.startGesture(
+      center,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump(const Duration(milliseconds: 650));
+    await pan.moveBy(const Offset(10, 5));
+    await tester.pump();
+    final before = controller.value.getTranslation();
+    await pan.moveBy(const Offset(22, 15));
+    await tester.pump();
+    final after = controller.value.getTranslation();
+    expect(after.x - before.x, closeTo(22, .1));
+    expect(after.y - before.y, closeTo(15, .1));
+    await pan.up();
+    await tester.pumpAndSettle();
+    expect(stage, findsOneWidget);
+    await tester.tapAt(center);
+    await tester.pumpAndSettle();
+    expect(stage, findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets(
     'mobile lightbox follows a horizontal swipe and a downward dismissal',
     (tester) async {
@@ -788,6 +847,29 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('1 / 2'), findsOneWidget);
       final viewport = find.byType(InteractiveViewer);
+      final center = tester.getCenter(viewport);
+      final first = await tester.startGesture(center - const Offset(48, 0));
+      final second = await tester.startGesture(center + const Offset(48, 0));
+      await first.moveBy(const Offset(-36, 0));
+      await second.moveBy(const Offset(36, 0));
+      await tester.pump();
+      expect(
+        tester
+            .widget<InteractiveViewer>(viewport)
+            .transformationController!
+            .value
+            .getMaxScaleOnAxis(),
+        greaterThan(1.2),
+      );
+      await first.up();
+      await second.up();
+      await tester.pumpAndSettle();
+      expect(viewport, findsOneWidget);
+      await tester.tapAt(center);
+      await tester.pumpAndSettle();
+      expect(viewport, findsNothing);
+      await tester.tap(find.byType(CreationArtworkTile).first);
+      await tester.pumpAndSettle();
       final drag = await tester.startGesture(tester.getCenter(viewport));
       await drag.moveBy(const Offset(-30, 0));
       await tester.pump();
