@@ -394,7 +394,7 @@ class _CreationComposerState extends State<CreationComposer> {
     final aspectRatio = state.ratioFor(widget.topicId);
     final hint = model == null
         ? l10n.creationNoModelPlaceholder
-        : switch ((state.mode, widget.topicId == null)) {
+        : switch ((state.mode, widget.desktop && widget.topicId == null)) {
             (MediaMode.image, true) => l10n.creationNewImagePrompt,
             (MediaMode.image, false) => l10n.creationImagePrompt,
             (MediaMode.video, true) => l10n.creationNewVideoPrompt,
@@ -449,7 +449,17 @@ class _CreationComposerState extends State<CreationComposer> {
                       builder: (context, constraints) {
                         final compact =
                             !widget.desktop || constraints.maxWidth < 650;
+                        final buttonSize = widget.desktop ? 34.0 : 36.0;
+                        final fontSize = widget.desktop ? 15.0 : 16.0;
+                        final lineHeight = 24 / fontSize;
+                        final scaledLineHeight =
+                            MediaQuery.textScalerOf(context).scale(fontSize) *
+                            lineHeight;
+                        final actionRowHeight =
+                            buttonSize +
+                            (scaledLineHeight - 24).clamp(0.0, double.infinity);
                         return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (enhancement != null)
@@ -485,8 +495,8 @@ class _CreationComposerState extends State<CreationComposer> {
                                     _pickReferences(anchor, role: role),
                               ),
                             Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                compact ? 18 : 20,
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                widget.desktop ? 20 : 18,
                                 10,
                                 10,
                                 2,
@@ -500,79 +510,106 @@ class _CreationComposerState extends State<CreationComposer> {
                                       onKeyEvent: widget.desktop
                                           ? _handleDesktopKey
                                           : null,
-                                      child: PlainTextInput(
-                                        controller: _prompt,
-                                        focusNode: _focus,
-                                        enabled: model != null,
-                                        minLines: 1,
-                                        maxLines: 6,
-                                        style: TextStyle(
-                                          fontSize: compact ? 16 : 15,
-                                          height: 1.5,
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minHeight: buttonSize,
                                         ),
-                                        placeholder: hint,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 5,
+                                        child: PlainTextInput(
+                                          controller: _prompt,
+                                          singleLinePlaceholder: true,
+                                          focusNode: _focus,
+                                          enabled: model != null,
+                                          minLines: 1,
+                                          maxLines: 6,
+                                          style: TextStyle(
+                                            fontSize: fontSize,
+                                            height: lineHeight,
+                                          ),
+                                          placeholder: hint,
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: (buttonSize - 24) / 2,
+                                          ),
+                                          textCapitalization:
+                                              TextCapitalization.sentences,
+                                          onChanged: (value) {
+                                            _dismissEnhancement();
+                                            state.updatePrompt(
+                                              widget.topicId,
+                                              value,
+                                            );
+                                          },
                                         ),
-                                        textCapitalization:
-                                            TextCapitalization.sentences,
-                                        onChanged: (value) {
-                                          _dismissEnhancement();
-                                          state.updatePrompt(
-                                            widget.topicId,
-                                            value,
-                                          );
-                                        },
                                       ),
                                     ),
                                   ),
-                                  ValueListenableBuilder(
-                                    valueListenable: _prompt,
-                                    builder: (context, value, _) =>
-                                        IosIconButton(
-                                          icon: Lucide.WandSparkles,
-                                          tooltip: l10n.creationEnhance,
-                                          minSize: 34,
-                                          enabled:
-                                              model != null &&
-                                              value.text.trim().isNotEmpty,
-                                          onTap: () => _enhance(),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    height: actionRowHeight,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ValueListenableBuilder(
+                                          valueListenable: _prompt,
+                                          builder: (context, value, _) =>
+                                              IosIconButton(
+                                                icon: Lucide.WandSparkles,
+                                                tooltip: l10n.creationEnhance,
+                                                minSize: buttonSize,
+                                                padding: EdgeInsets.zero,
+                                                enabled:
+                                                    model != null &&
+                                                    value.text
+                                                        .trim()
+                                                        .isNotEmpty,
+                                                onTap: () => _enhance(),
+                                              ),
                                         ),
-                                  ),
-                                  ValueListenableBuilder(
-                                    valueListenable: _prompt,
-                                    builder: (context, value, _) {
-                                      final enabled =
-                                          value.text.trim().isNotEmpty &&
-                                          state.canSubmit(widget.topicId);
-                                      return IosCardPress(
-                                        focusable: true,
-                                        borderRadius: BorderRadius.circular(99),
-                                        baseColor: enabled
-                                            ? cs.primary
-                                            : context.appColors.surfaceFill,
-                                        onTap: enabled ? _send : null,
-                                        child: Tooltip(
-                                          message: l10n.creationGenerate,
-                                          child: SizedBox.square(
-                                            dimension: compact ? 36 : 34,
-                                            child: Icon(
-                                              Lucide.ArrowUp,
-                                              size: 19,
-                                              color: enabled
-                                                  ? cs.onPrimary
-                                                  : cs.onSurfaceVariant,
-                                            ),
-                                          ),
+                                        const SizedBox(width: 8),
+                                        ValueListenableBuilder(
+                                          valueListenable: _prompt,
+                                          builder: (context, value, _) {
+                                            final enabled =
+                                                value.text.trim().isNotEmpty &&
+                                                state.canSubmit(widget.topicId);
+                                            return IosCardPress(
+                                              focusable: true,
+                                              borderRadius:
+                                                  BorderRadius.circular(99),
+                                              baseColor: enabled
+                                                  ? cs.primary
+                                                  : context
+                                                        .appColors
+                                                        .surfaceFill,
+                                              onTap: enabled ? _send : null,
+                                              child: Tooltip(
+                                                message: l10n.creationGenerate,
+                                                child: SizedBox.square(
+                                                  dimension: buttonSize,
+                                                  child: Icon(
+                                                    Lucide.ArrowUp,
+                                                    size: 19,
+                                                    color: enabled
+                                                        ? cs.onPrimary
+                                                        : cs.onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
                                         ),
-                                      );
-                                    },
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                widget.desktop ? 12 : 10,
+                                widget.desktop ? 6 : 4,
+                                10,
+                                10,
+                              ),
                               child: Row(
                                 children: [
                                   Builder(

@@ -51,7 +51,7 @@ void showCreationToast(
               Flexible(
                 child: Text(
                   message,
-                  style: TextStyle(
+                  style: Theme.of(ctx).textTheme.bodyMedium!.copyWith(
                     color: cs.surface,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,

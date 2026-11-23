@@ -52,7 +52,7 @@ Future<void> showCreationMenu(
               ),
               child: Material(
                 type: MaterialType.transparency,
-                textStyle: TextStyle(
+                textStyle: Theme.of(ctx).textTheme.bodyMedium!.copyWith(
                   color: cs.onSurface,
                   fontSize: 13.5,
                   letterSpacing: 0,

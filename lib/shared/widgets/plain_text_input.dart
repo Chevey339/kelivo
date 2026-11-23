@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:flutter/material.dart' show Theme;
 
+import 'app_text_selection_toolbar.dart';
+
 /// System text editing and selection with only the chrome supplied by the parent.
 class PlainTextInput extends StatelessWidget {
   const PlainTextInput({
@@ -11,6 +13,7 @@ class PlainTextInput extends StatelessWidget {
     this.placeholder,
     this.style,
     this.placeholderStyle,
+    this.singleLinePlaceholder = false,
     this.padding = EdgeInsets.zero,
     this.autofocus = false,
     this.enabled = true,
@@ -35,6 +38,9 @@ class PlainTextInput extends StatelessWidget {
   final TextStyle? style, placeholderStyle;
   final EdgeInsetsGeometry padding;
   final bool autofocus, enabled;
+
+  /// Keep a growing prompt field at one line until the user enters text.
+  final bool singleLinePlaceholder;
   final int? minLines, maxLines;
   final ValueChanged<String>? onChanged, onSubmitted;
   final TextInputAction? textInputAction;
@@ -48,14 +54,25 @@ class PlainTextInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textStyle = TextStyle(
-      color: scheme.onSurface,
-      fontSize: 14,
-      height: 1.35,
-      decoration: TextDecoration.none,
-    ).merge(style);
-    return CupertinoTextField(
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final textStyle = theme.textTheme.bodyMedium!
+        .copyWith(
+          color: scheme.onSurface,
+          fontSize: 14,
+          height: 1.35,
+          letterSpacing: 0,
+          decoration: TextDecoration.none,
+          leadingDistribution: TextLeadingDistribution.even,
+        )
+        .merge(style)
+        .copyWith(textBaseline: TextBaseline.alphabetic);
+    final hintStyle = textStyle
+        .copyWith(color: scheme.onSurface.withValues(alpha: .42))
+        .merge(placeholderStyle);
+    final overlayHint =
+        singleLinePlaceholder && placeholder != null && controller != null;
+    final field = CupertinoTextField(
       controller: controller,
       focusNode: focusNode,
       autofocus: autofocus,
@@ -69,10 +86,8 @@ class PlainTextInput extends StatelessWidget {
       textInputAction: textInputAction,
       textCapitalization: textCapitalization,
       style: textStyle,
-      placeholder: placeholder,
-      placeholderStyle: textStyle
-          .copyWith(color: scheme.onSurface.withValues(alpha: .42))
-          .merge(placeholderStyle),
+      placeholder: overlayHint ? null : placeholder,
+      placeholderStyle: hintStyle,
       cursorColor: cursorColor ?? scheme.primary,
       decoration: decoration ?? const BoxDecoration(),
       padding: padding,
@@ -80,6 +95,47 @@ class PlainTextInput extends StatelessWidget {
       suffix: suffix,
       textAlign: textAlign,
       textAlignVertical: TextAlignVertical.center,
+      contextMenuBuilder: (context, state) => AppTextSelectionToolbar(
+        anchors: state.contextMenuAnchors,
+        buttonItems: state.contextMenuButtonItems,
+        selectionContext: state.context,
+        onDismiss: () => state.hideToolbar(false),
+      ),
+    );
+    if (!overlayHint) return field;
+    // A textarea placeholder is paint-only: its translation must never size
+    // the editable row or move the send button when the user starts typing.
+    return Semantics(
+      hint: placeholder,
+      child: Stack(
+        children: [
+          field,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ExcludeSemantics(
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller!,
+                  builder: (context, value, child) =>
+                      value.text.isEmpty ? child! : const SizedBox.shrink(),
+                  child: Padding(
+                    padding: padding,
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        placeholder!,
+                        style: hintStyle,
+                        textAlign: textAlign,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

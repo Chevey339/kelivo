@@ -34,7 +34,7 @@ class CreationSurface extends StatelessWidget {
             color: cs.onSurface,
             borderRadius: BorderRadius.circular(8),
           ),
-          textStyle: TextStyle(color: cs.surface, fontSize: 12),
+          textStyle: style.copyWith(color: cs.surface, fontSize: 12),
           constraints: const BoxConstraints(minHeight: 0),
         ),
         child: IconTheme(
@@ -211,7 +211,7 @@ class CreationAction extends StatelessWidget {
               minHeight: minHeight == null ? 0 : minHeight! - 12,
             ),
             child: DefaultTextStyle(
-              style: DefaultTextStyle.of(context).style.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 fontSize: small ? 12.5 : 13,
                 fontWeight: pill ? FontWeight.w500 : FontWeight.w600,
                 color: color,

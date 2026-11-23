@@ -657,6 +657,28 @@ void main() {
         expect(find.byType(CreationComposer), findsOneWidget);
         expect(find.byTooltip('Generate'), findsOneWidget);
         expect(find.byTooltip('Add reference image'), findsOneWidget);
+        final composer = find.byType(CreationComposer);
+        final input = find.descendant(
+          of: composer,
+          matching: find.byType(EditableText),
+        );
+        final send = find.byTooltip('Generate');
+        expect(
+          tester.getCenter(input).dy,
+          closeTo(tester.getCenter(send).dy, 1),
+        );
+        controller.addReferencePaths(null, ['/sample/reference.png']);
+        await tester.pump();
+        final thumb = find.descendant(
+          of: composer,
+          matching: find.byType(CreationFileImage),
+        );
+        expect(
+          tester.getTopLeft(thumb).dx - tester.getTopLeft(composer).dx,
+          closeTo(14, 1),
+        );
+        controller.setReferences(null, []);
+        await tester.pump();
         expect(
           find.text(desktop ? '1 image' : 'Auto · 1 image'),
           findsOneWidget,
