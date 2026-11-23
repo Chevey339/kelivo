@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
@@ -16,7 +19,9 @@ import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/snackbar.dart';
+import '../../media/widgets/creation_toast.dart';
+import '../../media/widgets/creation_controls.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/thinking_sheen.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
@@ -52,7 +57,43 @@ class ChatCreationImages extends StatefulWidget {
 
 class _ChatCreationImagesState extends State<ChatCreationImages> {
   String? _selected;
+  String? _holding;
+  final _thumbFocus = <String, FocusNode>{};
+  @override
+  void dispose() {
+    for (final n in _thumbFocus.values) {
+      n.dispose();
+    }
+    super.dispose();
+  }
+
+  void _choose(String id, {bool keyboard = false}) {
+    setState(() {
+      if (_selected != id) _holding = null;
+      _selected = id;
+    });
+    final node = _thumbFocus[id];
+    if (keyboard) node?.requestFocus();
+    final ctx = node?.context;
+    if (ctx != null) {
+      final object = ctx.findRenderObject();
+      if (object == null) return;
+      Scrollable.maybeOf(ctx)?.position.ensureVisible(
+        object,
+        alignment: .5,
+        duration: handoffDuration(ctx, 160),
+        curve: handoffCurve,
+      );
+    }
+  }
+
+  void _hold(String id, bool value) {
+    if (!mounted || (value ? _holding == id : _holding != id)) return;
+    setState(() => _holding = value ? id : null);
+  }
+
   bool _hovered = false;
+  bool _imageFocused = false;
   String? _retrying;
 
   Future<void> _retry(
@@ -77,7 +118,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
       if (mounted) setState(() => _retrying = null);
     }
     if (mounted) {
-      showAppSnackBar(
+      showCreationToast(
         context,
         message: AppLocalizations.of(context)!.creationActionFailed,
       );
@@ -158,8 +199,16 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     final ratio = _ratio(slot);
     final batch = slot.batch;
     final active = batch?.status.isActive == true;
+    final held = _holding == slot.id && !active && slot.item != null;
+    final ids = slots.map((v) => v.id).toSet();
+    for (final id
+        in _thumbFocus.keys.where((id) => !ids.contains(id)).toList()) {
+      _thumbFocus.remove(id)!.dispose();
+    }
     final showRail = slots.length > 1;
-    final maxWidth = desktop
+    final maxWidth = active || held
+        ? (desktop ? 400.0 : 300.0)
+        : desktop
         ? ratio >= 2
               ? double.infinity
               : ratio > 1.01
@@ -181,73 +230,87 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
             bounds.maxWidth,
             maxWidth + (showRail ? 64 : 0),
           );
-          return SizedBox(
-            width: width,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 7,
-              children: [
-                if (active && batch != null && media != null)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ThinkingSheen(
-                          enabled: !MediaQuery.disableAnimationsOf(context),
-                          child: Text(
-                            l10n.creationWaitingImage,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              color: cs.onSurfaceVariant,
+          return Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: SizedBox(
+              width: width,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 7,
+                children: [
+                  if ((active || held) && batch != null && media != null)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ThinkingSheen(
+                            enabled:
+                                active &&
+                                !MediaQuery.disableAnimationsOf(context),
+                            child: Text(
+                              active
+                                  ? l10n.creationWaitingImage
+                                  : l10n.creationChatImageReady,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      _link(
-                        MaterialLocalizations.of(context).cancelButtonLabel,
-                        () => media.runner.cancel(batch.id),
-                      ),
-                    ],
-                  )
-                else if (batch != null &&
-                    batch.status == GenerationStatus.cancelled &&
-                    media != null)
+                        if (active)
+                          _link(
+                            MaterialLocalizations.of(context).cancelButtonLabel,
+                            () => media.runner.cancel(batch.id),
+                          ),
+                      ],
+                    )
+                  else if (batch != null &&
+                      batch.status == GenerationStatus.cancelled &&
+                      media != null)
+                    Row(
+                      children: [
+                        Expanded(child: Text(l10n.creationChatCancelled)),
+                        _link(
+                          l10n.creationChatRegenerate,
+                          widget.streaming || _retrying != null
+                              ? null
+                              : () => _retry(batch, media),
+                        ),
+                      ],
+                    ),
                   Row(
+                    key: const ValueKey('creation-image'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: Text(l10n.creationChatCancelled)),
-                      _link(
-                        l10n.creationChatRegenerate,
-                        widget.streaming || _retrying != null
-                            ? null
-                            : () => _retry(batch, media),
+                      Expanded(
+                        child: _main(slot, slots, media, ratio, desktop),
                       ),
-                    ],
-                  ),
-                Row(
-                  key: const ValueKey('creation-image'),
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _main(slot, slots, media, ratio, desktop)),
-                    if (showRail) ...[
-                      const SizedBox(width: 8),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 300),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            spacing: 8,
-                            children: [
-                              for (final candidate in slots)
-                                _thumbnail(candidate, slot.id == candidate.id),
-                            ],
+                      if (showRail) ...[
+                        const SizedBox(width: 8),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 300),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              spacing: 8,
+                              children: [
+                                for (final candidate in slots)
+                                  _thumbnail(
+                                    candidate,
+                                    slot.id == candidate.id,
+                                    slots,
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
-                ),
-                if (slot.item case final item?
-                    when !active && batch != null && media != null)
-                  _caption(item, batch, media, readyCount),
-              ],
+                  ),
+                  if (slot.item case final item?
+                      when !active && !held && batch != null && media != null)
+                    _caption(item, batch, media, readyCount),
+                ],
+              ),
             ),
           );
         },
@@ -288,6 +351,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
               preview: progress?.preview,
               queueAhead: busy ? media.runner.queueAhead(batch.id) : 0,
               showStatusLabel: false,
+              onGameHoldingChanged: (value) => _hold(slot.id, value),
               gameSeed: widget.messageId,
               result: result,
             );
@@ -328,7 +392,10 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     }
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: context.appColors.surfaceFill,
+        color: Color.alphaBlend(
+          cs.onSurface.withValues(alpha: .06),
+          context.appColors.surfaceCard,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
@@ -337,7 +404,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
           mainAxisSize: MainAxisSize.min,
           spacing: 6,
           children: [
-            const Icon(Lucide.ImageOff, size: 22),
+            Icon(Lucide.ImageOff, size: 22, color: cs.onSurfaceVariant),
             Text(
               l10n.creationChatImageUnavailable,
               style: TextStyle(
@@ -352,20 +419,26 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
                   ? l10n.creationInterrupted
                   : l10n.creationFailed,
               textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
             ),
             Wrap(
               alignment: WrapAlignment.center,
               spacing: 8,
               children: [
-                FilledButton.tonal(
+                CreationAction(
+                  small: true,
+                  tone: CreationActionTone.tonal,
+                  icon: const Icon(Lucide.RotateCcw, size: 13),
                   onPressed: widget.streaming || _retrying != null
                       ? null
                       : () => _retry(batch, media),
                   child: Text(l10n.creationRetry),
                 ),
                 if (batch.errorJson != null)
-                  TextButton(
+                  CreationAction(
+                    small: true,
                     onPressed: () => showCreationRequestDetails(
                       context,
                       batch,
@@ -389,93 +462,171 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     bool desktop,
   ) {
     final l10n = AppLocalizations.of(context)!;
-    return MouseRegion(
-      onEnter: desktop ? (_) => setState(() => _hovered = true) : null,
-      onExit: desktop ? (_) => setState(() => _hovered = false) : null,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            IosCardPress(
-              onTap: () => showCreationLightbox(
-                context,
-                item,
-                desktop: desktop,
-                gallery: [
-                  for (final value in slots)
-                    if (value.item case final artwork?) artwork,
-                ],
+    Widget glass(IconData icon, String label, VoidCallback tap) => ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: ColoredBox(
+          color: Colors.white.withValues(alpha: .16),
+          child: IosIconButton(
+            icon: icon,
+            size: 15,
+            minSize: 30,
+            padding: EdgeInsets.zero,
+            color: Colors.white,
+            tooltip: label,
+            onTap: tap,
+          ),
+        ),
+      ),
+    );
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (v) => setState(() => _imageFocused = v),
+      child: MouseRegion(
+        onEnter: desktop ? (_) => setState(() => _hovered = true) : null,
+        onExit: desktop ? (_) => setState(() => _hovered = false) : null,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              IosCardPress(
+                focusable: true,
+                baseColor: Colors.transparent,
+                onTap: () => showCreationLightbox(
+                  context,
+                  item,
+                  desktop: desktop,
+                  gallery: [
+                    for (final value in slots)
+                      if (value.item case final artwork?) artwork,
+                  ],
+                ),
+                child: CreationFileImage(slot.attachment?.uri ?? item.path),
               ),
-              child: CreationFileImage(slot.attachment?.uri ?? item.path),
-            ),
-            if (_hovered && desktop)
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(8, 18, 8, 6),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black54],
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IosIconButton(
-                        icon: Lucide.Download,
-                        color: Colors.white,
-                        minSize: 32,
-                        tooltip: l10n.creationSaveImage,
-                        onTap: () => saveCreationArtwork(
-                          context,
-                          item,
-                          desktop: desktop,
-                        ),
-                      ),
-                      IosIconButton(
-                        icon: Lucide.Share,
-                        color: Colors.white,
-                        minSize: 32,
-                        tooltip: l10n.creationShare,
-                        onTap: () => shareCreationArtwork(context, item),
-                      ),
-                    ],
+              if (desktop)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: AnimatedSwitcher(
+                    duration: handoffDuration(context, 160),
+                    switchInCurve: handoffCurve,
+                    switchOutCurve: handoffCurve,
+                    child: _hovered || _imageFocused
+                        ? Stack(
+                            key: const ValueKey('image-actions'),
+                            alignment: AlignmentDirectional.bottomEnd,
+                            children: [
+                              const Positioned.fill(
+                                child: IgnorePointer(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.transparent,
+                                          Color(0x52000000),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  10,
+                                  24,
+                                  10,
+                                  8,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    glass(
+                                      Lucide.Download,
+                                      l10n.creationSaveImage,
+                                      () => saveCreationArtwork(
+                                        context,
+                                        item,
+                                        desktop: true,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    glass(
+                                      Lucide.Share,
+                                      l10n.creationShare,
+                                      () => shareCreationArtwork(context, item),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        : const SizedBox.shrink(),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _thumbnail(_ImageSlot slot, bool selected) {
+  Widget _thumbnail(_ImageSlot slot, bool selected, List<_ImageSlot> slots) {
     final cs = Theme.of(context).colorScheme;
     final path =
         slot.item?.thumbnailPath ?? slot.attachment?.uri ?? slot.item?.path;
-    return IosCardPress(
-      onTap: () => setState(() => _selected = slot.id),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: 56,
-        height: 56,
-        padding: EdgeInsets.all(selected ? 2 : 0),
-        decoration: BoxDecoration(
+    final index = slots.indexWhere((s) => s.id == slot.id);
+    final node = _thumbFocus.putIfAbsent(
+      slot.id,
+      () => FocusNode(debugLabel: 'Chat image thumbnail'),
+    );
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: MaterialLocalizations.of(
+        context,
+      ).tabLabel(tabIndex: index + 1, tabCount: slots.length),
+      child: Focus(
+        focusNode: node,
+        skipTraversal: !selected,
+        onKeyEvent: (_, event) {
+          if (event is KeyUpEvent) return KeyEventResult.ignored;
+          final dest = switch (event.logicalKey) {
+            LogicalKeyboardKey.arrowUp => index - 1,
+            LogicalKeyboardKey.arrowDown => index + 1,
+            LogicalKeyboardKey.home => 0,
+            LogicalKeyboardKey.end => slots.length - 1,
+            LogicalKeyboardKey.enter || LogicalKeyboardKey.space => index,
+            _ => null,
+          };
+          if (dest == null) return KeyEventResult.ignored;
+          _choose(slots[dest.clamp(0, slots.length - 1)].id, keyboard: true);
+          return KeyEventResult.handled;
+        },
+        child: IosCardPress(
+          onTap: () => _choose(slot.id),
           borderRadius: BorderRadius.circular(10),
-          color: selected ? cs.primary : context.appColors.surfaceFill,
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Opacity(
-            opacity: selected ? 1 : .7,
-            child: slot.batch?.status.isActive == true
-                ? const CreationDotField(progress: .4, thumbnail: true)
-                : path == null
-                ? const Icon(Lucide.ImageOff, size: 19)
-                : CreationFileImage(path, cacheWidth: 144),
+          child: Container(
+            width: 56,
+            height: 56,
+            padding: EdgeInsets.all(selected ? 2 : 0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: selected ? cs.primary : context.appColors.surfaceFill,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Opacity(
+                opacity: selected ? 1 : .7,
+                child: slot.batch?.status.isActive == true
+                    ? const CreationDotField(progress: .4, thumbnail: true)
+                    : path == null
+                    ? const Icon(Lucide.ImageOff, size: 19)
+                    : CreationFileImage(path, cacheWidth: 144),
+              ),
+            ),
           ),
         ),
       ),
@@ -506,26 +657,59 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
           l10n.creationChatResultCaption(count, model.displayName, ratio),
           style: TextStyle(
             fontSize: 12.5,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: .42),
           ),
         ),
         _link(
           l10n.creationShowInCreation,
           () =>
               ChatActionBus.instance.fireCreation(OpenCreationArtwork(item.id)),
+          external: true,
         ),
       ],
     );
   }
 
-  Widget _link(String label, VoidCallback? onTap) => TextButton(
-    style: TextButton.styleFrom(
-      textStyle: const TextStyle(fontSize: 12.5),
-      minimumSize: const Size(28, 30),
-      padding: const EdgeInsets.symmetric(horizontal: 7),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    ),
-    onPressed: onTap,
-    child: Text(label),
-  );
+  Widget _link(String label, VoidCallback? onTap, {bool external = false}) {
+    final cs = Theme.of(context).colorScheme;
+    return Semantics(
+      link: true,
+      enabled: onTap != null,
+      child: IosCardPress(
+        focusable: true,
+        onTap: onTap,
+        baseColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(5),
+        duration: handoffDuration(context, 140),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurface.withValues(
+                    alpha: onTap == null ? .32 : .64,
+                  ),
+                  decoration: TextDecoration.underline,
+                  decorationStyle: TextDecorationStyle.dashed,
+                  decorationColor: cs.onSurface.withValues(alpha: .38),
+                ),
+              ),
+            ),
+            if (external)
+              Icon(
+                LucideIcons.arrowUpRight,
+                size: 12,
+                color: cs.onSurfaceVariant,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

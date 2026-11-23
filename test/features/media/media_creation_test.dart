@@ -587,12 +587,18 @@ void main() {
         });
         await tester.pump();
         expect(find.text('Creation ready · 0'), findsOneWidget);
+        if (chat) {
+          expect(find.text('Image created'), findsOneWidget);
+        }
         final images = find.byType(
           chat ? CreationFileImage : CreationArtworkTile,
         );
         expect(images, chat ? findsNothing : findsNWidgets(2));
         await tester.pump(const Duration(milliseconds: 1500));
         expect(find.text('Creation ready · 0'), findsNothing);
+        if (chat) {
+          expect(find.text('Image created'), findsNothing);
+        }
         expect(images, findsNWidgets(chat ? 1 : 3));
         await tester.pumpWidget(const SizedBox.shrink());
       },

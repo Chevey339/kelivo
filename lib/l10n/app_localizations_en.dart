@@ -18783,4 +18783,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get creationCancelledHelp =>
       'Your prompt and settings are saved. You can generate again at any time.';
+
+  @override
+  String get creationChatImageReady => 'Image created';
 }

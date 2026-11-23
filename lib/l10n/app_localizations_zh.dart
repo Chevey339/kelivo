@@ -17723,6 +17723,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get creationCancelledHelp => '提示词和参数都保留着，可以随时重新生成。';
+
+  @override
+  String get creationChatImageReady => '图像已生成';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -35444,6 +35447,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationCancelledHelp => '提示词和参数都保留着，可以随时重新生成。';
+
+  @override
+  String get creationChatImageReady => '图像已生成';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -53222,4 +53228,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationCancelledHelp => '提示詞和設定都保留著，可以隨時重新生成。';
+
+  @override
+  String get creationChatImageReady => '圖像已建立';
 }

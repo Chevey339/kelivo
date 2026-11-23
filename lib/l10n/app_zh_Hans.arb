@@ -6700,5 +6700,6 @@
   "creationCustomCountLabel": "自定义张数",
   "creationFailureCategory": "{kind, select, network{网络连接} rateLimited{请求频率限制} server{供应商错误} rejected{请求被拒绝} login{需要登录} parameters{参数无效} referenceTooLarge{参考图过大} download{下载失败} invalidResponse{响应无效} other{生成错误}}",
   "creationInterruptedHelp": "这个任务在应用关闭时还没有完成，提示词和参数都保留着。",
-  "creationCancelledHelp": "提示词和参数都保留着，可以随时重新生成。"
+  "creationCancelledHelp": "提示词和参数都保留着，可以随时重新生成。",
+  "creationChatImageReady": "图像已生成"
 }

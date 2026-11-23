@@ -73,6 +73,7 @@ class CreationWaitingCard extends StatefulWidget {
     this.ordinal = 0,
     this.gameSeed,
     this.result,
+    this.onGameHoldingChanged,
   });
 
   final GenerationBatchRow batch;
@@ -83,6 +84,7 @@ class CreationWaitingCard extends StatefulWidget {
   final int ordinal;
   final String? gameSeed;
   final Widget? result;
+  final ValueChanged<bool>? onGameHoldingChanged;
 
   @override
   State<CreationWaitingCard> createState() => _CreationWaitingCardState();
@@ -241,6 +243,22 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
   CreationWaitGame get _nextGame =>
       waitingGameFor(_gamePreference, widget.gameSeed ?? widget.batch.id);
 
+  bool _reportedHolding = false;
+  void _reportHolding(bool holding) {
+    if (_reportedHolding == holding) return;
+    _reportedHolding = holding;
+    final callback = widget.onGameHoldingChanged;
+    if (callback == null) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_reportedHolding == holding) callback(holding);
+      });
+    } else {
+      callback(holding);
+    }
+  }
+
   void _activate() {
     if (_phase == _GamePhase.paused && _canInteract) {
       setState(() => _phase = _GamePhase.playing);
@@ -258,6 +276,7 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
     } else {
       return;
     }
+    _reportHolding(true);
     _focus.requestFocus();
     _syncTicker();
   }
@@ -292,6 +311,7 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
     } else {
       reset();
     }
+    _reportHolding(false);
     _WaitingGameCards.release(this);
     _syncRegistration();
     _syncTicker();
@@ -338,6 +358,7 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
     _paint.value++;
     if (game.over) {
       setState(() => _phase = _GamePhase.ended);
+      _reportHolding(false);
       _WaitingGameCards.release(this);
       _syncTicker();
       _banner = Timer(const Duration(milliseconds: 1500), () {

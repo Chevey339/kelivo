@@ -18208,4 +18208,7 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get creationCancelledHelp =>
       '프롬프트와 설정은 저장되어 있습니다. 언제든지 다시 생성할 수 있습니다.';
+
+  @override
+  String get creationChatImageReady => '이미지가 생성되었습니다';
 }

@@ -32795,6 +32795,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your prompt and settings are saved. You can generate again at any time.'**
   String get creationCancelledHelp;
+
+  /// Status line above a chat image while the waiting game shows its completion banner before revealing the finished image.
+  ///
+  /// In en, this message translates to:
+  /// **'Image created'**
+  String get creationChatImageReady;
 }
 
 class _AppLocalizationsDelegate

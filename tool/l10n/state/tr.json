@@ -5443,5 +5443,6 @@
   "creationCustomCountLabel": "a8365ed8b341a20e563c55781f5a26ff774c7ca03be1da26fd469c6868dab761",
   "creationFailureCategory": "b9aa37bc8931cd09f69040b734541bf0a5e1983b27e85cdea76c74ef8d88866e",
   "creationInterruptedHelp": "fd2245f83d1f0b85be14272a71f154c629a14ecf1885fc9a039d9664e2d019b0",
-  "creationCancelledHelp": "e44d2e2ab390312ba4a20bcb28103a1e4312d6426b2fc164a267ed46e888bd04"
+  "creationCancelledHelp": "e44d2e2ab390312ba4a20bcb28103a1e4312d6426b2fc164a267ed46e888bd04",
+  "creationChatImageReady": "d65b54af8f5cafe4ed427bb07a5fc10c7d716e512127032922076d2e3627a4fd"
 }
