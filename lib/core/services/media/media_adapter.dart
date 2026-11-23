@@ -64,6 +64,7 @@ class MediaRequestLog {
       'requests',
       'image-synthesis',
       'generation',
+      'multimodal-generation',
       'video-synthesis',
       'content',
     };
@@ -81,6 +82,8 @@ class MediaRequestLog {
         .join('/');
     final body = <String, Object?>{};
     if (payload != null) {
+      final parameters = payload['parameters'];
+      final fields = parameters is Map ? parameters : payload;
       for (final key in [
         'n',
         'count',
@@ -88,15 +91,23 @@ class MediaRequestLog {
         'duration',
         'seconds',
       ]) {
-        final value = payload[key];
+        final value = fields[key];
         if (value is int && value >= 0 && value <= 60) body[key] = value;
       }
-      if (payload['size'] case final String size
-          when RegExp(r'^(auto|[0-9]{2,4}x[0-9]{2,4})$').hasMatch(size)) {
+      if (fields['size'] case final String size
+          when RegExp(r'^(auto|[0-9]{2,4}[x*][0-9]{2,4})$').hasMatch(size)) {
         body['size'] = size;
       }
       for (final key in ['stream', 'watermark']) {
-        if (payload[key] case final bool value) body[key] = value;
+        if (fields[key] case final bool value) body[key] = value;
+      }
+      if (payload['input'] case {
+        'messages': [{'content': final List content}],
+      }) {
+        body['referenceCount'] = content
+            .whereType<Map>()
+            .where((part) => part.containsKey('image'))
+            .length;
       }
     }
     _request = {
@@ -255,6 +266,9 @@ MediaFailure mediaResponseFailure(
           'content_policy',
           'content_filter',
           'safety_violation',
+          'datainspectionfailed',
+          'data_inspection_failed',
+          'inappropriate content',
         ].any(moderation.contains) =>
       MediaFailureKind.rejected,
     401 || 403 => MediaFailureKind.login,
@@ -266,6 +280,11 @@ MediaFailure mediaResponseFailure(
   const knownCodes = {
     'content_policy_violation',
     'content_filter',
+    'datainspectionfailed',
+    'inputdatainspectionfailed',
+    'outputdatainspectionfailed',
+    'invalidparameter',
+    'invalidparameter.range',
     'invalid_size',
     'invalid_request_error',
     'model_not_found',
@@ -280,6 +299,19 @@ MediaFailure mediaResponseFailure(
     [
       if (statusCode != null) 'HTTP $statusCode',
       if (knownCodes.contains(code)) code,
+      if (details['param'] case final String field
+          when const {
+            'model',
+            'prompt',
+            'size',
+            'n',
+            'image',
+            'image[]',
+            'images',
+            'input',
+            'parameters',
+          }.contains(field))
+        field,
     ].join(' · '),
     statusCode: statusCode,
     retryAfter: retryAfter,

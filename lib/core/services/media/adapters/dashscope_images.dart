@@ -6,7 +6,10 @@ import '../media_request.dart';
 import 'native_image_size.dart';
 
 class DashScopeImagesAdapter implements MediaAdapter {
-  const DashScopeImagesAdapter();
+  const DashScopeImagesAdapter({this.apiPath = '/api/v1'});
+
+  final String apiPath;
+  static const _pixelSizes = ['1024x1024', '1536x1024', '1024x1536'];
 
   static bool _wan26Edit(String model) => model.startsWith('wan2.6-image');
   static bool _wan26Text(String model) => model.startsWith('wan2.6-t2i');
@@ -40,7 +43,7 @@ class DashScopeImagesAdapter implements MediaAdapter {
     return MediaCapabilities(
       aspectRatios: _wanxEdit(model)
           ? const ['auto']
-          : _wan25Edit(model)
+          : _wan25Edit(model) || qwen
           ? standardImageRatios
           : const ['auto', '1:1', '4:3', '3:4', '16:9', '9:16'],
       maxPerRequest: qwen
@@ -58,7 +61,11 @@ class DashScopeImagesAdapter implements MediaAdapter {
         _ => 0,
       },
       requiresReference: edit || wanEdit,
-      sizes: wanEdit || wanModern ? const ['1K', '2K'] : const [],
+      sizes: wanEdit || wanModern
+          ? const ['1K', '2K']
+          : qwen
+          ? _pixelSizes
+          : const [],
       supportsNegativePrompt: _negative(model),
       supportsSeed: true,
       platformOptions: [
@@ -101,7 +108,7 @@ class DashScopeImagesAdapter implements MediaAdapter {
     MediaRequest request,
   ) async* {
     final origin = Uri.parse(context.provider.baseUrl).origin;
-    final api = '$origin/api/v1';
+    final api = '$origin$apiPath';
     final model = apiModelId(context.provider, request.modelId);
     final normalized = model.toLowerCase();
     final legacy = _legacyWan(normalized);
@@ -124,6 +131,9 @@ class DashScopeImagesAdapter implements MediaAdapter {
     final modernWanText =
         _wan26Text(normalized) || normalized.startsWith('wan2.5-t2i');
     final configuredSize = request.parameters['size'];
+    final explicitPixels =
+        configuredSize is String &&
+        RegExp(r'^[1-9]\d*[x*][1-9]\d*$').hasMatch(configuredSize);
     final dimensions = imageDimensions(
       request.aspectRatio,
       configuredSize == '2K' ? 2016 : 1344,
@@ -177,7 +187,9 @@ class DashScopeImagesAdapter implements MediaAdapter {
               },
         'parameters': {
           'n': request.count,
-          if (!wanxEdit && request.aspectRatio != 'auto')
+          if (_modernQwen(normalized) && explicitPixels)
+            'size': configuredSize.replaceAll('x', '*')
+          else if (!wanxEdit && request.aspectRatio != 'auto')
             'size': size
           else if (configuredSize != null)
             'size': configuredSize,

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/media/adapters/dashscope_images.dart';
+import 'package:Kelivo/core/services/media/media_adapter.dart';
 import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
@@ -13,8 +14,28 @@ import 'video_fixture.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'DashScope reports content rejection separately from bad parameters',
+    () {
+      final rejected = mediaResponseFailure({
+        'code': 'DataInspectionFailed',
+        'message': 'private prompt text',
+      }, statusCode: 400);
+      expect(rejected.kind, MediaFailureKind.rejected);
+      expect(rejected.message, 'HTTP 400 · datainspectionfailed');
+      final invalid = mediaResponseFailure({
+        'code': 'InvalidParameter',
+        'param': 'size',
+        'message': 'private prompt text',
+      }, statusCode: 400);
+      expect(invalid.kind, MediaFailureKind.parameters);
+      expect(invalid.message, 'HTTP 400 · invalidparameter · size');
+    },
+  );
+
   for (final id in [
     'qwen-image-plus',
+    'qwen-image-2.1-turbo',
     'wan2.6-image',
     'wan2.6-t2i',
     'wan2.5-t2i-preview',
@@ -48,6 +69,9 @@ void main() {
         final body = jsonDecode(request.body) as Map;
         expect(body['model'], id);
         expect(body['parameters']['seed'], 42);
+        if (id == 'qwen-image-2.1-turbo') {
+          expect(body['parameters']['size'], '1280*960');
+        }
         if (id == 'wan2.5-t2i-preview') {
           expect(body['input'], {
             'prompt': 'A garden',
@@ -94,7 +118,10 @@ void main() {
               negativePrompt: 'Blur',
               aspectRatio: '16:9',
               count: async ? 2 : 1,
-              parameters: const {'seed': 42},
+              parameters: {
+                'seed': 42,
+                if (id == 'qwen-image-2.1-turbo') 'size': '1280x960',
+              },
             ),
           )
           .toList();

@@ -57,6 +57,17 @@ class MediaAdapterResolver {
     if (key == 'bytedance' || host.endsWith('.volces.com')) {
       return video ? const ArkVideoAdapter() : const ArkImagesAdapter();
     }
+    // TokenDance lists DashScope for both generation and editing on these
+    // models. Its OpenAI compatibility endpoint supports generation only.
+    if (!video &&
+        (host == 'tokendance.space' || host == 'www.tokendance.space') &&
+        modelId != null &&
+        const {
+          'qwen-image-2.1-pro',
+          'qwen-image-2.1-turbo',
+        }.contains(apiModelId(provider, modelId).toLowerCase())) {
+      return const DashScopeImagesAdapter(apiPath: '/gateway/alibaba/api/v1');
+    }
     if (key == 'aliyun' ||
         host.startsWith('dashscope') && host.endsWith('.aliyuncs.com') ||
         host.endsWith('.maas.aliyuncs.com')) {

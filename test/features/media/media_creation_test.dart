@@ -107,6 +107,135 @@ void main() {
   );
 
   test(
+    'one TokenDance Qwen topic can generate twice and edit the original',
+    () async {
+      final harness = await createBusinessTestHarness(
+        initial: {BusinessKeyRegistry.creationAutoTitleKey: false},
+      );
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      const model = 'qwen-image-2.1-turbo';
+      final provider = _provider.copyWith(
+        baseUrl: 'https://tokendance.space/gateway/v1',
+        models: const [model],
+      );
+      await settings.setProviderConfig(provider.id, provider);
+      final root = await Directory.systemTemp.createTemp('qwen-topic');
+      SandboxPathResolver.debugSetDirs(docsDir: root.path);
+      final png = image.encodePng(image.Image(width: 24, height: 16));
+      final inputs = <List<dynamic>>[];
+      final sizes = <Object?>[];
+      final repository = MediaRepository(harness.database);
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: MediaFileStore(
+          directory: () async => Directory('${root.path}/generations'),
+        ),
+        clientFactory: (_, _) => MockClient((request) async {
+          if (request.method == 'GET') return http.Response.bytes(png, 200);
+          expect(
+            request.url.toString(),
+            'https://tokendance.space/gateway/alibaba/api/v1/services/aigc/multimodal-generation/generation',
+          );
+          final body = jsonDecode(request.body);
+          expect(body['model'], model);
+          sizes.add(body['parameters']['size']);
+          inputs.add(body['input']['messages'].single['content'] as List);
+          return http.Response(
+            jsonEncode({
+              'output': {
+                'choices': [
+                  {
+                    'message': {
+                      'content': [
+                        {'image': 'https://images.example.test/cup.png'},
+                      ],
+                    },
+                  },
+                ],
+              },
+            }),
+            200,
+          );
+        }),
+      );
+      final controller = MediaCreationController(
+        runner: runner,
+        settings: settings,
+        preferences: harness.preferences,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await runner.shutdown();
+        runner.dispose();
+        settings.dispose();
+        SandboxPathResolver.debugSetDirs();
+        await root.delete(recursive: true);
+      });
+      Future<GenerationItemRow> output(String topic) async {
+        final id = controller.lastSubmission(topic)!;
+        await repository
+            .watchBatches()
+            .firstWhere(
+              (rows) => rows.any((b) => b.id == id && !b.status.isActive),
+            )
+            .timeout(const Duration(seconds: 5));
+        expect(
+          (await repository.batch(id))!.status,
+          GenerationStatus.succeeded,
+        );
+        return (await repository.itemsForBatch(id)).single;
+      }
+
+      controller.updatePrompt(null, 'A ceramic cup');
+      final topic = (await controller.submit(null))!;
+      final original = await output(topic);
+      controller.updatePrompt(topic, 'A different image of a kite');
+      expect(await controller.submit(topic), topic);
+      await output(topic);
+      final edit = await controller.editItem(
+        original,
+        controller.editingModel(original)!,
+        prompt: 'Paint the cup blue',
+        ratio: 'auto',
+      );
+      expect(await edit!.completed, GenerationStatus.succeeded);
+      expect(inputs, [
+        [
+          {'text': 'A ceramic cup'},
+        ],
+        [
+          {'text': 'A different image of a kite'},
+        ],
+        [
+          {'image': 'data:image/png;base64,${base64Encode(png)}'},
+          {'text': 'Paint the cup blue'},
+        ],
+      ]);
+      final batches = await repository.watchBatches().first;
+      expect(batches, hasLength(3));
+      expect(batches.map((batch) => batch.topicId), everyElement(topic));
+      final failed = GenerationBatchRowsCompanion.insert(
+        id: 'previous-qwen-batch',
+        topicId: Value(topic),
+        providerId: provider.id,
+        modelId: model,
+        mode: MediaMode.image,
+        source: GenerationSource.workbench,
+        status: GenerationStatus.failed,
+        prompt: 'A ceramic cup in landscape',
+        paramsJson: '{"aspectRatio":"3:2","count":1,"size":"1536x1024"}',
+        referencesJson: '[]',
+        createdAt: DateTime.now(),
+      );
+      await repository.enqueue(failed);
+      final retry = await runner.retry(failed.id.value, provider);
+      expect(await retry!.completed, GenerationStatus.succeeded);
+      expect(sizes.last, '1536*1024');
+    },
+  );
+
+  test(
     'sending creates a named topic and keeps each topic draft separate',
     () async {
       final harness = await createBusinessTestHarness(
