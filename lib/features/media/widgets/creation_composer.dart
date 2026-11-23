@@ -1619,10 +1619,11 @@ class _ReferenceTileState extends State<_ReferenceTile> {
                 CreationFileImage(widget.ref.path, cacheWidth: 140),
                 if (widget.unavailable)
                   ColoredBox(color: cs.surface.withValues(alpha: .55)),
-                if (!widget.desktop || _hover || _focused)
-                  PositionedDirectional(
-                    top: 3,
-                    end: 3,
+                PositionedDirectional(
+                  top: 3,
+                  end: 3,
+                  child: CreationHoverActions(
+                    visible: !widget.desktop || _hover || _focused,
                     child: DecoratedBox(
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
@@ -1641,6 +1642,7 @@ class _ReferenceTileState extends State<_ReferenceTile> {
                       ),
                     ),
                   ),
+                ),
               ],
             ),
           ),
@@ -1891,25 +1893,28 @@ class _FrameSlotState extends State<_FrameSlot> {
                   ),
                 ),
               ),
-              if (remove)
+              if (value != null)
                 PositionedDirectional(
                   top: 3,
                   end: 3,
-                  child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      color: Colors.black54,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IosIconButton(
-                      icon: Lucide.X,
-                      size: 11,
-                      minSize: 18,
-                      padding: EdgeInsets.zero,
-                      color: Colors.white,
-                      tooltip: MaterialLocalizations.of(
-                        context,
-                      ).deleteButtonTooltip,
-                      onTap: widget.onRemove,
+                  child: CreationHoverActions(
+                    visible: remove,
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: IosIconButton(
+                        icon: Lucide.X,
+                        size: 11,
+                        minSize: 18,
+                        padding: EdgeInsets.zero,
+                        color: Colors.white,
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).deleteButtonTooltip,
+                        onTap: widget.onRemove,
+                      ),
                     ),
                   ),
                 ),

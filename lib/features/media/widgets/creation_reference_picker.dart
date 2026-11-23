@@ -134,12 +134,9 @@ Future<void> showCreationReferenceSources(
     );
     return;
   }
-  final box = context.findRenderObject() as RenderBox?;
   await showCreationMenu(
     context,
-    globalPosition: box == null
-        ? Offset.zero
-        : box.localToGlobal(box.size.topCenter(Offset.zero)),
+    preferAbove: true,
     items: [
       for (final item in items)
         DesktopContextMenuItem(

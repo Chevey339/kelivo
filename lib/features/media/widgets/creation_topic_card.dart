@@ -21,6 +21,48 @@ import '../providers/media_creation_controller.dart';
 import 'creation_lightbox.dart';
 import 'creation_waiting_card.dart';
 
+/// Sizes square covers and their two caption lines independently at every text scale.
+class CreationTopicGrid extends StatelessWidget {
+  const CreationTopicGrid({
+    super.key,
+    required this.desktop,
+    required this.covers,
+    required this.itemCount,
+    required this.itemBuilder,
+  });
+  final bool desktop, covers;
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context);
+    final columns = covers ? 3 : 2;
+    final gap = covers ? (desktop ? 6.0 : 4.0) : 10.0;
+    final captions = covers
+        ? 0.0
+        : 5.0 +
+              (scale.scale(desktop ? 12.5 : 15) * 1.35).ceil() +
+              (scale.scale(desktop ? 11 : 12) * 1.35).ceil();
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final width =
+            (constraints.crossAxisExtent - gap * (columns - 1)) / columns;
+        return SliverGrid.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: gap,
+            mainAxisSpacing: covers ? gap : (desktop ? 14 : 16),
+            mainAxisExtent: width + captions,
+          ),
+          itemCount: itemCount,
+          itemBuilder: itemBuilder,
+        );
+      },
+    );
+  }
+}
+
 class CreationTopicCard extends StatefulWidget {
   const CreationTopicCard({
     super.key,
@@ -40,7 +82,7 @@ class CreationTopicCard extends StatefulWidget {
 }
 
 class _CreationTopicCardState extends State<CreationTopicCard> {
-  bool _hover = false;
+  bool _hover = false, _focused = false;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +91,7 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
     final l10n = AppLocalizations.of(context)!;
     final topic = widget.topic;
     final active = widget.selected;
+    final showTools = _hover || _focused;
     final desktop = widget.desktop;
     final mode = media.topicView;
     final batches = media.batchesFor(topic.id);
@@ -71,6 +114,7 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         fontSize: desktop ? 12.5 : 15,
+        height: 1.35,
         fontWeight: AppFontWeights.semibold,
         color: active ? cs.primary : cs.onSurface,
       ),
@@ -83,10 +127,14 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
           : l10n.creationGenerationCount(batches.length),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: TextStyle(color: cs.onSurfaceVariant, fontSize: desktop ? 11 : 12),
+      style: TextStyle(
+        color: cs.onSurfaceVariant,
+        fontSize: desktop ? 11 : 12,
+        height: 1.35,
+      ),
     );
 
-    void menu([Offset? anchor]) =>
+    void menu([Rect? anchor]) =>
         showCreationTopicMenu(context, topic, desktop: desktop, anchor: anchor);
 
     Widget cover(List<GenerationItemRow?> cells) => ClipRRect(
@@ -113,26 +161,29 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
             fit: StackFit.expand,
             children: [
               cover(allCells),
-              if (mode == CreationTopicView.covers && _hover)
+              if (mode == CreationTopicView.covers && desktop)
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black54],
+                  child: CreationHoverActions(
+                    visible: showTools,
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.black54],
+                        ),
                       ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(5, 15, 5, 4),
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(5, 15, 5, 4),
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -156,16 +207,31 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
                     ),
                   ),
                 ),
-              if (_hover && desktop)
-                Positioned(
+              if (desktop)
+                PositionedDirectional(
                   top: 3,
-                  right: 3,
-                  child: IosIconButton(
-                    icon: Lucide.Ellipsis,
-                    minSize: 26,
-                    color: Colors.white,
-                    tooltip: l10n.chatMessageWidgetMoreTooltip,
-                    onTap: menu,
+                  end: 3,
+                  child: CreationHoverActions(
+                    visible: showTools,
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        color: Color(0x5c000000),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Builder(
+                        builder: (anchor) => IosIconButton(
+                          icon: Lucide.Ellipsis,
+                          minSize: 26,
+                          color: Colors.white,
+                          tooltip: l10n.chatMessageWidgetMoreTooltip,
+                          onTap: () => showCreationTopicMenu(
+                            anchor,
+                            topic,
+                            desktop: true,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -173,67 +239,96 @@ class _CreationTopicCardState extends State<CreationTopicCard> {
         ),
       ),
     );
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: desktop ? (_) => setState(() => _hover = true) : null,
-      onExit: desktop ? (_) => setState(() => _hover = false) : null,
-      child: GestureDetector(
-        onSecondaryTapDown: desktop
-            ? (details) => menu(details.globalPosition)
-            : null,
-        child: Semantics(
-          label: mode == CreationTopicView.covers ? title : null,
-          child: IosCardPress(
-            focusable: true,
-            baseColor: active && mode == CreationTopicView.list
-                ? cs.primary.withValues(alpha: .09)
-                : Colors.transparent,
-            borderRadius: radius,
-            onTap: widget.onOpen,
-            onLongPress: desktop ? null : menu,
-            child: switch (mode) {
-              CreationTopicView.covers => favoriteCover,
-              CreationTopicView.coverAndTitle => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  favoriteCover,
-                  const SizedBox(height: 5),
-                  text,
-                  subtitle,
-                ],
-              ),
-              CreationTopicView.list => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                child: Row(
+    return Focus(
+      canRequestFocus: false,
+      onFocusChange: (value) => setState(() => _focused = value),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: desktop ? (_) => setState(() => _hover = true) : null,
+        onExit: desktop ? (_) => setState(() => _hover = false) : null,
+        child: GestureDetector(
+          onSecondaryTapDown: desktop
+              ? (details) => menu(details.globalPosition & Size.zero)
+              : null,
+          child: Semantics(
+            label: mode == CreationTopicView.covers ? title : null,
+            child: IosCardPress(
+              focusable: true,
+              baseColor: active && mode == CreationTopicView.list
+                  ? cs.primary.withValues(alpha: .09)
+                  : Colors.transparent,
+              borderRadius: radius,
+              onTap: widget.onOpen,
+              onLongPress: desktop ? null : menu,
+              child: switch (mode) {
+                CreationTopicView.covers => favoriteCover,
+                CreationTopicView.coverAndTitle => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox.square(
-                      dimension: 40,
-                      child: cover(allCells.take(1).toList()),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [text, subtitle],
-                      ),
-                    ),
-                    if (running && !_hover)
-                      const SizedBox.square(
-                        dimension: 13,
-                        child: CreationSpinner(radius: 6),
-                      ),
-                    if (_hover && desktop)
-                      IosIconButton(
-                        icon: Lucide.Ellipsis,
-                        minSize: 28,
-                        tooltip: l10n.chatMessageWidgetMoreTooltip,
-                        onTap: menu,
-                      ),
+                    favoriteCover,
+                    const SizedBox(height: 5),
+                    text,
+                    subtitle,
                   ],
                 ),
-              ),
-            },
+                CreationTopicView.list => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox.square(
+                        dimension: 40,
+                        child: cover(allCells.take(1).toList()),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [text, subtitle],
+                        ),
+                      ),
+                      if (running || desktop)
+                        SizedBox.square(
+                          dimension: desktop ? 28 : 16,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              if (running)
+                                CreationHoverActions(
+                                  visible: !desktop || !showTools,
+                                  child: const SizedBox.square(
+                                    dimension: 13,
+                                    child: CreationSpinner(radius: 6),
+                                  ),
+                                ),
+                              if (desktop)
+                                CreationHoverActions(
+                                  visible: showTools,
+                                  child: Builder(
+                                    builder: (anchor) => IosIconButton(
+                                      icon: Lucide.Ellipsis,
+                                      minSize: 28,
+                                      tooltip:
+                                          l10n.chatMessageWidgetMoreTooltip,
+                                      onTap: () => showCreationTopicMenu(
+                                        anchor,
+                                        topic,
+                                        desktop: true,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              },
+            ),
           ),
         ),
       ),
@@ -341,7 +436,7 @@ Future<void> showCreationTopicMenu(
   BuildContext context,
   GenerationTopicRow topic, {
   required bool desktop,
-  Offset? anchor,
+  Rect? anchor,
   VoidCallback? onRename,
   VoidCallback? onDeleted,
 }) async {
@@ -411,14 +506,9 @@ Future<void> showCreationTopicMenu(
     await showCreationActions(context, title: topic.title, items: actions);
     return;
   }
-  final render = context.findRenderObject() as RenderBox?;
   await showCreationMenu(
     context,
-    globalPosition:
-        anchor ??
-        (render != null && render.hasSize
-            ? render.localToGlobal(render.size.center(Offset.zero))
-            : Offset.zero),
+    globalAnchor: anchor,
     items: [
       for (final action in actions)
         DesktopContextMenuItem(

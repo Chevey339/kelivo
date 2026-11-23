@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -398,7 +399,7 @@ class CreationArtworkTile extends StatefulWidget {
   final bool galleryTile;
   final VoidCallback onOpen;
   final String? sourceLabel, draftTopicId;
-  final ValueChanged<Offset?>? onMenu;
+  final ValueChanged<Rect?>? onMenu;
   final VoidCallback? onEdit;
   final bool showSource;
 
@@ -407,14 +408,15 @@ class CreationArtworkTile extends StatefulWidget {
 }
 
 class _CreationArtworkTileState extends State<CreationArtworkTile> {
-  bool _hovered = false;
+  bool _hovered = false, _focused = false;
 
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
+    final showTools = widget.desktop && (_hovered || _focused);
     final l10n = AppLocalizations.of(context)!;
     final media = context.read<MediaCreationController>();
-    void openMenu([Offset? anchor]) {
+    void openMenu([Rect? anchor]) {
       if (widget.onMenu case final callback?) {
         callback(anchor);
       } else {
@@ -428,189 +430,231 @@ class _CreationArtworkTileState extends State<CreationArtworkTile> {
       }
     }
 
-    return MouseRegion(
-      onEnter: widget.desktop ? (_) => setState(() => _hovered = true) : null,
-      onExit: widget.desktop ? (_) => setState(() => _hovered = false) : null,
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onOpen,
-        onSecondaryTapDown: widget.desktop
-            ? (details) => openMenu(details.globalPosition)
-            : null,
-        onLongPress: widget.desktop ? null : openMenu,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(
-            widget.galleryTile
-                ? widget.desktop
-                      ? 12
-                      : 4
-                : 16,
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Hero(tag: 'creation:${item.id}', child: CreationMediaCover(item)),
-              if (_hovered)
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0x5c000000)],
-                      ),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(5, 38, 5, 5),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final width = constraints.maxWidth;
-                        final size = width < 150 ? 26.0 : 30.0;
-                        Widget button(
-                          IconData icon,
-                          String label,
-                          VoidCallback tap, {
-                          bool showLabel = false,
-                        }) => DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: .18),
-                            borderRadius: BorderRadius.circular(size / 2),
+    return Focus(
+      skipTraversal: !widget.desktop,
+      onFocusChange: (value) => setState(() => _focused = value),
+      onKeyEvent: (node, event) {
+        if (!node.hasPrimaryFocus ||
+            event is! KeyDownEvent ||
+            (event.logicalKey != LogicalKeyboardKey.enter &&
+                event.logicalKey != LogicalKeyboardKey.space)) {
+          return KeyEventResult.ignored;
+        }
+        widget.onOpen();
+        return KeyEventResult.handled;
+      },
+      child: MouseRegion(
+        onEnter: widget.desktop ? (_) => setState(() => _hovered = true) : null,
+        onExit: widget.desktop ? (_) => setState(() => _hovered = false) : null,
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onOpen,
+          onSecondaryTapDown: widget.desktop
+              ? (details) => openMenu(details.globalPosition & Size.zero)
+              : null,
+          onLongPress: widget.desktop ? null : openMenu,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(
+              widget.galleryTile
+                  ? widget.desktop
+                        ? 12
+                        : 4
+                  : 16,
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Hero(
+                  tag: 'creation:${item.id}',
+                  child: CreationMediaCover(item),
+                ),
+                if (widget.desktop)
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: CreationHoverActions(
+                      visible: showTools,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Color(0x5c000000)],
                           ),
-                          child: IosIconButton(
-                            builder: (color) => Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(icon, color: color, size: 14),
-                                if (showLabel) ...[
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    label,
-                                    style: TextStyle(
-                                      color: color,
-                                      fontSize: 12.5,
-                                      fontWeight: AppFontWeights.semibold,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            color: Colors.white,
-                            borderRadius: size / 2,
-                            minSize: size,
-                            tooltip: showLabel ? null : label,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: showLabel ? 9 : 4,
-                              vertical: 4,
-                            ),
-                            onTap: tap,
-                          ),
-                        );
-                        final edit = media.editingModel(item) != null;
-                        return FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: SizedBox(
-                            width: math.max(width, 120),
-                            child: Row(
-                              spacing: 3,
-                              children: [
-                                if (edit)
-                                  button(
-                                    Lucide.Pencil,
-                                    l10n.creationEditImage,
-                                    widget.onEdit ??
-                                        () => showCreationLightbox(
-                                          context,
-                                          item,
-                                          desktop: true,
-                                          draftTopicId: widget.draftTopicId,
-                                          startEditing: true,
+                        ),
+                        padding: const EdgeInsets.fromLTRB(5, 38, 5, 5),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final width = constraints.maxWidth;
+                            final size = width < 150 ? 26.0 : 30.0;
+                            Widget button(
+                              IconData icon,
+                              String label,
+                              VoidCallback tap, {
+                              bool showLabel = false,
+                            }) => DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: .18),
+                                borderRadius: BorderRadius.circular(size / 2),
+                              ),
+                              child: IosIconButton(
+                                builder: (color) => Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(icon, color: color, size: 14),
+                                    if (showLabel) ...[
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        label,
+                                        style: TextStyle(
+                                          color: color,
+                                          fontSize: 12.5,
+                                          fontWeight: AppFontWeights.semibold,
                                         ),
-                                    showLabel: width >= 220,
-                                  ),
-                                Expanded(
-                                  child: Text(
-                                    widget.sourceLabel ?? '',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                color: Colors.white,
+                                borderRadius: size / 2,
+                                minSize: size,
+                                tooltip: showLabel ? null : label,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: showLabel ? 9 : 4,
+                                  vertical: 4,
+                                ),
+                                onTap: tap,
+                              ),
+                            );
+                            final edit = media.editingModel(item) != null;
+                            return FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: SizedBox(
+                                width: math.max(width, 120),
+                                child: Row(
+                                  spacing: 3,
+                                  children: [
+                                    if (edit)
+                                      button(
+                                        Lucide.Pencil,
+                                        l10n.creationEditImage,
+                                        widget.onEdit ??
+                                            () => showCreationLightbox(
+                                              context,
+                                              item,
+                                              desktop: true,
+                                              draftTopicId: widget.draftTopicId,
+                                              startEditing: true,
+                                            ),
+                                        showLabel: width >= 220,
+                                      ),
+                                    Expanded(
+                                      child: Text(
+                                        widget.sourceLabel ?? '',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                button(
-                                  item.favorite
-                                      ? LucideIcons.starOff
-                                      : LucideIcons.star,
-                                  item.favorite
-                                      ? l10n.creationUnfavorite
-                                      : l10n.creationFavorite,
-                                  () => toggleCreationArtworkFavorite(
-                                    context,
-                                    media,
-                                    item,
-                                  ),
-                                ),
-                                if (item.mode == MediaMode.image)
-                                  button(
-                                    LucideIcons.imagePlus,
-                                    l10n.creationUseReference,
-                                    () => addCreationArtworkReference(
-                                      context,
-                                      media,
-                                      item,
-                                      widget.draftTopicId,
+                                    button(
+                                      item.favorite
+                                          ? LucideIcons.starOff
+                                          : LucideIcons.star,
+                                      item.favorite
+                                          ? l10n.creationUnfavorite
+                                          : l10n.creationFavorite,
+                                      () => toggleCreationArtworkFavorite(
+                                        context,
+                                        media,
+                                        item,
+                                      ),
                                     ),
-                                  ),
-                                button(
-                                  Lucide.Ellipsis,
-                                  l10n.chatMessageWidgetMoreTooltip,
-                                  openMenu,
+                                    if (item.mode == MediaMode.image)
+                                      button(
+                                        LucideIcons.imagePlus,
+                                        l10n.creationUseReference,
+                                        () => addCreationArtworkReference(
+                                          context,
+                                          media,
+                                          item,
+                                          widget.draftTopicId,
+                                        ),
+                                      ),
+                                    Builder(
+                                      builder: (anchor) => button(
+                                        Lucide.Ellipsis,
+                                        l10n.chatMessageWidgetMoreTooltip,
+                                        () {
+                                          final box =
+                                              anchor.findRenderObject()!
+                                                  as RenderBox;
+                                          openMenu(
+                                            Rect.fromPoints(
+                                              box.localToGlobal(Offset.zero),
+                                              box.localToGlobal(
+                                                box.size.bottomRight(
+                                                  Offset.zero,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                )
-              else if (widget.showSource && widget.sourceLabel != null)
-                PositionedDirectional(
-                  start: 6,
-                  end: 6,
-                  bottom: 6,
-                  child: Text(
-                    widget.sourceLabel!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      shadows: [Shadow(blurRadius: 6, color: Colors.black)],
-                    ),
-                  ),
-                ),
-              if (!_hovered && item.favorite)
-                const Positioned(
-                  top: 7,
-                  right: 7,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.black38,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(5),
-                      child: Icon(
-                        LucideIcons.star,
-                        color: Color(0xffffd86b),
-                        size: 13,
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+                if (widget.showSource && widget.sourceLabel != null)
+                  PositionedDirectional(
+                    start: 6,
+                    end: 6,
+                    bottom: 6,
+                    child: CreationHoverActions(
+                      visible: !showTools,
+                      child: Text(
+                        widget.sourceLabel!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          shadows: [Shadow(blurRadius: 6, color: Colors.black)],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (item.favorite)
+                  Positioned(
+                    top: 7,
+                    right: 7,
+                    child: CreationHoverActions(
+                      visible: !showTools,
+                      child: const DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black38,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(5),
+                          child: Icon(
+                            LucideIcons.star,
+                            color: Color(0xffffd86b),
+                            size: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

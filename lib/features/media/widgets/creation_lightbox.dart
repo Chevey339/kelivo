@@ -1181,7 +1181,7 @@ Future<void> showCreationArtworkMenu(
   String? draftTopicId,
   List<GenerationItemRow>? gallery,
   OpenCreationTopic? onOpenTopic,
-  Offset? anchor,
+  Rect? anchor,
 }) {
   final media = context.read<MediaCreationController>();
   return _showArtworkMenu(
@@ -1215,7 +1215,7 @@ Future<void> _showArtworkMenu(
   List<ActionSheetItem> items, {
   required bool desktop,
   String? title,
-  Offset? anchor,
+  Rect? anchor,
 }) {
   if (!desktop) {
     return showCreationActions(
@@ -1225,14 +1225,9 @@ Future<void> _showArtworkMenu(
       darkSheet: ModalRoute.of(context)?.opaque == false,
     );
   }
-  final render = context.findRenderObject() as RenderBox?;
-  final position =
-      anchor ??
-      render?.localToGlobal(render.size.bottomCenter(Offset.zero)) ??
-      Offset.zero;
   return showCreationMenu(
     context,
-    globalPosition: position,
+    globalAnchor: anchor,
     items: [
       for (final item in items)
         DesktopContextMenuItem(

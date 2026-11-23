@@ -143,16 +143,15 @@ class _CreationTimelineState extends State<CreationTimeline> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (showDate) _DateDivider(date: batch.createdAt),
-                  _BatchHeader(batch: batch, desktop: desktop),
-                  const SizedBox(height: 12),
-                  _BatchResults(
+                  _BatchGroup(
                     batch: batch,
-                    items: media.itemsFor(batch.id),
                     desktop: desktop,
+                    results: _BatchResults(
+                      batch: batch,
+                      items: media.itemsFor(batch.id),
+                      desktop: desktop,
+                    ),
                   ),
-                  if (!batch.status.isActive &&
-                      batch.status != GenerationStatus.succeeded)
-                    _BatchFailure(batch: batch, desktop: widget.desktop),
                 ],
               ),
             ),
@@ -465,18 +464,22 @@ class _DateDivider extends StatelessWidget {
   }
 }
 
-class _BatchHeader extends StatefulWidget {
-  const _BatchHeader({required this.batch, required this.desktop});
+class _BatchGroup extends StatefulWidget {
+  const _BatchGroup({
+    required this.batch,
+    required this.desktop,
+    required this.results,
+  });
   final GenerationBatchRow batch;
   final bool desktop;
+  final Widget results;
 
   @override
-  State<_BatchHeader> createState() => _BatchHeaderState();
+  State<_BatchGroup> createState() => _BatchGroupState();
 }
 
-class _BatchHeaderState extends State<_BatchHeader> {
-  bool _expanded = false;
-  bool _hover = false, _focus = false;
+class _BatchGroupState extends State<_BatchGroup> {
+  bool _expanded = false, _hover = false, _focus = false;
 
   @override
   Widget build(BuildContext context) {
@@ -487,27 +490,78 @@ class _BatchHeaderState extends State<_BatchHeader> {
     final p = _parameters(batch);
     final visible = !widget.desktop || _hover || _focus;
     return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
+      onEnter: widget.desktop ? (_) => setState(() => _hover = true) : null,
+      onExit: widget.desktop ? (_) => setState(() => _hover = false) : null,
       child: Focus(
+        skipTraversal: !widget.desktop,
         onFocusChange: (f) => setState(() => _focus = f),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _expanded = !_expanded),
-                    child: Text(
-                      batch.prompt,
-                      maxLines: _expanded ? null : 2,
-                      overflow: _expanded ? null : TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14.5, height: 1.55),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: () => setState(() => _expanded = !_expanded),
+                        child: Text(
+                          batch.prompt,
+                          maxLines: _expanded ? null : 2,
+                          overflow: _expanded ? null : TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14.5, height: 1.55),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: [
+                          Text(
+                            MaterialLocalizations.of(context).formatTimeOfDay(
+                              TimeOfDay.fromDateTime(batch.createdAt),
+                            ),
+                            style: TextStyle(
+                              color: cs.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
+                          ),
+                          _Tag(
+                            batch.modelId,
+                            leading: ProviderAvatar(
+                              providerKey: batch.providerId,
+                              displayName: batch.providerId,
+                              size: 15,
+                            ),
+                          ),
+                          if (p.ratio != 'auto') _Tag(p.ratio),
+                          if (batch.mode == MediaMode.image)
+                            _Tag(l10n.creationImagesCount(p.count)),
+                          if (p.duration case final duration?)
+                            _Tag(l10n.creationDurationSeconds(duration)),
+                          if (p.resolution case final resolution?)
+                            _Tag(resolution),
+                          if (batch.parentItemId case final parent?)
+                            _EditedFromTag(
+                              item: media.item(parent),
+                              desktop: widget.desktop,
+                              draftTopicId: batch.topicId,
+                            ),
+                          if (_referenceCount(batch) case final count
+                              when count > 0)
+                            _Tag(
+                              l10n.creationImagesCount(count),
+                              leading: const Icon(Lucide.Image, size: 13),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
+                const SizedBox(width: 12),
                 if (batch.status.isActive)
                   CreationAction(
                     small: true,
@@ -517,71 +571,48 @@ class _BatchHeaderState extends State<_BatchHeader> {
                       MaterialLocalizations.of(context).cancelButtonLabel,
                     ),
                   )
-                else if (visible) ...[
-                  if (widget.desktop) ...[
-                    IosIconButton(
-                      icon: Lucide.RotateCcw,
-                      size: 16,
-                      tooltip: l10n.creationRepeat,
-                      onTap: _repeat,
+                else
+                  CreationHoverActions(
+                    visible: visible,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 2,
+                      children: [
+                        if (widget.desktop) ...[
+                          IosIconButton(
+                            icon: Lucide.RotateCcw,
+                            size: 16,
+                            minSize: 28,
+                            tooltip: l10n.creationRepeat,
+                            onTap: _repeat,
+                          ),
+                          IosIconButton(
+                            icon: Lucide.Copy,
+                            size: 16,
+                            minSize: 28,
+                            tooltip: l10n.creationCopyPrompt,
+                            onTap: _copy,
+                          ),
+                        ],
+                        Builder(
+                          builder: (anchor) => IosIconButton(
+                            icon: Lucide.Ellipsis,
+                            size: 16,
+                            minSize: widget.desktop ? 28 : 36,
+                            tooltip: l10n.chatMessageWidgetMoreTooltip,
+                            onTap: () => _menu(anchor),
+                          ),
+                        ),
+                      ],
                     ),
-                    IosIconButton(
-                      icon: Lucide.Copy,
-                      size: 16,
-                      tooltip: l10n.creationCopyPrompt,
-                      onTap: _copy,
-                    ),
-                  ],
-                  Builder(
-                    builder: (anchor) => IosIconButton(
-                      icon: Lucide.Ellipsis,
-                      size: 16,
-                      tooltip: l10n.chatMessageWidgetMoreTooltip,
-                      onTap: () => _menu(anchor),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 5,
-              runSpacing: 5,
-              children: [
-                Text(
-                  MaterialLocalizations.of(
-                    context,
-                  ).formatTimeOfDay(TimeOfDay.fromDateTime(batch.createdAt)),
-                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-                ),
-                _Tag(
-                  batch.modelId,
-                  leading: ProviderAvatar(
-                    providerKey: batch.providerId,
-                    displayName: batch.providerId,
-                    size: 15,
-                  ),
-                ),
-                if (p.ratio != 'auto') _Tag(p.ratio),
-                if (batch.mode == MediaMode.image)
-                  _Tag(l10n.creationImagesCount(p.count)),
-                if (p.duration case final duration?)
-                  _Tag(l10n.creationDurationSeconds(duration)),
-                if (p.resolution case final resolution?) _Tag(resolution),
-                if (batch.parentItemId case final parent?)
-                  _EditedFromTag(
-                    item: media.item(parent),
-                    desktop: widget.desktop,
-                    draftTopicId: batch.topicId,
-                  ),
-                if (_referenceCount(batch) case final count when count > 0)
-                  _Tag(
-                    l10n.creationImagesCount(count),
-                    leading: const Icon(Lucide.Image, size: 13),
                   ),
               ],
             ),
+            const SizedBox(height: 10),
+            widget.results,
+            if (!batch.status.isActive &&
+                batch.status != GenerationStatus.succeeded)
+              _BatchFailure(batch: batch, desktop: widget.desktop),
           ],
         ),
       ),
@@ -676,10 +707,8 @@ class _BatchHeaderState extends State<_BatchHeader> {
       await showCreationActions(context, items: choices);
       return;
     }
-    final box = anchor.findRenderObject() as RenderBox;
     await showCreationMenu(
-      context,
-      globalPosition: box.localToGlobal(box.size.bottomCenter(Offset.zero)),
+      anchor,
       items: [
         for (final item in choices)
           DesktopContextMenuItem(

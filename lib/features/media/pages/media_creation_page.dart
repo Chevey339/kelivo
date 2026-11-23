@@ -272,13 +272,9 @@ class _MobileTopics extends StatelessWidget {
                   itemCount: items.length,
                   itemBuilder: (_, i) => card(items[i]),
                 )
-              : SliverGrid.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: covers ? 3 : 2,
-                    mainAxisSpacing: covers ? 4 : 16,
-                    crossAxisSpacing: covers ? 4 : 10,
-                    childAspectRatio: covers ? 1 : .73,
-                  ),
+              : CreationTopicGrid(
+                  desktop: false,
+                  covers: covers,
                   itemCount: items.length - (showFirst ? 1 : 0),
                   itemBuilder: (_, i) => card(items[i + (showFirst ? 1 : 0)]),
                 ),

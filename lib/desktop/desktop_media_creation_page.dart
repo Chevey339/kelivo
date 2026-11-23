@@ -356,13 +356,9 @@ class _CreationTopicRailState extends State<_CreationTopicRail> {
                 else
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(14, 2, 14, 0),
-                    sliver: SliverGrid.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: covers ? 3 : 2,
-                        mainAxisSpacing: covers ? 6 : 14,
-                        crossAxisSpacing: covers ? 6 : 10,
-                        childAspectRatio: covers ? 1 : .75,
-                      ),
+                    sliver: CreationTopicGrid(
+                      desktop: true,
+                      covers: covers,
                       itemCount: topics.length + (showNew ? 1 : 0),
                       itemBuilder: (_, index) => topicAt(index),
                     ),
@@ -428,6 +424,7 @@ class _NewTopicCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12.5,
+              height: 1.35,
               fontWeight: AppFontWeights.semibold,
               color: cs.primary,
             ),
@@ -438,7 +435,11 @@ class _NewTopicCard extends StatelessWidget {
                 : l10n.creationPromptTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.35,
+              color: cs.onSurfaceVariant,
+            ),
           ),
         ],
       ],
@@ -523,7 +524,7 @@ class _CreationHeaderState extends State<_CreationHeader> {
     return SizedBox(
       height: 52,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
+        padding: const EdgeInsetsDirectional.fromSTEB(24, 0, 16, 0),
         child: Row(
           children: [
             if (widget.onToggleRail != null) ...[
@@ -534,74 +535,84 @@ class _CreationHeaderState extends State<_CreationHeader> {
               ),
               const SizedBox(width: 4),
             ],
-            if (_editing && topic != null)
-              Flexible(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: 300,
-                    minHeight: 32,
-                  ),
-                  child: CallbackShortcuts(
-                    bindings: {
-                      const SingleActivator(LogicalKeyboardKey.escape): () =>
-                          setState(() => _editing = false),
-                    },
-                    child: PlainTextInput(
-                      controller: _title,
-                      decoration: BoxDecoration(
-                        color: context.appColors.surfaceFill,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: cs.primary, width: 1.5),
+            Expanded(
+              child: Row(
+                children: [
+                  if (_editing && topic != null)
+                    Flexible(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 300,
+                          minHeight: 32,
+                        ),
+                        child: CallbackShortcuts(
+                          bindings: {
+                            const SingleActivator(
+                              LogicalKeyboardKey.escape,
+                            ): () =>
+                                setState(() => _editing = false),
+                          },
+                          child: PlainTextInput(
+                            controller: _title,
+                            decoration: BoxDecoration(
+                              color: context.appColors.surfaceFill,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: cs.primary, width: 1.5),
+                            ),
+                            autofocus: true,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
+                            onSubmitted: (value) async {
+                              setState(() => _editing = false);
+                              await media.renameTopic(topic.id, value);
+                            },
+                          ),
+                        ),
                       ),
-                      autofocus: true,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
+                    )
+                  else
+                    Flexible(
+                      child: GestureDetector(
+                        onTap: naming || topic == null ? null : _edit,
+                        child: ThinkingSheen(
+                          enabled: naming,
+                          child: Text(
+                            topic == null
+                                ? l10n.creationNewTopic
+                                : naming
+                                ? l10n.creationNaming
+                                : topic.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                          ),
+                        ),
                       ),
-                      onSubmitted: (value) async {
-                        setState(() => _editing = false);
-                        await media.renameTopic(topic.id, value);
-                      },
                     ),
-                  ),
-                ),
-              )
-            else
-              Flexible(
-                child: GestureDetector(
-                  onTap: naming || topic == null ? null : _edit,
-                  child: ThinkingSheen(
-                    enabled: naming,
+                  const SizedBox(width: 10),
+                  Flexible(
                     child: Text(
                       topic == null
-                          ? l10n.creationNewTopic
-                          : naming
-                          ? l10n.creationNaming
-                          : topic.title,
+                          ? media.autoTitle
+                                ? l10n.creationNameAfterSending
+                                : l10n.creationPromptTitle
+                          : '${l10n.creationGenerationCount(media.batchesFor(topic.id).length)} · ${l10n.creationWorksCount(media.worksFor(topic.id).length)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: AppFontWeights.semibold,
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ),
-                ),
-              ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                topic == null
-                    ? media.autoTitle
-                          ? l10n.creationNameAfterSending
-                          : l10n.creationPromptTitle
-                    : '${l10n.creationGenerationCount(media.batchesFor(topic.id).length)} · ${l10n.creationWorksCount(media.worksFor(topic.id).length)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ],
               ),
             ),
-            const Spacer(),
             if (topic != null)
               Builder(
                 builder: (context) => IosIconButton(

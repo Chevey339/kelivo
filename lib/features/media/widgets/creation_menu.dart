@@ -8,13 +8,31 @@ import '../../../theme/app_semantic_colors.dart';
 
 Future<void> showCreationMenu(
   BuildContext context, {
-  required Offset globalPosition,
+  Rect? globalAnchor,
+  bool preferAbove = false,
   required List<DesktopContextMenuItem> items,
 }) async {
   final navigator = Navigator.of(context, rootNavigator: true);
   final overlay = navigator.overlay?.context.findRenderObject() as RenderBox?;
   if (overlay == null) return;
-  final origin = overlay.globalToLocal(globalPosition);
+  final box = context.findRenderObject() as RenderBox?;
+  if (globalAnchor == null && (box == null || !box.hasSize)) return;
+  final Rect anchor;
+  if (globalAnchor != null) {
+    anchor = Rect.fromPoints(
+      overlay.globalToLocal(globalAnchor.topLeft),
+      overlay.globalToLocal(globalAnchor.bottomRight),
+    );
+  } else {
+    anchor = Rect.fromPoints(
+      overlay.globalToLocal(box!.localToGlobal(Offset.zero)),
+      overlay.globalToLocal(
+        box.localToGlobal(box.size.bottomRight(Offset.zero)),
+      ),
+    );
+  }
+  final rtl = Directionality.of(context) == TextDirection.rtl;
+  final width = items.any((item) => item.subtitle != null) ? 256.0 : 200.0;
   final duration = handoffDuration(context, 170);
   final selection = await showGeneralDialog<DesktopContextMenuItem>(
     context: context,
@@ -27,7 +45,7 @@ Future<void> showCreationMenu(
       final radius = BorderRadius.circular(14);
       final anim = animation.drive(CurveTween(curve: handoffCurve));
       return CustomSingleChildLayout(
-        delegate: _MenuPosition(origin),
+        delegate: _MenuPosition(anchor, preferAbove, rtl, width),
         child: FadeTransition(
           opacity: anim,
           child: ScaleTransition(
@@ -91,9 +109,7 @@ Future<void> showCreationMenu(
                           selected: it.checked,
                           child: IosCardPress(
                             focusable: it.onTap != null,
-                            baseColor: it.checked
-                                ? cs.primary.withValues(alpha: .10)
-                                : Colors.transparent,
+                            baseColor: Colors.transparent,
                             borderRadius: BorderRadius.circular(9),
                             duration: handoffDuration(ctx, 140),
                             padding: const EdgeInsets.symmetric(
@@ -172,25 +188,40 @@ Future<void> showCreationMenu(
 }
 
 class _MenuPosition extends SingleChildLayoutDelegate {
-  const _MenuPosition(this.origin);
-  final Offset origin;
+  const _MenuPosition(this.anchor, this.preferAbove, this.rtl, this.width);
+  final double width;
+  final Rect anchor;
+  final bool preferAbove, rtl;
   @override
   BoxConstraints getConstraintsForChild(BoxConstraints c) =>
       BoxConstraints.tightFor(
-        width: math.min(236, math.max(0, c.maxWidth - 16)),
+        width: math.min(width, math.max(0, c.maxWidth - 16)),
       ).copyWith(maxHeight: math.max(0, c.maxHeight - 16));
   @override
   Offset getPositionForChild(Size size, Size child) {
-    final below = origin.dy + 6;
+    final below = anchor.bottom + 6;
+    final above = anchor.top - child.height - 6;
+    final fitsBelow = below + child.height <= size.height - 8;
+    final fitsAbove = above >= 8;
+    final useAbove =
+        fitsAbove && (preferAbove || !fitsBelow) ||
+        !fitsAbove && !fitsBelow && anchor.top > size.height - anchor.bottom;
     return Offset(
-      origin.dx.clamp(8, math.max(8.0, size.width - child.width - 8)),
-      (below + child.height <= size.height - 8
-              ? below
-              : origin.dy - child.height - 6)
-          .clamp(8, math.max(8.0, size.height - child.height - 8)),
+      (rtl ? anchor.right - child.width : anchor.left).clamp(
+        8,
+        math.max(8.0, size.width - child.width - 8),
+      ),
+      (useAbove ? above : below).clamp(
+        8,
+        math.max(8.0, size.height - child.height - 8),
+      ),
     );
   }
 
   @override
-  bool shouldRelayout(_MenuPosition old) => old.origin != origin;
+  bool shouldRelayout(_MenuPosition old) =>
+      old.anchor != anchor ||
+      old.preferAbove != preferAbove ||
+      old.rtl != rtl ||
+      old.width != width;
 }

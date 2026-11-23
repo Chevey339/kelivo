@@ -21,6 +21,8 @@ import 'package:Kelivo/features/media/widgets/creation_lightbox.dart';
 import 'package:Kelivo/features/media/widgets/creation_timeline.dart';
 import 'package:Kelivo/features/media/widgets/creation_waiting_card.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
+import 'package:Kelivo/features/media/widgets/creation_controls.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart' show Value;
@@ -429,6 +431,48 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('A wide mountain lake'), findsOneWidget);
       expect(find.text('Mountain trip'), findsWidgets);
+      final topicMenu = find.byTooltip('More').hitTestable().first;
+      final buttonBounds = tester.getRect(topicMenu);
+      expect(buttonBounds.right, 1280 - 16);
+      await tester.tap(topicMenu);
+      await tester.pumpAndSettle();
+      final menu = find.text('Rename topic');
+      expect(menu, findsOneWidget);
+      expect(tester.getRect(menu).top, greaterThan(buttonBounds.bottom));
+      await tester.tapAt(const Offset(400, 50));
+      await tester.pumpAndSettle();
+
+      final prompt = find.text('A wide mountain lake');
+      final tile = find.byType(CreationArtworkTile).first;
+      final promptBounds = tester.getRect(prompt);
+      final tileBounds = tester.getRect(tile);
+      final copy = find.byTooltip('Copy prompt');
+      final groupActions = find.ancestor(
+        of: copy,
+        matching: find.byType(CreationHoverActions),
+      );
+      final fade = find
+          .descendant(of: groupActions, matching: find.byType(FadeTransition))
+          .first;
+      double opacity() => tester.widget<FadeTransition>(fade).opacity.value;
+      expect(opacity(), 0);
+      expect(copy.hitTestable(), findsNothing);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(5, 5));
+      await mouse.moveTo(tileBounds.center);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 70));
+      expect(opacity(), allOf(greaterThan(0), lessThan(1)));
+      expect(tester.getRect(prompt), promptBounds);
+      expect(tester.getRect(tile), tileBounds);
+      await tester.pump(const Duration(milliseconds: 180));
+      expect(opacity(), 1);
+      expect(copy.hitTestable(), findsOneWidget);
+      await mouse.moveTo(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      expect(opacity(), 0);
+      expect(tester.getRect(tile), tileBounds);
+      await mouse.removePointer();
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

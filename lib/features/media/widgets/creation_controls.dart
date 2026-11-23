@@ -46,6 +46,34 @@ class CreationSurface extends StatelessWidget {
   }
 }
 
+/// Fades controls without changing the measured size of their row or tile.
+class CreationHoverActions extends StatelessWidget {
+  const CreationHoverActions({
+    super.key,
+    required this.visible,
+    required this.child,
+  });
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ExcludeFocus(
+    excluding: !visible,
+    child: ExcludeSemantics(
+      excluding: !visible,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: handoffDuration(context, 160),
+          curve: Curves.easeInOut,
+          child: child,
+        ),
+      ),
+    ),
+  );
+}
+
 class CreationSearchBox extends StatefulWidget {
   const CreationSearchBox({
     super.key,

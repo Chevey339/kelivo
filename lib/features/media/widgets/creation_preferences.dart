@@ -122,14 +122,8 @@ Future<void> showCreationDisplayMenu(
     );
     return;
   }
-  final render = context.findRenderObject() as RenderBox?;
-  final anchor = render == null
-      ? Offset.zero
-      : render.localToGlobal(render.size.bottomCenter(Offset.zero));
   await showCreationMenu(
     context,
-    globalPosition: anchor,
-
     items: [
       for (final choice in items)
         DesktopContextMenuItem(

@@ -48,7 +48,7 @@ void main() {
           .style;
       showCreationMenu(
         anchor,
-        globalPosition: const Offset(50, 50),
+        globalAnchor: const Rect.fromLTWH(50, 50, 0, 0),
         items: [DesktopContextMenuItem(label: 'Menu choice', onTap: () {})],
       );
       await tester.pumpAndSettle();
