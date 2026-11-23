@@ -18051,4 +18051,128 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get worldBookGroupClearSelection => 'Снять выбор группы';
+
+  @override
+  String get sidebarSettingsTitle => 'Боковая панель';
+
+  @override
+  String get sidebarCustomize => 'Настроить боковую панель';
+
+  @override
+  String get sidebarLayoutTitle => 'Макет';
+
+  @override
+  String get sidebarPresetCurrent => 'Текущий макет';
+
+  @override
+  String get sidebarPresetNavigation => 'Список навигации';
+
+  @override
+  String get sidebarPresetAssistantBottom => 'Ассистент внизу';
+
+  @override
+  String get sidebarPresetAllTop => 'Всё сверху';
+
+  @override
+  String get sidebarPresetCustom => 'Свой макет';
+
+  @override
+  String get sidebarReorderTitle => 'Расположение блоков';
+
+  @override
+  String get sidebarReorderHint => 'Перетащите выше или ниже списка чатов';
+
+  @override
+  String get sidebarReorderHandle => 'Переместить';
+
+  @override
+  String get sidebarBlockUser => 'Панель пользователя';
+
+  @override
+  String get sidebarBlockSearch => 'Строка поиска';
+
+  @override
+  String get sidebarBlockEntries => 'Пункты';
+
+  @override
+  String get sidebarBlockAssistant => 'Ассистент';
+
+  @override
+  String get sidebarBlockConversations => 'Список чатов';
+
+  @override
+  String get sidebarBlockTop => 'Сверху';
+
+  @override
+  String get sidebarBlockBottom => 'Снизу';
+
+  @override
+  String get sidebarDisplayAs => 'Отображать как';
+
+  @override
+  String get sidebarStyleList => 'Список';
+
+  @override
+  String get sidebarStyleIcons => 'Значки';
+
+  @override
+  String get sidebarVisibilityShow => 'Показать';
+
+  @override
+  String get sidebarMore => 'Ещё';
+
+  @override
+  String get sidebarVisibilityHidden => 'Скрыть';
+
+  @override
+  String get sidebarLocationEntries => 'Список пунктов';
+
+  @override
+  String get sidebarLocationSearch => 'Рядом с поиском';
+
+  @override
+  String get sidebarLocationUserBar => 'Значки на панели пользователя';
+
+  @override
+  String get sidebarLocationMore => 'В разделе «Ещё»';
+
+  @override
+  String get sidebarLocationHidden => 'Скрыто из боковой панели';
+
+  @override
+  String get sidebarLocationRail => 'Левая панель значков';
+
+  @override
+  String get sidebarMenuShow => 'Показать в боковой панели';
+
+  @override
+  String get sidebarMenuMore => 'Переместить в «Ещё»';
+
+  @override
+  String get sidebarMenuHide => 'Скрыть из боковой панели';
+
+  @override
+  String get sidebarHideCustomize => 'Скрыть из «Ещё»';
+
+  @override
+  String get sidebarShowCustomizeInMore =>
+      'Показывать «Настроить боковую панель» в «Ещё»';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint =>
+      'Вы всегда можете изменить это здесь';
+
+  @override
+  String get sidebarHideSingleAssistant =>
+      'Скрывать строку ассистента, если он один';
+
+  @override
+  String get sidebarHideSingleAssistantHint =>
+      'Строка ассистента показывается по умолчанию';
+
+  @override
+  String get sidebarRestoreDefaults => 'Восстановить по умолчанию';
+
+  @override
+  String get sidebarOpenSettings => 'Открыть настройки боковой панели…';
 }

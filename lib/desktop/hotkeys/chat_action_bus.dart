@@ -5,6 +5,7 @@ enum ChatAction {
   toggleLeftPanelAssistants,
   toggleLeftPanelTopics,
   focusInput,
+  openHistory,
   switchModel,
   enterGlobalSearch,
   exitGlobalSearch,

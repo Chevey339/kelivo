@@ -19,6 +19,7 @@ import '../../scheduled_tasks/scheduled_task_preparation_binding.dart';
 import '../../../core/services/scheduled_tasks_service.dart';
 import '../../scheduled_tasks/scheduled_task_runner.dart';
 import 'dart:async';
+import '../../../desktop/chat_history_dialog.dart';
 import 'package:flutter/foundation.dart' show listEquals, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1149,6 +1150,11 @@ class HomePageController extends ChangeNotifier {
             });
           }
           break;
+        case ChatAction.openHistory:
+          if (isDesktopPlatform && ModalRoute.of(ctx)?.isCurrent != false) {
+            unawaited(_openDesktopHistory(ctx));
+          }
+          break;
         case ChatAction.switchModel:
           unawaited(showModelSelectSheet(ctx, controller: this));
           break;
@@ -1160,6 +1166,16 @@ class HomePageController extends ChangeNotifier {
           break;
       }
     });
+  }
+
+  Future<void> _openDesktopHistory(BuildContext context) async {
+    final id = await showChatHistoryDesktopDialog(
+      context,
+      assistantId: context.read<AssistantProvider>().currentAssistantId,
+    );
+    if (context.mounted && id != null && id.isNotEmpty) {
+      await switchConversationAnimated(id);
+    }
   }
 
   void _setupNotificationActions() {

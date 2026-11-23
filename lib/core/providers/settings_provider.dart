@@ -6,6 +6,7 @@ import '../../l10n/app_language.dart';
 import '../models/compression_config.dart';
 import '../services/auth/provider_oauth_service.dart';
 import '../models/mobile_background_settings.dart';
+import '../models/sidebar_layout.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1165,6 +1166,26 @@ class SettingsProvider extends ChangeNotifier {
     _showAppUpdates = prefs.getBool(_displayShowAppUpdatesKey) ?? true;
     _keepSidebarOpenOnAssistantTap =
         prefs.getBool(_displayKeepSidebarOpenOnAssistantTapKey) ?? false;
+    _mobileSidebarLayout = SidebarLayout.fromPreferences(
+      prefs.getString(BusinessKeyRegistry.mobileSidebarStyleKey),
+      prefs.getStringList(BusinessKeyRegistry.mobileSidebarBlockOrderKey),
+    );
+    _mobileSidebarEntries = decodeSidebarEntries(
+      prefs.getString(BusinessKeyRegistry.mobileSidebarEntriesKey),
+      defaultMobileSidebarEntries,
+    );
+    _desktopRailEntries = decodeSidebarEntries(
+      prefs.getString(BusinessKeyRegistry.desktopRailEntriesKey),
+      defaultDesktopSidebarEntries,
+    );
+    _showSidebarCustomizeInMore =
+        prefs.getBool(BusinessKeyRegistry.mobileSidebarShowCustomizeKey) ??
+        true;
+    _hideSidebarSingleAssistant =
+        prefs.getBool(
+          BusinessKeyRegistry.mobileSidebarHideSingleAssistantKey,
+        ) ??
+        false;
     _keepSidebarOpenOnTopicTap =
         prefs.getBool(_displayKeepSidebarOpenOnTopicTapKey) ?? false;
     _keepAssistantListExpandedOnSidebarClose =
@@ -6171,7 +6192,78 @@ Requirements:
     await prefs.setBool(_displayShowAppUpdatesKey, v);
   }
 
-  // Display: keep sidebar open when selecting assistant (mobile)
+  // Sidebar layout and entry preferences.
+  SidebarLayout _mobileSidebarLayout = SidebarPreset.current.layout;
+  SidebarLayout get mobileSidebarLayout => _mobileSidebarLayout;
+  Future<void> setMobileSidebarLayout(SidebarLayout layout) async {
+    if (layout.style == _mobileSidebarLayout.style &&
+        listEquals(layout.order, _mobileSidebarLayout.order)) {
+      return;
+    }
+    _mobileSidebarLayout = layout;
+    notifyListeners();
+    await _preferences.setMany({
+      BusinessKeyRegistry.mobileSidebarStyleKey: layout.style.name,
+      BusinessKeyRegistry.mobileSidebarBlockOrderKey: [
+        for (final block in layout.order) block.id,
+      ],
+    });
+  }
+
+  Map<SidebarEntry, SidebarVisibility> _mobileSidebarEntries =
+      defaultMobileSidebarEntries;
+  Map<SidebarEntry, SidebarVisibility> get mobileSidebarEntries =>
+      _mobileSidebarEntries;
+  Future<void> setMobileSidebarEntries(
+    Map<SidebarEntry, SidebarVisibility> entries,
+  ) async {
+    _mobileSidebarEntries = Map.unmodifiable(entries);
+    notifyListeners();
+    await _preferences.setString(
+      BusinessKeyRegistry.mobileSidebarEntriesKey,
+      encodeSidebarEntries(entries),
+    );
+  }
+
+  Map<SidebarEntry, SidebarVisibility> _desktopRailEntries =
+      defaultDesktopSidebarEntries;
+  Map<SidebarEntry, SidebarVisibility> get desktopRailEntries =>
+      _desktopRailEntries;
+  Future<void> setDesktopRailEntries(
+    Map<SidebarEntry, SidebarVisibility> entries,
+  ) async {
+    _desktopRailEntries = Map.unmodifiable(entries);
+    notifyListeners();
+    await _preferences.setString(
+      BusinessKeyRegistry.desktopRailEntriesKey,
+      encodeSidebarEntries(entries),
+    );
+  }
+
+  bool _showSidebarCustomizeInMore = true;
+  bool get showSidebarCustomizeInMore => _showSidebarCustomizeInMore;
+  Future<void> setShowSidebarCustomizeInMore(bool value) async {
+    if (value == _showSidebarCustomizeInMore) return;
+    _showSidebarCustomizeInMore = value;
+    notifyListeners();
+    await _preferences.setBool(
+      BusinessKeyRegistry.mobileSidebarShowCustomizeKey,
+      value,
+    );
+  }
+
+  bool _hideSidebarSingleAssistant = false;
+  bool get hideSidebarSingleAssistant => _hideSidebarSingleAssistant;
+  Future<void> setHideSidebarSingleAssistant(bool value) async {
+    if (value == _hideSidebarSingleAssistant) return;
+    _hideSidebarSingleAssistant = value;
+    notifyListeners();
+    await _preferences.setBool(
+      BusinessKeyRegistry.mobileSidebarHideSingleAssistantKey,
+      value,
+    );
+  }
+
   bool _keepSidebarOpenOnAssistantTap = false;
   bool get keepSidebarOpenOnAssistantTap => _keepSidebarOpenOnAssistantTap;
   Future<void> setKeepSidebarOpenOnAssistantTap(bool v) async {
@@ -6569,6 +6661,11 @@ Requirements:
     copy._hapticsOnCardTap = _hapticsOnCardTap;
     copy._showAppUpdates = _showAppUpdates;
     copy._keepSidebarOpenOnAssistantTap = _keepSidebarOpenOnAssistantTap;
+    copy._mobileSidebarLayout = _mobileSidebarLayout;
+    copy._mobileSidebarEntries = _mobileSidebarEntries;
+    copy._desktopRailEntries = _desktopRailEntries;
+    copy._showSidebarCustomizeInMore = _showSidebarCustomizeInMore;
+    copy._hideSidebarSingleAssistant = _hideSidebarSingleAssistant;
     copy._keepSidebarOpenOnTopicTap = _keepSidebarOpenOnTopicTap;
     copy._keepAssistantListExpandedOnSidebarClose =
         _keepAssistantListExpandedOnSidebarClose;

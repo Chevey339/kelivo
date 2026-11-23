@@ -17195,4 +17195,124 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get worldBookGroupClearSelection => '그룹 선택 해제';
+
+  @override
+  String get sidebarSettingsTitle => '사이드바';
+
+  @override
+  String get sidebarCustomize => '사이드바 사용자 지정';
+
+  @override
+  String get sidebarLayoutTitle => '레이아웃';
+
+  @override
+  String get sidebarPresetCurrent => '현재 레이아웃';
+
+  @override
+  String get sidebarPresetNavigation => '탐색 목록';
+
+  @override
+  String get sidebarPresetAssistantBottom => '어시스턴트 하단 배치';
+
+  @override
+  String get sidebarPresetAllTop => '모두 상단에';
+
+  @override
+  String get sidebarPresetCustom => '사용자 지정 레이아웃';
+
+  @override
+  String get sidebarReorderTitle => '블록 정렬';
+
+  @override
+  String get sidebarReorderHint => '대화 목록 위나 아래로 드래그하세요';
+
+  @override
+  String get sidebarReorderHandle => '순서 변경';
+
+  @override
+  String get sidebarBlockUser => '사용자 바';
+
+  @override
+  String get sidebarBlockSearch => '검색 바';
+
+  @override
+  String get sidebarBlockEntries => '항목';
+
+  @override
+  String get sidebarBlockAssistant => '어시스턴트';
+
+  @override
+  String get sidebarBlockConversations => '대화 목록';
+
+  @override
+  String get sidebarBlockTop => '상단';
+
+  @override
+  String get sidebarBlockBottom => '하단';
+
+  @override
+  String get sidebarDisplayAs => '표시 방식';
+
+  @override
+  String get sidebarStyleList => '목록';
+
+  @override
+  String get sidebarStyleIcons => '아이콘';
+
+  @override
+  String get sidebarVisibilityShow => '표시';
+
+  @override
+  String get sidebarMore => '더 보기';
+
+  @override
+  String get sidebarVisibilityHidden => '숨기기';
+
+  @override
+  String get sidebarLocationEntries => '항목 목록';
+
+  @override
+  String get sidebarLocationSearch => '검색 옆';
+
+  @override
+  String get sidebarLocationUserBar => '사용자 바 아이콘';
+
+  @override
+  String get sidebarLocationMore => '더 보기 안';
+
+  @override
+  String get sidebarLocationHidden => '사이드바에서 숨김';
+
+  @override
+  String get sidebarLocationRail => '왼쪽 아이콘 레일';
+
+  @override
+  String get sidebarMenuShow => '사이드바에 표시';
+
+  @override
+  String get sidebarMenuMore => '더 보기로 이동';
+
+  @override
+  String get sidebarMenuHide => '사이드바에서 숨기기';
+
+  @override
+  String get sidebarHideCustomize => '더 보기에서 숨기기';
+
+  @override
+  String get sidebarShowCustomizeInMore => '더 보기에 사이드바 사용자 지정 표시';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => '여기서 언제든 변경할 수 있습니다';
+
+  @override
+  String get sidebarHideSingleAssistant => '어시스턴트가 하나뿐이면 어시스턴트 행 숨기기';
+
+  @override
+  String get sidebarHideSingleAssistantHint => '어시스턴트 행은 기본적으로 표시됩니다';
+
+  @override
+  String get sidebarRestoreDefaults => '기본값 복원';
+
+  @override
+  String get sidebarOpenSettings => '사이드바 설정 열기…';
 }

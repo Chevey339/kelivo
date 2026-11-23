@@ -22,6 +22,7 @@ class SegmentedTabs extends StatelessWidget {
     this.height = 40,
     this.enabled = true,
     this.radioGroup = false,
+    this.compact = false,
     this.enableHaptics = true,
     this.backgroundColor,
     this.selectedColor,
@@ -34,7 +35,7 @@ class SegmentedTabs extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final bool expand;
   final double height;
-  final bool enabled, radioGroup, enableHaptics;
+  final bool enabled, radioGroup, compact, enableHaptics;
   final Color? backgroundColor,
       selectedColor,
       foregroundColor,
@@ -48,10 +49,12 @@ class SegmentedTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final innerRadius = (_shellRadius - _innerPadding).clamp(0.0, _shellRadius);
+    final padding = compact ? 3.0 : _innerPadding;
+    final radius = compact ? 11.0 : _shellRadius;
+    final innerRadius = radius - padding;
     final segments = <Widget>[];
     for (var i = 0; i < tabs.length; i++) {
-      if (i != 0) segments.add(const SizedBox(width: _gap));
+      if (i != 0) segments.add(SizedBox(width: compact ? 2 : _gap));
       final segment = _segment(
         cs: cs,
         tab: tabs[i],
@@ -76,11 +79,11 @@ class SegmentedTabs extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: backgroundColor ?? context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(_shellRadius),
+        borderRadius: BorderRadius.circular(radius),
       ),
       clipBehavior: Clip.hardEdge,
       child: Padding(
-        padding: const EdgeInsets.all(_innerPadding),
+        padding: EdgeInsets.all(padding),
         child: expand
             ? row
             : SingleChildScrollView(
@@ -110,7 +113,7 @@ class SegmentedTabs extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: color,
-        fontSize: 13,
+        fontSize: compact ? 12 : 13,
         fontWeight: selected ? AppFontWeights.semibold : AppFontWeights.medium,
       ),
     );
@@ -135,7 +138,7 @@ class SegmentedTabs extends StatelessWidget {
           ? (selectedColor ?? cs.primary.withValues(alpha: 0.14))
           : Colors.transparent,
       borderRadius: BorderRadius.circular(innerRadius),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8),
       child: Semantics(
         button: !radioGroup,
         selected: radioGroup ? null : selected,

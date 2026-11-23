@@ -38,6 +38,7 @@ Future<void> showDesktopContextMenuAt(
   required List<DesktopContextMenuItem> items,
   Color? backgroundColor,
   bool compact = false,
+  double borderRadius = 16,
 }) async {
   // Match the navigator used by showGeneralDialog, including nested panes.
   final overlay = Navigator.of(context, rootNavigator: true).overlay;
@@ -118,7 +119,7 @@ Future<void> showDesktopContextMenuAt(
                     child: DecoratedBox(
                       decoration: ShapeDecoration(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(borderRadius),
                           side: BorderSide(
                             color: isDark
                                 ? cs.onSurface.withValues(alpha: 0.08)
@@ -128,7 +129,7 @@ Future<void> showDesktopContextMenuAt(
                         ),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(borderRadius),
                         child: DesktopOverlayBackdrop(
                           sigma: 14,
                           child: DecoratedBox(

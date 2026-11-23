@@ -17739,4 +17739,126 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get worldBookGroupClearSelection => 'Clear group selection';
+
+  @override
+  String get sidebarSettingsTitle => 'Sidebar';
+
+  @override
+  String get sidebarCustomize => 'Customize sidebar';
+
+  @override
+  String get sidebarLayoutTitle => 'Layout';
+
+  @override
+  String get sidebarPresetCurrent => 'Current layout';
+
+  @override
+  String get sidebarPresetNavigation => 'Navigation list';
+
+  @override
+  String get sidebarPresetAssistantBottom => 'Assistant at bottom';
+
+  @override
+  String get sidebarPresetAllTop => 'All at the top';
+
+  @override
+  String get sidebarPresetCustom => 'Custom layout';
+
+  @override
+  String get sidebarReorderTitle => 'Arrange blocks';
+
+  @override
+  String get sidebarReorderHint => 'Drag above or below the conversation list';
+
+  @override
+  String get sidebarReorderHandle => 'Reorder';
+
+  @override
+  String get sidebarBlockUser => 'User bar';
+
+  @override
+  String get sidebarBlockSearch => 'Search bar';
+
+  @override
+  String get sidebarBlockEntries => 'Entries';
+
+  @override
+  String get sidebarBlockAssistant => 'Assistant';
+
+  @override
+  String get sidebarBlockConversations => 'Conversation list';
+
+  @override
+  String get sidebarBlockTop => 'Top';
+
+  @override
+  String get sidebarBlockBottom => 'Bottom';
+
+  @override
+  String get sidebarDisplayAs => 'Display as';
+
+  @override
+  String get sidebarStyleList => 'List';
+
+  @override
+  String get sidebarStyleIcons => 'Icons';
+
+  @override
+  String get sidebarVisibilityShow => 'Show';
+
+  @override
+  String get sidebarMore => 'More';
+
+  @override
+  String get sidebarVisibilityHidden => 'Hide';
+
+  @override
+  String get sidebarLocationEntries => 'Entry list';
+
+  @override
+  String get sidebarLocationSearch => 'Beside search';
+
+  @override
+  String get sidebarLocationUserBar => 'User bar icons';
+
+  @override
+  String get sidebarLocationMore => 'In More';
+
+  @override
+  String get sidebarLocationHidden => 'Hidden from the sidebar';
+
+  @override
+  String get sidebarLocationRail => 'Left icon rail';
+
+  @override
+  String get sidebarMenuShow => 'Show in sidebar';
+
+  @override
+  String get sidebarMenuMore => 'Move to More';
+
+  @override
+  String get sidebarMenuHide => 'Hide from sidebar';
+
+  @override
+  String get sidebarHideCustomize => 'Hide from More';
+
+  @override
+  String get sidebarShowCustomizeInMore => 'Show Customize sidebar in More';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => 'You can always change it here';
+
+  @override
+  String get sidebarHideSingleAssistant =>
+      'Hide assistant row when there is only one';
+
+  @override
+  String get sidebarHideSingleAssistantHint =>
+      'The assistant row is shown by default';
+
+  @override
+  String get sidebarRestoreDefaults => 'Restore defaults';
+
+  @override
+  String get sidebarOpenSettings => 'Open sidebar settings…';
 }

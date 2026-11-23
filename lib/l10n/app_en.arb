@@ -23028,5 +23028,165 @@
   "worldBookGroupClearSelection": "Clear group selection",
   "@worldBookGroupClearSelection": {
     "description": "Action in the chat World Book picker to deselect all books in this folder for the current chat or assistant."
+  },
+  "sidebarSettingsTitle": "Sidebar",
+  "@sidebarSettingsTitle": {
+    "description": "Title of the Sidebar page reached from Settings > Display and label of its navigation row."
+  },
+  "sidebarCustomize": "Customize sidebar",
+  "@sidebarCustomize": {
+    "description": "Action in mobile sidebar More and in desktop rail context menus. Opens sidebar layout and entry controls."
+  },
+  "sidebarLayoutTitle": "Layout",
+  "@sidebarLayoutTitle": {
+    "description": "Heading of the mobile Sidebar settings section that shows four layout presets."
+  },
+  "sidebarPresetCurrent": "Current layout",
+  "@sidebarPresetCurrent": {
+    "description": "Mobile sidebar layout preset matching the original Kelivo layout with icon entries and the user bar at the bottom."
+  },
+  "sidebarPresetNavigation": "Navigation list",
+  "@sidebarPresetNavigation": {
+    "description": "Mobile sidebar layout preset with a list of entry rows near the top."
+  },
+  "sidebarPresetAssistantBottom": "Assistant at bottom",
+  "@sidebarPresetAssistantBottom": {
+    "description": "Mobile sidebar layout preset with the assistant selector below the conversation list."
+  },
+  "sidebarPresetAllTop": "All at the top",
+  "@sidebarPresetAllTop": {
+    "description": "Mobile sidebar layout preset placing all fixed blocks above the scrolling conversation list."
+  },
+  "sidebarPresetCustom": "Custom layout",
+  "@sidebarPresetCustom": {
+    "description": "Status in Sidebar settings when the custom block order does not match a preset."
+  },
+  "sidebarReorderTitle": "Arrange blocks",
+  "@sidebarReorderTitle": {
+    "description": "Heading above the reorderable sidebar blocks."
+  },
+  "sidebarReorderHint": "Drag above or below the conversation list",
+  "@sidebarReorderHint": {
+    "description": "Instruction for moving fixed sidebar blocks around the non-draggable conversation list separator."
+  },
+  "sidebarReorderHandle": "Reorder",
+  "@sidebarReorderHandle": {
+    "description": "Accessible label for the reorder handle. Drag it or use Up and Down when focused."
+  },
+  "sidebarBlockUser": "User bar",
+  "@sidebarBlockUser": {
+    "description": "Name of the mobile sidebar block showing the user avatar, name, and settings."
+  },
+  "sidebarBlockSearch": "Search bar",
+  "@sidebarBlockSearch": {
+    "description": "Name of the mobile sidebar block containing the conversation search field."
+  },
+  "sidebarBlockEntries": "Entries",
+  "@sidebarBlockEntries": {
+    "description": "Name of the mobile sidebar block and settings section for configurable navigation actions."
+  },
+  "sidebarBlockAssistant": "Assistant",
+  "@sidebarBlockAssistant": {
+    "description": "Section title and mobile sidebar block name for the assistant switcher."
+  },
+  "sidebarBlockConversations": "Conversation list",
+  "@sidebarBlockConversations": {
+    "description": "Label of the fixed conversation list separator in the sidebar block reorder control."
+  },
+  "sidebarBlockTop": "Top",
+  "@sidebarBlockTop": {
+    "description": "Position tag for a mobile sidebar block above the conversation list."
+  },
+  "sidebarBlockBottom": "Bottom",
+  "@sidebarBlockBottom": {
+    "description": "Position tag for a mobile sidebar block below the conversation list."
+  },
+  "sidebarDisplayAs": "Display as",
+  "@sidebarDisplayAs": {
+    "description": "Label next to the List or Icons segmented control in the mobile Sidebar settings."
+  },
+  "sidebarStyleList": "List",
+  "@sidebarStyleList": {
+    "description": "Sidebar display style with navigation entries as full-width rows."
+  },
+  "sidebarStyleIcons": "Icons",
+  "@sidebarStyleIcons": {
+    "description": "Sidebar display style with navigation entries as icon buttons by the user bar or search field."
+  },
+  "sidebarVisibilityShow": "Show",
+  "@sidebarVisibilityShow": {
+    "description": "Short option to make a navigation entry visible directly in the sidebar."
+  },
+  "sidebarMore": "More",
+  "@sidebarMore": {
+    "description": "Label of the sidebar overflow section for navigation entries moved into an expandable list or menu."
+  },
+  "sidebarVisibilityHidden": "Hide",
+  "@sidebarVisibilityHidden": {
+    "description": "Short option to hide a navigation entry from both the sidebar and its More menu."
+  },
+  "sidebarLocationEntries": "Entry list",
+  "@sidebarLocationEntries": {
+    "description": "Subtitle for a visible sidebar action displayed as a row in the entry list."
+  },
+  "sidebarLocationSearch": "Beside search",
+  "@sidebarLocationSearch": {
+    "description": "Subtitle for the history action displayed beside the sidebar search field."
+  },
+  "sidebarLocationUserBar": "User bar icons",
+  "@sidebarLocationUserBar": {
+    "description": "Subtitle for a navigation action displayed as an icon in the mobile sidebar user bar."
+  },
+  "sidebarLocationMore": "In More",
+  "@sidebarLocationMore": {
+    "description": "Subtitle for a sidebar navigation action displayed in the More menu."
+  },
+  "sidebarLocationHidden": "Hidden from the sidebar",
+  "@sidebarLocationHidden": {
+    "description": "Subtitle for a navigation action hidden from the sidebar and its More menu."
+  },
+  "sidebarLocationRail": "Left icon rail",
+  "@sidebarLocationRail": {
+    "description": "Heading of the desktop sidebar customization panel and subtitle for a visible icon rail entry."
+  },
+  "sidebarMenuShow": "Show in sidebar",
+  "@sidebarMenuShow": {
+    "description": "Context menu action that moves a navigation entry into the directly visible sidebar."
+  },
+  "sidebarMenuMore": "Move to More",
+  "@sidebarMenuMore": {
+    "description": "Context menu action that moves a sidebar navigation entry into the More menu."
+  },
+  "sidebarMenuHide": "Hide from sidebar",
+  "@sidebarMenuHide": {
+    "description": "Context menu action that hides a navigation entry from the sidebar and More menu."
+  },
+  "sidebarHideCustomize": "Hide from More",
+  "@sidebarHideCustomize": {
+    "description": "Long-press action hiding the Customize sidebar shortcut from the More menu."
+  },
+  "sidebarShowCustomizeInMore": "Show Customize sidebar in More",
+  "@sidebarShowCustomizeInMore": {
+    "description": "Switch controlling the presence of the Customize sidebar shortcut in the mobile sidebar More entries."
+  },
+  "sidebarShowCustomizeInMoreHint": "You can always change it here",
+  "@sidebarShowCustomizeInMoreHint": {
+    "description": "Subtitle reassuring users that they can still reach Sidebar settings after hiding the shortcut."
+  },
+  "sidebarHideSingleAssistant": "Hide assistant row when there is only one",
+  "@sidebarHideSingleAssistant": {
+    "description": "Switch for hiding the assistant selector when the user has only one assistant."
+  },
+  "sidebarHideSingleAssistantHint": "The assistant row is shown by default",
+  "@sidebarHideSingleAssistantHint": {
+    "description": "Description of the normal behavior for the single-assistant selector."
+  },
+  "sidebarRestoreDefaults": "Restore defaults",
+  "@sidebarRestoreDefaults": {
+    "description": "Action in the desktop sidebar customization panel to restore the default navigation icon order and visibility."
+  },
+  "sidebarOpenSettings": "Open sidebar settings…",
+  "@sidebarOpenSettings": {
+    "description": "Action in the mobile long-press menu on Customize sidebar. Opens Settings > Display > Sidebar."
   }
 }

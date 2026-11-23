@@ -19,6 +19,7 @@ import '../../../utils/provider_grouping_logic.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
+import '../../../desktop/desktop_tab.dart' show DesktopTab;
 import '../../home/controllers/home_page_controller.dart';
 import '../../home/utils/model_display_helper.dart';
 import '../../provider/widgets/provider_avatar.dart';
@@ -2461,7 +2462,7 @@ class _DesktopModelSelectDialogBodyState
                     nav.push(
                       PageRouteBuilder(
                         pageBuilder: (_, __, ___) => DesktopHomePage(
-                          initialTabIndex: 3,
+                          initialTab: DesktopTab.settings,
                           initialProviderKey: providerKey,
                         ),
                         transitionDuration: const Duration(milliseconds: 220),

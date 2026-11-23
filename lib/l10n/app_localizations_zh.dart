@@ -16755,6 +16755,126 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get worldBookGroupClearSelection => '清空本组勾选';
+
+  @override
+  String get sidebarSettingsTitle => '侧边栏';
+
+  @override
+  String get sidebarCustomize => '自定义侧边栏';
+
+  @override
+  String get sidebarLayoutTitle => '布局';
+
+  @override
+  String get sidebarPresetCurrent => '现在的样子';
+
+  @override
+  String get sidebarPresetNavigation => '导航列表';
+
+  @override
+  String get sidebarPresetAssistantBottom => '助手在底部';
+
+  @override
+  String get sidebarPresetAllTop => '都放顶部';
+
+  @override
+  String get sidebarPresetCustom => '已自定义';
+
+  @override
+  String get sidebarReorderTitle => '调整位置';
+
+  @override
+  String get sidebarReorderHint => '拖到「对话列表」上面或下面';
+
+  @override
+  String get sidebarReorderHandle => '拖动排序';
+
+  @override
+  String get sidebarBlockUser => '用户栏';
+
+  @override
+  String get sidebarBlockSearch => '搜索框';
+
+  @override
+  String get sidebarBlockEntries => '入口';
+
+  @override
+  String get sidebarBlockAssistant => '助手';
+
+  @override
+  String get sidebarBlockConversations => '对话列表';
+
+  @override
+  String get sidebarBlockTop => '顶部';
+
+  @override
+  String get sidebarBlockBottom => '底部';
+
+  @override
+  String get sidebarDisplayAs => '显示为';
+
+  @override
+  String get sidebarStyleList => '列表';
+
+  @override
+  String get sidebarStyleIcons => '图标';
+
+  @override
+  String get sidebarVisibilityShow => '显示';
+
+  @override
+  String get sidebarMore => '更多';
+
+  @override
+  String get sidebarVisibilityHidden => '隐藏';
+
+  @override
+  String get sidebarLocationEntries => '入口区';
+
+  @override
+  String get sidebarLocationSearch => '搜索框右侧';
+
+  @override
+  String get sidebarLocationUserBar => '用户栏图标';
+
+  @override
+  String get sidebarLocationMore => '在「更多」里';
+
+  @override
+  String get sidebarLocationHidden => '已从侧边栏隐藏';
+
+  @override
+  String get sidebarLocationRail => '左侧图标栏';
+
+  @override
+  String get sidebarMenuShow => '显示在侧边栏';
+
+  @override
+  String get sidebarMenuMore => '收进「更多」';
+
+  @override
+  String get sidebarMenuHide => '从侧边栏隐藏';
+
+  @override
+  String get sidebarHideCustomize => '不在「更多」里显示';
+
+  @override
+  String get sidebarShowCustomizeInMore => '在「更多」里显示「自定义侧边栏」';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => '调好后可以关掉，之后从这里改';
+
+  @override
+  String get sidebarHideSingleAssistant => '只有一个助手时隐藏助手行';
+
+  @override
+  String get sidebarHideSingleAssistantHint => '默认照常显示，和现在一样';
+
+  @override
+  String get sidebarRestoreDefaults => '恢复默认';
+
+  @override
+  String get sidebarOpenSettings => '打开侧边栏设置…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -33508,6 +33628,126 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get worldBookGroupClearSelection => '清空本组勾选';
+
+  @override
+  String get sidebarSettingsTitle => '侧边栏';
+
+  @override
+  String get sidebarCustomize => '自定义侧边栏';
+
+  @override
+  String get sidebarLayoutTitle => '布局';
+
+  @override
+  String get sidebarPresetCurrent => '现在的样子';
+
+  @override
+  String get sidebarPresetNavigation => '导航列表';
+
+  @override
+  String get sidebarPresetAssistantBottom => '助手在底部';
+
+  @override
+  String get sidebarPresetAllTop => '都放顶部';
+
+  @override
+  String get sidebarPresetCustom => '已自定义';
+
+  @override
+  String get sidebarReorderTitle => '调整位置';
+
+  @override
+  String get sidebarReorderHint => '拖到「对话列表」上面或下面';
+
+  @override
+  String get sidebarReorderHandle => '拖动排序';
+
+  @override
+  String get sidebarBlockUser => '用户栏';
+
+  @override
+  String get sidebarBlockSearch => '搜索框';
+
+  @override
+  String get sidebarBlockEntries => '入口';
+
+  @override
+  String get sidebarBlockAssistant => '助手';
+
+  @override
+  String get sidebarBlockConversations => '对话列表';
+
+  @override
+  String get sidebarBlockTop => '顶部';
+
+  @override
+  String get sidebarBlockBottom => '底部';
+
+  @override
+  String get sidebarDisplayAs => '显示为';
+
+  @override
+  String get sidebarStyleList => '列表';
+
+  @override
+  String get sidebarStyleIcons => '图标';
+
+  @override
+  String get sidebarVisibilityShow => '显示';
+
+  @override
+  String get sidebarMore => '更多';
+
+  @override
+  String get sidebarVisibilityHidden => '隐藏';
+
+  @override
+  String get sidebarLocationEntries => '入口区';
+
+  @override
+  String get sidebarLocationSearch => '搜索框右侧';
+
+  @override
+  String get sidebarLocationUserBar => '用户栏图标';
+
+  @override
+  String get sidebarLocationMore => '在「更多」里';
+
+  @override
+  String get sidebarLocationHidden => '已从侧边栏隐藏';
+
+  @override
+  String get sidebarLocationRail => '左侧图标栏';
+
+  @override
+  String get sidebarMenuShow => '显示在侧边栏';
+
+  @override
+  String get sidebarMenuMore => '收进「更多」';
+
+  @override
+  String get sidebarMenuHide => '从侧边栏隐藏';
+
+  @override
+  String get sidebarHideCustomize => '不在「更多」里显示';
+
+  @override
+  String get sidebarShowCustomizeInMore => '在「更多」里显示「自定义侧边栏」';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => '调好后可以关掉，之后从这里改';
+
+  @override
+  String get sidebarHideSingleAssistant => '只有一个助手时隐藏助手行';
+
+  @override
+  String get sidebarHideSingleAssistantHint => '默认照常显示，和现在一样';
+
+  @override
+  String get sidebarRestoreDefaults => '恢复默认';
+
+  @override
+  String get sidebarOpenSettings => '打开侧边栏设置…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -50312,4 +50552,124 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get worldBookGroupClearSelection => '清空本組勾選';
+
+  @override
+  String get sidebarSettingsTitle => '側邊欄';
+
+  @override
+  String get sidebarCustomize => '自訂側邊欄';
+
+  @override
+  String get sidebarLayoutTitle => '版面配置';
+
+  @override
+  String get sidebarPresetCurrent => '目前樣式';
+
+  @override
+  String get sidebarPresetNavigation => '導覽清單';
+
+  @override
+  String get sidebarPresetAssistantBottom => '助手置於底部';
+
+  @override
+  String get sidebarPresetAllTop => '全部置於頂部';
+
+  @override
+  String get sidebarPresetCustom => '已自訂';
+
+  @override
+  String get sidebarReorderTitle => '調整區塊位置';
+
+  @override
+  String get sidebarReorderHint => '拖曳至「對話列表」上方或下方';
+
+  @override
+  String get sidebarReorderHandle => '拖曳排序';
+
+  @override
+  String get sidebarBlockUser => '使用者列';
+
+  @override
+  String get sidebarBlockSearch => '搜尋列';
+
+  @override
+  String get sidebarBlockEntries => '入口';
+
+  @override
+  String get sidebarBlockAssistant => '助手';
+
+  @override
+  String get sidebarBlockConversations => '對話列表';
+
+  @override
+  String get sidebarBlockTop => '頂部';
+
+  @override
+  String get sidebarBlockBottom => '底部';
+
+  @override
+  String get sidebarDisplayAs => '顯示為';
+
+  @override
+  String get sidebarStyleList => '清單';
+
+  @override
+  String get sidebarStyleIcons => '圖示';
+
+  @override
+  String get sidebarVisibilityShow => '顯示';
+
+  @override
+  String get sidebarMore => '更多';
+
+  @override
+  String get sidebarVisibilityHidden => '隱藏';
+
+  @override
+  String get sidebarLocationEntries => '入口區';
+
+  @override
+  String get sidebarLocationSearch => '搜尋列右側';
+
+  @override
+  String get sidebarLocationUserBar => '使用者列圖示';
+
+  @override
+  String get sidebarLocationMore => '在「更多」裡';
+
+  @override
+  String get sidebarLocationHidden => '已從側邊欄隱藏';
+
+  @override
+  String get sidebarLocationRail => '左側圖示列';
+
+  @override
+  String get sidebarMenuShow => '顯示在側邊欄';
+
+  @override
+  String get sidebarMenuMore => '收進「更多」';
+
+  @override
+  String get sidebarMenuHide => '從側邊欄隱藏';
+
+  @override
+  String get sidebarHideCustomize => '不在「更多」裡顯示';
+
+  @override
+  String get sidebarShowCustomizeInMore => '在「更多」裡顯示「自訂側邊欄」';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint => '之後仍可從這裡調整';
+
+  @override
+  String get sidebarHideSingleAssistant => '只有一個助手時隱藏助手列';
+
+  @override
+  String get sidebarHideSingleAssistantHint => '預設會照常顯示';
+
+  @override
+  String get sidebarRestoreDefaults => '恢復預設';
+
+  @override
+  String get sidebarOpenSettings => '開啟側邊欄設定…';
 }

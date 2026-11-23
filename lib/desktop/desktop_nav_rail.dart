@@ -10,95 +10,143 @@ import '../icons/lucide_adapter.dart' as lucide;
 import '../shared/widgets/avatar_image.dart';
 import '../theme/app_font_weights.dart';
 import 'widgets/desktop_pane_surface.dart';
+import '../core/models/sidebar_layout.dart';
+import '../shared/widgets/sidebar_entry_labels.dart';
+import 'desktop_context_menu.dart';
+import 'desktop_sidebar_customization.dart';
+import 'desktop_tab.dart';
 
 /// A compact left rail for desktop with avatar, primary actions, and bottom system toggles.
 class DesktopNavRail extends StatelessWidget {
   const DesktopNavRail({
     super.key,
-    required this.activeIndex,
+    required this.activeTab,
     this.globalSearchActive = false,
     required this.onTapChat,
-    required this.onTapGlobalSearch,
-    required this.onTapTranslate,
-    required this.onTapStorage,
+    required this.onTapEntry,
     required this.onTapSettings,
   });
 
-  final int activeIndex; // 0=Chat, 1=Translate, 2=Storage, 3=Settings
+  final DesktopTab activeTab;
   final bool globalSearchActive;
   final VoidCallback onTapChat;
-  final VoidCallback onTapGlobalSearch;
-  final VoidCallback onTapTranslate;
-  final VoidCallback onTapStorage;
+  final ValueChanged<SidebarEntry> onTapEntry;
   final VoidCallback onTapSettings;
 
   static const double width = 64.0;
+
+  bool _isActive(SidebarEntry entry) => switch (entry) {
+    SidebarEntry.search => globalSearchActive,
+    SidebarEntry.translate => activeTab == DesktopTab.translate,
+    SidebarEntry.storage => activeTab == DesktopTab.storage,
+    SidebarEntry.history => false,
+  };
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final isMac = Platform.isMacOS;
-    final double topGap = isMac ? 36.0 : 8.0;
-    final isChatActive = activeIndex == 0 && !globalSearchActive;
-    final isGlobalSearchActive = globalSearchActive;
-    final isTranslateActive = activeIndex == 1;
-    final isStorageActive = activeIndex == 2;
-    final isSettingsActive = activeIndex == 3;
+    final entries = context.watch<SettingsProvider>().desktopRailEntries;
+    final shown = sidebarEntriesWithVisibility(
+      entries,
+      SidebarVisibility.show,
+    ).where((entry) => entry != SidebarEntry.history);
+    final more = sidebarEntriesWithVisibility(entries, SidebarVisibility.more);
 
     return SizedBox(
       width: width,
       child: DesktopPaneSurface(
         child: Column(
           children: [
-            SizedBox(height: topGap),
-            _UserAvatarButton(),
-            const SizedBox(height: 12),
-            _CircleAction(
-              tooltip: l10n.desktopNavChatTooltip,
-              icon: lucide.Lucide.MessageCircle,
-              onTap: onTapChat,
-              size: 40,
-              iconSize: 18,
-              iconColor: isChatActive ? cs.primary : null,
+            Expanded(
+              child: SingleChildScrollView(
+                primary: false,
+                child: Column(
+                  children: [
+                    SizedBox(height: Platform.isMacOS ? 36 : 8),
+                    _UserAvatarButton(),
+                    const SizedBox(height: 12),
+                    _CircleAction(
+                      tooltip: l10n.desktopNavChatTooltip,
+                      icon: lucide.Lucide.MessageCircle,
+                      onTap: onTapChat,
+                      onSecondaryTapDown: (details) =>
+                          showDesktopSidebarEntryMenu(
+                            context,
+                            details.globalPosition,
+                          ),
+                      iconColor:
+                          activeTab == DesktopTab.chat && !globalSearchActive
+                          ? cs.primary
+                          : null,
+                    ),
+                    for (final entry in shown) ...[
+                      const SizedBox(height: 8),
+                      _CircleAction(
+                        key: ValueKey(entry),
+                        tooltip: entry.label(l10n),
+                        icon: entry.icon,
+                        onTap: () => onTapEntry(entry),
+                        onSecondaryTapDown: (details) =>
+                            showDesktopSidebarEntryMenu(
+                              context,
+                              details.globalPosition,
+                              entry: entry,
+                            ),
+                        iconColor: _isActive(entry) ? cs.primary : null,
+                      ),
+                    ],
+                    if (more.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (buttonContext) => _CircleAction(
+                          tooltip: l10n.sidebarMore,
+                          icon: lucide.Lucide.Ellipsis,
+                          iconColor: more.any(_isActive) ? cs.primary : null,
+                          onTap: () {
+                            final box =
+                                buttonContext.findRenderObject()! as RenderBox;
+                            showDesktopContextMenuAt(
+                              context,
+                              globalPosition: box.localToGlobal(
+                                Offset(box.size.width, 0),
+                              ),
+                              items: [
+                                for (final entry in more)
+                                  DesktopContextMenuItem(
+                                    icon: entry.icon,
+                                    label: entry.label(l10n),
+                                    checked: _isActive(entry),
+                                    onTap: () => onTapEntry(entry),
+                                  ),
+                                DesktopContextMenuItem(
+                                  icon: lucide.Lucide.panelLeft,
+                                  label: l10n.sidebarCustomize,
+                                  startsGroup: true,
+                                  onTap: () {
+                                    if (context.mounted) {
+                                      const DesktopCustomizeSidebarNotification()
+                                          .dispatch(context);
+                                    }
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 8),
-            _CircleAction(
-              tooltip: l10n.desktopNavGlobalSearchTooltip,
-              icon: lucide.Lucide.Search,
-              onTap: onTapGlobalSearch,
-              size: 40,
-              iconSize: 18,
-              iconColor: isGlobalSearchActive ? cs.primary : null,
-            ),
-            const SizedBox(height: 8),
-            _CircleAction(
-              tooltip: l10n.desktopNavTranslateTooltip,
-              icon: lucide.Lucide.Languages,
-              onTap: onTapTranslate,
-              size: 40,
-              iconSize: 18,
-              iconColor: isTranslateActive ? cs.primary : null,
-            ),
-            const SizedBox(height: 8),
-            _CircleAction(
-              tooltip: l10n.desktopNavStorageTooltip,
-              icon: lucide.Lucide.Folder,
-              onTap: onTapStorage,
-              size: 40,
-              iconSize: 18,
-              iconColor: isStorageActive ? cs.primary : null,
-            ),
-            const Spacer(),
             _ThemeCycleButton(),
             const SizedBox(height: 8),
             _CircleAction(
               tooltip: l10n.desktopNavSettingsTooltip,
               icon: lucide.Lucide.Settings,
               onTap: onTapSettings,
-              size: 40,
-              iconSize: 18,
-              iconColor: isSettingsActive ? cs.primary : null,
+              iconColor: activeTab == DesktopTab.settings ? cs.primary : null,
             ),
             const SizedBox(height: 12),
           ],
@@ -188,19 +236,18 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
 
 class _CircleAction extends StatelessWidget {
   const _CircleAction({
+    super.key,
     required this.icon,
     required this.onTap,
     required this.tooltip,
-    this.size = 44,
-    this.iconSize = 20,
+    this.onSecondaryTapDown,
     this.iconColor,
   });
   final IconData icon;
   final VoidCallback onTap;
   final String tooltip;
-  final double size;
-  final double iconSize;
   final Color? iconColor;
+  final GestureTapDownCallback? onSecondaryTapDown;
 
   @override
   Widget build(BuildContext context) {
@@ -210,11 +257,12 @@ class _CircleAction extends StatelessWidget {
       waitDuration: const Duration(milliseconds: 300),
       child: GestureDetector(
         onTap: onTap,
+        onSecondaryTapDown: onSecondaryTapDown,
         child: _HoverCircle(
-          size: size,
+          size: 40,
           child: Icon(
             icon,
-            size: iconSize,
+            size: 18,
             color: (iconColor ?? cs.onSurface.withValues(alpha: 0.8)),
           ),
         ),

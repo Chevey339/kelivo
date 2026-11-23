@@ -31007,6 +31007,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear group selection'**
   String get worldBookGroupClearSelection;
+
+  /// Title of the Sidebar page reached from Settings > Display and label of its navigation row.
+  ///
+  /// In en, this message translates to:
+  /// **'Sidebar'**
+  String get sidebarSettingsTitle;
+
+  /// Action in mobile sidebar More and in desktop rail context menus. Opens sidebar layout and entry controls.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize sidebar'**
+  String get sidebarCustomize;
+
+  /// Heading of the mobile Sidebar settings section that shows four layout presets.
+  ///
+  /// In en, this message translates to:
+  /// **'Layout'**
+  String get sidebarLayoutTitle;
+
+  /// Mobile sidebar layout preset matching the original Kelivo layout with icon entries and the user bar at the bottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Current layout'**
+  String get sidebarPresetCurrent;
+
+  /// Mobile sidebar layout preset with a list of entry rows near the top.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation list'**
+  String get sidebarPresetNavigation;
+
+  /// Mobile sidebar layout preset with the assistant selector below the conversation list.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant at bottom'**
+  String get sidebarPresetAssistantBottom;
+
+  /// Mobile sidebar layout preset placing all fixed blocks above the scrolling conversation list.
+  ///
+  /// In en, this message translates to:
+  /// **'All at the top'**
+  String get sidebarPresetAllTop;
+
+  /// Status in Sidebar settings when the custom block order does not match a preset.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom layout'**
+  String get sidebarPresetCustom;
+
+  /// Heading above the reorderable sidebar blocks.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrange blocks'**
+  String get sidebarReorderTitle;
+
+  /// Instruction for moving fixed sidebar blocks around the non-draggable conversation list separator.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag above or below the conversation list'**
+  String get sidebarReorderHint;
+
+  /// Accessible label for the reorder handle. Drag it or use Up and Down when focused.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder'**
+  String get sidebarReorderHandle;
+
+  /// Name of the mobile sidebar block showing the user avatar, name, and settings.
+  ///
+  /// In en, this message translates to:
+  /// **'User bar'**
+  String get sidebarBlockUser;
+
+  /// Name of the mobile sidebar block containing the conversation search field.
+  ///
+  /// In en, this message translates to:
+  /// **'Search bar'**
+  String get sidebarBlockSearch;
+
+  /// Name of the mobile sidebar block and settings section for configurable navigation actions.
+  ///
+  /// In en, this message translates to:
+  /// **'Entries'**
+  String get sidebarBlockEntries;
+
+  /// Section title and mobile sidebar block name for the assistant switcher.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get sidebarBlockAssistant;
+
+  /// Label of the fixed conversation list separator in the sidebar block reorder control.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation list'**
+  String get sidebarBlockConversations;
+
+  /// Position tag for a mobile sidebar block above the conversation list.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get sidebarBlockTop;
+
+  /// Position tag for a mobile sidebar block below the conversation list.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get sidebarBlockBottom;
+
+  /// Label next to the List or Icons segmented control in the mobile Sidebar settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Display as'**
+  String get sidebarDisplayAs;
+
+  /// Sidebar display style with navigation entries as full-width rows.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get sidebarStyleList;
+
+  /// Sidebar display style with navigation entries as icon buttons by the user bar or search field.
+  ///
+  /// In en, this message translates to:
+  /// **'Icons'**
+  String get sidebarStyleIcons;
+
+  /// Short option to make a navigation entry visible directly in the sidebar.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get sidebarVisibilityShow;
+
+  /// Label of the sidebar overflow section for navigation entries moved into an expandable list or menu.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get sidebarMore;
+
+  /// Short option to hide a navigation entry from both the sidebar and its More menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get sidebarVisibilityHidden;
+
+  /// Subtitle for a visible sidebar action displayed as a row in the entry list.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry list'**
+  String get sidebarLocationEntries;
+
+  /// Subtitle for the history action displayed beside the sidebar search field.
+  ///
+  /// In en, this message translates to:
+  /// **'Beside search'**
+  String get sidebarLocationSearch;
+
+  /// Subtitle for a navigation action displayed as an icon in the mobile sidebar user bar.
+  ///
+  /// In en, this message translates to:
+  /// **'User bar icons'**
+  String get sidebarLocationUserBar;
+
+  /// Subtitle for a sidebar navigation action displayed in the More menu.
+  ///
+  /// In en, this message translates to:
+  /// **'In More'**
+  String get sidebarLocationMore;
+
+  /// Subtitle for a navigation action hidden from the sidebar and its More menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden from the sidebar'**
+  String get sidebarLocationHidden;
+
+  /// Heading of the desktop sidebar customization panel and subtitle for a visible icon rail entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Left icon rail'**
+  String get sidebarLocationRail;
+
+  /// Context menu action that moves a navigation entry into the directly visible sidebar.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in sidebar'**
+  String get sidebarMenuShow;
+
+  /// Context menu action that moves a sidebar navigation entry into the More menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to More'**
+  String get sidebarMenuMore;
+
+  /// Context menu action that hides a navigation entry from the sidebar and More menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide from sidebar'**
+  String get sidebarMenuHide;
+
+  /// Long-press action hiding the Customize sidebar shortcut from the More menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide from More'**
+  String get sidebarHideCustomize;
+
+  /// Switch controlling the presence of the Customize sidebar shortcut in the mobile sidebar More entries.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Customize sidebar in More'**
+  String get sidebarShowCustomizeInMore;
+
+  /// Subtitle reassuring users that they can still reach Sidebar settings after hiding the shortcut.
+  ///
+  /// In en, this message translates to:
+  /// **'You can always change it here'**
+  String get sidebarShowCustomizeInMoreHint;
+
+  /// Switch for hiding the assistant selector when the user has only one assistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide assistant row when there is only one'**
+  String get sidebarHideSingleAssistant;
+
+  /// Description of the normal behavior for the single-assistant selector.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant row is shown by default'**
+  String get sidebarHideSingleAssistantHint;
+
+  /// Action in the desktop sidebar customization panel to restore the default navigation icon order and visibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore defaults'**
+  String get sidebarRestoreDefaults;
+
+  /// Action in the mobile long-press menu on Customize sidebar. Opens Settings > Display > Sidebar.
+  ///
+  /// In en, this message translates to:
+  /// **'Open sidebar settings…'**
+  String get sidebarOpenSettings;
 }
 
 class _AppLocalizationsDelegate

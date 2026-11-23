@@ -17840,4 +17840,129 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get worldBookGroupClearSelection => 'Grup seçimini temizle';
+
+  @override
+  String get sidebarSettingsTitle => 'Kenar çubuğu';
+
+  @override
+  String get sidebarCustomize => 'Kenar çubuğunu özelleştir';
+
+  @override
+  String get sidebarLayoutTitle => 'Düzen';
+
+  @override
+  String get sidebarPresetCurrent => 'Mevcut düzen';
+
+  @override
+  String get sidebarPresetNavigation => 'Gezinme listesi';
+
+  @override
+  String get sidebarPresetAssistantBottom => 'Asistan altta';
+
+  @override
+  String get sidebarPresetAllTop => 'Hepsi üstte';
+
+  @override
+  String get sidebarPresetCustom => 'Özel düzen';
+
+  @override
+  String get sidebarReorderTitle => 'Blokları düzenle';
+
+  @override
+  String get sidebarReorderHint =>
+      'Sohbet listesinin üstüne veya altına sürükleyin';
+
+  @override
+  String get sidebarReorderHandle => 'Yeniden sırala';
+
+  @override
+  String get sidebarBlockUser => 'Kullanıcı çubuğu';
+
+  @override
+  String get sidebarBlockSearch => 'Arama çubuğu';
+
+  @override
+  String get sidebarBlockEntries => 'Girişler';
+
+  @override
+  String get sidebarBlockAssistant => 'Asistan';
+
+  @override
+  String get sidebarBlockConversations => 'Sohbet listesi';
+
+  @override
+  String get sidebarBlockTop => 'Üst';
+
+  @override
+  String get sidebarBlockBottom => 'Alt';
+
+  @override
+  String get sidebarDisplayAs => 'Görünüm';
+
+  @override
+  String get sidebarStyleList => 'Liste';
+
+  @override
+  String get sidebarStyleIcons => 'Simgeler';
+
+  @override
+  String get sidebarVisibilityShow => 'Göster';
+
+  @override
+  String get sidebarMore => 'Daha fazla';
+
+  @override
+  String get sidebarVisibilityHidden => 'Gizle';
+
+  @override
+  String get sidebarLocationEntries => 'Giriş listesi';
+
+  @override
+  String get sidebarLocationSearch => 'Aramanın yanında';
+
+  @override
+  String get sidebarLocationUserBar => 'Kullanıcı çubuğu simgeleri';
+
+  @override
+  String get sidebarLocationMore => 'Daha fazla içinde';
+
+  @override
+  String get sidebarLocationHidden => 'Kenar çubuğundan gizlendi';
+
+  @override
+  String get sidebarLocationRail => 'Sol simge çubuğu';
+
+  @override
+  String get sidebarMenuShow => 'Kenar çubuğunda göster';
+
+  @override
+  String get sidebarMenuMore => 'Daha fazla bölümüne taşı';
+
+  @override
+  String get sidebarMenuHide => 'Kenar çubuğundan gizle';
+
+  @override
+  String get sidebarHideCustomize => 'Daha fazla bölümünden gizle';
+
+  @override
+  String get sidebarShowCustomizeInMore =>
+      'Daha fazla bölümünde Kenar çubuğunu özelleştir\'i göster';
+
+  @override
+  String get sidebarShowCustomizeInMoreHint =>
+      'Buradan her zaman değiştirebilirsiniz';
+
+  @override
+  String get sidebarHideSingleAssistant =>
+      'Yalnızca bir asistan varsa asistan satırını gizle';
+
+  @override
+  String get sidebarHideSingleAssistantHint =>
+      'Asistan satırı varsayılan olarak gösterilir';
+
+  @override
+  String get sidebarRestoreDefaults => 'Varsayılanlara geri dön';
+
+  @override
+  String get sidebarOpenSettings => 'Kenar çubuğu ayarlarını aç…';
 }

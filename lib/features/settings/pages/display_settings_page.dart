@@ -1,6 +1,7 @@
 import '../widgets/settings_search_target.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'mobile_background_settings_page.dart';
+import 'sidebar_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -99,6 +100,13 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   await _showLanguageSheet(context);
                   if (mounted) setState(() {});
                 },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.panelLeft,
+                label: l10n.sidebarSettingsTitle,
+                onTap: () => openSidebarSettings(context),
               ),
               _iosDivider(context),
               _iosNavRow(

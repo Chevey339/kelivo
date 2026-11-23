@@ -464,6 +464,22 @@ void main() {
             );
             expect(tester.takeException(), isNull);
           }
+          final menu = find.byKey(const ValueKey('desktop-navigation-menu'));
+          await tester.tap(menu);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip(l10n.desktopNavTranslateTooltip));
+          await tester.pumpAndSettle();
+          expect(find.byType(DesktopTranslatePage), findsOneWidget);
+          expect(find.byType(HomePage), findsNothing);
+          await tester.tap(menu);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip(l10n.desktopNavChatTooltip));
+          await tester.pumpAndSettle();
+          expect(tester.state(find.byType(HomePage)), same(pageState));
+          expect(
+            tester.widget<TextField>(field).controller!.text,
+            'Retained compact draft',
+          );
           return;
         }
 
