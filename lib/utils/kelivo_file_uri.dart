@@ -20,6 +20,7 @@ final class KelivoFileUri {
     'avatars',
     'fonts',
     'drafts',
+    'generations',
   ];
 
   /// Cheap prefix check. Does **not** validate structure.

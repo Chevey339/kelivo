@@ -112,20 +112,22 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     if (cfg.enabledModels.isEmpty) return;
 
     final name = cfg.name;
-    final list = <_ModelItem>[
-      for (final mid in cfg.enabledModels)
-        () {
-          final spec = ModelSpecResolver.instance.spec(cfg, mid);
-          return _ModelItem(
-            providerKey: key,
-            providerName: name.isNotEmpty ? name : key,
-            id: mid,
-            info: spec,
-            pinned: data.pinnedModels.contains('$key::$mid'),
-            selected: data.currentModelKey == '$key::$mid',
-          );
-        }(),
-    ];
+    final list = <_ModelItem>[];
+    for (final mid in cfg.enabledModels) {
+      final spec = ModelSpecResolver.instance.spec(cfg, mid);
+      if (spec.type.isMedia) continue;
+      list.add(
+        _ModelItem(
+          providerKey: key,
+          providerName: name.isNotEmpty ? name : key,
+          id: mid,
+          info: spec,
+          pinned: data.pinnedModels.contains('$key::$mid'),
+          selected: data.currentModelKey == '$key::$mid',
+        ),
+      );
+    }
+    if (list.isEmpty) return;
     groups[key] = _ProviderGroup(
       name: name.isNotEmpty ? name : key,
       items: list,
@@ -160,7 +162,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
         );
       },
     );
-    favItems.add(found.copyWith(pinned: true));
+    if (!found.info.type.isMedia) favItems.add(found.copyWith(pinned: true));
   }
 
   // Provider sections ordered by ProvidersPage order
@@ -1070,7 +1072,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               selected: false,
             ),
           );
-          if (_matchesSearch(query, found, found.providerName)) {
+          if (!found.info.type.isMedia &&
+              _matchesSearch(query, found, found.providerName)) {
             favs.add(found.copyWith(pinned: true));
             favMatchedKeys.add('$pk::$mid');
           }
@@ -1962,7 +1965,8 @@ class _DesktopModelSelectDialogBodyState
               selected: false,
             ),
           );
-          if (_matchesSearch(query, found, found.providerName)) {
+          if (!found.info.type.isMedia &&
+              _matchesSearch(query, found, found.providerName)) {
             favs.add(found.copyWith(pinned: true));
             favMatchedKeys.add('$pk::$mid');
           }

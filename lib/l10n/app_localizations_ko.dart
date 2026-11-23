@@ -17315,4 +17315,188 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get sidebarOpenSettings => '사이드바 설정 열기…';
+
+  @override
+  String get creationTitle => '생성';
+
+  @override
+  String get creationTopics => '주제';
+
+  @override
+  String get creationNewTopic => '새 주제';
+
+  @override
+  String get creationNameAfterSending => '첫 프롬프트 전송 후 자동으로 이름 지정';
+
+  @override
+  String get creationPromptTitle => '프롬프트 시작 부분을 제목으로 사용';
+
+  @override
+  String get creationSearchTopics => '주제 및 프롬프트 검색';
+
+  @override
+  String get creationTopicsEmpty => '첫 프롬프트를 보내면 주제가 여기에 표시됩니다';
+
+  @override
+  String get creationNaming => '주제 이름 지정 중…';
+
+  @override
+  String get creationRenameTopic => '주제 이름 변경';
+
+  @override
+  String get creationDeleteTopic => '주제 삭제';
+
+  @override
+  String get creationDeleteTopicBody => '이 주제와 모든 생성물을 삭제할까요?';
+
+  @override
+  String get creationImage => '이미지';
+
+  @override
+  String get creationVideo => '동영상';
+
+  @override
+  String get creationImagePrompt => '생성할 이미지를 설명하세요';
+
+  @override
+  String get creationVideoPrompt => '생성할 동영상을 설명하세요';
+
+  @override
+  String get creationNewImagePrompt => '새 주제로 시작할 이미지를 설명하세요';
+
+  @override
+  String get creationNewVideoPrompt => '새 주제로 시작할 동영상을 설명하세요';
+
+  @override
+  String get creationSelectModel => '모델 선택';
+
+  @override
+  String get creationSearchModels => '모델 또는 공급자 검색';
+
+  @override
+  String get creationNoModelTitle => '사용 가능한 생성 모델이 없습니다';
+
+  @override
+  String get creationNoModelBody => '공급자에서 호환되는 모델을 활성화하면 생성을 시작할 수 있습니다.';
+
+  @override
+  String get creationEmptyTitle => '아이디어로 시작하세요';
+
+  @override
+  String get creationEmptyBody => '생성하고 싶은 내용을 설명하세요.';
+
+  @override
+  String get creationAddReference => '참조 이미지 추가';
+
+  @override
+  String get creationReferenceTooLarge => '참조 이미지의 총 크기는 20 MB 이하여야 합니다.';
+
+  @override
+  String get creationAspectRatio => '화면 비율';
+
+  @override
+  String get creationCountLabel => '이미지 수';
+
+  @override
+  String get creationParameters => '생성 옵션';
+
+  @override
+  String get creationAuto => '자동';
+
+  @override
+  String get creationGenerate => '생성';
+
+  @override
+  String get creationWaitingImage => '이미지 생성 중';
+
+  @override
+  String get creationWaitingVideo => '동영상 준비 중';
+
+  @override
+  String get creationDownloading => '다운로드 중';
+
+  @override
+  String get creationFailed => '생성 실패';
+
+  @override
+  String get creationInterrupted => '앱이 종료되어 생성이 중단되었습니다';
+
+  @override
+  String get creationCancelled => '취소됨';
+
+  @override
+  String get creationPartial => '일부 결과를 저장하지 못했습니다';
+
+  @override
+  String get creationRetry => '다시 시도';
+
+  @override
+  String get creationCopyPrompt => '프롬프트 복사';
+
+  @override
+  String get creationSaveImage => '이미지 저장';
+
+  @override
+  String get creationCopyImage => '이미지 복사';
+
+  @override
+  String get creationShare => '공유';
+
+  @override
+  String get creationDeleteItem => '작품 삭제';
+
+  @override
+  String get creationDeleteItemBody => '이 작품을 삭제할까요?';
+
+  @override
+  String get creationActionFailed => '작업을 완료할 수 없습니다';
+
+  @override
+  String get creationOptionSaved => '저장됨';
+
+  @override
+  String get creationOptionCopied => '복사됨';
+
+  @override
+  String get backupScopeCreations => '창작물';
+
+  @override
+  String creationQueuePosition(int count) {
+    return '대기 중 · 앞에 $count개';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count장',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count회 생성',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 작품',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return '주제 $count';
+  }
 }

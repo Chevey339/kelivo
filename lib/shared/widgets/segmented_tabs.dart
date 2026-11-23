@@ -23,6 +23,7 @@ class SegmentedTabs extends StatelessWidget {
     this.enabled = true,
     this.radioGroup = false,
     this.compact = false,
+    this.iconOnly = false,
     this.enableHaptics = true,
     this.backgroundColor,
     this.selectedColor,
@@ -35,7 +36,7 @@ class SegmentedTabs extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final bool expand;
   final double height;
-  final bool enabled, radioGroup, compact, enableHaptics;
+  final bool enabled, radioGroup, compact, iconOnly, enableHaptics;
   final Color? backgroundColor,
       selectedColor,
       foregroundColor,
@@ -123,9 +124,10 @@ class SegmentedTabs extends StatelessWidget {
       children: [
         if (tab.icon != null) ...[
           Icon(tab.icon, size: 16, color: color),
-          const SizedBox(width: 6),
+          if (!iconOnly) const SizedBox(width: 6),
         ],
-        expand ? Flexible(child: label) : label,
+        if (!iconOnly || tab.icon == null)
+          if (expand) Flexible(child: label) else label,
       ],
     );
 

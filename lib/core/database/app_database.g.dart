@@ -12757,6 +12757,2318 @@ class ExtensionEntityRowsCompanion extends UpdateCompanion<ExtensionEntityRow> {
   }
 }
 
+class $GenerationTopicRowsTable extends GenerationTopicRows
+    with TableInfo<$GenerationTopicRowsTable, GenerationTopicRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GenerationTopicRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<GenerationTitleSource, String>
+  titleSource =
+      GeneratedColumn<String>(
+        'title_source',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<GenerationTitleSource>(
+        $GenerationTopicRowsTable.$convertertitleSource,
+      );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($GenerationTopicRowsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($GenerationTopicRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    titleSource,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'generation_topic_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GenerationTopicRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GenerationTopicRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GenerationTopicRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      titleSource: $GenerationTopicRowsTable.$convertertitleSource.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}title_source'],
+        )!,
+      ),
+      createdAt: $GenerationTopicRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $GenerationTopicRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $GenerationTopicRowsTable createAlias(String alias) {
+    return $GenerationTopicRowsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<GenerationTitleSource, String, String>
+  $convertertitleSource = const EnumNameConverter<GenerationTitleSource>(
+    GenerationTitleSource.values,
+  );
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class GenerationTopicRow extends DataClass
+    implements Insertable<GenerationTopicRow> {
+  final String id;
+  final String title;
+  final GenerationTitleSource titleSource;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const GenerationTopicRow({
+    required this.id,
+    required this.title,
+    required this.titleSource,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    {
+      map['title_source'] = Variable<String>(
+        $GenerationTopicRowsTable.$convertertitleSource.toSql(titleSource),
+      );
+    }
+    {
+      map['created_at'] = Variable<int>(
+        $GenerationTopicRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $GenerationTopicRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  GenerationTopicRowsCompanion toCompanion(bool nullToAbsent) {
+    return GenerationTopicRowsCompanion(
+      id: Value(id),
+      title: Value(title),
+      titleSource: Value(titleSource),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory GenerationTopicRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GenerationTopicRow(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      titleSource: $GenerationTopicRowsTable.$convertertitleSource.fromJson(
+        serializer.fromJson<String>(json['titleSource']),
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'titleSource': serializer.toJson<String>(
+        $GenerationTopicRowsTable.$convertertitleSource.toJson(titleSource),
+      ),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  GenerationTopicRow copyWith({
+    String? id,
+    String? title,
+    GenerationTitleSource? titleSource,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => GenerationTopicRow(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    titleSource: titleSource ?? this.titleSource,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  GenerationTopicRow copyWithCompanion(GenerationTopicRowsCompanion data) {
+    return GenerationTopicRow(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      titleSource: data.titleSource.present
+          ? data.titleSource.value
+          : this.titleSource,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenerationTopicRow(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('titleSource: $titleSource, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, title, titleSource, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GenerationTopicRow &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.titleSource == this.titleSource &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class GenerationTopicRowsCompanion extends UpdateCompanion<GenerationTopicRow> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<GenerationTitleSource> titleSource;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const GenerationTopicRowsCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.titleSource = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GenerationTopicRowsCompanion.insert({
+    required String id,
+    required String title,
+    required GenerationTitleSource titleSource,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       titleSource = Value(titleSource),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<GenerationTopicRow> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? titleSource,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (titleSource != null) 'title_source': titleSource,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GenerationTopicRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? title,
+    Value<GenerationTitleSource>? titleSource,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return GenerationTopicRowsCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      titleSource: titleSource ?? this.titleSource,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (titleSource.present) {
+      map['title_source'] = Variable<String>(
+        $GenerationTopicRowsTable.$convertertitleSource.toSql(
+          titleSource.value,
+        ),
+      );
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $GenerationTopicRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $GenerationTopicRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenerationTopicRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('titleSource: $titleSource, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $GenerationBatchRowsTable extends GenerationBatchRows
+    with TableInfo<$GenerationBatchRowsTable, GenerationBatchRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GenerationBatchRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _topicIdMeta = const VerificationMeta(
+    'topicId',
+  );
+  @override
+  late final GeneratedColumn<String> topicId = GeneratedColumn<String>(
+    'topic_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES generation_topic_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _providerIdMeta = const VerificationMeta(
+    'providerId',
+  );
+  @override
+  late final GeneratedColumn<String> providerId = GeneratedColumn<String>(
+    'provider_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _modelIdMeta = const VerificationMeta(
+    'modelId',
+  );
+  @override
+  late final GeneratedColumn<String> modelId = GeneratedColumn<String>(
+    'model_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<MediaMode, String> mode =
+      GeneratedColumn<String>(
+        'mode',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<MediaMode>($GenerationBatchRowsTable.$convertermode);
+  static const VerificationMeta _promptMeta = const VerificationMeta('prompt');
+  @override
+  late final GeneratedColumn<String> prompt = GeneratedColumn<String>(
+    'prompt',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _negativePromptMeta = const VerificationMeta(
+    'negativePrompt',
+  );
+  @override
+  late final GeneratedColumn<String> negativePrompt = GeneratedColumn<String>(
+    'negative_prompt',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _paramsJsonMeta = const VerificationMeta(
+    'paramsJson',
+  );
+  @override
+  late final GeneratedColumn<String> paramsJson = GeneratedColumn<String>(
+    'params_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _referencesJsonMeta = const VerificationMeta(
+    'referencesJson',
+  );
+  @override
+  late final GeneratedColumn<String> referencesJson = GeneratedColumn<String>(
+    'references_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<GenerationStatus, String> status =
+      GeneratedColumn<String>(
+        'status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<GenerationStatus>(
+        $GenerationBatchRowsTable.$converterstatus,
+      );
+  static const VerificationMeta _errorJsonMeta = const VerificationMeta(
+    'errorJson',
+  );
+  @override
+  late final GeneratedColumn<String> errorJson = GeneratedColumn<String>(
+    'error_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<GenerationSource, String> source =
+      GeneratedColumn<String>(
+        'source',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<GenerationSource>(
+        $GenerationBatchRowsTable.$convertersource,
+      );
+  static const VerificationMeta _parentItemIdMeta = const VerificationMeta(
+    'parentItemId',
+  );
+  @override
+  late final GeneratedColumn<String> parentItemId = GeneratedColumn<String>(
+    'parent_item_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($GenerationBatchRowsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> startedAt =
+      GeneratedColumn<int>(
+        'started_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>(
+        $GenerationBatchRowsTable.$converterstartedAtn,
+      );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> finishedAt =
+      GeneratedColumn<int>(
+        'finished_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>(
+        $GenerationBatchRowsTable.$converterfinishedAtn,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    topicId,
+    providerId,
+    modelId,
+    mode,
+    prompt,
+    negativePrompt,
+    paramsJson,
+    referencesJson,
+    status,
+    errorJson,
+    source,
+    parentItemId,
+    conversationId,
+    messageId,
+    createdAt,
+    startedAt,
+    finishedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'generation_batch_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GenerationBatchRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('topic_id')) {
+      context.handle(
+        _topicIdMeta,
+        topicId.isAcceptableOrUnknown(data['topic_id']!, _topicIdMeta),
+      );
+    }
+    if (data.containsKey('provider_id')) {
+      context.handle(
+        _providerIdMeta,
+        providerId.isAcceptableOrUnknown(data['provider_id']!, _providerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerIdMeta);
+    }
+    if (data.containsKey('model_id')) {
+      context.handle(
+        _modelIdMeta,
+        modelId.isAcceptableOrUnknown(data['model_id']!, _modelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_modelIdMeta);
+    }
+    if (data.containsKey('prompt')) {
+      context.handle(
+        _promptMeta,
+        prompt.isAcceptableOrUnknown(data['prompt']!, _promptMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_promptMeta);
+    }
+    if (data.containsKey('negative_prompt')) {
+      context.handle(
+        _negativePromptMeta,
+        negativePrompt.isAcceptableOrUnknown(
+          data['negative_prompt']!,
+          _negativePromptMeta,
+        ),
+      );
+    }
+    if (data.containsKey('params_json')) {
+      context.handle(
+        _paramsJsonMeta,
+        paramsJson.isAcceptableOrUnknown(data['params_json']!, _paramsJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paramsJsonMeta);
+    }
+    if (data.containsKey('references_json')) {
+      context.handle(
+        _referencesJsonMeta,
+        referencesJson.isAcceptableOrUnknown(
+          data['references_json']!,
+          _referencesJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_referencesJsonMeta);
+    }
+    if (data.containsKey('error_json')) {
+      context.handle(
+        _errorJsonMeta,
+        errorJson.isAcceptableOrUnknown(data['error_json']!, _errorJsonMeta),
+      );
+    }
+    if (data.containsKey('parent_item_id')) {
+      context.handle(
+        _parentItemIdMeta,
+        parentItemId.isAcceptableOrUnknown(
+          data['parent_item_id']!,
+          _parentItemIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GenerationBatchRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GenerationBatchRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      topicId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}topic_id'],
+      ),
+      providerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_id'],
+      )!,
+      modelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}model_id'],
+      )!,
+      mode: $GenerationBatchRowsTable.$convertermode.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}mode'],
+        )!,
+      ),
+      prompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}prompt'],
+      )!,
+      negativePrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}negative_prompt'],
+      ),
+      paramsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}params_json'],
+      )!,
+      referencesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}references_json'],
+      )!,
+      status: $GenerationBatchRowsTable.$converterstatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}status'],
+        )!,
+      ),
+      errorJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error_json'],
+      ),
+      source: $GenerationBatchRowsTable.$convertersource.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}source'],
+        )!,
+      ),
+      parentItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_item_id'],
+      ),
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      ),
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_id'],
+      ),
+      createdAt: $GenerationBatchRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      startedAt: $GenerationBatchRowsTable.$converterstartedAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}started_at'],
+        ),
+      ),
+      finishedAt: $GenerationBatchRowsTable.$converterfinishedAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}finished_at'],
+        ),
+      ),
+    );
+  }
+
+  @override
+  $GenerationBatchRowsTable createAlias(String alias) {
+    return $GenerationBatchRowsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<MediaMode, String, String> $convertermode =
+      const EnumNameConverter<MediaMode>(MediaMode.values);
+  static JsonTypeConverter2<GenerationStatus, String, String> $converterstatus =
+      const EnumNameConverter<GenerationStatus>(GenerationStatus.values);
+  static JsonTypeConverter2<GenerationSource, String, String> $convertersource =
+      const EnumNameConverter<GenerationSource>(GenerationSource.values);
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterstartedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterstartedAtn =
+      NullAwareTypeConverter.wrap($converterstartedAt);
+  static TypeConverter<DateTime, int> $converterfinishedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterfinishedAtn =
+      NullAwareTypeConverter.wrap($converterfinishedAt);
+}
+
+class GenerationBatchRow extends DataClass
+    implements Insertable<GenerationBatchRow> {
+  final String id;
+  final String? topicId;
+  final String providerId;
+  final String modelId;
+  final MediaMode mode;
+  final String prompt;
+  final String? negativePrompt;
+  final String paramsJson;
+  final String referencesJson;
+  final GenerationStatus status;
+  final String? errorJson;
+  final GenerationSource source;
+  final String? parentItemId;
+  final String? conversationId;
+  final String? messageId;
+  final DateTime createdAt;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+  const GenerationBatchRow({
+    required this.id,
+    this.topicId,
+    required this.providerId,
+    required this.modelId,
+    required this.mode,
+    required this.prompt,
+    this.negativePrompt,
+    required this.paramsJson,
+    required this.referencesJson,
+    required this.status,
+    this.errorJson,
+    required this.source,
+    this.parentItemId,
+    this.conversationId,
+    this.messageId,
+    required this.createdAt,
+    this.startedAt,
+    this.finishedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || topicId != null) {
+      map['topic_id'] = Variable<String>(topicId);
+    }
+    map['provider_id'] = Variable<String>(providerId);
+    map['model_id'] = Variable<String>(modelId);
+    {
+      map['mode'] = Variable<String>(
+        $GenerationBatchRowsTable.$convertermode.toSql(mode),
+      );
+    }
+    map['prompt'] = Variable<String>(prompt);
+    if (!nullToAbsent || negativePrompt != null) {
+      map['negative_prompt'] = Variable<String>(negativePrompt);
+    }
+    map['params_json'] = Variable<String>(paramsJson);
+    map['references_json'] = Variable<String>(referencesJson);
+    {
+      map['status'] = Variable<String>(
+        $GenerationBatchRowsTable.$converterstatus.toSql(status),
+      );
+    }
+    if (!nullToAbsent || errorJson != null) {
+      map['error_json'] = Variable<String>(errorJson);
+    }
+    {
+      map['source'] = Variable<String>(
+        $GenerationBatchRowsTable.$convertersource.toSql(source),
+      );
+    }
+    if (!nullToAbsent || parentItemId != null) {
+      map['parent_item_id'] = Variable<String>(parentItemId);
+    }
+    if (!nullToAbsent || conversationId != null) {
+      map['conversation_id'] = Variable<String>(conversationId);
+    }
+    if (!nullToAbsent || messageId != null) {
+      map['message_id'] = Variable<String>(messageId);
+    }
+    {
+      map['created_at'] = Variable<int>(
+        $GenerationBatchRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<int>(
+        $GenerationBatchRowsTable.$converterstartedAtn.toSql(startedAt),
+      );
+    }
+    if (!nullToAbsent || finishedAt != null) {
+      map['finished_at'] = Variable<int>(
+        $GenerationBatchRowsTable.$converterfinishedAtn.toSql(finishedAt),
+      );
+    }
+    return map;
+  }
+
+  GenerationBatchRowsCompanion toCompanion(bool nullToAbsent) {
+    return GenerationBatchRowsCompanion(
+      id: Value(id),
+      topicId: topicId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(topicId),
+      providerId: Value(providerId),
+      modelId: Value(modelId),
+      mode: Value(mode),
+      prompt: Value(prompt),
+      negativePrompt: negativePrompt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(negativePrompt),
+      paramsJson: Value(paramsJson),
+      referencesJson: Value(referencesJson),
+      status: Value(status),
+      errorJson: errorJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(errorJson),
+      source: Value(source),
+      parentItemId: parentItemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentItemId),
+      conversationId: conversationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(conversationId),
+      messageId: messageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(messageId),
+      createdAt: Value(createdAt),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      finishedAt: finishedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finishedAt),
+    );
+  }
+
+  factory GenerationBatchRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GenerationBatchRow(
+      id: serializer.fromJson<String>(json['id']),
+      topicId: serializer.fromJson<String?>(json['topicId']),
+      providerId: serializer.fromJson<String>(json['providerId']),
+      modelId: serializer.fromJson<String>(json['modelId']),
+      mode: $GenerationBatchRowsTable.$convertermode.fromJson(
+        serializer.fromJson<String>(json['mode']),
+      ),
+      prompt: serializer.fromJson<String>(json['prompt']),
+      negativePrompt: serializer.fromJson<String?>(json['negativePrompt']),
+      paramsJson: serializer.fromJson<String>(json['paramsJson']),
+      referencesJson: serializer.fromJson<String>(json['referencesJson']),
+      status: $GenerationBatchRowsTable.$converterstatus.fromJson(
+        serializer.fromJson<String>(json['status']),
+      ),
+      errorJson: serializer.fromJson<String?>(json['errorJson']),
+      source: $GenerationBatchRowsTable.$convertersource.fromJson(
+        serializer.fromJson<String>(json['source']),
+      ),
+      parentItemId: serializer.fromJson<String?>(json['parentItemId']),
+      conversationId: serializer.fromJson<String?>(json['conversationId']),
+      messageId: serializer.fromJson<String?>(json['messageId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      startedAt: serializer.fromJson<DateTime?>(json['startedAt']),
+      finishedAt: serializer.fromJson<DateTime?>(json['finishedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'topicId': serializer.toJson<String?>(topicId),
+      'providerId': serializer.toJson<String>(providerId),
+      'modelId': serializer.toJson<String>(modelId),
+      'mode': serializer.toJson<String>(
+        $GenerationBatchRowsTable.$convertermode.toJson(mode),
+      ),
+      'prompt': serializer.toJson<String>(prompt),
+      'negativePrompt': serializer.toJson<String?>(negativePrompt),
+      'paramsJson': serializer.toJson<String>(paramsJson),
+      'referencesJson': serializer.toJson<String>(referencesJson),
+      'status': serializer.toJson<String>(
+        $GenerationBatchRowsTable.$converterstatus.toJson(status),
+      ),
+      'errorJson': serializer.toJson<String?>(errorJson),
+      'source': serializer.toJson<String>(
+        $GenerationBatchRowsTable.$convertersource.toJson(source),
+      ),
+      'parentItemId': serializer.toJson<String?>(parentItemId),
+      'conversationId': serializer.toJson<String?>(conversationId),
+      'messageId': serializer.toJson<String?>(messageId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'startedAt': serializer.toJson<DateTime?>(startedAt),
+      'finishedAt': serializer.toJson<DateTime?>(finishedAt),
+    };
+  }
+
+  GenerationBatchRow copyWith({
+    String? id,
+    Value<String?> topicId = const Value.absent(),
+    String? providerId,
+    String? modelId,
+    MediaMode? mode,
+    String? prompt,
+    Value<String?> negativePrompt = const Value.absent(),
+    String? paramsJson,
+    String? referencesJson,
+    GenerationStatus? status,
+    Value<String?> errorJson = const Value.absent(),
+    GenerationSource? source,
+    Value<String?> parentItemId = const Value.absent(),
+    Value<String?> conversationId = const Value.absent(),
+    Value<String?> messageId = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> startedAt = const Value.absent(),
+    Value<DateTime?> finishedAt = const Value.absent(),
+  }) => GenerationBatchRow(
+    id: id ?? this.id,
+    topicId: topicId.present ? topicId.value : this.topicId,
+    providerId: providerId ?? this.providerId,
+    modelId: modelId ?? this.modelId,
+    mode: mode ?? this.mode,
+    prompt: prompt ?? this.prompt,
+    negativePrompt: negativePrompt.present
+        ? negativePrompt.value
+        : this.negativePrompt,
+    paramsJson: paramsJson ?? this.paramsJson,
+    referencesJson: referencesJson ?? this.referencesJson,
+    status: status ?? this.status,
+    errorJson: errorJson.present ? errorJson.value : this.errorJson,
+    source: source ?? this.source,
+    parentItemId: parentItemId.present ? parentItemId.value : this.parentItemId,
+    conversationId: conversationId.present
+        ? conversationId.value
+        : this.conversationId,
+    messageId: messageId.present ? messageId.value : this.messageId,
+    createdAt: createdAt ?? this.createdAt,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
+  );
+  GenerationBatchRow copyWithCompanion(GenerationBatchRowsCompanion data) {
+    return GenerationBatchRow(
+      id: data.id.present ? data.id.value : this.id,
+      topicId: data.topicId.present ? data.topicId.value : this.topicId,
+      providerId: data.providerId.present
+          ? data.providerId.value
+          : this.providerId,
+      modelId: data.modelId.present ? data.modelId.value : this.modelId,
+      mode: data.mode.present ? data.mode.value : this.mode,
+      prompt: data.prompt.present ? data.prompt.value : this.prompt,
+      negativePrompt: data.negativePrompt.present
+          ? data.negativePrompt.value
+          : this.negativePrompt,
+      paramsJson: data.paramsJson.present
+          ? data.paramsJson.value
+          : this.paramsJson,
+      referencesJson: data.referencesJson.present
+          ? data.referencesJson.value
+          : this.referencesJson,
+      status: data.status.present ? data.status.value : this.status,
+      errorJson: data.errorJson.present ? data.errorJson.value : this.errorJson,
+      source: data.source.present ? data.source.value : this.source,
+      parentItemId: data.parentItemId.present
+          ? data.parentItemId.value
+          : this.parentItemId,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      finishedAt: data.finishedAt.present
+          ? data.finishedAt.value
+          : this.finishedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenerationBatchRow(')
+          ..write('id: $id, ')
+          ..write('topicId: $topicId, ')
+          ..write('providerId: $providerId, ')
+          ..write('modelId: $modelId, ')
+          ..write('mode: $mode, ')
+          ..write('prompt: $prompt, ')
+          ..write('negativePrompt: $negativePrompt, ')
+          ..write('paramsJson: $paramsJson, ')
+          ..write('referencesJson: $referencesJson, ')
+          ..write('status: $status, ')
+          ..write('errorJson: $errorJson, ')
+          ..write('source: $source, ')
+          ..write('parentItemId: $parentItemId, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('messageId: $messageId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    topicId,
+    providerId,
+    modelId,
+    mode,
+    prompt,
+    negativePrompt,
+    paramsJson,
+    referencesJson,
+    status,
+    errorJson,
+    source,
+    parentItemId,
+    conversationId,
+    messageId,
+    createdAt,
+    startedAt,
+    finishedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GenerationBatchRow &&
+          other.id == this.id &&
+          other.topicId == this.topicId &&
+          other.providerId == this.providerId &&
+          other.modelId == this.modelId &&
+          other.mode == this.mode &&
+          other.prompt == this.prompt &&
+          other.negativePrompt == this.negativePrompt &&
+          other.paramsJson == this.paramsJson &&
+          other.referencesJson == this.referencesJson &&
+          other.status == this.status &&
+          other.errorJson == this.errorJson &&
+          other.source == this.source &&
+          other.parentItemId == this.parentItemId &&
+          other.conversationId == this.conversationId &&
+          other.messageId == this.messageId &&
+          other.createdAt == this.createdAt &&
+          other.startedAt == this.startedAt &&
+          other.finishedAt == this.finishedAt);
+}
+
+class GenerationBatchRowsCompanion extends UpdateCompanion<GenerationBatchRow> {
+  final Value<String> id;
+  final Value<String?> topicId;
+  final Value<String> providerId;
+  final Value<String> modelId;
+  final Value<MediaMode> mode;
+  final Value<String> prompt;
+  final Value<String?> negativePrompt;
+  final Value<String> paramsJson;
+  final Value<String> referencesJson;
+  final Value<GenerationStatus> status;
+  final Value<String?> errorJson;
+  final Value<GenerationSource> source;
+  final Value<String?> parentItemId;
+  final Value<String?> conversationId;
+  final Value<String?> messageId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> startedAt;
+  final Value<DateTime?> finishedAt;
+  final Value<int> rowid;
+  const GenerationBatchRowsCompanion({
+    this.id = const Value.absent(),
+    this.topicId = const Value.absent(),
+    this.providerId = const Value.absent(),
+    this.modelId = const Value.absent(),
+    this.mode = const Value.absent(),
+    this.prompt = const Value.absent(),
+    this.negativePrompt = const Value.absent(),
+    this.paramsJson = const Value.absent(),
+    this.referencesJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.errorJson = const Value.absent(),
+    this.source = const Value.absent(),
+    this.parentItemId = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GenerationBatchRowsCompanion.insert({
+    required String id,
+    this.topicId = const Value.absent(),
+    required String providerId,
+    required String modelId,
+    required MediaMode mode,
+    required String prompt,
+    this.negativePrompt = const Value.absent(),
+    required String paramsJson,
+    required String referencesJson,
+    required GenerationStatus status,
+    this.errorJson = const Value.absent(),
+    required GenerationSource source,
+    this.parentItemId = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.messageId = const Value.absent(),
+    required DateTime createdAt,
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       providerId = Value(providerId),
+       modelId = Value(modelId),
+       mode = Value(mode),
+       prompt = Value(prompt),
+       paramsJson = Value(paramsJson),
+       referencesJson = Value(referencesJson),
+       status = Value(status),
+       source = Value(source),
+       createdAt = Value(createdAt);
+  static Insertable<GenerationBatchRow> custom({
+    Expression<String>? id,
+    Expression<String>? topicId,
+    Expression<String>? providerId,
+    Expression<String>? modelId,
+    Expression<String>? mode,
+    Expression<String>? prompt,
+    Expression<String>? negativePrompt,
+    Expression<String>? paramsJson,
+    Expression<String>? referencesJson,
+    Expression<String>? status,
+    Expression<String>? errorJson,
+    Expression<String>? source,
+    Expression<String>? parentItemId,
+    Expression<String>? conversationId,
+    Expression<String>? messageId,
+    Expression<int>? createdAt,
+    Expression<int>? startedAt,
+    Expression<int>? finishedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (topicId != null) 'topic_id': topicId,
+      if (providerId != null) 'provider_id': providerId,
+      if (modelId != null) 'model_id': modelId,
+      if (mode != null) 'mode': mode,
+      if (prompt != null) 'prompt': prompt,
+      if (negativePrompt != null) 'negative_prompt': negativePrompt,
+      if (paramsJson != null) 'params_json': paramsJson,
+      if (referencesJson != null) 'references_json': referencesJson,
+      if (status != null) 'status': status,
+      if (errorJson != null) 'error_json': errorJson,
+      if (source != null) 'source': source,
+      if (parentItemId != null) 'parent_item_id': parentItemId,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (messageId != null) 'message_id': messageId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (startedAt != null) 'started_at': startedAt,
+      if (finishedAt != null) 'finished_at': finishedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GenerationBatchRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? topicId,
+    Value<String>? providerId,
+    Value<String>? modelId,
+    Value<MediaMode>? mode,
+    Value<String>? prompt,
+    Value<String?>? negativePrompt,
+    Value<String>? paramsJson,
+    Value<String>? referencesJson,
+    Value<GenerationStatus>? status,
+    Value<String?>? errorJson,
+    Value<GenerationSource>? source,
+    Value<String?>? parentItemId,
+    Value<String?>? conversationId,
+    Value<String?>? messageId,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? startedAt,
+    Value<DateTime?>? finishedAt,
+    Value<int>? rowid,
+  }) {
+    return GenerationBatchRowsCompanion(
+      id: id ?? this.id,
+      topicId: topicId ?? this.topicId,
+      providerId: providerId ?? this.providerId,
+      modelId: modelId ?? this.modelId,
+      mode: mode ?? this.mode,
+      prompt: prompt ?? this.prompt,
+      negativePrompt: negativePrompt ?? this.negativePrompt,
+      paramsJson: paramsJson ?? this.paramsJson,
+      referencesJson: referencesJson ?? this.referencesJson,
+      status: status ?? this.status,
+      errorJson: errorJson ?? this.errorJson,
+      source: source ?? this.source,
+      parentItemId: parentItemId ?? this.parentItemId,
+      conversationId: conversationId ?? this.conversationId,
+      messageId: messageId ?? this.messageId,
+      createdAt: createdAt ?? this.createdAt,
+      startedAt: startedAt ?? this.startedAt,
+      finishedAt: finishedAt ?? this.finishedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (topicId.present) {
+      map['topic_id'] = Variable<String>(topicId.value);
+    }
+    if (providerId.present) {
+      map['provider_id'] = Variable<String>(providerId.value);
+    }
+    if (modelId.present) {
+      map['model_id'] = Variable<String>(modelId.value);
+    }
+    if (mode.present) {
+      map['mode'] = Variable<String>(
+        $GenerationBatchRowsTable.$convertermode.toSql(mode.value),
+      );
+    }
+    if (prompt.present) {
+      map['prompt'] = Variable<String>(prompt.value);
+    }
+    if (negativePrompt.present) {
+      map['negative_prompt'] = Variable<String>(negativePrompt.value);
+    }
+    if (paramsJson.present) {
+      map['params_json'] = Variable<String>(paramsJson.value);
+    }
+    if (referencesJson.present) {
+      map['references_json'] = Variable<String>(referencesJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(
+        $GenerationBatchRowsTable.$converterstatus.toSql(status.value),
+      );
+    }
+    if (errorJson.present) {
+      map['error_json'] = Variable<String>(errorJson.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(
+        $GenerationBatchRowsTable.$convertersource.toSql(source.value),
+      );
+    }
+    if (parentItemId.present) {
+      map['parent_item_id'] = Variable<String>(parentItemId.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $GenerationBatchRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<int>(
+        $GenerationBatchRowsTable.$converterstartedAtn.toSql(startedAt.value),
+      );
+    }
+    if (finishedAt.present) {
+      map['finished_at'] = Variable<int>(
+        $GenerationBatchRowsTable.$converterfinishedAtn.toSql(finishedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenerationBatchRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('topicId: $topicId, ')
+          ..write('providerId: $providerId, ')
+          ..write('modelId: $modelId, ')
+          ..write('mode: $mode, ')
+          ..write('prompt: $prompt, ')
+          ..write('negativePrompt: $negativePrompt, ')
+          ..write('paramsJson: $paramsJson, ')
+          ..write('referencesJson: $referencesJson, ')
+          ..write('status: $status, ')
+          ..write('errorJson: $errorJson, ')
+          ..write('source: $source, ')
+          ..write('parentItemId: $parentItemId, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('messageId: $messageId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $GenerationItemRowsTable extends GenerationItemRows
+    with TableInfo<$GenerationItemRowsTable, GenerationItemRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GenerationItemRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _batchIdMeta = const VerificationMeta(
+    'batchId',
+  );
+  @override
+  late final GeneratedColumn<String> batchId = GeneratedColumn<String>(
+    'batch_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES generation_batch_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _ordinalMeta = const VerificationMeta(
+    'ordinal',
+  );
+  @override
+  late final GeneratedColumn<int> ordinal = GeneratedColumn<int>(
+    'ordinal',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<MediaMode, String> mode =
+      GeneratedColumn<String>(
+        'mode',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<MediaMode>($GenerationItemRowsTable.$convertermode);
+  static const VerificationMeta _pathMeta = const VerificationMeta('path');
+  @override
+  late final GeneratedColumn<String> path = GeneratedColumn<String>(
+    'path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _thumbnailPathMeta = const VerificationMeta(
+    'thumbnailPath',
+  );
+  @override
+  late final GeneratedColumn<String> thumbnailPath = GeneratedColumn<String>(
+    'thumbnail_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _widthMeta = const VerificationMeta('width');
+  @override
+  late final GeneratedColumn<int> width = GeneratedColumn<int>(
+    'width',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _heightMeta = const VerificationMeta('height');
+  @override
+  late final GeneratedColumn<int> height = GeneratedColumn<int>(
+    'height',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _durationMsMeta = const VerificationMeta(
+    'durationMs',
+  );
+  @override
+  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
+    'duration_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mimeMeta = const VerificationMeta('mime');
+  @override
+  late final GeneratedColumn<String> mime = GeneratedColumn<String>(
+    'mime',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _byteSizeMeta = const VerificationMeta(
+    'byteSize',
+  );
+  @override
+  late final GeneratedColumn<int> byteSize = GeneratedColumn<int>(
+    'byte_size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _revisedPromptMeta = const VerificationMeta(
+    'revisedPrompt',
+  );
+  @override
+  late final GeneratedColumn<String> revisedPrompt = GeneratedColumn<String>(
+    'revised_prompt',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _favoriteMeta = const VerificationMeta(
+    'favorite',
+  );
+  @override
+  late final GeneratedColumn<bool> favorite = GeneratedColumn<bool>(
+    'favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<GenerationItemStatus, String>
+  status =
+      GeneratedColumn<String>(
+        'status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<GenerationItemStatus>(
+        $GenerationItemRowsTable.$converterstatus,
+      );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($GenerationItemRowsTable.$convertercreatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    batchId,
+    ordinal,
+    mode,
+    path,
+    thumbnailPath,
+    width,
+    height,
+    durationMs,
+    mime,
+    byteSize,
+    revisedPrompt,
+    favorite,
+    status,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'generation_item_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GenerationItemRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('batch_id')) {
+      context.handle(
+        _batchIdMeta,
+        batchId.isAcceptableOrUnknown(data['batch_id']!, _batchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_batchIdMeta);
+    }
+    if (data.containsKey('ordinal')) {
+      context.handle(
+        _ordinalMeta,
+        ordinal.isAcceptableOrUnknown(data['ordinal']!, _ordinalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ordinalMeta);
+    }
+    if (data.containsKey('path')) {
+      context.handle(
+        _pathMeta,
+        path.isAcceptableOrUnknown(data['path']!, _pathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pathMeta);
+    }
+    if (data.containsKey('thumbnail_path')) {
+      context.handle(
+        _thumbnailPathMeta,
+        thumbnailPath.isAcceptableOrUnknown(
+          data['thumbnail_path']!,
+          _thumbnailPathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('width')) {
+      context.handle(
+        _widthMeta,
+        width.isAcceptableOrUnknown(data['width']!, _widthMeta),
+      );
+    }
+    if (data.containsKey('height')) {
+      context.handle(
+        _heightMeta,
+        height.isAcceptableOrUnknown(data['height']!, _heightMeta),
+      );
+    }
+    if (data.containsKey('duration_ms')) {
+      context.handle(
+        _durationMsMeta,
+        durationMs.isAcceptableOrUnknown(data['duration_ms']!, _durationMsMeta),
+      );
+    }
+    if (data.containsKey('mime')) {
+      context.handle(
+        _mimeMeta,
+        mime.isAcceptableOrUnknown(data['mime']!, _mimeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_mimeMeta);
+    }
+    if (data.containsKey('byte_size')) {
+      context.handle(
+        _byteSizeMeta,
+        byteSize.isAcceptableOrUnknown(data['byte_size']!, _byteSizeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_byteSizeMeta);
+    }
+    if (data.containsKey('revised_prompt')) {
+      context.handle(
+        _revisedPromptMeta,
+        revisedPrompt.isAcceptableOrUnknown(
+          data['revised_prompt']!,
+          _revisedPromptMeta,
+        ),
+      );
+    }
+    if (data.containsKey('favorite')) {
+      context.handle(
+        _favoriteMeta,
+        favorite.isAcceptableOrUnknown(data['favorite']!, _favoriteMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GenerationItemRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GenerationItemRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      batchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}batch_id'],
+      )!,
+      ordinal: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ordinal'],
+      )!,
+      mode: $GenerationItemRowsTable.$convertermode.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}mode'],
+        )!,
+      ),
+      path: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}path'],
+      )!,
+      thumbnailPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thumbnail_path'],
+      ),
+      width: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}width'],
+      ),
+      height: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}height'],
+      ),
+      durationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_ms'],
+      ),
+      mime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mime'],
+      )!,
+      byteSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}byte_size'],
+      )!,
+      revisedPrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}revised_prompt'],
+      ),
+      favorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}favorite'],
+      )!,
+      status: $GenerationItemRowsTable.$converterstatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}status'],
+        )!,
+      ),
+      createdAt: $GenerationItemRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $GenerationItemRowsTable createAlias(String alias) {
+    return $GenerationItemRowsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<MediaMode, String, String> $convertermode =
+      const EnumNameConverter<MediaMode>(MediaMode.values);
+  static JsonTypeConverter2<GenerationItemStatus, String, String>
+  $converterstatus = const EnumNameConverter<GenerationItemStatus>(
+    GenerationItemStatus.values,
+  );
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class GenerationItemRow extends DataClass
+    implements Insertable<GenerationItemRow> {
+  final String id;
+  final String batchId;
+  final int ordinal;
+  final MediaMode mode;
+  final String path;
+  final String? thumbnailPath;
+  final int? width;
+  final int? height;
+  final int? durationMs;
+  final String mime;
+  final int byteSize;
+  final String? revisedPrompt;
+  final bool favorite;
+  final GenerationItemStatus status;
+  final DateTime createdAt;
+  const GenerationItemRow({
+    required this.id,
+    required this.batchId,
+    required this.ordinal,
+    required this.mode,
+    required this.path,
+    this.thumbnailPath,
+    this.width,
+    this.height,
+    this.durationMs,
+    required this.mime,
+    required this.byteSize,
+    this.revisedPrompt,
+    required this.favorite,
+    required this.status,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['batch_id'] = Variable<String>(batchId);
+    map['ordinal'] = Variable<int>(ordinal);
+    {
+      map['mode'] = Variable<String>(
+        $GenerationItemRowsTable.$convertermode.toSql(mode),
+      );
+    }
+    map['path'] = Variable<String>(path);
+    if (!nullToAbsent || thumbnailPath != null) {
+      map['thumbnail_path'] = Variable<String>(thumbnailPath);
+    }
+    if (!nullToAbsent || width != null) {
+      map['width'] = Variable<int>(width);
+    }
+    if (!nullToAbsent || height != null) {
+      map['height'] = Variable<int>(height);
+    }
+    if (!nullToAbsent || durationMs != null) {
+      map['duration_ms'] = Variable<int>(durationMs);
+    }
+    map['mime'] = Variable<String>(mime);
+    map['byte_size'] = Variable<int>(byteSize);
+    if (!nullToAbsent || revisedPrompt != null) {
+      map['revised_prompt'] = Variable<String>(revisedPrompt);
+    }
+    map['favorite'] = Variable<bool>(favorite);
+    {
+      map['status'] = Variable<String>(
+        $GenerationItemRowsTable.$converterstatus.toSql(status),
+      );
+    }
+    {
+      map['created_at'] = Variable<int>(
+        $GenerationItemRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    return map;
+  }
+
+  GenerationItemRowsCompanion toCompanion(bool nullToAbsent) {
+    return GenerationItemRowsCompanion(
+      id: Value(id),
+      batchId: Value(batchId),
+      ordinal: Value(ordinal),
+      mode: Value(mode),
+      path: Value(path),
+      thumbnailPath: thumbnailPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(thumbnailPath),
+      width: width == null && nullToAbsent
+          ? const Value.absent()
+          : Value(width),
+      height: height == null && nullToAbsent
+          ? const Value.absent()
+          : Value(height),
+      durationMs: durationMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationMs),
+      mime: Value(mime),
+      byteSize: Value(byteSize),
+      revisedPrompt: revisedPrompt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(revisedPrompt),
+      favorite: Value(favorite),
+      status: Value(status),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory GenerationItemRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GenerationItemRow(
+      id: serializer.fromJson<String>(json['id']),
+      batchId: serializer.fromJson<String>(json['batchId']),
+      ordinal: serializer.fromJson<int>(json['ordinal']),
+      mode: $GenerationItemRowsTable.$convertermode.fromJson(
+        serializer.fromJson<String>(json['mode']),
+      ),
+      path: serializer.fromJson<String>(json['path']),
+      thumbnailPath: serializer.fromJson<String?>(json['thumbnailPath']),
+      width: serializer.fromJson<int?>(json['width']),
+      height: serializer.fromJson<int?>(json['height']),
+      durationMs: serializer.fromJson<int?>(json['durationMs']),
+      mime: serializer.fromJson<String>(json['mime']),
+      byteSize: serializer.fromJson<int>(json['byteSize']),
+      revisedPrompt: serializer.fromJson<String?>(json['revisedPrompt']),
+      favorite: serializer.fromJson<bool>(json['favorite']),
+      status: $GenerationItemRowsTable.$converterstatus.fromJson(
+        serializer.fromJson<String>(json['status']),
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'batchId': serializer.toJson<String>(batchId),
+      'ordinal': serializer.toJson<int>(ordinal),
+      'mode': serializer.toJson<String>(
+        $GenerationItemRowsTable.$convertermode.toJson(mode),
+      ),
+      'path': serializer.toJson<String>(path),
+      'thumbnailPath': serializer.toJson<String?>(thumbnailPath),
+      'width': serializer.toJson<int?>(width),
+      'height': serializer.toJson<int?>(height),
+      'durationMs': serializer.toJson<int?>(durationMs),
+      'mime': serializer.toJson<String>(mime),
+      'byteSize': serializer.toJson<int>(byteSize),
+      'revisedPrompt': serializer.toJson<String?>(revisedPrompt),
+      'favorite': serializer.toJson<bool>(favorite),
+      'status': serializer.toJson<String>(
+        $GenerationItemRowsTable.$converterstatus.toJson(status),
+      ),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  GenerationItemRow copyWith({
+    String? id,
+    String? batchId,
+    int? ordinal,
+    MediaMode? mode,
+    String? path,
+    Value<String?> thumbnailPath = const Value.absent(),
+    Value<int?> width = const Value.absent(),
+    Value<int?> height = const Value.absent(),
+    Value<int?> durationMs = const Value.absent(),
+    String? mime,
+    int? byteSize,
+    Value<String?> revisedPrompt = const Value.absent(),
+    bool? favorite,
+    GenerationItemStatus? status,
+    DateTime? createdAt,
+  }) => GenerationItemRow(
+    id: id ?? this.id,
+    batchId: batchId ?? this.batchId,
+    ordinal: ordinal ?? this.ordinal,
+    mode: mode ?? this.mode,
+    path: path ?? this.path,
+    thumbnailPath: thumbnailPath.present
+        ? thumbnailPath.value
+        : this.thumbnailPath,
+    width: width.present ? width.value : this.width,
+    height: height.present ? height.value : this.height,
+    durationMs: durationMs.present ? durationMs.value : this.durationMs,
+    mime: mime ?? this.mime,
+    byteSize: byteSize ?? this.byteSize,
+    revisedPrompt: revisedPrompt.present
+        ? revisedPrompt.value
+        : this.revisedPrompt,
+    favorite: favorite ?? this.favorite,
+    status: status ?? this.status,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  GenerationItemRow copyWithCompanion(GenerationItemRowsCompanion data) {
+    return GenerationItemRow(
+      id: data.id.present ? data.id.value : this.id,
+      batchId: data.batchId.present ? data.batchId.value : this.batchId,
+      ordinal: data.ordinal.present ? data.ordinal.value : this.ordinal,
+      mode: data.mode.present ? data.mode.value : this.mode,
+      path: data.path.present ? data.path.value : this.path,
+      thumbnailPath: data.thumbnailPath.present
+          ? data.thumbnailPath.value
+          : this.thumbnailPath,
+      width: data.width.present ? data.width.value : this.width,
+      height: data.height.present ? data.height.value : this.height,
+      durationMs: data.durationMs.present
+          ? data.durationMs.value
+          : this.durationMs,
+      mime: data.mime.present ? data.mime.value : this.mime,
+      byteSize: data.byteSize.present ? data.byteSize.value : this.byteSize,
+      revisedPrompt: data.revisedPrompt.present
+          ? data.revisedPrompt.value
+          : this.revisedPrompt,
+      favorite: data.favorite.present ? data.favorite.value : this.favorite,
+      status: data.status.present ? data.status.value : this.status,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenerationItemRow(')
+          ..write('id: $id, ')
+          ..write('batchId: $batchId, ')
+          ..write('ordinal: $ordinal, ')
+          ..write('mode: $mode, ')
+          ..write('path: $path, ')
+          ..write('thumbnailPath: $thumbnailPath, ')
+          ..write('width: $width, ')
+          ..write('height: $height, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('mime: $mime, ')
+          ..write('byteSize: $byteSize, ')
+          ..write('revisedPrompt: $revisedPrompt, ')
+          ..write('favorite: $favorite, ')
+          ..write('status: $status, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    batchId,
+    ordinal,
+    mode,
+    path,
+    thumbnailPath,
+    width,
+    height,
+    durationMs,
+    mime,
+    byteSize,
+    revisedPrompt,
+    favorite,
+    status,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GenerationItemRow &&
+          other.id == this.id &&
+          other.batchId == this.batchId &&
+          other.ordinal == this.ordinal &&
+          other.mode == this.mode &&
+          other.path == this.path &&
+          other.thumbnailPath == this.thumbnailPath &&
+          other.width == this.width &&
+          other.height == this.height &&
+          other.durationMs == this.durationMs &&
+          other.mime == this.mime &&
+          other.byteSize == this.byteSize &&
+          other.revisedPrompt == this.revisedPrompt &&
+          other.favorite == this.favorite &&
+          other.status == this.status &&
+          other.createdAt == this.createdAt);
+}
+
+class GenerationItemRowsCompanion extends UpdateCompanion<GenerationItemRow> {
+  final Value<String> id;
+  final Value<String> batchId;
+  final Value<int> ordinal;
+  final Value<MediaMode> mode;
+  final Value<String> path;
+  final Value<String?> thumbnailPath;
+  final Value<int?> width;
+  final Value<int?> height;
+  final Value<int?> durationMs;
+  final Value<String> mime;
+  final Value<int> byteSize;
+  final Value<String?> revisedPrompt;
+  final Value<bool> favorite;
+  final Value<GenerationItemStatus> status;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const GenerationItemRowsCompanion({
+    this.id = const Value.absent(),
+    this.batchId = const Value.absent(),
+    this.ordinal = const Value.absent(),
+    this.mode = const Value.absent(),
+    this.path = const Value.absent(),
+    this.thumbnailPath = const Value.absent(),
+    this.width = const Value.absent(),
+    this.height = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    this.mime = const Value.absent(),
+    this.byteSize = const Value.absent(),
+    this.revisedPrompt = const Value.absent(),
+    this.favorite = const Value.absent(),
+    this.status = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GenerationItemRowsCompanion.insert({
+    required String id,
+    required String batchId,
+    required int ordinal,
+    required MediaMode mode,
+    required String path,
+    this.thumbnailPath = const Value.absent(),
+    this.width = const Value.absent(),
+    this.height = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    required String mime,
+    required int byteSize,
+    this.revisedPrompt = const Value.absent(),
+    this.favorite = const Value.absent(),
+    required GenerationItemStatus status,
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       batchId = Value(batchId),
+       ordinal = Value(ordinal),
+       mode = Value(mode),
+       path = Value(path),
+       mime = Value(mime),
+       byteSize = Value(byteSize),
+       status = Value(status),
+       createdAt = Value(createdAt);
+  static Insertable<GenerationItemRow> custom({
+    Expression<String>? id,
+    Expression<String>? batchId,
+    Expression<int>? ordinal,
+    Expression<String>? mode,
+    Expression<String>? path,
+    Expression<String>? thumbnailPath,
+    Expression<int>? width,
+    Expression<int>? height,
+    Expression<int>? durationMs,
+    Expression<String>? mime,
+    Expression<int>? byteSize,
+    Expression<String>? revisedPrompt,
+    Expression<bool>? favorite,
+    Expression<String>? status,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (batchId != null) 'batch_id': batchId,
+      if (ordinal != null) 'ordinal': ordinal,
+      if (mode != null) 'mode': mode,
+      if (path != null) 'path': path,
+      if (thumbnailPath != null) 'thumbnail_path': thumbnailPath,
+      if (width != null) 'width': width,
+      if (height != null) 'height': height,
+      if (durationMs != null) 'duration_ms': durationMs,
+      if (mime != null) 'mime': mime,
+      if (byteSize != null) 'byte_size': byteSize,
+      if (revisedPrompt != null) 'revised_prompt': revisedPrompt,
+      if (favorite != null) 'favorite': favorite,
+      if (status != null) 'status': status,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GenerationItemRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? batchId,
+    Value<int>? ordinal,
+    Value<MediaMode>? mode,
+    Value<String>? path,
+    Value<String?>? thumbnailPath,
+    Value<int?>? width,
+    Value<int?>? height,
+    Value<int?>? durationMs,
+    Value<String>? mime,
+    Value<int>? byteSize,
+    Value<String?>? revisedPrompt,
+    Value<bool>? favorite,
+    Value<GenerationItemStatus>? status,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return GenerationItemRowsCompanion(
+      id: id ?? this.id,
+      batchId: batchId ?? this.batchId,
+      ordinal: ordinal ?? this.ordinal,
+      mode: mode ?? this.mode,
+      path: path ?? this.path,
+      thumbnailPath: thumbnailPath ?? this.thumbnailPath,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      durationMs: durationMs ?? this.durationMs,
+      mime: mime ?? this.mime,
+      byteSize: byteSize ?? this.byteSize,
+      revisedPrompt: revisedPrompt ?? this.revisedPrompt,
+      favorite: favorite ?? this.favorite,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (batchId.present) {
+      map['batch_id'] = Variable<String>(batchId.value);
+    }
+    if (ordinal.present) {
+      map['ordinal'] = Variable<int>(ordinal.value);
+    }
+    if (mode.present) {
+      map['mode'] = Variable<String>(
+        $GenerationItemRowsTable.$convertermode.toSql(mode.value),
+      );
+    }
+    if (path.present) {
+      map['path'] = Variable<String>(path.value);
+    }
+    if (thumbnailPath.present) {
+      map['thumbnail_path'] = Variable<String>(thumbnailPath.value);
+    }
+    if (width.present) {
+      map['width'] = Variable<int>(width.value);
+    }
+    if (height.present) {
+      map['height'] = Variable<int>(height.value);
+    }
+    if (durationMs.present) {
+      map['duration_ms'] = Variable<int>(durationMs.value);
+    }
+    if (mime.present) {
+      map['mime'] = Variable<String>(mime.value);
+    }
+    if (byteSize.present) {
+      map['byte_size'] = Variable<int>(byteSize.value);
+    }
+    if (revisedPrompt.present) {
+      map['revised_prompt'] = Variable<String>(revisedPrompt.value);
+    }
+    if (favorite.present) {
+      map['favorite'] = Variable<bool>(favorite.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(
+        $GenerationItemRowsTable.$converterstatus.toSql(status.value),
+      );
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $GenerationItemRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenerationItemRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('batchId: $batchId, ')
+          ..write('ordinal: $ordinal, ')
+          ..write('mode: $mode, ')
+          ..write('path: $path, ')
+          ..write('thumbnailPath: $thumbnailPath, ')
+          ..write('width: $width, ')
+          ..write('height: $height, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('mime: $mime, ')
+          ..write('byteSize: $byteSize, ')
+          ..write('revisedPrompt: $revisedPrompt, ')
+          ..write('favorite: $favorite, ')
+          ..write('status: $status, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -12828,6 +15140,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TombstoneRowsTable tombstoneRows = $TombstoneRowsTable(this);
   late final $ExtensionEntityRowsTable extensionEntityRows =
       $ExtensionEntityRowsTable(this);
+  late final $GenerationTopicRowsTable generationTopicRows =
+      $GenerationTopicRowsTable(this);
+  late final $GenerationBatchRowsTable generationBatchRows =
+      $GenerationBatchRowsTable(this);
+  late final $GenerationItemRowsTable generationItemRows =
+      $GenerationItemRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
     'idx_conversations_updated_at',
     'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
@@ -12896,6 +15214,34 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_extension_entities_kind_order',
     'CREATE INDEX idx_extension_entities_kind_order ON extension_entity_rows (kind, sort_order)',
   );
+  late final Index idxGenerationTopicsUpdated = Index(
+    'idx_generation_topics_updated',
+    'CREATE INDEX idx_generation_topics_updated ON generation_topic_rows (updated_at)',
+  );
+  late final Index idxGenerationBatchesTopicCreated = Index(
+    'idx_generation_batches_topic_created',
+    'CREATE INDEX idx_generation_batches_topic_created ON generation_batch_rows (topic_id, created_at)',
+  );
+  late final Index idxGenerationBatchesCreated = Index(
+    'idx_generation_batches_created',
+    'CREATE INDEX idx_generation_batches_created ON generation_batch_rows (created_at)',
+  );
+  late final Index idxGenerationBatchesStatus = Index(
+    'idx_generation_batches_status',
+    'CREATE INDEX idx_generation_batches_status ON generation_batch_rows (status)',
+  );
+  late final Index idxGenerationItemsBatchOrdinal = Index(
+    'idx_generation_items_batch_ordinal',
+    'CREATE UNIQUE INDEX idx_generation_items_batch_ordinal ON generation_item_rows (batch_id, ordinal)',
+  );
+  late final Index idxGenerationItemsFavorite = Index(
+    'idx_generation_items_favorite',
+    'CREATE INDEX idx_generation_items_favorite ON generation_item_rows (favorite)',
+  );
+  late final Index idxGenerationItemsModeCreated = Index(
+    'idx_generation_items_mode_created',
+    'CREATE INDEX idx_generation_items_mode_created ON generation_item_rows (mode, created_at)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -12935,6 +15281,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     messagePromptRows,
     tombstoneRows,
     extensionEntityRows,
+    generationTopicRows,
+    generationBatchRows,
+    generationItemRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
     idxMessagesConversationOrder,
@@ -12952,6 +15301,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxMemoryEntriesDedupe,
     idxMessagePromptsConversationSnapshot,
     idxExtensionEntitiesKindOrder,
+    idxGenerationTopicsUpdated,
+    idxGenerationBatchesTopicCreated,
+    idxGenerationBatchesCreated,
+    idxGenerationBatchesStatus,
+    idxGenerationItemsBatchOrdinal,
+    idxGenerationItemsFavorite,
+    idxGenerationItemsModeCreated,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -13040,6 +15396,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('generation_run_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'generation_topic_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('generation_batch_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'generation_batch_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('generation_item_rows', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -22028,6 +24398,1593 @@ typedef $$ExtensionEntityRowsTableProcessedTableManager =
       ExtensionEntityRow,
       PrefetchHooks Function()
     >;
+typedef $$GenerationTopicRowsTableCreateCompanionBuilder =
+    GenerationTopicRowsCompanion Function({
+      required String id,
+      required String title,
+      required GenerationTitleSource titleSource,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$GenerationTopicRowsTableUpdateCompanionBuilder =
+    GenerationTopicRowsCompanion Function({
+      Value<String> id,
+      Value<String> title,
+      Value<GenerationTitleSource> titleSource,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$GenerationTopicRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $GenerationTopicRowsTable,
+          GenerationTopicRow
+        > {
+  $$GenerationTopicRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<
+    $GenerationBatchRowsTable,
+    List<GenerationBatchRow>
+  >
+  _generationBatchRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.generationBatchRows,
+        aliasName: 'generation_topic_rows__id__generation_batch_rows__topic_id',
+      );
+
+  $$GenerationBatchRowsTableProcessedTableManager get generationBatchRowsRefs {
+    final manager = $$GenerationBatchRowsTableTableManager(
+      $_db,
+      $_db.generationBatchRows,
+    ).filter((f) => f.topicId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _generationBatchRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$GenerationTopicRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $GenerationTopicRowsTable> {
+  $$GenerationTopicRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    GenerationTitleSource,
+    GenerationTitleSource,
+    String
+  >
+  get titleSource => $composableBuilder(
+    column: $table.titleSource,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  Expression<bool> generationBatchRowsRefs(
+    Expression<bool> Function($$GenerationBatchRowsTableFilterComposer f) f,
+  ) {
+    final $$GenerationBatchRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.generationBatchRows,
+      getReferencedColumn: (t) => t.topicId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GenerationBatchRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.generationBatchRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$GenerationTopicRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $GenerationTopicRowsTable> {
+  $$GenerationTopicRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get titleSource => $composableBuilder(
+    column: $table.titleSource,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$GenerationTopicRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GenerationTopicRowsTable> {
+  $$GenerationTopicRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<GenerationTitleSource, String>
+  get titleSource => $composableBuilder(
+    column: $table.titleSource,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> generationBatchRowsRefs<T extends Object>(
+    Expression<T> Function($$GenerationBatchRowsTableAnnotationComposer a) f,
+  ) {
+    final $$GenerationBatchRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.generationBatchRows,
+          getReferencedColumn: (t) => t.topicId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenerationBatchRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.generationBatchRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$GenerationTopicRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GenerationTopicRowsTable,
+          GenerationTopicRow,
+          $$GenerationTopicRowsTableFilterComposer,
+          $$GenerationTopicRowsTableOrderingComposer,
+          $$GenerationTopicRowsTableAnnotationComposer,
+          $$GenerationTopicRowsTableCreateCompanionBuilder,
+          $$GenerationTopicRowsTableUpdateCompanionBuilder,
+          (GenerationTopicRow, $$GenerationTopicRowsTableReferences),
+          GenerationTopicRow,
+          PrefetchHooks Function({bool generationBatchRowsRefs})
+        > {
+  $$GenerationTopicRowsTableTableManager(
+    _$AppDatabase db,
+    $GenerationTopicRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GenerationTopicRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GenerationTopicRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$GenerationTopicRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<GenerationTitleSource> titleSource = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GenerationTopicRowsCompanion(
+                id: id,
+                title: title,
+                titleSource: titleSource,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String title,
+                required GenerationTitleSource titleSource,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => GenerationTopicRowsCompanion.insert(
+                id: id,
+                title: title,
+                titleSource: titleSource,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$GenerationTopicRowsTable, GenerationTopicRow>(
+                    table,
+                  ),
+                  $$GenerationTopicRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({generationBatchRowsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (generationBatchRowsRefs) db.generationBatchRows,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (generationBatchRowsRefs)
+                    await $_getPrefetchedDataByColumns<
+                      GenerationTopicRow,
+                      $GenerationTopicRowsTable,
+                      GenerationBatchRow,
+                      $GenerationBatchRowsTable
+                    >(
+                      currentTable: table,
+                      referencedTable: $$GenerationTopicRowsTableReferences
+                          ._generationBatchRowsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$GenerationTopicRowsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).generationBatchRowsRefs,
+                      currentColumn: 'id',
+                      referencedColumn: 'topic_id',
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$GenerationTopicRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GenerationTopicRowsTable,
+      GenerationTopicRow,
+      $$GenerationTopicRowsTableFilterComposer,
+      $$GenerationTopicRowsTableOrderingComposer,
+      $$GenerationTopicRowsTableAnnotationComposer,
+      $$GenerationTopicRowsTableCreateCompanionBuilder,
+      $$GenerationTopicRowsTableUpdateCompanionBuilder,
+      (GenerationTopicRow, $$GenerationTopicRowsTableReferences),
+      GenerationTopicRow,
+      PrefetchHooks Function({bool generationBatchRowsRefs})
+    >;
+typedef $$GenerationBatchRowsTableCreateCompanionBuilder =
+    GenerationBatchRowsCompanion Function({
+      required String id,
+      Value<String?> topicId,
+      required String providerId,
+      required String modelId,
+      required MediaMode mode,
+      required String prompt,
+      Value<String?> negativePrompt,
+      required String paramsJson,
+      required String referencesJson,
+      required GenerationStatus status,
+      Value<String?> errorJson,
+      required GenerationSource source,
+      Value<String?> parentItemId,
+      Value<String?> conversationId,
+      Value<String?> messageId,
+      required DateTime createdAt,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> finishedAt,
+      Value<int> rowid,
+    });
+typedef $$GenerationBatchRowsTableUpdateCompanionBuilder =
+    GenerationBatchRowsCompanion Function({
+      Value<String> id,
+      Value<String?> topicId,
+      Value<String> providerId,
+      Value<String> modelId,
+      Value<MediaMode> mode,
+      Value<String> prompt,
+      Value<String?> negativePrompt,
+      Value<String> paramsJson,
+      Value<String> referencesJson,
+      Value<GenerationStatus> status,
+      Value<String?> errorJson,
+      Value<GenerationSource> source,
+      Value<String?> parentItemId,
+      Value<String?> conversationId,
+      Value<String?> messageId,
+      Value<DateTime> createdAt,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> finishedAt,
+      Value<int> rowid,
+    });
+
+final class $$GenerationBatchRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $GenerationBatchRowsTable,
+          GenerationBatchRow
+        > {
+  $$GenerationBatchRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $GenerationTopicRowsTable _topicIdTable(_$AppDatabase db) =>
+      db.generationTopicRows.createAlias(
+        'generation_batch_rows__topic_id__generation_topic_rows__id',
+      );
+
+  $$GenerationTopicRowsTableProcessedTableManager? get topicId {
+    final $_column = $_itemColumn<String>('topic_id');
+    if ($_column == null) return null;
+    final manager = $$GenerationTopicRowsTableTableManager(
+      $_db,
+      $_db.generationTopicRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_topicIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$GenerationItemRowsTable, List<GenerationItemRow>>
+  _generationItemRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.generationItemRows,
+        aliasName: 'generation_batch_rows__id__generation_item_rows__batch_id',
+      );
+
+  $$GenerationItemRowsTableProcessedTableManager get generationItemRowsRefs {
+    final manager = $$GenerationItemRowsTableTableManager(
+      $_db,
+      $_db.generationItemRows,
+    ).filter((f) => f.batchId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _generationItemRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$GenerationBatchRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $GenerationBatchRowsTable> {
+  $$GenerationBatchRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<MediaMode, MediaMode, String> get mode =>
+      $composableBuilder(
+        column: $table.mode,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get prompt => $composableBuilder(
+    column: $table.prompt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get negativePrompt => $composableBuilder(
+    column: $table.negativePrompt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paramsJson => $composableBuilder(
+    column: $table.paramsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get referencesJson => $composableBuilder(
+    column: $table.referencesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<GenerationStatus, GenerationStatus, String>
+  get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get errorJson => $composableBuilder(
+    column: $table.errorJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<GenerationSource, GenerationSource, String>
+  get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get parentItemId => $composableBuilder(
+    column: $table.parentItemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get startedAt =>
+      $composableBuilder(
+        column: $table.startedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get finishedAt =>
+      $composableBuilder(
+        column: $table.finishedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$GenerationTopicRowsTableFilterComposer get topicId {
+    final $$GenerationTopicRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.topicId,
+      referencedTable: $db.generationTopicRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GenerationTopicRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.generationTopicRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> generationItemRowsRefs(
+    Expression<bool> Function($$GenerationItemRowsTableFilterComposer f) f,
+  ) {
+    final $$GenerationItemRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.generationItemRows,
+      getReferencedColumn: (t) => t.batchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GenerationItemRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.generationItemRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$GenerationBatchRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $GenerationBatchRowsTable> {
+  $$GenerationBatchRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get modelId => $composableBuilder(
+    column: $table.modelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mode => $composableBuilder(
+    column: $table.mode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get prompt => $composableBuilder(
+    column: $table.prompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get negativePrompt => $composableBuilder(
+    column: $table.negativePrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paramsJson => $composableBuilder(
+    column: $table.paramsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get referencesJson => $composableBuilder(
+    column: $table.referencesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get errorJson => $composableBuilder(
+    column: $table.errorJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentItemId => $composableBuilder(
+    column: $table.parentItemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$GenerationTopicRowsTableOrderingComposer get topicId {
+    final $$GenerationTopicRowsTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.topicId,
+          referencedTable: $db.generationTopicRows,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenerationTopicRowsTableOrderingComposer(
+                $db: $db,
+                $table: $db.generationTopicRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$GenerationBatchRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GenerationBatchRowsTable> {
+  $$GenerationBatchRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get providerId => $composableBuilder(
+    column: $table.providerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get modelId =>
+      $composableBuilder(column: $table.modelId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<MediaMode, String> get mode =>
+      $composableBuilder(column: $table.mode, builder: (column) => column);
+
+  GeneratedColumn<String> get prompt =>
+      $composableBuilder(column: $table.prompt, builder: (column) => column);
+
+  GeneratedColumn<String> get negativePrompt => $composableBuilder(
+    column: $table.negativePrompt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get paramsJson => $composableBuilder(
+    column: $table.paramsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get referencesJson => $composableBuilder(
+    column: $table.referencesJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<GenerationStatus, String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get errorJson =>
+      $composableBuilder(column: $table.errorJson, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<GenerationSource, String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get parentItemId => $composableBuilder(
+    column: $table.parentItemId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get finishedAt =>
+      $composableBuilder(
+        column: $table.finishedAt,
+        builder: (column) => column,
+      );
+
+  $$GenerationTopicRowsTableAnnotationComposer get topicId {
+    final $$GenerationTopicRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.topicId,
+          referencedTable: $db.generationTopicRows,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenerationTopicRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.generationTopicRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  Expression<T> generationItemRowsRefs<T extends Object>(
+    Expression<T> Function($$GenerationItemRowsTableAnnotationComposer a) f,
+  ) {
+    final $$GenerationItemRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.generationItemRows,
+          getReferencedColumn: (t) => t.batchId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenerationItemRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.generationItemRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$GenerationBatchRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GenerationBatchRowsTable,
+          GenerationBatchRow,
+          $$GenerationBatchRowsTableFilterComposer,
+          $$GenerationBatchRowsTableOrderingComposer,
+          $$GenerationBatchRowsTableAnnotationComposer,
+          $$GenerationBatchRowsTableCreateCompanionBuilder,
+          $$GenerationBatchRowsTableUpdateCompanionBuilder,
+          (GenerationBatchRow, $$GenerationBatchRowsTableReferences),
+          GenerationBatchRow,
+          PrefetchHooks Function({bool topicId, bool generationItemRowsRefs})
+        > {
+  $$GenerationBatchRowsTableTableManager(
+    _$AppDatabase db,
+    $GenerationBatchRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GenerationBatchRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GenerationBatchRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$GenerationBatchRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> topicId = const Value.absent(),
+                Value<String> providerId = const Value.absent(),
+                Value<String> modelId = const Value.absent(),
+                Value<MediaMode> mode = const Value.absent(),
+                Value<String> prompt = const Value.absent(),
+                Value<String?> negativePrompt = const Value.absent(),
+                Value<String> paramsJson = const Value.absent(),
+                Value<String> referencesJson = const Value.absent(),
+                Value<GenerationStatus> status = const Value.absent(),
+                Value<String?> errorJson = const Value.absent(),
+                Value<GenerationSource> source = const Value.absent(),
+                Value<String?> parentItemId = const Value.absent(),
+                Value<String?> conversationId = const Value.absent(),
+                Value<String?> messageId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> finishedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GenerationBatchRowsCompanion(
+                id: id,
+                topicId: topicId,
+                providerId: providerId,
+                modelId: modelId,
+                mode: mode,
+                prompt: prompt,
+                negativePrompt: negativePrompt,
+                paramsJson: paramsJson,
+                referencesJson: referencesJson,
+                status: status,
+                errorJson: errorJson,
+                source: source,
+                parentItemId: parentItemId,
+                conversationId: conversationId,
+                messageId: messageId,
+                createdAt: createdAt,
+                startedAt: startedAt,
+                finishedAt: finishedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> topicId = const Value.absent(),
+                required String providerId,
+                required String modelId,
+                required MediaMode mode,
+                required String prompt,
+                Value<String?> negativePrompt = const Value.absent(),
+                required String paramsJson,
+                required String referencesJson,
+                required GenerationStatus status,
+                Value<String?> errorJson = const Value.absent(),
+                required GenerationSource source,
+                Value<String?> parentItemId = const Value.absent(),
+                Value<String?> conversationId = const Value.absent(),
+                Value<String?> messageId = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> finishedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GenerationBatchRowsCompanion.insert(
+                id: id,
+                topicId: topicId,
+                providerId: providerId,
+                modelId: modelId,
+                mode: mode,
+                prompt: prompt,
+                negativePrompt: negativePrompt,
+                paramsJson: paramsJson,
+                referencesJson: referencesJson,
+                status: status,
+                errorJson: errorJson,
+                source: source,
+                parentItemId: parentItemId,
+                conversationId: conversationId,
+                messageId: messageId,
+                createdAt: createdAt,
+                startedAt: startedAt,
+                finishedAt: finishedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$GenerationBatchRowsTable, GenerationBatchRow>(
+                    table,
+                  ),
+                  $$GenerationBatchRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({topicId = false, generationItemRowsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (generationItemRowsRefs) db.generationItemRows,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (topicId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.topicId,
+                                    referencedTable:
+                                        $$GenerationBatchRowsTableReferences
+                                            ._topicIdTable(db),
+                                    referencedColumn:
+                                        $$GenerationBatchRowsTableReferences
+                                            ._topicIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (generationItemRowsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          GenerationBatchRow,
+                          $GenerationBatchRowsTable,
+                          GenerationItemRow,
+                          $GenerationItemRowsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$GenerationBatchRowsTableReferences
+                              ._generationItemRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$GenerationBatchRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).generationItemRowsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'batch_id',
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$GenerationBatchRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GenerationBatchRowsTable,
+      GenerationBatchRow,
+      $$GenerationBatchRowsTableFilterComposer,
+      $$GenerationBatchRowsTableOrderingComposer,
+      $$GenerationBatchRowsTableAnnotationComposer,
+      $$GenerationBatchRowsTableCreateCompanionBuilder,
+      $$GenerationBatchRowsTableUpdateCompanionBuilder,
+      (GenerationBatchRow, $$GenerationBatchRowsTableReferences),
+      GenerationBatchRow,
+      PrefetchHooks Function({bool topicId, bool generationItemRowsRefs})
+    >;
+typedef $$GenerationItemRowsTableCreateCompanionBuilder =
+    GenerationItemRowsCompanion Function({
+      required String id,
+      required String batchId,
+      required int ordinal,
+      required MediaMode mode,
+      required String path,
+      Value<String?> thumbnailPath,
+      Value<int?> width,
+      Value<int?> height,
+      Value<int?> durationMs,
+      required String mime,
+      required int byteSize,
+      Value<String?> revisedPrompt,
+      Value<bool> favorite,
+      required GenerationItemStatus status,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$GenerationItemRowsTableUpdateCompanionBuilder =
+    GenerationItemRowsCompanion Function({
+      Value<String> id,
+      Value<String> batchId,
+      Value<int> ordinal,
+      Value<MediaMode> mode,
+      Value<String> path,
+      Value<String?> thumbnailPath,
+      Value<int?> width,
+      Value<int?> height,
+      Value<int?> durationMs,
+      Value<String> mime,
+      Value<int> byteSize,
+      Value<String?> revisedPrompt,
+      Value<bool> favorite,
+      Value<GenerationItemStatus> status,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$GenerationItemRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $GenerationItemRowsTable,
+          GenerationItemRow
+        > {
+  $$GenerationItemRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $GenerationBatchRowsTable _batchIdTable(_$AppDatabase db) => db
+      .generationBatchRows
+      .createAlias('generation_item_rows__batch_id__generation_batch_rows__id');
+
+  $$GenerationBatchRowsTableProcessedTableManager get batchId {
+    final $_column = $_itemColumn<String>('batch_id')!;
+
+    final manager = $$GenerationBatchRowsTableTableManager(
+      $_db,
+      $_db.generationBatchRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_batchIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$GenerationItemRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $GenerationItemRowsTable> {
+  $$GenerationItemRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ordinal => $composableBuilder(
+    column: $table.ordinal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<MediaMode, MediaMode, String> get mode =>
+      $composableBuilder(
+        column: $table.mode,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get path => $composableBuilder(
+    column: $table.path,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get thumbnailPath => $composableBuilder(
+    column: $table.thumbnailPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mime => $composableBuilder(
+    column: $table.mime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get byteSize => $composableBuilder(
+    column: $table.byteSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get revisedPrompt => $composableBuilder(
+    column: $table.revisedPrompt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get favorite => $composableBuilder(
+    column: $table.favorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    GenerationItemStatus,
+    GenerationItemStatus,
+    String
+  >
+  get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$GenerationBatchRowsTableFilterComposer get batchId {
+    final $$GenerationBatchRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.batchId,
+      referencedTable: $db.generationBatchRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GenerationBatchRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.generationBatchRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GenerationItemRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $GenerationItemRowsTable> {
+  $$GenerationItemRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ordinal => $composableBuilder(
+    column: $table.ordinal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mode => $composableBuilder(
+    column: $table.mode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get path => $composableBuilder(
+    column: $table.path,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get thumbnailPath => $composableBuilder(
+    column: $table.thumbnailPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mime => $composableBuilder(
+    column: $table.mime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get byteSize => $composableBuilder(
+    column: $table.byteSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get revisedPrompt => $composableBuilder(
+    column: $table.revisedPrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get favorite => $composableBuilder(
+    column: $table.favorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$GenerationBatchRowsTableOrderingComposer get batchId {
+    final $$GenerationBatchRowsTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.batchId,
+          referencedTable: $db.generationBatchRows,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenerationBatchRowsTableOrderingComposer(
+                $db: $db,
+                $table: $db.generationBatchRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$GenerationItemRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GenerationItemRowsTable> {
+  $$GenerationItemRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get ordinal =>
+      $composableBuilder(column: $table.ordinal, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<MediaMode, String> get mode =>
+      $composableBuilder(column: $table.mode, builder: (column) => column);
+
+  GeneratedColumn<String> get path =>
+      $composableBuilder(column: $table.path, builder: (column) => column);
+
+  GeneratedColumn<String> get thumbnailPath => $composableBuilder(
+    column: $table.thumbnailPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get width =>
+      $composableBuilder(column: $table.width, builder: (column) => column);
+
+  GeneratedColumn<int> get height =>
+      $composableBuilder(column: $table.height, builder: (column) => column);
+
+  GeneratedColumn<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mime =>
+      $composableBuilder(column: $table.mime, builder: (column) => column);
+
+  GeneratedColumn<int> get byteSize =>
+      $composableBuilder(column: $table.byteSize, builder: (column) => column);
+
+  GeneratedColumn<String> get revisedPrompt => $composableBuilder(
+    column: $table.revisedPrompt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get favorite =>
+      $composableBuilder(column: $table.favorite, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<GenerationItemStatus, String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$GenerationBatchRowsTableAnnotationComposer get batchId {
+    final $$GenerationBatchRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.batchId,
+          referencedTable: $db.generationBatchRows,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenerationBatchRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.generationBatchRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$GenerationItemRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GenerationItemRowsTable,
+          GenerationItemRow,
+          $$GenerationItemRowsTableFilterComposer,
+          $$GenerationItemRowsTableOrderingComposer,
+          $$GenerationItemRowsTableAnnotationComposer,
+          $$GenerationItemRowsTableCreateCompanionBuilder,
+          $$GenerationItemRowsTableUpdateCompanionBuilder,
+          (GenerationItemRow, $$GenerationItemRowsTableReferences),
+          GenerationItemRow,
+          PrefetchHooks Function({bool batchId})
+        > {
+  $$GenerationItemRowsTableTableManager(
+    _$AppDatabase db,
+    $GenerationItemRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GenerationItemRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GenerationItemRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$GenerationItemRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> batchId = const Value.absent(),
+                Value<int> ordinal = const Value.absent(),
+                Value<MediaMode> mode = const Value.absent(),
+                Value<String> path = const Value.absent(),
+                Value<String?> thumbnailPath = const Value.absent(),
+                Value<int?> width = const Value.absent(),
+                Value<int?> height = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
+                Value<String> mime = const Value.absent(),
+                Value<int> byteSize = const Value.absent(),
+                Value<String?> revisedPrompt = const Value.absent(),
+                Value<bool> favorite = const Value.absent(),
+                Value<GenerationItemStatus> status = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GenerationItemRowsCompanion(
+                id: id,
+                batchId: batchId,
+                ordinal: ordinal,
+                mode: mode,
+                path: path,
+                thumbnailPath: thumbnailPath,
+                width: width,
+                height: height,
+                durationMs: durationMs,
+                mime: mime,
+                byteSize: byteSize,
+                revisedPrompt: revisedPrompt,
+                favorite: favorite,
+                status: status,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String batchId,
+                required int ordinal,
+                required MediaMode mode,
+                required String path,
+                Value<String?> thumbnailPath = const Value.absent(),
+                Value<int?> width = const Value.absent(),
+                Value<int?> height = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
+                required String mime,
+                required int byteSize,
+                Value<String?> revisedPrompt = const Value.absent(),
+                Value<bool> favorite = const Value.absent(),
+                required GenerationItemStatus status,
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => GenerationItemRowsCompanion.insert(
+                id: id,
+                batchId: batchId,
+                ordinal: ordinal,
+                mode: mode,
+                path: path,
+                thumbnailPath: thumbnailPath,
+                width: width,
+                height: height,
+                durationMs: durationMs,
+                mime: mime,
+                byteSize: byteSize,
+                revisedPrompt: revisedPrompt,
+                favorite: favorite,
+                status: status,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$GenerationItemRowsTable, GenerationItemRow>(
+                    table,
+                  ),
+                  $$GenerationItemRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({batchId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (batchId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.batchId,
+                                referencedTable:
+                                    $$GenerationItemRowsTableReferences
+                                        ._batchIdTable(db),
+                                referencedColumn:
+                                    $$GenerationItemRowsTableReferences
+                                        ._batchIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$GenerationItemRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GenerationItemRowsTable,
+      GenerationItemRow,
+      $$GenerationItemRowsTableFilterComposer,
+      $$GenerationItemRowsTableOrderingComposer,
+      $$GenerationItemRowsTableAnnotationComposer,
+      $$GenerationItemRowsTableCreateCompanionBuilder,
+      $$GenerationItemRowsTableUpdateCompanionBuilder,
+      (GenerationItemRow, $$GenerationItemRowsTableReferences),
+      GenerationItemRow,
+      PrefetchHooks Function({bool batchId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -22103,4 +26060,10 @@ class $AppDatabaseManager {
       $$TombstoneRowsTableTableManager(_db, _db.tombstoneRows);
   $$ExtensionEntityRowsTableTableManager get extensionEntityRows =>
       $$ExtensionEntityRowsTableTableManager(_db, _db.extensionEntityRows);
+  $$GenerationTopicRowsTableTableManager get generationTopicRows =>
+      $$GenerationTopicRowsTableTableManager(_db, _db.generationTopicRows);
+  $$GenerationBatchRowsTableTableManager get generationBatchRows =>
+      $$GenerationBatchRowsTableTableManager(_db, _db.generationBatchRows);
+  $$GenerationItemRowsTableTableManager get generationItemRows =>
+      $$GenerationItemRowsTableTableManager(_db, _db.generationItemRows);
 }

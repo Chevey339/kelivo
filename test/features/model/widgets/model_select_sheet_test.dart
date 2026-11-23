@@ -266,12 +266,25 @@ void main() {
               apiKey: '',
               baseUrl: OAuthProvider.chatgpt.baseUrl,
               oauthProvider: OAuthProvider.chatgpt,
-              models: ['enabled-model', 'disabled-model'],
+              models: [
+                'enabled-model',
+                'disabled-model',
+                'gpt-image-2',
+                'sora-2',
+                'gemini-2.5-flash-image',
+              ],
               disabledModels: {'disabled-model'},
+              modelOverrides: {
+                'gpt-image-2': {'name': 'Standalone image'},
+                'sora-2': {'name': 'Standalone video'},
+                'gemini-2.5-flash-image': {'name': 'Gemini chat image'},
+              },
             ),
           );
           // Old/imported favorites must not bypass the disabled-model filter.
           await settings.togglePinModel('oauth', 'disabled-model');
+          await settings.togglePinModel('oauth', 'gpt-image-2');
+          await settings.togglePinModel('oauth', 'sora-2');
           await settings.setCurrentModel('oauth', 'enabled-model');
           await _pumpModelSelector(
             tester,
@@ -280,6 +293,9 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(find.text('enabled-model'), findsOneWidget);
+          expect(find.text('Gemini chat image'), findsOneWidget);
+          expect(find.text('Standalone image'), findsNothing);
+          expect(find.text('Standalone video'), findsNothing);
           expect(
             find.textContaining('disabled-model', findRichText: true),
             findsNothing,

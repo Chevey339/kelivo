@@ -1,3 +1,5 @@
+import '../../media/pages/media_creation_page.dart';
+import '../../media/providers/media_creation_controller.dart';
 import '../services/composer_document_route.dart';
 import '../../chat/controllers/conversation_find_controller.dart';
 import '../../chat/models/conversation_find_candidate.dart';
@@ -100,6 +102,8 @@ import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
+enum HomeSurface { chat, creation }
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -171,6 +175,7 @@ class _HomePageState extends State<HomePage>
   // ============================================================================
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  HomeSurface _surface = HomeSurface.chat;
   final InteractiveDrawerController _drawerController =
       InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
@@ -991,6 +996,21 @@ class _HomePageState extends State<HomePage>
         ),
       );
 
+  void _openCreation({bool closeDrawer = true}) {
+    if (closeDrawer) unawaited(_drawerController.close());
+    if (_surface == HomeSurface.creation) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    _controller.cancelSelection();
+    unawaited(context.read<SettingsProvider>().markMediaEntrySeen());
+    setState(() => _surface = HomeSurface.creation);
+  }
+
+  void _openChatSurface() {
+    if (_surface != HomeSurface.chat) {
+      setState(() => _surface = HomeSurface.chat);
+    }
+  }
+
   Widget _buildPage(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final desktop = !kIsWeb && _controller.isDesktopPlatform;
@@ -1019,7 +1039,8 @@ class _HomePageState extends State<HomePage>
     _controller.setCompactDesktopLayout(
       desktop && width < AppBreakpoints.tablet,
     );
-    if (desktop || width >= AppBreakpoints.tablet) {
+    if (desktop ||
+        _surface == HomeSurface.chat && width >= AppBreakpoints.tablet) {
       return _buildTabletLayout(
         context,
         providerName: modelInfo.providerName,
@@ -1044,70 +1065,89 @@ class _HomePageState extends State<HomePage>
   }) {
     final allSelected = _controller.allSelectableMessagesSelected;
 
-    return HomeMobileScaffold(
-      scaffoldKey: _scaffoldKey,
-      drawerController: _drawerController,
-      assistantPickerCloseTick: _assistantPickerCloseTick,
-      loadingConversationIds: _controller.loadingConversationIds,
-      conversationId: _controller.currentConversation?.id,
-      providerName: providerName,
-      modelDisplay: modelDisplay,
-      onToggleDrawer: () => _drawerController.toggle(),
-      onDismissKeyboard: _controller.dismissKeyboard,
-      onSelectConversation: (id) {
-        _controller.switchConversationAnimated(id);
-      },
-      onNewConversation: () async {
-        await _controller.createNewConversationAnimated();
-      },
-      onOpenMiniMap: _openMiniMap,
-      onCreateNewConversation: () async {
-        await _controller.createNewConversationAnimated();
-        if (mounted) {
-          _controller.forceScrollToBottomSoon(animate: false);
+    final creation = _surface == HomeSurface.creation;
+    return PopScope(
+      canPop: !creation,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && creation && _drawerController.isClosed) {
+          _openChatSurface();
         }
       },
-      onToggleTemporaryConversation: () async {
-        await _controller.toggleTemporaryConversation();
-        if (mounted) {
-          _controller.forceScrollToBottomSoon(animate: false);
-        }
-      },
-      canToggleTemporaryConversation:
-          _controller.canToggleTemporaryConversation,
-      temporaryConversationEnabled: _controller.isTemporaryConversation,
-      onSelectModel: () =>
-          showModelSelectSheet(context, controller: _controller),
-      globalSearchMode: _controller.isGlobalSearchMode,
-      globalSearchQuery: _controller.globalSearchQuery,
-      onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
-      onEnterGlobalSearch: () =>
-          _controller.enterGlobalSearchMode(preserveQuery: false),
-      onExitGlobalSearch: () =>
-          _controller.exitGlobalSearchMode(clearQuery: true),
-      onOpenGlobalSearchResult: (convId, msgId, surfaceKey) =>
-          _controller.openGlobalSearchResult(
+      child: HomeMobileScaffold(
+        scaffoldKey: _scaffoldKey,
+        creationSelected: creation,
+        onOpenCreation: context.read<MediaCreationController?>() == null
+            ? null
+            : _openCreation,
+        drawerController: _drawerController,
+        assistantPickerCloseTick: _assistantPickerCloseTick,
+        loadingConversationIds: _controller.loadingConversationIds,
+        conversationId: _controller.currentConversation?.id,
+        providerName: providerName,
+        modelDisplay: modelDisplay,
+        onToggleDrawer: () => _drawerController.toggle(),
+        onDismissKeyboard: _controller.dismissKeyboard,
+        onSelectConversation: (id) {
+          _openChatSurface();
+          _controller.switchConversationAnimated(id);
+        },
+        onNewConversation: () async {
+          await _controller.createNewConversationAnimated();
+        },
+        onOpenMiniMap: _openMiniMap,
+        onCreateNewConversation: () async {
+          _openChatSurface();
+          await _controller.createNewConversationAnimated();
+          if (mounted) {
+            _controller.forceScrollToBottomSoon(animate: false);
+          }
+        },
+        onToggleTemporaryConversation: () async {
+          await _controller.toggleTemporaryConversation();
+          if (mounted) {
+            _controller.forceScrollToBottomSoon(animate: false);
+          }
+        },
+        canToggleTemporaryConversation:
+            _controller.canToggleTemporaryConversation,
+        temporaryConversationEnabled: _controller.isTemporaryConversation,
+        onSelectModel: () =>
+            showModelSelectSheet(context, controller: _controller),
+        globalSearchMode: _controller.isGlobalSearchMode,
+        globalSearchQuery: _controller.globalSearchQuery,
+        onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
+        onEnterGlobalSearch: () =>
+            _controller.enterGlobalSearchMode(preserveQuery: false),
+        onExitGlobalSearch: () =>
+            _controller.exitGlobalSearchMode(clearQuery: true),
+        onOpenGlobalSearchResult: (convId, msgId, surfaceKey) async {
+          _openChatSurface();
+          await _controller.openGlobalSearchResult(
             conversationId: convId,
             messageId: msgId,
             surfaceKey: surfaceKey,
-          ),
-      appBarOverride: _find.opened
-          ? _mobileFindHeader()
-          : _controller.selecting
-          ? ChatSelectionAppBar(
-              selectedCount: _controller.selectedCount,
-              allSelected: allSelected,
-              onClose: _controller.cancelSelection,
-              onOpenMiniMap: () {
-                unawaited(_openSelectionMiniMap());
-              },
-              miniMapKey: _selectionMiniMapKey,
-              onToggleSelectAll: _controller.toggleSelectAll,
-              onInvertSelection: _controller.invertSelection,
-            )
-          : null,
-      body: _chatFindShortcuts(
-        _wrapWithDropTarget(_buildMobileBody(context, cs)),
+          );
+        },
+        appBarOverride: _find.opened
+            ? _mobileFindHeader()
+            : _controller.selecting
+            ? ChatSelectionAppBar(
+                selectedCount: _controller.selectedCount,
+                allSelected: allSelected,
+                onClose: _controller.cancelSelection,
+                onOpenMiniMap: () {
+                  unawaited(_openSelectionMiniMap());
+                },
+                miniMapKey: _selectionMiniMapKey,
+                onToggleSelectAll: _controller.toggleSelectAll,
+                onInvertSelection: _controller.invertSelection,
+              )
+            : null,
+        body: creation
+            ? MediaCreationPage(onOpenDrawer: () => _drawerController.open())
+            : _chatFindShortcuts(
+                _wrapWithDropTarget(_buildMobileBody(context, cs)),
+              ),
       ),
     );
   }
@@ -1180,6 +1220,11 @@ class _HomePageState extends State<HomePage>
 
     return HomeDesktopScaffold(
       scaffoldKey: _scaffoldKey,
+      onOpenCreation:
+          !_controller.isDesktopPlatform &&
+              context.read<MediaCreationController?>() != null
+          ? () => _openCreation(closeDrawer: false)
+          : null,
       assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       conversationId: _controller.currentConversation?.id,

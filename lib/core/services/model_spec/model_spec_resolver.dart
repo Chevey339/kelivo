@@ -229,7 +229,12 @@ class ModelSpecResolver {
     final vendor = VendorDefaults.forProvider(cfg, modelId: upstreamId);
     final sources = <ModelSpecField, SpecSource>{};
 
-    final type = _resolveType(guess: guess, match: match, sources: sources);
+    final type = _resolveType(
+      id: upstreamId,
+      guess: guess,
+      match: match,
+      sources: sources,
+    );
     final input = _resolveModalities(
       catalogValues: match?.model.inputModalities,
       guessValues: guess.input,
@@ -399,18 +404,24 @@ class ModelSpecResolver {
   }
 
   static ModelType _resolveType({
+    required String id,
     required ModelGuess guess,
     required CatalogMatch? match,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
-    if (guess.type == ModelType.embedding) {
+    if (guess.type != ModelType.chat) {
       sources[ModelSpecField.type] = SpecSource.guess;
-      return ModelType.embedding;
+      return guess.type;
     }
     if (match != null) {
       final outs = match.model.outputModalities;
       sources[ModelSpecField.type] = SpecSource.catalog;
-      if (outs.contains('image') && !outs.contains('text')) {
+      if (outs.contains('video') && !outs.contains('text')) {
+        return ModelType.video;
+      }
+      if (outs.contains('image') &&
+          !outs.contains('text') &&
+          !id.toLowerCase().split('/').last.startsWith('gemini-')) {
         return ModelType.image;
       }
       return ModelType.chat;

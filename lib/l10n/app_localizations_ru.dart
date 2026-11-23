@@ -18175,4 +18175,202 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get sidebarOpenSettings => 'Открыть настройки боковой панели…';
+
+  @override
+  String get creationTitle => 'Создание';
+
+  @override
+  String get creationTopics => 'Темы';
+
+  @override
+  String get creationNewTopic => 'Новая тема';
+
+  @override
+  String get creationNameAfterSending => 'Название по первому запросу';
+
+  @override
+  String get creationPromptTitle =>
+      'Использует начало вашего запроса как заголовок';
+
+  @override
+  String get creationSearchTopics => 'Поиск тем и запросов';
+
+  @override
+  String get creationTopicsEmpty => 'Темы появятся здесь после первого запроса';
+
+  @override
+  String get creationNaming => 'Присвоение названия…';
+
+  @override
+  String get creationRenameTopic => 'Переименовать тему';
+
+  @override
+  String get creationDeleteTopic => 'Удалить тему';
+
+  @override
+  String get creationDeleteTopicBody => 'Удалить эту тему и все её работы?';
+
+  @override
+  String get creationImage => 'Изображение';
+
+  @override
+  String get creationVideo => 'Видео';
+
+  @override
+  String get creationImagePrompt => 'Опишите изображение для создания';
+
+  @override
+  String get creationVideoPrompt => 'Опишите видео для генерации';
+
+  @override
+  String get creationNewImagePrompt =>
+      'Опишите изображение, чтобы начать новую тему';
+
+  @override
+  String get creationNewVideoPrompt => 'Опишите видео, чтобы начать новую тему';
+
+  @override
+  String get creationSelectModel => 'Выбрать модель';
+
+  @override
+  String get creationSearchModels => 'Поиск моделей или провайдеров';
+
+  @override
+  String get creationNoModelTitle => 'Нет доступных моделей для создания';
+
+  @override
+  String get creationNoModelBody =>
+      'Включите подходящую модель в разделе «Провайдеры», чтобы начать создание.';
+
+  @override
+  String get creationEmptyTitle => 'Начните с идеи';
+
+  @override
+  String get creationEmptyBody => 'Опишите, что вы хотите создать.';
+
+  @override
+  String get creationAddReference => 'Добавить референсное изображение';
+
+  @override
+  String get creationReferenceTooLarge =>
+      'Общий размер референсных изображений не должен превышать 20 МБ.';
+
+  @override
+  String get creationAspectRatio => 'Соотношение сторон';
+
+  @override
+  String get creationCountLabel => 'Количество изображений';
+
+  @override
+  String get creationParameters => 'Параметры генерации';
+
+  @override
+  String get creationAuto => 'Авто';
+
+  @override
+  String get creationGenerate => 'Сгенерировать';
+
+  @override
+  String get creationWaitingImage => 'Создание изображения';
+
+  @override
+  String get creationWaitingVideo => 'Подготовка видео';
+
+  @override
+  String get creationDownloading => 'Загрузка';
+
+  @override
+  String get creationFailed => 'Ошибка генерации';
+
+  @override
+  String get creationInterrupted =>
+      'Генерация прервана при закрытии приложения';
+
+  @override
+  String get creationCancelled => 'Отменено';
+
+  @override
+  String get creationPartial => 'Некоторые результаты не удалось сохранить';
+
+  @override
+  String get creationRetry => 'Повторить';
+
+  @override
+  String get creationCopyPrompt => 'Копировать запрос';
+
+  @override
+  String get creationSaveImage => 'Сохранить изображение';
+
+  @override
+  String get creationCopyImage => 'Копировать изображение';
+
+  @override
+  String get creationShare => 'Поделиться';
+
+  @override
+  String get creationDeleteItem => 'Удалить творение';
+
+  @override
+  String get creationDeleteItemBody => 'Удалить это творение?';
+
+  @override
+  String get creationActionFailed => 'Не удалось выполнить действие';
+
+  @override
+  String get creationOptionSaved => 'Сохранено';
+
+  @override
+  String get creationOptionCopied => 'Скопировано';
+
+  @override
+  String get backupScopeCreations => 'Творения';
+
+  @override
+  String creationQueuePosition(int count) {
+    return 'В очереди · впереди $count';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count изображения',
+      many: '$count изображений',
+      few: '$count изображения',
+      one: '$count изображение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count генерации',
+      many: '$count генераций',
+      few: '$count генерации',
+      one: '$count генерация',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count творения',
+      many: '$count творений',
+      few: '$count творения',
+      one: '$count творение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return 'Темы $count';
+  }
 }

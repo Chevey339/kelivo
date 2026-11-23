@@ -17861,4 +17861,197 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sidebarOpenSettings => 'Open sidebar settings…';
+
+  @override
+  String get creationTitle => 'Create';
+
+  @override
+  String get creationTopics => 'Topics';
+
+  @override
+  String get creationNewTopic => 'New topic';
+
+  @override
+  String get creationNameAfterSending => 'Named after the first prompt';
+
+  @override
+  String get creationPromptTitle =>
+      'Uses the start of your prompt as the title';
+
+  @override
+  String get creationSearchTopics => 'Search topics and prompts';
+
+  @override
+  String get creationTopicsEmpty =>
+      'Topics appear here after your first prompt';
+
+  @override
+  String get creationNaming => 'Naming topic…';
+
+  @override
+  String get creationRenameTopic => 'Rename topic';
+
+  @override
+  String get creationDeleteTopic => 'Delete topic';
+
+  @override
+  String get creationDeleteTopicBody =>
+      'Delete this topic and all its creations?';
+
+  @override
+  String get creationImage => 'Image';
+
+  @override
+  String get creationVideo => 'Video';
+
+  @override
+  String get creationImagePrompt => 'Describe the image to create';
+
+  @override
+  String get creationVideoPrompt => 'Describe the video to generate';
+
+  @override
+  String get creationNewImagePrompt => 'Describe an image to start a new topic';
+
+  @override
+  String get creationNewVideoPrompt => 'Describe a video to start a new topic';
+
+  @override
+  String get creationSelectModel => 'Select model';
+
+  @override
+  String get creationSearchModels => 'Search models or providers';
+
+  @override
+  String get creationNoModelTitle => 'No creation models available';
+
+  @override
+  String get creationNoModelBody =>
+      'Enable a compatible model in Providers to start creating.';
+
+  @override
+  String get creationEmptyTitle => 'Start with an idea';
+
+  @override
+  String get creationEmptyBody => 'Describe what you want to create.';
+
+  @override
+  String get creationAddReference => 'Add reference image';
+
+  @override
+  String get creationReferenceTooLarge =>
+      'Reference images must total 20 MB or less.';
+
+  @override
+  String get creationAspectRatio => 'Aspect ratio';
+
+  @override
+  String get creationCountLabel => 'Image count';
+
+  @override
+  String get creationParameters => 'Generation options';
+
+  @override
+  String get creationAuto => 'Auto';
+
+  @override
+  String get creationGenerate => 'Generate';
+
+  @override
+  String get creationWaitingImage => 'Creating image';
+
+  @override
+  String get creationWaitingVideo => 'Preparing video';
+
+  @override
+  String get creationDownloading => 'Downloading';
+
+  @override
+  String get creationFailed => 'Generation failed';
+
+  @override
+  String get creationInterrupted =>
+      'Generation interrupted when the app closed';
+
+  @override
+  String get creationCancelled => 'Cancelled';
+
+  @override
+  String get creationPartial => 'Some results could not be saved';
+
+  @override
+  String get creationRetry => 'Try again';
+
+  @override
+  String get creationCopyPrompt => 'Copy prompt';
+
+  @override
+  String get creationSaveImage => 'Save image';
+
+  @override
+  String get creationCopyImage => 'Copy image';
+
+  @override
+  String get creationShare => 'Share';
+
+  @override
+  String get creationDeleteItem => 'Delete creation';
+
+  @override
+  String get creationDeleteItemBody => 'Delete this creation?';
+
+  @override
+  String get creationActionFailed => 'Could not complete the action';
+
+  @override
+  String get creationOptionSaved => 'Saved';
+
+  @override
+  String get creationOptionCopied => 'Copied';
+
+  @override
+  String get backupScopeCreations => 'Creations';
+
+  @override
+  String creationQueuePosition(int count) {
+    return 'Queued · $count ahead';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count images',
+      one: '1 image',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count generations',
+      one: '1 generation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count creations',
+      one: '1 creation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return 'Topics $count';
+  }
 }

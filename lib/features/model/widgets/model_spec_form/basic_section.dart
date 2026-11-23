@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/models/model_spec.dart';
+import '../../../../core/providers/settings_provider.dart';
 import '../../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -31,6 +32,18 @@ class BasicSection extends StatelessWidget {
       builder: (context, _) {
         final l10n = AppLocalizations.of(context)!;
         final spec = controller.spec;
+        final kind = ProviderConfig.classify(
+          controller.config.id,
+          explicitType: controller.config.providerType,
+        );
+        final types = [
+          ModelType.chat,
+          ModelType.embedding,
+          if (kind != ProviderKind.claude || spec.type.isMedia) ...[
+            ModelType.image,
+            ModelType.video,
+          ],
+        ];
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -79,22 +92,19 @@ class BasicSection extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
               child: SegmentedTabs(
                 tabs: [
-                  SegmentedTab(label: l10n.modelDetailSheetChatType),
-                  SegmentedTab(label: l10n.modelDetailSheetEmbeddingType),
-                  SegmentedTab(label: l10n.modelSpecFormImageType),
+                  for (final type in types)
+                    SegmentedTab(
+                      label: switch (type) {
+                        ModelType.chat => l10n.modelDetailSheetChatType,
+                        ModelType.embedding =>
+                          l10n.modelDetailSheetEmbeddingType,
+                        ModelType.image => l10n.modelSpecFormImageType,
+                        ModelType.video => l10n.modelSpecFormVideoMode,
+                      },
+                    ),
                 ],
-                index: spec.type == ModelType.embedding
-                    ? 1
-                    : spec.type == ModelType.image
-                    ? 2
-                    : 0,
-                onChanged: (index) {
-                  controller.setType(switch (index) {
-                    1 => ModelType.embedding,
-                    2 => ModelType.image,
-                    _ => ModelType.chat,
-                  });
-                },
+                index: types.indexOf(spec.type),
+                onChanged: (index) => controller.setType(types[index]),
               ),
             ),
           ],

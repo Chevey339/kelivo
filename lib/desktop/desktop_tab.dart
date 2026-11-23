@@ -1,1 +1,1 @@
-enum DesktopTab { chat, translate, storage, settings }
+enum DesktopTab { chat, media, translate, storage, settings }

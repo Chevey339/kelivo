@@ -734,6 +734,7 @@ void main() {
           extractedDirectory: extracted,
           includeChats: true,
           includeFiles: includeFiles,
+          scope: const BackupScope(excluded: {BackupCategory.creations}),
           sourceManifestSha256: await _manifestSha256(extracted),
         );
         final file = File(

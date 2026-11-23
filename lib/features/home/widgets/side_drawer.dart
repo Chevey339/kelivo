@@ -72,6 +72,8 @@ class SideDrawer extends StatefulWidget {
     required this.assistantName,
     this.onSelectConversation,
     this.onNewConversation,
+    this.onOpenCreation,
+    this.creationSelected = false,
     this.closePickerTicker,
     this.loadingConversationIds = const <String>{},
     this.embedded = false,
@@ -93,6 +95,8 @@ class SideDrawer extends StatefulWidget {
   final FutureOr<void> Function(String id, {bool closeDrawer})?
   onSelectConversation;
   final FutureOr<void> Function({bool closeDrawer})? onNewConversation;
+  final VoidCallback? onOpenCreation;
+  final bool creationSelected;
   final ValueNotifier<int>? closePickerTicker;
   final Set<String> loadingConversationIds;
   final bool
@@ -1832,8 +1836,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             entries: _isDesktop
                 ? const {SidebarEntry.translate: SidebarVisibility.show}
                 : layout.style == SidebarStyle.icons
-                ? settings.mobileSidebarEntries
+                ? {
+                    for (final entry in settings.mobileSidebarEntries.entries)
+                      if (entry.key != SidebarEntry.media ||
+                          widget.onOpenCreation != null)
+                        entry.key: entry.value,
+                  }
                 : const {},
+            creationSelected: widget.creationSelected,
             onOpen: _openMobileEntry,
             onEditAvatar: () => _editAvatar(context),
             onEditName: () => _editUserName(context),
@@ -1908,6 +1918,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                   SidebarBlock.entries: MobileSidebarEntries(
                     key: _mobileBlockKeys[SidebarBlock.entries],
                     onOpen: _openMobileEntry,
+                    allowCreation: widget.onOpenCreation != null,
+                    creationSelected: widget.creationSelected,
                   ),
                 if (assistant != null)
                   SidebarBlock.assistant: _MobileAssistantBlock(
@@ -2207,6 +2219,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
   void _openMobileEntry(SidebarEntry entry) {
     switch (entry) {
+      case SidebarEntry.media:
+        widget.onOpenCreation?.call();
       case SidebarEntry.history:
         unawaited(_openHistory(desktop: false));
       case SidebarEntry.translate:

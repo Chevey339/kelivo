@@ -231,8 +231,16 @@ class ModelDefaultsGuesser {
       if (rule.terminal) break;
     }
 
-    if (_isImagesApiId(id)) {
+    final mediaId = id.split('/').last;
+    if (!forceEmbedding && _isVideoModelId(mediaId)) {
+      draft.type = ModelType.video;
+      draft.input
+        ..clear()
+        ..add(Modality.text);
+      draft.abilities.clear();
+    } else if (!forceEmbedding && _isImageModelId(mediaId)) {
       draft.type = ModelType.image;
+      draft.abilities.clear();
       // dall-e-2 accepts reference images on the edits endpoint; the others
       // in this set are generation-only (agnes / SenseNova never allowed edits).
       if (id == 'dall-e-2') {
@@ -248,7 +256,8 @@ class ModelDefaultsGuesser {
 
     // The catalog remains authoritative; these cover manually added models
     // and relays without a catalog entry.
-    if (!forceEmbedding && !draft.output.contains(Modality.image)) {
+    if (draft.type == ModelType.chat &&
+        !draft.output.contains(Modality.image)) {
       if (_matches(
             id,
             r'(^|/)gemini-(1\.5-|[2-9][.-]|flash-latest|pro-latest)',
@@ -292,7 +301,7 @@ class ModelDefaultsGuesser {
     ReasoningReplayPolicy? replay;
     ReasoningReplayField? replayField;
 
-    if (normalized.type != ModelType.embedding) {
+    if (normalized.type == ModelType.chat) {
       for (final rule in _reasoningRules) {
         if (!rule.matches(id)) continue;
         final hit = rule.apply(id);
@@ -446,14 +455,26 @@ class ModelDefaultsGuesser {
   }
 }
 
-bool _isImagesApiId(String id) {
+bool _isImageModelId(String id) {
   return id.startsWith('gpt-image-') ||
       id.startsWith('chatgpt-image-') ||
+      id.startsWith('grok-imagine-image') ||
+      id.startsWith('doubao-seedream-') ||
+      id.startsWith('qwen-image') ||
+      id.startsWith('imagen-') ||
+      id.startsWith('flux') ||
+      id.startsWith('kolors') ||
+      _matches(id, r'^wan.*-(?:t2i|i2i)(?:-|$)') ||
       id.startsWith('agnes-image-') ||
       id == 'sensenova-u1-fast' ||
       id == 'dall-e-2' ||
       id == 'dall-e-3';
 }
+
+bool _isVideoModelId(String id) => _matches(
+  id,
+  r'^(?:grok-imagine-video|veo-|sora-|doubao-seedance-|seedance-|kling|hailuo|wan.*-(?:t2v|i2v|r2v)(?:-|$)|minimax.*video)',
+);
 
 bool _matches(String id, String pattern) {
   return RegExp(pattern, caseSensitive: false).hasMatch(id);

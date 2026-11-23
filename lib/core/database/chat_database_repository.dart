@@ -52,6 +52,7 @@ import '../../utils/kelivo_file_uri.dart';
 import '../models/memory_entry.dart';
 import '../models/user_profile_field.dart';
 import 'app_database.dart';
+import 'media_repository.dart';
 import 'empty_database_recovery_guard.dart';
 import 'empty_database_permission.dart';
 import 'message_timeline_index.dart';
@@ -198,6 +199,7 @@ class ChatDatabaseRepository {
        _observer = observer ?? ChatDatabaseObserver.instance;
 
   final AppDatabase _db;
+  late final MediaRepository mediaRepository = MediaRepository(_db);
   late final compression = CompressionRepository(ExtensionEntityStore(_db));
   late final _timelineIndex = MessageTimelineIndex(_db);
   late final _contextIndex = ContextOperationIndex(_db);
@@ -1124,6 +1126,50 @@ class ChatDatabaseRepository {
       'owner_id',
       'payload',
       'updated_at',
+    ],
+    'generation_topic_rows': [
+      'id',
+      'title',
+      'title_source',
+      'created_at',
+      'updated_at',
+    ],
+    'generation_batch_rows': [
+      'id',
+      'topic_id',
+      'provider_id',
+      'model_id',
+      'mode',
+      'prompt',
+      'negative_prompt',
+      'params_json',
+      'references_json',
+      'status',
+      'error_json',
+      'source',
+      'parent_item_id',
+      'conversation_id',
+      'message_id',
+      'created_at',
+      'started_at',
+      'finished_at',
+    ],
+    'generation_item_rows': [
+      'id',
+      'batch_id',
+      'ordinal',
+      'mode',
+      'path',
+      'thumbnail_path',
+      'width',
+      'height',
+      'duration_ms',
+      'mime',
+      'byte_size',
+      'revised_prompt',
+      'favorite',
+      'status',
+      'created_at',
     ],
     'gen_ui_surface_state_rows': [
       'revision_id',

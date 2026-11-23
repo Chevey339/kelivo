@@ -31247,6 +31247,324 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open sidebar settings…'**
   String get sidebarOpenSettings;
+
+  /// Title and Palette navigation entry for the image and video creation experience.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get creationTitle;
+
+  /// Section and mobile tab for media creation topics grouped by creative project.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics'**
+  String get creationTopics;
+
+  /// Action and desktop header for starting a separate media creation topic.
+  ///
+  /// In en, this message translates to:
+  /// **'New topic'**
+  String get creationNewTopic;
+
+  /// Subtitle for a new media creation topic before its first generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Named after the first prompt'**
+  String get creationNameAfterSending;
+
+  /// Subtitle for the new creation topic when automatic naming is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the start of your prompt as the title'**
+  String get creationPromptTitle;
+
+  /// Search input hint in the creation topic rail and mobile creation home.
+  ///
+  /// In en, this message translates to:
+  /// **'Search topics and prompts'**
+  String get creationSearchTopics;
+
+  /// Empty state inside the topic sidebar before any creations have been made.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics appear here after your first prompt'**
+  String get creationTopicsEmpty;
+
+  /// Status in the creation header while a model is naming a new topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Naming topic…'**
+  String get creationNaming;
+
+  /// Action that renames a media creation topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename topic'**
+  String get creationRenameTopic;
+
+  /// Destructive action and confirmation title for deleting a topic, its generation groups, and media files.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete topic'**
+  String get creationDeleteTopic;
+
+  /// Confirmation body for deleting an entire media creation topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this topic and all its creations?'**
+  String get creationDeleteTopicBody;
+
+  /// Image mode in the creation composer. Produces still images.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get creationImage;
+
+  /// Video mode in the creation composer. Produces moving clips.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get creationVideo;
+
+  /// Image composer text field hint inside an existing creation topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the image to create'**
+  String get creationImagePrompt;
+
+  /// Video composer text field hint inside an existing creation topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the video to generate'**
+  String get creationVideoPrompt;
+
+  /// Image composer text field hint when sending will create a new topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe an image to start a new topic'**
+  String get creationNewImagePrompt;
+
+  /// Video composer text field hint when sending will create a new topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe a video to start a new topic'**
+  String get creationNewVideoPrompt;
+
+  /// Tooltip and empty label of the model control in the creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Select model'**
+  String get creationSelectModel;
+
+  /// Hint in the media model selection popover or sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Search models or providers'**
+  String get creationSearchModels;
+
+  /// Empty state title when no enabled provider has a model for the selected media mode.
+  ///
+  /// In en, this message translates to:
+  /// **'No creation models available'**
+  String get creationNoModelTitle;
+
+  /// Empty state help for configuring media models.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable a compatible model in Providers to start creating.'**
+  String get creationNoModelBody;
+
+  /// Empty creation topic or workbench headline.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with an idea'**
+  String get creationEmptyTitle;
+
+  /// Empty creation topic or workbench prompt guidance.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe what you want to create.'**
+  String get creationEmptyBody;
+
+  /// Accessible label for the creation composer action that selects an image file as a reference.
+  ///
+  /// In en, this message translates to:
+  /// **'Add reference image'**
+  String get creationAddReference;
+
+  /// Message displayed by the creation composer if the selected reference images exceed the combined request budget of 20 MiB.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference images must total 20 MB or less.'**
+  String get creationReferenceTooLarge;
+
+  /// Heading of the media aspect ratio picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Aspect ratio'**
+  String get creationAspectRatio;
+
+  /// Heading of the number of images picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Image count'**
+  String get creationCountLabel;
+
+  /// Compact mobile composer action opening all generation parameters.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation options'**
+  String get creationParameters;
+
+  /// Default aspect ratio that lets a media provider pick image dimensions.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get creationAuto;
+
+  /// Submit button in the creation composer.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate'**
+  String get creationGenerate;
+
+  /// First waiting-card headline for a running image generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating image'**
+  String get creationWaitingImage;
+
+  /// First waiting-card headline for a running video generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing video'**
+  String get creationWaitingVideo;
+
+  /// Status when media generation has completed and outputs are being saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get creationDownloading;
+
+  /// Status title for a failed media generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation failed'**
+  String get creationFailed;
+
+  /// Status title for a media generation unfinished at the last app shutdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation interrupted when the app closed'**
+  String get creationInterrupted;
+
+  /// Status title for a generation cancelled by the user.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get creationCancelled;
+
+  /// Status title when some outputs of a media generation were saved and other outputs failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Some results could not be saved'**
+  String get creationPartial;
+
+  /// Action that retries a failed, partial, interrupted, or cancelled media generation.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get creationRetry;
+
+  /// Copies the prompt of a media generation to the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy prompt'**
+  String get creationCopyPrompt;
+
+  /// Save a creation to a local file or the photo library.
+  ///
+  /// In en, this message translates to:
+  /// **'Save image'**
+  String get creationSaveImage;
+
+  /// Copies the generated image to the system clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy image'**
+  String get creationCopyImage;
+
+  /// Shares a generated image file.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get creationShare;
+
+  /// Action and confirmation title for deleting one generated image or video.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete creation'**
+  String get creationDeleteItem;
+
+  /// Confirmation text for deleting one generated image or video.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this creation?'**
+  String get creationDeleteItemBody;
+
+  /// Fallback failure toast for a local creation action, such as saving or deleting a file.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the action'**
+  String get creationActionFailed;
+
+  /// Toast after successfully saving a creation to a file or photo library.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get creationOptionSaved;
+
+  /// Toast after copying a prompt or creation image.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get creationOptionCopied;
+
+  /// Backup scope category for media creation topics, generation records, and generated files.
+  ///
+  /// In en, this message translates to:
+  /// **'Creations'**
+  String get backupScopeCreations;
+
+  /// Waiting-card headline before a media generation starts. count is the number of jobs ahead in the queue.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued · {count} ahead'**
+  String creationQueuePosition(int count);
+
+  /// Number of images requested in a creation batch. count is the image quantity.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 image} other{{count} images}}'**
+  String creationImagesCount(int count);
+
+  /// Number of generations in one creation topic. count is the number of batches.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 generation} other{{count} generations}}'**
+  String creationGenerationCount(int count);
+
+  /// Number of saved outputs in a creation topic. count is the number of available media files.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 creation} other{{count} creations}}'**
+  String creationWorksCount(int count);
+
+  /// Header above the media topic cards. count is the number of topics shown.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics {count}'**
+  String creationTopicCount(int count);
 }
 
 class _AppLocalizationsDelegate

@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-enum SidebarEntry { search, history, translate, storage }
+enum SidebarEntry { search, media, history, translate, storage }
 
 enum SidebarVisibility { show, more, hidden }
 
@@ -110,12 +110,14 @@ class SidebarLayout {
 }
 
 const defaultMobileSidebarEntries = {
+  SidebarEntry.media: SidebarVisibility.show,
   SidebarEntry.history: SidebarVisibility.show,
   SidebarEntry.translate: SidebarVisibility.show,
 };
 
 const defaultDesktopSidebarEntries = {
   SidebarEntry.search: SidebarVisibility.show,
+  SidebarEntry.media: SidebarVisibility.show,
   SidebarEntry.translate: SidebarVisibility.show,
   SidebarEntry.storage: SidebarVisibility.show,
   SidebarEntry.history: SidebarVisibility.show,
@@ -141,10 +143,23 @@ Map<SidebarEntry, SidebarVisibility> decodeSidebarEntries(
       if (visibility != null) entries.putIfAbsent(entry, () => visibility);
     }
   }
-  for (final entry in defaults.entries) {
-    entries.putIfAbsent(entry.key, () => entry.value);
+  final order = entries.keys.toList();
+  final defaultOrder = defaults.keys.toList();
+  for (var index = 0; index < defaultOrder.length; index++) {
+    final id = defaultOrder[index];
+    if (entries.containsKey(id)) continue;
+    final following = defaultOrder
+        .skip(index + 1)
+        .where(order.contains)
+        .firstOrNull;
+    order.insert(
+      following == null ? order.length : order.indexOf(following),
+      id,
+    );
   }
-  return Map.unmodifiable(entries);
+  return Map.unmodifiable({
+    for (final id in order) id: entries[id] ?? defaults[id]!,
+  });
 }
 
 String encodeSidebarEntries(Map<SidebarEntry, SidebarVisibility> entries) =>

@@ -35,8 +35,10 @@ import '../migration/legacy_message_content_decoder.dart';
 import '../migration/legacy_record_sanitizer.dart';
 import '../../utils/multimodal_input_utils.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/kelivo_file_uri.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../database/backup_portability.dart';
+import '../../database/media_repository.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
 import 'restore_durability.dart';
@@ -304,6 +306,7 @@ class DataSync {
     'skills',
     'workspaces',
     'sessions',
+    'generations',
   ];
 
   final ChatService chatService;
@@ -350,34 +353,40 @@ class DataSync {
   }) {
     var canResume = true;
     void Function()? resumeUi;
-    return _runLiveBusinessRestore<void>(() async {
-      await RestoreBundlePreparation.prepare(
-        appDataDirectory: Directory(appDataPath),
-        extractedDirectory: Directory(extractedPath),
-        consumeExtractedFiles: true,
-        sourceManifestSha256: sourceManifestSha256,
-        bundleIncludesChats: includeChats,
-        bundleIncludesFiles: includeFiles,
-        restoreChats: restoreChats,
-        restoreFiles: restoreFiles,
-        scope: scope,
-        validatedSettings: validatedSettings,
-        onProgress: onProgress,
-        cancelToken: cancelToken,
-        durability: _restoreDurability,
-        beforePublish: () async {
-          final uiStore = chatService.chatRepositoryOrNull?.genUiStates;
-          await uiStore?.pauseAndDrain();
-          resumeUi = uiStore?.resume;
-          // This conclusion also controls settings, even with no mounted UI store.
-          canResume = false;
-        },
-        onUnpublishedDiscarded: () {
-          canResume = true;
-          resumeUi?.call();
-        },
-      );
-    }, canResumeOnError: () => canResume);
+    return _runLiveBusinessRestore<void>(
+      () => AttachmentFileLock.synchronized(() async {
+        final media = chatService.chatRepositoryOrNull?.mediaRepository;
+        await RestoreBundlePreparation.prepare(
+          appDataDirectory: Directory(appDataPath),
+          extractedDirectory: Directory(extractedPath),
+          consumeExtractedFiles: true,
+          sourceManifestSha256: sourceManifestSha256,
+          bundleIncludesChats: includeChats,
+          bundleIncludesFiles: includeFiles,
+          restoreChats: restoreChats,
+          restoreFiles: restoreFiles,
+          scope: scope,
+          validatedSettings: validatedSettings,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+          durability: _restoreDurability,
+          beforePublish: () async {
+            final uiStore = chatService.chatRepositoryOrNull?.genUiStates;
+            await uiStore?.pauseAndDrain();
+            resumeUi = uiStore?.resume;
+            media?.pauseWrites();
+            // This conclusion also controls settings, even with no mounted UI store.
+            canResume = false;
+          },
+          onUnpublishedDiscarded: () {
+            canResume = true;
+            resumeUi?.call();
+            media?.resumeWrites();
+          },
+        );
+      }),
+      canResumeOnError: () => canResume,
+    );
   }
 
   /// Prepares a local snapshot without opening the live database or providers.
@@ -427,7 +436,9 @@ class DataSync {
             ),
             onProgress: onProgress,
           );
-      if (!info.includeChats || info.databaseInfo == null) {
+      if (!info.scope.includes(BackupCategory.chats) ||
+          !info.includeChats ||
+          info.databaseInfo == null) {
         throw const FormatException('restore_preparation_database_required');
       }
       final settings = await runBackupIsolate<Map<String, dynamic>, String>(
@@ -511,7 +522,7 @@ class DataSync {
               allowUnverifiedForwardCompatible: false,
             ),
           );
-      if (!info.includeChats) {
+      if (!info.scope.includes(BackupCategory.chats) || !info.includeChats) {
         throw const FormatException('restore_preparation_database_required');
       }
       final settings = await runBackupIsolate<Map<String, dynamic>, String>(
@@ -680,7 +691,10 @@ class DataSync {
     final archive = await _prepareBackupArchive(
       chatService: chatService,
       verifyPayload: false,
-      includeChats: cfg.scope.includes(BackupCategory.chats),
+      // The SQLite component can carry creations independently of chats.
+      includeChats:
+          cfg.scope.includes(BackupCategory.chats) ||
+          cfg.scope.includes(BackupCategory.creations),
       includeFiles: cfg.scope.assetRoots.isNotEmpty,
       scope: cfg.scope,
       exportSettings: () =>
@@ -812,6 +826,7 @@ class DataSync {
 
       ChatDatabaseSnapshotInfo? snapshotInfo;
       var publishedDraftFiles = <String>{};
+      var publishedCreationFiles = const <String>{};
       if (includeChats) {
         final databaseFile = File(p.join(workDir.path, '_bk_kelivo.db'));
         databaseTmp = databaseFile;
@@ -824,7 +839,30 @@ class DataSync {
         );
         snapshotInfo = await snapshotDatabase(databaseFile);
         publishedDraftFiles = _publishedDraftFilesFrom(databaseFile);
-        await _sanitizeBackupDatabase(databaseFile, scope: scope);
+        final hasCreations = await _sanitizeBackupDatabase(
+          databaseFile,
+          scope: scope,
+        );
+        if (!scope.includes(BackupCategory.chats)) {
+          includeChats = hasCreations;
+          snapshotInfo = hasCreations
+              ? (
+                  schemaVersion: AppDatabase.currentSchemaVersion,
+                  conversationCount: 0,
+                  messageCount: 0,
+                )
+              : null;
+        }
+        if (hasCreations && includeFiles) {
+          final database = AppDatabase.open(file: databaseFile);
+          try {
+            publishedCreationFiles = await MediaRepository(
+              database,
+            ).referencedFiles();
+          } finally {
+            await database.close();
+          }
+        }
       }
 
       if (!includeChats && includeFiles) {
@@ -856,7 +894,7 @@ class DataSync {
       };
       final manifestPath = manifestFile.path;
       final settingsPath = settingsFile.path;
-      final databasePath = databaseTmp?.path;
+      final databasePath = includeChats ? databaseTmp!.path : null;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
       // Enumeration starts before the worker knows the byte total.
@@ -883,6 +921,7 @@ class DataSync {
           scope: scope,
           assetRootPaths: assetRootPaths,
           publishedDraftFiles: publishedDraftFiles,
+          publishedCreationFiles: publishedCreationFiles,
         ),
         cancelToken: cancelToken,
         onProgress: onProgress,
@@ -1139,6 +1178,7 @@ class DataSync {
     scope: args.scope,
     assetRootPaths: args.assetRootPaths,
     publishedDraftFiles: args.publishedDraftFiles,
+    publishedCreationFiles: args.publishedCreationFiles,
     ctx: ctx,
   );
 
@@ -1198,6 +1238,7 @@ class DataSync {
     required BackupScope scope,
     required Map<String, String> assetRootPaths,
     Set<String> publishedDraftFiles = const {},
+    Set<String> publishedCreationFiles = const {},
     BackupIsolateContext? ctx,
   }) {
     if (includeChats != (databasePath != null && snapshotInfo != null)) {
@@ -1242,6 +1283,15 @@ class DataSync {
           onUnreadable: (path) => recordUnreadable(name, path),
           ctx: ctx,
         )) {
+          if (name == 'generations' &&
+              !publishedCreationFiles.contains(
+                KelivoFileUri.encodeFromAbsolute(
+                  file.path,
+                  root: p.dirname(root),
+                ),
+              )) {
+            continue;
+          }
           if (draftName.hasMatch(p.basename(file.path))) {
             final relative = p.relative(file.path, from: p.dirname(root));
             final uri =
@@ -2525,14 +2575,25 @@ class DataSync {
       final declaredScope = manifest['scope'];
       if (declaredScope is! Map ||
           BackupCategory.values.any(
-            (category) => declaredScope[category.name] is! bool,
+            (category) =>
+                declaredScope[category.name] is! bool &&
+                (category != BackupCategory.creations ||
+                    declaredScope.containsKey(category.name)),
           )) {
         throw const FormatException('manifest_scope');
       }
     }
-    final scope = manifest.containsKey('scope')
-        ? BackupScope.fromJson(manifest['scope'])
-        : const BackupScope(excluded: {BackupCategory.environmentVariables});
+    final declaration = manifest['scope'];
+    final scope =
+        (manifest.containsKey('scope')
+                ? BackupScope.fromJson(declaration)
+                : const BackupScope(
+                    excluded: {BackupCategory.environmentVariables},
+                  ))
+            .withCategory(
+              BackupCategory.creations,
+              declaration is Map && declaration['creations'] == true,
+            );
 
     // A user may edit the database or add/remove attachments before repacking.
     // ZIP extraction verifies the repacked bytes. Rebuild the manifest from
@@ -2844,6 +2905,99 @@ class DataSync {
       throw const FormatException('settings.json');
     }
     return decoded.cast<String, dynamic>();
+  }
+
+  Future<void> _restoreCreations(
+    Directory payload, {
+    required bool includeDatabase,
+    required bool overwrite,
+    required bool restoreFiles,
+  }) async {
+    if (!overwrite && !includeDatabase) return;
+    await chatService.init();
+    final live = chatService.chatRepositoryOrNull!.mediaRepository;
+    final snapshot = includeDatabase
+        ? AppDatabase.open(file: File(p.join(payload.path, _databaseEntryName)))
+        : null;
+    try {
+      final incoming = snapshot == null ? null : MediaRepository(snapshot);
+      final wanted = restoreFiles
+          ? await incoming?.referencedFiles() ?? const <String>{}
+          : const <String>{};
+      await AttachmentFileLock.synchronized(() async {
+        final previous = overwrite && restoreFiles
+            ? await live.referencedFiles()
+            : const <String>{};
+        final content = await AppDirectories.getContentDirectory();
+        final relocated = <String, String>{};
+        final installed = <File>[];
+        final nonce = const Uuid().v4();
+        try {
+          for (final uri in wanted) {
+            final parts = _creationPathSegments(uri);
+            if (parts == null) continue;
+            final source = File(p.joinAll([payload.path, ...parts]));
+            if (!await source.exists()) continue;
+            var target = File(p.joinAll([content.path, ...parts]));
+            if (await FileSystemEntity.type(target.path, followLinks: false) !=
+                FileSystemEntityType.notFound) {
+              if (!overwrite) continue;
+              // Keep the old record's file readable until the new SQLite
+              // transaction is durable, even if both backups share a batch ID.
+              target = File(
+                p.join(
+                  target.parent.path,
+                  'restored-$nonce-${p.basename(target.path)}',
+                ),
+              );
+              relocated[uri] = KelivoFileUri.encodeFromAbsolute(
+                target.path,
+                root: content.path,
+              )!;
+            }
+            final partial = File('${target.path}.$nonce.part');
+            try {
+              await _copyRestoredFile(source, partial);
+              final output = await partial.open(mode: FileMode.append);
+              try {
+                await output.flush();
+              } finally {
+                await output.close();
+              }
+              installed.add(await partial.rename(target.path));
+            } finally {
+              await _deleteFileQuietly(partial);
+            }
+          }
+          await live.importFrom(
+            incoming,
+            overwrite: overwrite,
+            restoredPaths: relocated,
+          );
+        } catch (_) {
+          for (final file in installed) {
+            await _deleteFileQuietly(file);
+          }
+          rethrow;
+        }
+        for (final uri in previous) {
+          if (wanted.contains(uri) && !relocated.containsKey(uri)) continue;
+          final parts = _creationPathSegments(uri);
+          if (parts != null) {
+            await _deleteFileQuietly(File(p.joinAll([content.path, ...parts])));
+          }
+        }
+      });
+    } finally {
+      await snapshot?.close();
+    }
+  }
+
+  static List<String>? _creationPathSegments(String uri) {
+    final parts = KelivoFileUri.decodeToSegments(uri);
+    return parts != null && parts.length >= 3 && parts.first == 'generations'
+        ? parts
+        : null;
   }
 
   Future<Directory> _liveAssetRoot(String name) async {
@@ -3406,13 +3560,20 @@ class DataSync {
     );
   }
 
-  static Future<void> _sanitizeBackupDatabase(
+  static Future<bool> _sanitizeBackupDatabase(
     File file, {
     BackupScope scope = const BackupScope(),
   }) async {
+    if (!scope.includes(BackupCategory.chats)) {
+      return _retainOnlyCreations(file);
+    }
     final database = AppDatabase.open(file: file);
+    final bool hasCreations;
     try {
       await BackupPortability.sanitizeDatabase(database, scope: scope);
+      hasCreations =
+          scope.includes(BackupCategory.creations) &&
+          await MediaRepository(database).hasCreations;
       for (final sql in MessageTimelineIndex.discardStatements) {
         await database.customStatement(sql);
       }
@@ -3420,6 +3581,27 @@ class DataSync {
       await database.close();
     }
     await ChatDatabaseRepository.normalizeSnapshotJournal(file);
+    return hasCreations;
+  }
+
+  static Future<bool> _retainOnlyCreations(File snapshot) async {
+    final source = AppDatabase.open(file: snapshot);
+    final cleanFile = File('${snapshot.path}.creations');
+    try {
+      final sourceMedia = MediaRepository(source);
+      if (!await sourceMedia.hasCreations) return false;
+      final clean = AppDatabase.open(file: cleanFile);
+      try {
+        await MediaRepository(clean).importFrom(sourceMedia, overwrite: false);
+      } finally {
+        await clean.close();
+      }
+    } finally {
+      await source.close();
+    }
+    await ChatDatabaseRepository.normalizeSnapshotJournal(cleanFile);
+    await cleanFile.rename(snapshot.path);
+    return true;
   }
 
   /// Reads a backup file's manifest and reports what restoring it would mean.
@@ -3517,6 +3699,7 @@ class DataSync {
         versionedBackup?.scope ??
             BackupScope(
               excluded: {
+                BackupCategory.creations,
                 if (!settings.containsKey('environment_variables_v1'))
                   BackupCategory.environmentVariables,
               },
@@ -3559,6 +3742,10 @@ class DataSync {
         final restoreChats =
             scope.includes(BackupCategory.chats) && includeChats;
         final restoreFiles = selectedAssetRoots.isNotEmpty;
+        final restoreCreations = scope.includes(BackupCategory.creations);
+        final ordinaryAssetRoots = selectedAssetRoots.difference({
+          'generations',
+        });
         // Validate selected business data before changing any live files or chats.
         BusinessSettingsRouter.normalizeAndRoute(
           settings,
@@ -3574,8 +3761,16 @@ class DataSync {
               // skill/workspace directories together with their business rows.
               await _restoreAssetDirectories(
                 extractDir,
-                assetRoots: selectedAssetRoots,
+                assetRoots: ordinaryAssetRoots,
                 overwriteRoots: const {'skills', 'workspaces'},
+              );
+            }
+            if (restoreCreations) {
+              await _restoreCreations(
+                extractDir,
+                includeDatabase: includeChats,
+                overwrite: true,
+                restoreFiles: selectedAssetRoots.contains('generations'),
               );
             }
             await _runLiveBusinessRestore(
@@ -3642,7 +3837,15 @@ class DataSync {
           if (restoreFiles) {
             await _restoreAssetDirectories(
               extractDir,
-              assetRoots: selectedAssetRoots,
+              assetRoots: ordinaryAssetRoots,
+            );
+          }
+          if (restoreCreations) {
+            await _restoreCreations(
+              extractDir,
+              includeDatabase: includeChats,
+              overwrite: false,
+              restoreFiles: selectedAssetRoots.contains('generations'),
             );
           }
           await _runLiveBusinessRestore(pendingBusinessRestore);
@@ -3735,11 +3938,20 @@ class DataSync {
           // Merge mode: Only copy non-existing files
           await _restoreAssetDirectories(
             restorePayloadDirectory,
-            assetRoots: selectedAssetRoots,
+            assetRoots: selectedAssetRoots.difference({'generations'}),
             remappedConversationIds:
                 _lastMergeReport?.remappedConversationIds ?? const {},
           );
         }
+      }
+      if (versionedBackup?.includeChats == true &&
+          scope.includes(BackupCategory.creations)) {
+        await _restoreCreations(
+          extractDir,
+          includeDatabase: true,
+          overwrite: false,
+          restoreFiles: selectedAssetRoots.contains('generations'),
+        );
       }
       // Legacy chats.json decodes before assets exist. After files land,
       // directed-remap old absolute roots onto restored managed relatives,
@@ -4026,6 +4238,7 @@ class _BackupPackArgs {
     required this.scope,
     required this.assetRootPaths,
     this.publishedDraftFiles = const {},
+    this.publishedCreationFiles = const {},
   });
 
   final String outPath;
@@ -4041,6 +4254,7 @@ class _BackupPackArgs {
   final BackupScope scope;
   final Map<String, String> assetRootPaths;
   final Set<String> publishedDraftFiles;
+  final Set<String> publishedCreationFiles;
 }
 
 // Keep source failures distinct from ZIP destination failures (e.g. disk full).

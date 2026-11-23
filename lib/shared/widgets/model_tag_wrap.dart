@@ -98,11 +98,12 @@ class ModelTagWrap extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          model.type == ModelType.embedding
-              ? embeddingLabel
-              : model.type == ModelType.image
-              ? imageTypeLabel
-              : chatLabel,
+          switch (model.type) {
+            ModelType.embedding => embeddingLabel,
+            ModelType.image => imageTypeLabel,
+            ModelType.video => videoLabel,
+            ModelType.chat => chatLabel,
+          },
           style: TextStyle(
             fontSize: 11,
             color: isDark ? cs.primary : cs.primary.withValues(alpha: 0.9),
@@ -439,7 +440,17 @@ class ModelCapsulesRow extends StatelessWidget {
       );
     }
 
-    if (model.type != ModelType.embedding) {
+    if (model.output.contains(Modality.video)) {
+      caps.add(
+        labeledCapsule(
+          label: '$outputLabel: $videoLabel',
+          icon: Icon(Lucide.FileVideo, size: iconSize, color: cs.tertiary),
+          color: cs.tertiary,
+        ),
+      );
+    }
+
+    if (model.type == ModelType.chat) {
       final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities);
       for (final ab in uniqueAbilities) {
         switch (ab) {

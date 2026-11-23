@@ -23,6 +23,7 @@ class SidebarUserBar extends StatelessWidget {
     required this.onEditAvatar,
     required this.onEditName,
     this.desktop = false,
+    this.creationSelected = false,
   });
 
   final String name;
@@ -31,7 +32,7 @@ class SidebarUserBar extends StatelessWidget {
   final ValueChanged<SidebarEntry> onOpen;
   final VoidCallback onEditAvatar;
   final VoidCallback onEditName;
-  final bool desktop;
+  final bool desktop, creationSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +104,7 @@ class SidebarUserBar extends StatelessWidget {
               for (final entry in icons.take(shownCount)) ...[
                 MobileSidebarEntryIcon(
                   entry: entry,
+                  selected: entry == SidebarEntry.media && creationSelected,
                   onTap: () => onOpen(entry),
                 ),
                 const SizedBox(width: 4),
@@ -117,6 +119,7 @@ class SidebarUserBar extends StatelessWidget {
                     context,
                     onOpen,
                     iconLimit: shownCount,
+                    allowCreation: entries.containsKey(SidebarEntry.media),
                   ),
                 ),
                 const SizedBox(width: 4),

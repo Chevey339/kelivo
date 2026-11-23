@@ -1,6 +1,13 @@
 import 'package:flutter/foundation.dart';
 
-enum ModelType { chat, embedding, image }
+enum ModelType {
+  chat,
+  embedding,
+  image,
+  video;
+
+  bool get isMedia => this == image || this == video;
+}
 
 enum Modality { text, image, audio, video, pdf }
 
@@ -78,6 +85,8 @@ List<Modality> _normalizeOutputModalities(
   ModelType type,
 ) {
   if (type == ModelType.embedding) return const [Modality.text];
+  if (type == ModelType.image) return const [Modality.image];
+  if (type == ModelType.video) return const [Modality.video];
   final list = _uniqueSortedByIndex(mods.where(_outputModalities.contains));
   return list.isEmpty ? const [Modality.text] : list;
 }
@@ -1028,6 +1037,7 @@ class ModelSpecOverride {
     if (s == 'embedding' || s == 'embeddings') return ModelType.embedding;
     if (s == 'chat') return ModelType.chat;
     if (s == 'image') return ModelType.image;
+    if (s == 'video') return ModelType.video;
     return null;
   }
 

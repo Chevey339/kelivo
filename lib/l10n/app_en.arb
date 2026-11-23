@@ -23188,5 +23188,242 @@
   "sidebarOpenSettings": "Open sidebar settings…",
   "@sidebarOpenSettings": {
     "description": "Action in the mobile long-press menu on Customize sidebar. Opens Settings > Display > Sidebar."
+  },
+  "creationTitle": "Create",
+  "@creationTitle": {
+    "description": "Title and Palette navigation entry for the image and video creation experience."
+  },
+  "creationTopics": "Topics",
+  "@creationTopics": {
+    "description": "Section and mobile tab for media creation topics grouped by creative project."
+  },
+  "creationNewTopic": "New topic",
+  "@creationNewTopic": {
+    "description": "Action and desktop header for starting a separate media creation topic."
+  },
+  "creationNameAfterSending": "Named after the first prompt",
+  "@creationNameAfterSending": {
+    "description": "Subtitle for a new media creation topic before its first generation."
+  },
+  "creationPromptTitle": "Uses the start of your prompt as the title",
+  "@creationPromptTitle": {
+    "description": "Subtitle for the new creation topic when automatic naming is disabled."
+  },
+  "creationSearchTopics": "Search topics and prompts",
+  "@creationSearchTopics": {
+    "description": "Search input hint in the creation topic rail and mobile creation home."
+  },
+  "creationTopicsEmpty": "Topics appear here after your first prompt",
+  "@creationTopicsEmpty": {
+    "description": "Empty state inside the topic sidebar before any creations have been made."
+  },
+  "creationNaming": "Naming topic…",
+  "@creationNaming": {
+    "description": "Status in the creation header while a model is naming a new topic."
+  },
+  "creationRenameTopic": "Rename topic",
+  "@creationRenameTopic": {
+    "description": "Action that renames a media creation topic."
+  },
+  "creationDeleteTopic": "Delete topic",
+  "@creationDeleteTopic": {
+    "description": "Destructive action and confirmation title for deleting a topic, its generation groups, and media files."
+  },
+  "creationDeleteTopicBody": "Delete this topic and all its creations?",
+  "@creationDeleteTopicBody": {
+    "description": "Confirmation body for deleting an entire media creation topic."
+  },
+  "creationImage": "Image",
+  "@creationImage": {
+    "description": "Image mode in the creation composer. Produces still images."
+  },
+  "creationVideo": "Video",
+  "@creationVideo": {
+    "description": "Video mode in the creation composer. Produces moving clips."
+  },
+  "creationImagePrompt": "Describe the image to create",
+  "@creationImagePrompt": {
+    "description": "Image composer text field hint inside an existing creation topic."
+  },
+  "creationVideoPrompt": "Describe the video to generate",
+  "@creationVideoPrompt": {
+    "description": "Video composer text field hint inside an existing creation topic."
+  },
+  "creationNewImagePrompt": "Describe an image to start a new topic",
+  "@creationNewImagePrompt": {
+    "description": "Image composer text field hint when sending will create a new topic."
+  },
+  "creationNewVideoPrompt": "Describe a video to start a new topic",
+  "@creationNewVideoPrompt": {
+    "description": "Video composer text field hint when sending will create a new topic."
+  },
+  "creationSelectModel": "Select model",
+  "@creationSelectModel": {
+    "description": "Tooltip and empty label of the model control in the creation composer."
+  },
+  "creationSearchModels": "Search models or providers",
+  "@creationSearchModels": {
+    "description": "Hint in the media model selection popover or sheet."
+  },
+  "creationNoModelTitle": "No creation models available",
+  "@creationNoModelTitle": {
+    "description": "Empty state title when no enabled provider has a model for the selected media mode."
+  },
+  "creationNoModelBody": "Enable a compatible model in Providers to start creating.",
+  "@creationNoModelBody": {
+    "description": "Empty state help for configuring media models."
+  },
+  "creationEmptyTitle": "Start with an idea",
+  "@creationEmptyTitle": {
+    "description": "Empty creation topic or workbench headline."
+  },
+  "creationEmptyBody": "Describe what you want to create.",
+  "@creationEmptyBody": {
+    "description": "Empty creation topic or workbench prompt guidance."
+  },
+  "creationAddReference": "Add reference image",
+  "creationReferenceTooLarge": "Reference images must total 20 MB or less.",
+  "@creationReferenceTooLarge": {
+    "description": "Message displayed by the creation composer if the selected reference images exceed the combined request budget of 20 MiB."
+  },
+  "@creationAddReference": {
+    "description": "Accessible label for the creation composer action that selects an image file as a reference."
+  },
+  "creationAspectRatio": "Aspect ratio",
+  "@creationAspectRatio": {
+    "description": "Heading of the media aspect ratio picker."
+  },
+  "creationCountLabel": "Image count",
+  "@creationCountLabel": {
+    "description": "Heading of the number of images picker."
+  },
+  "creationParameters": "Generation options",
+  "@creationParameters": {
+    "description": "Compact mobile composer action opening all generation parameters."
+  },
+  "creationAuto": "Auto",
+  "@creationAuto": {
+    "description": "Default aspect ratio that lets a media provider pick image dimensions."
+  },
+  "creationGenerate": "Generate",
+  "@creationGenerate": {
+    "description": "Submit button in the creation composer."
+  },
+  "creationWaitingImage": "Creating image",
+  "@creationWaitingImage": {
+    "description": "First waiting-card headline for a running image generation."
+  },
+  "creationWaitingVideo": "Preparing video",
+  "@creationWaitingVideo": {
+    "description": "First waiting-card headline for a running video generation."
+  },
+  "creationDownloading": "Downloading",
+  "@creationDownloading": {
+    "description": "Status when media generation has completed and outputs are being saved."
+  },
+  "creationFailed": "Generation failed",
+  "@creationFailed": {
+    "description": "Status title for a failed media generation."
+  },
+  "creationInterrupted": "Generation interrupted when the app closed",
+  "@creationInterrupted": {
+    "description": "Status title for a media generation unfinished at the last app shutdown."
+  },
+  "creationCancelled": "Cancelled",
+  "@creationCancelled": {
+    "description": "Status title for a generation cancelled by the user."
+  },
+  "creationPartial": "Some results could not be saved",
+  "@creationPartial": {
+    "description": "Status title when some outputs of a media generation were saved and other outputs failed."
+  },
+  "creationRetry": "Try again",
+  "@creationRetry": {
+    "description": "Action that retries a failed, partial, interrupted, or cancelled media generation."
+  },
+  "creationCopyPrompt": "Copy prompt",
+  "@creationCopyPrompt": {
+    "description": "Copies the prompt of a media generation to the clipboard."
+  },
+  "creationSaveImage": "Save image",
+  "@creationSaveImage": {
+    "description": "Save a creation to a local file or the photo library."
+  },
+  "creationCopyImage": "Copy image",
+  "@creationCopyImage": {
+    "description": "Copies the generated image to the system clipboard."
+  },
+  "creationShare": "Share",
+  "@creationShare": {
+    "description": "Shares a generated image file."
+  },
+  "creationDeleteItem": "Delete creation",
+  "@creationDeleteItem": {
+    "description": "Action and confirmation title for deleting one generated image or video."
+  },
+  "creationDeleteItemBody": "Delete this creation?",
+  "@creationDeleteItemBody": {
+    "description": "Confirmation text for deleting one generated image or video."
+  },
+  "creationActionFailed": "Could not complete the action",
+  "@creationActionFailed": {
+    "description": "Fallback failure toast for a local creation action, such as saving or deleting a file."
+  },
+  "creationOptionSaved": "Saved",
+  "@creationOptionSaved": {
+    "description": "Toast after successfully saving a creation to a file or photo library."
+  },
+  "creationOptionCopied": "Copied",
+  "@creationOptionCopied": {
+    "description": "Toast after copying a prompt or creation image."
+  },
+  "backupScopeCreations": "Creations",
+  "@backupScopeCreations": {
+    "description": "Backup scope category for media creation topics, generation records, and generated files."
+  },
+  "creationQueuePosition": "Queued · {count} ahead",
+  "@creationQueuePosition": {
+    "description": "Waiting-card headline before a media generation starts. count is the number of jobs ahead in the queue.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationImagesCount": "{count, plural, one{1 image} other{{count} images}}",
+  "@creationImagesCount": {
+    "description": "Number of images requested in a creation batch. count is the image quantity.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationGenerationCount": "{count, plural, one{1 generation} other{{count} generations}}",
+  "@creationGenerationCount": {
+    "description": "Number of generations in one creation topic. count is the number of batches.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationWorksCount": "{count, plural, one{1 creation} other{{count} creations}}",
+  "@creationWorksCount": {
+    "description": "Number of saved outputs in a creation topic. count is the number of available media files.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creationTopicCount": "Topics {count}",
+  "@creationTopicCount": {
+    "description": "Header above the media topic cards. count is the number of topics shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

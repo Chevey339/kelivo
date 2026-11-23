@@ -17965,4 +17965,198 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get sidebarOpenSettings => 'Kenar çubuğu ayarlarını aç…';
+
+  @override
+  String get creationTitle => 'Oluştur';
+
+  @override
+  String get creationTopics => 'Konular';
+
+  @override
+  String get creationNewTopic => 'Yeni konu';
+
+  @override
+  String get creationNameAfterSending => 'İlk istemden sonra adlandırılır';
+
+  @override
+  String get creationPromptTitle =>
+      'İstemcinizin başlangıcını başlık olarak kullanır';
+
+  @override
+  String get creationSearchTopics => 'Konularda ve istemlerde ara';
+
+  @override
+  String get creationTopicsEmpty =>
+      'İlk isteminizden sonra konular burada görünür';
+
+  @override
+  String get creationNaming => 'Konu adlandırılıyor…';
+
+  @override
+  String get creationRenameTopic => 'Konuyu yeniden adlandır';
+
+  @override
+  String get creationDeleteTopic => 'Konuyu sil';
+
+  @override
+  String get creationDeleteTopicBody =>
+      'Bu konu ve tüm oluşturulanlar silinsin mi?';
+
+  @override
+  String get creationImage => 'Görsel';
+
+  @override
+  String get creationVideo => 'Video';
+
+  @override
+  String get creationImagePrompt => 'Oluşturulacak görseli tanımlayın';
+
+  @override
+  String get creationVideoPrompt => 'Oluşturulacak videoyu tanımlayın';
+
+  @override
+  String get creationNewImagePrompt =>
+      'Yeni konu başlatmak için bir görsel tanımlayın';
+
+  @override
+  String get creationNewVideoPrompt =>
+      'Yeni konu başlatmak için bir video tanımlayın';
+
+  @override
+  String get creationSelectModel => 'Model seç';
+
+  @override
+  String get creationSearchModels => 'Model veya sağlayıcı ara';
+
+  @override
+  String get creationNoModelTitle => 'Kullanılabilir oluşturma modeli yok';
+
+  @override
+  String get creationNoModelBody =>
+      'Oluşturmaya başlamak için Sağlayıcılar bölümünde uyumlu bir modeli etkinleştirin.';
+
+  @override
+  String get creationEmptyTitle => 'Bir fikirle başlayın';
+
+  @override
+  String get creationEmptyBody => 'Oluşturmak istediğinizi tanımlayın.';
+
+  @override
+  String get creationAddReference => 'Referans görsel ekle';
+
+  @override
+  String get creationReferenceTooLarge =>
+      'Referans görsellerin toplam boyutu 20 MB veya daha az olmalıdır.';
+
+  @override
+  String get creationAspectRatio => 'En-boy oranı';
+
+  @override
+  String get creationCountLabel => 'Görsel sayısı';
+
+  @override
+  String get creationParameters => 'Oluşturma seçenekleri';
+
+  @override
+  String get creationAuto => 'Otomatik';
+
+  @override
+  String get creationGenerate => 'Oluştur';
+
+  @override
+  String get creationWaitingImage => 'Görsel oluşturuluyor';
+
+  @override
+  String get creationWaitingVideo => 'Video hazırlanıyor';
+
+  @override
+  String get creationDownloading => 'İndiriliyor';
+
+  @override
+  String get creationFailed => 'Oluşturma başarısız';
+
+  @override
+  String get creationInterrupted => 'Uygulama kapanırken oluşturma kesildi';
+
+  @override
+  String get creationCancelled => 'İptal edildi';
+
+  @override
+  String get creationPartial => 'Bazı sonuçlar kaydedilemedi';
+
+  @override
+  String get creationRetry => 'Tekrar dene';
+
+  @override
+  String get creationCopyPrompt => 'İstemi kopyala';
+
+  @override
+  String get creationSaveImage => 'Görseli kaydet';
+
+  @override
+  String get creationCopyImage => 'Görseli kopyala';
+
+  @override
+  String get creationShare => 'Paylaş';
+
+  @override
+  String get creationDeleteItem => 'Oluşturmayı sil';
+
+  @override
+  String get creationDeleteItemBody => 'Bu oluşturma silinsin mi?';
+
+  @override
+  String get creationActionFailed => 'İşlem tamamlanamadı';
+
+  @override
+  String get creationOptionSaved => 'Kaydedildi';
+
+  @override
+  String get creationOptionCopied => 'Kopyalandı';
+
+  @override
+  String get backupScopeCreations => 'Oluşturmalar';
+
+  @override
+  String creationQueuePosition(int count) {
+    return 'Sırada · önünde $count görev var';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count görsel',
+      one: '1 görsel',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count üretim',
+      one: '1 üretim',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count oluşturma',
+      one: '1 oluşturma',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return 'Konular $count';
+  }
 }

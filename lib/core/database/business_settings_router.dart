@@ -31,6 +31,9 @@ final class BusinessKeyRegistry {
   static const mobileSidebarHideSingleAssistantKey =
       'mobile_sidebar_hide_assistant_when_single_v1';
   static const desktopRailEntriesKey = 'desktop_rail_entries_v1';
+  static const mediaEntrySeenKey = 'media_entry_seen_v1';
+  static const creationComposerKey = 'creation_composer_v1';
+  static const creationAutoTitleKey = 'creation_auto_title_v1';
 
   static const localOnlyKeys = <String>{
     'window_width_v1',
@@ -70,6 +73,9 @@ final class BusinessKeyRegistry {
     mobileSidebarShowCustomizeKey,
     mobileSidebarHideSingleAssistantKey,
     desktopRailEntriesKey,
+    mediaEntrySeenKey,
+    creationComposerKey,
+    creationAutoTitleKey,
     'desktop_scheduled_tasks_v1',
     'scheduled_task_results_v1',
     'current_assistant_id_v1',

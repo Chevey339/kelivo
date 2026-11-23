@@ -37,6 +37,7 @@ class DesktopNavRail extends StatelessWidget {
 
   bool _isActive(SidebarEntry entry) => switch (entry) {
     SidebarEntry.search => globalSearchActive,
+    SidebarEntry.media => activeTab == DesktopTab.media,
     SidebarEntry.translate => activeTab == DesktopTab.translate,
     SidebarEntry.storage => activeTab == DesktopTab.storage,
     SidebarEntry.history => false,
@@ -46,7 +47,8 @@ class DesktopNavRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final entries = context.watch<SettingsProvider>().desktopRailEntries;
+    final settings = context.watch<SettingsProvider>();
+    final entries = settings.desktopRailEntries;
     final shown = sidebarEntriesWithVisibility(
       entries,
       SidebarVisibility.show,
@@ -86,6 +88,9 @@ class DesktopNavRail extends StatelessWidget {
                         key: ValueKey(entry),
                         tooltip: entry.label(l10n),
                         icon: entry.icon,
+                        unread:
+                            entry == SidebarEntry.media &&
+                            !settings.mediaEntrySeen,
                         onTap: () => onTapEntry(entry),
                         onSecondaryTapDown: (details) =>
                             showDesktopSidebarEntryMenu(
@@ -241,12 +246,14 @@ class _CircleAction extends StatelessWidget {
     required this.onTap,
     required this.tooltip,
     this.onSecondaryTapDown,
+    this.unread = false,
     this.iconColor,
   });
   final IconData icon;
   final VoidCallback onTap;
   final String tooltip;
   final Color? iconColor;
+  final bool unread;
   final GestureTapDownCallback? onSecondaryTapDown;
 
   @override
@@ -260,10 +267,11 @@ class _CircleAction extends StatelessWidget {
         onSecondaryTapDown: onSecondaryTapDown,
         child: _HoverCircle(
           size: 40,
-          child: Icon(
-            icon,
+          child: SidebarEntryGlyph(
+            icon: icon,
             size: 18,
-            color: (iconColor ?? cs.onSurface.withValues(alpha: 0.8)),
+            color: iconColor ?? cs.onSurface.withValues(alpha: .8),
+            unread: unread,
           ),
         ),
       ),

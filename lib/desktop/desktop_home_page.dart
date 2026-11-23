@@ -4,6 +4,9 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'desktop_nav_rail.dart';
+import 'desktop_media_creation_page.dart';
+import '../core/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
 import 'desktop_tab.dart';
 import 'desktop_sidebar_customization.dart';
 import '../core/models/sidebar_layout.dart';
@@ -209,6 +212,9 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     switch (entry) {
       case SidebarEntry.search:
         _selectTab(DesktopTab.chat, search: true);
+      case SidebarEntry.media:
+        unawaited(context.read<SettingsProvider>().markMediaEntrySeen());
+        _selectTab(DesktopTab.media);
       case SidebarEntry.translate:
         _selectTab(DesktopTab.translate);
       case SidebarEntry.storage:
@@ -229,6 +235,10 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       DesktopTab.chat => TickerMode(
         enabled: _activeTab == tab,
         child: const DesktopChatPage(),
+      ),
+      DesktopTab.media => TickerMode(
+        enabled: _activeTab == tab,
+        child: const DesktopMediaCreationPage(),
       ),
       DesktopTab.translate => const DesktopTranslatePage(
         key: ValueKey('translate_page'),

@@ -1174,6 +1174,8 @@ class SettingsProvider extends ChangeNotifier {
       prefs.getString(BusinessKeyRegistry.mobileSidebarEntriesKey),
       defaultMobileSidebarEntries,
     );
+    _mediaEntrySeen =
+        prefs.getBool(BusinessKeyRegistry.mediaEntrySeenKey) ?? false;
     _desktopRailEntries = decodeSidebarEntries(
       prefs.getString(BusinessKeyRegistry.desktopRailEntriesKey),
       defaultDesktopSidebarEntries,
@@ -6240,6 +6242,15 @@ Requirements:
     );
   }
 
+  bool _mediaEntrySeen = false;
+  bool get mediaEntrySeen => _mediaEntrySeen;
+  Future<void> markMediaEntrySeen() async {
+    if (_mediaEntrySeen) return;
+    _mediaEntrySeen = true;
+    notifyListeners();
+    await _preferences.setBool(BusinessKeyRegistry.mediaEntrySeenKey, true);
+  }
+
   bool _showSidebarCustomizeInMore = true;
   bool get showSidebarCustomizeInMore => _showSidebarCustomizeInMore;
   Future<void> setShowSidebarCustomizeInMore(bool value) async {
@@ -6664,6 +6675,7 @@ Requirements:
     copy._mobileSidebarLayout = _mobileSidebarLayout;
     copy._mobileSidebarEntries = _mobileSidebarEntries;
     copy._desktopRailEntries = _desktopRailEntries;
+    copy._mediaEntrySeen = _mediaEntrySeen;
     copy._showSidebarCustomizeInMore = _showSidebarCustomizeInMore;
     copy._hideSidebarSingleAssistant = _hideSidebarSingleAssistant;
     copy._keepSidebarOpenOnTopicTap = _keepSidebarOpenOnTopicTap;

@@ -16,7 +16,10 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/extension_entity_store.dart';
+import 'package:Kelivo/core/database/media_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
@@ -24,6 +27,7 @@ import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/utils/app_directories.dart';
+import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 class _Paths extends PathProviderPlatform {
@@ -67,6 +71,39 @@ class _MergingChat extends ChatService {
 
 BackupScope _only(Set<BackupCategory> categories) =>
     BackupScope(excluded: BackupCategory.values.toSet().difference(categories));
+
+Future<void> _addCreation(AppDatabase database, String id) async {
+  final repository = MediaRepository(database);
+  final date = DateTime.utc(2026);
+  await repository.enqueue(
+    GenerationBatchRowsCompanion.insert(
+      id: id,
+      providerId: 'provider',
+      modelId: 'model',
+      mode: MediaMode.image,
+      prompt: 'Paint a bird',
+      paramsJson: '{}',
+      referencesJson: '[]',
+      status: GenerationStatus.succeeded,
+      source: GenerationSource.workbench,
+      createdAt: date,
+    ),
+  );
+  await repository.addItem(
+    GenerationItemRow(
+      id: '$id-image',
+      batchId: id,
+      ordinal: 0,
+      mode: MediaMode.image,
+      path: 'kelivo-file:///generations/$id/image.png',
+      mime: 'image/png',
+      byteSize: 3,
+      favorite: false,
+      status: GenerationItemStatus.ready,
+      createdAt: date,
+    ),
+  );
+}
 
 Map<String, Object?> _fixture(String prefix) => {
   'provider_configs_v1': jsonEncode({
@@ -175,6 +212,156 @@ void main() {
     PathProviderPlatform.instance = previousPaths;
     await root.delete(recursive: true);
   });
+
+  for (final mode in RestoreMode.values) {
+    test('creations-only $mode restores both metadata and files', () async {
+      final chat = ChatService(
+        existingRepository: ChatDatabaseRepository(target),
+      );
+      try {
+        final sourceContent = Directory('${root.path}/source-content');
+        PathProviderPlatform.instance = _Paths(sourceContent.path);
+        await _addCreation(source, 'incoming');
+        await ExtensionEntityStore(source).upsert(
+          'contextCompressionTask',
+          'chat-only',
+          {'summary': 'Private chat summary'},
+        );
+        final incoming = File(
+          '${sourceContent.path}/generations/incoming/image.png',
+        );
+        await incoming.parent.create(recursive: true);
+        await incoming.writeAsString('new');
+        await File(
+          '${incoming.parent.path}/unfinished.part',
+        ).writeAsString('pending');
+        final backup = await exporter.prepareBackupFile(
+          WebDavConfig(scope: _only({BackupCategory.creations})),
+        );
+        final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+        final snapshot = AppDatabase.open(
+          file: await File(
+            '${root.path}/creations.db',
+          ).writeAsBytes(archive.findFile('database/kelivo.db')!.readBytes()!),
+        );
+        try {
+          expect(
+            await snapshot.select(snapshot.extensionEntityRows).get(),
+            isEmpty,
+          );
+        } finally {
+          await snapshot.close();
+        }
+        await expectLater(
+          DataSync.inspectRecoverySnapshot(backup),
+          throwsFormatException,
+        );
+        expect(archive.findFile('generations/incoming/image.png'), isNotNull);
+        expect(
+          archive.findFile('generations/incoming/unfinished.part'),
+          isNull,
+        );
+
+        PathProviderPlatform.instance = _Paths(root.path);
+        await _addCreation(target, 'local');
+        final local = File('${root.path}/generations/local/image.png');
+        await local.parent.create(recursive: true);
+        await local.writeAsString('old');
+        final oldIncoming = File('${root.path}/generations/incoming/image.png');
+        if (mode == RestoreMode.overwrite) {
+          await _addCreation(target, 'incoming');
+          await oldIncoming.parent.create(recursive: true);
+          await oldIncoming.writeAsString('old version');
+        }
+        final sync = DataSync(
+          chatService: chat,
+          businessRepository: targetRepository,
+        );
+        await sync.restoreFromLocalFile(
+          backup,
+          const WebDavConfig(),
+          mode: mode,
+        );
+        final restored = MediaRepository(target);
+        final restoredPath = (await restored.itemsForBatch(
+          'incoming',
+        )).single.path;
+        final installed = KelivoFileUri.resolveToAbsolute(
+          restoredPath,
+          root: root.path,
+        )!;
+        expect(await File(installed).readAsString(), 'new');
+        expect(await oldIncoming.exists(), mode == RestoreMode.merge);
+        expect(
+          await restored.batch('local') != null,
+          mode == RestoreMode.merge,
+        );
+        expect(await local.exists(), mode == RestoreMode.merge);
+        expect(await targetRepository.getPreference('theme_mode_v1'), 'light');
+      } finally {
+        await chat.close();
+        chat.dispose();
+      }
+    });
+  }
+
+  test(
+    'explicit empty creation backup clears local creations on overwrite',
+    () async {
+      final chat = ChatService(
+        existingRepository: ChatDatabaseRepository(target),
+      );
+      try {
+        final scope = _only({BackupCategory.creations});
+        final backup = await exporter.prepareBackupFile(
+          WebDavConfig(scope: scope),
+        );
+        final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+        expect(archive.findFile('database/kelivo.db'), isNull);
+        await _addCreation(target, 'local');
+        final asset = File('${root.path}/generations/local/image.png');
+        await asset.parent.create(recursive: true);
+        await asset.writeAsString('old');
+        final sync = DataSync(
+          chatService: chat,
+          businessRepository: targetRepository,
+        );
+        await sync.restoreFromLocalFile(backup, const WebDavConfig());
+        expect(await MediaRepository(target).hasCreations, isFalse);
+        expect(await asset.exists(), isFalse);
+      } finally {
+        await chat.close();
+        chat.dispose();
+      }
+    },
+  );
+
+  test(
+    'excluding creations removes rows and assets from a chat backup',
+    () async {
+      await _addCreation(source, 'incoming');
+      final asset = File('${root.path}/generations/incoming/image.png');
+      await asset.parent.create(recursive: true);
+      await asset.writeAsString('new');
+      final backup = await exporter.prepareBackupFile(
+        const WebDavConfig(
+          scope: BackupScope(excluded: {BackupCategory.creations}),
+        ),
+      );
+      final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+      expect(archive.findFile('generations/incoming/image.png'), isNull);
+      final snapshot = File('${root.path}/exported.db');
+      await snapshot.writeAsBytes(
+        archive.findFile('database/kelivo.db')!.readBytes()!,
+      );
+      final database = AppDatabase.open(file: snapshot);
+      try {
+        expect(await MediaRepository(database).hasCreations, isFalse);
+      } finally {
+        await database.close();
+      }
+    },
+  );
 
   for (final platform in [
     TargetPlatform.android,

@@ -84,9 +84,15 @@ void _showCustomizeActions(BuildContext context, {VoidCallback? openSettings}) {
 }
 
 class MobileSidebarEntries extends StatefulWidget {
-  const MobileSidebarEntries({super.key, required this.onOpen});
+  const MobileSidebarEntries({
+    super.key,
+    required this.onOpen,
+    this.creationSelected = false,
+    this.allowCreation = true,
+  });
 
   final ValueChanged<SidebarEntry> onOpen;
+  final bool creationSelected, allowCreation;
 
   @override
   State<MobileSidebarEntries> createState() => _MobileSidebarEntriesState();
@@ -100,7 +106,11 @@ class _MobileSidebarEntriesState extends State<MobileSidebarEntries> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
-    final entries = settings.mobileSidebarEntries;
+    final entries = {
+      for (final entry in settings.mobileSidebarEntries.entries)
+        if (widget.allowCreation || entry.key != SidebarEntry.media)
+          entry.key: entry.value,
+    };
     final visible = sidebarEntriesWithVisibility(
       entries,
       SidebarVisibility.show,
@@ -117,6 +127,8 @@ class _MobileSidebarEntriesState extends State<MobileSidebarEntries> {
       icon: entry.icon,
       label: entry.label(l10n),
       muted: nested,
+      selected: entry == SidebarEntry.media && widget.creationSelected,
+      unread: entry == SidebarEntry.media && !settings.mediaEntrySeen,
       onTap: () => widget.onOpen(entry),
       onLongPress: (context) => _showEntryActions(context, entry),
     );
@@ -191,6 +203,8 @@ class _EntryRow extends StatelessWidget {
     this.onLongPress,
     this.trailing,
     this.muted = false,
+    this.selected = false,
+    this.unread = false,
   });
 
   final IconData icon;
@@ -198,24 +212,37 @@ class _EntryRow extends StatelessWidget {
   final VoidCallback onTap;
   final ValueChanged<BuildContext>? onLongPress;
   final Widget? trailing;
-  final bool muted;
+  final bool muted, selected, unread;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = muted ? cs.onSurfaceVariant : cs.onSurface;
+    final color = selected
+        ? cs.primary
+        : muted
+        ? cs.onSurfaceVariant
+        : cs.onSurface;
     return SizedBox(
       height: 46,
       child: IosCardPress(
         focusable: true,
-        baseColor: Colors.transparent,
+        baseColor: selected
+            ? cs.primary.withValues(
+                alpha: cs.brightness == Brightness.dark ? .16 : .12,
+              )
+            : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         onLongPress: onLongPress == null ? null : () => onLongPress!(context),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: color),
+            SidebarEntryGlyph(
+              icon: icon,
+              size: 20,
+              color: color,
+              unread: unread,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
@@ -238,23 +265,45 @@ class MobileSidebarEntryIcon extends StatelessWidget {
     super.key,
     required this.entry,
     required this.onTap,
+    this.selected = false,
   });
 
   final SidebarEntry entry;
   final VoidCallback onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     final history = entry == SidebarEntry.history;
-    return IosIconButton(
+    final cs = Theme.of(context).colorScheme;
+    final unread =
+        entry == SidebarEntry.media &&
+        !context.watch<SettingsProvider>().mediaEntrySeen;
+    final button = IosIconButton(
       key: ValueKey(entry),
-      icon: entry.icon,
+      builder: (color) => SidebarEntryGlyph(
+        icon: entry.icon,
+        size: history ? 20 : 22,
+        color: color,
+        unread: unread,
+      ),
+      color: selected ? cs.primary : null,
       size: history ? 20 : 22,
       minSize: history ? 44 : 45,
       padding: EdgeInsets.all(history ? 8 : 10),
       semanticLabel: entry.label(AppLocalizations.of(context)!),
       onTap: onTap,
       onLongPress: () => _showEntryActions(context, entry),
+    );
+    if (!selected) return button;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: cs.primary.withValues(
+          alpha: cs.brightness == Brightness.dark ? .16 : .12,
+        ),
+      ),
+      child: button,
     );
   }
 }
@@ -278,16 +327,18 @@ Future<void> showMobileSidebarMore(
   BuildContext context,
   ValueChanged<SidebarEntry> onOpen, {
   required int iconLimit,
+  bool allowCreation = true,
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final selection = await showFormSheet<Object>(
     context,
     builder: (context) {
       final settings = context.watch<SettingsProvider>();
-      final entries = mobileSidebarOverflow(
-        settings.mobileSidebarEntries,
-        iconLimit: iconLimit,
-      );
+      final entries = mobileSidebarOverflow({
+        for (final entry in settings.mobileSidebarEntries.entries)
+          if (allowCreation || entry.key != SidebarEntry.media)
+            entry.key: entry.value,
+      }, iconLimit: iconLimit);
       final cs = Theme.of(context).colorScheme;
       return FormSheet(
         title: l10n.sidebarMore,

@@ -232,6 +232,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
             _SettingsMenuItem.display,
           DesktopSettingsNavigationTarget.backup => _SettingsMenuItem.backup,
           DesktopSettingsNavigationTarget.mcp => _SettingsMenuItem.mcp,
+          DesktopSettingsNavigationTarget.providers =>
+            _SettingsMenuItem.providers,
         };
         if (target == DesktopSettingsNavigationTarget.topicPosition) {
           _showTopicPosition = true;

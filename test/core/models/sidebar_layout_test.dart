@@ -44,6 +44,7 @@ void main() {
   test('entry order and all three visibility states are restored', () {
     const entries = {
       SidebarEntry.storage: SidebarVisibility.more,
+      SidebarEntry.media: SidebarVisibility.show,
       SidebarEntry.history: SidebarVisibility.hidden,
       SidebarEntry.translate: SidebarVisibility.show,
       SidebarEntry.search: SidebarVisibility.more,
@@ -61,6 +62,7 @@ void main() {
       SidebarEntry.history,
     ]);
     expect(sidebarEntriesWithVisibility(restored, SidebarVisibility.show), [
+      SidebarEntry.media,
       SidebarEntry.translate,
     ]);
   });
@@ -76,6 +78,7 @@ void main() {
 
     const entries = {
       SidebarEntry.translate: SidebarVisibility.more,
+      SidebarEntry.media: SidebarVisibility.show,
       SidebarEntry.history: SidebarVisibility.hidden,
     };
     await settings.setMobileSidebarEntries(entries);

@@ -16875,6 +16875,175 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sidebarOpenSettings => '打开侧边栏设置…';
+
+  @override
+  String get creationTitle => '创作';
+
+  @override
+  String get creationTopics => '话题';
+
+  @override
+  String get creationNewTopic => '新话题';
+
+  @override
+  String get creationNameAfterSending => '发送第一条提示词后自动命名';
+
+  @override
+  String get creationPromptTitle => '用提示词开头作标题';
+
+  @override
+  String get creationSearchTopics => '搜索话题和提示词';
+
+  @override
+  String get creationTopicsEmpty => '发出第一条提示词后，话题会出现在这里';
+
+  @override
+  String get creationNaming => '正在命名…';
+
+  @override
+  String get creationRenameTopic => '重命名';
+
+  @override
+  String get creationDeleteTopic => '删除话题';
+
+  @override
+  String get creationDeleteTopicBody => '删除这个话题和其中的所有作品？';
+
+  @override
+  String get creationImage => '图片';
+
+  @override
+  String get creationVideo => '视频';
+
+  @override
+  String get creationImagePrompt => '描述要创建的图像';
+
+  @override
+  String get creationVideoPrompt => '描述要生成的视频';
+
+  @override
+  String get creationNewImagePrompt => '描述要创建的图像，发送后新建话题';
+
+  @override
+  String get creationNewVideoPrompt => '描述要生成的视频，发送后新建话题';
+
+  @override
+  String get creationSelectModel => '选择模型';
+
+  @override
+  String get creationSearchModels => '搜索模型或供应商';
+
+  @override
+  String get creationNoModelTitle => '没有可用模型';
+
+  @override
+  String get creationNoModelBody => '在「供应商」中启用支持创作的模型，即可开始。';
+
+  @override
+  String get creationEmptyTitle => '从你的创意开始';
+
+  @override
+  String get creationEmptyBody => '描述你想创作的内容。';
+
+  @override
+  String get creationAddReference => '添加参考图';
+
+  @override
+  String get creationReferenceTooLarge => '参考图总大小不能超过 20 MB。';
+
+  @override
+  String get creationAspectRatio => '画面比例';
+
+  @override
+  String get creationCountLabel => '张数';
+
+  @override
+  String get creationParameters => '生成参数';
+
+  @override
+  String get creationAuto => '自动';
+
+  @override
+  String get creationGenerate => '生成';
+
+  @override
+  String get creationWaitingImage => '正在创建图像';
+
+  @override
+  String get creationWaitingVideo => '正在准备视频';
+
+  @override
+  String get creationDownloading => '正在下载';
+
+  @override
+  String get creationFailed => '生成失败';
+
+  @override
+  String get creationInterrupted => '应用关闭，任务中断';
+
+  @override
+  String get creationCancelled => '已取消';
+
+  @override
+  String get creationPartial => '部分作品下载失败';
+
+  @override
+  String get creationRetry => '再试一次';
+
+  @override
+  String get creationCopyPrompt => '复制提示词';
+
+  @override
+  String get creationSaveImage => '保存图片';
+
+  @override
+  String get creationCopyImage => '复制图片';
+
+  @override
+  String get creationShare => '分享';
+
+  @override
+  String get creationDeleteItem => '删除作品';
+
+  @override
+  String get creationDeleteItemBody => '删除这个作品？';
+
+  @override
+  String get creationActionFailed => '操作未完成';
+
+  @override
+  String get creationOptionSaved => '已保存';
+
+  @override
+  String get creationOptionCopied => '已复制';
+
+  @override
+  String get backupScopeCreations => '创作';
+
+  @override
+  String creationQueuePosition(int count) {
+    return '排队中 · 前面还有 $count 个任务';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    return '$count 张';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    return '$count 次生成';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    return '$count 个作品';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return '话题 $count';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -33748,6 +33917,175 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get sidebarOpenSettings => '打开侧边栏设置…';
+
+  @override
+  String get creationTitle => '创作';
+
+  @override
+  String get creationTopics => '话题';
+
+  @override
+  String get creationNewTopic => '新话题';
+
+  @override
+  String get creationNameAfterSending => '发送第一条提示词后自动命名';
+
+  @override
+  String get creationPromptTitle => '用提示词开头作标题';
+
+  @override
+  String get creationSearchTopics => '搜索话题和提示词';
+
+  @override
+  String get creationTopicsEmpty => '发出第一条提示词后，话题会出现在这里';
+
+  @override
+  String get creationNaming => '正在命名…';
+
+  @override
+  String get creationRenameTopic => '重命名';
+
+  @override
+  String get creationDeleteTopic => '删除话题';
+
+  @override
+  String get creationDeleteTopicBody => '删除这个话题和其中的所有作品？';
+
+  @override
+  String get creationImage => '图片';
+
+  @override
+  String get creationVideo => '视频';
+
+  @override
+  String get creationImagePrompt => '描述要创建的图像';
+
+  @override
+  String get creationVideoPrompt => '描述要生成的视频';
+
+  @override
+  String get creationNewImagePrompt => '描述要创建的图像，发送后新建话题';
+
+  @override
+  String get creationNewVideoPrompt => '描述要生成的视频，发送后新建话题';
+
+  @override
+  String get creationSelectModel => '选择模型';
+
+  @override
+  String get creationSearchModels => '搜索模型或供应商';
+
+  @override
+  String get creationNoModelTitle => '没有可用模型';
+
+  @override
+  String get creationNoModelBody => '在「供应商」中启用支持创作的模型，即可开始。';
+
+  @override
+  String get creationEmptyTitle => '从你的创意开始';
+
+  @override
+  String get creationEmptyBody => '描述你想创作的内容。';
+
+  @override
+  String get creationAddReference => '添加参考图';
+
+  @override
+  String get creationReferenceTooLarge => '参考图总大小不能超过 20 MB。';
+
+  @override
+  String get creationAspectRatio => '画面比例';
+
+  @override
+  String get creationCountLabel => '张数';
+
+  @override
+  String get creationParameters => '生成参数';
+
+  @override
+  String get creationAuto => '自动';
+
+  @override
+  String get creationGenerate => '生成';
+
+  @override
+  String get creationWaitingImage => '正在创建图像';
+
+  @override
+  String get creationWaitingVideo => '正在准备视频';
+
+  @override
+  String get creationDownloading => '正在下载';
+
+  @override
+  String get creationFailed => '生成失败';
+
+  @override
+  String get creationInterrupted => '应用关闭，任务中断';
+
+  @override
+  String get creationCancelled => '已取消';
+
+  @override
+  String get creationPartial => '部分作品下载失败';
+
+  @override
+  String get creationRetry => '再试一次';
+
+  @override
+  String get creationCopyPrompt => '复制提示词';
+
+  @override
+  String get creationSaveImage => '保存图片';
+
+  @override
+  String get creationCopyImage => '复制图片';
+
+  @override
+  String get creationShare => '分享';
+
+  @override
+  String get creationDeleteItem => '删除作品';
+
+  @override
+  String get creationDeleteItemBody => '删除这个作品？';
+
+  @override
+  String get creationActionFailed => '操作未完成';
+
+  @override
+  String get creationOptionSaved => '已保存';
+
+  @override
+  String get creationOptionCopied => '已复制';
+
+  @override
+  String get backupScopeCreations => '创作';
+
+  @override
+  String creationQueuePosition(int count) {
+    return '排队中 · 前面还有 $count 个任务';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    return '$count 张';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    return '$count 次生成';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    return '$count 个作品';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return '话题 $count';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -50672,4 +51010,173 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get sidebarOpenSettings => '開啟側邊欄設定…';
+
+  @override
+  String get creationTitle => '創作';
+
+  @override
+  String get creationTopics => '話題';
+
+  @override
+  String get creationNewTopic => '新話題';
+
+  @override
+  String get creationNameAfterSending => '傳送第一條提示詞後自動命名';
+
+  @override
+  String get creationPromptTitle => '以提示詞開頭作為標題';
+
+  @override
+  String get creationSearchTopics => '搜尋話題和提示詞';
+
+  @override
+  String get creationTopicsEmpty => '傳送第一條提示詞後，話題會出現在這裡';
+
+  @override
+  String get creationNaming => '正在命名…';
+
+  @override
+  String get creationRenameTopic => '重新命名';
+
+  @override
+  String get creationDeleteTopic => '刪除話題';
+
+  @override
+  String get creationDeleteTopicBody => '刪除這個話題和其中的所有作品？';
+
+  @override
+  String get creationImage => '圖片';
+
+  @override
+  String get creationVideo => '影片';
+
+  @override
+  String get creationImagePrompt => '描述要建立的圖像';
+
+  @override
+  String get creationVideoPrompt => '描述要產生的影片';
+
+  @override
+  String get creationNewImagePrompt => '描述要建立的圖像，傳送後新增話題';
+
+  @override
+  String get creationNewVideoPrompt => '描述要產生的影片，傳送後新增話題';
+
+  @override
+  String get creationSelectModel => '選擇模型';
+
+  @override
+  String get creationSearchModels => '搜尋模型或供應商';
+
+  @override
+  String get creationNoModelTitle => '沒有可用模型';
+
+  @override
+  String get creationNoModelBody => '在「供應商」中啟用支援創作的模型，即可開始。';
+
+  @override
+  String get creationEmptyTitle => '從你的創意開始';
+
+  @override
+  String get creationEmptyBody => '描述你想創作的內容。';
+
+  @override
+  String get creationAddReference => '新增參考圖';
+
+  @override
+  String get creationReferenceTooLarge => '參考圖片總大小必須為 20 MB 或以下。';
+
+  @override
+  String get creationAspectRatio => '畫面比例';
+
+  @override
+  String get creationCountLabel => '張數';
+
+  @override
+  String get creationParameters => '生成參數';
+
+  @override
+  String get creationAuto => '自動';
+
+  @override
+  String get creationGenerate => '生成';
+
+  @override
+  String get creationWaitingImage => '正在建立圖像';
+
+  @override
+  String get creationWaitingVideo => '正在準備影片';
+
+  @override
+  String get creationDownloading => '正在下載';
+
+  @override
+  String get creationFailed => '生成失敗';
+
+  @override
+  String get creationInterrupted => '應用程式關閉，任務中斷';
+
+  @override
+  String get creationCancelled => '已取消';
+
+  @override
+  String get creationPartial => '部分作品下載失敗';
+
+  @override
+  String get creationRetry => '再試一次';
+
+  @override
+  String get creationCopyPrompt => '複製提示詞';
+
+  @override
+  String get creationSaveImage => '儲存圖片';
+
+  @override
+  String get creationCopyImage => '複製圖片';
+
+  @override
+  String get creationShare => '分享';
+
+  @override
+  String get creationDeleteItem => '刪除作品';
+
+  @override
+  String get creationDeleteItemBody => '刪除這個作品？';
+
+  @override
+  String get creationActionFailed => '操作未完成';
+
+  @override
+  String get creationOptionSaved => '已儲存';
+
+  @override
+  String get creationOptionCopied => '已複製';
+
+  @override
+  String get backupScopeCreations => '創作';
+
+  @override
+  String creationQueuePosition(int count) {
+    return '排隊中 · 前面還有 $count 個任務';
+  }
+
+  @override
+  String creationImagesCount(int count) {
+    return '$count 張';
+  }
+
+  @override
+  String creationGenerationCount(int count) {
+    return '$count 次生成';
+  }
+
+  @override
+  String creationWorksCount(int count) {
+    return '$count 個作品';
+  }
+
+  @override
+  String creationTopicCount(int count) {
+    return '話題 $count';
+  }
 }

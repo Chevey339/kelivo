@@ -1,0 +1,349 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/database/app_database.dart';
+import '../../../core/models/media_creation.dart';
+import '../../../desktop/desktop_context_menu.dart';
+import '../../../icons/lucide_adapter.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/action_sheet.dart';
+import '../../../shared/widgets/ios_form_text_field.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import '../../settings/widgets/custom_theme_widgets.dart';
+import '../providers/media_creation_controller.dart';
+import 'creation_lightbox.dart';
+import 'creation_waiting_card.dart';
+
+class CreationTopicCard extends StatelessWidget {
+  const CreationTopicCard({
+    super.key,
+    required this.topic,
+    required this.onOpen,
+    this.selected = false,
+    this.desktop = false,
+    this.wide = false,
+  });
+
+  final GenerationTopicRow topic;
+  final VoidCallback onOpen;
+  final bool selected, desktop, wide;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = context.watch<MediaCreationController>();
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final batches = media.batchesFor(topic.id);
+    final cover = <GenerationItemRow?>[
+      for (final batch in batches.reversed) ...[
+        if (batch.status.isActive) null,
+        ...media
+            .itemsFor(batch.id)
+            .where((item) => item.status == GenerationItemStatus.ready),
+      ],
+    ];
+    final radius = BorderRadius.circular(wide ? 16 : 12);
+    void menu([Offset? anchor]) =>
+        showCreationTopicMenu(context, topic, desktop: desktop, anchor: anchor);
+    return GestureDetector(
+      onSecondaryTapDown: desktop
+          ? (details) => menu(details.globalPosition)
+          : null,
+      child: IosCardPress(
+        focusable: true,
+        baseColor: Colors.transparent,
+        borderRadius: radius,
+        onTap: onOpen,
+        onLongPress: !desktop ? menu : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AspectRatio(
+              aspectRatio: wide ? 1.6 : 1,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: selected
+                        ? cs.primary
+                        : cs.outlineVariant.withValues(alpha: .45),
+                    width: selected ? 2 : 1,
+                  ),
+                  borderRadius: radius,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(selected ? 3 : 1),
+                  child: ClipRRect(
+                    borderRadius: radius,
+                    child: ColoredBox(
+                      color: context.appColors.surfaceFill,
+                      child: _CoverMosaic(
+                        cells: cover,
+                        status: batches.lastOrNull?.status,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              media.namingTopic(topic.id) ? l10n.creationNaming : topic.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: desktop ? 12.5 : 15,
+                fontWeight: AppFontWeights.semibold,
+                color: selected ? cs.primary : cs.onSurface,
+              ),
+            ),
+            Text(
+              l10n.creationGenerationCount(batches.length),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                fontSize: desktop ? 11 : 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoverMosaic extends StatelessWidget {
+  const _CoverMosaic({required this.cells, required this.status});
+
+  final List<GenerationItemRow?> cells;
+  final GenerationStatus? status;
+
+  @override
+  Widget build(BuildContext context) {
+    if (cells.isEmpty) {
+      final l10n = AppLocalizations.of(context)!;
+      final label = switch (status) {
+        GenerationStatus.failed => l10n.creationFailed,
+        GenerationStatus.interrupted => l10n.creationInterrupted,
+        GenerationStatus.cancelled => l10n.creationCancelled,
+        _ => null,
+      };
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              label == null ? Lucide.Image : Lucide.CircleAlert,
+              size: 22,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            if (label != null)
+              Padding(
+                padding: const EdgeInsets.all(4),
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11.5),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+    Widget cell(int index) {
+      final item = cells[index];
+      return Expanded(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (item == null)
+              const CreationDotField(progress: .4, thumbnail: true)
+            else
+              CreationFileImage(item.thumbnailPath ?? item.path),
+            if (index == 3 && cells.length > 4)
+              ColoredBox(
+                color: Colors.black.withValues(alpha: .42),
+                child: Center(
+                  child: Text(
+                    '+${cells.length - 4}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: AppFontWeights.emphasis,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    Widget row(int first, int second) =>
+        Row(children: [cell(first), const SizedBox(width: 2), cell(second)]);
+    return switch (cells.length) {
+      1 => Row(children: [cell(0)]),
+      2 => row(0, 1),
+      3 => Row(
+        children: [
+          cell(0),
+          const SizedBox(width: 2),
+          Expanded(
+            child: Column(
+              children: [cell(1), const SizedBox(height: 2), cell(2)],
+            ),
+          ),
+        ],
+      ),
+      _ => Column(
+        children: [
+          Expanded(child: row(0, 1)),
+          const SizedBox(height: 2),
+          Expanded(child: row(2, 3)),
+        ],
+      ),
+    };
+  }
+}
+
+Future<void> showCreationTopicMenu(
+  BuildContext context,
+  GenerationTopicRow topic, {
+  required bool desktop,
+  Offset? anchor,
+  VoidCallback? onRename,
+  VoidCallback? onDeleted,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  final actions = [
+    ActionSheetItem(
+      icon: Lucide.Pencil,
+      label: l10n.creationRenameTopic,
+      onTap: onRename ?? () => unawaited(renameCreationTopic(context, topic)),
+    ),
+    ActionSheetItem(
+      icon: Lucide.Trash2,
+      label: l10n.creationDeleteTopic,
+      destructive: true,
+      onTap: () async {
+        final media = context.read<MediaCreationController>();
+        final confirmed = await showAppDialog<bool>(
+          context,
+          maxWidth: 380,
+          child: Builder(
+            builder: (context) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.creationDeleteTopic,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(l10n.creationDeleteTopicBody),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: Text(
+                          MaterialLocalizations.of(context).cancelButtonLabel,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: Text(l10n.chatHistoryPageDelete),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        if (confirmed != true || !context.mounted) return;
+        try {
+          await media.deleteTopic(topic.id);
+          if (context.mounted) onDeleted?.call();
+        } catch (_) {
+          if (context.mounted) {
+            showAppSnackBar(context, message: l10n.creationActionFailed);
+          }
+        }
+      },
+    ),
+  ];
+  if (!desktop) {
+    await showMobileActionSheet(context, title: topic.title, items: actions);
+    return;
+  }
+  final render = context.findRenderObject() as RenderBox?;
+  await showDesktopContextMenuAt(
+    context,
+    globalPosition:
+        anchor ??
+        (render != null && render.hasSize
+            ? render.localToGlobal(render.size.center(Offset.zero))
+            : Offset.zero),
+    items: [
+      for (final action in actions)
+        DesktopContextMenuItem(
+          label: action.label,
+          icon: action.icon,
+          danger: action.destructive,
+          onTap: action.onTap,
+        ),
+    ],
+  );
+}
+
+Future<void> renameCreationTopic(
+  BuildContext context,
+  GenerationTopicRow topic,
+) async {
+  if (!context.mounted) return;
+  final l10n = AppLocalizations.of(context)!;
+  final media = context.read<MediaCreationController>();
+  final name = TextEditingController(text: topic.title);
+  try {
+    final selected = await showAppDialog<String>(
+      context,
+      maxWidth: 380,
+      child: Builder(
+        builder: (context) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IosFormTextField(
+                label: l10n.creationRenameTopic,
+                controller: name,
+                autofocus: true,
+                inlineLabel: false,
+                onSubmitted: (value) => Navigator.of(context).pop(value),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(name.text),
+                child: Text(MaterialLocalizations.of(context).saveButtonLabel),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null) await media.renameTopic(topic.id, selected);
+  } finally {
+    name.dispose();
+  }
+}

@@ -36,6 +36,7 @@ final class RestoreWorkspaceLock {
     'skills',
     'workspaces',
     'sessions',
+    'generations',
   };
   static const _previousDirectoryNames = {'previous.pending', 'previous'};
   static final _runIdPattern = RegExp(r'^[a-f0-9]{32}$');
