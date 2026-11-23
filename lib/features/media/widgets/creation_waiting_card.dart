@@ -25,22 +25,7 @@ import '../../../theme/app_semantic_colors.dart';
 import '../models/creation_waiting_games.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_game_painter.dart';
-
-Widget animateCreationResult(
-  BuildContext context,
-  GenerationItemRow item,
-  Widget result,
-) {
-  if (MediaQuery.disableAnimationsOf(context) ||
-      DateTime.now().difference(item.createdAt) > const Duration(seconds: 2)) {
-    return result;
-  }
-  return result
-      .animate()
-      .fadeIn(duration: const Duration(milliseconds: 700))
-      .blurXY(begin: 18, end: 0)
-      .scale(begin: const Offset(1.04, 1.04), end: const Offset(1, 1));
-}
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 
 int creationFakeProgress(Duration elapsed) {
   final fraction = elapsed.inMilliseconds.clamp(0, 1 << 32) / 45000;
@@ -95,6 +80,7 @@ enum _GamePhase { waiting, playing, paused, ended, fading, completing }
 class _CreationWaitingCardState extends State<CreationWaitingCard>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   Timer? _timer;
+  bool _revealResult = false;
   bool _tickerMode = true;
   bool _inViewport = true;
   bool get _visible => _tickerMode && _inViewport;
@@ -112,11 +98,25 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
   bool _draggingPaddle = false;
   bool _registered = false;
   bool _foreground = true;
-  Future<Uint8List?>? _preview;
+  Uint8List? _preview;
+  int _previewRevision = 0;
 
   void _decodePreview() {
     final value = widget.preview;
-    _preview = value == null ? null : compute(_previewBytes, value);
+    if (value == null) return;
+    final revision = ++_previewRevision;
+    unawaited(
+      compute(_previewBytes, value).then((bytes) {
+        if (mounted && revision == _previewRevision && bytes != null) {
+          setState(() => _preview = bytes);
+        }
+      }),
+    );
+  }
+
+  void _releasePreview() {
+    _previewRevision++;
+    if (_preview != null && mounted) setState(() => _preview = null);
   }
 
   @override
@@ -140,6 +140,10 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerMode = TickerMode.valuesOf(context).enabled;
+    if (widget.result != null && MediaQuery.disableAnimationsOf(context)) {
+      _previewRevision++;
+      _preview = null;
+    }
     if (!_tickerMode) _pause(rebuild: false, releaseFocus: true);
     _syncTimer();
     _syncTicker();
@@ -148,6 +152,17 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
   @override
   void didUpdateWidget(covariant CreationWaitingCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.batch.id != oldWidget.batch.id ||
+        (!oldWidget.batch.status.isActive && widget.batch.status.isActive)) {
+      _previewRevision++;
+      _preview = null;
+    }
+    if (widget.result != null && MediaQuery.disableAnimationsOf(context)) {
+      _previewRevision++;
+      _preview = null;
+    }
+    if (oldWidget.result == null && widget.result != null) _revealResult = true;
+    if (widget.result == null) _revealResult = false;
     if (oldWidget.result == null &&
         widget.result != null &&
         (_phase == _GamePhase.playing || _phase == _GamePhase.paused)) {
@@ -303,7 +318,6 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
       _phase = _GamePhase.waiting;
       _dragAnchor = null;
       _draggingPaddle = false;
-      if (widget.result != null) _preview = null;
     }
 
     if (rebuild) {
@@ -475,7 +489,34 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
   @override
   Widget build(BuildContext context) {
     if (widget.result case final result? when _phase != _GamePhase.completing) {
-      return result;
+      if (!_revealResult || MediaQuery.disableAnimationsOf(context)) {
+        return result;
+      }
+      const duration = Duration(milliseconds: 700);
+      final revealed = result
+          .animate(onComplete: (_) => _releasePreview())
+          .fadeIn(duration: duration, curve: handoffCurve)
+          .blurXY(begin: 18, end: 0, duration: duration, curve: handoffCurve)
+          .scale(
+            begin: const Offset(1.04, 1.04),
+            end: const Offset(1, 1),
+            duration: duration,
+            curve: handoffCurve,
+          );
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_preview case final bytes?)
+              Positioned.fill(
+                key: const ValueKey('last-preview'),
+                child: _BlurredPreview(bytes),
+              ),
+            KeyedSubtree(key: const ValueKey('result'), child: revealed),
+          ],
+        ),
+      );
     }
     _gamePreference = context
         .select<MediaCreationController?, CreationWaitGame>(
@@ -487,7 +528,12 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
     final elapsed = started == null
         ? Duration.zero
         : DateTime.now().difference(started);
-    final percent = widget.progress ?? creationFakeProgress(elapsed) / 100;
+    final percent = widget.result != null
+        ? 1.0
+        : (widget.progress ?? creationFakeProgress(elapsed) / 100).clamp(
+            0.0,
+            1.0,
+          );
     final label = switch (widget.batch.status) {
       GenerationStatus.queued => l10n.creationQueuePosition(widget.queueAhead),
       GenerationStatus.downloading => l10n.creationDownloading,
@@ -503,7 +549,10 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
       onVisibilityChanged: _visibilityChanged,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: context.appColors.surfaceFill.withValues(alpha: .58),
+          color: Color.alphaBlend(
+            cs.onSurface.withValues(alpha: .06),
+            context.appColors.surfaceCard,
+          ),
           borderRadius: radius,
         ),
         child: ClipRRect(
@@ -511,30 +560,7 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (_preview case final future?)
-                FutureBuilder<Uint8List?>(
-                  future: future,
-                  builder: (context, snapshot) {
-                    final bytes = snapshot.data;
-                    if (bytes == null) return const SizedBox.shrink();
-                    return Opacity(
-                      opacity: .7,
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                        child: Transform.scale(
-                          scale: 1.25,
-                          child: Image.memory(
-                            bytes,
-                            fit: BoxFit.cover,
-                            gaplessPlayback: true,
-                            filterQuality: FilterQuality.low,
-                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+              if (_preview case final bytes?) _BlurredPreview(bytes),
               Positioned.fill(
                 child: LayoutBuilder(
                   builder: (context, bounds) {
@@ -586,48 +612,57 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
                 ),
               if (started != null &&
                   widget.batch.status != GenerationStatus.queued)
-                Positioned(
-                  right: 10,
-                  bottom: 10,
-                  child: Container(
-                    height: 26,
-                    constraints: const BoxConstraints(minWidth: 50),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: context.appColors.surfaceCard.withValues(
-                        alpha: .8,
-                      ),
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: .45),
-                        width: .5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (widget.progress != null) ...[
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: cs.primary,
-                            ),
-                            child: const SizedBox.square(dimension: 6),
+                PositionedDirectional(
+                  end: 12,
+                  bottom: 12,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(13),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Container(
+                        height: 26,
+                        constraints: const BoxConstraints(minWidth: 50),
+                        padding: const EdgeInsets.symmetric(horizontal: 9),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: context.appColors.surfaceCard.withValues(
+                            alpha: .8,
                           ),
-                          const SizedBox(width: 5),
-                        ],
-                        Text(
-                          NumberFormat.percentPattern(
-                            l10n.localeName,
-                          ).format(percent),
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontSize: 12,
-                            fontWeight: AppFontWeights.semibold,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                          borderRadius: BorderRadius.circular(13),
+                          border: Border.all(
+                            color: cs.onSurface.withValues(alpha: .11),
+                            width: .5,
                           ),
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (widget.progress != null) ...[
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: cs.primary,
+                                ),
+                                child: const SizedBox.square(dimension: 6),
+                              ),
+                              const SizedBox(width: 5),
+                            ],
+                            Text(
+                              NumberFormat.percentPattern(
+                                l10n.localeName,
+                              ).format(percent),
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontSize: 12,
+                                fontWeight: AppFontWeights.semibold,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -636,9 +671,12 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
                   child: IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: context.appColors.surfaceCard.withValues(
-                          alpha: .28,
-                        ),
+                        color: _preview != null
+                            ? Colors.black.withValues(alpha: .12)
+                            : Color.alphaBlend(
+                                cs.onSurface.withValues(alpha: .06),
+                                context.appColors.surfaceCard,
+                              ).withValues(alpha: .28),
                       ),
                       child: Center(
                         child: Text(
@@ -647,6 +685,9 @@ class _CreationWaitingCardState extends State<CreationWaitingCard>
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 13.5,
+                            color: _preview != null
+                                ? Colors.white
+                                : cs.onSurfaceVariant,
                             fontWeight: AppFontWeights.semibold,
                           ),
                         ),
@@ -941,6 +982,28 @@ String creationWaitingText(
   return l10n.creationWaitingLong;
 }
 
+class _BlurredPreview extends StatelessWidget {
+  const _BlurredPreview(this.bytes);
+  final Uint8List bytes;
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: .7,
+    child: ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+      child: Transform.scale(
+        scale: 1.25,
+        child: Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.low,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      ),
+    ),
+  );
+}
+
 class CreationDotField extends StatelessWidget {
   const CreationDotField({
     super.key,
@@ -959,9 +1022,8 @@ class CreationDotField extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final reduced = MediaQuery.disableAnimationsOf(context);
     return RepaintBoundary(
-      child: StatusAnimation(
-        paused: paused || thumbnail,
-        duration: const Duration(minutes: 4),
+      child: StatusAnimation.elapsed(
+        paused: paused || thumbnail || reduced,
         builder: (context, animation) => CustomPaint(
           painter: _Dots(
             color: color ?? cs.primary,
@@ -996,10 +1058,18 @@ class _Dots extends CustomPainter {
     return t * t * (3 - 2 * t);
   }
 
-  double _sweep(int cycles, double min, double max) {
-    if (reduced) return (min + max) / 2;
-    final t = (1 - math.cos(animation.value * cycles * 2 * math.pi)) / 2;
-    return min + (max - min) * t;
+  double _sweep(double seconds, double from, double to) {
+    if (reduced) return (from + to) / 2;
+    final phase = animation.value / seconds;
+    final wave = (1 - math.cos(phase * math.pi)) / 2;
+    return from + (to - from) * wave;
+  }
+
+  double _blob(double spread, double distance) {
+    final inner = spread * .14;
+    final edge = _smooth((distance - inner) / (spread - inner));
+    final center = _smooth((distance - inner) / (spread * .32));
+    return (1 - edge) * (1 - center * .12);
   }
 
   @override
@@ -1009,17 +1079,20 @@ class _Dots extends CustomPainter {
     final left = (size.width - (columns - 1) * spacing) / 2;
     final top = (size.height - (rows - 1) * spacing) / 2;
     final maturity = math.pow((progress / .82).clamp(0.0, 1.0), 1.28);
-    // Integer cycle counts keep each sweep continuous across the shared clock's wrap.
-    final first = Offset(_sweep(69, .18, .82), _sweep(49, .2, .8));
-    final second = Offset(_sweep(56, .8, .2), _sweep(54, .82, .18));
-    final expansion = maturity * .65;
-    final spread1 = _sweep(67, .18, .30) + expansion;
-    final spread2 = _sweep(100, .22, .35) + expansion;
+    final first = Offset(_sweep(3.46, .18, .82), _sweep(4.87, .18, .82));
+    final second = Offset(_sweep(4.31, .82, .18), _sweep(4.42, .82, .18));
+    final expansion = maturity * (.72 - .08 * _smooth((maturity - .5) / .5));
+    final spread1 = _sweep(3.6, .35, .60) * .5 + expansion;
+    final spread2 = _sweep(2.4, .43, .70) * .5 + expansion;
     final radius =
         math.min(spacing * .48, (2 + 5 * _smooth(progress / .7)) / 2) *
-        _sweep(107, .45, 1);
-    final opacity = _sweep(114, .58, .82);
-    final faint = Paint()..color = color.withValues(alpha: color.a * .2);
+        (reduced ? 1 : _sweep(2.25, .105, .234) / .234);
+    final opacity = _sweep(2.1, .58, .82);
+    final breath = reduced
+        ? .47
+        : .38 + .18 * (1 - math.cos(animation.value / 1.75 * math.pi * 2)) / 2;
+    final faint = Paint()
+      ..color = color.withValues(alpha: color.a * .2 * breath);
     final glow = Paint();
     for (var x = 0; x < columns; x++) {
       for (var y = 0; y < rows; y++) {
@@ -1033,12 +1106,17 @@ class _Dots extends CustomPainter {
           rows == 1 ? .5 : y / (rows - 1),
         );
         final light = math.max(
-          1 - _smooth((relative - first).distance / spread1),
-          1 - _smooth((relative - second).distance / spread2),
+          _blob(spread1, (relative - first).distance),
+          _blob(spread2, (relative - second).distance),
         );
-        if (light * radius <= .2) continue;
-        glow.color = color.withValues(alpha: color.a * opacity * light);
-        canvas.drawCircle(center, radius * light, glow);
+        final dotRadius = radius * math.pow(light, 1.15);
+        if (dotRadius <= .2) continue;
+        final glowStrength = maturity * math.pow(light, .85 + maturity * 1.1);
+        glow.color = color.withValues(
+          alpha:
+              color.a * (opacity + (1 - opacity) * glowStrength * .64) * breath,
+        );
+        canvas.drawCircle(center, dotRadius, glow);
       }
     }
   }

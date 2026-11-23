@@ -1118,7 +1118,7 @@ class _BatchResultsState extends State<_BatchResults> {
   Widget _artwork(BuildContext context, GenerationItemRow item) {
     final batch = widget.batch;
     final desktop = widget.desktop;
-    final tile = CreationArtworkTile(
+    return CreationArtworkTile(
       key: ValueKey(item.id),
       item: item,
       desktop: desktop,
@@ -1130,7 +1130,6 @@ class _BatchResultsState extends State<_BatchResults> {
         draftTopicId: batch.topicId,
       ),
     );
-    return animateCreationResult(context, item, tile);
   }
 }
 

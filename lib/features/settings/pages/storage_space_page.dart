@@ -1,3 +1,4 @@
+import '../../../shared/widgets/ios_date_picker.dart';
 import '../widgets/custom_theme_widgets.dart';
 import '../widgets/attachment_cleanup_button.dart';
 import 'dart:async';
@@ -1684,12 +1685,12 @@ class _CreationStorageCleanupState extends State<_CreationStorageCleanup> {
     final now = DateTime.now();
     setState(() => _running = true);
     try {
-      final date = await showDatePicker(
-        context: context,
+      final date = await showIosDatePicker(
+        context,
+        title: l10n.creationStorageDate,
         firstDate: DateTime(2000),
         lastDate: now,
         initialDate: now.subtract(const Duration(days: 30)),
-        helpText: l10n.creationStorageDate,
       );
       if (date == null || !mounted) return;
       final label = MaterialLocalizations.of(context).formatFullDate(date);

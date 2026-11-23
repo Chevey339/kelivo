@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'creation_controls.dart';
+import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/services/media/creation_prompt_enhancer.dart';
@@ -47,7 +49,7 @@ class _CreationEnhancementPanelState extends State<CreationEnhancementPanel> {
         ),
         border: Border(
           bottom: BorderSide(
-            color: colors.outlineVariant.withValues(alpha: .55),
+            color: colors.onSurface.withValues(alpha: .08),
             width: .5,
           ),
         ),
@@ -157,28 +159,32 @@ class _CreationEnhancementPanelState extends State<CreationEnhancementPanel> {
               crossAxisAlignment: WrapCrossAlignment.center,
               spacing: 5,
               children: [
-                TextButton.icon(
+                CreationAction(
+                  small: true,
                   onPressed: () =>
                       setState(() => _showOriginal = !_showOriginal),
                   icon: Icon(
                     _showOriginal ? Lucide.ChevronUp : Lucide.ChevronDown,
                     size: 14,
                   ),
-                  label: Text(l10n.creationEnhanceOriginal),
+                  child: Text(l10n.creationEnhanceOriginal),
                 ),
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 5,
                   children: [
-                    TextButton.icon(
+                    CreationAction(
+                      small: true,
                       onPressed: widget.onAgain,
                       icon: const Icon(Lucide.RotateCcw, size: 14),
-                      label: Text(l10n.creationEnhanceAgain),
+                      child: Text(l10n.creationEnhanceAgain),
                     ),
-                    FilledButton.icon(
+                    CreationAction(
+                      small: true,
+                      tone: CreationActionTone.primary,
                       onPressed: widget.onApply,
                       icon: const Icon(Lucide.Check, size: 14),
-                      label: Text(l10n.creationEnhanceApply),
+                      child: Text(l10n.creationEnhanceApply),
                     ),
                   ],
                 ),
@@ -198,7 +204,15 @@ class _CreationEnhancementPanelState extends State<CreationEnhancementPanel> {
     if (reduceMotion) return panel;
     return panel
         .animate()
-        .fadeIn(duration: const Duration(milliseconds: 260))
-        .slideY(begin: .045, end: 0);
+        .fadeIn(
+          duration: const Duration(milliseconds: 260),
+          curve: handoffCurve,
+        )
+        .moveY(
+          begin: 6,
+          end: 0,
+          duration: const Duration(milliseconds: 260),
+          curve: handoffCurve,
+        );
   }
 }

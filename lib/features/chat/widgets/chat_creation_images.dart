@@ -336,11 +336,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
         child: AnimatedBuilder(
           animation: busy ? media.runner : const AlwaysStoppedAnimation(0),
           child: !busy && item != null
-              ? animateCreationResult(
-                  context,
-                  item,
-                  _finishedImage(slot, item, slots, desktop),
-                )
+              ? _finishedImage(slot, item, slots, desktop)
               : null,
           builder: (_, result) {
             final progress = busy ? media.runner.progressFor(batch.id) : null;

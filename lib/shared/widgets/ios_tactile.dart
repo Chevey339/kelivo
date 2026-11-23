@@ -377,7 +377,9 @@ class _IosCardPressState extends State<IosCardPress> {
         ? pressTarget
         : (_hovered || _focused ? hoverTarget : base);
     final double scale = _pressed ? (widget.pressedScale ?? 1.0) : 1.0;
-    final Duration dur = widget.duration ?? const Duration(milliseconds: 200);
+    final Duration dur = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : widget.duration ?? const Duration(milliseconds: 200);
     final omitScale = (widget.pressedScale ?? 1.0) == 1.0;
     final omitColor = widget.pressedBlendStrength == 0;
 
