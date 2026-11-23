@@ -31,6 +31,7 @@ import 'creation_controls.dart';
 import '../../provider/pages/provider_detail_page.dart';
 import '../../provider/pages/providers_page.dart';
 import '../../provider/widgets/oauth_login_panel.dart';
+import '../../home/widgets/model_icon.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../providers/media_creation_controller.dart';
 import 'creation_lightbox.dart';
@@ -626,9 +627,10 @@ class _BatchGroupState extends State<_BatchGroup> {
                           ),
                           _Tag(
                             batch.modelId,
-                            leading: ProviderAvatar(
+                            leading: CurrentModelIcon(
                               providerKey: batch.providerId,
-                              displayName: batch.providerId,
+                              modelId: batch.modelId,
+                              iconScale: .70,
                               size: 15,
                             ),
                           ),

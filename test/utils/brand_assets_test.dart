@@ -3,6 +3,53 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('BrandAssets', () {
+    test('recognizes media model families independently of the gateway', () {
+      for (final entry in {
+        'qwen-image-2.1-pro': 'qwen-color.svg',
+        'qwen-image-2.1-turbo': 'qwen-color.svg',
+        'openai/dall-e-3': 'openai.svg',
+        'dashscope/wan2.6-image': 'alibabacloud-color.svg',
+        'fal-ai/nano-banana/edit': 'gemini-color.svg',
+        'Nano Banana Pro': 'gemini-color.svg',
+        'DALL·E 2': 'openai.svg',
+        'imagen-4.0-generate-001': 'google-color.svg',
+        'veo-3.1-fast': 'google-color.svg',
+        'wan2.6-image': 'alibabacloud-color.svg',
+        'wanx2.1-i2v-plus': 'alibabacloud-color.svg',
+      }.entries) {
+        expect(
+          BrandAssets.assetForName(entry.key),
+          'assets/icons/${entry.value}',
+        );
+      }
+      expect(BrandAssets.assetForName('swan-song'), isNull);
+      expect(BrandAssets.assetForName('imagenation'), isNull);
+      expect(
+        BrandAssets.assetForModel('endpoint-123', displayName: 'Example Image'),
+        isNull,
+      );
+      expect(BrandAssets.assetForModel('Bingo Portrait'), isNull);
+      expect(BrandAssets.assetForModel('openrouter/endpoint-123'), isNull);
+      expect(BrandAssets.assetForModel('dashscope/endpoint-123'), isNull);
+      expect(
+        BrandAssets.assetForModel('openai/text-embedding-3-large'),
+        'assets/icons/openai.svg',
+      );
+      expect(
+        BrandAssets.assetForModel(
+          'minimax/h3-max/text-to-video',
+          displayName: 'Studio A',
+        ),
+        'assets/icons/minimax-color.svg',
+      );
+      expect(
+        BrandAssets.assetForModel(
+          'openai/endpoint-123',
+          displayName: 'Qwen Image Turbo',
+        ),
+        'assets/icons/qwen-color.svg',
+      );
+    });
     test('Vercel Gateway icon is selectable and adapts to dark mode', () {
       const asset = 'assets/icons/vercel.svg';
       expect(BrandAssets.assetForName('Vercel AI Gateway'), asset);

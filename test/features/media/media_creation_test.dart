@@ -17,6 +17,7 @@ import 'package:Kelivo/features/chat/widgets/chat_creation_images.dart';
 import 'package:Kelivo/features/media/pages/media_creation_page.dart';
 import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
 import 'package:Kelivo/features/media/widgets/creation_composer.dart';
+import 'package:Kelivo/shared/widgets/configurable_avatar.dart';
 import 'package:Kelivo/features/media/widgets/creation_enhancement_panel.dart';
 import 'package:Kelivo/features/media/widgets/creation_gallery.dart';
 import 'package:Kelivo/features/media/widgets/creation_lightbox.dart';
@@ -1305,8 +1306,19 @@ void main() {
           find.text(desktop ? '1 image' : 'Auto · 1 image'),
           findsOneWidget,
         );
+        final modelAvatars = find.byWidgetPredicate(
+          (w) =>
+              w is ConfigurableAvatar &&
+              w.fallbackAsset == 'assets/icons/openai.svg' &&
+              w.name == _model,
+        );
+        expect(
+          find.descendant(of: composer, matching: modelAvatars),
+          findsOneWidget,
+        );
         await tester.tap(find.text(_model).hitTestable().last);
         await tester.pumpAndSettle();
+        expect(modelAvatars, findsNWidgets(2));
         final search = find.byType(CreationSearchBox).hitTestable().last;
         expect(
           tester.getTopLeft(find.text('Test Images')).dy -

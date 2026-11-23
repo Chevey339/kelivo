@@ -27,7 +27,7 @@ import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
-import '../../provider/widgets/provider_avatar.dart';
+import '../../home/widgets/model_icon.dart';
 import '../../model/pages/default_model_page.dart';
 import '../../settings/widgets/settings_search_target.dart';
 import '../providers/media_creation_controller.dart';
@@ -665,9 +665,10 @@ class _CreationComposerState extends State<CreationComposer> {
                                       maxWidth: 190,
                                       leading: model == null
                                           ? null
-                                          : ProviderAvatar(
+                                          : CurrentModelIcon(
                                               providerKey: model.provider.id,
-                                              displayName: model.provider.name,
+                                              modelId: model.spec.id,
+                                              iconScale: .70,
                                               size: 16,
                                             ),
                                       trailing: model == null
@@ -1056,9 +1057,10 @@ class _ModelOptionsState extends State<_ModelOptions> {
                           borderRadius: BorderRadius.circular(10),
                           child: Row(
                             children: [
-                              ProviderAvatar(
+                              CurrentModelIcon(
                                 providerKey: model.provider.id,
-                                displayName: model.provider.name,
+                                modelId: model.spec.id,
+                                iconScale: .70,
                                 size: 26,
                               ),
                               const SizedBox(width: 8),

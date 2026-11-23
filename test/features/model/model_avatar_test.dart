@@ -221,6 +221,56 @@ void main() {
     },
   );
 
+  testWidgets(
+    'gateway aliases use the upstream model brand, then the display name',
+    (tester) async {
+      final sp = await settings();
+      final base = sp.getProviderConfig('A');
+      final overrides = {
+        ...base.modelOverrides,
+        'upstream': {
+          'apiModelId': 'qwen-image-2.1-pro',
+          'name': 'GPT image alias',
+        },
+        'display': {
+          'apiModelId': 'openrouter/endpoint-123',
+          'name': 'Qwen Image Turbo',
+        },
+      };
+      await sp.setProviderConfig(
+        'A',
+        base.copyWith(
+          models: [...base.models, 'upstream', 'display'],
+          modelOverrides: overrides,
+        ),
+      );
+      await sp.setProviderAvatarEmoji('A', '🟢');
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: sp,
+          child: const MaterialApp(
+            home: Row(
+              children: [
+                CurrentModelIcon(providerKey: 'A', modelId: 'upstream'),
+                CurrentModelIcon(providerKey: 'A', modelId: 'display'),
+              ],
+            ),
+          ),
+        ),
+      );
+      final icons = tester.widgetList<ConfigurableAvatar>(
+        find.byType(ConfigurableAvatar),
+      );
+      expect(
+        icons.map((w) => w.fallbackAsset),
+        everyElement('assets/icons/qwen-color.svg'),
+      );
+      expect(icons.map((w) => w.avatar), everyElement(isNull));
+      expect(icons, hasLength(2));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   for (final desktop in [false, true]) {
     testWidgets(
       '${desktop ? 'desktop' : 'mobile'} model editor saves, reopens, switches and resets LobeHub style',

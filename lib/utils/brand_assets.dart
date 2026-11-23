@@ -12,7 +12,7 @@ class BrandAssets {
     if (key.isEmpty) return null;
     // Recompute if previously cached as null so newly added mappings take effect without restart.
     if (_cache.containsKey(key) && _cache[key] != null) return _cache[key];
-    String? result = ModelBrand.match(key)?.asset;
+    String? result = assetForModel(key) ?? ModelBrand.match(key)?.asset;
     if (result == null) {
       for (final e in _mapping) {
         if (e.key.hasMatch(key)) {
@@ -25,10 +25,71 @@ class BrandAssets {
     return result;
   }
 
-  /// Clear the in-memory cache (useful after changing mappings at runtime).
-  static void clearCache() => _cache.clear();
+  /// Match model families independently from platform and search-service names.
+  /// A gateway's namespace must not take precedence over a model's display name.
+  static String? assetForModel(String upstreamId, {String? displayName}) {
+    final family =
+        _modelAsset(upstreamId) ??
+        (displayName == null ? null : _modelAsset(displayName));
+    if (family != null) return family;
+    final slash = upstreamId.indexOf('/');
+    if (slash < 1) return null;
+    final publisher = upstreamId.substring(0, slash).trim().toLowerCase();
+    // Infer a publisher only from an exact organization name. An arbitrary
+    // gateway prefix (or a search service with a similar name) is not a model.
+    if (ModelBrand.isGroupName(publisher)) return _modelAsset(publisher);
+    final file = _publisherIcons[publisher];
+    return file == null ? null : 'assets/icons/$file';
+  }
 
-  static final Map<String, String?> _cache = <String, String?>{};
+  static String? _modelAsset(String name) {
+    final key = name.trim().toLowerCase();
+    if (key.isEmpty) return null;
+    return _modelCache.putIfAbsent(key, () {
+      final parts = key.split('/');
+      // e.g. fal-ai/nano-banana/edit: "edit" is not a brand, but the
+      // preceding model family is. Only the first segment is the host.
+      for (var i = parts.length - 1; i >= (parts.length > 1 ? 1 : 0); i--) {
+        final part = parts[i];
+        final brand = ModelBrand.match(part);
+        if (brand != null) return brand.asset;
+        for (final entry in _mediaModelAssets.entries) {
+          if (entry.key.hasMatch(part)) return 'assets/icons/${entry.value}';
+        }
+      }
+      return null;
+    });
+  }
+
+  static const _publisherIcons = {
+    'openai': 'openai.svg',
+    'anthropic': 'anthropic.svg',
+    'google': 'google-color.svg',
+    'google-deepmind': 'google-color.svg',
+    'meta': 'meta-color.svg',
+    'meta-llama': 'meta-color.svg',
+    'deepseek-ai': 'deepseek-color.svg',
+    'mistralai': 'mistral-color.svg',
+    'x-ai': 'xai.svg',
+    'moonshotai': 'kimi-color.svg',
+    'z-ai': 'zhipu-color.svg',
+  };
+
+  static final _mediaModelAssets = {
+    RegExp(r'(?:^|[ ._-])dall[-· .]?e(?=$|[ ._-]|[0-9])'): 'openai.svg',
+    RegExp(r'(?:^|[ ._-])(?:imagen|veo)(?=$|[ ._-]|[0-9])'): 'google-color.svg',
+    RegExp(r'(?:^|[ ._-])wanx?(?=$|[ ._-]|[0-9])'): 'alibabacloud-color.svg',
+    RegExp(r'(?:^|[ ._-])nano[ -]banana(?=$|[ ._-]|[0-9])'): 'gemini-color.svg',
+  };
+
+  /// Clear the in-memory caches after changing mappings at runtime.
+  static void clearCache() {
+    _cache.clear();
+    _modelCache.clear();
+  }
+
+  static final Map<String, String?> _cache = {};
+  static final Map<String, String?> _modelCache = {};
 
   // Keep order-specific matching using a list of entries.
   static final List<MapEntry<RegExp, String>> _mapping =

@@ -34,7 +34,7 @@ import 'creation_toast.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../providers/media_creation_controller.dart';
-import '../../provider/widgets/provider_avatar.dart';
+import '../../home/widgets/model_icon.dart';
 import 'creation_video_player.dart';
 
 typedef OpenCreationTopic = void Function(String topicId, String batchId);
@@ -692,9 +692,10 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                   Row(
                     children: [
                       if (batch != null) ...[
-                        ProviderAvatar(
+                        CurrentModelIcon(
                           providerKey: batch.providerId,
-                          displayName: batch.providerId,
+                          modelId: batch.modelId,
+                          iconScale: .70,
                           size: 14,
                         ),
                         const SizedBox(width: 5),
