@@ -1319,6 +1319,20 @@ void main() {
         await tester.tap(find.text(_model).hitTestable().last);
         await tester.pumpAndSettle();
         expect(modelAvatars, findsNWidgets(2));
+        for (final avatar in tester.widgetList<ConfigurableAvatar>(
+          modelAvatars,
+        )) {
+          expect(avatar.withBackground, isFalse);
+        }
+        final menuIcon = modelAvatars.hitTestable().last;
+        final menuText = find.text(_model).hitTestable().last;
+        final labelColumn = find
+            .ancestor(of: menuText, matching: find.byType(Column))
+            .first;
+        expect(
+          tester.getCenter(menuIcon).dy,
+          closeTo(tester.getCenter(labelColumn).dy, 1),
+        );
         final search = find.byType(CreationSearchBox).hitTestable().last;
         expect(
           tester.getTopLeft(find.text('Test Images')).dy -

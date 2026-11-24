@@ -668,7 +668,8 @@ class _CreationComposerState extends State<CreationComposer> {
                                           : CurrentModelIcon(
                                               providerKey: model.provider.id,
                                               modelId: model.spec.id,
-                                              iconScale: .70,
+                                              withBackground: false,
+                                              iconScale: 1,
                                               size: 16,
                                             ),
                                       trailing: model == null
@@ -1060,7 +1061,8 @@ class _ModelOptionsState extends State<_ModelOptions> {
                               CurrentModelIcon(
                                 providerKey: model.provider.id,
                                 modelId: model.spec.id,
-                                iconScale: .70,
+                                withBackground: false,
+                                iconScale: .85,
                                 size: 26,
                               ),
                               const SizedBox(width: 8),

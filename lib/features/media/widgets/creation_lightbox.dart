@@ -695,7 +695,8 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                         CurrentModelIcon(
                           providerKey: batch.providerId,
                           modelId: batch.modelId,
-                          iconScale: .70,
+                          withBackground: false,
+                          iconScale: 1,
                           size: 14,
                         ),
                         const SizedBox(width: 5),

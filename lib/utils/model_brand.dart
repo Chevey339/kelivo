@@ -39,6 +39,11 @@ class ModelBrand {
     ModelBrand('Claude', 'claude-color.svg', r'claude'),
     ModelBrand('DeepSeek', 'deepseek-color.svg', r'deepseek'),
     ModelBrand(
+      'Krea',
+      'krea.svg',
+      r'krea(?=$|[^a-z0-9])|k3[-_]edit(?=$|[^a-z0-9])',
+    ),
+    ModelBrand(
       'Kimi',
       'kimi-color.svg',
       r'kimi|moonshot|月之暗面|k3(?=$|[^a-z0-9])',
@@ -56,7 +61,8 @@ class ModelBrand {
       r'hunyuan|混元|hy[34](?=$|[^a-z0-9])',
     ),
     ModelBrand('MiMo', 'mimo.svg', r'mimo|xiaomi|小米'),
-    ModelBrand('MiniMax', 'minimax-color.svg', r'minimax'),
+    ModelBrand('Kling', 'kling-color.svg', r'kling(?=$|[^a-z0-9]|[0-9])|可灵'),
+    ModelBrand('MiniMax', 'minimax-color.svg', r'minimax|hailuo'),
     ModelBrand('Grok', 'grok.svg', r'grok'),
     ModelBrand(
       'Mistral',

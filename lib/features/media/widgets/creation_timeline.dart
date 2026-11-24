@@ -630,7 +630,8 @@ class _BatchGroupState extends State<_BatchGroup> {
                             leading: CurrentModelIcon(
                               providerKey: batch.providerId,
                               modelId: batch.modelId,
-                              iconScale: .70,
+                              withBackground: false,
+                              iconScale: 1,
                               size: 15,
                             ),
                           ),

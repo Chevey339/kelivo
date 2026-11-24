@@ -7,6 +7,12 @@ void main() {
       for (final entry in {
         'qwen-image-2.1-pro': 'qwen-color.svg',
         'qwen-image-2.1-turbo': 'qwen-color.svg',
+        'kling-image-4.0-long-image': 'kling-color.svg',
+        'kling-avatar-image2video': 'kling-color.svg',
+        'krea/k3-edit': 'krea.svg',
+        'moonshotai/k3': 'kimi-color.svg',
+        'fal-ai/kling-video/v2.6/pro/text-to-video': 'kling-color.svg',
+        'happyhorse-1.1-t2v': 'alibabacloud-color.svg',
         'openai/dall-e-3': 'openai.svg',
         'dashscope/wan2.6-image': 'alibabacloud-color.svg',
         'fal-ai/nano-banana/edit': 'gemini-color.svg',

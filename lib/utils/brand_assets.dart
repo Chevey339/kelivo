@@ -78,6 +78,8 @@ class BrandAssets {
   static final _mediaModelAssets = {
     RegExp(r'(?:^|[ ._-])dall[-· .]?e(?=$|[ ._-]|[0-9])'): 'openai.svg',
     RegExp(r'(?:^|[ ._-])(?:imagen|veo)(?=$|[ ._-]|[0-9])'): 'google-color.svg',
+    RegExp(r'(?:^|[ ._-])happyhorse(?=$|[ ._-]|[0-9])'):
+        'alibabacloud-color.svg',
     RegExp(r'(?:^|[ ._-])wanx?(?=$|[ ._-]|[0-9])'): 'alibabacloud-color.svg',
     RegExp(r'(?:^|[ ._-])nano[ -]banana(?=$|[ ._-]|[0-9])'): 'gemini-color.svg',
   };
@@ -281,6 +283,12 @@ class BrandAssets {
       label: 'MiniMax',
       asset: 'assets/icons/minimax-color.svg',
     ),
+    BrandIconOption(
+      id: 'kling',
+      label: 'Kling',
+      asset: 'assets/icons/kling-color.svg',
+    ),
+    BrandIconOption(id: 'krea', label: 'Krea', asset: 'assets/icons/krea.svg'),
     BrandIconOption(id: 'xai', label: 'xAI', asset: 'assets/icons/xai.svg'),
     BrandIconOption(
       id: 'juhenext',
@@ -478,6 +486,7 @@ class BrandAssets {
 
   static const Set<String> _darkAdaptiveAssets = <String>{
     'openai.svg',
+    'krea.svg',
     'anthropic.svg',
     'grok.svg',
     'xai.svg',
