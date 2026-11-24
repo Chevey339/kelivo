@@ -257,39 +257,43 @@ void main() {
     },
   );
 
-  test(
-    'a lost generation response does not submit a second billable job',
-    () async {
-      var calls = 0;
-      final runner = MediaGenerationRunner(
-        repository: repository,
-        files: files,
-        delay: (_) async {},
-        clientFactory: (_, _) => MockClient((r) async {
-          calls++;
-          throw http.ClientException('Response lost', r.url);
-        }),
-      );
-      addTearDown(runner.shutdown);
-      final cfg = provider(
-        'router-loss',
-      ).copyWith(baseUrl: 'https://openrouter.ai/api/v1');
-      final ticket = await runner.enqueue(
-        provider: cfg,
-        request: const MediaRequest(
-          modelId: model,
-          mode: MediaMode.image,
-          prompt: 'Lake',
-        ),
-      );
-      expect(await ticket.completed, GenerationStatus.failed);
-      final failure = jsonDecode(
-        (await repository.batch(ticket.batchId))!.errorJson!,
-      );
-      expect(failure['automaticRetry'], isFalse);
-      expect(calls, 1);
-    },
-  );
+  for (final status in [null, 502, 504]) {
+    test(
+      'an uncertain generation response ($status) does not submit a second billable job',
+      () async {
+        var calls = 0;
+        final runner = MediaGenerationRunner(
+          repository: repository,
+          files: files,
+          delay: (_) async {},
+          clientFactory: (_, _) => MockClient((r) async {
+            calls++;
+            if (status != null) return http.Response('Gateway failure', status);
+            throw http.ClientException('Response lost', r.url);
+          }),
+        );
+        addTearDown(runner.shutdown);
+        final cfg = provider(
+          'router-loss',
+        ).copyWith(baseUrl: 'https://openrouter.ai/api/v1');
+        final ticket = await runner.enqueue(
+          provider: cfg,
+          request: const MediaRequest(
+            modelId: model,
+            mode: MediaMode.image,
+            prompt: 'Lake',
+          ),
+        );
+        expect(await ticket.completed, GenerationStatus.failed);
+        final failure = jsonDecode(
+          (await repository.batch(ticket.batchId))!.errorJson!,
+        );
+        expect(failure['automaticRetry'], isFalse);
+        expect(failure['statusCode'], status);
+        expect(calls, 1);
+      },
+    );
+  }
 
   test(
     'failed generation diagnostics retain only allowlisted request fields',

@@ -603,7 +603,9 @@ class MediaGenerationRunner extends ChangeNotifier {
       } catch (error) {
         _checkCancelled(job);
         final failure = classifyMediaFailure(error);
-        if (failure.kind == MediaFailureKind.network &&
+        if ((failure.kind == MediaFailureKind.network ||
+                failure.statusCode == 502 ||
+                failure.statusCode == 504) &&
             !accepted &&
             job.log.startedPost) {
           // A lost response does not tell us whether the provider has already
@@ -611,6 +613,7 @@ class MediaGenerationRunner extends ChangeNotifier {
           throw MediaFailure(
             failure.kind,
             failure.message,
+            statusCode: failure.statusCode,
             automaticRetry: false,
           );
         }
