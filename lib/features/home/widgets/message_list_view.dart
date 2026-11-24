@@ -29,6 +29,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/selection_scroll_container.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/timeline_projection.dart';
+import '../../chat/widgets/chat_creation_images.dart';
 import '../../chat/widgets/timeline_visibility.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../../chat/widgets/message_more_sheet.dart';
@@ -163,6 +164,7 @@ class MessageListView extends StatefulWidget {
     this.collapseThinkingSteps = false,
     this.showThinkingCards = true,
     this.showToolCards = true,
+    this.inlineChatImages = false,
     this.showProducedFiles = true,
     this.showToolResultSummary = false,
     this.hideToolResultImages = false,
@@ -285,6 +287,7 @@ class MessageListView extends StatefulWidget {
 
   /// Whether tool-use cards render in chat.
   final bool showToolCards;
+  final bool inlineChatImages;
 
   /// Whether the file summary below a reply occupies height.
   final bool showProducedFiles;
@@ -619,6 +622,7 @@ class _MessageListViewState extends State<MessageListView> {
     collapseThinkingSteps: false,
     showThinkingCards: true,
     showToolCards: true,
+    inlineChatImages: false,
     showToolResultSummary: false,
     hideToolResultImages: false,
     showBrowserPageCards: true,
@@ -1014,13 +1018,26 @@ class _MessageListViewState extends State<MessageListView> {
     final lineHeight = fontSize * 1.5;
     final codeFontSize = _estimateCodeFontSize * fontScale;
     final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
+    final generated = parts.whereType<ImagePart>().where(
+      (part) => part.generationItemId != null,
+    );
+    final placement = settings.inlineChatImages
+        ? ChatImagePlacement.resolve(
+            context,
+            message.id,
+            generated.toList(),
+            projected,
+            listen: false,
+          )
+        : null;
     for (final block in visibleAssistantTimeline(
       projected,
+      imageCallOrdinals: placement?.atCall.keys.toSet() ?? const {},
       showThinkingCards: settings.showThinkingCards,
       showToolCards: settings.showToolCards,
       isPendingApproval: isPending,
     )) {
-      if (block.isImage) {
+      if (block.isImage || block.imageCallOrdinal != null) {
         addVisible(
           estimateTimelineImageHeight(
             maxWidth: textWidth,
@@ -1067,6 +1084,11 @@ class _MessageListViewState extends State<MessageListView> {
           toolImageAspects: toolImageAspects,
           fontScale: fontScale,
         ),
+      );
+    }
+    if (placement?.footer.isNotEmpty ?? generated.isNotEmpty) {
+      addVisible(
+        estimateTimelineImageHeight(maxWidth: textWidth, aspectRatio: null),
       );
     }
     return (extent: extent, fromParts: projected.fromParts);
@@ -1403,6 +1425,7 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.collapseThinkingSteps != widget.collapseThinkingSteps ||
         oldWidget.showThinkingCards != widget.showThinkingCards ||
         oldWidget.showToolCards != widget.showToolCards ||
+        oldWidget.inlineChatImages != widget.inlineChatImages ||
         oldWidget.showProducedFiles != widget.showProducedFiles ||
         oldWidget.showToolResultSummary != widget.showToolResultSummary ||
         oldWidget.hideToolResultImages != widget.hideToolResultImages ||
@@ -1808,6 +1831,7 @@ class _MessageListViewState extends State<MessageListView> {
       collapseThinkingSteps: widget.collapseThinkingSteps,
       showThinkingCards: widget.showThinkingCards,
       showToolCards: widget.showToolCards,
+      inlineChatImages: widget.inlineChatImages,
       showToolResultSummary: widget.showToolResultSummary,
       hideToolResultImages: widget.hideToolResultImages,
       showBrowserPageCards: widget.showBrowserPageCards,
@@ -2813,6 +2837,7 @@ final class _EstimateSettings {
     required this.collapseThinkingSteps,
     required this.showThinkingCards,
     required this.showToolCards,
+    required this.inlineChatImages,
     required this.showToolResultSummary,
     required this.hideToolResultImages,
     required this.showBrowserPageCards,
@@ -2833,6 +2858,7 @@ final class _EstimateSettings {
 
   /// Whether tool-use cards contribute to estimated height.
   final bool showToolCards;
+  final bool inlineChatImages;
 
   /// Whether collapsed tool cards also show a short result summary.
   final bool showToolResultSummary;
@@ -2863,6 +2889,7 @@ final class _EstimateSettings {
       other.collapseThinkingSteps == collapseThinkingSteps &&
       other.showThinkingCards == showThinkingCards &&
       other.showToolCards == showToolCards &&
+      other.inlineChatImages == inlineChatImages &&
       other.showToolResultSummary == showToolResultSummary &&
       other.hideToolResultImages == hideToolResultImages &&
       other.showBrowserPageCards == showBrowserPageCards &&
@@ -2877,6 +2904,7 @@ final class _EstimateSettings {
     collapseThinkingSteps,
     showThinkingCards,
     showToolCards,
+    inlineChatImages,
     showToolResultSummary,
     hideToolResultImages,
     showBrowserPageCards,

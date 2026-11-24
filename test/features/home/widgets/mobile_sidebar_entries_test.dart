@@ -5,6 +5,7 @@ import 'package:Kelivo/features/home/widgets/sidebar_user_bar.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/features/home/widgets/mobile_sidebar_entries.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/sidebar_entry_labels.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -60,6 +61,16 @@ void main() {
     expect(find.text(l10n.sidebarMore), findsNothing);
     expect(find.text(l10n.sidebarCustomize), findsNothing);
     expect(find.text(l10n.sideDrawerHistory), findsOneWidget);
+    await tester.longPress(find.text(l10n.sideDrawerHistory));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    await tester.tap(find.text(SidebarVisibility.hidden.menuLabel(l10n)));
+    await tester.pumpAndSettle();
+    expect(
+      settings.mobileSidebarEntries[SidebarEntry.history],
+      SidebarVisibility.hidden,
+    );
+    expect(find.text(l10n.sideDrawerHistory), findsNothing);
   });
   testWidgets('a 240px user bar keeps Settings reachable with overflow', (
     tester,

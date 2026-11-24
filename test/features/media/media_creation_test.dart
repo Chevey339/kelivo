@@ -14,6 +14,12 @@ import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:Kelivo/desktop/desktop_media_creation_page.dart';
 import 'package:Kelivo/desktop/hotkeys/chat_action_bus.dart';
 import 'package:Kelivo/features/chat/widgets/chat_creation_images.dart';
+import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
+import 'package:Kelivo/core/services/tools/generate_image_tool.dart';
+import 'package:Kelivo/features/settings/widgets/storage_contents_list.dart';
+import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
+import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/features/media/pages/media_creation_page.dart';
 import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
 import 'package:Kelivo/features/media/widgets/creation_composer.dart';
@@ -783,10 +789,114 @@ void main() {
         await tester.pumpAndSettle();
         expect(media.imageReferences('topic'), isEmpty);
         await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
   }
+
+  testWidgets(
+    'chat image details and the Creation link can be hidden independently',
+    (tester) async {
+      final media = await _pumpCreationGallery(
+        tester,
+        desktop: true,
+        count: 1,
+        chatMessageId: 'chat-result',
+      );
+      await tester.pumpAndSettle();
+      final link = find.text('Show in Creation');
+      final info = find.textContaining(_model);
+      expect(link, findsOneWidget);
+      expect(info, findsOneWidget);
+      await tester.runAsync(() => media.settings.setShowChatImageInfo(false));
+      await tester.pump();
+      expect(info, findsNothing);
+      expect(link, findsOneWidget);
+      await tester.runAsync(() => media.settings.setShowChatImageLink(false));
+      await tester.pump();
+      expect(link, findsNothing);
+      expect(find.byType(CreationFileImage), findsOneWidget);
+      await tester.runAsync(() => media.settings.setShowChatImageInfo(true));
+      await tester.pump();
+      expect(info, findsOneWidget);
+      expect(link, findsNothing);
+    },
+  );
+
+  testWidgets(
+    'creation storage drills from the prompt into a saved artwork preview',
+    (tester) async {
+      final media = await _pumpCreationGallery(tester, desktop: true, count: 1);
+      await tester.pumpAndSettle();
+      final file = File(media.itemsFor('batch').single.path);
+      final stats = StorageUsageStats(fileCount: 1, bytes: file.lengthSync());
+      final host = tester.element(find.byType(DesktopMediaCreationPage));
+      Navigator.of(host).push(
+        MaterialPageRoute<void>(
+          builder: (_) => Scaffold(
+            body: StorageContentsList(
+              category: StorageUsageCategory(
+                key: StorageUsageCategoryKey.creations,
+                stats: stats,
+                subcategories: [
+                  StorageUsageSubcategory(
+                    id: 'batch',
+                    path: file.parent.path,
+                    isDirectory: true,
+                    stats: stats,
+                  ),
+                ],
+              ),
+              fmtBytes: (value) => '$value B',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final row = find.byKey(const ValueKey('storage-content-batch'));
+      expect(
+        find.descendant(of: row, matching: find.text('A wide mountain lake')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.byType(CreationMediaCover)),
+        findsOneWidget,
+      );
+      await tester.tap(row);
+      final item = find.byKey(FileBrowser.itemKey('result.png'));
+      for (var i = 0; i < 30 && item.evaluate().isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.pumpAndSettle();
+      await tester.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+      final more = find.byWidgetPredicate(
+        (w) =>
+            w is IosIconButton &&
+            w.tooltip ==
+                AppLocalizations.of(host)!.chatMessageWidgetMoreTooltip,
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: tester.getCenter(more));
+      await tester.pumpAndSettle();
+      final painted = tester.widget<AnimatedContainer>(
+        find.descendant(of: more, matching: find.byType(AnimatedContainer)),
+      );
+      expect((painted.decoration! as BoxDecoration).shape, BoxShape.circle);
+      expect(
+        (painted.decoration! as BoxDecoration).color,
+        isNot(Colors.transparent),
+      );
+      await mouse.removePointer();
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
 
   testWidgets('zoomed desktop panning keeps the artwork in the viewer', (
     tester,
@@ -1072,7 +1182,11 @@ void main() {
               modelId: _model,
               mode: MediaMode.image,
               prompt: 'Bird in a garden',
-              paramsJson: jsonEncode({'count': chat ? 1 : 3}),
+              paramsJson: jsonEncode({
+                'count': chat ? 1 : 3,
+                if (chat)
+                  GenerateImageTool.callIdParameter: 'active-generation',
+              }),
               referencesJson: '[]',
               status: GenerationStatus.running,
               source: chat ? GenerationSource.chat : GenerationSource.workbench,
@@ -1154,6 +1268,31 @@ void main() {
           (widget) => widget is CreationWaitingCard && widget.result == null,
         );
         expect(waiting, findsNWidgets(chat ? 1 : 2));
+        if (chat) {
+          final projection = projectAssistantTimeline(
+            parts: const [
+              ToolCallPart(
+                '{"id":"active-generation","name":"generate_image","arguments":{}}',
+              ),
+            ],
+            liveTools: const [],
+            reasoningSegments: const [],
+            visualContent: '',
+            partsArrivalOrdered: true,
+          );
+          final placement = ChatImagePlacement.resolve(
+            tester.element(waiting.first),
+            'message',
+            const [],
+            projection,
+            listen: false,
+          )!;
+          expect(
+            placement.atCall.values.single.single.batch!.id,
+            'playing-batch',
+          );
+          expect(placement.footer, isEmpty);
+        }
         await tester.tap(waiting.first);
         await tester.pump();
         expect(find.bySemanticsLabel('Score 0'), findsOneWidget);

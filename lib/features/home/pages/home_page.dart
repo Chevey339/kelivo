@@ -1662,6 +1662,7 @@ class _HomePageState extends State<HomePage>
       collapseThinkingSteps: settings.collapseThinkingSteps,
       showThinkingCards: settings.showThinkingCards,
       showToolCards: settings.showToolCards,
+      inlineChatImages: settings.inlineChatImages,
       showProducedFiles: settings.showProducedFiles,
       showToolResultSummary: settings.showToolResultSummary,
       hideToolResultImages: settings.hideToolResultImages,

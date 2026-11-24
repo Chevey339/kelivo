@@ -1,10 +1,9 @@
 import 'package:flutter/widgets.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/services/media/media_request.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/media_creation_controller.dart';
-import 'creation_toast.dart';
+import '../../../shared/widgets/snackbar.dart';
 
 CreationReferenceResult addCreationReferences(
   BuildContext context,
@@ -29,7 +28,15 @@ CreationReferenceResult addCreationReferences(
     CreationReferenceResult.empty => null,
   };
   if (message != null) {
-    showCreationToast(context, message: message, icon: LucideIcons.imagePlus);
+    showAppSnackBar(
+      context,
+      message: message,
+      type: switch (result) {
+        CreationReferenceResult.added => NotificationType.success,
+        CreationReferenceResult.alreadyAdded => NotificationType.info,
+        _ => NotificationType.warning,
+      },
+    );
   }
   return result;
 }

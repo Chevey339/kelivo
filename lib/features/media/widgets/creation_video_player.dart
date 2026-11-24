@@ -12,7 +12,7 @@ import '../../../core/database/app_database.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import 'creation_toast.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import 'creation_slider.dart';
@@ -68,8 +68,9 @@ class _CreationVideoPlayerState extends State<CreationVideoPlayer> {
         ? null
         : await OpenFilex.open(path, type: widget.item.mime);
     if (mounted && result?.type != ResultType.done) {
-      showCreationToast(
+      showAppSnackBar(
         context,
+        type: NotificationType.error,
         message: AppLocalizations.of(context)!.creationActionFailed,
       );
     }
@@ -212,6 +213,7 @@ class _VideoSurface extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: IosIconButton(
+                        shape: BoxShape.circle,
                         icon: Lucide.Play,
                         size: 24,
                         minSize: 52,

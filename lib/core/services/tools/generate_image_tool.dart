@@ -4,6 +4,7 @@ import '../../models/message_part.dart';
 abstract final class GenerateImageTool {
   static const name = 'generate_image';
   static const imageIdPattern = r'^img_[0-9a-f]{20}$';
+  static const callIdParameter = 'chatToolCallId';
   static const batchKey = 'generationBatchId';
   static const attachmentKey = 'generatedImage';
 

@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'package:Kelivo/core/services/tools/generate_image_tool.dart';
+import 'package:Kelivo/features/chat/widgets/chat_creation_images.dart';
+import 'package:Kelivo/features/media/widgets/creation_lightbox.dart';
 import '../../../support/markdown_render_helpers.dart';
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -69,6 +73,86 @@ void expectAbove(WidgetTester tester, Object upper, Object lower) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'multiple generated images follow their calls and unlinked copies stay below the reply',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(480, 2200);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final preferences = createBusinessTestPreferences();
+      final settings = SettingsProvider(preferences);
+      await settings.loaded;
+      await settings.setShowToolCards(false);
+      ImagePart image(String id) => ImagePart(
+        uri: 'kelivo-file:///upload/$id.png',
+        mime: 'image/png',
+        generationItemId: id,
+      );
+      ToolCallPart call(ImagePart image) => ToolCallPart(
+        jsonEncode({
+          'id': image.generationItemId,
+          'name': GenerateImageTool.name,
+          'content': 'ok',
+          'metadata': {GenerateImageTool.attachmentKey: image.encodePayload()},
+        }),
+      );
+      final first = image('first'),
+          second = image('second'),
+          unlinked = image('unlinked');
+      final message = ChatMessage(
+        id: 'creation-calls',
+        role: 'assistant',
+        conversationId: 'c',
+        parts: [
+          const TextPart('BEFORE_IMAGE'),
+          call(first),
+          const TextPart('BETWEEN_IMAGES'),
+          call(second),
+          const TextPart('AFTER_IMAGES'),
+          first,
+          second,
+          unlinked,
+        ],
+      );
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: SingleChildScrollView(
+            child: ChatMessageWidget(message: message, showModelIcon: false),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatCreationImages), findsOneWidget);
+      await settings.setInlineChatImages(true);
+      await tester.pumpAndSettle();
+      Finder artwork(ImagePart image) => find.byWidgetPredicate(
+        (w) => w is CreationFileImage && w.path == image.uri,
+      );
+      expect(artwork(first), findsOneWidget);
+      expect(artwork(second), findsOneWidget);
+      expect(artwork(unlinked), findsOneWidget);
+      expectAbove(tester, 'BEFORE_IMAGE', artwork(first));
+      expectAbove(tester, artwork(first), 'BETWEEN_IMAGES');
+      expectAbove(tester, 'BETWEEN_IMAGES', artwork(second));
+      expectAbove(tester, artwork(second), 'AFTER_IMAGES');
+      expectAbove(tester, 'AFTER_IMAGES', artwork(unlinked));
+      await settings.setShowChatImageInfo(false);
+      await settings.setShowChatImageLink(false);
+      final restored = SettingsProvider(preferences);
+      await restored.loaded;
+      expect(restored.inlineChatImages, isTrue);
+      expect(restored.showChatImageInfo, isFalse);
+      expect(restored.showChatImageLink, isFalse);
+      restored.dispose();
+      await settings.setInlineChatImages(false);
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatCreationImages), findsOneWidget);
+      expectAbove(tester, 'AFTER_IMAGES', find.byType(ChatCreationImages));
+    },
+  );
 
   testWidgets(
     'pending tools use bounded status animation and settle on finish',

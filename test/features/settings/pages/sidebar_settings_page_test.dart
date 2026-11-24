@@ -12,6 +12,53 @@ import 'package:provider/provider.dart';
 import '../../../support/business_test_harness.dart';
 
 void main() {
+  testWidgets(
+    'sidebar settings push and swipe back like other settings pages',
+    (tester) async {
+      final settings = (await tester.runAsync(() async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        return settings;
+      }))!;
+      addTearDown(settings.dispose);
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => openSidebarSettings(context),
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      expect(
+        ModalRoute.of(tester.element(find.byType(SidebarSettingsPage))),
+        isA<MaterialPageRoute<void>>(),
+      );
+      expect(find.byType(AppBar), findsOneWidget);
+      await tester.dragFrom(
+        const Offset(2, 180),
+        Offset(
+          tester.view.physicalSize.width / tester.view.devicePixelRatio * .85,
+          0,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Open'), findsOneWidget);
+      expect(find.byType(SidebarSettingsPage), findsNothing);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
   testWidgets('moving blocks shows the drop line and Escape cancels the move', (
     tester,
   ) async {

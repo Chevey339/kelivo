@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/sidebar_layout.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../desktop/desktop_context_menu.dart';
+import '../../../shared/widgets/action_sheet.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
@@ -16,11 +16,6 @@ import '../../settings/pages/sidebar_settings_page.dart';
 
 const sidebarExpandCurve = Cubic(.32, .72, 0, 1);
 
-Offset _menuAnchor(BuildContext context) {
-  final box = context.findRenderObject()! as RenderBox;
-  return box.localToGlobal(box.size.center(Offset.zero));
-}
-
 void _showEntryActions(
   BuildContext context,
   SidebarEntry entry, {
@@ -28,14 +23,17 @@ void _showEntryActions(
 }) {
   final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
-  showDesktopContextMenuAt(
+  showMobileActionSheet(
     context,
-    globalPosition: _menuAnchor(context),
-    compact: true,
-    borderRadius: 14,
+    title: entry.label(l10n),
     items: [
       for (final value in SidebarVisibility.values)
-        DesktopContextMenuItem(
+        ActionSheetItem(
+          icon: switch (value) {
+            SidebarVisibility.show => Lucide.Eye,
+            SidebarVisibility.more => Lucide.Ellipsis,
+            SidebarVisibility.hidden => Lucide.EyeOff,
+          },
           label: value.menuLabel(l10n),
           checked: value == settings.mobileSidebarEntries[entry],
           onTap: () => settings.setMobileSidebarEntries({
@@ -43,7 +41,8 @@ void _showEntryActions(
             entry: value,
           }),
         ),
-      DesktopContextMenuItem(
+      ActionSheetItem(
+        icon: Lucide.Settings2,
         label: l10n.sidebarCustomize,
         startsGroup: true,
         onTap:
@@ -61,17 +60,17 @@ enum _Customize { open }
 void _showCustomizeActions(BuildContext context, {VoidCallback? openSettings}) {
   final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
-  showDesktopContextMenuAt(
+  showMobileActionSheet(
     context,
-    globalPosition: _menuAnchor(context),
-    compact: true,
-    borderRadius: 14,
+    title: l10n.sidebarCustomize,
     items: [
-      DesktopContextMenuItem(
+      ActionSheetItem(
+        icon: Lucide.EyeOff,
         label: l10n.sidebarHideCustomize,
         onTap: () => settings.setShowSidebarCustomizeInMore(false),
       ),
-      DesktopContextMenuItem(
+      ActionSheetItem(
+        icon: Lucide.Settings2,
         label: l10n.sidebarOpenSettings,
         onTap:
             openSettings ??

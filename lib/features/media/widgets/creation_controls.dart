@@ -319,7 +319,7 @@ class CreationAction extends StatelessWidget {
           duration: handoffDuration(context, 140),
           borderRadius: BorderRadius.circular(
             pill
-                ? 16
+                ? 99
                 : small
                 ? 9
                 : 11,

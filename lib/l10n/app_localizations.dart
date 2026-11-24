@@ -32520,6 +32520,42 @@ abstract class AppLocalizations {
   /// **'Let this assistant draw or edit images in chat using the default image generation model.'**
   String get creationLocalToolHelp;
 
+  /// Count of files on disk within one generation in Storage > Creation, including artwork, references and thumbnails.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 file} other{{count} files}}'**
+  String creationStorageFileCount(int count);
+
+  /// Action in the chat tools panel and assistant settings that opens the default image model picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a default image model'**
+  String get creationSelectDefaultImage;
+
+  /// Notification when configuring the chat image tool and there are no eligible image models in any provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Add or enable an image model in Providers first.'**
+  String get creationConfigureImageProvider;
+
+  /// Chat item display setting. When on, each image result appears at its tool call in the reply. When off, images are grouped below the reply.
+  ///
+  /// In en, this message translates to:
+  /// **'Show generated images at the tool call'**
+  String get displayChatImagesAtToolCall;
+
+  /// Chat item display switch for the image count, model name and aspect ratio below generated images.
+  ///
+  /// In en, this message translates to:
+  /// **'Show generated image details'**
+  String get displayChatImageInfo;
+
+  /// Chat item display switch for the link from a generated image to its source in Creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Show link to Creation'**
+  String get displayChatImageLink;
+
   /// Warning below the assistant image generation toggle when no usable default image model is configured.
   ///
   /// In en, this message translates to:

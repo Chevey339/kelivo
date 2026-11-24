@@ -25,74 +25,83 @@ void main() {
   });
 
   for (final platform in [TargetPlatform.android, TargetPlatform.macOS]) {
-    testWidgets(
-      '$platform session storage browses real files without a workspace binding',
-      (tester) async {
-        debugDefaultTargetPlatformOverride = platform;
-        try {
-          tester.view.physicalSize = Size(
-            platform == TargetPlatform.android ? 420 : 1200,
-            900,
-          );
-          tester.view.devicePixelRatio = 1;
-          addTearDown(tester.view.resetPhysicalSize);
-          addTearDown(tester.view.resetDevicePixelRatio);
-          await tester.runAsync(() async {
-            await Directory('${root.path}/attachments').create();
-            await File(
-              '${root.path}/attachments/报告.txt',
-            ).writeAsString('report');
-          });
-          final category = StorageUsageCategory(
-            key: StorageUsageCategoryKey.sessionFiles,
-            stats: const StorageUsageStats(fileCount: 1, bytes: 6),
-            subcategories: [
-              StorageUsageSubcategory(
-                id: 'conversation-a',
-                path: root.path,
-                isDirectory: true,
-                stats: const StorageUsageStats(fileCount: 1, bytes: 6),
-              ),
-            ],
-          );
-          await tester.pumpWidget(
-            ChangeNotifierProvider(
-              create: (_) => SettingsProvider(createBusinessTestPreferences()),
-              child: MaterialApp(
-                locale: const Locale('en'),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: Scaffold(
-                  body: StorageContentsList(
-                    category: category,
-                    fmtBytes: (bytes) => '$bytes B',
+    for (final key in [
+      StorageUsageCategoryKey.sessionFiles,
+      StorageUsageCategoryKey.creations,
+    ]) {
+      testWidgets(
+        '$platform $key browses real files without a database record',
+        (tester) async {
+          debugDefaultTargetPlatformOverride = platform;
+          try {
+            tester.view.physicalSize = Size(
+              platform == TargetPlatform.android ? 420 : 1200,
+              900,
+            );
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            await tester.runAsync(() async {
+              await Directory('${root.path}/attachments').create();
+              await File(
+                '${root.path}/attachments/报告.txt',
+              ).writeAsString('report');
+            });
+            final category = StorageUsageCategory(
+              key: key,
+              stats: const StorageUsageStats(fileCount: 1, bytes: 6),
+              subcategories: [
+                StorageUsageSubcategory(
+                  id: 'conversation-a',
+                  path: root.path,
+                  isDirectory: true,
+                  stats: const StorageUsageStats(fileCount: 1, bytes: 6),
+                ),
+              ],
+            );
+            await tester.pumpWidget(
+              ChangeNotifierProvider(
+                create: (_) =>
+                    SettingsProvider(createBusinessTestPreferences()),
+                child: MaterialApp(
+                  locale: const Locale('en'),
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  home: Scaffold(
+                    body: StorageContentsList(
+                      category: category,
+                      fmtBytes: (bytes) => '$bytes B',
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-          await tester.pumpAndSettle();
-          expect(find.text('6 B'), findsOneWidget);
-          await tester.tap(
-            find.byKey(const ValueKey('storage-content-conversation-a')),
-          );
-          await _waitFor(
-            tester,
-            find.byKey(FileBrowser.itemKey('attachments')),
-          );
-          expect(find.byType(BottomSheet), findsNothing);
-          final browser = tester.widget<FileBrowser>(find.byType(FileBrowser));
-          expect(browser.root.path, root.path);
-          await tester.tap(find.byKey(FileBrowser.itemKey('attachments')));
-          await _waitFor(tester, find.byKey(FileBrowser.itemKey('报告.txt')));
-          expect(tester.takeException(), isNull);
-          await tester.pumpWidget(const SizedBox());
-          await tester.pumpAndSettle();
-        } finally {
-          debugDefaultTargetPlatformOverride = null;
-        }
-      },
-    );
+            );
+            await tester.pumpAndSettle();
+            expect(find.textContaining('6 B'), findsOneWidget);
+            await tester.tap(
+              find.byKey(const ValueKey('storage-content-conversation-a')),
+            );
+            await _waitFor(
+              tester,
+              find.byKey(FileBrowser.itemKey('attachments')),
+            );
+            expect(find.byType(BottomSheet), findsNothing);
+            final browser = tester.widget<FileBrowser>(
+              find.byType(FileBrowser),
+            );
+            expect(browser.root.path, root.path);
+            await tester.tap(find.byKey(FileBrowser.itemKey('attachments')));
+            await _waitFor(tester, find.byKey(FileBrowser.itemKey('报告.txt')));
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox());
+            await tester.pumpAndSettle();
+          } finally {
+            debugDefaultTargetPlatformOverride = null;
+          }
+        },
+      );
+    }
   }
 }
 

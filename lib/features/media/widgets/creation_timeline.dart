@@ -24,7 +24,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import 'creation_toast.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'creation_controls.dart';
@@ -720,8 +720,9 @@ class _BatchGroupState extends State<_BatchGroup> {
   Future<void> _copy() async {
     await Clipboard.setData(ClipboardData(text: widget.batch.prompt));
     if (mounted) {
-      showCreationToast(
+      showAppSnackBar(
         context,
+        type: NotificationType.success,
         message: AppLocalizations.of(context)!.creationOptionCopied,
       );
     }
@@ -733,8 +734,9 @@ class _BatchGroupState extends State<_BatchGroup> {
       await media.repeat(widget.batch);
     } catch (_) {
       if (mounted) {
-        showCreationToast(
+        showAppSnackBar(
           context,
+          type: NotificationType.error,
           message: AppLocalizations.of(context)!.creationActionFailed,
         );
       }
@@ -857,7 +859,11 @@ class _BatchGroupState extends State<_BatchGroup> {
       await media.deleteBatch(widget.batch);
     } catch (_) {
       if (mounted) {
-        showCreationToast(context, message: l10n.creationActionFailed);
+        showAppSnackBar(
+          context,
+          type: NotificationType.error,
+          message: l10n.creationActionFailed,
+        );
       }
     }
   }
@@ -1005,7 +1011,11 @@ Future<void> showCreationRequestDetails(
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: copyText));
           if (dialog.mounted) {
-            showCreationToast(dialog, message: l10n.creationOptionCopied);
+            showAppSnackBar(
+              dialog,
+              type: NotificationType.success,
+              message: l10n.creationOptionCopied,
+            );
           }
         },
         child: Text(MaterialLocalizations.of(dialog).copyButtonLabel),
@@ -1023,7 +1033,11 @@ Future<void> showCreationRequestDetails(
             }
           } catch (_) {
             if (context.mounted) {
-              showCreationToast(context, message: l10n.creationActionFailed);
+              showAppSnackBar(
+                context,
+                type: NotificationType.error,
+                message: l10n.creationActionFailed,
+              );
             }
           }
         },
@@ -1319,8 +1333,9 @@ class _DownloadFailure extends StatelessWidget {
                       await media.retry(batch);
                     } catch (_) {
                       if (context.mounted) {
-                        showCreationToast(
+                        showAppSnackBar(
                           context,
+                          type: NotificationType.error,
                           message: l10n.creationActionFailed,
                         );
                       }
@@ -1433,8 +1448,9 @@ class _BatchFailure extends StatelessWidget {
                             await media.retry(batch);
                           } catch (_) {
                             if (context.mounted) {
-                              showCreationToast(
+                              showAppSnackBar(
                                 context,
+                                type: NotificationType.error,
                                 message: l10n.creationActionFailed,
                               );
                             }

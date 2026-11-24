@@ -3,6 +3,7 @@ import 'dart:async';
 
 import '../../../shared/widgets/desktop_file_drop_target.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
@@ -89,7 +90,16 @@ class _MediaCreationPageState extends State<MediaCreationPage> {
             CreationMobileBar(
               searching: _searching,
               leading: IosIconButton(
-                icon: _searching ? Lucide.ArrowLeft : Lucide.Menu,
+                icon: _searching ? Lucide.ArrowLeft : null,
+                builder: _searching
+                    ? null
+                    : (color) => SvgPicture.asset(
+                        'assets/icons/list.svg',
+                        width: 14,
+                        height: 14,
+                        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                      ),
+                visualSize: 44,
                 minSize: 44,
                 tooltip: _searching
                     ? MaterialLocalizations.of(context).backButtonTooltip

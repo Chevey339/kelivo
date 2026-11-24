@@ -18705,6 +18705,34 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bu asistanın sohbette varsayılan görsel oluşturma modelini kullanarak görsel çizmesine veya düzenlemesine izin verin.';
 
   @override
+  String creationStorageFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dosya',
+      one: '1 dosya',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationSelectDefaultImage => 'Varsayılan bir görsel modeli seçin';
+
+  @override
+  String get creationConfigureImageProvider =>
+      'Önce Sağlayıcılar bölümünde bir görsel modeli ekleyin veya etkinleştirin.';
+
+  @override
+  String get displayChatImagesAtToolCall =>
+      'Oluşturulan görselleri araç çağrısında göster';
+
+  @override
+  String get displayChatImageInfo => 'Oluşturulan görsel ayrıntılarını göster';
+
+  @override
+  String get displayChatImageLink => 'Oluşturma bağlantısını göster';
+
+  @override
   String get creationLocalToolNeedsModel =>
       'Önce Varsayılan modeller bölümünde bir görsel oluşturma modeli seçin.';
 

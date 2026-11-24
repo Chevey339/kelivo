@@ -10,6 +10,9 @@ import 'package:provider/provider.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/models/media_creation.dart';
 import '../../../core/models/message_part.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/tools/generate_image_tool.dart';
+import 'timeline_projection.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/media/chat_image_generation_service.dart';
 import '../../../core/services/media/media_request.dart';
@@ -18,7 +21,7 @@ import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../media/widgets/creation_toast.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../media/widgets/creation_controls.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/thinking_sheen.dart';
@@ -31,12 +34,127 @@ import '../../media/widgets/creation_timeline.dart';
 import '../../media/widgets/creation_waiting_card.dart';
 import '../pages/image_viewer_page.dart';
 
-typedef _ImageSlot = ({
+typedef ChatImageSlot = ({
   String id,
   GenerationBatchRow? batch,
   GenerationItemRow? item,
   ImagePart? attachment,
 });
+
+List<ChatImageSlot> _imageSlots(
+  BuildContext context,
+  String messageId,
+  List<ImagePart> attachments, {
+  bool listen = true,
+}) {
+  List<(GenerationBatchRow, GenerationItemRow?)> rowsFor(
+    MediaCreationController? media,
+  ) => [
+    if (media != null)
+      for (final batch in media.chatBatchesFor(messageId))
+        (
+          batch,
+          media
+              .itemsFor(batch.id)
+              .where((item) => item.status == GenerationItemStatus.ready)
+              .firstOrNull,
+        ),
+  ];
+  final rows = listen
+      ? context.select<
+          MediaCreationController?,
+          List<(GenerationBatchRow, GenerationItemRow?)>
+        >(rowsFor)
+      : rowsFor(context.read<MediaCreationController?>());
+  final byItem = {
+    for (final part in attachments)
+      if (part.generationItemId case final id?) id: part,
+  };
+  return <ChatImageSlot>[
+    for (final (batch, item) in rows)
+      if (batch.status.isActive ||
+          item != null ||
+          batch.status != GenerationStatus.succeeded)
+        (
+          id: batch.id,
+          batch: batch,
+          item: item,
+          attachment: byItem.remove(item?.id),
+        ),
+    for (final part in byItem.values)
+      (id: part.generationItemId!, batch: null, item: null, attachment: part),
+  ];
+}
+
+/// Matches only this reply's results. An older or unlinked image stays in the footer.
+class ChatImagePlacement {
+  ChatImagePlacement._(this.atCall, this.footer);
+
+  final Map<int, List<ChatImageSlot>> atCall;
+  final List<ChatImageSlot> footer;
+
+  static ChatImagePlacement? resolve(
+    BuildContext context,
+    String messageId,
+    List<ImagePart> attachments,
+    TimelineProjection projection, {
+    bool listen = true,
+  }) {
+    final steps = [
+      for (final block in projection.blocks)
+        for (final step in block.steps)
+          if (step.tool?.toolName == GenerateImageTool.name) step,
+    ];
+    if (steps.isEmpty) return null;
+    final byBatch = <String, int>{};
+    final byCall = <String, int>{};
+    final byItem = <String, int>{};
+    for (final step in steps) {
+      final tool = step.tool!;
+      if (tool.providerId.isNotEmpty) {
+        byCall[tool.providerId] = step.sourceOrdinal;
+      }
+      if (tool.metadata?[GenerateImageTool.batchKey] case final String id) {
+        byBatch[id] = step.sourceOrdinal;
+      }
+      if (GenerateImageTool.attachment(tool.metadata)?.generationItemId
+          case final id?) {
+        byItem[id] = step.sourceOrdinal;
+      }
+    }
+    final atCall = <int, List<ChatImageSlot>>{};
+    final footer = <ChatImageSlot>[];
+    for (final slot in _imageSlots(
+      context,
+      messageId,
+      attachments,
+      listen: listen,
+    )) {
+      var ordinal =
+          byBatch[slot.batch?.id] ??
+          byItem[slot.item?.id ?? slot.attachment?.generationItemId];
+      // Active calls can precede the tool-result metadata in the chat stream.
+      final batch = slot.batch;
+      if (ordinal == null && batch != null) {
+        try {
+          if (jsonDecode(batch.paramsJson) case {
+            GenerateImageTool.callIdParameter: final String id,
+          }) {
+            ordinal = byCall[id];
+          }
+        } on FormatException {
+          // The saved chat attachment can still be displayed in the footer.
+        }
+      }
+      if (ordinal == null) {
+        footer.add(slot);
+      } else {
+        (atCall[ordinal] ??= []).add(slot);
+      }
+    }
+    return ChatImagePlacement._(atCall, footer);
+  }
+}
 
 class ChatCreationImages extends StatefulWidget {
   const ChatCreationImages({
@@ -44,9 +162,17 @@ class ChatCreationImages extends StatefulWidget {
     required this.messageId,
     required this.attachments,
     required this.streaming,
-  });
+  }) : slots = null;
+
+  const ChatCreationImages.forSlots({
+    super.key,
+    required this.messageId,
+    required List<ChatImageSlot> this.slots,
+    required this.streaming,
+  }) : attachments = const [];
 
   final String messageId;
+  final List<ChatImageSlot>? slots;
   final List<ImagePart> attachments;
   final bool streaming;
 
@@ -117,14 +243,15 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
       if (mounted) setState(() => _retrying = null);
     }
     if (mounted) {
-      showCreationToast(
+      showAppSnackBar(
         context,
+        type: NotificationType.error,
         message: AppLocalizations.of(context)!.creationActionFailed,
       );
     }
   }
 
-  double _ratio(_ImageSlot slot) {
+  double _ratio(ChatImageSlot slot) {
     final width = slot.item?.width;
     final height = slot.item?.height;
     if (width != null && height != null && width > 0 && height > 0) {
@@ -153,43 +280,17 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
   @override
   Widget build(BuildContext context) {
     final media = context.read<MediaCreationController?>();
-    final rows = context
-        .select<
-          MediaCreationController?,
-          List<(GenerationBatchRow, GenerationItemRow?)>
-        >(
-          (media) => [
-            for (final batch
-                in media?.chatBatchesFor(widget.messageId) ??
-                    const <GenerationBatchRow>[])
-              (
-                batch,
-                media
-                    ?.itemsFor(batch.id)
-                    .where((item) => item.status == GenerationItemStatus.ready)
-                    .firstOrNull,
-              ),
-          ],
-        );
-    final byItem = {
-      for (final part in widget.attachments)
-        if (part.generationItemId case final id?) id: part,
-    };
-    final slots = <_ImageSlot>[
-      for (final (batch, item) in rows)
-        if (batch.status.isActive ||
-            item != null ||
-            batch.status != GenerationStatus.succeeded)
-          (
-            id: batch.id,
-            batch: batch,
-            item: item,
-            attachment: byItem.remove(item?.id),
-          ),
-      for (final part in byItem.values)
-        (id: part.generationItemId!, batch: null, item: null, attachment: part),
-    ];
+    final slots =
+        widget.slots ??
+        _imageSlots(context, widget.messageId, widget.attachments);
     if (slots.isEmpty) return const SizedBox.shrink();
+    final (showInfo, showLink) = context
+        .select<SettingsProvider?, (bool, bool)>(
+          (settings) => (
+            settings?.showChatImageInfo ?? true,
+            settings?.showChatImageLink ?? true,
+          ),
+        );
     final slot =
         slots.where((value) => value.id == _selected).firstOrNull ?? slots.last;
     final l10n = AppLocalizations.of(context)!;
@@ -306,8 +407,19 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
                     ],
                   ),
                   if (slot.item case final item?
-                      when !active && !held && batch != null && media != null)
-                    _caption(item, batch, media, readyCount),
+                      when (showInfo || showLink) &&
+                          !active &&
+                          !held &&
+                          batch != null &&
+                          media != null)
+                    _caption(
+                      item,
+                      batch,
+                      media,
+                      readyCount,
+                      showInfo: showInfo,
+                      showLink: showLink,
+                    ),
                 ],
               ),
             ),
@@ -318,8 +430,8 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
   }
 
   Widget _main(
-    _ImageSlot slot,
-    List<_ImageSlot> slots,
+    ChatImageSlot slot,
+    List<ChatImageSlot> slots,
     MediaCreationController? media,
     double ratio,
     bool desktop,
@@ -451,9 +563,9 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
   }
 
   Widget _finishedImage(
-    _ImageSlot slot,
+    ChatImageSlot slot,
     GenerationItemRow item,
-    List<_ImageSlot> slots,
+    List<ChatImageSlot> slots,
     bool desktop,
   ) {
     return Focus(
@@ -500,7 +612,11 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     );
   }
 
-  Widget _thumbnail(_ImageSlot slot, bool selected, List<_ImageSlot> slots) {
+  Widget _thumbnail(
+    ChatImageSlot slot,
+    bool selected,
+    List<ChatImageSlot> slots,
+  ) {
     final cs = Theme.of(context).colorScheme;
     final path =
         slot.item?.thumbnailPath ?? slot.attachment?.uri ?? slot.item?.path;
@@ -564,8 +680,10 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
     GenerationItemRow item,
     GenerationBatchRow batch,
     MediaCreationController media,
-    int count,
-  ) {
+    int count, {
+    required bool showInfo,
+    required bool showLink,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     final provider = media.settings.getProviderConfig(batch.providerId);
     final model = ModelSpecResolver.instance.spec(provider, batch.modelId);
@@ -580,21 +698,24 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 8,
       children: [
-        Text(
-          l10n.creationChatResultCaption(count, model.displayName, ratio),
-          style: TextStyle(
-            fontSize: 12.5,
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: .42),
+        if (showInfo)
+          Text(
+            l10n.creationChatResultCaption(count, model.displayName, ratio),
+            style: TextStyle(
+              fontSize: 12.5,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: .42),
+            ),
           ),
-        ),
-        _link(
-          l10n.creationShowInCreation,
-          () =>
-              ChatActionBus.instance.fireCreation(OpenCreationArtwork(item.id)),
-          external: true,
-        ),
+        if (showLink)
+          _link(
+            l10n.creationShowInCreation,
+            () => ChatActionBus.instance.fireCreation(
+              OpenCreationArtwork(item.id),
+            ),
+            external: true,
+          ),
       ],
     );
   }
@@ -657,6 +778,7 @@ class _ChatImageActions extends StatelessWidget {
     Widget button(IconData icon, String label, VoidCallback tap) => ColoredBox(
       color: Colors.white.withValues(alpha: .16),
       child: IosIconButton(
+        shape: BoxShape.circle,
         icon: icon,
         size: 15,
         minSize: 30,

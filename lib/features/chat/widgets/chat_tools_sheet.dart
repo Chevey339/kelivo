@@ -383,7 +383,9 @@ class _LocalToolsGroup extends StatelessWidget {
     );
     if (assistant == null) return const SizedBox.shrink();
     final ids = availableLocalToolIds();
+    final hasImageModel = watchHasDefaultImageModel(context);
     final enabled = assistant.localToolIds.toSet();
+    if (!hasImageModel) enabled.remove(LocalToolNames.generateImage);
     final enabledCount = ids.where(enabled.contains).length;
 
     return ImageRecallControl(
@@ -402,6 +404,9 @@ class _LocalToolsGroup extends StatelessWidget {
               key: ChatToolsSheet.localToolKey(id),
               icon: localToolIcon(id),
               label: localToolTitle(l10n, id),
+              subtitle: id == LocalToolNames.generateImage && !hasImageModel
+                  ? l10n.creationSelectDefaultImage
+                  : null,
               selected: enabled.contains(id),
               onTap: () => unawaited(
                 setLocalToolEnabled(

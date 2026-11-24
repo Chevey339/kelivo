@@ -38,7 +38,6 @@ class ChatImageGenerationService {
   final ChatService chat;
   final SettingsProvider settings;
   final Future<Directory> Function() _uploadDirectory;
-  static const _toolCallParameter = 'chatToolCallId';
 
   static ClientToolResult error(String message, {String? batchId}) =>
       ClientToolResult(
@@ -152,7 +151,7 @@ class ChatImageGenerationService {
           references: references,
           parameters: {
             if (toolCallId != null && toolCallId.isNotEmpty)
-              _toolCallParameter: toolCallId,
+              GenerateImageTool.callIdParameter: toolCallId,
           },
         ),
         source: GenerationSource.chat,
@@ -267,7 +266,7 @@ class ChatImageGenerationService {
     }
     final toolCallId = MediaRequest.fromBatch(
       batch,
-    ).parameters[_toolCallParameter];
+    ).parameters[GenerateImageTool.callIdParameter];
     while (identical(chat.chatRepositoryOrNull, repository) &&
         await repository.waitForFinishedMessage(messageId)) {
       final applied = await AttachmentFileLock.synchronized<bool?>(() async {

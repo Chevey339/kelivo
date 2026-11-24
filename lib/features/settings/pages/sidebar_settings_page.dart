@@ -14,22 +14,9 @@ import '../../../theme/app_semantic_colors.dart';
 import '../widgets/sidebar_entries_editor.dart';
 
 void openSidebarSettings(BuildContext context) {
-  final duration = handoffDuration(context, 460);
-  Navigator.of(context).push<void>(
-    PageRouteBuilder(
-      transitionDuration: duration,
-      reverseTransitionDuration: duration,
-      pageBuilder: (_, _, _) => const SidebarSettingsPage(),
-      transitionsBuilder: (context, animation, _, child) => SlideTransition(
-        position: Tween(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: handoffCurve)),
-        textDirection: Directionality.of(context),
-        child: child,
-      ),
-    ),
-  );
+  Navigator.of(
+    context,
+  ).push<void>(MaterialPageRoute(builder: (_) => const SidebarSettingsPage()));
 }
 
 class SidebarSettingsPage extends StatelessWidget {
@@ -42,210 +29,156 @@ class SidebarSettingsPage extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final layout = settings.mobileSidebarLayout;
     final currentPreset = layout.preset;
-    return ColoredBox(
-      color: cs.surface,
-      child: SafeArea(
-        child: DefaultTextStyle(
-          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-            color: cs.onSurface,
-            decoration: TextDecoration.none,
-          ),
-          child: Column(
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 52),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.sidebarSettingsTitle),
+        leading: IosIconButton(
+          icon: Lucide.ArrowLeft,
+          size: 22,
+          color: cs.onSurface,
+          tooltip: l10n.settingsPageBackButton,
+          onTap: () => Navigator.of(context).maybePop(),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            IosSectionHeader(text: l10n.sidebarLayoutTitle),
+            if (currentPreset == null)
+              IosSectionFooter(text: l10n.sidebarPresetCustom),
+            for (final presets in [
+              SidebarPreset.values.take(2),
+              SidebarPreset.values.skip(2),
+            ])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(width: 8),
-                    IosIconButton(
-                      icon: Lucide.ArrowLeft,
-                      size: 22,
-                      minSize: 44,
-                      tooltip: l10n.settingsPageBackButton,
-                      onTap: () => Navigator.of(context).maybePop(),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${l10n.settingsPageTitle} › ${l10n.settingsPageDisplay}',
-                            style: TextStyle(
-                              color: cs.onSurfaceVariant,
-                              fontSize: 11.5,
-                            ),
-                          ),
-                          Text(
-                            l10n.sidebarSettingsTitle,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                    for (final preset in presets) ...[
+                      if (preset != presets.first) const SizedBox(width: 8),
+                      Expanded(
+                        child: _PresetCard(
+                          preset: preset,
+                          selected: currentPreset == preset,
+                          onTap: () =>
+                              settings.setMobileSidebarLayout(preset.layout),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  children: [
-                    IosSectionHeader(text: l10n.sidebarLayoutTitle),
-                    if (currentPreset == null)
-                      IosSectionFooter(text: l10n.sidebarPresetCustom),
-                    for (final presets in [
-                      SidebarPreset.values.take(2),
-                      SidebarPreset.values.skip(2),
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (final preset in presets) ...[
-                              if (preset != presets.first)
-                                const SizedBox(width: 8),
-                              Expanded(
-                                child: _PresetCard(
-                                  preset: preset,
-                                  selected: currentPreset == preset,
-                                  onTap: () => settings.setMobileSidebarLayout(
-                                    preset.layout,
-                                  ),
+            IosSectionHeader(text: l10n.sidebarReorderTitle),
+            IosSectionFooter(text: l10n.sidebarReorderHint),
+            SectionCard(
+              children: [
+                SidebarReorderList<SidebarBlock>(
+                  items: layout.visibleOrder.toList(),
+                  itemExtent: 52,
+                  separator: SidebarBlock.conversations,
+                  onMove: (block, target) => settings.setMobileSidebarLayout(
+                    layout.moveBlock(block, target),
+                  ),
+                  itemBuilder: (context, block, handle) {
+                    final separator = block == SidebarBlock.conversations;
+                    return Container(
+                      height: 52,
+                      color: separator ? context.appColors.surfaceFill : null,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        children: [
+                          handle,
+                          Icon(
+                            _blockIcon(block),
+                            size: 18,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(_blockLabel(block, l10n))),
+                          if (!separator)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Text(
+                                layout.isBelowConversations(block)
+                                    ? l10n.sidebarBlockBottom
+                                    : l10n.sidebarBlockTop,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurfaceVariant,
                                 ),
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    IosSectionHeader(text: l10n.sidebarReorderTitle),
-                    IosSectionFooter(text: l10n.sidebarReorderHint),
-                    SectionCard(
-                      children: [
-                        SidebarReorderList<SidebarBlock>(
-                          items: layout.visibleOrder.toList(),
-                          itemExtent: 52,
-                          separator: SidebarBlock.conversations,
-                          onMove: (block, target) =>
-                              settings.setMobileSidebarLayout(
-                                layout.moveBlock(block, target),
-                              ),
-                          itemBuilder: (context, block, handle) {
-                            final separator =
-                                block == SidebarBlock.conversations;
-                            return Container(
-                              height: 52,
-                              color: separator
-                                  ? context.appColors.surfaceFill
-                                  : null,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              child: Row(
-                                children: [
-                                  handle,
-                                  Icon(
-                                    _blockIcon(block),
-                                    size: 18,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(_blockLabel(block, l10n)),
-                                  ),
-                                  if (!separator)
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: Text(
-                                        layout.isBelowConversations(block)
-                                            ? l10n.sidebarBlockBottom
-                                            : l10n.sidebarBlockTop,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: cs.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    IosSectionHeader(text: l10n.sidebarBlockAssistant),
-                    SectionCard(
-                      children: [
-                        IosSwitchRow(
-                          label: l10n
-                              .displaySettingsPageKeepSidebarOpenOnAssistantTapTitle,
-                          value: settings.keepSidebarOpenOnAssistantTap,
-                          onChanged: settings.setKeepSidebarOpenOnAssistantTap,
-                        ),
-                        const IosRowDivider(),
-                        IosSwitchRow(
-                          label: l10n
-                              .displaySettingsPageNewChatOnAssistantSwitchTitle,
-                          value: settings.newChatOnAssistantSwitch,
-                          onChanged: settings.setNewChatOnAssistantSwitch,
-                        ),
-                        const IosRowDivider(),
-                        IosSwitchRow(
-                          label: l10n.sidebarHideSingleAssistant,
-                          subtitle: l10n.sidebarHideSingleAssistantHint,
-                          value: settings.hideSidebarSingleAssistant,
-                          onChanged: settings.setHideSidebarSingleAssistant,
-                        ),
-                      ],
-                    ),
-                    IosSectionHeader(text: l10n.sidebarBlockEntries),
-                    SectionCard(
-                      children: [
-                        IosNavRow(
-                          label: l10n.sidebarDisplayAs,
-                          trailing: SizedBox(
-                            width: 140,
-                            child: SlidingSegmentedTabs(
-                              height: 36,
-                              backgroundColor: context.appColors.surfaceFill,
-                              tabs: [
-                                SegmentedTab(label: l10n.sidebarStyleList),
-                                SegmentedTab(label: l10n.sidebarStyleIcons),
-                              ],
-                              index: layout.style.index,
-                              onChanged: (index) =>
-                                  settings.setMobileSidebarLayout(
-                                    layout.withStyle(
-                                      SidebarStyle.values[index],
-                                    ),
-                                  ),
                             ),
-                          ),
-                        ),
-                        const IosRowDivider(),
-                        SidebarEntriesEditor(
-                          entries: settings.mobileSidebarEntries,
-                          mobileStyle: layout.style,
-                          onChanged: settings.setMobileSidebarEntries,
-                        ),
-                        const IosRowDivider(),
-                        IosSwitchRow(
-                          label: l10n.sidebarShowCustomizeInMore,
-                          subtitle: l10n.sidebarShowCustomizeInMoreHint,
-                          value: settings.showSidebarCustomizeInMore,
-                          onChanged: settings.setShowSidebarCustomizeInMore,
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+            IosSectionHeader(text: l10n.sidebarBlockAssistant),
+            SectionCard(
+              children: [
+                IosSwitchRow(
+                  label: l10n
+                      .displaySettingsPageKeepSidebarOpenOnAssistantTapTitle,
+                  value: settings.keepSidebarOpenOnAssistantTap,
+                  onChanged: settings.setKeepSidebarOpenOnAssistantTap,
+                ),
+                const IosRowDivider(),
+                IosSwitchRow(
+                  label: l10n.displaySettingsPageNewChatOnAssistantSwitchTitle,
+                  value: settings.newChatOnAssistantSwitch,
+                  onChanged: settings.setNewChatOnAssistantSwitch,
+                ),
+                const IosRowDivider(),
+                IosSwitchRow(
+                  label: l10n.sidebarHideSingleAssistant,
+                  subtitle: l10n.sidebarHideSingleAssistantHint,
+                  value: settings.hideSidebarSingleAssistant,
+                  onChanged: settings.setHideSidebarSingleAssistant,
+                ),
+              ],
+            ),
+            IosSectionHeader(text: l10n.sidebarBlockEntries),
+            SectionCard(
+              children: [
+                IosNavRow(
+                  label: l10n.sidebarDisplayAs,
+                  trailing: SizedBox(
+                    width: 140,
+                    child: SlidingSegmentedTabs(
+                      height: 36,
+                      backgroundColor: context.appColors.surfaceFill,
+                      tabs: [
+                        SegmentedTab(label: l10n.sidebarStyleList),
+                        SegmentedTab(label: l10n.sidebarStyleIcons),
+                      ],
+                      index: layout.style.index,
+                      onChanged: (index) => settings.setMobileSidebarLayout(
+                        layout.withStyle(SidebarStyle.values[index]),
+                      ),
+                    ),
+                  ),
+                ),
+                const IosRowDivider(),
+                SidebarEntriesEditor(
+                  entries: settings.mobileSidebarEntries,
+                  mobileStyle: layout.style,
+                  onChanged: settings.setMobileSidebarEntries,
+                ),
+                const IosRowDivider(),
+                IosSwitchRow(
+                  label: l10n.sidebarShowCustomizeInMore,
+                  subtitle: l10n.sidebarShowCustomizeInMoreHint,
+                  value: settings.showSidebarCustomizeInMore,
+                  onChanged: settings.setShowSidebarCustomizeInMore,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

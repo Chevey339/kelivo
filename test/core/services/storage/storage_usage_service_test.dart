@@ -89,6 +89,12 @@ void main() {
     );
     expect(creations.stats.bytes, 42);
     expect(creations.stats.fileCount, 2);
+    final batch = creations.subcategories.single;
+    expect(batch.id, 'batch');
+    expect(batch.isDirectory, isTrue);
+    expect(batch.path, p.join(tempDir.path, 'generations', 'batch'));
+    expect(batch.stats.bytes, 42);
+    expect(batch.stats.fileCount, 2);
     expect(report.totalBytes, 50);
     expect(report.totalFiles, 3);
   });

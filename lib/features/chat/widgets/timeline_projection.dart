@@ -2,6 +2,7 @@ import 'package:Kelivo/utils/protected_text.dart';
 import 'package:Kelivo/utils/source_text_map.dart';
 import 'package:markstream/markstream_core.dart' show SourceSpan;
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show setEquals;
 
 import '../../../core/models/message_part.dart';
 import '../utils/thinking_tag_parser.dart';
@@ -294,7 +295,8 @@ class TimelineProjection {
 /// One visible assistant block after role settings and approval filters.
 class TimelineVisibleBlock {
   const TimelineVisibleBlock.text(this.text, {this.uiSource, this.sourceMap})
-    : imageUri = null,
+    : imageCallOrdinal = null,
+      imageUri = null,
       imageKey = null,
       aspectRatio = null,
       thinkingSteps = const [];
@@ -303,19 +305,31 @@ class TimelineVisibleBlock {
     this.imageUri, {
     this.imageKey,
     this.aspectRatio,
-  }) : text = null,
+  }) : imageCallOrdinal = null,
+       text = null,
        uiSource = null,
        sourceMap = null,
        thinkingSteps = const [];
 
   const TimelineVisibleBlock.thinking(this.thinkingSteps)
-    : text = null,
+    : imageCallOrdinal = null,
+      text = null,
       uiSource = null,
       sourceMap = null,
       imageUri = null,
       imageKey = null,
       aspectRatio = null;
 
+  const TimelineVisibleBlock.chatImage(this.imageCallOrdinal)
+    : text = null,
+      uiSource = null,
+      sourceMap = null,
+      imageUri = null,
+      imageKey = null,
+      aspectRatio = null,
+      thinkingSteps = const [];
+
+  final int? imageCallOrdinal;
   final String? text;
   final UiTextSlice? uiSource;
   final SourceTextMap? sourceMap;
@@ -1208,19 +1222,61 @@ List<TimelineVisibleBlock> visibleAssistantTimeline(
   TimelineProjection projection, {
   required bool showThinkingCards,
   required bool showToolCards,
+  Set<int> imageCallOrdinals = const {},
   required bool Function(TimelineToolRef tool) isPendingApproval,
 }) {
-  return [
-    for (final block in projection.blocks)
-      if (_visibleAssistantBlock(
-            block,
-            showThinkingCards: showThinkingCards,
-            showToolCards: showToolCards,
-            isPendingApproval: isPendingApproval,
-          )
-          case final visible?)
-        visible,
-  ];
+  final visible = <TimelineVisibleBlock>[];
+  for (final block in projection.blocks) {
+    _appendVisibleAssistantBlock(
+      visible,
+      block,
+      showThinkingCards: showThinkingCards,
+      showToolCards: showToolCards,
+      imageCallOrdinals: imageCallOrdinals,
+      isPendingApproval: isPendingApproval,
+    );
+  }
+  return visible;
+}
+
+void _appendVisibleAssistantBlock(
+  List<TimelineVisibleBlock> visible,
+  TimelineProjectedBlock block, {
+  required bool showThinkingCards,
+  required bool showToolCards,
+  required Set<int> imageCallOrdinals,
+  required bool Function(TimelineToolRef tool) isPendingApproval,
+}) {
+  void append(TimelineProjectedBlock part) {
+    final result = _visibleAssistantBlock(
+      part,
+      showThinkingCards: showThinkingCards,
+      showToolCards: showToolCards,
+      isPendingApproval: isPendingApproval,
+    );
+    if (result != null) visible.add(result);
+  }
+
+  var start = 0;
+  if (imageCallOrdinals.isNotEmpty) {
+    for (var i = 0; i < block.steps.length; i++) {
+      final step = block.steps[i];
+      if (step.tool?.toolName != LocalToolNames.generateImage ||
+          !imageCallOrdinals.contains(step.sourceOrdinal)) {
+        continue;
+      }
+      if (start < i) {
+        append(TimelineProjectedBlock.thinking(block.steps.sublist(start, i)));
+      }
+      visible.add(TimelineVisibleBlock.chatImage(step.sourceOrdinal));
+      start = i + 1;
+    }
+  }
+  if (start == 0) {
+    append(block);
+  } else if (start < block.steps.length) {
+    append(TimelineProjectedBlock.thinking(block.steps.sublist(start)));
+  }
 }
 
 /// Per-message visibility state. Only a changed suffix visits the block memo;
@@ -1229,6 +1285,7 @@ class TimelineVisibilityCache {
   TimelineProjection? _projection;
   List<TimelineVisibleBlock> _visible = const [];
   final _visiblePrefixCounts = <int>[0];
+  Set<int> _imageCallOrdinals = const {};
   bool? _showThinkingCards, _showToolCards;
   int filteredBlockCount = 0;
 
@@ -1236,10 +1293,12 @@ class TimelineVisibilityCache {
     TimelineProjection projection, {
     required bool showThinkingCards,
     required bool showToolCards,
+    Set<int> imageCallOrdinals = const {},
     required bool Function(TimelineToolRef tool) isPendingApproval,
   }) {
     final canReuse =
         showToolCards &&
+        setEquals(_imageCallOrdinals, imageCallOrdinals) &&
         _showToolCards == showToolCards &&
         _showThinkingCards == showThinkingCards;
     if (canReuse && identical(projection, _projection)) return _visible;
@@ -1253,15 +1312,17 @@ class TimelineVisibilityCache {
     _visiblePrefixCounts.length = prefix + 1;
     for (var i = prefix; i < projection.blocks.length; i++) {
       filteredBlockCount++;
-      final block = _visibleAssistantBlock(
+      _appendVisibleAssistantBlock(
+        visible,
         projection.blocks[i],
+        imageCallOrdinals: imageCallOrdinals,
         showThinkingCards: showThinkingCards,
         showToolCards: showToolCards,
         isPendingApproval: isPendingApproval,
       );
-      if (block != null) visible.add(block);
       _visiblePrefixCounts.add(visible.length);
     }
+    _imageCallOrdinals = imageCallOrdinals;
     _projection = projection;
     _showThinkingCards = showThinkingCards;
     _showToolCards = showToolCards;

@@ -18595,6 +18595,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'Let this assistant draw or edit images in chat using the default image generation model.';
 
   @override
+  String creationStorageFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationSelectDefaultImage => 'Choose a default image model';
+
+  @override
+  String get creationConfigureImageProvider =>
+      'Add or enable an image model in Providers first.';
+
+  @override
+  String get displayChatImagesAtToolCall =>
+      'Show generated images at the tool call';
+
+  @override
+  String get displayChatImageInfo => 'Show generated image details';
+
+  @override
+  String get displayChatImageLink => 'Show link to Creation';
+
+  @override
   String get creationLocalToolNeedsModel =>
       'Choose an image generation model in Default models first.';
 

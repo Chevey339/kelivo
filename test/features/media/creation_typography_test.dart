@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/desktop/desktop_context_menu.dart';
 import 'package:Kelivo/features/media/widgets/creation_menu.dart';
 import 'package:Kelivo/features/media/widgets/creation_picker.dart';
-import 'package:Kelivo/features/media/widgets/creation_toast.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/shared/widgets/plain_text_input.dart';
 
 void main() {
@@ -21,6 +21,7 @@ void main() {
       late BuildContext anchor;
       await tester.pumpWidget(
         MaterialApp(
+          builder: (context, child) => AppSnackBarOverlay(child: child!),
           theme: ThemeData(fontFamily: font, fontFamilyFallback: fallback),
           home: Scaffold(
             body: Builder(
@@ -66,7 +67,7 @@ void main() {
       check(rendered('Picker item'));
       Navigator.of(anchor).pop();
       await tester.pumpAndSettle();
-      showCreationToast(anchor, message: 'Added reference');
+      showAppSnackBar(anchor, message: 'Added reference');
       await tester.pump();
       check(rendered('Added reference'));
       await tester.pump(const Duration(seconds: 4));

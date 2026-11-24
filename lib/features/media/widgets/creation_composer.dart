@@ -24,7 +24,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
-import 'creation_toast.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../home/widgets/model_icon.dart';
@@ -112,8 +112,9 @@ class _CreationComposerState extends State<CreationComposer> {
     } catch (error) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        showCreationToast(
+        showAppSnackBar(
           context,
+          type: NotificationType.error,
           message: switch (error) {
             MediaFailure(kind: MediaFailureKind.referenceTooLarge) =>
               l10n.creationReferenceTooLarge,
@@ -173,8 +174,9 @@ class _CreationComposerState extends State<CreationComposer> {
     } catch (error) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
-      showCreationToast(
+      showAppSnackBar(
         context,
+        type: NotificationType.error,
         message:
             error is MediaFailure &&
                 error.kind == MediaFailureKind.referenceTooLarge
@@ -214,9 +216,11 @@ class _CreationComposerState extends State<CreationComposer> {
     if (original.trim().isEmpty) return;
     final selected = resolvePromptEnhancementModel(media.settings);
     if (selected == null) {
-      showCreationToast(
+      showAppSnackBar(
         context,
+        type: NotificationType.warning,
         message: l10n.creationEnhanceNeedsModel,
+        duration: const Duration(seconds: 6),
         actionLabel: l10n.creationDefaultEnhance,
         onAction: () {
           if (!mounted) return;
@@ -293,7 +297,11 @@ class _CreationComposerState extends State<CreationComposer> {
     } catch (_) {
       if (!mounted || !current()) return;
       _dismissEnhancement();
-      showCreationToast(context, message: l10n.creationActionFailed);
+      showAppSnackBar(
+        context,
+        type: NotificationType.error,
+        message: l10n.creationActionFailed,
+      );
     }
   }
 
@@ -1676,6 +1684,7 @@ class _ReferenceTileState extends State<_ReferenceTile> {
                         color: Colors.black54,
                       ),
                       child: IosIconButton(
+                        shape: BoxShape.circle,
                         icon: Lucide.X,
                         size: 11,
                         minSize: 18,
@@ -1951,6 +1960,7 @@ class _FrameSlotState extends State<_FrameSlot> {
                         shape: BoxShape.circle,
                       ),
                       child: IosIconButton(
+                        shape: BoxShape.circle,
                         icon: Lucide.X,
                         size: 11,
                         minSize: 18,

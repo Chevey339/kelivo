@@ -18926,6 +18926,37 @@ class AppLocalizationsRu extends AppLocalizations {
       'Позволяет ассистенту рисовать или редактировать изображения в чате с помощью модели генерации изображений по умолчанию.';
 
   @override
+  String creationStorageFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файла',
+      many: '$count файлов',
+      few: '$count файла',
+      one: '$count файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationSelectDefaultImage =>
+      'Выбрать модель генерации изображений по умолчанию';
+
+  @override
+  String get creationConfigureImageProvider =>
+      'Сначала добавьте или включите модель изображений в разделе «Провайдеры».';
+
+  @override
+  String get displayChatImagesAtToolCall =>
+      'Показывать созданные изображения у вызова инструмента';
+
+  @override
+  String get displayChatImageInfo => 'Показывать сведения об изображениях';
+
+  @override
+  String get displayChatImageLink => 'Показывать ссылку на «Создание»';
+
+  @override
   String get creationLocalToolNeedsModel =>
       'Сначала выберите модель генерации изображений в разделе «Модели по умолчанию».';
 

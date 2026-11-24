@@ -241,6 +241,9 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowThinkingCardsKey =
       'display_show_thinking_cards_v1';
   static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
+  static const String _inlineChatImagesKey = 'display_inline_chat_images_v1';
+  static const String _showChatImageInfoKey = 'display_chat_image_info_v1';
+  static const String _showChatImageLinkKey = 'display_chat_image_link_v1';
   static const String _displayShowProducedFilesKey =
       'display_show_produced_files_v1';
   static const String _displayShowReasoningLevelBadgeKey =
@@ -1128,6 +1131,9 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowUserMessageActionsKey) ?? true;
     _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
     _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
+    _inlineChatImages = prefs.getBool(_inlineChatImagesKey) ?? false;
+    _showChatImageInfo = prefs.getBool(_showChatImageInfoKey) ?? true;
+    _showChatImageLink = prefs.getBool(_showChatImageLinkKey) ?? true;
     _showProducedFiles = prefs.getBool(_displayShowProducedFilesKey) ?? true;
     _showReasoningLevelBadge =
         prefs.getBool(_displayShowReasoningLevelBadgeKey) ?? false;
@@ -5367,6 +5373,33 @@ Requirements:
     await prefs.setBool(_displayShowToolCardsKey, v);
   }
 
+  bool _inlineChatImages = false;
+  bool get inlineChatImages => _inlineChatImages;
+  Future<void> setInlineChatImages(bool value) async {
+    if (_inlineChatImages == value) return;
+    _inlineChatImages = value;
+    notifyListeners();
+    await _preferences.setBool(_inlineChatImagesKey, value);
+  }
+
+  bool _showChatImageInfo = true;
+  bool get showChatImageInfo => _showChatImageInfo;
+  Future<void> setShowChatImageInfo(bool value) async {
+    if (_showChatImageInfo == value) return;
+    _showChatImageInfo = value;
+    notifyListeners();
+    await _preferences.setBool(_showChatImageInfoKey, value);
+  }
+
+  bool _showChatImageLink = true;
+  bool get showChatImageLink => _showChatImageLink;
+  Future<void> setShowChatImageLink(bool value) async {
+    if (_showChatImageLink == value) return;
+    _showChatImageLink = value;
+    notifyListeners();
+    await _preferences.setBool(_showChatImageLinkKey, value);
+  }
+
   // Display: files produced by tools at the bottom of assistant messages.
   bool _showProducedFiles = true;
   bool get showProducedFiles => _showProducedFiles;
@@ -6727,6 +6760,9 @@ Requirements:
     copy._showModelTimestamp = _showModelTimestamp;
     copy._showThinkingCards = _showThinkingCards;
     copy._showToolCards = _showToolCards;
+    copy._inlineChatImages = _inlineChatImages;
+    copy._showChatImageInfo = _showChatImageInfo;
+    copy._showChatImageLink = _showChatImageLink;
     copy._showProducedFiles = _showProducedFiles;
     copy._showReasoningLevelBadge = _showReasoningLevelBadge;
     copy._iosNativeSelectionMenuEnabled = _iosNativeSelectionMenuEnabled;

@@ -18025,6 +18025,31 @@ class AppLocalizationsKo extends AppLocalizations {
       '기본 이미지 생성 모델을 사용해 어시스턴트가 채팅에서 이미지를 그리거나 편집하도록 합니다.';
 
   @override
+  String creationStorageFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 파일',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationSelectDefaultImage => '기본 이미지 모델 선택';
+
+  @override
+  String get creationConfigureImageProvider => '먼저 공급자에서 이미지 모델을 추가하거나 활성화하세요.';
+
+  @override
+  String get displayChatImagesAtToolCall => '도구 호출 위치에 생성 이미지 표시';
+
+  @override
+  String get displayChatImageInfo => '생성 이미지 세부 정보 표시';
+
+  @override
+  String get displayChatImageLink => '생성 항목 링크 표시';
+
+  @override
   String get creationLocalToolNeedsModel => '먼저 기본 모델에서 이미지 생성 모델을 선택하세요.';
 
   @override

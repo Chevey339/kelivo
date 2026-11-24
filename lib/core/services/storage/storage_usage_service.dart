@@ -533,7 +533,7 @@ abstract final class StorageUsageService {
             environmentDirectory ?? AppDirectories.getEnvironmentDirectory,
         rootfsUsageDirectory: rootfsUsageDirectory,
       ),
-      _measureUsage(creationsDir),
+      _measureContentsOf(() async => creationsDir),
     ).wait;
     byCat[StorageUsageCategoryKey.workspaceFiles]!.addStats(
       workspaceUsage.stats,
@@ -543,19 +543,19 @@ abstract final class StorageUsageService {
     byCat[StorageUsageCategoryKey.sandboxEnvironment]!.addStats(
       sandboxUsage.stats,
     );
-    byCat[StorageUsageCategoryKey.creations]!.addStats(creationUsage);
+    byCat[StorageUsageCategoryKey.creations]!.addStats(creationUsage.stats);
     totalFiles +=
         workspaceUsage.stats.fileCount +
         skillsUsage.stats.fileCount +
         sessionsUsage.stats.fileCount +
         sandboxUsage.stats.fileCount +
-        creationUsage.fileCount;
+        creationUsage.stats.fileCount;
     totalBytes +=
         workspaceUsage.stats.bytes +
         skillsUsage.stats.bytes +
         sessionsUsage.stats.bytes +
         sandboxUsage.stats.bytes +
-        creationUsage.bytes;
+        creationUsage.stats.bytes;
 
     final fontsDir = await AppDirectories.getFontsDirectory();
     final localModelsDir = Directory(p.join(contentRoot.path, 'asr_models'));
@@ -615,7 +615,8 @@ abstract final class StorageUsageService {
       ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.creations,
-        stats: creationUsage,
+        stats: creationUsage.stats,
+        subcategories: creationUsage.subcategories,
       ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.chatData,

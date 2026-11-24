@@ -3837,9 +3837,7 @@ class _ModelCard extends StatelessWidget {
                 if (!isSelectionMode) ...[
                   const SizedBox(width: 8),
                   _TactileIconButton(
-                    icon: effective.type.isMedia
-                        ? Lucide.SlidersHorizontal
-                        : Lucide.Settings2,
+                    icon: Lucide.Settings2,
                     color: cs.onSurface.withValues(alpha: 0.7),
                     size: 18,
                     semanticLabel: l10n.providerDetailPageEditTooltip,

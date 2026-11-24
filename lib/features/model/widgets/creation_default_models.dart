@@ -33,7 +33,7 @@ import 'model_select_sheet.dart';
   ),
 };
 
-Future<void> pickCreationDefaultModel(
+Future<bool> pickCreationDefaultModel(
   BuildContext context,
   CreationModelSlot slot,
 ) async {
@@ -45,12 +45,12 @@ Future<void> pickCreationDefaultModel(
     initialProviderKey: current?.providerKey,
     initialModelId: current?.modelId,
   );
-  if (selected != null && context.mounted) {
-    await settings.setCreationModel(slot, (
-      providerKey: selected.providerKey,
-      modelId: selected.modelId,
-    ));
-  }
+  if (selected == null || !context.mounted) return false;
+  await settings.setCreationModel(slot, (
+    providerKey: selected.providerKey,
+    modelId: selected.modelId,
+  ));
+  return true;
 }
 
 Future<void> editCreationEnhancePrompt(

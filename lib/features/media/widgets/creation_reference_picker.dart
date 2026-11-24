@@ -23,7 +23,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/action_sheet.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
-import 'creation_toast.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/app_directories.dart';
 import '../../home/services/composer_clipboard.dart';
@@ -86,7 +86,11 @@ Future<void> showCreationReferenceSources(
     final data = await readCreationClipboard();
     if (!context.mounted) return;
     if (data.paths.isEmpty) {
-      showCreationToast(context, message: l10n.creationNoClipboardImage);
+      showAppSnackBar(
+        context,
+        type: NotificationType.warning,
+        message: l10n.creationNoClipboardImage,
+      );
     } else {
       onSelected(data.paths);
     }
@@ -97,7 +101,11 @@ Future<void> showCreationReferenceSources(
       await action();
     } catch (_) {
       if (context.mounted) {
-        showCreationToast(context, message: l10n.creationActionFailed);
+        showAppSnackBar(
+          context,
+          type: NotificationType.error,
+          message: l10n.creationActionFailed,
+        );
       }
     }
   }
@@ -385,8 +393,9 @@ class _RecentImagesState extends State<_RecentImages> {
       }
       if (!mounted) return;
       setState(() => _adding = false);
-      showCreationToast(
+      showAppSnackBar(
         context,
+        type: NotificationType.error,
         message: AppLocalizations.of(context)!.creationDownloadFailed,
       );
     }

@@ -16,7 +16,7 @@ import '../../../shared/widgets/plain_text_input.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart'
     show handoffCurve, handoffDuration;
-import 'creation_toast.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../providers/media_creation_controller.dart';
@@ -602,7 +602,11 @@ Future<void> showCreationTopicMenu(
           if (context.mounted) onDeleted?.call();
         } catch (_) {
           if (context.mounted) {
-            showCreationToast(context, message: l10n.creationActionFailed);
+            showAppSnackBar(
+              context,
+              type: NotificationType.error,
+              message: l10n.creationActionFailed,
+            );
           }
         }
       },

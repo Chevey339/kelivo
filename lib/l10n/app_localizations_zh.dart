@@ -17553,6 +17553,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationLocalToolHelp => '让助手在对话里画图或改图，使用「默认模型」里的生图模型。';
 
   @override
+  String creationStorageFileCount(int count) {
+    return '$count 个文件';
+  }
+
+  @override
+  String get creationSelectDefaultImage => '选择默认生图模型';
+
+  @override
+  String get creationConfigureImageProvider => '请先在供应商设置中添加或启用一个生图模型。';
+
+  @override
+  String get displayChatImagesAtToolCall => '在工具调用处显示生成图片';
+
+  @override
+  String get displayChatImageInfo => '显示生图信息';
+
+  @override
+  String get displayChatImageLink => '显示「在创作中查看」';
+
+  @override
   String get creationLocalToolNeedsModel => '先在「默认模型 › 生图模型」里选一个模型。';
 
   @override
@@ -35296,6 +35316,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationLocalToolHelp => '让助手在对话里画图或改图，使用「默认模型」里的生图模型。';
+
+  @override
+  String creationStorageFileCount(int count) {
+    return '$count 个文件';
+  }
+
+  @override
+  String get creationSelectDefaultImage => '选择默认生图模型';
+
+  @override
+  String get creationConfigureImageProvider => '请先在供应商设置中添加或启用一个生图模型。';
+
+  @override
+  String get displayChatImagesAtToolCall => '在工具调用处显示生成图片';
+
+  @override
+  String get displayChatImageInfo => '显示生图信息';
+
+  @override
+  String get displayChatImageLink => '显示「在创作中查看」';
 
   @override
   String get creationLocalToolNeedsModel => '先在「默认模型 › 生图模型」里选一个模型。';
@@ -53092,6 +53132,31 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationLocalToolHelp => '讓助手在對話裡畫圖或改圖，使用「預設模型」裡的生圖模型。';
+
+  @override
+  String creationStorageFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 個檔案',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get creationSelectDefaultImage => '選擇預設生圖模型';
+
+  @override
+  String get creationConfigureImageProvider => '請先在供應商設定中新增或啟用一個生圖模型。';
+
+  @override
+  String get displayChatImagesAtToolCall => '在工具呼叫處顯示生成圖片';
+
+  @override
+  String get displayChatImageInfo => '顯示生圖資訊';
+
+  @override
+  String get displayChatImageLink => '顯示「在創作中查看」連結';
 
   @override
   String get creationLocalToolNeedsModel => '先在「預設模型 › 生圖模型」裡選一個模型。';

@@ -30,7 +30,7 @@ import '../../../shared/widgets/action_sheet.dart';
 import '../../../shared/widgets/plain_text_input.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/sliding_segmented_tabs.dart';
-import 'creation_toast.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../providers/media_creation_controller.dart';
@@ -52,8 +52,9 @@ Future<void> showCreationLightbox(
 }) async {
   final media = context.read<MediaCreationController>();
   if (SandboxPathResolver.resolveForIo(item.path) == null) {
-    showCreationToast(
+    showAppSnackBar(
       context,
+      type: NotificationType.error,
       message: AppLocalizations.of(context)!.creationActionFailed,
     );
     return;
@@ -258,7 +259,11 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     if (!mounted) return;
     final topicId = _media.batch(source.batchId)?.topicId;
     final l10n = AppLocalizations.of(context)!;
-    showCreationToast(context, message: l10n.creationEditStarted);
+    showAppSnackBar(
+      context,
+      type: NotificationType.success,
+      message: l10n.creationEditStarted,
+    );
     if (widget.canOpenTopic && topicId != null) {
       _jump(topicId, id);
     } else {
@@ -504,6 +509,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
     VoidCallback? onTap, {
     Color color = Colors.white,
   }) => IosIconButton(
+    shape: BoxShape.circle,
     icon: icon,
     tooltip: label,
     color: color,
@@ -724,6 +730,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
                     message: l10n.creationShowInTopic,
                     child: CreationAction(
                       small: true,
+                      pill: true,
                       foreground: Colors.white,
                       icon: const Icon(LucideIcons.externalLink, size: 15),
                       onPressed: () => _jump(topicId, item.batchId),
@@ -922,6 +929,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
               shape: BoxShape.circle,
             ),
             child: IosIconButton(
+              shape: BoxShape.circle,
               icon: icon,
               color: Colors.white,
               tooltip: label,
@@ -1179,8 +1187,9 @@ class _CreationEditFormState extends State<_CreationEditForm> {
       if (mounted && ticket != null) widget.onSubmitted(ticket.batchId);
     } catch (_) {
       if (mounted) {
-        showCreationToast(
+        showAppSnackBar(
           context,
+          type: NotificationType.error,
           message: AppLocalizations.of(context)!.creationActionFailed,
         );
       }
@@ -1470,7 +1479,11 @@ List<ActionSheetItem> _artworkActions(
         onTap: () async {
           await Clipboard.setData(ClipboardData(text: batch.prompt));
           if (context.mounted) {
-            showCreationToast(context, message: l10n.creationOptionCopied);
+            showAppSnackBar(
+              context,
+              type: NotificationType.success,
+              message: l10n.creationOptionCopied,
+            );
           }
         },
       ),
@@ -1507,8 +1520,9 @@ Future<void> _runArtworkAction(
     await action();
   } catch (_) {
     if (context.mounted) {
-      showCreationToast(
+      showAppSnackBar(
         context,
+        type: NotificationType.error,
         message: AppLocalizations.of(context)!.creationActionFailed,
       );
     }
@@ -1524,8 +1538,9 @@ Future<void> toggleCreationArtworkFavorite(
   await media.setFavorite(item.id, value);
   if (context.mounted) {
     final l10n = AppLocalizations.of(context)!;
-    showCreationToast(
+    showAppSnackBar(
       context,
+      type: NotificationType.success,
       message: value ? l10n.creationFavorited : l10n.creationUnfavorited,
     );
   }
@@ -1554,8 +1569,9 @@ Future<void> saveCreationArtwork(
     }
   }
   if (context.mounted) {
-    showCreationToast(
+    showAppSnackBar(
       context,
+      type: NotificationType.success,
       message: AppLocalizations.of(context)!.creationOptionSaved,
     );
   }
@@ -1574,8 +1590,9 @@ Future<void> _copyArtwork(BuildContext context, GenerationItemRow item) =>
       };
       await clipboard.write([DataWriterItem()..add(format(bytes))]);
       if (context.mounted) {
-        showCreationToast(
+        showAppSnackBar(
           context,
+          type: NotificationType.success,
           message: AppLocalizations.of(context)!.creationOptionCopied,
         );
       }
@@ -1653,8 +1670,9 @@ void _sendArtworkToChat(BuildContext context, GenerationItemRow item) {
   if (file != null) {
     ChatActionBus.instance.fireCreation(PrefillChatImage(file));
   } else {
-    showCreationToast(
+    showAppSnackBar(
       context,
+      type: NotificationType.error,
       message: AppLocalizations.of(context)!.creationActionFailed,
     );
   }
@@ -1711,17 +1729,20 @@ class CreationMediaCover extends StatelessWidget {
     super.key,
     this.playOverlay = true,
     this.thumbnail = false,
+    this.cacheWidth,
   });
 
   final GenerationItemRow item;
   final bool playOverlay;
   final bool thumbnail;
+  final int? cacheWidth;
 
   @override
   Widget build(BuildContext context) {
     if (item.mode == MediaMode.image) {
       return CreationFileImage(
         thumbnail ? item.thumbnailPath ?? item.path : item.path,
+        cacheWidth: cacheWidth,
       );
     }
     final l10n = AppLocalizations.of(context)!;
@@ -1731,7 +1752,7 @@ class CreationMediaCover extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           if (item.thumbnailPath case final path?)
-            CreationFileImage(path)
+            CreationFileImage(path, cacheWidth: cacheWidth)
           else
             ColoredBox(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,

@@ -79,7 +79,9 @@ class _LocalToolsTab extends StatelessWidget {
               warning: imageModel == null
                   ? l10n.creationLocalToolNeedsModel
                   : null,
-              enabled: imageEnabled,
+              enabled: imageEnabled && imageModel != null,
+              onOpenSettings: () => configureChatImageModel(context),
+              settingsLabel: l10n.creationSelectDefaultImage,
               onChanged: (value) =>
                   toggleTool(LocalToolNames.generateImage, value),
             ),
@@ -294,6 +296,7 @@ class _LocalToolRow extends StatelessWidget {
     required this.onChanged,
     this.onOpenSettings,
     this.warning,
+    this.settingsLabel,
   });
 
   final IconData icon;
@@ -303,6 +306,7 @@ class _LocalToolRow extends StatelessWidget {
   final ValueChanged<bool> onChanged;
   final VoidCallback? onOpenSettings;
   final String? warning;
+  final String? settingsLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +375,9 @@ class _LocalToolRow extends StatelessWidget {
                   if (onOpenSettings != null)
                     IconButton(
                       icon: const Icon(Lucide.Settings, size: 18),
-                      tooltip: AppLocalizations.of(context)!.phoneControlTitle,
+                      tooltip:
+                          settingsLabel ??
+                          AppLocalizations.of(context)!.phoneControlTitle,
                       onPressed: onOpenSettings,
                     ),
                   IosSwitch(value: enabled, onChanged: onChanged),
