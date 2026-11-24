@@ -37,6 +37,7 @@ import '../../../shared/widgets/plain_text_input.dart';
 import 'creation_enhancement_panel.dart';
 import 'creation_lightbox.dart';
 import 'creation_reference_picker.dart';
+import 'creation_slider.dart';
 
 typedef _Enhancement = ({
   String requestId,
@@ -710,7 +711,8 @@ class _CreationComposerState extends State<CreationComposer> {
                                           if (state.duration
                                               case final int duration
                                               when video)
-                                            l10n.creationDurationSeconds(
+                                            creationDurationLabel(
+                                              l10n,
                                               duration,
                                             ),
                                         ].join(' · '),
@@ -762,7 +764,8 @@ class _CreationComposerState extends State<CreationComposer> {
                                           when video)
                                         _ComposerChip(
                                           maxWidth: 96,
-                                          label: l10n.creationDurationSeconds(
+                                          label: creationDurationLabel(
+                                            l10n,
                                             duration,
                                           ),
                                           leading: const Icon(
@@ -1127,14 +1130,10 @@ class _ModelOptionsState extends State<_ModelOptions> {
                                               .capabilities
                                               .durations
                                               .isNotEmpty)
-                                            model.capabilities.durations
-                                                .map(
-                                                  (v) => l10n
-                                                      .creationDurationSeconds(
-                                                        v,
-                                                      ),
-                                                )
-                                                .join(' / '),
+                                            _durationSummary(
+                                              model.capabilities.durations,
+                                              l10n,
+                                            ),
                                           if (model
                                               .capabilities
                                               .frameRoles
@@ -1143,9 +1142,14 @@ class _ModelOptionsState extends State<_ModelOptions> {
                                         ] else
                                           model.capabilities.maxReferences > 0
                                               ? l10n.creationModelReferenceLimit(
-                                                  model
-                                                      .capabilities
-                                                      .maxReferences,
+                                                  model.capabilities
+                                                      .referenceLimits(
+                                                        state.model?.key ==
+                                                                model.key
+                                                            ? state.parameters
+                                                            : const {},
+                                                      )
+                                                      .max,
                                                 )
                                               : l10n.creationTextOnlyImage,
                                       ].join(' · '),
@@ -1173,6 +1177,20 @@ class _ModelOptionsState extends State<_ModelOptions> {
       ],
     );
   }
+}
+
+String _durationSummary(List<int> values, AppLocalizations l10n) {
+  final seconds = values.where((v) => v > 0).toList();
+  final consecutive =
+      seconds.length > 3 &&
+      seconds.indexed.every((entry) => entry.$2 == seconds.first + entry.$1);
+  return [
+    if (values.contains(-1)) l10n.creationAuto,
+    if (consecutive)
+      '${l10n.creationDurationSeconds(seconds.first)}–${l10n.creationDurationSeconds(seconds.last)}'
+    else
+      ...seconds.map(l10n.creationDurationSeconds),
+  ].join(' / ');
 }
 
 class _ParameterOptions extends StatelessWidget {
@@ -1222,17 +1240,39 @@ class _ParameterOptions extends StatelessWidget {
           if (ratio) const SizedBox(height: 12),
           Text(l10n.creationDuration),
           const SizedBox(height: 6),
-          SlidingSegmentedTabs(
-            fitLabels: true,
-            height: 36,
+          if (caps.durations.length > 6)
+            Row(
+              children: [
+                Expanded(
+                  child: CreationSlider(
+                    label: l10n.creationDuration,
+                    formatValue: (index) => creationDurationLabel(
+                      l10n,
+                      caps.durations[index.round()],
+                    ),
+                    value: caps.durations.indexOf(state.duration!).toDouble(),
+                    max: (caps.durations.length - 1).toDouble(),
+                    divisions: caps.durations.length - 1,
+                    onChanged: (index) =>
+                        state.selectDuration(caps.durations[index.round()]),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(creationDurationLabel(l10n, state.duration!)),
+              ],
+            )
+          else
+            SlidingSegmentedTabs(
+              fitLabels: true,
+              height: 36,
 
-            tabs: [
-              for (final value in caps.durations)
-                SegmentedTab(label: l10n.creationDurationSeconds(value)),
-            ],
-            index: caps.durations.indexOf(state.duration!),
-            onChanged: (index) => state.selectDuration(caps.durations[index]),
-          ),
+              tabs: [
+                for (final value in caps.durations)
+                  SegmentedTab(label: creationDurationLabel(l10n, value)),
+              ],
+              index: caps.durations.indexOf(state.duration!),
+              onChanged: (index) => state.selectDuration(caps.durations[index]),
+            ),
         ],
         if (resolution && resolutions.isNotEmpty) ...[
           if (ratio || duration) const SizedBox(height: 12),

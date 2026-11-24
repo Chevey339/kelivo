@@ -101,6 +101,7 @@ class MediaModelOverrides {
       framesUseAutomaticRatio: base.framesUseAutomaticRatio,
       requiresFirstFrame: base.requiresFirstFrame,
       requiresReference: base.requiresReference,
+      referenceBounds: base.referenceBounds,
       maxCombinedInputsAndOutputs: base.maxCombinedInputsAndOutputs,
       sizes: sizes ?? base.sizes,
       qualities: base.qualities,

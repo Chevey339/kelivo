@@ -232,7 +232,9 @@ class ModelDefaultsGuesser {
     }
 
     final mediaId = id.split('/').last;
-    if (!forceEmbedding && _isVideoModelId(mediaId)) {
+    if (!forceEmbedding &&
+        !_isImageModelId(mediaId) &&
+        _isVideoModelId(mediaId)) {
       draft.type = ModelType.video;
       draft.input
         ..clear()
@@ -460,6 +462,9 @@ bool _isImageModelId(String id) {
       id.startsWith('chatgpt-image-') ||
       id.startsWith('grok-imagine-image') ||
       id.startsWith('doubao-seedream-') ||
+      id.startsWith('seedream-') ||
+      id.startsWith('kling-image-') ||
+      id.startsWith('minimax-h3-image') ||
       id.startsWith('qwen-image') ||
       id.startsWith('imagen-') ||
       id.startsWith('flux') ||
@@ -474,7 +479,7 @@ bool _isImageModelId(String id) {
 
 bool _isVideoModelId(String id) => _matches(
   id,
-  r'^(?:grok-imagine-video|veo-|sora-|doubao-seedance-|seedance-|kling|hailuo|wan.*-(?:t2v|i2v|r2v|kf2v|video)(?:-|$)|minimax(?:.*video|-h3))',
+  r'^(?:grok-imagine-video|veo-|sora-|doubao-seedance-|seedance-|kling[-_]?(?:v?\d|video|avatar|effects)|hailuo|happyhorse-.*-(?:t2v|i2v|r2v|video-edit)$|wan.*-(?:t2v|i2v|r2v|kf2v|video)(?:-|$)|minimax(?:.*video|-h3))',
 );
 
 bool _matches(String id, String pattern) {

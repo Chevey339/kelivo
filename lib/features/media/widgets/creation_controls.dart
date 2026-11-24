@@ -1,3 +1,4 @@
+import '../../../l10n/app_localizations.dart';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,9 @@ import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../theme/app_semantic_colors.dart';
 
 /// The desktop tab can be mounted directly in the window, outside a Scaffold.
+String creationDurationLabel(AppLocalizations l10n, int seconds) =>
+    seconds == -1 ? l10n.creationAuto : l10n.creationDurationSeconds(seconds);
+
 class CreationSurface extends StatelessWidget {
   const CreationSurface({super.key, required this.child});
   final Widget child;

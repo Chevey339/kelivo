@@ -18781,6 +18781,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'server': 'Provider error',
       'rejected': 'Request rejected',
       'login': 'Sign-in required',
+      'unavailable': 'Model or endpoint unavailable',
       'parameters': 'Invalid parameters',
       'referenceTooLarge': 'Reference too large',
       'download': 'Download failed',

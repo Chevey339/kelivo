@@ -51,8 +51,14 @@ abstract final class GenerateImageTool {
     return null;
   }
 
-  static Map<String, dynamic> definition({required bool allowReferences}) {
-    final purpose = allowReferences
+  static Map<String, dynamic> definition({
+    required bool allowReferences,
+    int minReferences = 0,
+    int? maxReferences,
+  }) {
+    final purpose = minReferences > 0
+        ? 'Edit an image from this conversation. The selected model needs a reference image.'
+        : allowReferences
         ? 'Create an image from a text description, or edit images from this conversation.'
         : 'Create an image from a text description.';
     return {
@@ -84,11 +90,14 @@ The result is shown to the user automatically, so don't repeat it in Markdown. O
               'image_ids': {
                 'type': 'array',
                 'items': {'type': 'string', 'pattern': imageIdPattern},
+                if (minReferences > 0) 'minItems': minReferences,
+                if (maxReferences != null) 'maxItems': maxReferences,
                 'description':
-                    'Optional. img_ identifiers of conversation images to edit or use as references. Copy them exactly from the messages or a view_image listing; never invent one. Omit to create a new image.',
+                    'Use the exact img_ identifiers of conversation images from the messages or a view_image listing.'
+                    '${minReferences > 0 ? ' A reference image is required.' : ' Omit to create a new image.'}',
               },
           },
-          'required': ['prompt'],
+          'required': ['prompt', if (minReferences > 0) 'image_ids'],
           'additionalProperties': false,
         },
       },

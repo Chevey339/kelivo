@@ -66,15 +66,16 @@ class ChatImageGenerationService {
     final messageId = context.targetMessageId;
     final prompt = args['prompt'];
     final ids = args['image_ids'] ?? const <String>[];
+    final limits = model.capabilities.referenceLimits(const {});
     if (messageId.isEmpty ||
         prompt is! String ||
         prompt.trim().isEmpty ||
         ids is! List ||
-        ids.length > model.capabilities.maxReferences ||
+        ids.length > limits.max ||
+        ids.length < limits.min ||
         ids.any((id) => id is! String || !_imageId.hasMatch(id)) ||
         args.keys.any((key) => key != 'prompt' && key != 'image_ids') ||
-        args.containsKey('image_ids') &&
-            model.capabilities.maxReferences == 0) {
+        args.containsKey('image_ids') && limits.max == 0) {
       return error(
         'Supply a prompt and supported conversation image identifiers.',
       );

@@ -18,6 +18,7 @@ import '../../../core/services/media/media_generation_runner.dart';
 import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../core/services/model_spec/model_list_metadata_cache.dart';
 import '../../../core/services/storage/attachment_file_lock.dart';
 
 enum CreationReferenceResult {
@@ -109,6 +110,7 @@ class MediaCreationController extends ChangeNotifier {
       notifyListeners();
     }, onError: _storageError);
     settings.addListener(_settingsChanged);
+    ModelListMetadataCache.instance.addListener(_settingsChanged);
   }
 
   final MediaGenerationRunner runner;
@@ -499,8 +501,8 @@ class MediaCreationController extends ChangeNotifier {
       caps,
     ).where((ref) => ref.role != MediaReferenceRole.platform);
     if (mode == MediaMode.image) {
-      return refs.length <= caps.maxReferences &&
-          (refs.isNotEmpty || !caps.requiresReference);
+      final limits = caps.referenceLimits(parameters);
+      return refs.length >= limits.min && refs.length <= limits.max;
     }
     if (!showsFrames(topicId)) return !caps.requiresFirstFrame;
     return refs.any((ref) => ref.role == MediaReferenceRole.firstFrame);
@@ -529,7 +531,8 @@ class MediaCreationController extends ChangeNotifier {
       setFrame(topicId, role, paths.first);
       return CreationReferenceResult.added;
     }
-    if (caps.maxReferences == 0) return CreationReferenceResult.unsupported;
+    final limit = caps.referenceLimits(parameters).max;
+    if (limit == 0) return CreationReferenceResult.unsupported;
     final existing = imageReferences(topicId);
     final seen = existing
         .map((ref) => SandboxPathResolver.dedupeKey(ref.path))
@@ -538,10 +541,7 @@ class MediaCreationController extends ChangeNotifier {
         .where((path) => seen.add(SandboxPathResolver.dedupeKey(path)))
         .toList();
     if (unique.isEmpty) return CreationReferenceResult.alreadyAdded;
-    final available = (caps.maxReferences - existing.length).clamp(
-      0,
-      caps.maxReferences,
-    );
+    final available = (limit - existing.length).clamp(0, limit);
     if (available > 0) {
       setReferences(topicId, [
         ...existing,
@@ -986,6 +986,7 @@ class MediaCreationController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     settings.removeListener(_settingsChanged);
+    ModelListMetadataCache.instance.removeListener(_settingsChanged);
     unawaited(_topicsSubscription.cancel());
     unawaited(_batchesSubscription.cancel());
     unawaited(_itemsSubscription.cancel());

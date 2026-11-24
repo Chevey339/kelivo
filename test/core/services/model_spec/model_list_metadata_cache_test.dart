@@ -82,21 +82,29 @@ void main() {
       ),
     ]);
     expect(cache.lookup(cfg, 'top-level'), (
+      mediaProtocol: null,
+      openRouterMedia: null,
       contextWindow: 262144,
       maxOutput: 16384,
       pricing: const ModelPricing(input: 2.5, output: 5.5),
     ));
     expect(cache.lookup(cfg, 'nested'), (
+      mediaProtocol: null,
+      openRouterMedia: null,
       contextWindow: 128000,
       maxOutput: 16384,
       pricing: null,
     ));
     expect(cache.lookup(cfg, 'lower-priority'), (
+      mediaProtocol: null,
+      openRouterMedia: null,
       contextWindow: 256000,
       maxOutput: 8192,
       pricing: const ModelPricing(input: 0),
     ));
     expect(cache.lookup(cfg, 'google'), (
+      mediaProtocol: null,
+      openRouterMedia: null,
       contextWindow: 10000000,
       maxOutput: 1024,
       pricing: null,

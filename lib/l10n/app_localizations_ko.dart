@@ -18201,10 +18201,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String creationFailureCategory(String kind) {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'network': '네트워크 연결',
-      'rateLimited': '요청 한도 초과',
+      'rateLimited': '요청 빈도 제한',
       'server': '공급자 오류',
       'rejected': '요청 거부됨',
       'login': '로그인 필요',
+      'unavailable': '모델 또는 엔드포인트 사용 불가',
       'parameters': '잘못된 매개변수',
       'referenceTooLarge': '참조 이미지 너무 큼',
       'download': '다운로드 실패',

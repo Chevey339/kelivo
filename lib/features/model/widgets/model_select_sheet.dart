@@ -79,7 +79,7 @@ _ModelItem? _favoriteModel(
   final inGroup = group.items.where((item) => item.id == modelId).firstOrNull;
   if (inGroup != null || creationSlot != null) return inGroup;
   final spec = ModelSpecResolver.instance.spec(provider, modelId);
-  if (spec.type.isMedia) return null;
+  if (spec.type.isMedia || spec.type == ModelType.other) return null;
   return _ModelItem(
     providerKey: provider.id,
     providerName: group.name,
@@ -137,7 +137,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
       final spec = ModelSpecResolver.instance.spec(cfg, mid);
       final slot = data.creationSlot;
       if (slot == null) {
-        if (spec.type.isMedia) continue;
+        if (spec.type.isMedia || spec.type == ModelType.other) continue;
       } else if (slot.mode case final mode?) {
         if (resolveMediaModel(cfg, mid, mode, resolvedSpec: spec) == null) {
           continue;

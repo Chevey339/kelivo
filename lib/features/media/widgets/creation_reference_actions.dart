@@ -20,7 +20,7 @@ CreationReferenceResult addCreationReferences(
     CreationReferenceResult.added => l10n.creationReferenceAdded,
     CreationReferenceResult.alreadyAdded => l10n.creationReferenceAlreadyAdded,
     CreationReferenceResult.limitReached => l10n.creationReferenceLimitReached(
-      model!.capabilities.maxReferences,
+      model!.capabilities.referenceLimits(media.parameters).max,
     ),
     CreationReferenceResult.unsupported =>
       model == null

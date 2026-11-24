@@ -639,7 +639,7 @@ class _BatchGroupState extends State<_BatchGroup> {
                           if (batch.mode == MediaMode.image)
                             _Tag(l10n.creationImagesCount(p.count)),
                           if (p.duration case final duration?)
-                            _Tag(l10n.creationDurationSeconds(duration)),
+                            _Tag(creationDurationLabel(l10n, duration)),
                           if (p.resolution case final resolution?)
                             _Tag(resolution),
                           if (batch.parentItemId case final parent?)
@@ -938,9 +938,11 @@ Future<void> showCreationRequestDetails(
   final provider = media.settings.getProviderConfig(batch.providerId);
   final model = ModelSpecResolver.instance.spec(provider, batch.modelId);
   final kind = details['kind'];
-  final retryable = MediaFailureKind.values
-      .where((value) => value.name == kind)
-      .any((value) => MediaFailure(value, '').retryable);
+  final retryable =
+      details['automaticRetry'] != false &&
+      MediaFailureKind.values
+          .where((value) => value.name == kind)
+          .any((value) => MediaFailure(value, '').retryable);
   Widget code(String title, Object data) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -1071,6 +1073,10 @@ Map<String, Object?> _requestDetails(GenerationBatchRow batch) {
   try {
     if (jsonDecode(batch.errorJson ?? '{}')
         case final Map<String, dynamic> value) {
+      if (value['kind'] == 'parameters' &&
+          const {404, 405}.contains(value['statusCode'])) {
+        return {...value, 'kind': MediaFailureKind.unavailable.name};
+      }
       return value;
     }
   } on FormatException {

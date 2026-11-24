@@ -106,6 +106,8 @@ class ModelTagWrap extends StatelessWidget {
             ModelType.embedding => embeddingLabel,
             ModelType.image => imageTypeLabel,
             ModelType.video => videoLabel,
+            ModelType.other =>
+              l10n?.providerDetailPageOtherModelsGroupTitle ?? 'Other',
             ModelType.chat => chatLabel,
           },
           style: TextStyle(

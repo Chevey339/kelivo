@@ -5,7 +5,9 @@ import '../media_polling.dart';
 import '../media_request.dart';
 
 class ArkVideoAdapter implements MediaAdapter {
-  const ArkVideoAdapter();
+  const ArkVideoAdapter({this.taskPath = 'contents/generations/tasks'});
+
+  final String taskPath;
 
   static bool _is25(String model) =>
       model.contains('seedance-2-5') || model.contains('seedance-2.5');
@@ -16,9 +18,10 @@ class ArkVideoAdapter implements MediaAdapter {
     final textOnly = model.endsWith('-t2v');
     final v2 = model.contains('seedance-2');
     final pro15 = model.contains('seedance-1-5');
+    final version = model.replaceAll('.', '-');
     final limitedResolution =
-        model.contains('2-0-fast') ||
-        model.contains('2-0-mini') ||
+        version.contains('2-0-fast') ||
+        version.contains('2-0-mini') ||
         (_is25(model) && model.contains('flash'));
     final last =
         !textOnly &&
@@ -26,7 +29,10 @@ class ArkVideoAdapter implements MediaAdapter {
     return MediaCapabilities(
       aspectRatios: const ['auto', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
       durations: v2
-          ? List.generate(12, (index) => index + 4)
+          ? [
+              for (var i = 4; i <= (_is25(model) ? 30 : 15); i++) i,
+              if (_is25(model)) -1,
+            ]
           : pro15
           ? List.generate(9, (index) => index + 4)
           : const [5, 10],
@@ -34,7 +40,7 @@ class ArkVideoAdapter implements MediaAdapter {
         '720p',
         '480p',
         if (!limitedResolution) '1080p',
-        if (v2 && !limitedResolution) '4k',
+        if (v2 && !_is25(model) && !limitedResolution) '4k',
       ],
       maxReferences: textOnly
           ? 0
@@ -57,10 +63,9 @@ class ArkVideoAdapter implements MediaAdapter {
   ) async* {
     final headers = context.headers(request.modelId);
     final model = apiModelId(context.provider, request.modelId);
-    const path = 'contents/generations/tasks';
     final created = await context.jsonRequest(
       'POST',
-      context.endpoint(path),
+      context.endpoint(taskPath),
       headers: headers,
       body: context.body(request, {
         'model': model,
@@ -84,10 +89,12 @@ class ArkVideoAdapter implements MediaAdapter {
       }),
     );
     final id = Uri.encodeComponent(requireMediaTaskId(created['id']));
-    final task = context.endpoint('$path/$id');
+    final task = context.endpoint('$taskPath/$id');
     yield* pollMediaTask(
       context,
-      accepted: MediaTaskAccepted(cancelUrl: task, cancelHeaders: headers),
+      accepted: taskPath.startsWith('/')
+          ? const MediaTaskAccepted()
+          : MediaTaskAccepted(cancelUrl: task, cancelHeaders: headers),
       poll: () => context.jsonRequest('GET', task, headers: headers),
       progress: (data) => mediaPercent(data['progress']),
       result: (data) {

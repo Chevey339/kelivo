@@ -19116,6 +19116,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'server': 'Ошибка провайдера',
       'rejected': 'Запрос отклонён',
       'login': 'Требуется вход',
+      'unavailable': 'Модель или эндпоинт недоступны',
       'parameters': 'Неверные параметры',
       'referenceTooLarge': 'Слишком большой референс',
       'download': 'Ошибка загрузки',

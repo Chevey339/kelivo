@@ -22,6 +22,7 @@ import 'media_adapter.dart';
 import 'media_adapter_resolver.dart';
 import 'media_file_store.dart';
 import 'media_request.dart';
+import 'tokendance_media_protocol.dart';
 
 class MediaGenerationTicket {
   const MediaGenerationTicket._(this._job);
@@ -109,6 +110,7 @@ class MediaGenerationRunner extends ChangeNotifier {
 
   MediaCapabilities _validate(ProviderConfig provider, MediaRequest request) {
     final caps = capabilities(provider, request.mode, request.modelId);
+    final referenceLimits = caps?.referenceLimits(request.parameters);
     if (caps == null ||
         !provider.enabled ||
         !provider.enabledModels.contains(request.modelId) ||
@@ -120,8 +122,8 @@ class MediaGenerationRunner extends ChangeNotifier {
                 request.aspectRatio == 'auto' &&
                 caps.framesUseAutomaticRatio &&
                 request.frame(MediaReferenceRole.firstFrame) != null)) ||
-        request.inputImages.length > caps.maxReferences ||
-        caps.requiresReference && request.inputImages.isEmpty ||
+        request.inputImages.length > referenceLimits!.max ||
+        request.inputImages.length < referenceLimits.min ||
         (caps.maxCombinedInputsAndOutputs ?? 32) <=
             request.inputImages.length) {
       throw const MediaFailure(
@@ -292,18 +294,32 @@ class MediaGenerationRunner extends ChangeNotifier {
             }.contains(batch.status)) {
           return null;
         }
-        final request = MediaRequest.fromBatch(batch);
-        final caps = _validate(provider, request);
         final existing = await repository.itemsForBatch(id);
+        final saved = MediaRequest.fromBatch(batch);
+        var request = saved;
+        if (existing.isEmpty &&
+            batch.status == GenerationStatus.failed &&
+            batch.mode == MediaMode.video &&
+            TokenDanceMediaProtocol.isHost(
+              Uri.tryParse(provider.baseUrl)?.host,
+            ) &&
+            _missingVideoRoute(batch.errorJson)) {
+          final options = capabilities(provider, batch.mode, batch.modelId);
+          if (options != null) request = saved.withCurrentVideoOptions(options);
+        }
+        final caps = _validate(provider, request);
         final firstOrdinal = existing.isEmpty ? 0 : existing.last.ordinal + 1;
         _requireOpen();
         await repository.updateBatch(
           id,
-          const GenerationBatchRowsCompanion(
-            status: Value(GenerationStatus.queued),
-            startedAt: Value(null),
-            finishedAt: Value(null),
-            errorJson: Value(null),
+          GenerationBatchRowsCompanion(
+            status: const Value(GenerationStatus.queued),
+            startedAt: const Value(null),
+            finishedAt: const Value(null),
+            errorJson: const Value(null),
+            paramsJson: identical(request, saved)
+                ? const Value.absent()
+                : Value(jsonEncode(request.storedParameters)),
           ),
         );
         final job = _MediaJob(
@@ -321,6 +337,27 @@ class MediaGenerationRunner extends ChangeNotifier {
       });
     } finally {
       _retrying.remove(id);
+    }
+  }
+
+  static bool _missingVideoRoute(String? raw) {
+    if (raw == null) return false;
+    try {
+      final log = jsonDecode(raw);
+      return switch (log) {
+        {
+          'statusCode': 404,
+          'request': {
+            'host': final String host,
+            'method': 'POST',
+            'route': final String route,
+          },
+        } =>
+          TokenDanceMediaProtocol.isHost(host) && route.endsWith('/videos'),
+        _ => false,
+      };
+    } on FormatException {
+      return false;
     }
   }
 
@@ -566,6 +603,17 @@ class MediaGenerationRunner extends ChangeNotifier {
       } catch (error) {
         _checkCancelled(job);
         final failure = classifyMediaFailure(error);
+        if (failure.kind == MediaFailureKind.network &&
+            !accepted &&
+            job.log.startedPost) {
+          // A lost response does not tell us whether the provider has already
+          // accepted (and billed) this submission.
+          throw MediaFailure(
+            failure.kind,
+            failure.message,
+            automaticRetry: false,
+          );
+        }
         if (accepted || !failure.retryable || retry == 3) throw failure;
         final interval = Duration(seconds: 1 << retry);
         final retryAfter = failure.retryAfter;

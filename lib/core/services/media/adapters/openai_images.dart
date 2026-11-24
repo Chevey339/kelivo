@@ -13,7 +13,9 @@ import '../media_adapter.dart';
 import '../media_request.dart';
 
 class OpenAiImagesAdapter implements MediaAdapter {
-  const OpenAiImagesAdapter();
+  const OpenAiImagesAdapter({this.generationOnly = false});
+
+  final bool generationOnly;
 
   static bool _isGpt(String id) =>
       id.startsWith('gpt-image-') || id.startsWith('chatgpt-image-');
@@ -32,7 +34,8 @@ class OpenAiImagesAdapter implements MediaAdapter {
     final codex = provider.oauthProvider == OAuthProvider.chatgpt;
     final legacySquare = id == 'dall-e-2';
     final legacyWide = id == 'dall-e-3';
-    final generationOnly =
+    final canOnlyGenerate =
+        generationOnly ||
         legacyWide ||
         id.startsWith('agnes-image-') ||
         id == 'sensenova-u1-fast';
@@ -43,7 +46,7 @@ class OpenAiImagesAdapter implements MediaAdapter {
     return MediaCapabilities(
       aspectRatios: ratios,
       maxPerRequest: codex || legacyWide ? 1 : 10,
-      maxReferences: generationOnly
+      maxReferences: canOnlyGenerate
           ? 0
           : legacySquare || !_isGpt(id)
           ? 1

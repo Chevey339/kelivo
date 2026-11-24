@@ -2,8 +2,10 @@ import '../../models/media_creation.dart';
 import '../../models/model_spec.dart';
 import '../../providers/settings_provider.dart';
 import '../model_spec/model_spec_resolver.dart';
+import '../model_spec/model_list_metadata_cache.dart';
 import 'media_adapter_resolver.dart';
 import 'media_request.dart';
+import 'openrouter_media_catalog.dart';
 
 class MediaModelChoice {
   const MediaModelChoice(this.provider, this.spec, this.capabilities);
@@ -28,17 +30,31 @@ MediaModelChoice? resolveMediaModel(
     return null;
   }
   final spec = resolvedSpec ?? ModelSpecResolver.instance.spec(provider, id);
+  final openRouter = OpenRouterMediaModel.isHost(
+    Uri.tryParse(provider.baseUrl)?.host,
+  );
   final eligible = switch (mode) {
-    MediaMode.video => spec.type == ModelType.video,
+    MediaMode.video =>
+      spec.type == ModelType.video ||
+          spec.type == ModelType.chat &&
+              openRouter &&
+              // Video is delivered through the dedicated generation endpoint.
+              // The ordinary chat stream has no video output modality.
+              ModelListMetadataCache.instance
+                      .lookup(provider, spec.upstreamId)
+                      ?.openRouterMedia
+                      ?.mode ==
+                  MediaMode.video,
     MediaMode.image =>
       spec.type == ModelType.image ||
           spec.type == ModelType.chat &&
               spec.output.contains(Modality.image) &&
-              ProviderConfig.classify(
-                    provider.id,
-                    explicitType: provider.providerType,
-                  ) ==
-                  ProviderKind.google,
+              (openRouter ||
+                  ProviderConfig.classify(
+                        provider.id,
+                        explicitType: provider.providerType,
+                      ) ==
+                      ProviderKind.google),
   };
   if (!eligible) return null;
   final capabilities = resolver.capabilities(provider, mode, id);

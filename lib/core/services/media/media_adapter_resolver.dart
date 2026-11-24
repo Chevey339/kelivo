@@ -2,14 +2,18 @@ import '../../models/media_creation.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
 import '../api/chat_api_helpers.dart';
+import '../model_spec/model_list_metadata_cache.dart';
 import 'adapters/ark_images.dart';
 import 'adapters/ark_video.dart';
 import 'adapters/dashscope_images.dart';
 import 'adapters/dashscope_video.dart';
 import 'adapters/fal_media.dart';
 import 'adapters/gemini_images.dart';
+import 'adapters/kling_gateway.dart';
+import 'adapters/minimax_video.dart';
 import 'adapters/openai_images.dart';
 import 'adapters/openai_videos.dart';
+import 'adapters/openrouter_media.dart';
 import 'adapters/siliconflow_images.dart';
 import 'adapters/siliconflow_video.dart';
 import 'adapters/veo_video.dart';
@@ -17,6 +21,8 @@ import 'adapters/xai_media.dart';
 import 'media_adapter.dart';
 import 'media_model_overrides.dart';
 import 'media_request.dart';
+import 'openrouter_media_catalog.dart';
+import 'tokendance_media_protocol.dart';
 
 class MediaAdapterResolver {
   const MediaAdapterResolver();
@@ -40,8 +46,74 @@ class MediaAdapterResolver {
       provider.id,
       explicitType: provider.providerType,
     );
-    if (kind == ProviderKind.claude) return null;
     final host = Uri.tryParse(provider.baseUrl)?.host ?? '';
+    if (OpenRouterMediaModel.isHost(host)) {
+      final data = modelId == null
+          ? null
+          : ModelListMetadataCache.instance
+                .lookup(provider, apiModelId(provider, modelId))
+                ?.openRouterMedia;
+      if (data != null && (mode != data.mode || !data.supportsComposer)) {
+        return null;
+      }
+      return OpenRouterMediaAdapter(mode, data);
+    }
+    if (TokenDanceMediaProtocol.isHost(host)) {
+      if (modelId == null) return null;
+      final upstream = apiModelId(provider, modelId);
+      final cache = ModelListMetadataCache.instance;
+      final protocol =
+          cache.lookup(provider, upstream)?.mediaProtocol ??
+          (upstream != modelId
+              ? cache.lookup(provider, modelId)?.mediaProtocol
+              : null) ??
+          TokenDanceMediaProtocol.known(upstream);
+      if (protocol?.mode != mode) return null;
+      return switch (protocol) {
+        TokenDanceMediaProtocol.miniMax => const MiniMaxVideoAdapter(
+          apiPath: '/gateway/minimax/v2',
+        ),
+        TokenDanceMediaProtocol.klingImage ||
+        TokenDanceMediaProtocol.klingLongImage ||
+        TokenDanceMediaProtocol.klingV1 ||
+        TokenDanceMediaProtocol.klingV2 ||
+        TokenDanceMediaProtocol.klingOmni => KlingGatewayAdapter(protocol!),
+        TokenDanceMediaProtocol.arkImage => const ArkImagesAdapter(
+          path: '/gateway/ark/v3/images/generations',
+        ),
+        TokenDanceMediaProtocol.seedance => const ArkVideoAdapter(
+          taskPath: '/gateway/ark/v3/generations/tasks',
+        ),
+        TokenDanceMediaProtocol.dashScopeImage => const DashScopeImagesAdapter(
+          apiPath: '/gateway/alibaba/api/v1',
+        ),
+        TokenDanceMediaProtocol.wan => const DashScopeVideoAdapter(
+          gatewayPath: '/gateway/alibaba/wan3/v1',
+        ),
+        TokenDanceMediaProtocol.happyHorse => const DashScopeVideoAdapter(
+          gatewayPath: '/gateway/alibaba/happyhorse/v1',
+        ),
+        TokenDanceMediaProtocol.xaiVideo => const XaiVideoAdapter(),
+        TokenDanceMediaProtocol.openAiEdit => const OpenAiImagesAdapter(),
+        TokenDanceMediaProtocol.openAiImage => const OpenAiImagesAdapter(
+          generationOnly: true,
+        ),
+        _ => null,
+      };
+    }
+    if (const {
+          'api.minimax.io',
+          'api.minimaxi.com',
+          'api.minimax.chat',
+        }.contains(host) &&
+        video &&
+        modelId != null &&
+        RegExp(
+          r'^minimax-h3(?:-(?:max(?:-turbo)?|highspeed|lite|mg|nc))?$',
+        ).hasMatch(apiModelId(provider, modelId).toLowerCase())) {
+      return const MiniMaxVideoAdapter();
+    }
+    if (kind == ProviderKind.claude) return null;
     final key = provider.id.toLowerCase();
     if (provider.isFal || host == 'queue.fal.run') {
       final model = modelId == null
@@ -56,17 +128,6 @@ class MediaAdapterResolver {
     }
     if (key == 'bytedance' || host.endsWith('.volces.com')) {
       return video ? const ArkVideoAdapter() : const ArkImagesAdapter();
-    }
-    // TokenDance lists DashScope for both generation and editing on these
-    // models. Its OpenAI compatibility endpoint supports generation only.
-    if (!video &&
-        (host == 'tokendance.space' || host == 'www.tokendance.space') &&
-        modelId != null &&
-        const {
-          'qwen-image-2.1-pro',
-          'qwen-image-2.1-turbo',
-        }.contains(apiModelId(provider, modelId).toLowerCase())) {
-      return const DashScopeImagesAdapter(apiPath: '/gateway/alibaba/api/v1');
     }
     if (key == 'aliyun' ||
         host.startsWith('dashscope') && host.endsWith('.aliyuncs.com') ||
@@ -137,6 +198,9 @@ class MediaAdapterResolver {
 
   bool hasModelData(ProviderConfig provider, MediaMode mode, String modelId) {
     final adapter = resolve(provider, mode, modelId: modelId);
+    if (TokenDanceMediaProtocol.isHost(Uri.tryParse(provider.baseUrl)?.host)) {
+      return adapter != null;
+    }
     final id = apiModelId(provider, modelId).toLowerCase();
     return switch (adapter) {
       FalMediaAdapter() =>
@@ -144,6 +208,8 @@ class MediaAdapterResolver {
       OpenAiImagesAdapter() =>
         id.startsWith('gpt-image-') || id.startsWith('dall-e-'),
       OpenAiVideosAdapter() => id.startsWith('sora-'),
+      KlingGatewayAdapter() || MiniMaxVideoAdapter() => true,
+      OpenRouterMediaAdapter(:final model) => model != null,
       XaiImageAdapter() || XaiVideoAdapter() => id.startsWith('grok-imagine-'),
       GeminiImagesAdapter() =>
         id.contains('imagen-') ||
@@ -153,7 +219,8 @@ class MediaAdapterResolver {
       ArkVideoAdapter() => id.contains('seedance-'),
       DashScopeImagesAdapter() =>
         id.startsWith('wan') || id.startsWith('qwen-image'),
-      DashScopeVideoAdapter() => id.startsWith('wan'),
+      DashScopeVideoAdapter() =>
+        id.startsWith('wan') || id.startsWith('happyhorse-'),
       SiliconFlowImagesAdapter() =>
         id.contains('kolors') || id.contains('qwen-image'),
       SiliconFlowVideoAdapter() =>

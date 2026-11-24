@@ -86,41 +86,12 @@ class OpenAiVideosAdapter implements MediaAdapter {
     final created = await readMediaJson(
       await context.send(submitted, diagnosticBody: payload),
     );
-    final id = Uri.encodeComponent(requireMediaTaskId(created['id']));
-    yield* pollMediaTask(
+    yield* pollOpenAiVideo(
       context,
-      initial: created,
-      poll: () => context.jsonRequest(
-        'GET',
-        context.endpoint('videos/$id'),
-        headers: authHeaders,
-      ),
-      progress: (data) => mediaPercent(data['progress']),
-      result: (data) {
-        final status = data['status'];
-        if (const {'failed', 'cancelled', 'expired'}.contains(status)) {
-          failedMediaTask(data['error']);
-        }
-        if (status != 'completed' && status != 'succeeded') return null;
-        final dimensions = (data['size']?.toString() ?? _size(model, request))
-            ?.split('x')
-            .map(int.tryParse)
-            .toList();
-        final meta = data['metadata'];
-        return [
-          MediaResult(
-            mime: 'video/mp4',
-            url: context.endpoint('videos/$id/content'),
-            downloadHeaders: authHeaders,
-            previewUrl: mediaResultUri(
-              meta is Map ? meta['thumbnail_url'] : null,
-            ),
-            durationMs: videoDurationMs(data['seconds'] ?? request.durationSec),
-            width: dimensions?.length == 2 ? dimensions!.first : null,
-            height: dimensions?.length == 2 ? dimensions!.last : null,
-          ),
-        ];
-      },
+      request,
+      created,
+      authHeaders,
+      size: _size(model, request),
     );
   }
 
@@ -138,4 +109,66 @@ class OpenAiVideosAdapter implements MediaAdapter {
       _ => null,
     };
   }
+}
+
+/// Sora-compatible relays may return a delivery URL or an authenticated
+/// content endpoint. A signed CDN URL never needs the provider's headers.
+Stream<MediaEvent> pollOpenAiVideo(
+  MediaContext context,
+  MediaRequest request,
+  Map<String, dynamic> created,
+  Map<String, String> headers, {
+  String? size,
+}) {
+  final id = Uri.encodeComponent(requireMediaTaskId(created['id']));
+  final task = context.endpoint('videos/$id');
+  return pollMediaTask(
+    context,
+    initial: created,
+    poll: () => context.jsonRequest('GET', task, headers: headers),
+    progress: (data) => mediaPercent(data['progress']),
+    result: (data) {
+      final status = data['status'];
+      if (const {
+        'failed',
+        'cancelled',
+        'canceled',
+        'expired',
+      }.contains(status)) {
+        failedMediaTask(data['error']);
+      }
+      if (status != 'completed' && status != 'succeeded') return null;
+      final dimensions = (data['size']?.toString() ?? size)
+          ?.split('x')
+          .map(int.tryParse)
+          .toList();
+      final meta = data['metadata'];
+      final metadata = meta is Map ? meta : const {};
+      final signed = data['urls'];
+      final unsigned = data['unsigned_urls'];
+      final signedUrl = signed is List
+          ? mediaResultUri(signed.firstOrNull)
+          : null;
+      final url =
+          signedUrl ??
+          mediaResultUri(data['url'] ?? metadata['url']) ??
+          (unsigned is List ? mediaResultUri(unsigned.firstOrNull) : null) ??
+          context.endpoint('videos/$id/content');
+      return [
+        MediaResult(
+          mime: 'video/mp4',
+          url: url,
+          downloadHeaders: signedUrl == null && url.origin == task.origin
+              ? headers
+              : const {},
+          previewUrl: mediaResultUri(metadata['thumbnail_url']),
+          durationMs: videoDurationMs(
+            data['seconds'] ?? data['duration'] ?? request.durationSec,
+          ),
+          width: dimensions?.length == 2 ? dimensions!.first : null,
+          height: dimensions?.length == 2 ? dimensions!.last : null,
+        ),
+      ];
+    },
+  );
 }

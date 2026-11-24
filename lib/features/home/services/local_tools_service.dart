@@ -492,6 +492,7 @@ class LocalToolsService {
     required Assistant? assistant,
     required bool supportsTools,
     int? imageReferenceLimit,
+    int minimumImageReferences = 0,
   }) {
     if (!supportsTools || assistant == null) {
       return const <Map<String, dynamic>>[];
@@ -510,6 +511,8 @@ class LocalToolsService {
           tools.add(
             GenerateImageTool.definition(
               allowReferences: imageReferenceLimit > 0,
+              minReferences: minimumImageReferences,
+              maxReferences: imageReferenceLimit,
             ),
           );
         }

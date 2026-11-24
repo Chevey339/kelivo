@@ -16,6 +16,7 @@ import '../services/custom_request_merger.dart';
 import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
+import '../services/media/openrouter_media_catalog.dart';
 import '../services/model_spec/model_list_metadata_cache.dart';
 import '../services/model_spec/model_spec_resolver.dart';
 import '../services/model_spec/ollama_model_service.dart';
@@ -74,7 +75,21 @@ class OpenAIProvider extends BaseProvider {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final data = jsonDecode(res.body)['data'] as List?;
         if (data == null) return [];
-        final rows = _Http.modelRows(data);
+        final keyed = {
+          for (final row in _Http.modelRows(data)) row.id: row.json,
+        };
+        if (OpenRouterMediaModel.isHost(uri.host)) {
+          await mergeOpenRouterMediaCatalogs(
+            client,
+            Uri.parse(cfg.baseUrl),
+            mergedHeaders,
+            keyed,
+            cached: (mode) => _resolver.cachedOpenRouterMedia(cfg, mode),
+          );
+        }
+        final rows = keyed.entries.map(
+          (entry) => (id: entry.key, json: entry.value),
+        );
         await replaceMetadata(rows);
         return [
           for (final row in rows)

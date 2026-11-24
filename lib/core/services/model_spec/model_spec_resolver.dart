@@ -4,6 +4,9 @@ import '../../models/model_spec.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
 import '../media/fal_model_catalog.dart';
+import '../media/tokendance_media_protocol.dart';
+import '../media/openrouter_media_catalog.dart';
+import '../../models/media_creation.dart' show MediaMode;
 import '../model_catalog/catalog_entry.dart';
 import '../model_catalog/model_catalog_service.dart';
 import 'model_defaults_guesser.dart';
@@ -117,6 +120,11 @@ class ModelSpecResolver {
   final ModelCatalogService _catalog;
   final OllamaModelService _ollama;
   final ModelListMetadataCache _modelLists;
+
+  Map<String, OpenRouterMediaModel> cachedOpenRouterMedia(
+    ProviderConfig cfg,
+    MediaMode mode,
+  ) => _modelLists.openRouterCatalog(cfg, mode);
   final Map<(String, String), _MemoEntry> _memo = {};
   int _seenCatalogVersion = -1;
 
@@ -315,6 +323,78 @@ class ModelSpecResolver {
     sources[ModelSpecField.dynamicWebSearch] = SpecSource.guess;
     sources[ModelSpecField.remoteImageUrls] = SpecSource.guess;
     sources[ModelSpecField.promptCacheControl] = SpecSource.guess;
+    if (TokenDanceMediaProtocol.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
+      final protocol =
+          upstreamMetadata?.mediaProtocol ??
+          keyMetadata?.mediaProtocol ??
+          TokenDanceMediaProtocol.known(upstreamId);
+      if (protocol?.mode case final mode?) {
+        final video = mode == MediaMode.video;
+        base = base.copyWith(
+          type: video ? ModelType.video : ModelType.image,
+          input: [
+            Modality.text,
+            if (protocol != TokenDanceMediaProtocol.openAiImage &&
+                !upstreamId.endsWith('-t2v'))
+              Modality.image,
+          ],
+          output: [video ? Modality.video : Modality.image],
+          abilities: const [],
+        );
+        sources[ModelSpecField.type] =
+            upstreamMetadata?.mediaProtocol != null ||
+                keyMetadata?.mediaProtocol != null
+            ? SpecSource.vendor
+            : SpecSource.guess;
+      } else if (protocol == TokenDanceMediaProtocol.unsupported &&
+          base.type == ModelType.chat) {
+        base = base.copyWith(
+          type: ModelType.other,
+          input: const [],
+          output: const [],
+          abilities: const [],
+        );
+        sources[ModelSpecField.type] = SpecSource.vendor;
+      }
+    }
+    final media =
+        upstreamMetadata?.openRouterMedia ?? keyMetadata?.openRouterMedia;
+    if (media != null &&
+        OpenRouterMediaModel.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
+      final video = media.mode == MediaMode.video;
+      final chat = media.fields['chat'] == true;
+      final chatInputs = media.fields['chatInputs'];
+      final chatOutputs = media.fields['chatOutputs'];
+      base = base.copyWith(
+        type: chat
+            ? ModelType.chat
+            : video
+            ? ModelType.video
+            : ModelType.image,
+        input: _protocolInput(
+          cfg,
+          upstreamId,
+          {
+            if (chat)
+              ...(chatInputs is List
+                  ? Modality.values.where((m) => chatInputs.contains(m.name))
+                  : base.input),
+            Modality.text,
+            if (media.capabilities.maxReferences > 0) Modality.image,
+          }.toList(),
+        ),
+        output: {
+          if (chat)
+            ...(chatOutputs is List
+                ? Modality.values.where((m) => chatOutputs.contains(m.name))
+                : base.output),
+          if (chat) Modality.text,
+          video ? Modality.video : Modality.image,
+        }.toList(),
+        abilities: chat ? base.abilities : const [],
+      );
+      sources[ModelSpecField.type] = SpecSource.vendor;
+    }
     if (cfg.isFal) {
       final fal = falModels[upstreamId];
       final video = fal?.video ?? type == ModelType.video;

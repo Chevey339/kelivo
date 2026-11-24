@@ -24373,9 +24373,9 @@
   "@creationCustomCountLabel": {
     "description": "Label beside the custom output count stepper in the Creation composer."
   },
-  "creationFailureCategory": "{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}",
+  "creationFailureCategory": "{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} unavailable{Model or endpoint unavailable} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}",
   "@creationFailureCategory": {
-    "description": "User-facing cause for an unsuccessful generation, shared by the failure card and request details. Keep all select keys.",
+    "description": "Category shown on a failed Creation job and in its request log. The kind is a stable error category. Use unavailable for a missing model or API endpoint.",
     "placeholders": {
       "kind": {
         "type": "String"

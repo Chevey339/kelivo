@@ -5,7 +5,10 @@ import '../media_polling.dart';
 import '../media_request.dart';
 
 class DashScopeVideoAdapter implements MediaAdapter {
-  const DashScopeVideoAdapter();
+  const DashScopeVideoAdapter({this.gatewayPath});
+
+  // TokenDance gives Wan3 and HappyHorse separate task namespaces.
+  final String? gatewayPath;
 
   static bool _modern(String model) =>
       model.startsWith('wan3.') || model.startsWith('wan2.7');
@@ -33,6 +36,19 @@ class DashScopeVideoAdapter implements MediaAdapter {
   @override
   MediaCapabilities capabilities(ProviderConfig provider, String modelId) {
     final model = apiModelId(provider, modelId).toLowerCase();
+    if (model.startsWith('happyhorse-')) {
+      final image = model.endsWith('-i2v');
+      return MediaCapabilities(
+        aspectRatios: image
+            ? const ['auto']
+            : const ['16:9', '9:16', '1:1', '4:3', '3:4'],
+        durations: [for (var seconds = 3; seconds <= 15; seconds++) seconds],
+        resolutions: const ['720p', '1080p'],
+        maxReferences: image ? 1 : 0,
+        frameRoles: [if (image) MediaReferenceRole.firstFrame],
+        requiresFirstFrame: image,
+      );
+    }
     final modern = _modern(model);
     final textOnly = _textOnly(model);
     final wan3 = model.startsWith('wan3.');
@@ -50,6 +66,10 @@ class DashScopeVideoAdapter implements MediaAdapter {
             }
           : const {},
       durations: switch (model) {
+        _ when wan3 && gatewayPath != null => [
+          for (var i = 2; i <= 30; i++) i,
+          -1,
+        ],
         _ when wan3 => List.generate(11, (index) => index + 5),
         _ when wan27 || wan26 && textOnly => List.generate(
           14,
@@ -84,7 +104,7 @@ class DashScopeVideoAdapter implements MediaAdapter {
         if (last) MediaReferenceRole.lastFrame,
       ],
       requiresFirstFrame: model.contains('-i2v') || model.contains('kf2v'),
-      supportsNegativePrompt: true,
+      supportsNegativePrompt: !wan3,
       supportsSeed: true,
     );
   }
@@ -95,11 +115,12 @@ class DashScopeVideoAdapter implements MediaAdapter {
     MediaRequest request,
   ) async* {
     final base = Uri.parse(context.provider.baseUrl);
-    final api = '${base.origin}/api/v1';
+    final api = '${base.origin}${gatewayPath ?? '/api/v1'}';
     final headers = context.headers(request.modelId);
     final model = apiModelId(context.provider, request.modelId);
     final normalized = model.toLowerCase();
-    final modern = _modern(normalized);
+    final happyHorse = normalized.startsWith('happyhorse-');
+    final modern = _modern(normalized) || happyHorse;
     final keyframeEndpoint = !modern && normalized.contains('kf2v');
     final legacyText = _textOnly(normalized) && !modern;
     final autoRatio = request.aspectRatio == 'auto';
@@ -119,7 +140,9 @@ class DashScopeVideoAdapter implements MediaAdapter {
     final created = await context.jsonRequest(
       'POST',
       context.endpoint(
-        keyframeEndpoint
+        gatewayPath != null
+            ? 'video-synthesis'
+            : keyframeEndpoint
             ? 'services/aigc/image2video/video-synthesis'
             : 'services/aigc/video-generation/video-synthesis',
         base: api,
@@ -129,7 +152,8 @@ class DashScopeVideoAdapter implements MediaAdapter {
         'model': model,
         'input': {
           'prompt': request.prompt,
-          if (request.negativePrompt case final value?)
+          if (request.negativePrompt case final value?
+              when !normalized.startsWith('wan3.') && !happyHorse)
             'negative_prompt': value,
           if (modern && first != null)
             'media': [

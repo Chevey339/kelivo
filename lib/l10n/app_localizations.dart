@@ -32790,10 +32790,10 @@ abstract class AppLocalizations {
   /// **'Custom count'**
   String get creationCustomCountLabel;
 
-  /// User-facing cause for an unsuccessful generation, shared by the failure card and request details. Keep all select keys.
+  /// Category shown on a failed Creation job and in its request log. The kind is a stable error category. Use unavailable for a missing model or API endpoint.
   ///
   /// In en, this message translates to:
-  /// **'{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}'**
+  /// **'{kind, select, network{Network connection} rateLimited{Rate limit} server{Provider error} rejected{Request rejected} login{Sign-in required} unavailable{Model or endpoint unavailable} parameters{Invalid parameters} referenceTooLarge{Reference too large} download{Download failed} invalidResponse{Invalid response} other{Generation error}}'**
   String creationFailureCategory(String kind);
 
   /// Explanation on an interrupted generation card.

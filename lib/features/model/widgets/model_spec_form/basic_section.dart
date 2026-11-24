@@ -109,6 +109,8 @@ class BasicSection extends StatelessWidget {
                           l10n.modelDetailSheetEmbeddingType,
                         ModelType.image => l10n.modelSpecFormImageType,
                         ModelType.video => l10n.modelSpecFormVideoMode,
+                        ModelType.other =>
+                          l10n.providerDetailPageOtherModelsGroupTitle,
                       },
                     ),
                 ],

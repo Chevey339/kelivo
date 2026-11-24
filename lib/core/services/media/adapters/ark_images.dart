@@ -5,7 +5,9 @@ import '../media_request.dart';
 import 'native_image_size.dart';
 
 class ArkImagesAdapter implements MediaAdapter {
-  const ArkImagesAdapter();
+  const ArkImagesAdapter({this.path = 'images/generations'});
+
+  final String path;
 
   static bool _group(String id) =>
       id.contains('seedream-4') ||
@@ -90,7 +92,7 @@ class ArkImagesAdapter implements MediaAdapter {
     });
     final output = await context.jsonRequest(
       'POST',
-      context.endpoint('images/generations'),
+      context.endpoint(path),
       headers: context.headers(request.modelId),
       body: context.body(request, {
         'model': model,

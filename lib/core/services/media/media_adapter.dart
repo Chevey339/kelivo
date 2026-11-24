@@ -47,6 +47,7 @@ class MediaRequestLog {
   Map<String, Object?>? _request;
   Map<String, Object?>? _response;
   final _retries = <Map<String, Object?>>[];
+  bool get startedPost => _request?['method'] == 'POST';
 
   void start(http.BaseRequest request, Map<String, dynamic>? payload) {
     const knownSegments = {
@@ -67,6 +68,23 @@ class MediaRequestLog {
       'multimodal-generation',
       'video-synthesis',
       'content',
+      'gateway',
+      'minimax',
+      'kling',
+      'ark',
+      'alibaba',
+      'wan3',
+      'happyhorse',
+      'v1',
+      'v2',
+      'v3',
+      'video_generation',
+      'query',
+      'text2video',
+      'image2video',
+      'omni-video',
+      'image-generation',
+      'long-image-generation',
     };
     final route = request.url.pathSegments
         .map((part) {
@@ -161,9 +179,15 @@ class MediaContext {
   final Future<void> Function(Duration) delay;
   final MediaRequestLog? log;
 
-  Uri endpoint(String path, {String? base}) => Uri.parse(
-    '${(base ?? provider.baseUrl).replaceFirst(RegExp(r'/+$'), '')}/$path',
-  );
+  Uri endpoint(String path, {String? base}) {
+    final root = base ?? provider.baseUrl;
+    // Some gateways serve each media protocol under its own root, alongside
+    // their OpenAI-compatible chat endpoint.
+    if (path.startsWith('/')) {
+      return Uri.parse('${Uri.parse(root).origin}$path');
+    }
+    return Uri.parse('${root.replaceFirst(RegExp(r'/+$'), '')}/$path');
+  }
 
   Map<String, String> headers(
     String modelId, {
@@ -274,7 +298,9 @@ MediaFailure mediaResponseFailure(
     401 || 403 => MediaFailureKind.login,
     429 => MediaFailureKind.rateLimited,
     >= 500 => MediaFailureKind.server,
-    400 || 404 || 405 || 415 || 422 => MediaFailureKind.parameters,
+    404 || 405 => MediaFailureKind.unavailable,
+    _ when code == 'model_not_found' => MediaFailureKind.unavailable,
+    400 || 415 || 422 => MediaFailureKind.parameters,
     _ => MediaFailureKind.invalidResponse,
   };
   const knownCodes = {
@@ -348,7 +374,16 @@ MediaFailure mediaHttpFailure(http.StreamedResponse response, String body) {
   );
 }
 
-Future<String> mediaReferenceDataUri(MediaReference reference) async {
+Future<String> mediaReferenceDataUri(MediaReference reference) =>
+    _encodeMediaReference(reference, withMimePrefix: true);
+
+Future<String> mediaReferenceBase64(MediaReference reference) =>
+    _encodeMediaReference(reference, withMimePrefix: false);
+
+Future<String> _encodeMediaReference(
+  MediaReference reference, {
+  required bool withMimePrefix,
+}) async {
   final path = SandboxPathResolver.resolveForIo(reference.path);
   if (path == null) {
     throw const MediaFailure(
@@ -357,12 +392,18 @@ Future<String> mediaReferenceDataUri(MediaReference reference) async {
     );
   }
   final bytes = await File(path).readAsBytes();
-  return compute(_encodeReference, (name: path, bytes: bytes));
+  return compute(_encodeReference, (
+    name: path,
+    bytes: bytes,
+    prefix: withMimePrefix,
+  ));
 }
 
-String _encodeReference(({String name, Uint8List bytes}) data) {
-  final mime = mimeFromPath(data.name);
-  return 'data:$mime;base64,${base64Encode(data.bytes)}';
+String _encodeReference(({String name, Uint8List bytes, bool prefix}) data) {
+  final encoded = base64Encode(data.bytes);
+  return data.prefix
+      ? 'data:${mimeFromPath(data.name)};base64,$encoded'
+      : encoded;
 }
 
 List<MediaResult> parseOpenAiMediaImages(

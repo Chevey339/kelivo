@@ -364,7 +364,11 @@ class ToolHandlerService {
       LocalToolsService.buildToolDefinitions(
         assistant: assistant,
         supportsTools: supportsTools,
-        imageReferenceLimit: imageModel?.capabilities.maxReferences,
+        imageReferenceLimit: imageModel?.capabilities
+            .referenceLimits(const {})
+            .max,
+        minimumImageReferences:
+            imageModel?.capabilities.referenceLimits(const {}).min ?? 0,
       ).where(
         (definition) =>
             (definition['function'] as Map)['name'] !=

@@ -5443,7 +5443,7 @@
   "creationTextOnlyImage": "文生圖",
   "creationTextOnlyVideo": "文生影片",
   "creationCustomCountLabel": "自訂張數",
-  "creationFailureCategory": "{kind, select, network{網路連線} rateLimited{請求頻率限制} server{供應商錯誤} rejected{請求被拒絕} login{需要登入} parameters{參數無效} referenceTooLarge{參考圖過大} download{下載失敗} invalidResponse{回應無效} other{生成錯誤}}",
+  "creationFailureCategory": "{kind, select, network{網路連線} rateLimited{請求頻率限制} server{供應商錯誤} rejected{請求遭拒} login{需要登入} unavailable{模型或端點無法使用} parameters{參數無效} referenceTooLarge{參考圖過大} download{下載失敗} invalidResponse{回應無效} other{生成錯誤}}",
   "creationInterruptedHelp": "這個任務在應用程式關閉時尚未完成，提示詞和設定都保留著。",
   "creationCancelledHelp": "提示詞和設定都保留著，可以隨時重新生成。",
   "creationChatImageReady": "圖像已建立"

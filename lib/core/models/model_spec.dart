@@ -4,7 +4,8 @@ enum ModelType {
   chat,
   embedding,
   image,
-  video;
+  video,
+  other;
 
   bool get isMedia => this == image || this == video;
 }

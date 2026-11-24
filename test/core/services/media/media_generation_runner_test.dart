@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:drift/native.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -89,6 +90,106 @@ void main() {
   });
 
   test(
+    'retrying the original H3 404 preserves the prompt and records the supported resolution',
+    () async {
+      const id = 'minimax-h3';
+      const prompt = 'Run through a park';
+      final cfg = provider(
+        'test-relay',
+      ).copyWith(baseUrl: 'https://tokendance.space/gateway/v1', models: [id]);
+      await repository.enqueue(
+        GenerationBatchRowsCompanion.insert(
+          id: 'old-h3',
+          errorJson: const Value(
+            '{"statusCode":404,"request":{"host":"tokendance.space","method":"POST","route":"/…/…/videos"}}',
+          ),
+          providerId: cfg.id,
+          modelId: id,
+          mode: MediaMode.video,
+          prompt: prompt,
+          paramsJson:
+              '{"aspectRatio":"16:9","durationSec":5,"resolution":"720p"}',
+          referencesJson: '[]',
+          status: GenerationStatus.failed,
+          source: GenerationSource.workbench,
+          createdAt: DateTime.now(),
+        ),
+      );
+      var submissions = 0;
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+        delay: (_) async {},
+        clientFactory: (_, _) => MockClient((r) async {
+          if (r.url.host == 'cdn.test') {
+            expect(r.headers.containsKey('authorization'), isFalse);
+            return http.Response.bytes([
+              0,
+              0,
+              0,
+              24,
+              ...ascii.encode('ftypisom'),
+            ], 200);
+          }
+          if (r.method == 'POST') {
+            submissions++;
+            final body = jsonDecode(r.body);
+            expect(r.url.path, '/gateway/minimax/v2/video_generation');
+            expect(body['resolution'], '768P');
+            expect(body['duration'], 5);
+            expect(body['content'].first['text'], prompt);
+            return http.Response('{"task_id":"job"}', 200);
+          }
+          return http.Response(
+            '{"task":{"status":"succeeded","content":{"url":"https://cdn.test/video"}}}',
+            200,
+          );
+        }),
+      );
+      addTearDown(runner.shutdown);
+      expect(
+        await (await runner.retry('old-h3', cfg))!.completed,
+        GenerationStatus.succeeded,
+      );
+      final batch = (await repository.batch('old-h3'))!;
+      expect(jsonDecode(batch.paramsJson)['resolution'], '768p');
+      expect(
+        (await repository.itemsForBatch(batch.id)).single.mime,
+        'video/mp4',
+      );
+      await repository.enqueue(
+        GenerationBatchRowsCompanion.insert(
+          id: 'old-relay',
+          providerId: cfg.id,
+          modelId: id,
+          errorJson: const Value(
+            '{"statusCode":404,"request":{"host":"another.test","method":"POST","route":"/…/videos"}}',
+          ),
+          mode: MediaMode.video,
+          prompt: prompt,
+          paramsJson:
+              '{"aspectRatio":"16:9","durationSec":5,"resolution":"720p"}',
+          referencesJson: '[]',
+          status: GenerationStatus.failed,
+          source: GenerationSource.workbench,
+          createdAt: DateTime.now(),
+        ),
+      );
+      await expectLater(
+        runner.retry('old-relay', cfg),
+        throwsA(isA<MediaFailure>()),
+      );
+      expect(
+        jsonDecode(
+          (await repository.batch('old-relay'))!.paramsJson,
+        )['resolution'],
+        '720p',
+      );
+      expect(submissions, 1);
+    },
+  );
+
+  test(
     'a retry keeps its output ordinals after another artwork is deleted',
     () async {
       final requested = Completer<void>();
@@ -157,6 +258,40 @@ void main() {
   );
 
   test(
+    'a lost generation response does not submit a second billable job',
+    () async {
+      var calls = 0;
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+        delay: (_) async {},
+        clientFactory: (_, _) => MockClient((r) async {
+          calls++;
+          throw http.ClientException('Response lost', r.url);
+        }),
+      );
+      addTearDown(runner.shutdown);
+      final cfg = provider(
+        'router-loss',
+      ).copyWith(baseUrl: 'https://openrouter.ai/api/v1');
+      final ticket = await runner.enqueue(
+        provider: cfg,
+        request: const MediaRequest(
+          modelId: model,
+          mode: MediaMode.image,
+          prompt: 'Lake',
+        ),
+      );
+      expect(await ticket.completed, GenerationStatus.failed);
+      final failure = jsonDecode(
+        (await repository.batch(ticket.batchId))!.errorJson!,
+      );
+      expect(failure['automaticRetry'], isFalse);
+      expect(calls, 1);
+    },
+  );
+
+  test(
     'failed generation diagnostics retain only allowlisted request fields',
     () async {
       final runner = MediaGenerationRunner(
@@ -186,7 +321,7 @@ void main() {
       expect(jsonDecode(error)['request'], {
         'method': 'POST',
         'host': 'example.test',
-        'route': '/…/images/generations',
+        'route': '/v1/images/generations',
         'body': {'n': 10, 'size': '1536x1024'},
       });
       expect(jsonDecode(error)['response'], {

@@ -100,6 +100,42 @@ class MediaRequest {
     if (resolution != null) 'resolution': resolution,
   };
 
+  MediaRequest withCurrentVideoOptions(MediaCapabilities caps) {
+    if (mode != MediaMode.video) return this;
+    final resolutions = caps.resolutionsFor(
+      hasLastFrame: frame(MediaReferenceRole.lastFrame) != null,
+    );
+    final size = resolution == null || resolutions.contains(resolution)
+        ? resolution
+        : resolutions.firstOrNull;
+    final ratios = caps.ratiosFor(size);
+    final ratio =
+        caps.framesUseAutomaticRatio &&
+            frame(MediaReferenceRole.firstFrame) != null
+        ? 'auto'
+        : ratios.contains(aspectRatio)
+        ? aspectRatio
+        : ratios.firstOrNull ?? aspectRatio;
+    final seconds = durationSec == null || caps.durations.contains(durationSec)
+        ? durationSec
+        : caps.durations.firstOrNull;
+    if (size == resolution && ratio == aspectRatio && seconds == durationSec) {
+      return this;
+    }
+    return MediaRequest(
+      modelId: modelId,
+      mode: mode,
+      prompt: prompt,
+      negativePrompt: negativePrompt,
+      count: count,
+      aspectRatio: ratio,
+      durationSec: seconds,
+      resolution: size,
+      references: references,
+      parameters: parameters,
+    );
+  }
+
   MediaReference? frame(MediaReferenceRole role) =>
       references.where((reference) => reference.role == role).firstOrNull;
 
@@ -122,6 +158,7 @@ class MediaCapabilities {
     this.framesUseAutomaticRatio = false,
     this.requiresFirstFrame = false,
     this.requiresReference = false,
+    this.referenceBounds,
     this.maxCombinedInputsAndOutputs,
     this.sizes = const [],
     this.qualities = const [],
@@ -144,10 +181,19 @@ class MediaCapabilities {
   final bool framesUseAutomaticRatio;
   final bool requiresFirstFrame;
   final bool requiresReference;
+  final ({int min, int max}) Function(Map<String, dynamic>)? referenceBounds;
   final int? maxCombinedInputsAndOutputs;
   final List<String> sizes, qualities, formats;
   final bool supportsNegativePrompt, supportsSeed, supportsTransparent;
   final List<MediaParameter> platformOptions;
+
+  ({int min, int max}) referenceLimits(Map<String, dynamic> options) {
+    final bounds = referenceBounds?.call(options);
+    return (
+      min: math.max(requiresReference ? 1 : 0, bounds?.min ?? 0),
+      max: math.min(maxReferences, bounds?.max ?? maxReferences),
+    );
+  }
 
   int outputLimit(int inputImages) => switch (maxCombinedInputsAndOutputs) {
     final limit? => math.min(maxPerRequest, limit - inputImages),
@@ -248,6 +294,7 @@ enum MediaFailureKind {
   server,
   rejected,
   login,
+  unavailable,
   parameters,
   referenceTooLarge,
   download,
@@ -260,24 +307,29 @@ class MediaFailure implements Exception {
     this.message, {
     this.retryAfter,
     this.statusCode,
+    this.automaticRetry = true,
   });
 
   final MediaFailureKind kind;
   final String message;
   final Duration? retryAfter;
   final int? statusCode;
+  final bool automaticRetry;
 
-  bool get retryable => switch (kind) {
-    MediaFailureKind.network ||
-    MediaFailureKind.rateLimited ||
-    MediaFailureKind.server => true,
-    _ => false,
-  };
+  bool get retryable =>
+      automaticRetry &&
+      switch (kind) {
+        MediaFailureKind.network ||
+        MediaFailureKind.rateLimited ||
+        MediaFailureKind.server => true,
+        _ => false,
+      };
 
   Map<String, Object?> toJson() => {
     'kind': kind.name,
     'message': message,
     if (statusCode != null) 'statusCode': statusCode,
+    if (!automaticRetry) 'automaticRetry': false,
   };
 
   @override
