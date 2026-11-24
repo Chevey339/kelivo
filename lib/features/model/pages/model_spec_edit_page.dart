@@ -259,6 +259,10 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
     return [
       IosSectionHeader(text: l10n.modelSpecFormAdvancedSection, first: true),
       SectionCard(child: AdvancedSection(controller: _controller)),
+      if (_controller.hasMediaSettings && !_controller.spec.type.isMedia) ...[
+        IosSectionHeader(text: l10n.creationParameters),
+        MediaOptionsSection(controller: _controller),
+      ],
       if (_controller.spec.type == ModelType.chat) ...[
         IosSectionHeader(text: l10n.modelDetailSheetBuiltinToolsTab),
         SectionCard(child: BuiltinToolsSection(controller: _controller)),

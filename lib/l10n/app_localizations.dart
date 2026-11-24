@@ -31386,6 +31386,18 @@ abstract class AppLocalizations {
   /// **'Reference images must total 20 MB or less.'**
   String get creationReferenceTooLarge;
 
+  /// Provider model settings field that selects the wire protocol used for this model in the image or video creation workbench.
+  ///
+  /// In en, this message translates to:
+  /// **'Creation API protocol'**
+  String get creationApiProtocol;
+
+  /// Help beneath the creation API protocol setting explaining when to override automatic routing for a third-party gateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto uses the provider’s API. For a custom gateway, choose the protocol listed in its documentation.'**
+  String get creationApiProtocolHelp;
+
   /// Heading of the media aspect ratio picker.
   ///
   /// In en, this message translates to:

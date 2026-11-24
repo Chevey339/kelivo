@@ -2,6 +2,8 @@ import '../../../models/media_creation.dart';
 import '../../../providers/settings_provider.dart';
 import '../../api/chat_api_helpers.dart';
 import '../media_adapter.dart';
+import '../gemini_media_models.dart';
+import 'gemini_images.dart';
 import '../media_request.dart';
 import '../openrouter_media_catalog.dart';
 import 'openai_videos.dart';
@@ -13,8 +15,21 @@ class OpenRouterMediaAdapter implements MediaAdapter {
   final OpenRouterMediaModel? model;
 
   @override
-  MediaCapabilities capabilities(ProviderConfig provider, String modelId) =>
-      model?.capabilities ?? const MediaCapabilities(aspectRatios: ['auto']);
+  MediaCapabilities capabilities(ProviderConfig provider, String modelId) {
+    if (model != null) return model!.capabilities;
+    if (mode == MediaMode.image &&
+        isGeminiImageModel(apiModelId(provider, modelId))) {
+      final native = const GeminiImagesAdapter().capabilities(
+        provider,
+        modelId,
+      );
+      return MediaCapabilities(
+        aspectRatios: native.aspectRatios,
+        maxReferences: native.maxReferences,
+      );
+    }
+    return const MediaCapabilities(aspectRatios: ['auto']);
+  }
 
   @override
   Stream<MediaEvent> generate(

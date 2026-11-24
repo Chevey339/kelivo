@@ -1,4 +1,5 @@
 import '../../models/media_creation.dart';
+import 'gemini_media_models.dart';
 
 /// TokenDance's /models rows advertise wire protocols, independently of the
 /// chat API configured for the same gateway. Prefer native editing protocols.
@@ -7,6 +8,8 @@ enum TokenDanceMediaProtocol {
   dashScopeImage(MediaMode.image, 'dashscope:multimodal-generation'),
   klingImage(MediaMode.image, 'kling:image-generation'),
   klingLongImage(MediaMode.image, 'kling:long-image-generation'),
+  geminiImage(MediaMode.image, 'gemini:generate-content'),
+  chatCompletionsImage(MediaMode.image, 'openai:chat-completions'),
   openAiEdit(MediaMode.image, 'openai:image-edits'),
   openAiImage(MediaMode.image, 'openai:image-generations'),
   miniMax(MediaMode.video, 'minimax:video_generation_v2'),
@@ -24,13 +27,18 @@ enum TokenDanceMediaProtocol {
   final MediaMode? mode;
   final String wireName;
 
+  bool get chatImage => this == geminiImage || this == chatCompletionsImage;
+
   static bool isHost(String? host) =>
       host == 'tokendance.space' || host == 'www.tokendance.space';
 
   static TokenDanceMediaProtocol? advertised(String model, Object? protocols) {
     if (protocols is! List) return null;
     for (final protocol in values) {
-      if (!protocols.contains(protocol.wireName)) continue;
+      if (protocol.wireName.isEmpty || !protocols.contains(protocol.wireName)) {
+        continue;
+      }
+      if (protocol.chatImage && !isGeminiImageModel(model)) continue;
       // Speech recognition shares the DashScope endpoint. HappyHorse edits
       // and multi-subject references need inputs beyond the frame composer.
       if (protocol == dashScopeImage &&
@@ -84,6 +92,7 @@ enum TokenDanceMediaProtocol {
     'happyhorse-1.1-i2v' => happyHorse,
     'grok-imagine-video' => xaiVideo,
     'kling-tts' || 'kling-avatar-image2video' || 'kling-effects' => unsupported,
+    final model when isGeminiImageModel(model) => geminiImage,
     final model when model.startsWith('gpt-image-') => openAiEdit,
     _ => null,
   };

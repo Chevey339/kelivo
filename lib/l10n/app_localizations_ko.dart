@@ -17388,6 +17388,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationReferenceTooLarge => '참조 이미지의 총 크기는 20 MB 이하여야 합니다.';
 
   @override
+  String get creationApiProtocol => '생성 API 프로토콜';
+
+  @override
+  String get creationApiProtocolHelp =>
+      '자동은 공급자의 API를 사용합니다. 사용자 지정 게이트웨이의 경우 해당 문서에 나열된 프로토콜을 선택하세요.';
+
+  @override
   String get creationAspectRatio => '화면 비율';
 
   @override

@@ -5209,6 +5209,8 @@
   "creationEmptyBody": "描述你想創作的內容。送出第一則提示詞後，會為結果建立一個話題，之後的修改也會留在這裡。",
   "creationAddReference": "新增參考圖",
   "creationReferenceTooLarge": "參考圖片總大小必須為 20 MB 或以下。",
+  "creationApiProtocol": "創作 API 協定",
+  "creationApiProtocolHelp": "自動使用供應商的 API。使用自訂中轉時，可依中轉文件選擇協定。",
   "creationAspectRatio": "畫面比例",
   "creationCountLabel": "張數",
   "creationDuration": "時長",

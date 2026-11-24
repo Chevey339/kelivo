@@ -550,6 +550,78 @@ void main() {
     },
   );
 
+  test(
+    'New API stores a downloaded video from a protected task result without resubmitting',
+    () async {
+      const id = 'private-video';
+      final cfg = provider('custom-new-api').copyWith(
+        models: [id],
+        modelOverrides: {
+          id: {
+            'type': 'video',
+            'media': {'protocol': 'newApiVideo'},
+          },
+        },
+      );
+      final calls = <String>[];
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+        delay: (_) async {},
+        clientFactory: (_, _) => MockClient((sent) async {
+          calls.add('${sent.method} ${sent.url.path}');
+          if (sent.url.path == '/v1/video/generations') {
+            return http.Response(
+              '{"task_id":"original","status":"queued"}',
+              202,
+            );
+          }
+          if (sent.url.path == '/v1/video/generations/original') {
+            return http.Response(
+              '{"code":"success","data":{"status":"SUCCESS","result_url":"/v1/videos/original/content","metadata":{"duration":5}}}',
+              200,
+            );
+          }
+          expect(sent.headers['authorization'], 'Bearer fixture-key');
+          return http.Response.bytes([
+            0,
+            0,
+            0,
+            12,
+            ...ascii.encode('ftypmp42'),
+          ], 200);
+        }),
+      );
+      addTearDown(runner.dispose);
+      final ticket = await runner.enqueue(
+        provider: cfg,
+        request: const MediaRequest(
+          mode: MediaMode.video,
+          modelId: id,
+          prompt: 'Clouds',
+          aspectRatio: '16:9',
+          durationSec: 5,
+          resolution: '720p',
+        ),
+      );
+      expect(await ticket.completed, GenerationStatus.succeeded);
+      expect(calls, [
+        'POST /v1/video/generations',
+        'GET /v1/video/generations/original',
+        'GET /v1/videos/original/content',
+      ]);
+      final item = (await repository.itemsForBatch(ticket.batchId)).single;
+      expect(item.durationMs, 5000);
+      expect(item.mime, 'video/mp4');
+      expect(
+        await File(
+          KelivoFileUri.resolveToAbsolute(item.path, root: root.path)!,
+        ).exists(),
+        true,
+      );
+    },
+  );
+
   test('remote poll errors do not submit a second generation job', () async {
     var submits = 0;
     var reads = 0;

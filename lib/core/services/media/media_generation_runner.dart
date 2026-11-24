@@ -175,7 +175,9 @@ class MediaGenerationRunner extends ChangeNotifier {
     final last = roles.contains(MediaReferenceRole.lastFrame);
     return request.count == 1 &&
         (request.durationSec == null ||
-            caps.durations.contains(request.durationSec)) &&
+            caps
+                .durationsFor(hasLastFrame: last)
+                .contains(request.durationSec)) &&
         (request.resolution == null ||
             caps
                 .resolutionsFor(hasLastFrame: last)

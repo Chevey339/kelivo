@@ -23281,6 +23281,14 @@
   "@creationAddReference": {
     "description": "Accessible label for the creation composer action that selects an image file as a reference."
   },
+  "creationApiProtocol": "Creation API protocol",
+  "@creationApiProtocol": {
+    "description": "Provider model settings field that selects the wire protocol used for this model in the image or video creation workbench."
+  },
+  "creationApiProtocolHelp": "Auto uses the provider’s API. For a custom gateway, choose the protocol listed in its documentation.",
+  "@creationApiProtocolHelp": {
+    "description": "Help beneath the creation API protocol setting explaining when to override automatic routing for a third-party gateway."
+  },
   "creationAspectRatio": "Aspect ratio",
   "@creationAspectRatio": {
     "description": "Heading of the media aspect ratio picker."

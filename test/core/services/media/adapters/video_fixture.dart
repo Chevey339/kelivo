@@ -32,12 +32,13 @@ http.Response videoJson(Map<String, dynamic> data, [int status = 200]) =>
 MediaRequest videoRequest(
   String model, {
   List<MediaReference> frames = const [],
+  int seconds = 8,
   Map<String, dynamic> parameters = const {},
 }) => MediaRequest(
   modelId: model,
   mode: MediaMode.video,
   prompt: 'Sunlight on a garden',
-  durationSec: 8,
+  durationSec: seconds,
   resolution: '720p',
   aspectRatio: '16:9',
   references: frames,

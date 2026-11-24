@@ -16947,6 +16947,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationReferenceTooLarge => '参考图总大小不能超过 20 MB。';
 
   @override
+  String get creationApiProtocol => '创作接口协议';
+
+  @override
+  String get creationApiProtocolHelp => '自动使用供应商的接口。使用自定义中转时，可按中转文档选择协议。';
+
+  @override
   String get creationAspectRatio => '画面比例';
 
   @override
@@ -34684,6 +34690,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get creationReferenceTooLarge => '参考图总大小不能超过 20 MB。';
+
+  @override
+  String get creationApiProtocol => '创作接口协议';
+
+  @override
+  String get creationApiProtocolHelp => '自动使用供应商的接口。使用自定义中转时，可按中转文档选择协议。';
 
   @override
   String get creationAspectRatio => '画面比例';
@@ -52474,6 +52486,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get creationReferenceTooLarge => '參考圖片總大小必須為 20 MB 或以下。';
+
+  @override
+  String get creationApiProtocol => '創作 API 協定';
+
+  @override
+  String get creationApiProtocolHelp => '自動使用供應商的 API。使用自訂中轉時，可依中轉文件選擇協定。';
 
   @override
   String get creationAspectRatio => '畫面比例';

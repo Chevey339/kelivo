@@ -1,21 +1,33 @@
 import '../../../providers/settings_provider.dart';
 import '../../api/chat_api_helpers.dart';
-import '../../api/providers/google_vertex.dart';
 import '../media_adapter.dart';
 import '../media_polling.dart';
 import '../media_request.dart';
 import 'google_media_route.dart';
+import 'gemini_images.dart';
+import '../gemini_media_models.dart';
 
 class VeoVideoAdapter implements MediaAdapter {
   const VeoVideoAdapter();
 
+  static bool retiredOnVertex(String model) => const {
+    'veo-2.0-generate-001',
+    'veo-3.0-generate-001',
+    'veo-3.0-fast-generate-001',
+  }.contains(geminiMediaName(model));
+
   @override
   MediaCapabilities capabilities(ProviderConfig provider, String modelId) {
-    final supportsLast = apiModelId(provider, modelId).contains('veo-3.1');
+    final name = geminiMediaName(apiModelId(provider, modelId));
+    final supportsLast = name.contains('veo-3.1');
     return MediaCapabilities(
       aspectRatios: const ['16:9', '9:16'],
       durations: const [4, 6, 8],
-      resolutions: const ['720p', '1080p'],
+      resolutions: [
+        '720p',
+        '1080p',
+        if (provider.vertexAI == true && name == 'veo-3.1-generate-001') '4k',
+      ],
       maxReferences: supportsLast ? 2 : 1,
       supportsNegativePrompt: true,
       supportsSeed: true,
@@ -33,13 +45,9 @@ class VeoVideoAdapter implements MediaAdapter {
   ) async* {
     final provider = context.provider;
     final vertex = provider.vertexAI == true;
-    final model = apiModelId(
-      provider,
-      request.modelId,
-    ).replaceFirst(RegExp(r'^models/'), '');
-    final GoogleMediaRoute(:base, :auth) = await GoogleMediaRoute.resolve(
-      context,
-    );
+    final model = GeminiImagesAdapter.modelName(provider, request.modelId);
+    final route = await GoogleMediaRoute.resolve(context);
+    final GoogleMediaRoute(:base, :auth) = route;
 
     final first = request.frame(MediaReferenceRole.firstFrame);
     final last = request.frame(MediaReferenceRole.lastFrame);
@@ -104,7 +112,7 @@ class VeoVideoAdapter implements MediaAdapter {
         final record = entries?.whereType<Map>().firstOrNull;
         final video = (record?['video'] as Map?) ?? record;
         final bytes = video?['bytesBase64Encoded'];
-        final url = _videoUri(video?['gcsUri'] ?? video?['uri']);
+        final url = route.resultUri(video?['gcsUri'] ?? video?['uri']);
         if (bytes is! String && url == null) {
           if ((response?['raiMediaFilteredCount'] as num? ?? 0) > 0) {
             throw const MediaFailure(
@@ -117,16 +125,14 @@ class VeoVideoAdapter implements MediaAdapter {
             'Veo video unavailable',
           );
         }
-        final origin = Uri.parse(base).origin;
-        final attachAuth =
-            url != null &&
-            (vertex ? shouldAttachVertexMediaAuth(url) : url.origin == origin);
         return [
           MediaResult(
             mime: 'video/mp4',
             base64: bytes is String ? bytes : null,
             url: url,
-            downloadHeaders: attachAuth ? auth : const {},
+            downloadHeaders: url == null
+                ? const {}
+                : route.resultHeaders(url, vertex: vertex, headers: headers),
             durationMs: videoDurationMs(request.durationSec),
           ),
         ];
@@ -137,29 +143,5 @@ class VeoVideoAdapter implements MediaAdapter {
   static Future<Map<String, String>> _encodedImage(MediaReference image) async {
     final data = await googleImageInput(image);
     return {'mimeType': data.mime, 'bytesBase64Encoded': data.base64};
-  }
-
-  static Uri? _videoUri(Object? value) {
-    if (value is! String) return null;
-    final gs = Uri.tryParse(value);
-    if (gs != null &&
-        gs.scheme == 'gs' &&
-        gs.host.isNotEmpty &&
-        gs.path.length > 1) {
-      return Uri(
-        scheme: 'https',
-        host: 'storage.googleapis.com',
-        pathSegments: [
-          'storage',
-          'v1',
-          'b',
-          gs.host,
-          'o',
-          gs.pathSegments.join('/'),
-        ],
-        queryParameters: {'alt': 'media'},
-      );
-    }
-    return mediaResultUri(value);
   }
 }

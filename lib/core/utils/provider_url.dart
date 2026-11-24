@@ -113,7 +113,7 @@ String resolveRequestUrl(
     case ProviderKind.claude:
       return '$base/messages';
     case ProviderKind.google:
-      final model = modelId ?? '{模型}';
+      final model = modelId == null ? '{模型}' : googleRequestModelId(c, modelId);
       if (c.vertexAI == true && model.toLowerCase().startsWith('claude-')) {
         final location = (c.location ?? 'us-central1').trim();
         final project = (c.projectId ?? '').trim();
@@ -130,6 +130,16 @@ String resolveRequestUrl(
       }
       return '$base/models/$model:$endpoint';
   }
+}
+
+String googleRequestModelId(ProviderConfig config, String model) {
+  final name = model.replaceFirst(RegExp(r'^models/'), '');
+  final official =
+      config.vertexAI == true ||
+      Uri.tryParse(config.baseUrl)?.host == 'generativelanguage.googleapis.com';
+  return official
+      ? name.replaceFirst(RegExp(r'^(?:publishers/google/models/|google/)'), '')
+      : name;
 }
 
 String providerVertexOrigin(ProviderConfig config, String loc) {

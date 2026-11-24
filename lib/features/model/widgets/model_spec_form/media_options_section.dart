@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/models/media_creation.dart';
+import '../../../../core/services/media/media_model_overrides.dart';
+import '../../../../shared/widgets/action_sheet.dart';
 import '../../../../core/services/media/adapters/native_image_size.dart'
     show standardImageRatios, imageFormats;
 import '../../../media/widgets/creation_ratio_grid.dart';
@@ -89,6 +91,48 @@ class MediaOptionsSection extends StatelessWidget {
               ],
             ),
           ),
+          if (!controller.config.isOAuth)
+            _Field(
+              title: l10n.creationApiProtocol,
+              help: l10n.creationApiProtocolHelp,
+              child: Builder(
+                builder: (anchorContext) {
+                  final selected = controller.mediaProtocol;
+                  String label(MediaApiProtocol p) =>
+                      p == MediaApiProtocol.auto ? l10n.creationAuto : p.label;
+                  return Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: CreationAction(
+                      icon: const Icon(LucideIcons.chevronDown, size: 14),
+                      child: Text(label(selected)),
+                      onPressed: () {
+                        final box =
+                            anchorContext.findRenderObject() as RenderBox;
+                        showAdaptiveActionMenu(
+                          anchorContext,
+                          anchor: box.localToGlobal(Offset(0, box.size.height)),
+                          title: l10n.creationApiProtocol,
+                          items: [
+                            for (final protocol in MediaApiProtocol.values)
+                              if (protocol.mode == null ||
+                                  protocol.mode == controller.mediaMode)
+                                ActionSheetItem(
+                                  icon: LucideIcons.plug,
+                                  label: label(protocol),
+                                  checked: protocol == selected,
+                                  onTap: () => controller.setMediaValue(
+                                    'protocol',
+                                    protocol.name,
+                                  ),
+                                ),
+                          ],
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
           _Field(
             title: l10n.creationAspectRatio,
             help: l10n.creationRatioHelp,

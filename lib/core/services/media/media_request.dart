@@ -116,9 +116,12 @@ class MediaRequest {
         : ratios.contains(aspectRatio)
         ? aspectRatio
         : ratios.firstOrNull ?? aspectRatio;
-    final seconds = durationSec == null || caps.durations.contains(durationSec)
+    final durations = caps.durationsFor(
+      hasLastFrame: frame(MediaReferenceRole.lastFrame) != null,
+    );
+    final seconds = durationSec == null || durations.contains(durationSec)
         ? durationSec
-        : caps.durations.firstOrNull;
+        : durations.firstOrNull;
     if (size == resolution && ratio == aspectRatio && seconds == durationSec) {
       return this;
     }
@@ -151,6 +154,7 @@ class MediaCapabilities {
     this.maxReferences = 0,
     this.nativeProgress = false,
     this.durations = const [],
+    this.durationsWithLastFrame,
     this.resolutions = const [],
     this.resolutionsWithLastFrame,
     this.frameRoles = const [],
@@ -174,6 +178,7 @@ class MediaCapabilities {
   final int maxReferences;
   final bool nativeProgress;
   final List<int> durations;
+  final List<int>? durationsWithLastFrame;
   final List<String> resolutions;
   final List<String>? resolutionsWithLastFrame;
   final List<MediaReferenceRole> frameRoles;
@@ -203,6 +208,9 @@ class MediaCapabilities {
   List<String> ratiosFor(String? resolution) =>
       ratiosByResolution[resolution] ?? aspectRatios;
 
+  List<int> durationsFor({required bool hasLastFrame}) =>
+      (hasLastFrame ? durationsWithLastFrame : null) ?? durations;
+
   List<String> resolutionsFor({required bool hasLastFrame}) =>
       (hasLastFrame ? resolutionsWithLastFrame : null) ?? resolutions;
 }
@@ -214,6 +222,7 @@ class MediaParameter {
     this.key,
     this.type, {
     this.choices = const [],
+    this.availableWithLastFrame = true,
     this.minimum,
     this.maximum,
     this.step,
@@ -224,6 +233,7 @@ class MediaParameter {
   final String key;
   final MediaParameterType type;
   final List<String> choices;
+  final bool availableWithLastFrame;
   final num? minimum, maximum, step;
   final Object? defaultValue;
   final bool required;

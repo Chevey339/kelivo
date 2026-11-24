@@ -1,8 +1,31 @@
 import '../custom_request_merger.dart';
+import '../../models/media_creation.dart';
 import 'media_request.dart';
+
+/// A model on a self-hosted gateway can use a different API from chat.
+enum MediaApiProtocol {
+  auto('Auto'),
+  openAiImage('OpenAI Images', MediaMode.image),
+  chatImage('OpenAI Chat Completions', MediaMode.image),
+  geminiImage('Gemini generateContent', MediaMode.image),
+  arkImage('Ark / Seedream', MediaMode.image),
+  dashScopeImage('DashScope', MediaMode.image),
+  modelScopeImage('ModelScope', MediaMode.image),
+  openAiVideo('OpenAI Videos / Sora', MediaMode.video),
+  modelScopeVideo('ModelScope', MediaMode.video),
+  newApiVideo('New API /video/generations', MediaMode.video),
+  arkVideo('Ark / Seedance', MediaMode.video),
+  dashScopeVideo('DashScope', MediaMode.video),
+  geminiVideo('Gemini Interactions', MediaMode.video);
+
+  const MediaApiProtocol(this.label, [this.mode]);
+  final String label;
+  final MediaMode? mode;
+}
 
 class MediaModelOverrides {
   const MediaModelOverrides({
+    this.protocol = MediaApiProtocol.auto,
     this.aspectRatios,
     this.maxPerRequest,
     this.maxReferences,
@@ -18,6 +41,7 @@ class MediaModelOverrides {
     this.extra = const {},
   });
 
+  final MediaApiProtocol protocol;
   final List<String>? aspectRatios, sizes, resolutions, formats;
   final List<int>? durations;
   final int? maxPerRequest, maxReferences;
@@ -27,11 +51,18 @@ class MediaModelOverrides {
   factory MediaModelOverrides.fromJson(Object? value) {
     if (value is! Map) return const MediaModelOverrides();
     return MediaModelOverrides(
+      protocol:
+          MediaApiProtocol.values
+              .where((p) => p.name == value['protocol'])
+              .firstOrNull ??
+          MediaApiProtocol.auto,
       aspectRatios: _values<String>(value['aspectRatios'], keepEmpty: false),
       maxPerRequest: _boundedInt(value['maxPerRequest'], 1, 16),
       maxReferences: _boundedInt(value['maxReferences'], 0, 16),
       sizes: _values<String>(value['sizes']),
-      durations: _values<int>(value['durations'])?.where((n) => n > 0).toList(),
+      durations: _values<int>(
+        value['durations'],
+      )?.where((n) => n == -1 || n > 0).toList(),
       resolutions: _values<String>(value['resolutions']),
       firstFrame: _flag(value['firstFrame']),
       lastFrame: _flag(value['lastFrame']),
@@ -48,6 +79,7 @@ class MediaModelOverrides {
   }
 
   Map<String, dynamic> toJson() => {
+    if (protocol != MediaApiProtocol.auto) 'protocol': protocol.name,
     if (aspectRatios != null) 'aspectRatios': aspectRatios,
     if (maxPerRequest != null) 'maxPerRequest': maxPerRequest,
     if (maxReferences != null) 'maxReferences': maxReferences,
@@ -86,6 +118,9 @@ class MediaModelOverrides {
             ),
       nativeProgress: base.nativeProgress,
       durations: durations ?? base.durations,
+      durationsWithLastFrame: base.durationsWithLastFrame
+          ?.where((durations ?? base.durations).contains)
+          .toList(),
       resolutions: resolutions ?? base.resolutions,
       resolutionsWithLastFrame: base.resolutionsWithLastFrame
           ?.where((resolutions ?? base.resolutions).contains)

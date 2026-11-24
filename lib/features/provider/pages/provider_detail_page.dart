@@ -151,30 +151,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    bool isUserAdded(String key) {
-      const fixed = {
-        'KelivoIN',
-        'OpenAI',
-        'STA1N API',
-        '10dian-API',
-        'Gemini',
-        'SiliconFlow',
-        'OpenRouter',
-        'Vercel',
-        'DeepSeek',
-        'Tensdaq',
-        'AIhubmix',
-        '随想AI中转站',
-        'MaruCode',
-        '砂糖酒馆',
-        'Aliyun',
-        'Zhipu AI',
-        'Claude',
-        'Grok',
-        'ByteDance',
-      };
-      return !fixed.contains(key);
-    }
+    bool isUserAdded(String key) => !SettingsProvider.isBuiltInProvider(key);
 
     final page = Scaffold(
       appBar: AppBar(

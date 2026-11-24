@@ -313,7 +313,9 @@ class MediaCreationController extends ChangeNotifier {
   List<String> ratiosFor(String? topicId) {
     final caps = model?.capabilities;
     if (caps == null ||
-        (caps.framesUseAutomaticRatio && showsFrames(topicId))) {
+        (caps.framesUseAutomaticRatio &&
+            showsFrames(topicId) &&
+            frame(topicId, MediaReferenceRole.firstFrame) != null)) {
       return const ['auto'];
     }
     return caps.ratiosFor(resolutionFor(topicId));
@@ -326,8 +328,26 @@ class MediaCreationController extends ChangeNotifier {
         : ratios.firstOrNull ?? 'auto';
   }
 
-  int? get duration {
-    final choices = model?.capabilities.durations ?? const <int>[];
+  List<MediaParameter> platformOptionsFor(String? topicId) {
+    final options =
+        model?.capabilities.platformOptions ?? const <MediaParameter>[];
+    if (!showsFrames(topicId) ||
+        frame(topicId, MediaReferenceRole.lastFrame) == null) {
+      return options;
+    }
+    return options.where((p) => p.availableWithLastFrame).toList();
+  }
+
+  List<int> durationsFor(String? topicId) =>
+      model?.capabilities.durationsFor(
+        hasLastFrame:
+            showsFrames(topicId) &&
+            frame(topicId, MediaReferenceRole.lastFrame) != null,
+      ) ??
+      const [];
+
+  int? durationFor(String? topicId) {
+    final choices = durationsFor(topicId);
     final value = _currentOptions.duration;
     return choices.contains(value) ? value : choices.firstOrNull;
   }
@@ -603,7 +623,7 @@ class MediaCreationController extends ChangeNotifier {
           : null,
       count: count,
       aspectRatio: ratioFor(topicId),
-      durationSec: duration,
+      durationSec: durationFor(topicId),
       resolution: resolutionFor(topicId),
       references: _effectiveReferences(topicId, caps),
       parameters: {
@@ -616,7 +636,7 @@ class MediaCreationController extends ChangeNotifier {
           'background': options['background'],
         if (caps.supportsSeed && options['seed'] != null)
           'seed': int.parse(options['seed'].toString()),
-        for (final field in caps.platformOptions)
+        for (final field in platformOptionsFor(topicId))
           if (field.type != MediaParameterType.image &&
               options[field.key] != null)
             field.key: options[field.key],

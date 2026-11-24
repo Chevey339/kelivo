@@ -18044,6 +18044,13 @@ class AppLocalizationsTr extends AppLocalizations {
       'Referans görsellerin toplam boyutu 20 MB veya daha az olmalıdır.';
 
   @override
+  String get creationApiProtocol => 'Oluşturma API protokolü';
+
+  @override
+  String get creationApiProtocolHelp =>
+      'Otomatik, sağlayıcının API\'sini kullanır. Özel bir ağ geçidi için belgelerinde listelenen protokolü seçin.';
+
+  @override
   String get creationAspectRatio => 'En-boy oranı';
 
   @override

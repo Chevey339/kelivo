@@ -375,6 +375,7 @@ class _CreationComposerState extends State<CreationComposer> {
     final frames = state.showsFrames(widget.topicId);
     final caps = model?.capabilities;
     final aspectRatio = state.ratioFor(widget.topicId);
+    final selectedDuration = state.durationFor(widget.topicId);
     final hint = model == null
         ? l10n.creationNoModelPlaceholder
         : switch ((state.mode, widget.desktop && widget.topicId == null)) {
@@ -708,7 +709,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                             l10n.creationImagesCount(
                                               state.count,
                                             ),
-                                          if (state.duration
+                                          if (selectedDuration
                                               case final int duration
                                               when video)
                                             creationDurationLabel(
@@ -760,8 +761,8 @@ class _CreationComposerState extends State<CreationComposer> {
                                           ),
                                         ),
                                       ),
-                                      if (state.duration case final int duration
-                                          when video)
+                                      if (selectedDuration
+                                          case final int duration when video)
                                         _ComposerChip(
                                           maxWidth: 96,
                                           label: creationDurationLabel(
@@ -1215,6 +1216,8 @@ class _ParameterOptions extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final caps = state.model?.capabilities;
     final ratios = state.ratiosFor(topicId);
+    final durations = state.durationsFor(topicId);
+    final selectedDuration = state.durationFor(topicId);
     final resolutions = state.resolutionsFor(topicId);
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1236,29 +1239,27 @@ class _ParameterOptions extends StatelessWidget {
         ],
         if (ratio && count) const SizedBox(height: 12),
         if (count) _ImageCountOptions(topicId: topicId, showLabel: advanced),
-        if (duration && caps != null && caps.durations.isNotEmpty) ...[
+        if (duration && durations.isNotEmpty) ...[
           if (ratio) const SizedBox(height: 12),
           Text(l10n.creationDuration),
           const SizedBox(height: 6),
-          if (caps.durations.length > 6)
+          if (durations.length > 6)
             Row(
               children: [
                 Expanded(
                   child: CreationSlider(
                     label: l10n.creationDuration,
-                    formatValue: (index) => creationDurationLabel(
-                      l10n,
-                      caps.durations[index.round()],
-                    ),
-                    value: caps.durations.indexOf(state.duration!).toDouble(),
-                    max: (caps.durations.length - 1).toDouble(),
-                    divisions: caps.durations.length - 1,
+                    formatValue: (index) =>
+                        creationDurationLabel(l10n, durations[index.round()]),
+                    value: durations.indexOf(selectedDuration!).toDouble(),
+                    max: (durations.length - 1).toDouble(),
+                    divisions: durations.length - 1,
                     onChanged: (index) =>
-                        state.selectDuration(caps.durations[index.round()]),
+                        state.selectDuration(durations[index.round()]),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(creationDurationLabel(l10n, state.duration!)),
+                Text(creationDurationLabel(l10n, selectedDuration)),
               ],
             )
           else
@@ -1267,11 +1268,11 @@ class _ParameterOptions extends StatelessWidget {
               height: 36,
 
               tabs: [
-                for (final value in caps.durations)
+                for (final value in durations)
                   SegmentedTab(label: creationDurationLabel(l10n, value)),
               ],
-              index: caps.durations.indexOf(state.duration!),
-              onChanged: (index) => state.selectDuration(caps.durations[index]),
+              index: durations.indexOf(selectedDuration!),
+              onChanged: (index) => state.selectDuration(durations[index]),
             ),
         ],
         if (resolution && resolutions.isNotEmpty) ...[

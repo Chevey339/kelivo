@@ -153,16 +153,45 @@ class ModelSpecFormController extends ChangeNotifier {
 
   MediaMode get mediaMode =>
       spec.type == ModelType.video ? MediaMode.video : MediaMode.image;
-  String get _mediaId => apiModelIdController.text.trim();
+  bool get hasMediaSettings =>
+      spec.type.isMedia ||
+      spec.type == ModelType.chat && spec.output.contains(Modality.image);
+  MediaApiProtocol get mediaProtocol =>
+      media.protocol.mode == mediaMode ? media.protocol : MediaApiProtocol.auto;
+  String get _mediaKey => isNew ? apiModelIdController.text.trim() : _modelKey;
 
-  bool get hasMediaModelData =>
-      const MediaAdapterResolver().hasModelData(_config, mediaMode, _mediaId);
+  ProviderConfig get _mediaPreviewConfig {
+    return _config.copyWith(
+      modelOverrides: {
+        ..._config.modelOverrides,
+        _mediaKey: {
+          ...draft.toJson(),
+          'apiModelId': apiModelIdController.text.trim(),
+          'name': displayNameController.text.trim(),
+        },
+      },
+    );
+  }
 
-  MediaCapabilities get mediaDefaults =>
-      const MediaAdapterResolver()
-          .resolve(_config, mediaMode, modelId: _mediaId)
-          ?.capabilities(_config, _mediaId) ??
-      const MediaCapabilities(aspectRatios: standardImageRatios);
+  bool get hasMediaModelData => const MediaAdapterResolver().hasModelData(
+    _mediaPreviewConfig,
+    mediaMode,
+    _mediaKey,
+    protocol: mediaProtocol,
+  );
+
+  MediaCapabilities get mediaDefaults {
+    final config = _mediaPreviewConfig;
+    return const MediaAdapterResolver()
+            .resolve(
+              config,
+              mediaMode,
+              modelId: _mediaKey,
+              protocol: mediaProtocol,
+            )
+            ?.capabilities(config, _mediaKey) ??
+        const MediaCapabilities(aspectRatios: standardImageRatios);
+  }
 
   MediaCapabilities get mediaCapabilities =>
       media.apply(mediaDefaults, video: mediaMode == MediaMode.video);
@@ -185,7 +214,7 @@ class ModelSpecFormController extends ChangeNotifier {
   }
 
   bool get _validMediaExtra =>
-      !spec.type.isMedia ||
+      !hasMediaSettings ||
       mediaExtraController.text.trim().isEmpty ||
       _tryParseJsonObject(mediaExtraController.text.trim()) != null;
 
@@ -703,7 +732,7 @@ class ModelSpecFormController extends ChangeNotifier {
         final options = imageGeneration.toJson();
         if (options.isNotEmpty) payload['imageGeneration'] = options;
       }
-      if (_mediaTouched && spec.type.isMedia) {
+      if (_mediaTouched && hasMediaSettings) {
         final data = media.toJson()..remove('extra');
         final extra = _tryParseJsonObject(mediaExtraController.text.trim());
         if (extra != null && extra.isNotEmpty) data['extra'] = extra;

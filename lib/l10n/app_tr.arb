@@ -5209,6 +5209,8 @@
   "creationEmptyBody": "Ne oluşturmak istediğinizi açıklayın. İlk istemi göndermek, sonuç ve sonraki düzenlemeler için bir konu başlatır.",
   "creationAddReference": "Referans görsel ekle",
   "creationReferenceTooLarge": "Referans görsellerin toplam boyutu 20 MB veya daha az olmalıdır.",
+  "creationApiProtocol": "Oluşturma API protokolü",
+  "creationApiProtocolHelp": "Otomatik, sağlayıcının API'sini kullanır. Özel bir ağ geçidi için belgelerinde listelenen protokolü seçin.",
   "creationAspectRatio": "En-boy oranı",
   "creationCountLabel": "Görsel sayısı",
   "creationDuration": "Süre",

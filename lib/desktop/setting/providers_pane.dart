@@ -334,6 +334,9 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'Grok', key: 'Grok'),
       (name: l10n.providersPageByteDanceName, key: 'ByteDance'),
       (name: 'fal', key: 'fal'),
+      (name: 'Replicate', key: 'Replicate'),
+      (name: 'ModelScope', key: 'ModelScope'),
+      (name: 'BytePlus', key: 'BytePlus'),
     ];
 
     final cfgs = settings.providerConfigs;

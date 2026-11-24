@@ -17938,6 +17938,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reference images must total 20 MB or less.';
 
   @override
+  String get creationApiProtocol => 'Creation API protocol';
+
+  @override
+  String get creationApiProtocolHelp =>
+      'Auto uses the provider’s API. For a custom gateway, choose the protocol listed in its documentation.';
+
+  @override
   String get creationAspectRatio => 'Aspect ratio';
 
   @override

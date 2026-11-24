@@ -45,6 +45,52 @@ void main() {
     l10n = await AppLocalizations.delegate.load(const Locale('en'));
   });
 
+  test(
+    'chat image aliases preview, persist and clear a per-model creation protocol',
+    () async {
+      const id = 'my-image-model';
+      final cfg = _cfg(
+        models: [id],
+        overrides: {
+          id: {
+            'apiModelId': 'deployment-321',
+            'type': 'chat',
+            'output': ['text', 'image'],
+          },
+        },
+      );
+      final settings = await _settings(cfg);
+      addTearDown(settings.dispose);
+      final form = ModelSpecFormController(
+        config: cfg,
+        modelKey: id,
+        isNew: false,
+      );
+      addTearDown(form.dispose);
+      expect(form.hasMediaSettings, true);
+      expect(form.mediaDefaults.maxReferences, 1);
+      expect(form.mediaDefaults.aspectRatios, ['auto']);
+      form.setMediaValue('protocol', 'geminiImage');
+      expect(form.mediaDefaults.maxReferences, 14);
+      expect(await form.save(settings), true);
+      final saved = settings.getProviderConfig(cfg.id);
+      final reopened = ModelSpecFormController(
+        config: saved,
+        modelKey: id,
+        isNew: false,
+      );
+      addTearDown(reopened.dispose);
+      expect(reopened.spec.type, ModelType.chat);
+      expect(reopened.mediaProtocol.name, 'geminiImage');
+      reopened.setMediaValue('protocol', 'auto');
+      expect(reopened.mediaDefaults.maxReferences, 1);
+      expect(await reopened.save(settings), true);
+      expect(
+        settings.getProviderConfig(cfg.id).modelOverrides[id],
+        isNot(contains('media')),
+      );
+    },
+  );
   test('media settings save per model and reset to adapter defaults', () async {
     const id = 'gpt-image-2';
     final cfg = _cfg(

@@ -47,14 +47,7 @@ MediaModelChoice? resolveMediaModel(
                   MediaMode.video,
     MediaMode.image =>
       spec.type == ModelType.image ||
-          spec.type == ModelType.chat &&
-              spec.output.contains(Modality.image) &&
-              (openRouter ||
-                  ProviderConfig.classify(
-                        provider.id,
-                        explicitType: provider.providerType,
-                      ) ==
-                      ProviderKind.google),
+          spec.type == ModelType.chat && spec.output.contains(Modality.image),
   };
   if (!eligible) return null;
   final capabilities = resolver.capabilities(provider, mode, id);

@@ -66,11 +66,7 @@ class DashScopeVideoAdapter implements MediaAdapter {
             }
           : const {},
       durations: switch (model) {
-        _ when wan3 && gatewayPath != null => [
-          for (var i = 2; i <= 30; i++) i,
-          -1,
-        ],
-        _ when wan3 => List.generate(11, (index) => index + 5),
+        _ when wan3 => [for (var i = 2; i <= 30; i++) i, -1],
         _ when wan27 || wan26 && textOnly => List.generate(
           14,
           (index) => index + 2,
@@ -114,8 +110,9 @@ class DashScopeVideoAdapter implements MediaAdapter {
     MediaContext context,
     MediaRequest request,
   ) async* {
-    final base = Uri.parse(context.provider.baseUrl);
-    final api = '${base.origin}${gatewayPath ?? '/api/v1'}';
+    final api = gatewayPath == null
+        ? context.nativeBase('api/v1')
+        : context.endpoint(gatewayPath!).toString();
     final headers = context.headers(request.modelId);
     final model = apiModelId(context.provider, request.modelId);
     final normalized = model.toLowerCase();

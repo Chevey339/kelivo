@@ -32,6 +32,7 @@ class CreationAdvancedOptions extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
     final caps = model.capabilities;
+    final platformOptions = state.platformOptionsFor(topicId);
     final options = state.parameters;
     final invalidJson = state.extraParameters == null;
 
@@ -154,7 +155,7 @@ class CreationAdvancedOptions extends StatelessWidget {
               ],
             ),
           ),
-        if (caps.platformOptions.isNotEmpty) ...[
+        if (platformOptions.isNotEmpty) ...[
           const SizedBox(height: 14),
           Text(
             '${model.provider.name} · ${l10n.creationPlatformOptions}',
@@ -164,7 +165,7 @@ class CreationAdvancedOptions extends StatelessWidget {
               color: colors.onSurfaceVariant,
             ),
           ),
-          for (final field in caps.platformOptions)
+          for (final field in platformOptions)
             _PlatformInput(
               key: ValueKey(field.key),
               field: field,

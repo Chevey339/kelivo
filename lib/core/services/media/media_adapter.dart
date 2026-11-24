@@ -84,6 +84,13 @@ class MediaRequestLog {
       'image2video',
       'omni-video',
       'image-generation',
+      'models',
+      'interactions',
+      'predictions',
+      'async-result',
+      'files',
+      'chat',
+      'completions',
       'long-image-generation',
     };
     final route = request.url.pathSegments
@@ -180,13 +187,32 @@ class MediaContext {
   final MediaRequestLog? log;
 
   Uri endpoint(String path, {String? base}) {
-    final root = base ?? provider.baseUrl;
-    // Some gateways serve each media protocol under its own root, alongside
-    // their OpenAI-compatible chat endpoint.
-    if (path.startsWith('/')) {
-      return Uri.parse('${Uri.parse(root).origin}$path');
-    }
-    return Uri.parse('${root.replaceFirst(RegExp(r'/+$'), '')}/$path');
+    final root = Uri.parse(base ?? provider.baseUrl);
+    final route = Uri.parse(path);
+    final prefix = root.path.replaceFirst(RegExp(r'/+$'), '');
+    final query = [
+      if (root.hasQuery) root.query,
+      if (route.hasQuery) route.query,
+    ].join('&');
+    return root
+        .replace(
+          path: path.startsWith('/') ? route.path : '$prefix/${route.path}',
+          query: query.isEmpty ? null : query,
+        )
+        .removeFragment();
+  }
+
+  /// A relay may mount multiple native APIs below its own path prefix.
+  String nativeBase(String apiPath) {
+    final uri = Uri.parse(provider.baseUrl);
+    final root = uri.path.replaceFirst(RegExp(r'/+$'), '');
+    final prefix = root.replaceFirst(
+      RegExp(
+        r'/(?:api/v2/apps/protocols/compatible-mode/v1|compatible-mode/v1|v1beta/openai|api/v[13]|v1beta|v1)$',
+      ),
+      '',
+    );
+    return uri.replace(path: '$prefix/$apiPath').toString();
   }
 
   Map<String, String> headers(
@@ -248,19 +274,28 @@ class MediaContext {
     Uri url, {
     required Map<String, String> headers,
     Map<String, dynamic>? body,
+    bool allowZeroErrorCode = false,
   }) async {
     final request = http.Request(method, url)..headers.addAll(headers);
     if (body != null) request.body = jsonEncode(body);
-    return readMediaJson(await send(request, diagnosticBody: body));
+    return readMediaJson(
+      await send(request, diagnosticBody: body),
+      allowZeroErrorCode: allowZeroErrorCode,
+    );
   }
 }
 
 Future<Map<String, dynamic>> readMediaJson(
-  http.StreamedResponse response,
-) async {
+  http.StreamedResponse response, {
+  bool allowZeroErrorCode = false,
+}) async {
   final payload = await response.stream.toBytes();
   final value = await compute(decodeMediaJson, payload);
-  if (value['error'] != null) throw mediaResponseFailure(value['error']);
+  final error = value['error'];
+  if (error != null &&
+      !(allowZeroErrorCode && error is Map && error['code'] == 0)) {
+    throw mediaResponseFailure(error);
+  }
   return value;
 }
 
@@ -384,6 +419,15 @@ Future<String> _encodeMediaReference(
   MediaReference reference, {
   required bool withMimePrefix,
 }) async {
+  final bytes = await readMediaReference(reference);
+  return compute(_encodeReference, (
+    name: reference.path,
+    bytes: bytes,
+    prefix: withMimePrefix,
+  ));
+}
+
+Future<Uint8List> readMediaReference(MediaReference reference) async {
   final path = SandboxPathResolver.resolveForIo(reference.path);
   if (path == null) {
     throw const MediaFailure(
@@ -391,12 +435,7 @@ Future<String> _encodeMediaReference(
       'Reference file unavailable',
     );
   }
-  final bytes = await File(path).readAsBytes();
-  return compute(_encodeReference, (
-    name: path,
-    bytes: bytes,
-    prefix: withMimePrefix,
-  ));
+  return File(path).readAsBytes();
 }
 
 String _encodeReference(({String name, Uint8List bytes, bool prefix}) data) {

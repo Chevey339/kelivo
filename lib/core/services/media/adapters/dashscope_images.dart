@@ -6,9 +6,9 @@ import '../media_request.dart';
 import 'native_image_size.dart';
 
 class DashScopeImagesAdapter implements MediaAdapter {
-  const DashScopeImagesAdapter({this.apiPath = '/api/v1'});
+  const DashScopeImagesAdapter({this.apiPath});
 
-  final String apiPath;
+  final String? apiPath;
   static const _pixelSizes = ['1024x1024', '1536x1024', '1024x1536'];
 
   static bool _wan26Edit(String model) => model.startsWith('wan2.6-image');
@@ -107,8 +107,9 @@ class DashScopeImagesAdapter implements MediaAdapter {
     MediaContext context,
     MediaRequest request,
   ) async* {
-    final origin = Uri.parse(context.provider.baseUrl).origin;
-    final api = '$origin$apiPath';
+    final api = apiPath == null
+        ? context.nativeBase('api/v1')
+        : context.endpoint(apiPath!).toString();
     final model = apiModelId(context.provider, request.modelId);
     final normalized = model.toLowerCase();
     final legacy = _legacyWan(normalized);

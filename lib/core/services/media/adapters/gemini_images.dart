@@ -1,21 +1,37 @@
 import '../../../providers/settings_provider.dart';
+import '../../../utils/provider_url.dart';
 import '../../api/chat_api_helpers.dart';
+import '../gemini_media_models.dart';
 import '../media_adapter.dart';
 import '../media_request.dart';
 import 'google_media_route.dart';
 
 class GeminiImagesAdapter implements MediaAdapter {
-  const GeminiImagesAdapter();
+  const GeminiImagesAdapter({this.apiBasePath, this.compatibleBase = false});
+
+  final String? apiBasePath;
+  final bool compatibleBase;
+
+  static bool available(ProviderConfig provider, String id) {
+    final name = modelName(provider, id);
+    if (provider.vertexAI == true) {
+      return !retiredOnVertex(name) &&
+          (!isNanoBanana21(name) || GoogleMediaRoute.globalAvailable(provider));
+    }
+    return Uri.tryParse(provider.baseUrl)?.host !=
+            'generativelanguage.googleapis.com' ||
+        !isImagen(name);
+  }
 
   static bool isImagen(String model) => model.startsWith('imagen-');
   static bool retiredOnVertex(String model) =>
       model.startsWith('imagen-3.') || model.startsWith('imagen-4.');
   static String modelName(ProviderConfig config, String id) =>
-      apiModelId(config, id).replaceFirst(RegExp(r'^models/'), '');
+      googleRequestModelId(config, apiModelId(config, id));
 
   @override
   MediaCapabilities capabilities(ProviderConfig provider, String modelId) {
-    final id = modelName(provider, modelId);
+    final id = geminiMediaName(modelName(provider, modelId));
     final imagen = isImagen(id);
     return MediaCapabilities(
       aspectRatios: [
@@ -25,6 +41,13 @@ class GeminiImagesAdapter implements MediaAdapter {
         '9:16',
         if (!imagen) ...['3:2', '2:3', '4:3', '3:4', '4:5', '5:4', '21:9'],
         if (imagen) ...['4:3', '3:4'],
+        if (id.contains('nano-banana-2.1') ||
+            id.startsWith('gemini-3.1-flash-image')) ...[
+          '1:4',
+          '4:1',
+          '1:8',
+          '8:1',
+        ],
       ],
       maxPerRequest: imagen ? 4 : 1,
       maxReferences: imagen
@@ -39,7 +62,12 @@ class GeminiImagesAdapter implements MediaAdapter {
           : id.startsWith('gemini-2.5') ||
                 id.startsWith('gemini-3.1-flash-lite-image')
           ? const []
-          : const ['1K', '2K', '4K'],
+          : [
+              '1K',
+              '2K',
+              '4K',
+              if (id.startsWith('gemini-3.1-flash-image')) '512',
+            ],
       formats: imagen ? const ['png', 'jpeg'] : const [],
     );
   }
@@ -50,7 +78,15 @@ class GeminiImagesAdapter implements MediaAdapter {
     MediaRequest request,
   ) async* {
     final model = modelName(context.provider, request.modelId);
-    final route = await GoogleMediaRoute.resolve(context);
+    final route = await GoogleMediaRoute.resolve(
+      context,
+      globalByDefault: isNanoBanana21(model),
+      apiBase: apiBasePath != null
+          ? context.endpoint(apiBasePath!).toString()
+          : compatibleBase
+          ? context.nativeBase('v1beta')
+          : null,
+    );
     final imagen = isImagen(model);
     final resource = 'models/${Uri.encodeComponent(model)}';
     final size = request.parameters['size'];
@@ -113,7 +149,7 @@ class GeminiImagesAdapter implements MediaAdapter {
         ],
         'generationConfig': {
           'responseModalities': [
-            if (model.startsWith('gemini-2.5')) 'TEXT',
+            if (geminiMediaName(model).startsWith('gemini-2.5')) 'TEXT',
             'IMAGE',
           ],
           if (size != null || request.aspectRatio != 'auto')
@@ -138,6 +174,24 @@ class GeminiImagesAdapter implements MediaAdapter {
           final mime = inline['mimeType'] ?? inline['mime_type'] ?? 'image/png';
           if (mime is String && mime.startsWith('image/')) {
             images.add(MediaResult(mime: mime, base64: data));
+          }
+        } else {
+          final file = part['fileData'] ?? part['file_data'];
+          if (file is! Map) continue;
+          final url = route.resultUri(file['fileUri'] ?? file['file_uri']);
+          final mime = file['mimeType'] ?? file['mime_type'];
+          if (url != null && mime is String && mime.startsWith('image/')) {
+            images.add(
+              MediaResult(
+                mime: mime,
+                url: url,
+                downloadHeaders: route.resultHeaders(
+                  url,
+                  vertex: context.provider.vertexAI == true,
+                  headers: headers,
+                ),
+              ),
+            );
           }
         }
       }

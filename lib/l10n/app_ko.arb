@@ -5209,6 +5209,8 @@
   "creationEmptyBody": "만들고 싶은 것을 설명하세요. 첫 프롬프트를 보내면 결과와 이후 수정을 위한 주제가 시작됩니다.",
   "creationAddReference": "참조 이미지 추가",
   "creationReferenceTooLarge": "참조 이미지의 총 크기는 20 MB 이하여야 합니다.",
+  "creationApiProtocol": "생성 API 프로토콜",
+  "creationApiProtocolHelp": "자동은 공급자의 API를 사용합니다. 사용자 지정 게이트웨이의 경우 해당 문서에 나열된 프로토콜을 선택하세요.",
   "creationAspectRatio": "화면 비율",
   "creationCountLabel": "이미지 수",
   "creationDuration": "길이",

@@ -269,6 +269,7 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
     return [
       _SpecSection.basic,
       _SpecSection.modalities,
+      if (_controller.hasMediaSettings) _SpecSection.media,
       if (spec.type != ModelType.embedding) ...[
         _SpecSection.reasoning,
         _SpecSection.strategy,

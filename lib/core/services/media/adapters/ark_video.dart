@@ -1,6 +1,7 @@
 import '../../../providers/settings_provider.dart';
 import '../../api/chat_api_helpers.dart';
 import '../media_adapter.dart';
+import '../ark_media_models.dart';
 import '../media_polling.dart';
 import '../media_request.dart';
 
@@ -14,10 +15,15 @@ class ArkVideoAdapter implements MediaAdapter {
 
   @override
   MediaCapabilities capabilities(ProviderConfig provider, String modelId) {
-    final model = apiModelId(provider, modelId).toLowerCase();
-    final textOnly = model.endsWith('-t2v');
+    final raw = provider.modelOverrides[modelId];
+    final model = arkMediaFamily(
+      apiModelId(provider, modelId),
+      modelId,
+      raw is Map ? raw['name'] as String? : null,
+    );
+    final textOnly = RegExp(r'(?:^|-)t2v(?:-|$)').hasMatch(model);
     final v2 = model.contains('seedance-2');
-    final pro15 = model.contains('seedance-1-5');
+    final pro15 = model.replaceAll('.', '-').contains('seedance-1-5');
     final version = model.replaceAll('.', '-');
     final limitedResolution =
         version.contains('2-0-fast') ||
@@ -25,7 +31,12 @@ class ArkVideoAdapter implements MediaAdapter {
         (_is25(model) && model.contains('flash'));
     final last =
         !textOnly &&
-        (v2 || pro15 || model.contains('lite-i2v') || model.startsWith('ep-'));
+        (v2 ||
+            pro15 ||
+            version.contains('seedance-1-0-pro') &&
+                !version.contains('-fast') ||
+            model.contains('lite-i2v') ||
+            model.startsWith('ep-'));
     return MediaCapabilities(
       aspectRatios: const ['auto', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
       durations: v2
@@ -51,7 +62,7 @@ class ArkVideoAdapter implements MediaAdapter {
         if (!textOnly) MediaReferenceRole.firstFrame,
         if (last) MediaReferenceRole.lastFrame,
       ],
-      requiresFirstFrame: model.endsWith('-i2v'),
+      requiresFirstFrame: RegExp(r'(?:^|-)i2v(?:-|$)').hasMatch(model),
       framesUseAutomaticRatio: _is25(model),
     );
   }
@@ -63,9 +74,16 @@ class ArkVideoAdapter implements MediaAdapter {
   ) async* {
     final headers = context.headers(request.modelId);
     final model = apiModelId(context.provider, request.modelId);
+    final raw = context.provider.modelOverrides[request.modelId];
+    final family = arkMediaFamily(
+      model,
+      request.modelId,
+      raw is Map ? raw['name'] as String? : null,
+    );
+    final api = context.nativeBase('api/v3');
     final created = await context.jsonRequest(
       'POST',
-      context.endpoint(taskPath),
+      context.endpoint(taskPath, base: api),
       headers: headers,
       body: context.body(request, {
         'model': model,
@@ -80,7 +98,7 @@ class ArkVideoAdapter implements MediaAdapter {
                   : 'first_frame',
             },
         ],
-        if (_is25(model.toLowerCase()) && request.references.isNotEmpty)
+        if (_is25(family) && request.references.isNotEmpty)
           'ratio': 'adaptive'
         else if (request.aspectRatio != 'auto')
           'ratio': request.aspectRatio,
@@ -89,7 +107,7 @@ class ArkVideoAdapter implements MediaAdapter {
       }),
     );
     final id = Uri.encodeComponent(requireMediaTaskId(created['id']));
-    final task = context.endpoint('$taskPath/$id');
+    final task = context.endpoint('$taskPath/$id', base: api);
     yield* pollMediaTask(
       context,
       accepted: taskPath.startsWith('/')

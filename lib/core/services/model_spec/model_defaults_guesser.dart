@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../models/model_spec.dart';
+import '../media/gemini_media_models.dart';
 
 /// Model-id-derived defaults. Host/protocol defaults live in [VendorDefaults].
 @immutable
@@ -196,6 +197,21 @@ class ModelDefaultsGuesser {
       apply: _claudeFamily,
     ),
     _ReasoningRule(matches: _isGemma4, apply: _gemma4),
+    _ReasoningRule(
+      matches: isNanoBanana21,
+      apply: (_) => _fixed(
+        dialect: ReasoningDialect.geminiThinkingLevel,
+        levels: const [
+          ReasoningLevel.minimal,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ],
+        canDisable: false,
+        defaultLevel: ReasoningLevel.medium,
+        sampling: SamplingPolicy.never,
+        replay: ReasoningReplayPolicy.all,
+      ),
+    ),
     _ReasoningRule(matches: _isGemini3FlashImage, apply: _gemini3FlashImage),
     _ReasoningRule(matches: _isGemini3Pro, apply: _gemini3Pro),
     _ReasoningRule(matches: _isGemini3Flash, apply: _gemini3Flash),
@@ -355,6 +371,17 @@ class ModelDefaultsGuesser {
         terminal: true,
       ),
       _CapRule(
+        matches: isNanoBanana21,
+        apply: (draft) {
+          draft.input.addAll([Modality.image, Modality.video, Modality.pdf]);
+          draft.output.add(Modality.image);
+          draft.abilities
+            ..clear()
+            ..add(ModelAbility.reasoning);
+        },
+        terminal: true,
+      ),
+      _CapRule(
         matches: _isGemini3FlashImage,
         apply: (draft) {
           if (!draft.input.contains(Modality.image)) {
@@ -390,7 +417,7 @@ class ModelDefaultsGuesser {
         terminal: true,
       ),
       _CapRule(
-        matches: (id) => id.contains('image'),
+        matches: (id) => id.contains('image') || isGeminiImageModel(id),
         apply: (draft) {
           if (!draft.input.contains(Modality.image)) {
             draft.input.add(Modality.image);
@@ -458,10 +485,14 @@ class ModelDefaultsGuesser {
 }
 
 bool _isImageModelId(String id) {
-  return id.startsWith('gpt-image-') ||
+  return id == 'glm-image' ||
+      id.startsWith('gpt-image-') ||
       id.startsWith('chatgpt-image-') ||
       id.startsWith('grok-imagine-image') ||
       id.startsWith('doubao-seedream-') ||
+      id.startsWith('dola-seedream-') ||
+      id.startsWith('doubao-seededit-') ||
+      id.startsWith('seededit-') ||
       id.startsWith('seedream-') ||
       id.startsWith('kling-image-') ||
       id.startsWith('minimax-h3-image') ||
@@ -477,10 +508,12 @@ bool _isImageModelId(String id) {
       id == 'dall-e-3';
 }
 
-bool _isVideoModelId(String id) => _matches(
-  id,
-  r'^(?:grok-imagine-video|veo-|sora-|doubao-seedance-|seedance-|kling[-_]?(?:v?\d|video|avatar|effects)|hailuo|happyhorse-.*-(?:t2v|i2v|r2v|video-edit)$|wan.*-(?:t2v|i2v|r2v|kf2v|video)(?:-|$)|minimax(?:.*video|-h3))',
-);
+bool _isVideoModelId(String id) =>
+    isGeminiOmniVideoModel(id) ||
+    _matches(
+      id,
+      r'^(?:ltx-2\.3(?:$|-)|cogvideox-3(?:$|-)|grok-imagine-video|veo-|sora-|(?:doubao-|dreamina-)?seedance-|kling[-_]?(?:v?\d|video|avatar|effects)|hailuo|happyhorse-.*-(?:t2v|i2v|r2v|video-edit)$|wan.*-(?:t2v|i2v|r2v|kf2v|video)(?:-|$)|minimax(?:.*video|-h3))',
+    );
 
 bool _matches(String id, String pattern) {
   return RegExp(pattern, caseSensitive: false).hasMatch(id);

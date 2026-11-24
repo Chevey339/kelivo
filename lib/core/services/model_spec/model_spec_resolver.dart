@@ -4,6 +4,9 @@ import '../../models/model_spec.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
 import '../media/fal_model_catalog.dart';
+import '../media/gemini_media_models.dart';
+import '../media/ark_media_models.dart';
+import '../media/replicate_models.dart';
 import '../media/tokendance_media_protocol.dart';
 import '../media/openrouter_media_catalog.dart';
 import '../../models/media_creation.dart' show MediaMode;
@@ -234,7 +237,12 @@ class ModelSpecResolver {
     final keyMetadata = upstreamId != modelKey
         ? _modelLists.lookup(cfg, modelKey)
         : null;
-    final guess = ModelDefaultsGuesser.guess(upstreamId);
+    final guessId =
+        isArkMediaHost(Uri.tryParse(cfg.baseUrl)?.host ?? '') ||
+            cfg.id.toLowerCase() == 'bytedance'
+        ? arkMediaFamily(upstreamId, modelKey, ov.displayName ?? displayName)
+        : upstreamId;
+    final guess = ModelDefaultsGuesser.guess(guessId);
     final vendor = VendorDefaults.forProvider(cfg, modelId: upstreamId);
     final sources = <ModelSpecField, SpecSource>{};
 
@@ -328,7 +336,13 @@ class ModelSpecResolver {
           upstreamMetadata?.mediaProtocol ??
           keyMetadata?.mediaProtocol ??
           TokenDanceMediaProtocol.known(upstreamId);
-      if (protocol?.mode case final mode?) {
+      if (protocol?.chatImage == true) {
+        base = base.copyWith(
+          type: ModelType.chat,
+          input: {...base.input, Modality.text, Modality.image}.toList(),
+          output: {...base.output, Modality.text, Modality.image}.toList(),
+        );
+      } else if (protocol?.mode case final mode?) {
         final video = mode == MediaMode.video;
         base = base.copyWith(
           type: video ? ModelType.video : ModelType.image,
@@ -394,6 +408,22 @@ class ModelSpecResolver {
         abilities: chat ? base.abilities : const [],
       );
       sources[ModelSpecField.type] = SpecSource.vendor;
+    }
+    if (ReplicateMediaModel.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
+      final model = ReplicateMediaModel.find(upstreamId);
+      if (model != null) {
+        final video = model.mode == MediaMode.video;
+        base = base.copyWith(
+          type: video ? ModelType.video : ModelType.image,
+          input: [
+            Modality.text,
+            if (model.capabilities.maxReferences > 0) Modality.image,
+          ],
+          output: [video ? Modality.video : Modality.image],
+          abilities: const [],
+        );
+        sources[ModelSpecField.type] = SpecSource.vendor;
+      }
     }
     if (cfg.isFal) {
       final fal = falModels[upstreamId];
@@ -518,7 +548,8 @@ class ModelSpecResolver {
       if (outs.contains('image') &&
           !outs.contains('text') &&
           (guess.type == ModelType.chat || guess.type == ModelType.image) &&
-          !id.toLowerCase().split('/').last.startsWith('gemini-')) {
+          !id.toLowerCase().split('/').last.startsWith('gemini-') &&
+          !isGeminiImageModel(id)) {
         return ModelType.image;
       }
       if (guess.type == ModelType.chat) return guess.type;
