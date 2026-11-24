@@ -213,6 +213,9 @@ void main() {
         '砂糖酒馆',
         'Vercel',
         'fal',
+        'Replicate',
+        'ModelScope',
+        'BytePlus',
       ];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart' show CancelToken;
@@ -8,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../../../utils/kelivo_file_uri.dart';
 import '../../database/app_database.dart';
 import '../../database/media_repository.dart';
 import '../../models/media_creation.dart';
@@ -67,11 +69,32 @@ class MediaGenerationRunner extends ChangeNotifier {
   static const maxActivePerProvider = 2;
   static const maxCount = 16;
   static const _uuid = Uuid();
-  late final Future<void> initialized = repository.markInterrupted();
+  late final Future<void> initialized = _initialize();
+
+  Future<void> _initialize() async {
+    final interrupted = await repository.markInterrupted();
+    for (final id in interrupted) {
+      if (!KelivoFileUri.isGenerationId(id)) continue;
+      try {
+        final batch = await repository.batch(id);
+        final items = await repository.itemsForBatch(id);
+        await files.discardInterruptedWrites(id, {
+          for (final item in items) ...[item.path, ?item.thumbnailPath],
+          if (batch != null)
+            ...MediaRepository.referencePaths(id, batch.referencesJson),
+        });
+      } on FileSystemException {
+        // The interrupted row is retained; a later launch can retry cleanup.
+      } on FormatException {
+        // Never delete files when the set of stored references is unreadable.
+      }
+    }
+  }
 
   Future<void> recoverBatchDeletions() => AttachmentFileLock.synchronized(
     () => files.recoverBatchDeletions(
       (id) async => await repository.batch(id) != null,
+      repository.hasItem,
     ),
   );
 
@@ -476,6 +499,13 @@ class MediaGenerationRunner extends ChangeNotifier {
                 mode: request.mode,
                 result: result,
                 downloadClient: raw,
+                waitForDownloadRetry: (duration) async {
+                  _checkCancelled(job);
+                  await Future.any<void>([
+                    _delay(duration),
+                    job.token.whenCancel.then<void>((error) => throw error),
+                  ]);
+                },
                 publish: (item) async {
                   _checkCancelled(job);
                   await repository.addItem(item);
@@ -484,11 +514,13 @@ class MediaGenerationRunner extends ChangeNotifier {
               job.revisedPrompt ??= result.revisedPrompt;
               saved++;
               job.nextOrdinal++;
-            } catch (_) {
+            } catch (error) {
               _checkCancelled(job);
-              failure = const MediaFailure(
+              final cause = classifyMediaFailure(error);
+              failure = MediaFailure(
                 MediaFailureKind.download,
                 'Could not save a generation result',
+                statusCode: cause.statusCode,
               );
             }
           }
@@ -588,6 +620,8 @@ class MediaGenerationRunner extends ChangeNotifier {
                 preview: previous?.preview,
               );
             case MediaPreview(:final base64):
+              // This is a transient blurred preview, not the final artwork.
+              if (base64.length > 8 * 1024 * 1024) continue;
               _progress[job.id] = (
                 fraction: previous?.fraction,
                 preview: base64,

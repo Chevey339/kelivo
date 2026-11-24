@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data' show BytesBuilder;
+import 'dart:ui' as ui;
 
 import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:image/image.dart' as image;
+import 'package:flutter/scheduler.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
@@ -16,8 +17,11 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../database/app_database.dart';
 import '../../models/media_creation.dart';
 import '../../models/request_budget.dart';
+import '../../utils/multimodal_input_utils.dart' show sniffMimeFromFile;
+import '../../../utils/safe_resize_image.dart';
 import '../storage/attachment_file_lock.dart';
 import 'media_polling.dart';
+import 'media_adapter.dart' show classifyMediaFailure;
 import 'media_request.dart';
 
 class MediaFileStore {
@@ -27,12 +31,11 @@ class MediaFileStore {
 
   final Future<Directory> Function() directory;
 
-  static final _safeId = RegExp(r'^[a-zA-Z0-9_-]+$');
   static const _maxFileBytes = 128 * 1024 * 1024;
   static const _referenceBudget = RequestBudget();
 
   Future<Directory> _batchDirectory(String id) async {
-    if (!_safeId.hasMatch(id)) {
+    if (!KelivoFileUri.isGenerationId(id)) {
       throw const FormatException('Invalid batch identifier');
     }
     return Directory(p.join((await directory()).path, id));
@@ -104,32 +107,58 @@ class MediaFileStore {
     required MediaResult result,
     required http.Client downloadClient,
     required Future<void> Function(GenerationItemRow) publish,
+    Future<void> Function(Duration) waitForDownloadRetry = Future<void>.delayed,
   }) async {
     final batch = await (await _batchDirectory(
       batchId,
     )).create(recursive: true);
     final id = const Uuid().v4();
-    final pending = File(p.join(batch.path, '$id.part'));
+    var pending = File(p.join(batch.path, '$id.part'));
     File? output;
     File? thumbnail;
     try {
       if (result.url case final url?
           when result.base64 == null && result.bytes == null) {
-        await _download(downloadClient, url, result.downloadHeaders, pending);
+        await _download(
+          downloadClient,
+          url,
+          result.downloadHeaders,
+          pending,
+          waitForRetry: waitForDownloadRetry,
+        );
       } else {
-        final bytes =
-            result.bytes ??
-            await compute<String, Uint8List>(base64Decode, result.base64!);
-        if (bytes.isEmpty || bytes.length > _maxFileBytes) {
-          throw const MediaFailure(
-            MediaFailureKind.download,
-            'Invalid media length',
-          );
+        if (result.bytes case final bytes?) {
+          if (bytes.isEmpty || bytes.length > _maxFileBytes) {
+            throw const MediaFailure(
+              MediaFailureKind.download,
+              'Invalid media length',
+            );
+          }
+          await pending.writeAsBytes(bytes, flush: true);
+        } else {
+          final encoded = result.base64!;
+          if (encoded.isEmpty ||
+              encoded.length > ((_maxFileBytes + 2) ~/ 3) * 4) {
+            throw const MediaFailure(
+              MediaFailureKind.download,
+              'Invalid media length',
+            );
+          }
+          await compute(_writeInlineMedia, (
+            path: pending.path,
+            encoded: encoded,
+          ));
+          final length = await pending.length();
+          if (length == 0 || length > _maxFileBytes) {
+            throw const MediaFailure(
+              MediaFailureKind.download,
+              'Invalid media length',
+            );
+          }
         }
-        await pending.writeAsBytes(bytes, flush: true);
       }
       final info = mode == MediaMode.image
-          ? await compute(_imageInfo, pending.path)
+          ? await _inspectImage(pending.path)
           : null;
       if (mode == MediaMode.image && info == null) {
         throw const MediaFailure(
@@ -149,27 +178,35 @@ class MediaFileStore {
       final cover = mode == MediaMode.video && result.previewUrl != null
           ? await _readCover(batch, id, result, downloadClient)
           : null;
+      final mime = info?.mime ?? videoMime ?? result.mime;
+      final ext = switch (mime) {
+        'video/mp4' => 'mp4',
+        'video/webm' => 'webm',
+        _ => AppDirectories.extFromMime(mime),
+      };
+      Uint8List? thumbnailBytes = info?.thumbnail ?? cover?.thumbnail;
+      var thumbnailExt = 'png';
+      if (mode == MediaMode.video && thumbnailBytes == null) {
+        // Native readers use the extension to select the container. Extract
+        // before publication so slow codecs do not block all chat attachments.
+        pending = await pending.rename(p.join(batch.path, '$id.part.$ext'));
+        thumbnailBytes = await _withThumbnailDecoder(
+          () => _extractFrame(pending),
+        );
+        thumbnailExt = 'jpg';
+      }
+      final preview = thumbnailBytes;
       return await AttachmentFileLock.synchronized(() async {
         try {
-          final mime = info?.mime ?? videoMime ?? result.mime;
-          final ext = switch (mime) {
-            'video/mp4' => 'mp4',
-            'video/webm' => 'webm',
-            _ => AppDirectories.extFromMime(mime),
-          };
           final stored = await pending.rename(p.join(batch.path, '$id.$ext'));
           output = stored;
-          final thumbnailBytes =
-              info?.thumbnail ??
-              cover?.thumbnail ??
-              (mode == MediaMode.video ? await _extractFrame(stored) : null);
-          if (thumbnailBytes != null) {
+          if (preview != null) {
             final thumbs = await Directory(
               p.join(batch.path, 'thumbs'),
             ).create(recursive: true);
             thumbnail = await File(
-              p.join(thumbs.path, '$id.jpg'),
-            ).writeAsBytes(thumbnailBytes, flush: true);
+              p.join(thumbs.path, '$id.$thumbnailExt'),
+            ).writeAsBytes(preview, flush: true);
           }
           final item = GenerationItemRow(
             id: id,
@@ -206,17 +243,45 @@ class MediaFileStore {
     }
   }
 
+  // Native codecs can need an intermediate surface even when a target size
+  // is supplied. Serialize thumbnail work, not downloads or database writes.
+  static Future<void>? _activeDecoder;
+  static Future<T?> _withThumbnailDecoder<T>(
+    Future<T?> Function() decode,
+  ) async {
+    final elapsed = Stopwatch()..start();
+    const deadline = Duration(seconds: 8);
+    try {
+      while (true) {
+        final busy = _activeDecoder;
+        if (busy == null) break;
+        await busy.timeout(deadline - elapsed.elapsed);
+        if (elapsed.elapsed >= deadline) return null;
+      }
+      final idle = Completer<void>();
+      _activeDecoder = idle.future;
+      // If the platform suspends its raster thread, return the original at
+      // the deadline. The native job retains sole ownership until it settles.
+      return await Future.sync(decode)
+          .whenComplete(() {
+            _activeDecoder = null;
+            idle.complete();
+          })
+          .timeout(deadline - elapsed.elapsed);
+    } on TimeoutException {
+      return null;
+    }
+  }
+
   static Future<Uint8List?> _extractFrame(File video) async {
     try {
       if (Platform.isLinux) return await _extractLinuxFrame(video);
-      return await FcNativeVideoThumbnail()
-          .saveThumbnailToBytes(
-            srcFile: video.path,
-            width: 440,
-            height: 440,
-            quality: 84,
-          )
-          .timeout(const Duration(seconds: 8));
+      return await FcNativeVideoThumbnail().saveThumbnailToBytes(
+        srcFile: video.path,
+        width: 440,
+        height: 440,
+        quality: 84,
+      );
     } catch (_) {
       // The downloaded video remains available when its codec has no thumbnail.
       return null;
@@ -270,7 +335,7 @@ class MediaFileStore {
         result.previewHeaders,
         pending,
       );
-      return await compute(_imageInfo, pending.path);
+      return await _inspectImage(pending.path);
     } catch (_) {
       return null;
     } finally {
@@ -299,6 +364,31 @@ class MediaFileStore {
   }
 
   static Future<void> _download(
+    http.Client client,
+    Uri url,
+    Map<String, String> headers,
+    File file, {
+    Future<void> Function(Duration)? waitForRetry,
+  }) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        await _downloadOnce(client, url, headers, file);
+        return;
+      } catch (error) {
+        final failure = classifyMediaFailure(error);
+        final status = failure.statusCode;
+        final transient =
+            failure.kind == MediaFailureKind.network ||
+            status == 408 ||
+            status == 429 ||
+            status != null && status >= 500;
+        if (!transient || attempt >= 2 || waitForRetry == null) rethrow;
+        await waitForRetry(Duration(seconds: 1 << attempt));
+      }
+    }
+  }
+
+  static Future<void> _downloadOnce(
     http.Client client,
     Uri url,
     Map<String, String> headers,
@@ -369,6 +459,15 @@ class MediaFileStore {
     } finally {
       await sink.close();
     }
+    final encoding = response.headers[HttpHeaders.contentEncodingHeader];
+    if ((encoding == null || encoding == 'identity') &&
+        response.contentLength != null &&
+        length != response.contentLength) {
+      throw const MediaFailure(
+        MediaFailureKind.network,
+        'Incomplete media download',
+      );
+    }
     if (length == 0) {
       throw const MediaFailure(
         MediaFailureKind.download,
@@ -404,35 +503,98 @@ class MediaFileStore {
 
   /// Keep the files recoverable until the database transaction commits.
   /// The caller holds the attachment lock across both resources.
-  Future<void> deleteBatchAndRecord(
-    String id,
-    Future<void> Function() deleteRecord,
+  Future<void> deleteBatchesAndRecords(
+    Iterable<String> ids,
+    Future<void> Function() deleteRecords,
   ) async {
-    final batch = await _batchDirectory(id);
-    if (!await batch.exists()) {
-      await deleteRecord();
-      return;
-    }
-    final pending = (await _deletionDirectory(batch.parent, create: true))!;
-    final staged = await batch.rename(p.join(pending.path, id));
+    final staged = <Directory, Directory>{};
     try {
-      await deleteRecord();
+      for (final id in ids) {
+        final batch = await _batchDirectory(id);
+        if (!await batch.exists()) continue;
+        final pending = (await _deletionDirectory(batch.parent, create: true))!;
+        staged[batch] = await batch.rename(p.join(pending.path, id));
+      }
+      await deleteRecords();
     } catch (_) {
-      await staged.rename(batch.path);
+      for (final entry in staged.entries.toList().reversed) {
+        await entry.value.rename(entry.key.path);
+      }
       rethrow;
     }
-    await staged.delete(recursive: true);
+    for (final dir in staged.values) {
+      await dir.delete(recursive: true);
+    }
+  }
+
+  static final _pendingOutput = RegExp(r'\.part(?:\.(?:mp4|webm))?$');
+  static final _generatedOutput = RegExp(
+    r'^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.(?:png|jpg|webp|gif|mp4|webm)$',
+  );
+
+  Future<void> discardInterruptedWrites(
+    String id,
+    Set<String> referenced,
+  ) async {
+    final batch = await _batchDirectory(id);
+    if (await FileSystemEntity.type(batch.path, followLinks: false) !=
+        FileSystemEntityType.directory) {
+      return;
+    }
+    Future<void> sweep(Directory directory) async {
+      await for (final file in directory.list(followLinks: false)) {
+        if (file is! File) continue;
+        final name = p.basename(file.path);
+        if ((_pendingOutput.hasMatch(name) ||
+                _generatedOutput.hasMatch(name)) &&
+            !referenced.contains(_portable(batch, file.path))) {
+          await _delete(file);
+        }
+      }
+    }
+
+    await sweep(batch);
+    final thumbs = Directory(p.join(batch.path, 'thumbs'));
+    if (await FileSystemEntity.type(thumbs.path, followLinks: false) ==
+        FileSystemEntityType.directory) {
+      await sweep(thumbs);
+    }
   }
 
   Future<void> recoverBatchDeletions(
     Future<bool> Function(String id) hasRecord,
+    Future<bool> Function(String id) hasItem,
   ) async {
     final root = await directory();
+    final itemTrash = Directory(p.join(root.path, '.pending-items'));
+    if (await FileSystemEntity.type(itemTrash.path, followLinks: false) ==
+        FileSystemEntityType.directory) {
+      await for (final batch in itemTrash.list(followLinks: false)) {
+        if (batch is! Directory ||
+            !KelivoFileUri.isGenerationId(p.basename(batch.path))) {
+          continue;
+        }
+        await for (final item in batch.list(followLinks: false)) {
+          if (item is! Directory ||
+              !KelivoFileUri.isGenerationId(p.basename(item.path))) {
+            continue;
+          }
+          if (await hasItem(p.basename(item.path))) {
+            await _restoreItemFiles(
+              item,
+              await _batchDirectory(p.basename(batch.path)),
+            );
+          }
+          await item.delete(recursive: true);
+        }
+        await batch.delete();
+      }
+    }
     final pending = await _deletionDirectory(root);
     if (pending == null) return;
     await for (final staged in pending.list(followLinks: false)) {
       final id = p.basename(staged.path);
-      if (staged is! Directory || !_safeId.hasMatch(id)) continue;
+      if (staged is! Directory || !KelivoFileUri.isGenerationId(id)) continue;
       if (await hasRecord(id)) {
         await staged.rename(p.join(root.path, id));
       } else {
@@ -441,18 +603,46 @@ class MediaFileStore {
     }
   }
 
-  Future<void> deleteItem(GenerationItemRow item) async {
-    final root = (await directory()).parent.path;
-    for (final raw in [item.path, ?item.thumbnailPath]) {
-      final parts = KelivoFileUri.decodeToSegments(raw);
-      if (parts == null ||
-          parts.length < 3 ||
-          parts.first != 'generations' ||
-          parts[1] != item.batchId) {
-        continue;
+  Future<void> deleteItemAndRecord(
+    GenerationItemRow item,
+    Future<void> Function() deleteRecord,
+  ) async {
+    final batch = await _batchDirectory(item.batchId);
+    if (!KelivoFileUri.isGenerationId(item.id)) {
+      throw const FormatException('Invalid artwork identifier');
+    }
+    final staged = Directory(
+      p.join(batch.parent.path, '.pending-items', item.batchId, item.id),
+    );
+    try {
+      for (final raw in {item.path, ?item.thumbnailPath}) {
+        if (!KelivoFileUri.isGenerationFile(raw, item.batchId)) continue;
+        final parts = KelivoFileUri.decodeToSegments(raw)!.skip(2);
+        final file = File(p.joinAll([batch.path, ...parts]));
+        if (!await file.exists()) continue;
+        final target = File(p.joinAll([staged.path, ...parts]));
+        await target.parent.create(recursive: true);
+        await file.rename(target.path);
       }
-      final file = File(p.joinAll([root, ...parts]));
-      if (await file.exists()) await file.delete();
+      await deleteRecord();
+    } catch (_) {
+      if (await staged.exists()) {
+        await _restoreItemFiles(staged, batch);
+        await staged.delete(recursive: true);
+      }
+      rethrow;
+    }
+    if (await staged.exists()) await staged.delete(recursive: true);
+  }
+
+  Future<void> _restoreItemFiles(Directory staged, Directory batch) async {
+    await for (final file in staged.list(recursive: true, followLinks: false)) {
+      if (file is! File) continue;
+      final destination = File(
+        p.join(batch.path, p.relative(file.path, from: staged.path)),
+      );
+      await destination.parent.create(recursive: true);
+      await file.rename(destination.path);
     }
   }
 
@@ -469,29 +659,117 @@ typedef _ImageInfo = ({
   int width,
   int height,
   String mime,
-  Uint8List thumbnail,
+  Uint8List? thumbnail,
 });
 
-_ImageInfo? _imageInfo(String path) {
-  final bytes = File(path).readAsBytesSync();
-  final decoder = image.findDecoderForData(bytes);
-  final decoded = decoder?.decode(bytes, frame: 0);
-  if (decoder == null || decoded == null) return null;
-  final mime = switch (decoder.format) {
-    image.ImageFormat.jpg => 'image/jpeg',
-    image.ImageFormat.webp => 'image/webp',
-    image.ImageFormat.gif => 'image/gif',
-    _ => 'image/png',
-  };
-  final scaled = image.copyResize(
-    decoded,
-    width: decoded.width >= decoded.height ? 320 : null,
-    height: decoded.width < decoded.height ? 320 : null,
-  );
-  return (
-    width: decoded.width,
-    height: decoded.height,
-    mime: mime,
-    thumbnail: image.encodeJpg(scaled, quality: 84),
-  );
+Future<void> _writeInlineMedia(({String path, String encoded}) input) async {
+  Stream<String> chunks() async* {
+    const size = 64 * 1024;
+    for (var start = 0; start < input.encoded.length; start += size) {
+      yield input.encoded.substring(
+        start,
+        (start + size).clamp(0, input.encoded.length),
+      );
+    }
+  }
+
+  final output = File(input.path).openWrite();
+  try {
+    await output.addStream(chunks().transform(base64.decoder));
+    await output.flush();
+  } finally {
+    await output.close();
+  }
+}
+
+Future<_ImageInfo?> _inspectImage(String path) async {
+  final mime = await sniffMimeFromFile(path);
+  if (mime == null || !mime.startsWith('image/')) return null;
+  final buffer = await ui.ImmutableBuffer.fromFilePath(path);
+  ui.ImageDescriptor? descriptor;
+  late final int width, height;
+  try {
+    descriptor = await ui.ImageDescriptor.encoded(buffer);
+    width = descriptor.width;
+    height = descriptor.height;
+  } finally {
+    descriptor?.dispose();
+    buffer.dispose();
+  }
+  if (width < 1 || height < 1) return null;
+  final thumbnail = width > maxCreationSourcePixels ~/ height
+      ? null
+      : await MediaFileStore._withThumbnailDecoder(
+          () => _thumbnailPng(path, width, height),
+        );
+  return (width: width, height: height, mime: mime, thumbnail: thumbnail);
+}
+
+Future<Uint8List?> _thumbnailPng(String path, int width, int height) async {
+  final state = defaultTargetPlatform == TargetPlatform.iOS
+      ? SchedulerBinding.instance.lifecycleState
+      : null;
+  if (state == ui.AppLifecycleState.paused ||
+      state == ui.AppLifecycleState.hidden) {
+    return null;
+  }
+  final buffer = await ui.ImmutableBuffer.fromFilePath(path);
+  ui.ImageDescriptor? descriptor;
+  ui.Codec? codec;
+  ui.Image? frame, resized;
+  try {
+    descriptor = await ui.ImageDescriptor.encoded(buffer);
+    final target = computeSafeResizeTarget(
+      intrinsicWidth: width,
+      intrinsicHeight: height,
+      boxWidth: creationThumbnailEdge,
+      boxHeight: creationThumbnailEdge,
+      fit: SafeResizeFit.contain,
+    );
+    codec = await descriptor.instantiateCodec(
+      targetWidth: target.width,
+      targetHeight: target.height,
+    );
+    frame = (await codec.getNextFrame()).image;
+    try {
+      if (frame.width != target.width || frame.height != target.height) {
+        final recorder = ui.PictureRecorder();
+        ui.Canvas(recorder).drawImageRect(
+          frame,
+          ui.Rect.fromLTWH(
+            0,
+            0,
+            frame.width.toDouble(),
+            frame.height.toDouble(),
+          ),
+          ui.Rect.fromLTWH(
+            0,
+            0,
+            target.width.toDouble(),
+            target.height.toDouble(),
+          ),
+          ui.Paint()..filterQuality = ui.FilterQuality.medium,
+        );
+        final picture = recorder.endRecording();
+        try {
+          resized = await picture.toImage(target.width, target.height);
+        } finally {
+          picture.dispose();
+        }
+      }
+      final png = await (resized ?? frame).toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      return png?.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes);
+    } catch (_) {
+      // The first frame is valid. A GPU readback failure should only omit its thumbnail.
+      return null;
+    }
+  } finally {
+    resized?.dispose();
+    frame?.dispose();
+    codec?.dispose();
+    descriptor?.dispose();
+    buffer.dispose();
+  }
 }

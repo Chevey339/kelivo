@@ -465,7 +465,7 @@ class _CreationArtworkTileState extends State<CreationArtworkTile> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                CreationMediaCover(item),
+                CreationMediaCover(item, thumbnail: widget.galleryTile),
                 if (widget.desktop)
                   Align(
                     alignment: Alignment.bottomCenter,

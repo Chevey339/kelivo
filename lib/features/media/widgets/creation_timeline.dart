@@ -899,7 +899,7 @@ class _EditedFromTag extends StatelessWidget {
               borderRadius: BorderRadius.circular(3),
               child: SizedBox.square(
                 dimension: 16,
-                child: CreationMediaCover(source),
+                child: CreationMediaCover(source, thumbnail: true),
               ),
             ),
     );
@@ -1041,7 +1041,7 @@ Future<void> showCreationRequestDetails(
             }
           }
         },
-        child: Text(l10n.creationRetry),
+        child: Text(creationRetryLabel(l10n, batch)),
       ),
     ],
   );
@@ -1295,6 +1295,11 @@ class _BatchResultsState extends State<_BatchResults> {
   }
 }
 
+String creationRetryLabel(AppLocalizations l10n, GenerationBatchRow batch) =>
+    _requestDetails(batch)['kind'] == MediaFailureKind.download.name
+    ? l10n.creationChatRegenerate
+    : l10n.creationRetry;
+
 class _DownloadFailure extends StatelessWidget {
   const _DownloadFailure({required this.batch});
 
@@ -1341,7 +1346,7 @@ class _DownloadFailure extends StatelessWidget {
                       }
                     }
                   },
-                  child: Text(l10n.creationRetry),
+                  child: Text(creationRetryLabel(l10n, batch)),
                 ),
               ],
             ),
@@ -1442,7 +1447,7 @@ class _BatchFailure extends StatelessWidget {
                         tone: CreationActionTone.tonal,
                         small: true,
                         icon: const Icon(Lucide.RotateCcw, size: 14),
-                        child: Text(l10n.creationRetry),
+                        child: Text(creationRetryLabel(l10n, batch)),
                         onPressed: () async {
                           try {
                             await media.retry(batch);

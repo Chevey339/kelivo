@@ -10,6 +10,14 @@ class DashScopeVideoAdapter implements MediaAdapter {
   // TokenDance gives Wan3 and HappyHorse separate task namespaces.
   final String? gatewayPath;
 
+  static bool supportsPromptOrFrames(String id) {
+    final model = id.toLowerCase();
+    return !(model.contains('-r2v') ||
+        model.contains('-v2v') ||
+        model.contains('videoedit') ||
+        model.contains('video-edit'));
+  }
+
   static bool _modern(String model) =>
       model.startsWith('wan3.') || model.startsWith('wan2.7');
 

@@ -829,10 +829,9 @@ abstract final class StorageUsageService {
             !batch.createdAt.isBefore(cutoff)) {
           return;
         }
-        await runner.files.deleteBatchAndRecord(
+        await runner.files.deleteBatchesAndRecords([
           id,
-          () => repository.deleteBatch(id),
-        );
+        ], () => repository.deleteBatch(id));
         removed++;
       });
     }

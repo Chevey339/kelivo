@@ -3,10 +3,12 @@ import 'creation_menu.dart';
 import 'creation_controls.dart';
 import 'creation_picker.dart';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/services.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
@@ -18,6 +20,7 @@ import 'package:super_clipboard/super_clipboard.dart';
 import 'package:super_drag_and_drop/super_drag_and_drop.dart' as drag;
 
 import '../../../core/database/app_database.dart';
+import '../../../core/services/native_file_save.dart';
 import '../../../core/models/media_creation.dart';
 import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/media_request.dart';
@@ -33,6 +36,7 @@ import '../../../shared/widgets/sliding_segmented_tabs.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/safe_resize_image.dart';
 import '../providers/media_creation_controller.dart';
 import '../../home/widgets/model_icon.dart';
 import 'creation_video_player.dart';
@@ -139,7 +143,7 @@ class _CreationLightboxState extends State<_CreationLightbox> {
   @override
   void initState() {
     super.initState();
-    if (desktop) _transform.addListener(_scaleChanged);
+    _transform.addListener(_scaleChanged);
     _editFocus.addListener(_editFocusChanged);
     if (widget.startEditing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -863,6 +867,8 @@ class _CreationLightboxState extends State<_CreationLightbox> {
               fit: BoxFit.contain,
               fill: knownSize,
               fadeOnCacheHit: true,
+              viewer: true,
+              zoomed: _zoomed,
             ),
           ),
         ),
@@ -1562,6 +1568,11 @@ Future<void> saveCreationArtwork(
     );
     if (target == null) return;
     if (!p.equals(path, target)) await File(path).copy(target);
+  } else if (defaultTargetPlatform == TargetPlatform.iOS &&
+      item.mode == MediaMode.image) {
+    if (!await NativeFileSave.saveImageToGallery(sourcePath: path)) {
+      throw StateError('Could not save creation');
+    }
   } else {
     final result = await ImageGallerySaverPlus.saveFile(path);
     if (result is! Map || result['isSuccess'] != true) {
@@ -1686,40 +1697,70 @@ class CreationFileImage extends StatelessWidget {
     this.cacheWidth,
     this.fill = true,
     this.fadeOnCacheHit = false,
+    this.viewer = false,
+    this.zoomed = false,
   });
 
   final String path;
   final BoxFit fit;
   final bool fill;
   final bool fadeOnCacheHit;
+  final bool viewer, zoomed;
   final int? cacheWidth;
 
   @override
   Widget build(BuildContext context) {
     final file = SandboxPathResolver.resolveForIo(path);
     const placeholder = Center(child: Icon(Lucide.Image, size: 22));
-    return file == null
-        ? placeholder
-        : Image.file(
-            File(file),
-            key: ValueKey((file, cacheWidth)),
-            frameBuilder: MediaQuery.disableAnimationsOf(context)
-                ? null
-                : (context, child, frame, synchronous) {
-                    if (frame == null || (synchronous && !fadeOnCacheHit)) {
-                      return child;
-                    }
-                    return child.animate().fadeIn(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                    );
-                  },
-            cacheWidth: cacheWidth,
-            fit: fit,
-            width: fill ? double.infinity : null,
-            height: fill ? double.infinity : null,
-            errorBuilder: (_, _, _) => placeholder,
-          );
+    if (file == null) return placeholder;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final viewport = MediaQuery.sizeOf(context);
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        int pixels(double logical) =>
+            ((logical * dpr / 32).ceil() * 32).clamp(1, 4096);
+        final width = zoomed
+            ? 4096
+            : cacheWidth ??
+                  pixels(box.hasBoundedWidth ? box.maxWidth : viewport.width);
+        final height = zoomed
+            ? 4096
+            : cacheWidth ??
+                  pixels(
+                    box.hasBoundedHeight ? box.maxHeight : viewport.height,
+                  );
+        return Image(
+          key: ValueKey(('creation-raster', file)),
+          gaplessPlayback: true,
+          image: SafeResizeImage.wrap(
+            FileImage(File(file)),
+            width: width,
+            height: height,
+            fit: fit == BoxFit.cover
+                ? SafeResizeFit.cover
+                : SafeResizeFit.contain,
+            maxSourcePixels: maxCreationSourcePixels,
+            maxEdge: 4096,
+            maxPixels: viewer ? 12 * 1024 * 1024 : 2 * 1024 * 1024,
+          ),
+          frameBuilder: MediaQuery.disableAnimationsOf(context)
+              ? null
+              : (context, child, frame, synchronous) {
+                  if (frame == null || (synchronous && !fadeOnCacheHit)) {
+                    return child;
+                  }
+                  return child.animate().fadeIn(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                  );
+                },
+          fit: fit,
+          width: fill ? double.infinity : null,
+          height: fill ? double.infinity : null,
+          errorBuilder: (_, _, _) => placeholder,
+        );
+      },
+    );
   }
 }
 
@@ -1740,9 +1781,31 @@ class CreationMediaCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (item.mode == MediaMode.image) {
-      return CreationFileImage(
-        thumbnail ? item.thumbnailPath ?? item.path : item.path,
-        cacheWidth: cacheWidth,
+      final preview = item.thumbnailPath;
+      if (thumbnail || preview == null) {
+        return CreationFileImage(preview ?? item.path, cacheWidth: cacheWidth);
+      }
+      final width = item.width, height = item.height;
+      if (width == null || height == null) {
+        return CreationFileImage(item.path, cacheWidth: cacheWidth);
+      }
+      return LayoutBuilder(
+        builder: (context, box) {
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+          final longestEdge = math.max(width, height);
+          final canUsePreview =
+              longestEdge > 0 &&
+              box.hasBoundedWidth &&
+              box.hasBoundedHeight &&
+              (cacheWidth ?? (box.maxWidth * dpr).ceil()) <=
+                  creationThumbnailEdge * width / longestEdge &&
+              (cacheWidth ?? (box.maxHeight * dpr).ceil()) <=
+                  creationThumbnailEdge * height / longestEdge;
+          return CreationFileImage(
+            canUsePreview ? preview : item.path,
+            cacheWidth: cacheWidth,
+          );
+        },
       );
     }
     final l10n = AppLocalizations.of(context)!;

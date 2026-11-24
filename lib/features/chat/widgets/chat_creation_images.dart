@@ -541,7 +541,7 @@ class _ChatCreationImagesState extends State<ChatCreationImages> {
                   onPressed: widget.streaming || _retrying != null
                       ? null
                       : () => _retry(batch, media),
-                  child: Text(l10n.creationRetry),
+                  child: Text(creationRetryLabel(l10n, batch)),
                 ),
                 if (batch.errorJson != null)
                   CreationAction(

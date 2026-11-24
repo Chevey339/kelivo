@@ -58,6 +58,9 @@ class ArkVideoAdapter implements MediaAdapter {
           : last
           ? 2
           : 1,
+      protocolFrameRoles: !textOnly && !version.contains('seedance')
+          ? const [MediaReferenceRole.firstFrame, MediaReferenceRole.lastFrame]
+          : null,
       frameRoles: [
         if (!textOnly) MediaReferenceRole.firstFrame,
         if (last) MediaReferenceRole.lastFrame,

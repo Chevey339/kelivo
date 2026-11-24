@@ -7,6 +7,7 @@ import 'package:Kelivo/core/database/media_repository.dart';
 import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/media/media_file_store.dart';
+import 'package:Kelivo/core/services/media/media_adapter.dart';
 import 'package:Kelivo/core/services/media/media_generation_runner.dart';
 import 'package:Kelivo/core/services/media/media_adapter_resolver.dart';
 import 'package:Kelivo/core/services/media/adapters/veo_video.dart';
@@ -88,6 +89,109 @@ void main() {
     await database.close();
     await root.delete(recursive: true);
   });
+
+  test(
+    'large chunked JSON and declared oversized responses respect the transport boundary',
+    () async {
+      final inline = 'b' * (380 * 1024);
+      final bytes = utf8.encode(jsonEncode({'data': inline}));
+      final result = await readMediaJson(
+        http.StreamedResponse(
+          Stream.fromIterable([
+            for (var offset = 0; offset < bytes.length; offset += 8192)
+              bytes.sublist(offset, (offset + 8192).clamp(0, bytes.length)),
+          ]),
+          200,
+        ),
+      );
+      expect(result['data'], inline);
+      final oversized = http.StreamedResponse(
+        const Stream.empty(),
+        200,
+        contentLength: maxMediaResponseBytes + 1,
+      );
+      await expectLater(readMediaJson(oversized), throwsA(isA<MediaFailure>()));
+    },
+  );
+
+  test(
+    'cold start removes unpublished generation files and retains committed artwork and references',
+    () async {
+      const id = 'interrupted';
+      const referenced = 'bbbbbbbb-1111-4444-8888-111111111111.png';
+      await repository.enqueue(
+        GenerationBatchRowsCompanion.insert(
+          id: id,
+          providerId: 'p',
+          modelId: model,
+          mode: MediaMode.image,
+          prompt: 'circle',
+          // A restored row may contain request metadata that cannot be replayed.
+          paramsJson: '{"count":"invalid"}',
+          referencesJson: jsonEncode([
+            {'path': 'kelivo-file:///generations/$id/$referenced'},
+          ]),
+          status: GenerationStatus.interrupted,
+          source: GenerationSource.workbench,
+          createdAt: DateTime.now(),
+        ),
+      );
+      final batch = await Directory(
+        p.join(root.path, 'generations', id),
+      ).create(recursive: true);
+      const kept = 'faaaaaaa-1aaa-4aaa-8aaa-111111111111.png';
+      const orphan = 'aaaaaaaa-1111-4444-8888-111111111111.png';
+      for (final name in [
+        kept,
+        referenced,
+        orphan,
+        'unfinished.part.mp4',
+        'refs/0.png',
+        'thumbs/$orphan',
+        'notes.txt',
+      ]) {
+        final file = File(p.join(batch.path, name));
+        await file.parent.create(recursive: true);
+        await file.writeAsString('example');
+      }
+      await repository.addItem(
+        GenerationItemRow(
+          id: 'retained',
+          batchId: id,
+          ordinal: 0,
+          mode: MediaMode.image,
+          path: 'kelivo-file:///generations/$id/$kept',
+          mime: 'image/png',
+          byteSize: 7,
+          status: GenerationItemStatus.ready,
+          favorite: false,
+          createdAt: DateTime.now(),
+        ),
+      );
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+      );
+      await runner.initialized;
+      final interrupted = (await repository.batch(id))!;
+      // Chat cards recognize malformed saved requests as a formatting error.
+      expect(() => MediaRequest.fromBatch(interrupted), throwsFormatException);
+      expect(
+        () =>
+            MediaRequest.fromBatch(interrupted.copyWith(referencesJson: '[]')),
+        throwsFormatException,
+      );
+      expect(await File(p.join(batch.path, kept)).exists(), isTrue);
+      expect(await File(p.join(batch.path, referenced)).exists(), isTrue);
+      expect(await File(p.join(batch.path, 'refs/0.png')).exists(), isTrue);
+      expect(await File(p.join(batch.path, 'notes.txt')).exists(), isTrue);
+      for (final name in [orphan, 'unfinished.part.mp4', 'thumbs/$orphan']) {
+        expect(await File(p.join(batch.path, name)).exists(), isFalse);
+      }
+      await runner.shutdown();
+      runner.dispose();
+    },
+  );
 
   test(
     'retrying the original H3 404 preserves the prompt and records the supported resolution',
@@ -401,12 +505,18 @@ void main() {
     'per-provider and global caps hold across queued and cancelled work',
     () async {
       final waiting = <String, List<Completer<http.Response>>>{};
+      final slotsFilled = Completer<void>();
       final runner = MediaGenerationRunner(
         repository: repository,
         files: files,
         clientFactory: (provider, token) => MockClient((_) {
           final gate = Completer<http.Response>();
           (waiting[provider.id] ??= []).add(gate);
+          if (!slotsFilled.isCompleted &&
+              waiting.values.fold(0, (n, jobs) => n + jobs.length) ==
+                  MediaGenerationRunner.maxActive) {
+            slotsFilled.complete();
+          }
           return Future.any([
             gate.future,
             token.whenCancel.then<http.Response>((e) => throw e),
@@ -430,7 +540,7 @@ void main() {
           ),
         );
       }
-      await Future<void>.delayed(Duration.zero);
+      await slotsFilled.future.timeout(const Duration(seconds: 5));
       expect(waiting['first'], hasLength(2));
       expect(waiting['second'], hasLength(2));
       expect(waiting['third'], isNull);
@@ -551,7 +661,7 @@ void main() {
   );
 
   test(
-    'New API stores a downloaded video from a protected task result without resubmitting',
+    'New API retries an interrupted result download without resubmitting its billable job',
     () async {
       const id = 'private-video';
       final cfg = provider('custom-new-api').copyWith(
@@ -583,6 +693,12 @@ void main() {
             );
           }
           expect(sent.headers['authorization'], 'Bearer fixture-key');
+          if (calls
+                  .where((call) => call == 'GET /v1/videos/original/content')
+                  .length ==
+              1) {
+            return http.Response('temporary', 503);
+          }
           return http.Response.bytes([
             0,
             0,
@@ -608,6 +724,7 @@ void main() {
       expect(calls, [
         'POST /v1/video/generations',
         'GET /v1/video/generations/original',
+        'GET /v1/videos/original/content',
         'GET /v1/videos/original/content',
       ]);
       final item = (await repository.itemsForBatch(ticket.batchId)).single;

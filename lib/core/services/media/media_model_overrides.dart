@@ -98,14 +98,28 @@ class MediaModelOverrides {
   MediaCapabilities apply(MediaCapabilities base, {required bool video}) {
     final first =
         base.requiresFirstFrame ||
-        (firstFrame ?? base.frameRoles.contains(MediaReferenceRole.firstFrame));
+        (firstFrame != false &&
+            (firstFrame == true ? base.configurableFrameRoles : base.frameRoles)
+                .contains(MediaReferenceRole.firstFrame));
     final last =
         first &&
-        (lastFrame ?? base.frameRoles.contains(MediaReferenceRole.lastFrame));
-    final ratios = aspectRatios ?? base.aspectRatios;
+        (lastFrame != false &&
+            (lastFrame == true ? base.configurableFrameRoles : base.frameRoles)
+                .contains(MediaReferenceRole.lastFrame));
+    final ratios = base.fixedAspectRatio
+        ? base.aspectRatios
+        : aspectRatios ?? base.aspectRatios;
     return MediaCapabilities(
       aspectRatios: ratios,
-      maxPerRequest: video ? 1 : maxPerRequest ?? base.maxPerRequest,
+      customImageEndpoint: base.customImageEndpoint,
+      protocolFrameRoles: base.protocolFrameRoles,
+      fixedAspectRatio: base.fixedAspectRatio,
+      maxPerRequest: video
+          ? 1
+          : (maxPerRequest ?? base.maxPerRequest).clamp(
+              1,
+              base.configurableOutputs,
+            ),
       maxReferences: video
           ? (last
                 ? 2
@@ -114,7 +128,7 @@ class MediaModelOverrides {
                 : 0)
           : (maxReferences ?? base.maxReferences).clamp(
               base.requiresReference ? 1 : 0,
-              16,
+              base.configurableReferences,
             ),
       nativeProgress: base.nativeProgress,
       durations: durations ?? base.durations,
@@ -140,10 +154,20 @@ class MediaModelOverrides {
       maxCombinedInputsAndOutputs: base.maxCombinedInputsAndOutputs,
       sizes: sizes ?? base.sizes,
       qualities: base.qualities,
-      formats: formats ?? base.formats,
-      supportsNegativePrompt: negativePrompt ?? base.supportsNegativePrompt,
-      supportsSeed: seed ?? base.supportsSeed,
-      supportsTransparent: transparent ?? base.supportsTransparent,
+      formats: formats == null
+          ? base.formats
+          : base.customImageEndpoint
+          ? formats!
+          : formats!.where(base.formats.contains).toList(),
+      supportsNegativePrompt:
+          (negativePrompt ?? base.supportsNegativePrompt) &&
+          (base.supportsNegativePrompt || base.customImageEndpoint),
+      supportsSeed:
+          (seed ?? base.supportsSeed) &&
+          (base.supportsSeed || base.customImageEndpoint),
+      supportsTransparent:
+          (transparent ?? base.supportsTransparent) &&
+          (base.supportsTransparent || base.customImageEndpoint),
       platformOptions: base.platformOptions,
     );
   }

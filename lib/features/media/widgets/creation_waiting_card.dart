@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../../utils/safe_resize_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -982,9 +983,41 @@ String creationWaitingText(
   return l10n.creationWaitingLong;
 }
 
-class _BlurredPreview extends StatelessWidget {
+class _BlurredPreview extends StatefulWidget {
   const _BlurredPreview(this.bytes);
   final Uint8List bytes;
+
+  @override
+  State<_BlurredPreview> createState() => _BlurredPreviewState();
+}
+
+class _BlurredPreviewState extends State<_BlurredPreview> {
+  static SafeResizeImage _image(Uint8List bytes) => SafeResizeImage.wrap(
+    MemoryImage(bytes),
+    width: 320,
+    height: 320,
+    maxSourcePixels: maxCreationSourcePixels,
+    maxEdge: 640,
+    maxPixels: 320 * 320,
+    fit: SafeResizeFit.cover,
+  );
+  late SafeResizeImage _provider = _image(widget.bytes);
+
+  @override
+  void didUpdateWidget(_BlurredPreview previous) {
+    super.didUpdateWidget(previous);
+    if (!identical(previous.bytes, widget.bytes)) {
+      unawaited(_provider.evict());
+      _provider = _image(widget.bytes);
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_provider.evict());
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => Opacity(
     opacity: .7,
@@ -992,8 +1025,8 @@ class _BlurredPreview extends StatelessWidget {
       imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
       child: Transform.scale(
         scale: 1.25,
-        child: Image.memory(
-          bytes,
+        child: Image(
+          image: _provider,
           fit: BoxFit.cover,
           gaplessPlayback: true,
           filterQuality: FilterQuality.low,

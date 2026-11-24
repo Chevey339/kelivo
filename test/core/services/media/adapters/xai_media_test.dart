@@ -17,6 +17,51 @@ import 'video_fixture.dart';
 void main() {
   const model = 'grok-imagine-image';
   const adapter = XaiImageAdapter();
+  test(
+    'xAI 2.0 sends each selected source to the multi-image editing endpoint in order',
+    () async {
+      const id = 'grok-imagine-image-2.0';
+      final provider = videoProvider('https://api.x.ai/v1', id);
+      final folder = await Directory.systemTemp.createTemp('kelivo-xai-edit');
+      addTearDown(() => folder.delete(recursive: true));
+      final inputs = [
+        for (final value in ['first', 'second'])
+          MediaReference(
+            (await File('${folder.path}/$value.png').writeAsString(value)).path,
+          ),
+      ];
+      expect(adapter.capabilities(provider, id).maxReferences, 5);
+      final client = MockClient((r) async {
+        expect(r.url.path, '/v1/images/edits');
+        final data = jsonDecode(r.body) as Map;
+        expect(data.containsKey('image'), isFalse);
+        expect(data['images'], [
+          for (final value in ['first', 'second'])
+            {
+              'type': 'image_url',
+              'url':
+                  'data:image/png;base64,${base64Encode(utf8.encode(value))}',
+            },
+        ]);
+        return videoJson({
+          'data': [
+            {'url': 'https://result.test/result.jpg'},
+          ],
+        });
+      });
+      await adapter
+          .generate(
+            videoContext(provider, client),
+            MediaRequest(
+              modelId: id,
+              mode: MediaMode.image,
+              prompt: 'combine',
+              references: inputs,
+            ),
+          )
+          .drain<void>();
+    },
+  );
   for (final oauth in [null, OAuthProvider.grok]) {
     test('xAI image edit routes to the proper endpoint for $oauth', () async {
       final directory = await Directory.systemTemp.createTemp(

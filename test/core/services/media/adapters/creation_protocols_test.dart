@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'video_fixture.dart';
+import 'package:Kelivo/core/services/media/media_model_overrides.dart';
 
 const resolver = MediaAdapterResolver();
 
@@ -39,6 +40,58 @@ MediaRequest imageRequest(String id, [List<MediaReference> refs = const []]) =>
     );
 
 void main() {
+  test(
+    'overrides honor the chosen transport while Ark aliases can request an encodable last frame',
+    () {
+      MediaCapabilities configured(MediaApiProtocol protocol, MediaMode mode) {
+        const id = 'private-media';
+        final cfg = videoProvider('https://relay.test/v1', id).copyWith(
+          modelOverrides: {
+            id: {'mediaGeneration': {}},
+          },
+        );
+        final adapter = resolver.resolve(
+          cfg,
+          mode,
+          modelId: id,
+          protocol: protocol,
+        )!;
+        return const MediaModelOverrides(
+          firstFrame: true,
+          lastFrame: true,
+          maxPerRequest: 8,
+          formats: ['webp'],
+          aspectRatios: ['3:2'],
+        ).apply(adapter.capabilities(cfg, id), video: mode == MediaMode.video);
+      }
+
+      expect(
+        configured(MediaApiProtocol.arkVideo, MediaMode.video).frameRoles,
+        contains(MediaReferenceRole.lastFrame),
+      );
+      expect(
+        configured(MediaApiProtocol.openAiVideo, MediaMode.video).frameRoles,
+        isNot(contains(MediaReferenceRole.lastFrame)),
+      );
+      final chat = configured(MediaApiProtocol.chatImage, MediaMode.image);
+      expect(chat.maxPerRequest, 1);
+      expect(chat.formats, isEmpty);
+      expect(chat.aspectRatios, ['auto']);
+      const wan = 'wan2.7-r2v-2026-06-12';
+      expect(
+        resolver.resolve(
+          videoProvider(
+            'https://dashscope.aliyuncs.com/compatible-mode/v1',
+            wan,
+          ),
+          MediaMode.video,
+          modelId: wan,
+        ),
+        isNull,
+      );
+    },
+  );
+
   TestWidgetsFlutterBinding.ensureInitialized();
   late File input;
   setUp(() async {

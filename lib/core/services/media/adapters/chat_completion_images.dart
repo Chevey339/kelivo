@@ -17,6 +17,7 @@ class ChatCompletionImagesAdapter implements MediaAdapter {
     final gemini = isGeminiImageModel(apiModelId(provider, modelId));
     return MediaCapabilities(
       aspectRatios: const ['auto'],
+      fixedAspectRatio: true,
       maxReferences: gemini
           ? const GeminiImagesAdapter()
                 .capabilities(provider, modelId)

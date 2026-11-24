@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
@@ -6,7 +7,9 @@ import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/features/media/models/creation_waiting_games.dart';
 import 'package:Kelivo/features/media/widgets/creation_waiting_card.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/utils/safe_resize_image.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -39,17 +42,22 @@ Widget _host(Widget child) => MaterialApp(
   home: Scaffold(body: Center(child: child)),
 );
 
-Widget _card(GenerationBatchRow batch, int ordinal, {Widget? result}) =>
-    SizedBox(
-      width: 250,
-      height: 225,
-      child: CreationWaitingCard(
-        key: ValueKey((batch.id, ordinal)),
-        batch: batch,
-        ordinal: ordinal,
-        result: result,
-      ),
-    );
+Widget _card(
+  GenerationBatchRow batch,
+  int ordinal, {
+  Widget? result,
+  String? preview,
+}) => SizedBox(
+  width: 250,
+  height: 225,
+  child: CreationWaitingCard(
+    key: ValueKey((batch.id, ordinal)),
+    batch: batch,
+    ordinal: ordinal,
+    result: result,
+    preview: preview,
+  ),
+);
 
 void main() {
   test(
@@ -182,6 +190,45 @@ void main() {
     tearDown(() {
       VisibilityDetectorController.instance.updateInterval = visibilityInterval;
     });
+
+    testWidgets(
+      'streamed preview cache entries are released on replacement and exit',
+      (tester) async {
+        final batch = _batch('preview');
+        final cache = PaintingBinding.instance.imageCache;
+        final previews = find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is SafeResizeImage &&
+              (widget.image as SafeResizeImage).imageProvider is MemoryImage,
+        );
+        Future<Object> showPreview(int size, {Object? previous}) async {
+          final encoded = base64Encode(
+            img.encodePng(img.Image(width: size, height: size)),
+          );
+          await tester.pumpWidget(_host(_card(batch, 0, preview: encoded)));
+          // The waiting card decodes base64 on a worker isolate.
+          for (var attempt = 0; attempt < 200; attempt++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump();
+            if (previews.evaluate().isEmpty) continue;
+            final provider = tester.widget<Image>(previews.first).image;
+            final key = await provider.obtainKey(ImageConfiguration.empty);
+            if (key != previous && cache.statusForKey(key).tracked) return key;
+          }
+          throw StateError('Preview did not reach the image cache');
+        }
+
+        final first = await showPreview(2);
+        final second = await showPreview(3, previous: first);
+        expect(cache.statusForKey(first).untracked, isTrue);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump();
+        expect(cache.statusForKey(second).untracked, isTrue);
+      },
+    );
 
     testWidgets(
       'Space targets the newest batch or hovered card after an outside pause',

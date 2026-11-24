@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
+import '../../utils/kelivo_file_uri.dart';
 
 import '../models/media_creation.dart';
 import 'app_database.dart';
@@ -98,21 +100,36 @@ class MediaRepository {
     await _db.into(_db.generationItemRows).insert(item);
   }
 
-  Future<void> markInterrupted() async {
-    await (_db.update(_db.generationBatchRows)..where(
-          (row) => row.status.isIn([
-            GenerationStatus.queued.name,
-            GenerationStatus.running.name,
-            GenerationStatus.downloading.name,
-          ]),
-        ))
-        .write(
-          GenerationBatchRowsCompanion(
-            status: const Value(GenerationStatus.interrupted),
-            finishedAt: Value(DateTime.now()),
-          ),
-        );
-  }
+  Future<List<String>> markInterrupted() => _db.transaction(() async {
+    final table = _db.generationBatchRows;
+    final active = table.status.isIn([
+      GenerationStatus.queued.name,
+      GenerationStatus.running.name,
+      GenerationStatus.downloading.name,
+    ]);
+    final rows =
+        await (_db.selectOnly(table)
+              ..addColumns([table.id])
+              ..where(
+                active | table.status.equals(GenerationStatus.interrupted.name),
+              ))
+            .get();
+    if (rows.isNotEmpty) {
+      await (_db.update(table)..where((_) => active)).write(
+        GenerationBatchRowsCompanion(
+          status: const Value(GenerationStatus.interrupted),
+          finishedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+    return [for (final row in rows) row.read(table.id)!];
+  });
+
+  Future<bool> hasItem(String id) async =>
+      await (_db.select(
+        _db.generationItemRows,
+      )..where((row) => row.id.equals(id))).getSingleOrNull() !=
+      null;
 
   Future<void> renameTopic(
     String id,
@@ -289,10 +306,75 @@ class MediaRepository {
     await _db.delete(_db.generationTopicRows).go();
   });
 
+  static void validateSnapshotPaths(sqlite.Database database) {
+    final batches = database.prepare(
+      'SELECT id, references_json FROM generation_batch_rows',
+    );
+    final items = database.prepare(
+      'SELECT id, batch_id, path, thumbnail_path FROM generation_item_rows',
+    );
+    try {
+      final batchRows = batches.selectCursor();
+      while (batchRows.moveNext()) {
+        final row = batchRows.current;
+        referencePaths(row['id'] as String, row['references_json'] as String);
+      }
+      final itemRows = items.selectCursor();
+      while (itemRows.moveNext()) {
+        final row = itemRows.current;
+        _validateItemPaths(
+          row['id'] as String,
+          row['batch_id'] as String,
+          row['path'] as String,
+          row['thumbnail_path'] as String?,
+        );
+      }
+    } finally {
+      batches.close();
+      items.close();
+    }
+  }
+
+  /// Only ownership and file paths matter when preserving interrupted writes.
+  /// Request parameters and reference roles are interpreted when a job runs.
+  static Set<String> referencePaths(String id, String referencesJson) {
+    final refs = jsonDecode(referencesJson);
+    if (!KelivoFileUri.isGenerationId(id) || refs is! List) {
+      throw const FormatException('Invalid stored creation references');
+    }
+    final paths = <String>{};
+    for (final ref in refs) {
+      if (ref case {
+        'path': final String path,
+      } when KelivoFileUri.isGenerationFile(path, id)) {
+        paths.add(path);
+      } else {
+        throw const FormatException('Invalid stored creation reference');
+      }
+    }
+    return paths;
+  }
+
+  static void _validateItemPaths(
+    String itemId,
+    String batchId,
+    String path,
+    String? thumbnail,
+  ) {
+    if (!KelivoFileUri.isGenerationId(itemId) ||
+        !KelivoFileUri.isGenerationFile(path, batchId) ||
+        thumbnail != null &&
+            !KelivoFileUri.isGenerationFile(thumbnail, batchId)) {
+      throw const FormatException('Invalid stored creation file');
+    }
+  }
+
   Future<void> importFrom(
     MediaRepository? source, {
     required bool overwrite,
     Map<String, String> restoredPaths = const {},
+    Map<String, String> remappedConversations = const {},
+    Map<String, String>? mergedMessages,
   }) async {
     _requireWritable();
     if (source == null) {
@@ -309,6 +391,12 @@ class MediaRepository {
         await source._db.select(source._db.generationItemRows).get(),
       ),
     );
+    for (final row in batches) {
+      referencePaths(row.id, row.referencesJson);
+    }
+    for (final item in items) {
+      _validateItemPaths(item.id, item.batchId, item.path, item.thumbnailPath);
+    }
     await _db.transaction(() async {
       if (overwrite) await clear();
       await _db.batch((batch) {
@@ -320,6 +408,19 @@ class MediaRepository {
         batch.insertAll(_db.generationBatchRows, [
           for (final row in batches)
             row.copyWith(
+              conversationId: Value(
+                mergedMessages != null &&
+                        row.messageId != null &&
+                        !mergedMessages.containsKey(row.messageId)
+                    ? null
+                    : remappedConversations[row.conversationId] ??
+                          row.conversationId,
+              ),
+              messageId: Value(
+                mergedMessages == null
+                    ? row.messageId
+                    : mergedMessages[row.messageId],
+              ),
               status: row.status.isActive
                   ? GenerationStatus.interrupted
                   : row.status,

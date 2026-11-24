@@ -10,8 +10,8 @@ class XaiImageAdapter implements MediaAdapter {
 
   @override
   MediaCapabilities capabilities(ProviderConfig provider, String modelId) =>
-      const MediaCapabilities(
-        aspectRatios: [
+      MediaCapabilities(
+        aspectRatios: const [
           'auto',
           '1:1',
           '3:2',
@@ -22,7 +22,13 @@ class XaiImageAdapter implements MediaAdapter {
           '9:16',
         ],
         maxPerRequest: 10,
-        maxReferences: 1,
+        maxReferences:
+            apiModelId(
+              provider,
+              modelId,
+            ).toLowerCase().startsWith('grok-imagine-image-2')
+            ? 5
+            : 1,
       );
 
   @override
@@ -49,7 +55,12 @@ class XaiImageAdapter implements MediaAdapter {
         if (request.aspectRatio != 'auto') 'aspect_ratio': request.aspectRatio,
         if (request.parameters['resolution'] case final String resolution)
           'resolution': resolution,
-        if (reference != null)
+        if (request.references.length > 1)
+          'images': [
+            for (final input in request.references)
+              {'type': 'image_url', 'url': await mediaReferenceDataUri(input)},
+          ]
+        else if (reference != null)
           'image': {
             'type': 'image_url',
             'url': await mediaReferenceDataUri(reference),

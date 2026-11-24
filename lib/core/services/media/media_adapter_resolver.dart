@@ -84,7 +84,10 @@ class MediaAdapterResolver {
         MediaApiProtocol.arkImage => const ArkImagesAdapter(),
         MediaApiProtocol.arkVideo => const ArkVideoAdapter(),
         MediaApiProtocol.dashScopeImage => const DashScopeImagesAdapter(),
-        MediaApiProtocol.dashScopeVideo => const DashScopeVideoAdapter(),
+        MediaApiProtocol.dashScopeVideo =>
+          DashScopeVideoAdapter.supportsPromptOrFrames(upstream)
+              ? const DashScopeVideoAdapter()
+              : null,
         MediaApiProtocol.modelScopeImage => const ModelScopeImagesAdapter(),
         MediaApiProtocol.modelScopeVideo => const ModelScopeVideoAdapter(),
         MediaApiProtocol.openAiVideo => const OpenAiVideosAdapter(),
@@ -200,6 +203,9 @@ class MediaAdapterResolver {
     if (key == 'aliyun' ||
         host.startsWith('dashscope') && host.endsWith('.aliyuncs.com') ||
         host.endsWith('.maas.aliyuncs.com')) {
+      if (video && !DashScopeVideoAdapter.supportsPromptOrFrames(upstream)) {
+        return null;
+      }
       return video
           ? const DashScopeVideoAdapter()
           : const DashScopeImagesAdapter();

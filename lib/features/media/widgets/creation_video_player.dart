@@ -33,8 +33,10 @@ class CreationVideoPlayer extends StatefulWidget {
 
 class _CreationVideoPlayerState extends State<CreationVideoPlayer> {
   VideoPlayerController? _player;
+  AppLifecycleListener? _lifecycle;
   bool _ready = false;
   bool _loading = false;
+  bool _fullscreen = false;
 
   @override
   void initState() {
@@ -48,15 +50,39 @@ class _CreationVideoPlayerState extends State<CreationVideoPlayer> {
     if (path == null) return;
     final player = VideoPlayerController.file(
       File(path),
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      // Own the lifecycle listener only after allocation. The plugin registers
+      // its observer before creating a player and cannot detach it if creation throws.
+      videoPlayerOptions: VideoPlayerOptions(
+        mixWithOthers: true,
+        allowBackgroundPlayback: true,
+      ),
     );
     _player = player;
     _loading = true;
     try {
       await player.initialize();
-      if (mounted) setState(() => _ready = true);
+      if (!mounted) return;
+      if (player.value.isInitialized && !player.value.hasError) {
+        var resumePlayback = false;
+        _lifecycle = AppLifecycleListener(
+          onPause: () {
+            resumePlayback = player.value.isPlaying;
+            if (resumePlayback) unawaited(player.pause());
+          },
+          onResume: () {
+            if (resumePlayback && !player.value.hasError) {
+              unawaited(player.play());
+            }
+            resumePlayback = false;
+          },
+        );
+        player.addListener(_checkPlaybackError);
+        setState(() => _ready = true);
+      } else {
+        _releasePlayer();
+      }
     } catch (_) {
-      // The local file can still be opened in a system player.
+      if (mounted) _releasePlayer();
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -64,10 +90,16 @@ class _CreationVideoPlayerState extends State<CreationVideoPlayer> {
 
   Future<void> _openExternally() async {
     final path = SandboxPathResolver.resolveForIo(widget.item.path);
-    final result = path == null
-        ? null
-        : await OpenFilex.open(path, type: widget.item.mime);
-    if (mounted && result?.type != ResultType.done) {
+    try {
+      if (path != null &&
+          (await OpenFilex.open(path, type: widget.item.mime)).type ==
+              ResultType.done) {
+        return;
+      }
+    } catch (_) {
+      // A system player may be unavailable.
+    }
+    if (mounted) {
       showAppSnackBar(
         context,
         type: NotificationType.error,
@@ -76,9 +108,28 @@ class _CreationVideoPlayerState extends State<CreationVideoPlayer> {
     }
   }
 
+  void _checkPlaybackError() {
+    if (_player?.value.hasError != true) return;
+    // Keep the controller valid for this notification and any fullscreen
+    // surface; rebuild both surfaces with the system-player fallback.
+    if (mounted && _ready) {
+      setState(() => _ready = false);
+      if (!_fullscreen) scheduleMicrotask(_releasePlayer);
+    }
+  }
+
+  void _releasePlayer() {
+    _lifecycle?.dispose();
+    _lifecycle = null;
+    final player = _player;
+    _player = null;
+    player?.removeListener(_checkPlaybackError);
+    unawaited(player?.dispose());
+  }
+
   @override
   void dispose() {
-    unawaited(_player?.dispose());
+    _releasePlayer();
     super.dispose();
   }
 
@@ -88,26 +139,34 @@ class _CreationVideoPlayerState extends State<CreationVideoPlayer> {
     if (_ready && player != null) {
       return _VideoSurface(
         player: player,
-        onFullScreen: () => Navigator.of(context).push<void>(
-          PageRouteBuilder<void>(
-            transitionDuration: handoffDuration(context, 220),
-            reverseTransitionDuration: handoffDuration(context, 220),
-            pageBuilder: (context, _, _) => ColoredBox(
-              color: Colors.black,
-              child: SafeArea(
-                child: _VideoSurface(
-                  player: player,
-                  expanded: true,
-                  onFullScreen: () => Navigator.of(context).pop(),
+        onFullScreen: () async {
+          _fullscreen = true;
+          try {
+            await Navigator.of(context).push<void>(
+              PageRouteBuilder<void>(
+                transitionDuration: handoffDuration(context, 220),
+                reverseTransitionDuration: handoffDuration(context, 220),
+                pageBuilder: (context, _, _) => ColoredBox(
+                  color: Colors.black,
+                  child: SafeArea(
+                    child: _VideoSurface(
+                      player: player,
+                      expanded: true,
+                      onFullScreen: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ),
+                transitionsBuilder: (_, animation, _, child) => FadeTransition(
+                  opacity: animation.drive(CurveTween(curve: handoffCurve)),
+                  child: child,
                 ),
               ),
-            ),
-            transitionsBuilder: (_, animation, _, child) => FadeTransition(
-              opacity: animation.drive(CurveTween(curve: handoffCurve)),
-              child: child,
-            ),
-          ),
-        ),
+            );
+          } finally {
+            _fullscreen = false;
+            if (mounted && !_ready) _releasePlayer();
+          }
+        },
       );
     }
     final l10n = AppLocalizations.of(context)!;
@@ -157,6 +216,16 @@ class _VideoSurface extends StatelessWidget {
     return ValueListenableBuilder(
       valueListenable: player,
       builder: (context, value, _) {
+        if (value.hasError || !value.isInitialized) {
+          return Center(
+            child: IosIconButton(
+              icon: Lucide.Minimize2,
+              color: Colors.white,
+              tooltip: l10n.creationExitFullScreen,
+              onTap: onFullScreen,
+            ),
+          );
+        }
         final duration = value.duration.inMilliseconds;
         final position = value.position.inMilliseconds.clamp(0, duration);
         final muted = value.volume == 0;

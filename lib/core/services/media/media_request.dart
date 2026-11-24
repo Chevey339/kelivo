@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import '../../models/media_creation.dart';
 import '../../database/app_database.dart';
+import '../../../utils/kelivo_file_uri.dart';
 
 enum MediaReferenceRole { image, firstFrame, lastFrame, platform }
 
@@ -24,11 +25,19 @@ class MediaReference {
     if (parameterKey != null) 'parameterKey': parameterKey,
   };
 
-  factory MediaReference.fromJson(Map<String, dynamic> json) => MediaReference(
-    json['path'] as String,
-    role: MediaReferenceRole.values.byName(json['role'] as String),
-    parameterKey: json['parameterKey'] as String?,
-  );
+  factory MediaReference.fromJson(Map<String, dynamic> json) {
+    final role = MediaReferenceRole.values
+        .where((value) => value.name == json['role'])
+        .firstOrNull;
+    if (role == null) {
+      throw const FormatException('Invalid stored creation reference role');
+    }
+    return MediaReference(
+      json['path'] as String,
+      role: role,
+      parameterKey: json['parameterKey'] as String?,
+    );
+  }
 }
 
 class MediaRequest {
@@ -46,22 +55,32 @@ class MediaRequest {
   });
 
   factory MediaRequest.fromBatch(GenerationBatchRow batch) {
-    final params = jsonDecode(batch.paramsJson) as Map<String, dynamic>;
-    return MediaRequest(
-      modelId: batch.modelId,
-      mode: batch.mode,
-      prompt: batch.prompt,
-      negativePrompt: batch.negativePrompt,
-      count: params.remove('count') as int? ?? 1,
-      aspectRatio: params.remove('aspectRatio') as String? ?? 'auto',
-      durationSec: params.remove('durationSec') as int?,
-      resolution: params.remove('resolution') as String?,
-      parameters: params,
-      references: [
+    try {
+      final params = jsonDecode(batch.paramsJson) as Map<String, dynamic>;
+      final refs = [
         for (final row in jsonDecode(batch.referencesJson) as List)
           MediaReference.fromJson((row as Map).cast<String, dynamic>()),
-      ],
-    );
+      ];
+      if (refs.any(
+        (ref) => !KelivoFileUri.isGenerationFile(ref.path, batch.id),
+      )) {
+        throw const FormatException('Invalid stored creation reference');
+      }
+      return MediaRequest(
+        modelId: batch.modelId,
+        mode: batch.mode,
+        prompt: batch.prompt,
+        negativePrompt: batch.negativePrompt,
+        count: params.remove('count') as int? ?? 1,
+        aspectRatio: params.remove('aspectRatio') as String? ?? 'auto',
+        durationSec: params.remove('durationSec') as int?,
+        resolution: params.remove('resolution') as String?,
+        parameters: params,
+        references: refs,
+      );
+    } on TypeError {
+      throw const FormatException('Invalid stored creation request');
+    }
   }
 
   final String modelId;
@@ -151,6 +170,9 @@ class MediaCapabilities {
   const MediaCapabilities({
     required this.aspectRatios,
     this.maxPerRequest = 1,
+    this.customImageEndpoint = false,
+    this.protocolFrameRoles,
+    this.fixedAspectRatio = false,
     this.maxReferences = 0,
     this.nativeProgress = false,
     this.durations = const [],
@@ -175,6 +197,17 @@ class MediaCapabilities {
 
   final List<String> aspectRatios;
   final int maxPerRequest;
+  // OpenAI-compatible relays can accept additional images, n, and optional
+  // JSON parameters even when an unlisted model has conservative defaults.
+  final bool customImageEndpoint;
+  final bool fixedAspectRatio;
+  final List<MediaReferenceRole>? protocolFrameRoles;
+  List<MediaReferenceRole> get configurableFrameRoles =>
+      protocolFrameRoles ?? frameRoles;
+  bool get configurableFormat => customImageEndpoint || formats.isNotEmpty;
+  int get configurableOutputs => customImageEndpoint ? 16 : maxPerRequest;
+  int get configurableReferences =>
+      customImageEndpoint && maxReferences > 0 ? 16 : maxReferences;
   final int maxReferences;
   final bool nativeProgress;
   final List<int> durations;

@@ -1,3 +1,7 @@
+/// Bound native decode intermediates while preserving larger original files for export.
+const maxCreationSourcePixels = 8192 * 8192;
+const creationThumbnailEdge = 512;
+
 enum MediaMode { image, video }
 
 enum CreationModelSlot {

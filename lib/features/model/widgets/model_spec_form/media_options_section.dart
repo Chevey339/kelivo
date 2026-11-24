@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/models/media_creation.dart';
+import '../../../../core/services/media/media_request.dart';
 import '../../../../core/services/media/media_model_overrides.dart';
 import '../../../../shared/widgets/action_sheet.dart';
 import '../../../../core/services/media/adapters/native_image_size.dart'
@@ -133,19 +134,20 @@ class MediaOptionsSection extends StatelessWidget {
                 },
               ),
             ),
-          _Field(
-            title: l10n.creationAspectRatio,
-            help: l10n.creationRatioHelp,
-            child: _Choices(
-              values: ratios,
-              active: caps.aspectRatios,
-              label: (value) => value == 'auto' ? l10n.creationAuto : value,
-              onChange: (values) =>
-                  controller.setMediaValue('aspectRatios', values),
-              allowEmpty: false,
-              ratioIcons: true,
+          if (!defaults.fixedAspectRatio)
+            _Field(
+              title: l10n.creationAspectRatio,
+              help: l10n.creationRatioHelp,
+              child: _Choices(
+                values: ratios,
+                active: caps.aspectRatios,
+                label: (value) => value == 'auto' ? l10n.creationAuto : value,
+                onChange: (values) =>
+                    controller.setMediaValue('aspectRatios', values),
+                allowEmpty: false,
+                ratioIcons: true,
+              ),
             ),
-          ),
           if (video) ...[
             _Field(
               title: l10n.creationDuration,
@@ -174,7 +176,11 @@ class MediaOptionsSection extends StatelessWidget {
                   _Flag(
                     label: l10n.creationFirstFrame,
                     active: first,
-                    onChanged: defaults.requiresFirstFrame
+                    onChanged:
+                        defaults.requiresFirstFrame ||
+                            !defaults.configurableFrameRoles.contains(
+                              MediaReferenceRole.firstFrame,
+                            )
                         ? null
                         : (value) =>
                               controller.setMediaValue('firstFrame', value),
@@ -182,7 +188,11 @@ class MediaOptionsSection extends StatelessWidget {
                   _Flag(
                     label: l10n.creationLastFrame,
                     active: last,
-                    onChanged: first
+                    onChanged:
+                        first &&
+                            defaults.configurableFrameRoles.contains(
+                              MediaReferenceRole.lastFrame,
+                            )
                         ? (value) =>
                               controller.setMediaValue('lastFrame', value)
                         : null,
@@ -207,6 +217,7 @@ class MediaOptionsSection extends StatelessWidget {
               help: l10n.creationMaxPerRequestHelp,
               child: _Count(
                 value: caps.maxPerRequest,
+                maximum: defaults.configurableOutputs,
                 minimum: 1,
                 onChanged: (value) =>
                     controller.setMediaValue('maxPerRequest', value),
@@ -217,6 +228,7 @@ class MediaOptionsSection extends StatelessWidget {
               help: l10n.creationReferenceLimitHelp,
               child: _Count(
                 value: caps.maxReferences,
+                maximum: defaults.configurableReferences,
                 minimum: caps.requiresReference ? 1 : 0,
                 onChanged: (value) =>
                     controller.setMediaValue('maxReferences', value),
@@ -231,37 +243,54 @@ class MediaOptionsSection extends StatelessWidget {
                   label: l10n.creationNegativePrompt,
                   help: l10n.creationEnableOptionHelp,
                   active: caps.supportsNegativePrompt,
-                  onChanged: (value) =>
-                      controller.setMediaValue('negativePrompt', value),
+                  onChanged:
+                      (defaults.supportsNegativePrompt ||
+                          defaults.customImageEndpoint)
+                      ? (value) =>
+                            controller.setMediaValue('negativePrompt', value)
+                      : null,
                 ),
                 _Flag(
                   label: l10n.creationSeed,
                   help: l10n.creationEnableOptionHelp,
                   active: caps.supportsSeed,
-                  onChanged: (value) => controller.setMediaValue('seed', value),
+                  onChanged:
+                      (defaults.supportsSeed || defaults.customImageEndpoint)
+                      ? (value) => controller.setMediaValue('seed', value)
+                      : null,
                 ),
                 if (!video)
                   _Flag(
                     label: l10n.creationTransparentBackground,
                     help: l10n.creationEnableOptionHelp,
                     active: caps.supportsTransparent,
-                    onChanged: (value) =>
-                        controller.setMediaValue('transparent', value),
+                    onChanged:
+                        (defaults.supportsTransparent ||
+                            defaults.customImageEndpoint)
+                        ? (value) =>
+                              controller.setMediaValue('transparent', value)
+                        : null,
                   ),
               ],
             ),
           ),
           if (!video)
-            _Field(
-              title: l10n.creationOutputFormat,
-              child: _Choices(
-                values: {...imageFormats, ...caps.formats},
-                active: caps.formats,
-                label: (value) => value.toUpperCase(),
-                onChange: (values) =>
-                    controller.setMediaValue('formats', values),
+            if (defaults.configurableFormat)
+              _Field(
+                title: l10n.creationOutputFormat,
+                child: _Choices(
+                  values: {
+                    ...(defaults.customImageEndpoint
+                        ? imageFormats
+                        : defaults.formats),
+                    ...caps.formats,
+                  },
+                  active: caps.formats,
+                  label: (value) => value.toUpperCase(),
+                  onChange: (values) =>
+                      controller.setMediaValue('formats', values),
+                ),
               ),
-            ),
           _Field(
             title: l10n.creationExtraJson,
             help: l10n.creationExtraJsonHint,
@@ -397,9 +426,10 @@ class _Count extends StatelessWidget {
   const _Count({
     required this.value,
     required this.minimum,
+    required this.maximum,
     required this.onChanged,
   });
-  final int value, minimum;
+  final int value, minimum, maximum;
   final ValueChanged<int> onChanged;
 
   @override
@@ -419,7 +449,7 @@ class _Count extends StatelessWidget {
           icon: Lucide.Plus,
           size: 15,
           minSize: 34,
-          onTap: value < 16 ? () => onChanged(value + 1) : null,
+          onTap: value < maximum ? () => onChanged(value + 1) : null,
         ),
       ],
     );

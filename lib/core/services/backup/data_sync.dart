@@ -2524,7 +2524,10 @@ class DataSync {
           // Lets an older build decide whether it may restore this backup by
           // dropping what it does not know, instead of refusing outright.
           SchemaMigrations.minimumReadableManifestKey:
-              SchemaMigrations.minimumReadableSchemaVersion,
+              scope.includes(BackupCategory.creations) &&
+                  !scope.includes(BackupCategory.chats)
+              ? 6 // The first reader that distinguishes creation-only SQLite payloads.
+              : SchemaMigrations.minimumReadableSchemaVersion,
           'conversationCount': snapshotInfo.conversationCount,
           'messageCount': snapshotInfo.messageCount,
         },
@@ -2922,6 +2925,7 @@ class DataSync {
     required bool includeDatabase,
     required bool overwrite,
     required bool restoreFiles,
+    BackupMergeReport? chatMerge,
   }) async {
     final snapshot = includeDatabase
         ? AppDatabase.open(file: File(p.join(payload.path, _databaseEntryName)))
@@ -2986,6 +2990,9 @@ class DataSync {
             incoming,
             overwrite: overwrite,
             restoredPaths: relocated,
+            remappedConversations:
+                chatMerge?.remappedConversationIds ?? const {},
+            mergedMessages: chatMerge?.mergedMessageIds,
           );
         } catch (_) {
           for (final file in installed) {
@@ -3963,6 +3970,7 @@ class DataSync {
           extractDir,
           includeDatabase: true,
           overwrite: false,
+          chatMerge: _lastMergeReport,
           restoreFiles: selectedAssetRoots.contains('generations'),
         );
       }

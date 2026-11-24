@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data' show BytesBuilder;
 
 import 'package:dio/dio.dart' show CancelToken, DioException;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
 
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../providers/settings_provider.dart';
@@ -263,7 +265,15 @@ class MediaContext {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response;
     }
-    final body = await response.stream.bytesToString();
+    // Error pages can be large or binary. Only a small diagnostic prefix is used.
+    final prefix = BytesBuilder(copy: false);
+    const limit = 64 * 1024;
+    await for (final chunk in response.stream) {
+      final room = limit - prefix.length;
+      prefix.add(chunk.length > room ? chunk.sublist(0, room) : chunk);
+      if (prefix.length == limit) break;
+    }
+    final body = utf8.decode(prefix.takeBytes(), allowMalformed: true);
     final failure = mediaHttpFailure(response, body);
     log?.response(response.statusCode, errorKind: failure.kind);
     throw failure;
@@ -277,7 +287,7 @@ class MediaContext {
     bool allowZeroErrorCode = false,
   }) async {
     final request = http.Request(method, url)..headers.addAll(headers);
-    if (body != null) request.body = jsonEncode(body);
+    if (body != null) request.bodyBytes = await encodeMediaJson(body);
     return readMediaJson(
       await send(request, diagnosticBody: body),
       allowZeroErrorCode: allowZeroErrorCode,
@@ -285,12 +295,80 @@ class MediaContext {
   }
 }
 
+Future<Uint8List> encodeMediaJson(Map<String, dynamic> body) =>
+    compute(_mediaJsonBytes, body);
+
+Uint8List _mediaJsonBytes(Map<String, dynamic> body) =>
+    utf8.encode(jsonEncode(body));
+
+// A 128 MiB inline result expands to about 171 MiB in base64. Share the same
+// response budget across ordinary JSON and streamed generation events.
+const maxMediaResponseBytes = 180 * 1024 * 1024;
+Stream<List<int>> boundedMediaResponse(http.StreamedResponse response) async* {
+  const failure = MediaFailure(
+    MediaFailureKind.invalidResponse,
+    'Media response too large',
+  );
+  if ((response.contentLength ?? 0) > maxMediaResponseBytes) {
+    await response.stream.listen(null).cancel();
+    throw failure;
+  }
+  var received = 0;
+  await for (final bytes in response.stream) {
+    received += bytes.length;
+    if (received > maxMediaResponseBytes) throw failure;
+    yield bytes;
+  }
+}
+
+Future<Map<String, dynamic>> _parseMediaResponse(
+  http.StreamedResponse response,
+) async {
+  // Most polls fit in a single packet. Spool inline images and videos so the
+  // isolate that parses them need not receive a second copy of the whole body.
+  final small = BytesBuilder(copy: false);
+  Directory? spool;
+  RandomAccessFile? writer;
+  try {
+    await for (final bytes in boundedMediaResponse(response)) {
+      if (writer == null && small.length + bytes.length <= 256 * 1024) {
+        small.add(bytes);
+        continue;
+      }
+      if (writer == null) {
+        spool = await Directory.systemTemp.createTemp('kelivo-media-response-');
+        writer = await File(
+          p.join(spool.path, 'body'),
+        ).open(mode: FileMode.write);
+        await writer.writeFrom(small.takeBytes());
+      }
+      await writer.writeFrom(bytes);
+    }
+    if (spool == null) return decodeMediaJson(small.takeBytes());
+    await writer!.close();
+    writer = null;
+    return await compute(_parseMediaFile, p.join(spool.path, 'body'));
+  } finally {
+    await writer?.close();
+    if (spool != null) await spool.delete(recursive: true);
+  }
+}
+
+Future<Map<String, dynamic>> _parseMediaFile(String path) async {
+  final value = await File(
+    path,
+  ).openRead().transform(utf8.decoder).transform(json.decoder).single;
+  if (value is! Map<String, dynamic>) {
+    throw const FormatException('Expected a media response object');
+  }
+  return value;
+}
+
 Future<Map<String, dynamic>> readMediaJson(
   http.StreamedResponse response, {
   bool allowZeroErrorCode = false,
 }) async {
-  final payload = await response.stream.toBytes();
-  final value = await compute(decodeMediaJson, payload);
+  final value = await _parseMediaResponse(response);
   final error = value['error'];
   if (error != null &&
       !(allowZeroErrorCode && error is Map && error['code'] == 0)) {
@@ -419,12 +497,14 @@ Future<String> _encodeMediaReference(
   MediaReference reference, {
   required bool withMimePrefix,
 }) async {
-  final bytes = await readMediaReference(reference);
-  return compute(_encodeReference, (
-    name: reference.path,
-    bytes: bytes,
-    prefix: withMimePrefix,
-  ));
+  final path = SandboxPathResolver.resolveForIo(reference.path);
+  if (path == null) {
+    throw const MediaFailure(
+      MediaFailureKind.parameters,
+      'Reference file unavailable',
+    );
+  }
+  return compute(_encodeReference, (path: path, prefix: withMimePrefix));
 }
 
 Future<Uint8List> readMediaReference(MediaReference reference) async {
@@ -438,10 +518,12 @@ Future<Uint8List> readMediaReference(MediaReference reference) async {
   return File(path).readAsBytes();
 }
 
-String _encodeReference(({String name, Uint8List bytes, bool prefix}) data) {
-  final encoded = base64Encode(data.bytes);
+Future<String> _encodeReference(({String path, bool prefix}) data) async {
+  final encoded = await File(
+    data.path,
+  ).openRead().transform(base64.encoder).join();
   return data.prefix
-      ? 'data:${mimeFromPath(data.name)};base64,$encoded'
+      ? 'data:${mimeFromPath(data.path)};base64,$encoded'
       : encoded;
 }
 

@@ -75,6 +75,7 @@ class MediaCreationController extends ChangeNotifier {
     _options.addAll(_readOptions());
     _topicsSubscription = runner.repository.watchTopics().listen((topics) {
       _topics = topics;
+      _topicsById = {for (final topic in topics) topic.id: topic};
       notifyListeners();
     }, onError: _storageError);
     _batchesSubscription = runner.repository.watchBatches().listen((batches) {
@@ -120,6 +121,7 @@ class MediaCreationController extends ChangeNotifier {
   late final StreamSubscription<List<GenerationBatchRow>> _batchesSubscription;
   late final StreamSubscription<List<GenerationItemRow>> _itemsSubscription;
   List<GenerationTopicRow> _topics = const [];
+  Map<String, GenerationTopicRow> _topicsById = const {};
   List<GenerationItemRow> _readyItems = const [];
   final _batchesById = <String, GenerationBatchRow>{};
   final _itemsById = <String, GenerationItemRow>{};
@@ -140,8 +142,7 @@ class MediaCreationController extends ChangeNotifier {
 
   MediaMode get mode => _mode;
   List<GenerationTopicRow> get topics => _topics;
-  GenerationTopicRow? topic(String id) =>
-      _topics.where((row) => row.id == id).firstOrNull;
+  GenerationTopicRow? topic(String id) => _topicsById[id];
   List<GenerationBatchRow> batchesFor(String id) =>
       _batchesByTopic[id] ?? const [];
   List<GenerationBatchRow> chatBatchesFor(String messageId) =>
@@ -762,10 +763,10 @@ class MediaCreationController extends ChangeNotifier {
         await runner.cancel(batch);
       }
       await AttachmentFileLock.synchronized(() async {
-        await runner.repository.deleteTopic(id);
-        for (final batch in batches) {
-          await runner.files.deleteBatch(batch);
-        }
+        await runner.files.deleteBatchesAndRecords(
+          await runner.repository.batchesForTopic(id),
+          () => runner.repository.deleteTopic(id),
+        );
       });
       _drafts.remove(id);
       _lastSubmissionByTopic.remove(id);
@@ -776,8 +777,10 @@ class MediaCreationController extends ChangeNotifier {
 
   Future<void> deleteItem(GenerationItemRow item) =>
       AttachmentFileLock.synchronized(() async {
-        await runner.repository.deleteItem(item.id);
-        await runner.files.deleteItem(item);
+        await runner.files.deleteItemAndRecord(
+          item,
+          () => runner.repository.deleteItem(item.id),
+        );
       });
 
   Future<void> setFavorite(String itemId, bool value) =>
@@ -796,8 +799,9 @@ class MediaCreationController extends ChangeNotifier {
       await AttachmentFileLock.synchronized(() async {});
       await runner.cancel(batch.id);
       await AttachmentFileLock.synchronized(() async {
-        await runner.repository.deleteBatch(batch.id);
-        await runner.files.deleteBatch(batch.id);
+        await runner.files.deleteBatchesAndRecords([
+          batch.id,
+        ], () => runner.repository.deleteBatch(batch.id));
       });
     } finally {
       _deletingBatches.remove(batch.id);

@@ -8,6 +8,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 
 void main() {
@@ -35,6 +36,52 @@ void main() {
         await directory.delete(recursive: true);
       }
     });
+
+    for (final badReference in [true, false]) {
+      test(
+        'current-schema restore rejects a creation path outside its batch (reference=$badReference)',
+        () async {
+          await sourceRepository.mediaRepository.enqueue(
+            GenerationBatchRowsCompanion.insert(
+              id: 'art',
+              providerId: 'fixture',
+              modelId: 'fixture',
+              mode: MediaMode.image,
+              prompt: 'circle',
+              paramsJson: '{}',
+              referencesJson: badReference
+                  ? '[{"path":"kelivo-file:///upload/sample.png","role":"image"}]'
+                  : '[]',
+              status: GenerationStatus.succeeded,
+              source: GenerationSource.workbench,
+              createdAt: DateTime.utc(2026),
+            ),
+          );
+          if (!badReference) {
+            await sourceRepository.mediaRepository.addItem(
+              GenerationItemRow(
+                id: 'out',
+                batchId: 'art',
+                ordinal: 0,
+                mode: MediaMode.image,
+                path: 'kelivo-file:///generations/other/sample.png',
+                mime: 'image/png',
+                byteSize: 3,
+                status: GenerationItemStatus.ready,
+                favorite: false,
+                createdAt: DateTime.utc(2026),
+              ),
+            );
+          }
+          await sourceRepository.close();
+          sourceClosed = true;
+          await expectLater(
+            ChatDatabaseRepository.prepareSnapshotForRestore(sourceFile),
+            throwsFormatException,
+          );
+        },
+      );
+    }
 
     test('backs up a live WAL database into one standalone file', () async {
       await sourceRepository.putMigrationBatch(

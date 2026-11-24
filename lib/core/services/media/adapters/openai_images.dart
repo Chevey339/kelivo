@@ -45,6 +45,8 @@ class OpenAiImagesAdapter implements MediaAdapter {
         : const ['auto', '1:1', '3:2', '2:3'];
     return MediaCapabilities(
       aspectRatios: ratios,
+      customImageEndpoint:
+          !_isOfficial(provider) && !codex && !legacySquare && !legacyWide,
       maxPerRequest: codex || legacyWide ? 1 : 10,
       maxReferences: canOnlyGenerate
           ? 0
@@ -165,7 +167,7 @@ class OpenAiImagesAdapter implements MediaAdapter {
             extra: {if (codex) 'x-codex-image-turn-id': context.requestId},
           ),
         )
-        ..body = jsonEncode(body);
+        ..bodyBytes = await encodeMediaJson(body);
     }
     final response = await context.send(httpRequest, diagnosticBody: body);
     if (!((response.headers['content-type'] ?? '').contains(
@@ -178,7 +180,7 @@ class OpenAiImagesAdapter implements MediaAdapter {
     }
 
     final completed = <MediaResult>[];
-    await for (final event in parseSseEvents(response.stream)) {
+    await for (final event in parseSseEvents(boundedMediaResponse(response))) {
       if (event.data.isEmpty || event.data == '[DONE]') continue;
       final data = await compute(decodeMediaEvent, event.data);
       final type = (data['type'] ?? event.event ?? '').toString();
