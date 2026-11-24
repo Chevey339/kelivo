@@ -283,24 +283,36 @@ void main() {
       expect(payload.body, isEmpty);
     });
 
-    test('Grok Responses builder sends web and X search tools', () {
-      final grok = _cfg(
-        id: 'Grok',
-        baseUrl: 'https://api.x.ai/v1',
-        kind: ProviderKind.openai,
-        useResponseApi: true,
-        modelId: 'grok-4.7',
-      );
-      final payload = BuiltInToolsHelper.buildResponsesTools(
-        cfg: grok,
-        modelId: 'grok-4.7',
-        upstreamModelId: 'grok-4.7',
-      );
-      expect(payload.tools, [
-        {'type': 'web_search'},
-        {'type': 'x_search'},
-      ]);
-      expect(payload.body, isEmpty);
+    group('Responses search tools by hostname', () {
+      const cases = {
+        'x.ai': true,
+        'api.x.ai': true,
+        'api.x.ai.': true,
+        'notx.ai': false,
+        'x.ai.example': false,
+      };
+
+      for (final entry in cases.entries) {
+        test(entry.key, () {
+          final cfg = _cfg(
+            id: 'Custom',
+            baseUrl: 'https://${entry.key}/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: true,
+            modelId: 'any-chat-model',
+          );
+          final payload = BuiltInToolsHelper.buildResponsesTools(
+            cfg: cfg,
+            modelId: 'any-chat-model',
+            upstreamModelId: 'any-chat-model',
+          );
+          expect(payload.tools, [
+            {'type': 'web_search'},
+            if (entry.value) {'type': 'x_search'},
+          ]);
+          expect(payload.body, isEmpty);
+        });
+      }
     });
 
     test('Chat builder preserves provider-specific search formats', () {
