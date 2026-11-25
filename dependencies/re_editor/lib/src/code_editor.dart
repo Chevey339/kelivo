@@ -207,6 +207,7 @@ class CodeEditor extends StatefulWidget {
     this.borderRadius,
     this.clipBehavior = Clip.none,
     this.readOnly,
+    this.showCursor,
     this.showCursorWhenReadOnly,
     this.wordWrap,
     this.autocompleteSymbols,
@@ -300,6 +301,11 @@ class CodeEditor extends StatefulWidget {
   ///
   /// Defaults to false.
   final bool? readOnly;
+
+  /// Whether to show cursor when focused.
+  ///
+  /// Defaults to true.
+  final bool? showCursor;
 
   /// Whether to show cursor when in readonly mode.
   ///
@@ -544,6 +550,7 @@ class _CodeEditorState extends State<CodeEditor> {
       cursorLineColor: widget.style?.cursorLineColor,
       chunkIndicatorColor: widget.style?.chunkIndicatorColor,
       cursorWidth: widget.style?.cursorWidth ?? _kDefaultCaretWidth,
+      showCursor: widget.showCursor ?? true,
       showCursorWhenReadOnly: widget.showCursorWhenReadOnly ?? true,
       leadingDivider: widget.leadingDivider,
       border: widget.border,

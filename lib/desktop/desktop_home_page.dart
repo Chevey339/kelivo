@@ -1,8 +1,10 @@
 import '../features/side_panel/desktop_side_panel_controller.dart';
+
 import 'package:flutter/material.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
+
 import 'desktop_nav_rail.dart';
 import 'desktop_chat_page.dart';
 import 'window_title_bar.dart';
@@ -13,8 +15,11 @@ import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
 import '../features/settings/pages/storage_space_page.dart';
 import '../l10n/app_localizations.dart';
+
 import 'package:window_manager/window_manager.dart';
+
 import 'dart:async';
+
 import 'hotkeys/hotkey_event_bus.dart';
 import 'hotkeys/chat_action_bus.dart';
 import 'desktop_settings_navigation_bus.dart';
@@ -39,19 +44,29 @@ class DesktopHomePage extends StatefulWidget {
   State<DesktopHomePage> createState() => _DesktopHomePageState();
 }
 
-class _DesktopHomePageState extends State<DesktopHomePage> {
+class _DesktopHomePageState extends State<DesktopHomePage>
+    with WidgetsBindingObserver {
   int _tabIndex = 0; // 0=Chat, 1=Translate, 2=Storage, 3=Settings
   final _visitedTabs = <int>{};
   bool _navigationOpen = false;
   bool _globalSearchActive = false;
+  late bool _windowVisible = _isWindowLifecycleVisible(
+    WidgetsBinding.instance.lifecycleState,
+  );
   StreamSubscription<HotkeyAction>? _hotkeySub;
   StreamSubscription<ChatAction>? _chatActionSub;
   StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
   StreamSubscription<String>? _conversationOpenSub;
 
+  static bool _isWindowLifecycleVisible(AppLifecycleState? state) =>
+      state != AppLifecycleState.hidden &&
+      state != AppLifecycleState.paused &&
+      state != AppLifecycleState.detached;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.initialTabIndex != null) {
       _tabIndex = widget.initialTabIndex!.clamp(0, 3);
     }
@@ -182,6 +197,13 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final visible = _isWindowLifecycleVisible(state);
+    if (_windowVisible == visible || !mounted) return;
+    setState(() => _windowVisible = visible);
+  }
+
   void _selectTab(
     int index, {
     bool search = false,
@@ -263,28 +285,40 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
                             index: _tabIndex,
                             children: [
                               TickerMode(
-                                enabled: _tabIndex == 0,
+                                enabled: _windowVisible && _tabIndex == 0,
                                 child: const DesktopChatPage(),
                               ),
-                              _visitedTabs.contains(1)
-                                  ? const DesktopTranslatePage(
-                                      key: ValueKey('translate_page'),
-                                    )
-                                  : const SizedBox.shrink(),
-                              _visitedTabs.contains(2)
-                                  ? StorageSpacePage(
-                                      key: const ValueKey('storage_space_page'),
-                                      embedded: true,
-                                      active: _tabIndex == 2,
-                                    )
-                                  : const SizedBox.shrink(),
-                              _visitedTabs.contains(3)
-                                  ? DesktopSettingsPage(
-                                      key: const ValueKey('settings_page'),
-                                      initialProviderKey:
-                                          widget.initialProviderKey,
-                                    )
-                                  : const SizedBox.shrink(),
+                              TickerMode(
+                                enabled: _windowVisible && _tabIndex == 1,
+                                child: _visitedTabs.contains(1)
+                                    ? const DesktopTranslatePage(
+                                        key: ValueKey('translate_page'),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                              TickerMode(
+                                enabled: _windowVisible && _tabIndex == 2,
+                                child: _visitedTabs.contains(2)
+                                    ? StorageSpacePage(
+                                        key: const ValueKey(
+                                          'storage_space_page',
+                                        ),
+                                        embedded: true,
+                                        active:
+                                            _windowVisible && _tabIndex == 2,
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                              TickerMode(
+                                enabled: _windowVisible && _tabIndex == 3,
+                                child: _visitedTabs.contains(3)
+                                    ? DesktopSettingsPage(
+                                        key: const ValueKey('settings_page'),
+                                        initialProviderKey:
+                                            widget.initialProviderKey,
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
                             ],
                           ),
                         ),
@@ -333,6 +367,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_conversationOpenSub?.cancel());
     try {
       _hotkeySub?.cancel();

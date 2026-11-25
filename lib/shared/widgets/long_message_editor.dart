@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:markstream/markstream.dart' show containsStrongRtl;
+
 import 'dart:async';
+
 import '../text_input/message_editing_controller.dart';
 import '../markdown/chat_prose_direction.dart';
 import 'app_text_selection_toolbar.dart';
@@ -70,7 +72,7 @@ class LongMessageEditor extends StatefulWidget {
 }
 
 class LongMessageEditorState extends State<LongMessageEditor>
-    with UndoManagerClient {
+    with WidgetsBindingObserver, UndoManagerClient {
   // Leave headroom for the rest of the real home screen at 120 Hz: even a
   // 3,800-character paragraph approached its frame budget on the test phone.
   static const _threshold = 2048;
@@ -107,6 +109,12 @@ class LongMessageEditorState extends State<LongMessageEditor>
       (_document?.nativeInputEnabled == true ? _document!.handoffInput : null);
   int _inputGeneration = 0;
   bool _documentWasDraining = false;
+  late bool _showCursor = _isLifecycleResumed(
+    WidgetsBinding.instance.lifecycleState,
+  );
+
+  static bool _isLifecycleResumed(AppLifecycleState? state) =>
+      state == null || state == AppLifecycleState.resumed;
   bool get _inputPaused =>
       _drainingInput ||
       _inputModeExitFailed ||
@@ -121,6 +129,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _text = widget.controller.text;
     _textDirection = chatProseDirection.forText(_text);
     _focus = widget.focusNode ?? FocusNode();
@@ -593,7 +602,15 @@ class LongMessageEditorState extends State<LongMessageEditor>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final next = _isLifecycleResumed(state);
+    if (_showCursor == next || !mounted) return;
+    setState(() => _showCursor = next);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _toolbar.hide(context);
     if (UndoManager.client == this) UndoManager.client = null;
     _undoController.dispose();
@@ -839,6 +856,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
           maxLines: widget.maxLines,
           expands: widget.expands,
           readOnly: widget.readOnly || _inputPaused,
+          showCursor: _showCursor ? null : false,
           onChanged: widget.onChanged,
           onSubmitted: widget.onSubmitted,
           style: widget.style,
@@ -894,6 +912,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
             focusNode: _focus,
             autofocus: widget.autofocus,
             readOnly: widget.readOnly || _inputPaused,
+            showCursor: _showCursor,
             showCursorWhenReadOnly: false,
             onSubmitted: widget.onSubmitted,
             onKeyEvent: (node, event) => _inputPaused
