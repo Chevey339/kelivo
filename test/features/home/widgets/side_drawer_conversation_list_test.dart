@@ -17,6 +17,7 @@ import 'package:Kelivo/features/home/pages/home_mobile_layout.dart';
 import 'package:Kelivo/shared/animations/status_animation.dart';
 import 'package:Kelivo/shared/animations/widgets.dart';
 import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
+import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/visible_route_theme.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -1374,6 +1375,62 @@ void main() {
           tester.element(find.byType(SideDrawer)),
         )!;
         expect(find.text(l10n.sideDrawerGlobalSearchEmptyHint), findsOneWidget);
+      });
+    },
+  );
+
+  testWidgets(
+    'scrolled-in rows skip entrance fade animations and omit hidden checkboxes',
+    (tester) async {
+      await asDesktop(() async {
+        final service = createService();
+        await tester.runAsync(() => service.init());
+        final now = DateTime.now();
+        service.seedConversationsForTest([
+          for (var i = 0; i < 200; i++)
+            Conversation(
+              id: 'c-$i',
+              title: 'Chat $i',
+              updatedAt: now.subtract(Duration(seconds: i)),
+              createdAt: now.subtract(Duration(seconds: i)),
+            ),
+        ]);
+        await pumpDrawer(tester, service);
+
+        // Outside selection mode, no hidden IosCheckbox widgets should mount.
+        expect(find.byType(IosCheckbox), findsNothing);
+
+        final position = tester
+            .state<ScrollableState>(drawerScrollable(tester))
+            .position;
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pump();
+
+        final deepLabels = find
+            .byType(Text)
+            .evaluate()
+            .map((e) => (e.widget as Text).data)
+            .whereType<String>()
+            .where((text) {
+              final match = RegExp(r'^Chat (\d+)$').firstMatch(text);
+              return match != null && int.parse(match.group(1)!) > 50;
+            })
+            .toList();
+        expect(deepLabels, isNotEmpty);
+        for (final label in deepLabels) {
+          final hiddenFades = find
+              .ancestor(
+                of: find.text(label),
+                matching: find.byType(FadeTransition),
+              )
+              .evaluate()
+              .where(
+                (element) =>
+                    (element.widget as FadeTransition).opacity.value < 1.0,
+              );
+          expect(hiddenFades, isEmpty, reason: label);
+        }
+        expect(find.byType(IosCheckbox), findsNothing);
       });
     },
   );
