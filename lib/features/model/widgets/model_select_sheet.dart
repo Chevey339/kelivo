@@ -59,6 +59,7 @@ class _ModelProcessingData {
   final List<String> providersOrder;
   final String? limitProviderKey;
   final CreationModelSlot? creationSlot;
+  final bool includeEmbedding;
 
   _ModelProcessingData({
     required this.providerConfigs,
@@ -67,6 +68,7 @@ class _ModelProcessingData {
     required this.providersOrder,
     this.limitProviderKey,
     this.creationSlot,
+    this.includeEmbedding = false,
   });
 }
 
@@ -74,12 +76,17 @@ _ModelItem? _favoriteModel(
   _ProviderGroup group,
   String modelId,
   ProviderConfig provider,
-  CreationModelSlot? creationSlot,
-) {
+  CreationModelSlot? creationSlot, {
+  bool includeEmbedding = false,
+}) {
   final inGroup = group.items.where((item) => item.id == modelId).firstOrNull;
   if (inGroup != null || creationSlot != null) return inGroup;
   final spec = ModelSpecResolver.instance.spec(provider, modelId);
-  if (spec.type.isMedia || spec.type == ModelType.other) return null;
+  if (spec.type.isMedia ||
+      spec.type == ModelType.other ||
+      (!includeEmbedding && spec.isEmbedding)) {
+    return null;
+  }
   return _ModelItem(
     providerKey: provider.id,
     providerName: group.name,
@@ -137,7 +144,11 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
       final spec = ModelSpecResolver.instance.spec(cfg, mid);
       final slot = data.creationSlot;
       if (slot == null) {
-        if (spec.type.isMedia || spec.type == ModelType.other) continue;
+        if (spec.type.isMedia ||
+            spec.type == ModelType.other ||
+            (!data.includeEmbedding && spec.isEmbedding)) {
+          continue;
+        }
       } else if (slot.mode case final mode?) {
         if (resolveMediaModel(cfg, mid, mode, resolvedSpec: spec) == null) {
           continue;
@@ -187,6 +198,7 @@ Future<ModelSelection?> showModelSelector(
   BuildContext context, {
   String? limitProviderKey,
   CreationModelSlot? creationSlot,
+  bool includeEmbedding = false,
   String? initialProviderKey,
   String? initialModelId,
   bool allowInherit = false,
@@ -204,6 +216,7 @@ Future<ModelSelection?> showModelSelector(
         context,
         limitProviderKey: limitProviderKey,
         creationSlot: creationSlot,
+        includeEmbedding: includeEmbedding,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
         allowInherit: allowInherit,
@@ -220,6 +233,7 @@ Future<ModelSelection?> showModelSelector(
       builder: (ctx) => _ModelSelectSheet(
         limitProviderKey: limitProviderKey,
         creationSlot: creationSlot,
+        includeEmbedding: includeEmbedding,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
         allowInherit: allowInherit,
@@ -337,6 +351,7 @@ class _ModelSelectSheet extends StatefulWidget {
   const _ModelSelectSheet({
     this.limitProviderKey,
     this.creationSlot,
+    this.includeEmbedding = false,
     this.initialProviderKey,
     this.initialModelId,
     this.allowInherit = false,
@@ -344,6 +359,7 @@ class _ModelSelectSheet extends StatefulWidget {
   });
   final String? limitProviderKey;
   final CreationModelSlot? creationSlot;
+  final bool includeEmbedding;
   final String? initialProviderKey;
   final String? initialModelId;
   final bool allowInherit;
@@ -460,6 +476,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         ),
         limitProviderKey: widget.limitProviderKey,
         creationSlot: widget.creationSlot,
+        includeEmbedding: widget.includeEmbedding,
       );
 
       final result = _processModelsInBackground(processingData);
@@ -517,6 +534,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       ),
       limitProviderKey: widget.limitProviderKey,
       creationSlot: widget.creationSlot,
+      includeEmbedding: widget.includeEmbedding,
     );
 
     final result = _processModelsInBackground(processingData);
@@ -1066,6 +1084,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             mid,
             settings.getProviderConfig(pk),
             widget.creationSlot,
+            includeEmbedding: widget.includeEmbedding,
           );
           if (found != null &&
               _matchesSearch(query, found, found.providerName)) {
@@ -1735,6 +1754,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
   BuildContext context, {
   String? limitProviderKey,
   CreationModelSlot? creationSlot,
+  bool includeEmbedding = false,
   String? initialProviderKey,
   String? initialModelId,
   bool allowInherit = false,
@@ -1748,6 +1768,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
     pageBuilder: (ctx, _, __) => _DesktopModelSelectDialogBody(
       limitProviderKey: limitProviderKey,
       creationSlot: creationSlot,
+      includeEmbedding: includeEmbedding,
       initialProviderKey: initialProviderKey,
       initialModelId: initialModelId,
       allowInherit: allowInherit,
@@ -1770,6 +1791,7 @@ class _DesktopModelSelectDialogBody extends StatefulWidget {
   const _DesktopModelSelectDialogBody({
     this.limitProviderKey,
     this.creationSlot,
+    this.includeEmbedding = false,
     this.initialProviderKey,
     this.initialModelId,
     this.allowInherit = false,
@@ -1777,6 +1799,7 @@ class _DesktopModelSelectDialogBody extends StatefulWidget {
   });
   final String? limitProviderKey;
   final CreationModelSlot? creationSlot;
+  final bool includeEmbedding;
   final String? initialProviderKey;
   final String? initialModelId;
   final bool allowInherit;
@@ -1871,6 +1894,7 @@ class _DesktopModelSelectDialogBodyState
       ),
       limitProviderKey: widget.limitProviderKey,
       creationSlot: widget.creationSlot,
+      includeEmbedding: widget.includeEmbedding,
     );
     // Synchronous processing is fast enough here
     final result = _processModelsInBackground(data);
@@ -1957,6 +1981,7 @@ class _DesktopModelSelectDialogBodyState
             mid,
             settings.getProviderConfig(pk),
             widget.creationSlot,
+            includeEmbedding: widget.includeEmbedding,
           );
           if (found != null &&
               _matchesSearch(query, found, found.providerName)) {

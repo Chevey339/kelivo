@@ -4053,6 +4053,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
           final sel = await showModelSelector(
             dctx,
             limitProviderKey: widget.providerKey,
+            includeEmbedding: true,
             initialProviderKey: detectModelId == null
                 ? null
                 : widget.providerKey,
@@ -4738,6 +4739,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
           final sel = await showModelSelector(
             ctx,
             limitProviderKey: widget.providerKey,
+            includeEmbedding: true,
             initialProviderKey: selectedModelId == null
                 ? null
                 : widget.providerKey,
