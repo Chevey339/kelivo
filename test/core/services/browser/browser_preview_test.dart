@@ -701,6 +701,33 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  previewTest(
+    'agent action finishing while app is backgrounded re-hides mounted views',
+    (tester) async {
+      final tab = await service.createTab(
+        url: 'https://agent.example',
+        ownerSessionId: 'chat',
+      );
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      final engine = engines[tab.id]!;
+      expect(engine.visibility.last, isTrue);
+
+      service.didChangeAppLifecycleState(AppLifecycleState.hidden);
+      await tester.pump();
+      expect(engine.visibility.last, isFalse);
+
+      await service.runAgentAction<void>(
+        sessionId: 'chat',
+        label: 'inspect',
+        tabId: tab.id,
+        action: () async {},
+      );
+      await tester.pump();
+      expect(engine.visibility.last, isFalse);
+    },
+  );
 }
 
 class _Store extends BrowserStore {

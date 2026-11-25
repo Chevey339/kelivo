@@ -1425,6 +1425,43 @@ void main() {
   );
 
   test(
+    'windows tabs pause when idle and defer suspension during active agent runs',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      var agentActive = false;
+      final engine = await _createEngine(
+        tab: const BrowserTab(id: 'windows-pause-test'),
+        settings: const BrowserSettings(),
+        onChanged: (_) {},
+        onDownload: (_, __) {},
+        onNewWindow: (_, __) async => false,
+        isAgentActive: () => agentActive,
+      );
+      try {
+        final document = platform.views.single.document;
+        await engine.setVisible(false);
+        expect(document.pauses, 1);
+        expect(document.mediaPauses, 0);
+
+        await engine.setVisible(true);
+        expect(document.resumes, 1);
+
+        agentActive = true;
+        await engine.setVisible(false);
+        expect(document.pauses, 1);
+        expect(document.mediaPauses, 1);
+
+        agentActive = false;
+        await engine.setVisible(false);
+        expect(document.pauses, 2);
+      } finally {
+        await engine.dispose();
+      }
+    },
+  );
+
+  test(
     'surface changes update native composition without reloading documents',
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -2267,6 +2304,8 @@ class _Document {
   int reloads = 0;
   int focusClears = 0;
   int mediaPauses = 0;
+  int pauses = 0;
+  int resumes = 0;
   Completer<void>? clearFocusGate;
   Completer<void>? stopLoadingGate;
   Completer<CallAsyncJavaScriptResult?>? faviconResult;
@@ -2475,6 +2514,10 @@ class _Controller extends PlatformInAppWebViewController {
     await document.clearFocusGate?.future;
   }
 
+  @override
+  Future<void> pause() async => document.pauses++;
+  @override
+  Future<void> resume() async => document.resumes++;
   @override
   Future<void> pauseAllMediaPlayback() async => document.mediaPauses++;
   @override
