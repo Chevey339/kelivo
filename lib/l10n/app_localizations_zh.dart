@@ -1773,6 +1773,27 @@ class AppLocalizationsZh extends AppLocalizations {
       'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
 
   @override
+  String get databaseUpgradeTitle => '正在升级聊天数据库';
+
+  @override
+  String get databaseUpgradeStageBackup => '正在备份聊天记录';
+
+  @override
+  String get databaseUpgradeStageUpdate => '正在更新数据表和索引';
+
+  @override
+  String get databaseUpgradeStageCheck => '正在检查聊天数据库';
+
+  @override
+  String get databaseUpgradeStageRestore => '正在恢复升级前的数据库';
+
+  @override
+  String get databaseUpgradeStageOpen => '正在打开 Kelivo';
+
+  @override
+  String get databaseUpgradeKeepOpen => '聊天记录较多时可能需要一些时间，请保持 Kelivo 开启。';
+
+  @override
   String get restoreProgressTitle => '正在恢复备份';
 
   @override
@@ -19597,6 +19618,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
       'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+
+  @override
+  String get databaseUpgradeTitle => '正在升级聊天数据库';
+
+  @override
+  String get databaseUpgradeStageBackup => '正在备份聊天记录';
+
+  @override
+  String get databaseUpgradeStageUpdate => '正在更新数据表和索引';
+
+  @override
+  String get databaseUpgradeStageCheck => '正在检查聊天数据库';
+
+  @override
+  String get databaseUpgradeStageRestore => '正在恢复升级前的数据库';
+
+  @override
+  String get databaseUpgradeStageOpen => '正在打开 Kelivo';
+
+  @override
+  String get databaseUpgradeKeepOpen => '聊天记录较多时可能需要一些时间，请保持 Kelivo 开启。';
 
   @override
   String get restoreProgressTitle => '正在恢复备份';
@@ -37428,6 +37470,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
       'Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。';
+
+  @override
+  String get databaseUpgradeTitle => '正在更新聊天資料庫';
+
+  @override
+  String get databaseUpgradeStageBackup => '正在備份聊天記錄';
+
+  @override
+  String get databaseUpgradeStageUpdate => '正在更新資料表與索引';
+
+  @override
+  String get databaseUpgradeStageCheck => '正在檢查聊天資料庫';
+
+  @override
+  String get databaseUpgradeStageRestore => '正在還原升級前的備份';
+
+  @override
+  String get databaseUpgradeStageOpen => '正在開啟 Kelivo';
+
+  @override
+  String get databaseUpgradeKeepOpen => '聊天記錄較多時可能需要一些時間，請保持 Kelivo 開啟。';
 
   @override
   String get restoreProgressTitle => '正在還原備份';

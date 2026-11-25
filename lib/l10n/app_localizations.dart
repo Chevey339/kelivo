@@ -3478,6 +3478,48 @@ abstract class AppLocalizations {
   /// **'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.'**
   String get backupRestoreBusinessLeaseUnavailableContent;
 
+  /// Title of the startup progress screen during a chat database upgrade, including recovery from an interrupted upgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating your chat database'**
+  String get databaseUpgradeTitle;
+
+  /// Startup database upgrade stage while Kelivo saves a temporary safety copy of the installed database before changing it.
+  ///
+  /// In en, this message translates to:
+  /// **'Backing up your chat history'**
+  String get databaseUpgradeStageBackup;
+
+  /// Startup database upgrade stage while Kelivo applies the new database structure to existing chat data.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating database tables and indexes'**
+  String get databaseUpgradeStageUpdate;
+
+  /// Startup database upgrade stage while validating the upgraded database or checking the files left by an interrupted upgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the chat database'**
+  String get databaseUpgradeStageCheck;
+
+  /// Startup database upgrade stage while Kelivo restores the safety copy after a failed or interrupted upgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring the pre-upgrade backup'**
+  String get databaseUpgradeStageRestore;
+
+  /// Final stage of the startup database upgrade screen after the database is ready and before the main app opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Kelivo'**
+  String get databaseUpgradeStageOpen;
+
+  /// Reassurance on the startup database upgrade screen explaining the wait for a large chat history and asking the user to keep the app open.
+  ///
+  /// In en, this message translates to:
+  /// **'Large chat histories can take a while. Please keep Kelivo open.'**
+  String get databaseUpgradeKeepOpen;
+
   /// Title on the restore progress screen shown while a backup is being restored.
   ///
   /// In en, this message translates to:

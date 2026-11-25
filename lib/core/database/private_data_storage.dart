@@ -139,6 +139,7 @@ abstract final class PrivateDataStorage {
     required Directory source,
     required Directory target,
     void Function()? onCopying,
+    DatabaseUpgradeStageSink? onUpgradeStage,
     RestoreDurability? durability,
   }) async {
     if (p.equals(source.absolute.path, target.absolute.path) ||
@@ -172,7 +173,7 @@ abstract final class PrivateDataStorage {
           durability: io,
         );
         try {
-          await _finishRecovery(target, io);
+          await _finishRecovery(target, io, onUpgradeStage: onUpgradeStage);
         } finally {
           await targetLease.close();
         }
@@ -445,8 +446,9 @@ abstract final class PrivateDataStorage {
 
   static Future<void> _finishRecovery(
     Directory target,
-    RestoreDurability io,
-  ) async {
+    RestoreDurability io, {
+    DatabaseUpgradeStageSink? onUpgradeStage,
+  }) async {
     final intentFile = File(p.join(target.parent.path, recoveryName));
     final intent = await _readRecord(intentFile);
     if (intent['runId'] is String) {
@@ -460,6 +462,7 @@ abstract final class PrivateDataStorage {
       final receipt = await DatabaseInstallationGate.ensureReady(
         appDataDirectory: target,
         durability: io,
+        onUpgradeStage: onUpgradeStage,
       );
       if (receipt.databaseId != intent['databaseId']) {
         throw StateError('private_storage_recovery_identity');

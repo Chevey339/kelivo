@@ -5,6 +5,11 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'app_database.dart';
 
+/// Work that can keep the user waiting during an installed database upgrade.
+enum DatabaseUpgradeStage { checking, backingUp, updating, restoring, opening }
+
+typedef DatabaseUpgradeStageSink = void Function(DatabaseUpgradeStage stage);
+
 /// The result of considering a database file for upgrade.
 ///
 /// [upgraded] is false when the file was already at [toVersion], in which case

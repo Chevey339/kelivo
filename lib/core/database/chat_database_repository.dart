@@ -64,6 +64,7 @@ import 'chat_database_observer.dart';
 import 'generation_run.dart';
 import 'generation_run_commands.dart';
 import 'schema_migrations.dart';
+import 'database_upgrade_io.dart';
 import '../services/storage/storage_space.dart';
 import 'gen_ui_derived_schema.dart';
 import '../services/api/stream/stream_chunk_handler.dart';
@@ -471,6 +472,7 @@ class ChatDatabaseRepository {
   static Future<DatabaseUpgradeOutcome> migrateInstalledDatabase(
     File file, {
     RestoreDurability? durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
   }) async {
     final int schemaVersion;
     try {
@@ -506,16 +508,35 @@ class ChatDatabaseRepository {
       throw StateError('database_schema_version');
     }
 
+    onUpgradeStage?.call(DatabaseUpgradeStage.backingUp);
     // Recheck on every attempt, including installations already copied by an
     // earlier build. Never start the checkpoint/backup with a known shortfall.
     await InsufficientStorageSpace.require(
       64 * 1024 * 1024 + await SchemaMigrations.additionalUpgradeBytes(file),
     );
 
-    final resolvedDurability = durability ?? RestorePlatformDurability();
+    await runDatabaseUpgradeIo(
+      (file: file, version: schemaVersion),
+      _upgradeWithBackup,
+      durability: durability ?? RestorePlatformDurability(),
+      onStage: onUpgradeStage,
+    );
+    return (
+      fromVersion: schemaVersion,
+      toVersion: AppDatabase.currentSchemaVersion,
+      upgraded: true,
+    );
+  }
+
+  static Future<void> _upgradeWithBackup(
+    ({File file, int version}) source,
+    RestoreDurability durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
+  ) async {
+    final (:file, :version) = source;
     final parent = file.absolute.parent;
     final backup = File(
-      '${file.absolute.path}$premigrationBackupPrefix$schemaVersion',
+      '${file.absolute.path}$premigrationBackupPrefix$version',
     );
 
     // Fold any WAL back in first so the copy is a self-contained database.
@@ -533,12 +554,14 @@ class ChatDatabaseRepository {
 
     if (await backup.exists()) await backup.delete();
     await file.copy(backup.path);
-    await resolvedDurability.restrictFile(backup);
-    await resolvedDurability.syncFile(backup, fullBarrier: true);
-    await resolvedDurability.syncDirectory(parent, fullBarrier: true);
+    await durability.restrictFile(backup);
+    await durability.syncFile(backup, fullBarrier: true);
+    await durability.syncDirectory(parent, fullBarrier: true);
 
+    onUpgradeStage?.call(DatabaseUpgradeStage.updating);
     try {
       await SchemaMigrations.upgradeFileInPlace(file);
+      onUpgradeStage?.call(DatabaseUpgradeStage.checking);
       final database = sqlite.sqlite3.open(
         file.absolute.path,
         mode: sqlite.OpenMode.readOnly,
@@ -554,26 +577,21 @@ class ChatDatabaseRepository {
       // disk, so the copy is the only surviving good state and must outlive
       // this process: DatabaseInstallationGate's sweep finishes the rollback
       // on the next launch if we die here.
+      onUpgradeStage?.call(DatabaseUpgradeStage.restoring);
       await restorePreMigrationBackup(
         backup: backup,
         target: file,
-        durability: resolvedDurability,
+        durability: durability,
       );
       if (InsufficientStorageSpace.causedBy(error)) {
         Error.throwWithStackTrace(error, stackTrace);
       }
-      throw StateError('database_migration_failed:$schemaVersion');
+      throw StateError('database_migration_failed:$version');
     }
 
-    await resolvedDurability.syncFile(file, fullBarrier: true);
+    await durability.syncFile(file, fullBarrier: true);
     await backup.delete();
-    await resolvedDurability.syncDirectory(parent, fullBarrier: true);
-
-    return (
-      fromVersion: schemaVersion,
-      toVersion: AppDatabase.currentSchemaVersion,
-      upgraded: true,
-    );
+    await durability.syncDirectory(parent, fullBarrier: true);
   }
 
   static InstalledChatDatabaseInfo inspectInstalledDatabase(

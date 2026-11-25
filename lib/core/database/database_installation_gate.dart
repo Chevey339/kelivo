@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'database_family_preserver.dart';
+import 'database_upgrade_io.dart';
 
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -10,6 +11,7 @@ import '../services/backup/recovery_file_discovery.dart';
 import '../services/backup/restore_durability.dart';
 import 'app_database.dart';
 import 'chat_database_repository.dart';
+import 'schema_migrations.dart';
 import '../../utils/app_directories.dart';
 
 final class DatabaseInstallationReceipt {
@@ -112,6 +114,7 @@ final class DatabaseInstallationGate {
     bool allowDatabaseIdentityChange = false,
     bool allowEmptyInitialization = false,
     RestoreDurability? durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
   }) async {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     await appDataDirectory.create(recursive: true);
@@ -129,6 +132,7 @@ final class DatabaseInstallationGate {
     await _sweepPreMigrationBackups(
       appDataDirectory,
       durability: resolvedDurability,
+      onUpgradeStage: onUpgradeStage,
     );
     final receipts = await _readReceipts(appDataDirectory);
     final databaseType = await FileSystemEntity.type(
@@ -162,6 +166,7 @@ final class DatabaseInstallationGate {
         await ChatDatabaseRepository.migrateInstalledDatabase(
           databaseFile,
           durability: resolvedDurability,
+          onUpgradeStage: onUpgradeStage,
         );
       }
 
@@ -726,6 +731,7 @@ final class DatabaseInstallationGate {
   static Future<void> _sweepPreMigrationBackups(
     Directory appDataDirectory, {
     required RestoreDurability durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
   }) async {
     final prefix =
         '${AppDatabase.databaseFileName}'
@@ -738,9 +744,24 @@ final class DatabaseInstallationGate {
     }
     if (backups.isEmpty) return;
 
+    onUpgradeStage?.call(DatabaseUpgradeStage.checking);
     final databaseFile = File(
       p.join(appDataDirectory.path, AppDatabase.databaseFileName),
     );
+    await runDatabaseUpgradeIo(
+      (databaseFile: databaseFile, backups: backups),
+      _recoverPreMigrationBackups,
+      durability: durability,
+      onStage: onUpgradeStage,
+    );
+  }
+
+  static Future<void> _recoverPreMigrationBackups(
+    ({File databaseFile, List<File> backups}) files,
+    RestoreDurability durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
+  ) async {
+    final (:databaseFile, :backups) = files;
     switch (ChatDatabaseRepository.classifyInstalledDatabase(databaseFile)) {
       case InstalledDatabaseDisposition.usable:
         for (final backup in backups) {
@@ -750,7 +771,7 @@ final class DatabaseInstallationGate {
                 '${databaseFile.path}$displacedDatabasePrefix${DateTime.now().microsecondsSinceEpoch}',
           );
         }
-        await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+        await durability.syncDirectory(databaseFile.parent, fullBarrier: true);
 
       case InstalledDatabaseDisposition.foreignSchema:
         // A newer build migrated this database and left its copy behind, and
@@ -766,6 +787,7 @@ final class DatabaseInstallationGate {
         if (backups.length != 1) {
           throw StateError('database_premigration_ambiguous');
         }
+        onUpgradeStage?.call(DatabaseUpgradeStage.restoring);
         await ChatDatabaseRepository.restorePreMigrationBackup(
           backup: backups.single,
           target: databaseFile,

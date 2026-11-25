@@ -1885,6 +1885,31 @@ class AppLocalizationsRu extends AppLocalizations {
       'Данные Kelivo всё ещё используются другим процессом приложения. Закройте другие окна Kelivo и перезапустите. Этот процесс не открывал данные чатов.';
 
   @override
+  String get databaseUpgradeTitle => 'Обновление базы данных чатов';
+
+  @override
+  String get databaseUpgradeStageBackup =>
+      'Создание резервной копии истории чатов';
+
+  @override
+  String get databaseUpgradeStageUpdate =>
+      'Обновление таблиц и индексов базы данных';
+
+  @override
+  String get databaseUpgradeStageCheck => 'Проверка базы данных чатов';
+
+  @override
+  String get databaseUpgradeStageRestore =>
+      'Восстановление резервной копии, созданной до обновления';
+
+  @override
+  String get databaseUpgradeStageOpen => 'Открытие Kelivo';
+
+  @override
+  String get databaseUpgradeKeepOpen =>
+      'При большой истории чатов это может занять некоторое время. Пожалуйста, не закрывайте Kelivo.';
+
+  @override
   String get restoreProgressTitle => 'Восстановление резервной копии';
 
   @override

@@ -1856,6 +1856,29 @@ class AppLocalizationsEn extends AppLocalizations {
       'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.';
 
   @override
+  String get databaseUpgradeTitle => 'Updating your chat database';
+
+  @override
+  String get databaseUpgradeStageBackup => 'Backing up your chat history';
+
+  @override
+  String get databaseUpgradeStageUpdate =>
+      'Updating database tables and indexes';
+
+  @override
+  String get databaseUpgradeStageCheck => 'Checking the chat database';
+
+  @override
+  String get databaseUpgradeStageRestore => 'Restoring the pre-upgrade backup';
+
+  @override
+  String get databaseUpgradeStageOpen => 'Opening Kelivo';
+
+  @override
+  String get databaseUpgradeKeepOpen =>
+      'Large chat histories can take a while. Please keep Kelivo open.';
+
+  @override
   String get restoreProgressTitle => 'Restoring your backup';
 
   @override

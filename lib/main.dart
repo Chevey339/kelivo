@@ -76,6 +76,7 @@ import 'core/services/workspace/workspace_runtime_bootstrap.dart';
 import 'features/workspace/terminal/terminal_session_manager.dart';
 import 'core/database/extension_entity_store.dart';
 import 'core/database/database_installation_gate.dart';
+import 'core/database/schema_migrations.dart';
 import 'core/database/empty_database_recovery_guard.dart';
 import 'core/database/private_data_storage.dart';
 import 'core/database/app_database.dart';
@@ -106,6 +107,7 @@ import 'shared/widgets/floating_ipad_padding.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_progress_screen.dart';
+import 'shared/widgets/startup_progress_screen.dart';
 import 'shared/widgets/windows_data_directory_startup.dart';
 import 'core/services/storage/windows_data_directory.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
@@ -257,11 +259,10 @@ Future<void> main(List<String> arguments) async {
           await _initDesktopWindow();
         }
         if (defaultTargetPlatform == TargetPlatform.windows) {
-          await initializeWindowsDataDirectory(
-            showWindow: _initRestoreFailureWindow,
-          );
+          await initializeWindowsDataDirectory(showWindow: _showStartupWindow);
         }
         final appDataDirectory = await AppDirectories.getAppDataDirectory();
+        final upgradeProgress = _DatabaseUpgradePresentation();
         final retained = await AppDirectories.documentsDirectoryFor(
           appDataDirectory,
         );
@@ -270,8 +271,9 @@ Future<void> main(List<String> arguments) async {
             await PrivateDataStorage.prepare(
               source: retained,
               target: appDataDirectory,
+              onUpgradeStage: upgradeProgress.show,
               onCopying: () => runApp(
-                _RestoreProgressApp(
+                _StartupProgressApp.restore(
                   progress: ValueNotifier<RestoreStartupProgress>((
                     stage: RestoreStartupStage.protectingData,
                     detail: null,
@@ -279,6 +281,7 @@ Future<void> main(List<String> arguments) async {
                 ),
               ),
             );
+            upgradeProgress.finish();
           } catch (error, stackTrace) {
             runApp(
               _RestoreFailureApp(
@@ -312,8 +315,8 @@ Future<void> main(List<String> arguments) async {
               ))
             : null;
         if (restoreProgress != null) {
-          await _initRestoreFailureWindow();
-          runApp(_RestoreProgressApp(progress: restoreProgress));
+          await _showStartupWindow();
+          runApp(_StartupProgressApp.restore(progress: restoreProgress));
         }
         while (true) {
           try {
@@ -343,7 +346,7 @@ Future<void> main(List<String> arguments) async {
             break;
           } catch (error, stackTrace) {
             stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
-            await _initRestoreFailureWindow();
+            await _showStartupWindow();
             final report = StartupFailureReport.capture(
               stage: StartupFailureStage.restoreGate,
               error: error,
@@ -374,7 +377,7 @@ Future<void> main(List<String> arguments) async {
                 stage: RestoreStartupStage.checkingBackup,
                 detail: null,
               );
-              runApp(_RestoreProgressApp(progress: restoreProgress));
+              runApp(_StartupProgressApp.restore(progress: restoreProgress));
             }
           }
         }
@@ -415,7 +418,7 @@ Future<void> main(List<String> arguments) async {
             final migrationDecision =
                 await HiveToSqliteMigrationService.check();
             if (migrationDecision.needsMigration) {
-              await _initRestoreFailureWindow();
+              await _showStartupWindow();
               runApp(
                 MigrationApp(
                   service: HiveToSqliteMigrationService(
@@ -431,12 +434,14 @@ Future<void> main(List<String> arguments) async {
             final installationReceipt =
                 await DatabaseInstallationGate.ensureReady(
                   appDataDirectory: appDataDirectory,
+                  onUpgradeStage: upgradeProgress.show,
                   allowDatabaseIdentityChange:
                       restoreOutcome?.selectedComponents.contains(
                         RestoreComponent.database,
                       ) ??
                       false,
                 );
+            upgradeProgress.finish();
             admissionStep = 'empty_database_recovery_check';
             if (restoreOutcome?.state == RestoreReceiptState.committed &&
                 restoreOutcome!.selectedComponents.contains(
@@ -484,7 +489,7 @@ Future<void> main(List<String> arguments) async {
                 error,
               );
               if (recovery == _AdmissionRecovery.remigrate) {
-                await _initRestoreFailureWindow();
+                await _showStartupWindow();
                 runApp(
                   MigrationApp(
                     service: HiveToSqliteMigrationService(
@@ -497,7 +502,7 @@ Future<void> main(List<String> arguments) async {
                 return;
               }
             }
-            await _initRestoreFailureWindow();
+            await _showStartupWindow();
             runApp(
               _RestoreFailureApp(
                 report: StartupFailureReport.capture(
@@ -558,7 +563,7 @@ Future<void> main(List<String> arguments) async {
           Error.throwWithStackTrace(error, stackTrace);
         }
         stderr.writeln('[DesktopStartup] $error\n$stackTrace');
-        await _initRestoreFailureWindow();
+        await _showStartupWindow();
         runApp(
           _RestoreFailureApp(
             report: StartupFailureReport.capture(
@@ -629,7 +634,28 @@ HiveToSqliteMigrationDecision _legacyMigrationDecision(
   );
 }
 
-Future<void> _initRestoreFailureWindow() async {
+class _DatabaseUpgradePresentation {
+  ValueNotifier<DatabaseUpgradeStage>? _progress;
+
+  void show(DatabaseUpgradeStage stage) {
+    final progress = _progress;
+    if (progress != null) {
+      progress.value = stage;
+      return;
+    }
+    final notifier = ValueNotifier(stage);
+    _progress = notifier;
+    runApp(_StartupProgressApp.databaseUpgrade(progress: notifier));
+    unawaited(_showStartupWindow());
+  }
+
+  void finish() {
+    _progress?.value = DatabaseUpgradeStage.opening;
+    _progress = null;
+  }
+}
+
+Future<void> _showStartupWindow() async {
   DesktopStartupService.cancelDeferredLaunch();
   if (kIsWeb) return;
   final isDesktop =
@@ -653,18 +679,21 @@ Future<void> _initRestoreFailureWindow() async {
       },
     );
   } catch (error) {
-    stderr.writeln('[RestoreFailureWindow] $error');
+    stderr.writeln('[StartupWindow] $error');
   }
 }
 
-/// Persistence-free shell for [RestoreProgressScreen].
-///
-/// Deliberately built from defaults: the user's theme and locale live in the
-/// settings this restore may be replacing, and nothing here may open them.
-class _RestoreProgressApp extends StatelessWidget {
-  const _RestoreProgressApp({required this.progress});
+/// Uses defaults while the user's database and settings are unavailable.
+class _StartupProgressApp extends StatelessWidget {
+  _StartupProgressApp.restore({
+    required ValueNotifier<RestoreStartupProgress> progress,
+  }) : screen = RestoreProgressScreen(progress: progress);
 
-  final ValueNotifier<RestoreStartupProgress> progress;
+  _StartupProgressApp.databaseUpgrade({
+    required ValueNotifier<DatabaseUpgradeStage> progress,
+  }) : screen = DatabaseUpgradeProgressScreen(progress: progress);
+
+  final Widget screen;
 
   @override
   Widget build(BuildContext context) {
@@ -676,7 +705,7 @@ class _RestoreProgressApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: RestoreProgressScreen(progress: progress),
+      home: screen,
     );
   }
 }
@@ -743,7 +772,7 @@ Future<void> _initDesktopWindow() async {
   } catch (_) {
     // Native runners can start hidden; a failed geometry restore must still
     // leave a visible window on every desktop platform.
-    await _initRestoreFailureWindow();
+    await _showStartupWindow();
   }
 }
 
@@ -1400,7 +1429,7 @@ class MyApp extends StatelessWidget {
                         }
                       } catch (_) {
                         if (DesktopStartupService.deferWindow) {
-                          await _initRestoreFailureWindow();
+                          await _showStartupWindow();
                         }
                       }
                     });

@@ -1864,6 +1864,30 @@ class AppLocalizationsTr extends AppLocalizations {
       'Kelivo\'nun verileri hâlâ başka bir uygulama süreci tarafından kullanılıyor. Diğer Kelivo pencerelerini kapatın, ardından yeniden başlatın. Sohbet verileriniz bu süreç tarafından açılmadı.';
 
   @override
+  String get databaseUpgradeTitle => 'Sohbet veritabanınız güncelleniyor';
+
+  @override
+  String get databaseUpgradeStageBackup => 'Sohbet geçmişiniz yedekleniyor';
+
+  @override
+  String get databaseUpgradeStageUpdate =>
+      'Veritabanı tabloları ve dizinleri güncelleniyor';
+
+  @override
+  String get databaseUpgradeStageCheck => 'Sohbet veritabanı kontrol ediliyor';
+
+  @override
+  String get databaseUpgradeStageRestore =>
+      'Güncelleme öncesi yedek geri yükleniyor';
+
+  @override
+  String get databaseUpgradeStageOpen => 'Kelivo açılıyor';
+
+  @override
+  String get databaseUpgradeKeepOpen =>
+      'Büyük sohbet geçmişleri biraz zaman alabilir. Lütfen Kelivo\'yu açık tutun.';
+
+  @override
   String get restoreProgressTitle => 'Yedeğiniz geri yükleniyor';
 
   @override
