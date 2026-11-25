@@ -11,6 +11,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
@@ -288,6 +289,130 @@ void main() {
           expect(tagPayload, {'name': 'After rename'});
           expect(tagMap['assistant-a'], restoredTag.id);
         } finally {
+          await inspectionDatabase.close();
+        }
+      },
+    );
+
+    test(
+      'staging preserves target device lastBackupAt while restoring portable reminder schedule from legacy archive',
+      () async {
+        const localLastBackupAt = '2026-07-19T23:30:00.000Z';
+        const staleArchiveLastBackupAt = '2026-07-17T21:41:00.000Z';
+        const incomingEnabledAt = '2026-07-17T08:00:00.000Z';
+
+        final deviceDatabaseFile = File(
+          p.join(root.path, AppDatabase.databaseFileName),
+        );
+        final deviceDatabase = AppDatabase.open(file: deviceDatabaseFile);
+        try {
+          final deviceRepository = BusinessRepository(deviceDatabase);
+          await BusinessRestoreService(deviceRepository).overwrite({
+            'backup_reminder_enabled_v1': false,
+            'backup_reminder_interval_days_v1': 14,
+          });
+          await BusinessPreferences(
+            deviceRepository,
+          ).setString('backup_reminder_last_backup_at_v1', localLastBackupAt);
+        } finally {
+          await deviceDatabase.close();
+        }
+
+        final extracted = Directory(p.join(root.path, 'legacy-extracted'));
+        final archiveDatabaseFile = File(
+          p.join(extracted.path, 'database', 'kelivo.db'),
+        );
+        await archiveDatabaseFile.parent.create(recursive: true);
+        final archiveDatabase = AppDatabase.open(file: archiveDatabaseFile);
+        try {
+          final archiveRepository = BusinessRepository(archiveDatabase);
+          await BusinessRestoreService(archiveRepository).overwrite({
+            'backup_reminder_enabled_v1': true,
+            'backup_reminder_interval_days_v1': 3,
+            'backup_reminder_minutes_of_day_v1': 540,
+            'backup_reminder_enabled_at_v1': incomingEnabledAt,
+          });
+          await archiveRepository.setPreference(
+            'backup_reminder_last_backup_at_v1',
+            staleArchiveLastBackupAt,
+          );
+        } finally {
+          await archiveDatabase.close();
+        }
+        final databaseInfo =
+            await ChatDatabaseRepository.prepareSnapshotForRestore(
+              archiveDatabaseFile,
+            );
+
+        final settingsFile = File(p.join(extracted.path, 'settings.json'));
+        await settingsFile.writeAsString(
+          jsonEncode({
+            'backup_reminder_enabled_v1': true,
+            'backup_reminder_interval_days_v1': 3,
+            'backup_reminder_minutes_of_day_v1': 540,
+            'backup_reminder_enabled_at_v1': incomingEnabledAt,
+            'backup_reminder_last_backup_at_v1': staleArchiveLastBackupAt,
+          }),
+          flush: true,
+        );
+        final manifestFile = File(p.join(extracted.path, 'manifest.json'));
+        await manifestFile.writeAsString(
+          jsonEncode({
+            'format': 'kelivo-backup',
+            'formatVersion': 2,
+            'payloadKind': 'sqlite',
+            'createdAtUtc': '2026-07-18T00:00:00.000Z',
+            'appVersion': 'test',
+            'includeChats': true,
+            'includeFiles': false,
+            'secretsIncluded': true,
+            'database': {
+              'entry': 'database/kelivo.db',
+              'schemaVersion': databaseInfo.schemaVersion,
+              'conversationCount': databaseInfo.conversationCount,
+              'messageCount': databaseInfo.messageCount,
+            },
+            'entries': {
+              'settings.json': {
+                'bytes': await settingsFile.length(),
+                'sha256': await _sha256(settingsFile),
+              },
+              'database/kelivo.db': {
+                'bytes': await archiveDatabaseFile.length(),
+                'sha256': await _sha256(archiveDatabaseFile),
+              },
+            },
+          }),
+          flush: true,
+        );
+
+        final staged = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: false,
+          sourceManifestSha256: await _sha256(manifestFile),
+        );
+
+        final inspectionFile = await File(
+          p.join(staged.payloadDirectory.path, 'database', 'kelivo.db'),
+        ).copy(p.join(root.path, 'reminder-inspection.sqlite'));
+        final inspectionDatabase = AppDatabase.open(file: inspectionFile);
+        final reminder = BackupReminderProvider(
+          preferences: BusinessPreferences(
+            BusinessRepository(inspectionDatabase),
+          ),
+          autoLoad: false,
+        );
+        try {
+          await reminder.load(startTimer: false);
+          expect(reminder.enabled, isTrue);
+          expect(reminder.intervalDays, 3);
+          expect(reminder.reminderMinutesOfDay, 540);
+          expect(reminder.enabledAt, DateTime.parse(incomingEnabledAt));
+          expect(reminder.lastBackupAt, DateTime.parse(localLastBackupAt));
+        } finally {
+          reminder.dispose();
           await inspectionDatabase.close();
         }
       },
