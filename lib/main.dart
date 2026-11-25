@@ -330,6 +330,9 @@ Future<void> main(List<String> arguments) async {
                   appDataDirectory: appDataDirectory,
                   businessLease: businessLease,
                   diagnostics: restoreDiagnostics,
+                  onUpgradeStage: restoreProgress == null
+                      ? upgradeProgress.show
+                      : null,
                   onStage: restoreProgress == null
                       ? null
                       : (stage) => restoreProgress.value = (
@@ -415,8 +418,13 @@ Future<void> main(List<String> arguments) async {
         while (true) {
           try {
             admissionStep = 'legacy_migration_check';
-            final migrationDecision =
-                await HiveToSqliteMigrationService.check();
+            final migrationDecision = await HiveToSqliteMigrationService.check(
+              recoverInterruptedUpgrade: (directory) =>
+                  DatabaseInstallationGate.recoverPreMigrationBackups(
+                    directory,
+                    onUpgradeStage: upgradeProgress.show,
+                  ),
+            );
             if (migrationDecision.needsMigration) {
               await _showStartupWindow();
               runApp(
@@ -646,7 +654,7 @@ class _DatabaseUpgradePresentation {
     final notifier = ValueNotifier(stage);
     _progress = notifier;
     runApp(_StartupProgressApp.databaseUpgrade(progress: notifier));
-    unawaited(_showStartupWindow());
+    unawaited(_showStartupWindow(respectHiddenLaunch: true));
   }
 
   void finish() {
@@ -655,16 +663,16 @@ class _DatabaseUpgradePresentation {
   }
 }
 
-Future<void> _showStartupWindow() async {
-  DesktopStartupService.cancelDeferredLaunch();
-  if (kIsWeb) return;
-  final isDesktop =
-      defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.linux;
-  if (!isDesktop) return;
+Future<void> _showStartupWindow({bool respectHiddenLaunch = false}) async {
+  if (!DesktopStartupService.isDesktop) return;
   try {
+    if (respectHiddenLaunch &&
+        await DesktopStartupService.hideProgressWindow()) {
+      return;
+    }
+    DesktopStartupService.cancelDeferredLaunch();
     await windowManager.ensureInitialized();
+    if (respectHiddenLaunch && await windowManager.isVisible()) return;
     if (defaultTargetPlatform == TargetPlatform.windows) {
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
       await windowManager.show();

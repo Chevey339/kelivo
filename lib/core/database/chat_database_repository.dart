@@ -111,6 +111,9 @@ enum InstalledDatabaseDisposition {
   /// instead.
   foreignSchema,
 
+  /// A live connection still holds the database. Keep the entire family.
+  busy,
+
   /// Missing, truncated, or failing `quick_check`. A pre-migration copy is the
   /// better state.
   unusable,
@@ -460,14 +463,22 @@ class ChatDatabaseRepository {
   /// crash without opening them.
   static const premigrationBackupPrefix = '.premigrate-v';
 
+  static final _premigrationBackupName = RegExp(
+    '^${RegExp.escape(AppDatabase.databaseFileName + premigrationBackupPrefix)}'
+    r'[0-9]+$',
+  );
+
+  static bool isPremigrationBackup(String name) =>
+      _premigrationBackupName.hasMatch(name);
+
   /// Brings the installed database at [file] up to the current schema.
   ///
   /// A file already at [AppDatabase.currentSchemaVersion] is validated and left
   /// untouched — this is the every-launch path and performs no writes. A file
   /// at an older published schema is copied aside, upgraded through
-  /// [SchemaMigrations], re-validated, and the copy deleted; if any of that
-  /// fails the copy is restored and `StateError('database_migration_failed:N')`
-  /// is thrown. Anything newer or unpublished throws
+  /// the versioned migrations, and validated before commit. A failed
+  /// transaction rolls back in place. The safety copy stays on disk until
+  /// the live database is verified and flushed. An unsupported version throws
   /// `StateError('database_schema_version')`.
   static Future<DatabaseUpgradeOutcome> migrateInstalledDatabase(
     File file, {
@@ -478,6 +489,7 @@ class ChatDatabaseRepository {
     try {
       schemaVersion = SchemaMigrations.readSchemaVersion(file);
     } on sqlite.SqliteException catch (error) {
+      if (_isSqliteBusy(error)) throw StateError('database_upgrade_busy');
       if (InsufficientStorageSpace.causedBy(error)) rethrow;
       throw StateError('database_corrupt');
     }
@@ -497,6 +509,21 @@ class ChatDatabaseRepository {
       } finally {
         database.close();
       }
+      // A reset or snapshot restore can install a current database after an
+      // interrupted upgrade. Its unpublished copy no longer has a consumer.
+      if (await _upgradeScratch(file).exists()) {
+        onUpgradeStage?.report(DatabaseUpgradeStage.checking);
+        try {
+          await runDatabaseUpgradeIo(
+            file,
+            _discardInterruptedCopy,
+            durability: durability ?? RestorePlatformDurability(),
+          );
+        } on sqlite.SqliteException catch (error) {
+          // Housekeeping may wait for another connection on a usable database.
+          if (!_isSqliteBusy(error)) rethrow;
+        }
+      }
       return (
         fromVersion: schemaVersion,
         toVersion: schemaVersion,
@@ -508,24 +535,56 @@ class ChatDatabaseRepository {
       throw StateError('database_schema_version');
     }
 
-    onUpgradeStage?.call(DatabaseUpgradeStage.backingUp);
-    // Recheck on every attempt, including installations already copied by an
-    // earlier build. Never start the checkpoint/backup with a known shortfall.
-    await InsufficientStorageSpace.require(
-      64 * 1024 * 1024 + await SchemaMigrations.additionalUpgradeBytes(file),
-    );
-
-    await runDatabaseUpgradeIo(
-      (file: file, version: schemaVersion),
-      _upgradeWithBackup,
-      durability: durability ?? RestorePlatformDurability(),
-      onStage: onUpgradeStage,
-    );
+    onUpgradeStage?.report(DatabaseUpgradeStage.backingUp);
+    final io = durability ?? RestorePlatformDurability();
+    try {
+      if (await _upgradeScratch(file).exists()) {
+        await runDatabaseUpgradeIo(
+          file,
+          _discardInterruptedCopy,
+          durability: io,
+        );
+      }
+      await InsufficientStorageSpace.require(
+        64 * 1024 * 1024 + await SchemaMigrations.additionalUpgradeBytes(file),
+      );
+      await runDatabaseUpgradeIo(
+        (file: file, version: schemaVersion),
+        _upgradeWithBackup,
+        durability: io,
+        onStage: onUpgradeStage,
+      );
+    } on sqlite.SqliteException catch (error) {
+      if (_isSqliteBusy(error)) throw StateError('database_upgrade_busy');
+      if (InsufficientStorageSpace.causedBy(error)) rethrow;
+      throw StateError('database_corrupt');
+    }
     return (
       fromVersion: schemaVersion,
       toVersion: AppDatabase.currentSchemaVersion,
       upgraded: true,
     );
+  }
+
+  static File _upgradeScratch(File file) =>
+      File('${file.absolute.path}.upgrade-copy.tmp');
+
+  static Future<void> _discardInterruptedCopy(
+    File file,
+    RestoreDurability durability,
+    DatabaseUpgradeStageSink? _,
+  ) async {
+    final database = sqlite.sqlite3.open(
+      file.path,
+      mode: sqlite.OpenMode.readWrite,
+    );
+    try {
+      _lockForUpgrade(database);
+      await _deleteDatabaseFamily(_upgradeScratch(file));
+      await durability.syncDirectory(file.absolute.parent, fullBarrier: true);
+    } finally {
+      database.close();
+    }
   }
 
   static Future<void> _upgradeWithBackup(
@@ -539,60 +598,108 @@ class ChatDatabaseRepository {
       '${file.absolute.path}$premigrationBackupPrefix$version',
     );
 
-    // Fold any WAL back in first so the copy is a self-contained database.
+    final database = sqlite.sqlite3.open(
+      file.absolute.path,
+      mode: sqlite.OpenMode.readWrite,
+    );
+    var rolledBack = false;
     try {
-      final database = sqlite.sqlite3.open(file.absolute.path);
-      try {
-        database.execute('PRAGMA wal_checkpoint(TRUNCATE);');
-      } finally {
-        database.close();
+      _lockForUpgrade(database);
+      if (database.userVersion != version) {
+        throw StateError('database_schema_version');
       }
-    } on sqlite.SqliteException catch (error) {
-      if (InsufficientStorageSpace.causedBy(error)) rethrow;
-      throw StateError('database_corrupt');
-    }
+      if (!_checkpointComplete(database)) {
+        throw StateError('database_upgrade_busy');
+      }
 
-    if (await backup.exists()) await backup.delete();
-    await file.copy(backup.path);
-    await durability.restrictFile(backup);
-    await durability.syncFile(backup, fullBarrier: true);
-    await durability.syncDirectory(parent, fullBarrier: true);
+      if (await backup.exists()) {
+        throw StateError('database_premigration_pending');
+      }
+      // Closing an ordinary file descriptor for the live file releases
+      // SQLite's POSIX locks. Read through SQLite's own handle on every OS.
+      final scratch = _upgradeScratch(file);
+      await scratch.create(exclusive: true);
+      await durability.restrictFile(scratch);
+      final copy = sqlite.sqlite3.open(scratch.path);
+      try {
+        // A fresh, private destination has no competing writer. A second
+        // emission from this single-step copy means SQLite had to retry.
+        var attempted = false;
+        await for (final _ in database.backup(copy, nPage: -1)) {
+          if (attempted) throw StateError('database_upgrade_busy');
+          attempted = true;
+        }
+        if (copy.userVersion != version || !_checkpointComplete(copy)) {
+          throw StateError('database_upgrade_backup_failed');
+        }
+      } finally {
+        copy.close();
+      }
+      await durability.syncFile(scratch, fullBarrier: true);
+      await durability.renameAndSync(source: scratch, targetPath: backup.path);
+      await durability.syncDirectory(parent, fullBarrier: true);
 
-    onUpgradeStage?.call(DatabaseUpgradeStage.updating);
-    try {
-      await SchemaMigrations.upgradeFileInPlace(file);
-      onUpgradeStage?.call(DatabaseUpgradeStage.checking);
-      final database = sqlite.sqlite3.open(
-        file.absolute.path,
-        mode: sqlite.OpenMode.readOnly,
+      onUpgradeStage?.call(DatabaseUpgradeStage.updating);
+      final migration = AppDatabase.lockedUpgrade(
+        database,
+        validate: () {
+          onUpgradeStage?.call(DatabaseUpgradeStage.checking);
+          _validateRawStructure(database);
+        },
       );
       try {
-        _validateRawStructure(database);
+        // The DDL, version and validation share one SQLite transaction.
+        await migration.customSelect('SELECT 1').getSingle();
+      } catch (error) {
+        onUpgradeStage?.call(DatabaseUpgradeStage.checking);
+        if (InsufficientStorageSpace.causedBy(error)) rethrow;
+        if (error is sqlite.SqliteException && _isSqliteBusy(error)) rethrow;
+        // SQLite has rolled back in place. Keep the safety copy on disk if
+        // the original cannot be verified, so the next launch can recover.
+        if (!database.autocommit ||
+            database.userVersion != version ||
+            database.select('PRAGMA quick_check').singleOrNull?.values.single !=
+                'ok') {
+          throw StateError('database_rollback_failed');
+        }
+        rolledBack = true;
       } finally {
-        database.close();
+        await migration.close();
       }
-    } catch (error, stackTrace) {
-      // The copy is deliberately LEFT BEHIND. Between deleting the database
-      // family and finishing the copy back there is no usable database on
-      // disk, so the copy is the only surviving good state and must outlive
-      // this process: DatabaseInstallationGate's sweep finishes the rollback
-      // on the next launch if we die here.
-      onUpgradeStage?.call(DatabaseUpgradeStage.restoring);
-      await restorePreMigrationBackup(
-        backup: backup,
-        target: file,
-        durability: durability,
-      );
-      if (InsufficientStorageSpace.causedBy(error)) {
-        Error.throwWithStackTrace(error, stackTrace);
-      }
-      throw StateError('database_migration_failed:$version');
-    }
 
+      if (!_checkpointComplete(database)) {
+        throw StateError('database_upgrade_busy');
+      }
+    } finally {
+      database.close();
+    }
     await durability.syncFile(file, fullBarrier: true);
     await backup.delete();
     await durability.syncDirectory(parent, fullBarrier: true);
+    if (rolledBack) throw StateError('database_migration_failed:$version');
   }
+
+  static void _lockForUpgrade(sqlite.Database database) {
+    // EXCLUSIVE locking mode keeps the file lock after COMMIT, including in
+    // rollback-journal mode where wal_checkpoint cannot detect a writer.
+    database.select('PRAGMA locking_mode=EXCLUSIVE');
+    database.execute('BEGIN EXCLUSIVE');
+    database.execute('COMMIT');
+  }
+
+  static bool _checkpointComplete(sqlite.Database database) {
+    // A blocked checkpoint returns a row, even when committed changes are
+    // still only in the WAL. A backup of the main file would lose those rows.
+    final checkpoint = database
+        .select('PRAGMA wal_checkpoint(TRUNCATE);')
+        .single;
+    return checkpoint['busy'] == 0 &&
+        checkpoint['log'] == checkpoint['checkpointed'];
+  }
+
+  static bool _isSqliteBusy(sqlite.SqliteException error) =>
+      error.resultCode == sqlite.SqlError.SQLITE_BUSY ||
+      error.resultCode == sqlite.SqlError.SQLITE_LOCKED;
 
   static InstalledChatDatabaseInfo inspectInstalledDatabase(
     File file, {
@@ -1488,26 +1595,16 @@ class ChatDatabaseRepository {
   /// restored database has been verified.
   ///
   /// A crash at any point leaves [backup] intact and a re-run redoes the copy.
-  /// This is what makes the pre-migration copy a real safety net rather than a
-  /// second thing to lose. Note that a re-run is only free of information loss
-  /// where [retireTarget] is: the default deletes, so a caller that can retry
-  /// must supply one that does not.
-  ///
-  /// [retireTarget] decides what happens to the database being rolled back
-  /// over. It defaults to deleting it, which is right when the caller made the
-  /// mess itself (a failed in-place migration, where [backup] is that same
-  /// database moments earlier). A caller acting on a *guess* about the target
-  /// — a crash sweep, which cannot tell an unreadable database from a
-  /// destroyed one — must pass something non-destructive instead.
+  /// [retireTarget] preserves the displaced family, including its journals.
   static Future<void> restorePreMigrationBackup({
     required File backup,
     required File target,
     RestoreDurability? durability,
-    Future<void> Function(File target)? retireTarget,
+    required Future<void> Function(File target) retireTarget,
   }) async {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     final parent = target.absolute.parent;
-    await (retireTarget ?? _deleteDatabaseFamily)(target);
+    await retireTarget(target);
     await backup.copy(target.absolute.path);
     await resolvedDurability.syncFile(target, fullBarrier: true);
     await resolvedDurability.syncDirectory(parent, fullBarrier: true);
@@ -1521,9 +1618,7 @@ class ChatDatabaseRepository {
 
   /// What a crash-recovery sweep may do with the installed database at [file].
   ///
-  /// Deliberately total: throwing here would strand the user with a
-  /// pre-migration copy nobody dares act on, so every failure mode resolves to
-  /// a disposition.
+  /// A busy database or insufficient disk space must never trigger replacement.
   static InstalledDatabaseDisposition classifyInstalledDatabase(File file) {
     if (!file.existsSync()) return InstalledDatabaseDisposition.unusable;
 
@@ -1537,10 +1632,15 @@ class ChatDatabaseRepository {
     }
 
     try {
-      final database = sqlite.sqlite3.open(file.absolute.path);
+      final database = sqlite.sqlite3.open(
+        file.absolute.path,
+        mode: sqlite.OpenMode.readWrite,
+      );
       try {
-        // Folds in a hot WAL, so committed data is not mistaken for damage.
-        database.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+        _lockForUpgrade(database);
+        if (!_checkpointComplete(database)) {
+          return InstalledDatabaseDisposition.busy;
+        }
         // Re-read after the checkpoint: the read-only peek above can fail
         // outright on a hot WAL, and this is the first reliable reading.
         final schemaVersion = database.userVersion;
@@ -1565,16 +1665,16 @@ class ChatDatabaseRepository {
         // wait until it has been migrated. Its copy is a duplicate of itself
         // at that point, so nothing is lost by trusting it.
         if (schemaVersion == AppDatabase.currentSchemaVersion) {
-          try {
-            _validateRawStructure(database);
-          } catch (_) {
-            return InstalledDatabaseDisposition.unusable;
-          }
+          _validateRawStructure(database);
         }
         return InstalledDatabaseDisposition.usable;
       } finally {
         database.close();
       }
+    } on sqlite.SqliteException catch (error) {
+      if (_isSqliteBusy(error)) return InstalledDatabaseDisposition.busy;
+      if (InsufficientStorageSpace.causedBy(error)) rethrow;
+      return InstalledDatabaseDisposition.unusable;
     } catch (_) {
       return InstalledDatabaseDisposition.unusable;
     }

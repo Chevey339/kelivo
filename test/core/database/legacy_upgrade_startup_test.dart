@@ -159,7 +159,10 @@ void main() {
   Future<void> expectStartupSucceeds() async {
     // 1. The legacy check, which used to open a live connection here and throw
     //    DriftRemoteException('database_schema_version').
-    final decision = await HiveToSqliteMigrationService.check();
+    final decision = await HiveToSqliteMigrationService.check(
+      recoverInterruptedUpgrade:
+          DatabaseInstallationGate.recoverPreMigrationBackups,
+    );
     expect(decision.needsMigration, isFalse);
 
     // 2. Admission, which is what may upgrade the schema.
@@ -201,6 +204,21 @@ void main() {
     // whatever shape the generated helper still knows about.
     expect(GeneratedHelper.versions, AppDatabase.publishedSchemaVersions);
   });
+
+  for (final partial in [false, true]) {
+    test(
+      'retained Hive cannot take precedence over a SQLite rollback (partial: $partial)',
+      () async {
+        await seedHiveMigratedInstall(5, hotWal: false);
+        final file = databaseFile();
+        final backup = await file.rename('${file.path}.premigrate-v5');
+        if (partial) {
+          await file.writeAsBytes((await backup.readAsBytes()).sublist(0, 512));
+        }
+        await expectStartupSucceeds();
+      },
+    );
+  }
 
   for (final schemaVersion in AppDatabase.publishedSchemaVersions) {
     test('a Hive-migrated schema-$schemaVersion install starts', () async {

@@ -51,6 +51,7 @@ void main() {
       await DesktopStartupService.setHidden(true);
       await DesktopStartupService.prepareLaunch(const []);
       expect(DesktopStartupService.deferWindow, isFalse);
+      expect(await DesktopStartupService.hideProgressWindow(), isFalse);
     },
   );
 
@@ -60,6 +61,8 @@ void main() {
       for (final tray in [false, true]) {
         await DesktopStartupService.prepareLaunch(const []);
         expect(DesktopStartupService.deferWindow, isTrue);
+        await DesktopStartupService.setHidden(hide);
+        expect(await DesktopStartupService.hideProgressWindow(), hide);
         expect(
           DesktopStartupService.finishLaunch(hideToTray: hide, trayReady: tray),
           !(hide && tray),

@@ -22,6 +22,9 @@ class DesktopStartupService {
 
   static bool get deferWindow => _pendingLaunch;
 
+  static Future<bool> hideProgressWindow() async =>
+      _pendingLaunch && await readHidden();
+
   static Future<void> prepareLaunch(List<String> arguments) async {
     if (!isDesktop) return;
     _pendingLaunch = arguments.contains(argument);

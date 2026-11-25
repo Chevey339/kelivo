@@ -266,7 +266,9 @@ class HiveToSqliteMigrationService {
     return _attemptCount;
   }
 
-  static Future<HiveToSqliteMigrationDecision> check() async {
+  static Future<HiveToSqliteMigrationDecision> check({
+    Future<void> Function(Directory)? recoverInterruptedUpgrade,
+  }) async {
     final appDataDir = await AppDirectories.getAppDataDirectory();
     final contentDirectory = await AppDirectories.contentDirectoryFor(
       appDataDir,
@@ -289,6 +291,9 @@ class HiveToSqliteMigrationService {
         contentDirectory: contentDirectory,
       );
     }
+    // Startup owns the business lease. Finish any interrupted SQLite rollback
+    // before an absent receipt could send the user back to their old Hive data.
+    await recoverInterruptedUpgrade?.call(appDataDir);
     // Read the receipt off the file rather than through a live connection:
     // this runs before the installation gate upgrades the database, and a live
     // connection refuses any schema that is not already current.

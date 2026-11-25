@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:isolate';
 
 import '../services/backup/restore_durability.dart';
@@ -5,6 +6,22 @@ import 'schema_migrations.dart';
 
 typedef DatabaseUpgradeWork<T> =
     Future<void> Function(T, RestoreDurability, DatabaseUpgradeStageSink?);
+
+extension DatabaseUpgradeProgressReporting on DatabaseUpgradeStageSink {
+  /// Presentation errors must not interrupt a migration or its rollback.
+  void report(DatabaseUpgradeStage stage) {
+    try {
+      this(stage);
+    } catch (error, stackTrace) {
+      developer.log(
+        'Could not report database upgrade progress.',
+        name: 'Kelivo.database.upgrade',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+}
 
 /// Native checkpoints, integrity checks and full disk flushes can block for
 /// seconds. Send only the filesystem work to the worker; device free-space
@@ -17,7 +34,7 @@ Future<void> runDatabaseUpgradeIo<T>(
 }) async {
   // Custom durability implementations keep their caller-owned state.
   if (durability is! RestorePlatformDurability) {
-    await work(files, durability, onStage);
+    await work(files, durability, onStage?.report);
     return;
   }
   if (onStage == null) {
@@ -28,7 +45,7 @@ Future<void> runDatabaseUpgradeIo<T>(
   final delivered = stages
       .takeWhile((stage) => stage != null)
       .cast<DatabaseUpgradeStage>()
-      .forEach(onStage);
+      .forEach(onStage.report);
   try {
     await _runOnWorker(files, work, stages.sendPort);
   } finally {

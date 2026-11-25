@@ -4,6 +4,7 @@ import '../../database/database_family_preserver.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/database_installation_gate.dart';
+import '../../database/schema_migrations.dart';
 import 'backup_task_progress.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_business_lease.dart';
@@ -317,6 +318,7 @@ final class RestoreStartupGate {
     RestoreBusinessLease? businessLease,
     RestoreDurability? durability,
     RestoreStartupStageSink? onStage,
+    DatabaseUpgradeStageSink? onUpgradeStage,
     BackupProgressSink? onProgress,
     RestoreStartupDiagnostics? diagnostics,
   }) async {
@@ -356,6 +358,7 @@ final class RestoreStartupGate {
       await DatabaseFamilyPreserver.resume(
         appDataDirectory,
         durability: resolvedDurability,
+        onUpgradeStage: onUpgradeStage,
       );
       if (await _snapshotRecoveryIncomplete(appDataDirectory)) {
         throw StateError('restore_startup_snapshot_preparation_incomplete');

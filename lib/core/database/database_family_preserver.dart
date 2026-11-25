@@ -6,6 +6,8 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../services/backup/restore_durability.dart';
+import 'database_upgrade_io.dart';
+import 'schema_migrations.dart';
 
 /// Keeps a complete, immutable SQLite family before retiring any live member.
 /// Callers hold the business lease. The pending record is replayed before any
@@ -79,10 +81,21 @@ abstract final class DatabaseFamilyPreserver {
   static Future<void> resume(
     Directory root, {
     required RestoreDurability durability,
+    DatabaseUpgradeStageSink? onUpgradeStage,
   }) async {
     final pending = File(p.join(root.path, pendingName));
     final type = await FileSystemEntity.type(pending.path, followLinks: false);
     if (type == FileSystemEntityType.notFound) return;
+    onUpgradeStage?.report(DatabaseUpgradeStage.checking);
+    await runDatabaseUpgradeIo(pending, _resume, durability: durability);
+  }
+
+  static Future<void> _resume(
+    File pending,
+    RestoreDurability durability,
+    DatabaseUpgradeStageSink? _,
+  ) async {
+    final root = pending.parent;
     final record = await _read(pending);
     final name = record['directory'];
     if (name is! String || !isCopyDirectory(name)) {

@@ -6,6 +6,7 @@ import 'dart:isolate';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:sqlite3/common.dart' show AllowedArgumentCount, CommonDatabase;
+import 'package:sqlite3/sqlite3.dart' as sqlite show Database;
 
 import '../../features/intelligent_ui/catalog/ui_budgets.dart';
 import '../../utils/app_directories.dart';
@@ -819,7 +820,22 @@ class GenUiSurfaceStateRows extends Table {
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase(super.executor);
+  AppDatabase(super.executor) : _validateUpgrade = null;
+
+  /// The upgrade worker owns this connection and its exclusive file lock.
+  AppDatabase.lockedUpgrade(
+    sqlite.Database database, {
+    required void Function() validate,
+  }) : _validateUpgrade = validate,
+       super(
+         NativeDatabase.opened(
+           database,
+           setup: _migrationSetup,
+           closeUnderlyingOnClose: false,
+         ),
+       );
+
+  final void Function()? _validateUpgrade;
 
   static const databaseFileName = 'kelivo.db';
 
@@ -842,7 +858,7 @@ class AppDatabase extends _$AppDatabase {
   /// created (0) or already at the current schema.
   ///
   /// Upgrades never happen implicitly on an ordinary open — they are performed
-  /// only by `SchemaMigrations`, through [upgradeExecutor].
+  /// through [lockedUpgrade] for an installation or [upgradeExecutor] for a snapshot.
   static bool acceptsLiveSchema(int userVersion) =>
       userVersion == 0 || userVersion == currentSchemaVersion;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
@@ -1042,73 +1058,132 @@ FROM probe;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    // Reachable only through [upgradeExecutor]; every other executor rejects a
-    // non-current file before drift's migrator runs. See SchemaMigrations for
-    // the procedure that adds a version. onDowngrade stays unset so drift's
-    // default (throw) applies.
-    onUpgrade: stepByStep(
-      from1To2: (m, schema) async {
-        await m.addColumn(
-          schema.conversationRows,
-          schema.conversationRows.chatModelProvider,
-        );
-        await m.addColumn(
-          schema.conversationRows,
-          schema.conversationRows.chatModelId,
-        );
-      },
-      // Purely additive; no data rewrite. message_rows.updated_at is nullable
-      // by design so no backfill is needed (null reads as "= timestamp").
-      from2To3: (m, schema) async {
-        await m.addColumn(
-          schema.conversationRows,
-          schema.conversationRows.extrasJson,
-        );
-        await m.addColumn(schema.messageRows, schema.messageRows.updatedAt);
-        await m.addColumn(schema.messageRows, schema.messageRows.senderId);
-        await m.addColumn(schema.messageRows, schema.messageRows.extrasJson);
-        await m.addColumn(schema.assetRows, schema.assetRows.extrasJson);
-        await m.createTable(schema.tombstoneRows);
-        await m.createTable(schema.extensionEntityRows);
-        // stepByStep does not create new indexes automatically.
-        await m.create(schema.idxExtensionEntitiesKindOrder);
-      },
-      // v4 was never published: migrate directly between the frozen snapshots.
-      from3To5: (m, schema) async {
-        await m.createTable(schema.genUiSurfaceStateRows);
-        await customStatement(
-          'DELETE FROM chat_storage_meta_rows WHERE key = ?',
-          [GenUiDerivedSchema.searchBackfillKey],
-        );
-        // The composite PK creates the ordinary owner index with the table.
-        await m.create(schema.genUiSurfaceSearch);
-        await m.create(schema.genUiStateSearchInsert);
-        await m.create(schema.genUiStateSearchUpdate);
-        await m.create(schema.genUiStateSearchDelete);
-      },
-      from5To6: (m, schema) async {
-        await m.createTable(schema.generationTopicRows);
-        await m.createTable(schema.generationBatchRows);
-        await m.createTable(schema.generationItemRows);
-        await m.create(schema.idxGenerationTopicsUpdated);
-        await m.create(schema.idxGenerationBatchesTopicCreated);
-        await m.create(schema.idxGenerationBatchesCreated);
-        await m.create(schema.idxGenerationBatchesStatus);
-        await m.create(schema.idxGenerationItemsBatchOrdinal);
-        await m.create(schema.idxGenerationItemsFavorite);
-        await m.create(schema.idxGenerationItemsModeCreated);
-      },
-      from6To7: (m, schema) async {
-        // An older install may have built this index lazily or kept a
-        // different same-name definition from a forward-compatible backup.
-        final index = schema.idxTimelineGenerationTarget;
-        await m.drop(index);
-        await m.create(index);
-      },
-    ),
+    // Only explicit upgrade executors admit an older file.
+    onUpgrade: (m, from, to) => transaction(() async {
+      await _upgrade(m, from, to);
+      _validateUpgrade?.call();
+    }),
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
       await customStatement('PRAGMA busy_timeout = 5000;');
+    },
+  );
+
+  // Older builds could stop between a DDL statement and its user_version
+  // update. Resume those files without discarding any newer chat rows.
+  Future<void> _addMissingColumn(
+    Migrator m,
+    TableInfo table,
+    GeneratedColumn column,
+  ) async {
+    final existing = await customSelect(
+      'SELECT type, "notnull", dflt_value FROM pragma_table_info(?) WHERE name = ?',
+      variables: [
+        Variable.withString(table.actualTableName),
+        Variable.withString(column.$name),
+      ],
+    ).getSingleOrNull();
+    if (existing == null) {
+      await m.addColumn(table, column);
+      return;
+    }
+    final context = GenerationContext.fromDb(this);
+    final defaultValue = column.defaultValue;
+    defaultValue?.writeInto(context);
+    if (existing.read<String>('type').toUpperCase() !=
+            column.type.sqlTypeName(context).toUpperCase() ||
+        existing.read<int>('notnull') != (column.$nullable ? 0 : 1) ||
+        existing.readNullable<String>('dflt_value') !=
+            (defaultValue == null ? null : context.sql)) {
+      throw StateError('database_migration_column_mismatch');
+    }
+  }
+
+  Future<void> _recreateDerivedObjects(
+    Migrator m,
+    List<DatabaseSchemaEntity> objects,
+  ) async {
+    for (final object in objects) {
+      if (object is Index || object is Trigger) await m.drop(object);
+      await m.create(object);
+    }
+  }
+
+  OnUpgrade get _upgrade => stepByStep(
+    from1To2: (m, schema) async {
+      await _addMissingColumn(
+        m,
+        schema.conversationRows,
+        schema.conversationRows.chatModelProvider,
+      );
+      await _addMissingColumn(
+        m,
+        schema.conversationRows,
+        schema.conversationRows.chatModelId,
+      );
+    },
+    // Purely additive; no data rewrite. message_rows.updated_at is nullable
+    // by design so no backfill is needed (null reads as "= timestamp").
+    from2To3: (m, schema) async {
+      await _addMissingColumn(
+        m,
+        schema.conversationRows,
+        schema.conversationRows.extrasJson,
+      );
+      await _addMissingColumn(
+        m,
+        schema.messageRows,
+        schema.messageRows.updatedAt,
+      );
+      await _addMissingColumn(
+        m,
+        schema.messageRows,
+        schema.messageRows.senderId,
+      );
+      await _addMissingColumn(
+        m,
+        schema.messageRows,
+        schema.messageRows.extrasJson,
+      );
+      await _addMissingColumn(m, schema.assetRows, schema.assetRows.extrasJson);
+      await m.createTable(schema.tombstoneRows);
+      await m.createTable(schema.extensionEntityRows);
+      // stepByStep does not create new indexes automatically.
+      await _recreateDerivedObjects(m, [schema.idxExtensionEntitiesKindOrder]);
+    },
+    // v4 was never published: migrate directly between the frozen snapshots.
+    from3To5: (m, schema) async {
+      await m.createTable(schema.genUiSurfaceStateRows);
+      await customStatement(
+        'DELETE FROM chat_storage_meta_rows WHERE key = ?',
+        [GenUiDerivedSchema.searchBackfillKey],
+      );
+      // The composite PK creates the ordinary owner index with the table.
+      await m.create(schema.genUiSurfaceSearch);
+      await _recreateDerivedObjects(m, [
+        schema.genUiStateSearchInsert,
+        schema.genUiStateSearchUpdate,
+        schema.genUiStateSearchDelete,
+      ]);
+    },
+    from5To6: (m, schema) async {
+      await m.createTable(schema.generationTopicRows);
+      await m.createTable(schema.generationBatchRows);
+      await m.createTable(schema.generationItemRows);
+      await _recreateDerivedObjects(m, [
+        schema.idxGenerationTopicsUpdated,
+        schema.idxGenerationBatchesTopicCreated,
+        schema.idxGenerationBatchesCreated,
+        schema.idxGenerationBatchesStatus,
+        schema.idxGenerationItemsBatchOrdinal,
+        schema.idxGenerationItemsFavorite,
+        schema.idxGenerationItemsModeCreated,
+      ]);
+    },
+    from6To7: (m, schema) async {
+      // An older install may have built this index lazily or kept a
+      // different same-name definition from a forward-compatible backup.
+      await _recreateDerivedObjects(m, [schema.idxTimelineGenerationTarget]);
     },
   );
 }

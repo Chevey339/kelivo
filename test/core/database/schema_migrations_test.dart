@@ -8,6 +8,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/database/schema_migrations.dart';
 
 import 'generated_schema/schema.dart';
@@ -110,6 +111,93 @@ void main() {
     } finally {
       raw.close();
     }
+  });
+
+  test(
+    'a later migration failure rolls back earlier DDL and version writes',
+    () async {
+      final file = await createV1Database();
+      final before = columnsOf(file, 'conversation_rows');
+      final db = sqlite.sqlite3.open(file.path);
+      db.execute('CREATE TABLE generation_topic_rows (id TEXT PRIMARY KEY)');
+      db.close();
+
+      await expectLater(
+        SchemaMigrations.upgradeFileInPlace(file),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains('no such column: updated_at'),
+          ),
+        ),
+      );
+      expect(SchemaMigrations.readSchemaVersion(file), 1);
+      expect(columnsOf(file, 'conversation_rows'), before);
+      expect(columnsOf(file, 'gen_ui_surface_state_rows'), isEmpty);
+    },
+  );
+
+  test(
+    'resumes partially applied legacy DDL with newer chat data intact',
+    () async {
+      final file = await createV1Database();
+      await file.copy('${file.path}.premigrate-v1');
+      final db = sqlite.sqlite3.open(file.path);
+      db.execute(
+        'ALTER TABLE conversation_rows ADD COLUMN chat_model_provider TEXT',
+      );
+      db.execute(
+        "UPDATE conversation_rows SET title = 'After the backup', chat_model_provider = 'local'",
+      );
+      db.close();
+
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: workspace,
+      );
+      expect(
+        (await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: workspace,
+        )).databaseId,
+        receipt.databaseId,
+      );
+      final restored = sqlite.sqlite3.open(
+        file.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      try {
+        expect(restored.userVersion, AppDatabase.currentSchemaVersion);
+        final row = restored
+            .select('SELECT title, chat_model_provider FROM conversation_rows')
+            .single;
+        expect(row['title'], 'After the backup');
+        expect(row['chat_model_provider'], 'local');
+      } finally {
+        restored.close();
+      }
+    },
+  );
+
+  test('rejects an incompatible same-name column in an old database', () async {
+    final file = await createV1Database();
+    final db = sqlite.sqlite3.open(file.path);
+    db.execute(
+      'ALTER TABLE conversation_rows ADD COLUMN chat_model_provider INTEGER',
+    );
+    db.close();
+
+    await expectLater(
+      SchemaMigrations.upgradeFileInPlace(file),
+      throwsA(
+        predicate(
+          (error) =>
+              error.toString().contains('database_migration_column_mismatch'),
+        ),
+      ),
+    );
+    expect(SchemaMigrations.readSchemaVersion(file), 1);
+    expect(
+      columnsOf(file, 'conversation_rows'),
+      isNot(contains('chat_model_id')),
+    );
   });
 
   test('upgrades a schema 2 file preserving message rows', () async {
