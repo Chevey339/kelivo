@@ -24,6 +24,7 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
     this.streaming = false,
     this.useBlockRendering = false,
     this.conversationId,
+    this.baseFilePath,
     this.highlightRanges = const [],
     this.highlightColor,
     this.uiHost,
@@ -43,6 +44,7 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
   /// source blocks and keeps their identity through streaming completion.
   final bool useBlockRendering;
   final String? conversationId;
+  final String? baseFilePath;
   final List<SourceSpan> highlightRanges;
   final Color? highlightColor;
   @override
@@ -94,6 +96,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     return MarkdownLinkScope(
       source: _source,
       conversationId: widget.conversationId,
+      baseFilePath: widget.baseFilePath,
       imageStorage: PageStorage.maybeOf(context),
       child: CitationScope(
         onTap: widget.onCitationTap,
