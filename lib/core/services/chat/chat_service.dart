@@ -1,4 +1,5 @@
 import '../../../features/chat/models/conversation_find_candidate.dart';
+import '../../../features/chat/services/conversation_find_worker.dart';
 import '../../models/carried_original.dart';
 import '../../../shared/markdown/markdown_image_sources.dart';
 import '../api/request_image_context.dart';
@@ -1994,6 +1995,8 @@ class ChatService extends ChangeNotifier {
   Stream<List<ConversationFindCandidate>> conversationFindCandidates(
     String conversationId, {
     bool Function()? isCurrent,
+    ConversationFindPrefilter? prefilter,
+    ConversationFindWorker? worker,
   }) async* {
     if (!_initialized || isCurrent?.call() == false) return;
     if (_temporaryConversationIds.contains(conversationId) ||
@@ -2017,6 +2020,8 @@ class ChatService extends ChangeNotifier {
       yield* _repo.conversationFindCandidates(
         conversationId,
         isCurrent: isCurrent,
+        prefilter: prefilter,
+        worker: worker,
       );
     }
   }

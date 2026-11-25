@@ -4,13 +4,200 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/assistant_regex.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/features/chat/models/conversation_find_candidate.dart';
 import 'package:Kelivo/features/chat/services/conversation_find_service.dart';
+import 'package:Kelivo/features/chat/services/conversation_find_worker.dart';
 
 void main() {
+  test(
+    'preview prefilter preserves rendered hits, counts, order and spans',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      final repo = ChatDatabaseRepository(db);
+      addTearDown(repo.close);
+      ChatMessage msg(
+        String id,
+        String body, {
+        List<MessagePart>? parts,
+        String? translation,
+      }) => ChatMessage(
+        id: id,
+        conversationId: 'c',
+        role: 'assistant',
+        content: body,
+        parts: parts,
+        translation: translation,
+      );
+      final largeCss = '```css\n${'.button { color: red; }\n' * 900}```';
+      final messages = [
+        msg('plain', '已经明白。明白。 Foobar'),
+        msg('markdown', '明**白** fo**ob**ar'),
+        msg('entity', '&#x660e;&#x767d; fo&#111;bar'),
+        msg(
+          'split',
+          '',
+          parts: const [TextPart('明'), TextPart('白 fo'), TextPart('obar')],
+        ),
+        msg(
+          'reasoning',
+          '',
+          parts: const [ReasoningPart('hidden'), TextPart('明白 Foobar')],
+        ),
+        msg(
+          'hidden',
+          '',
+          parts: const [
+            ReasoningPart('明白 Foobar'),
+            TextPart('ordinary answer'),
+          ],
+        ),
+        msg('translation', 'ordinary prose', translation: '明白 FOOBAR'),
+        msg('unicode', 'Straße ﬃ Kelvin ПРИВЕТ'),
+        msg('nul', 'prefix\u0000fo**ob**ar'),
+        msg('stream', 'ordinary prose'),
+        msg('large-miss', largeCss),
+        msg('large-hit', '$largeCss\n\n明白'),
+      ];
+      await repo.putMigrationBatch(
+        conversations: [Conversation(id: 'c', title: 'find')],
+        messages: [
+          for (final (i, m) in messages.indexed) (message: m, messageOrder: i),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await db.customStatement(
+        "UPDATE message_rows SET is_streaming=1 WHERE id='stream'",
+      );
+      Future<List<Object>> results(
+        ConversationFindService finder,
+        String q, {
+        required bool optimized,
+      }) async {
+        final worker = ConversationFindWorker();
+        try {
+          final source = repo.conversationFindCandidates(
+            'c',
+            prefilter: optimized ? finder.previewPrefilter(q) : null,
+            worker: optimized ? worker : null,
+          );
+          return await finder
+              .searchPreviews(
+                source,
+                q,
+                worker: optimized ? worker : null,
+                liveCandidate: (row) => row.id == 'stream'
+                    ? ConversationFindCandidate(msg('stream', '明白 Foobar'))
+                    : row,
+              )
+              .expand((page) => page)
+              .map((p) => [p.hit, p.role, p.matchCount, p.before, p.segments])
+              .toList();
+        } finally {
+          worker.close();
+        }
+      }
+
+      const finder = ConversationFindService();
+      final hanCandidates = await repo
+          .conversationFindCandidates(
+            'c',
+            prefilter: finder.previewPrefilter('明白'),
+          )
+          .expand((page) => page.map((r) => r.id))
+          .toList();
+      expect(hanCandidates, contains('reasoning'));
+      expect(hanCandidates, isNot(contains('hidden')));
+      expect(hanCandidates, contains('large-hit'));
+      expect(hanCandidates, isNot(contains('large-miss')));
+      for (final q in [
+        '明白',
+        'FOOBAR',
+        'STRASSE',
+        'ffi',
+        'KELVIN',
+        'привет',
+        '。',
+      ]) {
+        final all = await results(finder, q, optimized: false);
+        expect(all, isNotEmpty, reason: q);
+        expect(await results(finder, q, optimized: true), all, reason: q);
+      }
+      final visual = ConversationFindService(
+        assistant: Assistant(
+          id: 'a',
+          name: 'a',
+          regexRules: const [
+            AssistantRegex(
+              id: 'replace',
+              name: 'replace',
+              pattern: 'ordinary prose',
+              replacement: '新词',
+              visualOnly: true,
+              scopes: [AssistantRegexScope.assistant],
+            ),
+          ],
+        ),
+      );
+      expect(visual.previewPrefilter('新词'), isNull);
+      expect(await results(visual, '新词', optimized: true), isNotEmpty);
+    },
+  );
+
+  test(
+    'sparse and dense preview pages hydrate only candidates and keep the tail',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      final repo = ChatDatabaseRepository(db);
+      addTearDown(repo.close);
+      const finder = ConversationFindService();
+      final expected = [for (var i = 325; i < 525; i++) 'm$i', 'm706'];
+      final matching = expected.toSet();
+      await repo.putMigrationBatch(
+        conversations: [Conversation(id: 'c', title: 'find')],
+        messages: [
+          for (var i = 0; i <= 706; i++)
+            (
+              message: ChatMessage(
+                id: 'm$i',
+                conversationId: 'c',
+                role: 'user',
+                content: matching.contains('m$i') ? '青柠雨伞' : '普通对话 青山',
+              ),
+              messageOrder: i,
+            ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      final pages = await repo
+          .conversationFindCandidates(
+            'c',
+            prefilter: finder.previewPrefilter('青柠'),
+          )
+          .toList();
+      expect(pages.expand((page) => page.map((r) => r.id)), expected);
+      expect(
+        pages.every((p) => p.length <= ConversationFindCandidate.batchSize),
+        isTrue,
+      );
+      expect(
+        await repo
+            .conversationFindCandidates(
+              'c',
+              prefilter: finder.previewPrefilter('missing'),
+            )
+            .toList(),
+        isEmpty,
+      );
+    },
+  );
+
   test(
     'a first search can overlap a transaction loading another history',
     () async {

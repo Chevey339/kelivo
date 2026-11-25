@@ -9,6 +9,7 @@ import '../utils/chat_image_result.dart';
 import '../utils/conversation_fork_title.dart';
 import '../models/quote_ref.dart';
 import '../../features/chat/models/conversation_find_candidate.dart';
+import '../../features/chat/services/conversation_find_worker.dart';
 import 'package:Kelivo/features/search/utils/searchable_text.dart';
 import 'package:Kelivo/features/intelligent_ui/storage/ui_search_index.dart';
 import 'package:Kelivo/features/intelligent_ui/text/ui_search_text.dart';
@@ -91,6 +92,7 @@ typedef _FindPage = ({
   List<MessageRow> messages,
   _MessageDetails details,
   Map<String, Map<String, UiSearchSurfaceText>> surfaces,
+  ConversationFindPrefilter? prefilter,
 });
 
 /// What crash recovery is allowed to do with the installed database.
@@ -3237,59 +3239,128 @@ ORDER BY m.message_order DESC LIMIT 20
   });
 
   /// Read only this conversation's visible revisions, in timeline order.
-  /// Visual substitutions and Unicode folds make raw-text LIKE filters lossy.
   Stream<List<ConversationFindCandidate>> conversationFindCandidates(
     String conversationId, {
     bool Function()? isCurrent,
+    ConversationFindPrefilter? prefilter,
+    ConversationFindWorker? worker,
   }) async* {
-    if (isCurrent?.call() == false) return;
+    bool current() => worker?.isCurrent != false && isCurrent?.call() != false;
+    if (!current()) return;
     await _timelineIndex.ensureConversation(conversationId);
     const batchSize = ConversationFindCandidate.batchSize;
     (int, String)? cursor;
-    while (isCurrent?.call() != false) {
+    var scanSize = batchSize;
+    var more = true;
+    final columns = prefilter == null
+        ? 'm.*'
+        : 'm.id, ${_possiblePreviewSql(prefilter)} AS possible';
+    final filterArgs = <Variable<Object>>[
+      if (prefilter != null) ...prefilter.literals.map(Variable<String>.new),
+      if (prefilter?.ideographs == true)
+        ...ConversationFindPrefilter.projectionMarkers.map(
+          Variable<String>.new,
+        ),
+      if (prefilter != null && prefilter.foldSources.isNotEmpty)
+        Variable<String>('*[${prefilter.foldSources}]*'),
+    ];
+    while (more && current()) {
       final after = cursor;
       final page = await _db.transaction<_FindPage?>(() async {
+        if (!current()) return null;
         final rows = await _db
             .customSelect(
-              'SELECT g.anchor_order,g.group_id AS cursor_group_id,m.* FROM timeline_group_rows g '
+              'SELECT g.anchor_order,g.group_id AS cursor_group_id,$columns FROM timeline_group_rows g '
               'LEFT JOIN timeline_selection_rows s ON s.conversation_id=g.conversation_id AND s.group_id=g.group_id '
               'JOIN message_rows m ON m.id=${MessageTimelineIndex.selectedRevision('g')} '
               "WHERE g.conversation_id=? AND m.role IN ('user','assistant') "
               "${after == null ? '' : 'AND (g.anchor_order,g.group_id)>(?,?) '} "
               'ORDER BY g.anchor_order,g.group_id LIMIT ?',
               variables: [
+                ...filterArgs,
                 Variable<String>(conversationId),
                 if (after != null) ...[
                   Variable<int>(after.$1),
                   Variable<String>(after.$2),
                 ],
-                Variable<int>(batchSize),
+                Variable<int>(scanSize),
               ],
             )
             .get();
-        if (rows.isEmpty || isCurrent?.call() == false) return null;
+        if (rows.isEmpty || !current()) {
+          more = false;
+          return null;
+        }
+        final matching = prefilter == null
+            ? rows
+            : rows
+                  .where((row) => row.read<int>('possible') != 0)
+                  .take(batchSize)
+                  .toList();
+        final last = matching.length == batchSize ? matching.last : rows.last;
+        more = rows.length == scanSize || !identical(last, rows.last);
         cursor = (
-          rows.last.read<int>('anchor_order'),
-          rows.last.read<String>('cursor_group_id'),
+          last.read<int>('anchor_order'),
+          last.read<String>('cursor_group_id'),
         );
-        final messages = [
-          for (final row in rows) _db.messageRows.map(row.data),
-        ];
-        final ids = [for (final message in messages) message.id];
+        // Grow the scan only for sparse hits. Each database turn and each
+        // decoded page stay bounded even for an absent or very common word.
+        if (prefilter != null) {
+          scanSize = matching.length == batchSize ? batchSize : 256;
+        }
+        if (matching.isEmpty) return null;
+        final ids = [for (final row in matching) row.read<String>('id')];
+        final List<MessageRow> messages;
+        if (prefilter == null) {
+          messages = [
+            for (final row in matching) _db.messageRows.map(row.data),
+          ];
+        } else {
+          final headers = await (_db.select(
+            _db.messageRows,
+          )..where((m) => m.id.isIn(ids))).get();
+          final byId = {for (final row in headers) row.id: row};
+          messages = [for (final id in ids) byId[id]!];
+        }
         return (
           messages: messages,
           details: await _readMessageDetails(ids),
           surfaces: await _genUiSearch.read(ids),
+          prefilter: prefilter,
         );
       });
-      if (page == null || isCurrent?.call() == false) return;
+      if (!current()) return;
+      if (page == null) continue;
       // Release the database before decoding attachment and tool payloads.
       // Missing card text is projected by the matcher for this page only.
-      final batch = await compute(_hydrateFindPage, page);
-      if (isCurrent?.call() == false) return;
-      yield batch;
-      if (batch.length < batchSize) return;
+      final batch =
+          await (worker?.run(_hydrateFindPage, page) ??
+              compute(_hydrateFindPage, page));
+      if (batch == null || !current()) return;
+      if (batch.isNotEmpty) yield batch;
     }
+  }
+
+  static String _possiblePreviewSql(ConversationFindPrefilter filter) {
+    // Formatting can join the letters of a word. A basic Han character is
+    // itself a necessary literal unless a decoder or card generates the text.
+    // For other words, only rule out unmarked prose. Non-ASCII case-fold
+    // substitutions are verified by the regular matcher.
+    final possible = filter.ideographs
+        ? """(${List.filled(filter.literals.length, 'instr(p.payload, ?)').join(' AND ')})
+             OR ${List.filled(ConversationFindPrefilter.projectionMarkers.length, 'instr(p.payload, ?)').join(' OR ')}"""
+        : """instr(lower(p.payload), ?) OR instr(p.payload, char(0))
+             OR p.payload GLOB '*[^a-zA-Z0-9 .,!?\t\r\n\u0080-\u{10ffff}]*'
+             ${filter.foldSources.isEmpty ? '' : 'OR p.payload GLOB ?'}""";
+    return """
+      m.is_streaming OR coalesce(m.translation, '') != ''
+      OR EXISTS (SELECT 1 FROM message_part_rows p WHERE p.revision_id=m.id AND
+        CASE WHEN p.kind='reasoning' THEN 0
+             WHEN p.kind != 'text' OR length(CAST(p.payload AS BLOB)) > ${ConversationFindPrefilter.maxSqlTextBytes}
+               OR (p.ordinal > 0 AND EXISTS (SELECT 1 FROM message_part_rows prior
+                 WHERE prior.revision_id=p.revision_id AND prior.ordinal<p.ordinal AND prior.kind='text'))
+             THEN 1 ELSE ($possible) END)
+    """;
   }
 
   static List<ConversationFindCandidate> _hydrateFindPage(_FindPage page) => [
@@ -3298,10 +3369,11 @@ ORDER BY m.message_order DESC LIMIT 20
       page.details.parts,
       page.details.runs,
     ))
-      ConversationFindCandidate(
-        message,
-        surfaces: page.surfaces[message.id] ?? const {},
-      ),
+      if (page.prefilter?.mayMatchLargeBody(message) != false)
+        ConversationFindCandidate(
+          message,
+          surfaces: page.surfaces[message.id] ?? const {},
+        ),
   ];
 
   Future<Set<String>> getMessageIdsForGroups(

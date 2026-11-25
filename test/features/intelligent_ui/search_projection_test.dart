@@ -191,8 +191,15 @@ void main() {
       WHEN NEW.key = '${GenUiDerivedSchema.searchBackfillKey}'
       BEGIN SELECT RAISE(ABORT, 'unexpected global backfill'); END
     """);
-      final previews = await const ConversationFindService()
-          .searchPreviews(repo.conversationFindCandidates('c'), '明白')
+      const finder = ConversationFindService();
+      final previews = await finder
+          .searchPreviews(
+            repo.conversationFindCandidates(
+              'c',
+              prefilter: finder.previewPrefilter('明白'),
+            ),
+            '明白',
+          )
           .expand((page) => page)
           .toList();
       expect(previews.map((p) => (p.hit.messageId, p.matchCount)), [
@@ -223,6 +230,29 @@ void main() {
       expect(await schemaVersion(database), indexed);
     });
   });
+
+  test(
+    'preview prefilter retains a web card with an escaped Chinese title',
+    () async {
+      await put('web', r'''```kelivo-web
+{"version":1,"title":"\u660e\u767d","summary":"Charts"}
+<p>Chart</p>
+```''');
+      const finder = ConversationFindService();
+      final preview = await finder
+          .searchPreviews(
+            repo.conversationFindCandidates(
+              'c',
+              prefilter: finder.previewPrefilter('明白'),
+            ),
+            '明白',
+          )
+          .expand((page) => page)
+          .single;
+      expect(preview.hit.messageId, 'web');
+      expect(preview.hit.part, FindPart.surface);
+    },
+  );
 
   test(
     'restart restores card search for an abandoned tool continuation',

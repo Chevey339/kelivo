@@ -155,10 +155,10 @@ void main() {
           desktop: desktop,
           onFind: () => fail('Minimap search must stay in the map'),
           onSelect: picks.add,
-          onSearch: (query, isCurrent) {
+          onSearch: (query, worker) {
             searched.add(query);
             if (query == 'old') {
-              isOldSearchCurrent = isCurrent;
+              isOldSearchCurrent = () => worker.isCurrent;
               return stale.stream;
             }
             return latest.stream;

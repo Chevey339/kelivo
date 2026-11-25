@@ -335,3 +335,27 @@ String foldUnicodeScalar(int scalar) {
   }
   return String.fromCharCode(scalar);
 }
+
+/// Non-ASCII source characters that can contribute to [folded] through case
+/// folding. SQLite's built-in lower() only folds ASCII.
+String nonAsciiFoldSources(String folded) {
+  final targets = folded.runes.toSet();
+  final sources = StringBuffer();
+  for (final (start, end, stride, delta) in _ranges) {
+    for (final target in targets) {
+      final source = target - delta;
+      if (source > 127 &&
+          source >= start &&
+          source <= end &&
+          (source - start) % stride == 0) {
+        sources.writeCharCode(source);
+      }
+    }
+  }
+  for (final entry in _expansions.entries) {
+    if (entry.value.runes.any(targets.contains)) {
+      sources.writeCharCode(entry.key);
+    }
+  }
+  return sources.toString();
+}

@@ -10,12 +10,13 @@ import '../../../theme/app_semantic_colors.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../browser/widgets/browser_text_field.dart';
 import '../../chat/services/conversation_find_service.dart';
+import '../../chat/services/conversation_find_worker.dart';
 
 typedef MiniMapSelection = ({String messageId, ConversationFindHit? match});
 typedef MiniMapSearch =
     Stream<List<ConversationFindPreview>> Function(
       String query,
-      bool Function() isCurrent,
+      ConversationFindWorker worker,
     );
 
 class MiniMapSearchPanel extends StatefulWidget {
@@ -44,6 +45,7 @@ class _MiniMapSearchPanelState extends State<MiniMapSearchPanel> {
   final _localScroll = ScrollController();
   final _results = <ConversationFindPreview>[];
   Timer? _debounce;
+  ConversationFindWorker? _worker;
   String _query = '';
   int _generation = 0;
   bool _searching = false;
@@ -64,6 +66,7 @@ class _MiniMapSearchPanelState extends State<MiniMapSearchPanel> {
         : _field.text.trim();
     if (query == _query) return;
     _debounce?.cancel();
+    _worker?.close();
     final generation = ++_generation;
     setState(() {
       _results.clear();
@@ -80,9 +83,10 @@ class _MiniMapSearchPanelState extends State<MiniMapSearchPanel> {
   }
 
   Future<void> _search(String query, int generation) async {
+    final worker = _worker = ConversationFindWorker();
     bool current() => mounted && generation == _generation;
     try {
-      await for (final batch in widget.onSearch(query, current)) {
+      await for (final batch in widget.onSearch(query, worker)) {
         if (!current()) return;
         setState(() => _results.addAll(batch));
       }
@@ -97,6 +101,8 @@ class _MiniMapSearchPanelState extends State<MiniMapSearchPanel> {
       );
       _failed = true;
     } finally {
+      worker.close();
+      if (identical(_worker, worker)) _worker = null;
       if (current()) setState(() => _searching = false);
     }
   }
@@ -105,6 +111,7 @@ class _MiniMapSearchPanelState extends State<MiniMapSearchPanel> {
   void dispose() {
     _generation++;
     _debounce?.cancel();
+    _worker?.close();
     _field.dispose();
     _focus.dispose();
     _localScroll.dispose();

@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/assistant_regex.dart';
@@ -7,8 +9,52 @@ import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/features/intelligent_ui/catalog/ui_catalog.dart';
 import 'package:Kelivo/features/chat/models/conversation_find_candidate.dart';
 import 'package:Kelivo/features/chat/services/conversation_find_service.dart';
+import 'package:Kelivo/features/chat/services/conversation_find_worker.dart';
+
+int _busyPage((SendPort, SendPort) ports) {
+  Isolate.current.addOnExitListener(ports.$2);
+  ports.$1.send(true);
+  final watch = Stopwatch()..start();
+  while (watch.elapsed < const Duration(seconds: 10)) {
+    // Model a synchronous parser that cannot service cancellation messages.
+  }
+  return 1;
+}
+
+int _failPage(int _) => throw StateError('bad preview page');
 
 void main() {
+  test(
+    'closing a preview terminates the active CPU job and a fresh query can run',
+    () async {
+      final worker = ConversationFindWorker();
+      final started = ReceivePort(), exited = ReceivePort();
+      addTearDown(worker.close);
+      addTearDown(started.close);
+      addTearDown(exited.close);
+      final work = worker.run(_busyPage, (started.sendPort, exited.sendPort));
+      await started.first.timeout(const Duration(seconds: 5));
+      worker.close();
+      expect(await work.timeout(const Duration(seconds: 2)), isNull);
+      await exited.first.timeout(const Duration(seconds: 2));
+      final next = ConversationFindWorker();
+      addTearDown(next.close);
+      expect(
+        await Future.wait([
+          next.run((int n) => n + 1, 1),
+          next.run((int n) => n + 2, 1),
+        ]),
+        [2, 3],
+      );
+    },
+  );
+
+  test('an error in a preview worker completes the pending request', () async {
+    final worker = ConversationFindWorker();
+    addTearDown(worker.close);
+    await expectLater(worker.run(_failPage, 1), throwsA(isA<RemoteError>()));
+  });
+
   ChatMessage message(
     String body, {
     String role = 'user',

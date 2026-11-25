@@ -4,6 +4,7 @@ import '../services/composer_document_route.dart';
 import '../../chat/controllers/conversation_find_controller.dart';
 import '../../chat/models/conversation_find_candidate.dart';
 import '../../chat/services/conversation_find_service.dart';
+import '../../chat/services/conversation_find_worker.dart';
 import '../../chat/widgets/conversation_find_bar.dart';
 import '../../../shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/source_rect_scroll.dart';
@@ -2039,16 +2040,20 @@ class _HomePageState extends State<HomePage>
 
     Stream<List<ConversationFindPreview>> search(
       String query,
-      bool Function() isCurrent,
+      ConversationFindWorker worker,
     ) {
-      bool current() => isCurrent() && inConversation();
+      bool current() => worker.isCurrent && inConversation();
       if (!current()) return const Stream.empty();
-      return _findService().searchPreviews(
+      final finder = _findService();
+      return finder.searchPreviews(
         context.read<ChatService>().conversationFindCandidates(
           conversation,
           isCurrent: current,
+          prefilter: finder.previewPrefilter(query),
+          worker: worker,
         ),
         query,
+        worker: worker,
         cache: _findCache,
         isCurrent: current,
         liveCandidate: _findSnapshot,
