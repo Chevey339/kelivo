@@ -67,4 +67,73 @@ void main() {
       await sub.cancel();
     },
   );
+
+  group('cancelChatCompleted', () {
+    setUp(NotificationService.debugReset);
+    tearDown(NotificationService.debugReset);
+
+    test('ignores null, empty, and whitespace-only conversation IDs', () async {
+      final cancelled = <(String, int)>[];
+      NotificationService.debugCancelChatCompleted = (id, notificationId) {
+        cancelled.add((id, notificationId));
+      };
+
+      await NotificationService.cancelChatCompleted(null);
+      await NotificationService.cancelChatCompleted('');
+      await NotificationService.cancelChatCompleted('   \t\n  ');
+
+      expect(cancelled, isEmpty);
+    });
+
+    test(
+      'passes exact conversation notification ID and does not cancel others',
+      () async {
+        final cancelled = <(String, int)>[];
+        NotificationService.debugCancelChatCompleted = (id, notificationId) {
+          cancelled.add((id, notificationId));
+        };
+
+        await NotificationService.cancelChatCompleted('conv-1');
+
+        expect(cancelled, [
+          (
+            'conv-1',
+            NotificationService.notificationIdForConversation('conv-1'),
+          ),
+        ]);
+        expect(
+          cancelled.single.$2,
+          isNot(NotificationService.notificationIdForConversation('conv-2')),
+        );
+      },
+    );
+
+    test(
+      'completes safely on host environment without override or initialized plugin',
+      () async {
+        await expectLater(
+          NotificationService.cancelChatCompleted('conv-1'),
+          completes,
+        );
+      },
+    );
+
+    test('catches sync and async errors from cancel hook safely', () async {
+      NotificationService.debugCancelChatCompleted = (_, _) {
+        throw StateError('sync failure');
+      };
+      await expectLater(
+        NotificationService.cancelChatCompleted('conv-1'),
+        completes,
+      );
+
+      NotificationService.debugCancelChatCompleted = (_, _) async {
+        throw StateError('async failure');
+      };
+      await expectLater(
+        NotificationService.cancelChatCompleted('conv-1'),
+        completes,
+      );
+    });
+  });
 }

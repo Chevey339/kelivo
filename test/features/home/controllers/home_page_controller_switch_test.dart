@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/database/composer_draft_store.dart';
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
@@ -189,6 +191,36 @@ class _ControlledChatService extends ChatService {
   ) async => const <String, int>{};
 }
 
+class _StartupControlledChatService extends _ControlledChatService {
+  _StartupControlledChatService(super.messagesByConversation);
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  List<Conversation> getAllConversations() => [
+    for (final id in _messagesByConversation.keys) getConversation(id)!,
+  ];
+}
+
+class _StartupSettingsProvider extends SettingsProvider {
+  _StartupSettingsProvider() : super(createBusinessTestPreferences());
+
+  @override
+  bool get newChatOnLaunch => false;
+}
+
+class _StartupAssistantProvider extends AssistantProvider {
+  _StartupAssistantProvider()
+    : super(preferences: createBusinessTestPreferences());
+
+  @override
+  Future<void> get loaded => Future<void>.value();
+
+  @override
+  Assistant? resolveConversationAssistant(String? assistantId) => null;
+}
+
 class _DelayedComposerDrafts extends ChangeNotifier
     implements ComposerDraftStore {
   final firstLoad = Completer<ComposerDraft>();
@@ -273,19 +305,33 @@ void main() {
     WidgetTester tester,
     _ControlledChatService service, {
     Widget Function(HomePageController)? timeline,
+    SettingsProvider? settingsProvider,
+    AssistantProvider? assistantProvider,
+    bool? isAndroidOverride,
   }) async {
     HomePageController? controller;
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsProvider(createBusinessTestPreferences()),
-          ),
+          if (settingsProvider != null)
+            ChangeNotifierProvider<SettingsProvider>.value(
+              value: settingsProvider,
+            )
+          else
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            ),
           ChangeNotifierProvider<ChatService>.value(value: service),
-          ChangeNotifierProvider(
-            create: (_) =>
-                AssistantProvider(preferences: createBusinessTestPreferences()),
-          ),
+          if (assistantProvider != null)
+            ChangeNotifierProvider<AssistantProvider>.value(
+              value: assistantProvider,
+            )
+          else
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(
+                preferences: createBusinessTestPreferences(),
+              ),
+            ),
         ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -293,6 +339,7 @@ void main() {
           home: _ControllerHarness(
             onCreated: (value) => controller = value,
             timeline: timeline,
+            isAndroidOverride: isAndroidOverride,
           ),
         ),
       ),
@@ -1611,13 +1658,383 @@ void main() {
       });
     });
   });
+
+  group('chat completion notification clearing', () {
+    testWidgets(
+      'switching conversations clears only the entered conversation notification',
+      (tester) async {
+        await runAsMobile(() async {
+          addTearDown(NotificationService.debugReset);
+          final cancelled = <(String, int)>[];
+          NotificationService.debugCancelChatCompleted = (id, notificationId) {
+            cancelled.add((id, notificationId));
+          };
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+            'conv-c': [_message('conv-c', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          expect(cancelled, [
+            (
+              'conv-a',
+              NotificationService.notificationIdForConversation('conv-a'),
+            ),
+          ]);
+
+          await switchAndSettle(tester, controller, service, 'conv-b');
+          expect(cancelled, [
+            (
+              'conv-a',
+              NotificationService.notificationIdForConversation('conv-a'),
+            ),
+            (
+              'conv-b',
+              NotificationService.notificationIdForConversation('conv-b'),
+            ),
+          ]);
+          expect(cancelled.where((entry) => entry.$1 == 'conv-c'), isEmpty);
+          await tester.pumpWidget(const SizedBox());
+        });
+      },
+    );
+
+    testWidgets('re-entering current conversation clears its notification', (
+      tester,
+    ) async {
+      await runAsMobile(() async {
+        addTearDown(NotificationService.debugReset);
+        final cancelled = <String>[];
+        NotificationService.debugCancelChatCompleted = (id, _) {
+          cancelled.add(id);
+        };
+        final service = _ControlledChatService({
+          'conv-a': [_message('conv-a', 0)],
+          'conv-b': [_message('conv-b', 0)],
+        });
+        final controller = await pumpHarness(tester, service);
+        await switchAndSettle(tester, controller, service, 'conv-a');
+        cancelled.clear();
+
+        await controller.switchConversationAnimated('conv-a');
+        await tester.pump();
+
+        expect(cancelled, ['conv-a']);
+        await tester.pumpWidget(const SizedBox());
+      });
+    });
+
+    testWidgets(
+      'superseded switch A -> B -> C and missing target never clear B or missing',
+      (tester) async {
+        await runAsMobile(() async {
+          addTearDown(NotificationService.debugReset);
+          final cancelled = <String>[];
+          NotificationService.debugCancelChatCompleted = (id, _) {
+            cancelled.add(id);
+          };
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+            'conv-c': [_message('conv-c', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          cancelled.clear();
+
+          final switchB = controller.switchConversationAnimated('conv-b');
+          for (var i = 0; i < 40 && service.pageRequests.length < 2; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(2));
+          final requestB = service.pageRequests.last;
+
+          final switchC = controller.switchConversationAnimated('conv-c');
+          for (var i = 0; i < 40 && service.pageRequests.length < 3; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(3));
+          final requestC = service.pageRequests.last;
+
+          service.completePage(
+            requestB,
+            service.messagesOf('conv-b'),
+            startIndex: 0,
+          );
+          await tester.pump();
+          expect(cancelled, isEmpty);
+
+          service.completePage(
+            requestC,
+            service.messagesOf('conv-c'),
+            startIndex: 0,
+          );
+          await pumpUntilDone(tester, [switchB, switchC]);
+          expect(cancelled, ['conv-c']);
+
+          cancelled.clear();
+          await pumpUntilDone(tester, [
+            controller.switchConversationAnimated('missing'),
+          ]);
+          expect(cancelled, isEmpty);
+          await tester.pumpWidget(const SizedBox());
+        });
+      },
+    );
+
+    testWidgets(
+      'resume clears active conversation only when visible and not covered',
+      (tester) async {
+        await runAsMobile(() async {
+          addTearDown(NotificationService.debugReset);
+          final cancelled = <String>[];
+          NotificationService.debugCancelChatCompleted = (id, _) {
+            cancelled.add(id);
+          };
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          cancelled.clear();
+
+          controller.onAppLifecycleStateChanged(AppLifecycleState.inactive);
+          controller.onAppLifecycleStateChanged(AppLifecycleState.hidden);
+          controller.onAppLifecycleStateChanged(AppLifecycleState.paused);
+          expect(cancelled, isEmpty);
+
+          controller.onAppLifecycleStateChanged(AppLifecycleState.resumed);
+          expect(cancelled, ['conv-a']);
+          cancelled.clear();
+
+          controller.onDidPushNext();
+          controller.onAppLifecycleStateChanged(AppLifecycleState.paused);
+          controller.onAppLifecycleStateChanged(AppLifecycleState.resumed);
+          expect(cancelled, isEmpty);
+
+          controller.onDidPopNext();
+          expect(cancelled, ['conv-a']);
+          cancelled.clear();
+
+          controller.onHomeVisibilityChanged(false);
+          controller.onAppLifecycleStateChanged(AppLifecycleState.resumed);
+          expect(cancelled, isEmpty);
+          controller.onHomeVisibilityChanged(true);
+          expect(cancelled, ['conv-a']);
+          await tester.pumpWidget(const SizedBox());
+        });
+      },
+    );
+
+    testWidgets(
+      'tapping notification for conv-b while covered pops without clearing conv-a and clears conv-b on commit',
+      (tester) async {
+        await runAsMobile(() async {
+          addTearDown(NotificationService.debugReset);
+          final cancelled = <String>[];
+          NotificationService.debugCancelChatCompleted = (id, _) {
+            cancelled.add(id);
+          };
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          controller.debugSetChatInitialized();
+          cancelled.clear();
+
+          controller.onDidPushNext();
+          controller.debugHandleNotificationConversationTap('conv-b');
+          await tester.pump();
+          expect(cancelled, isEmpty);
+
+          controller.onDidPopNext();
+          expect(cancelled, isEmpty);
+          for (var i = 0; i < 40 && service.pageRequests.length < 2; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(2));
+          service.completePage(
+            service.pageRequests.last,
+            service.messagesOf('conv-b'),
+            startIndex: 0,
+          );
+          for (
+            var i = 0;
+            i < 40 && controller.currentConversation?.id != 'conv-b';
+            i++
+          ) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+
+          expect(controller.currentConversation?.id, 'conv-b');
+          expect(cancelled, ['conv-b']);
+          await tester.pumpWidget(const SizedBox());
+        });
+      },
+    );
+
+    testWidgets(
+      'initChat clears restored recent conversation when no pending notification exists',
+      (tester) async {
+        await runAsMobile(() async {
+          const scheduledTasksChannel = MethodChannel('app.scheduled_tasks');
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            scheduledTasksChannel,
+            (call) async => call.method == 'list'
+                ? <String, Object?>{'tasks': <String>[], 'exactAlarms': false}
+                : null,
+          );
+          addTearDown(
+            () => tester.binding.defaultBinaryMessenger
+                .setMockMethodCallHandler(scheduledTasksChannel, null),
+          );
+          addTearDown(NotificationService.debugReset);
+          final cancelled = <String>[];
+          NotificationService.debugCancelChatCompleted = (id, _) {
+            cancelled.add(id);
+          };
+          final settings = _StartupSettingsProvider();
+          final assistants = _StartupAssistantProvider();
+
+          final service = _StartupControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(
+            tester,
+            service,
+            settingsProvider: settings,
+            assistantProvider: assistants,
+            isAndroidOverride: true,
+          );
+
+          final initFuture = controller.initChat();
+          for (var i = 0; i < 40 && service.pageRequests.isEmpty; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(1));
+          service.completePage(
+            service.pageRequests.single,
+            service.messagesOf('conv-a'),
+            startIndex: 0,
+          );
+          var initDone = false;
+          unawaited(initFuture.whenComplete(() => initDone = true));
+          for (var i = 0; i < 40 && !initDone; i++) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+          expect(initDone, isTrue);
+          await initFuture;
+
+          expect(controller.currentConversation?.id, 'conv-a');
+          expect(cancelled, ['conv-a']);
+          await tester.pumpWidget(const SizedBox());
+          settings.dispose();
+          assistants.dispose();
+        });
+      },
+    );
+
+    testWidgets(
+      'initChat skips clearing recent conversation when cold-start notification targets another conversation',
+      (tester) async {
+        await runAsMobile(() async {
+          const scheduledTasksChannel = MethodChannel('app.scheduled_tasks');
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            scheduledTasksChannel,
+            (call) async => call.method == 'list'
+                ? <String, Object?>{'tasks': <String>[], 'exactAlarms': false}
+                : null,
+          );
+          addTearDown(
+            () => tester.binding.defaultBinaryMessenger
+                .setMockMethodCallHandler(scheduledTasksChannel, null),
+          );
+          addTearDown(NotificationService.debugReset);
+          addTearDown(NotificationService.takePendingConversationId);
+          final cancelled = <String>[];
+          NotificationService.debugCancelChatCompleted = (id, _) {
+            cancelled.add(id);
+          };
+          NotificationService.openConversation('conv-b');
+          final settings = _StartupSettingsProvider();
+          final assistants = _StartupAssistantProvider();
+
+          final service = _StartupControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(
+            tester,
+            service,
+            settingsProvider: settings,
+            assistantProvider: assistants,
+            isAndroidOverride: true,
+          );
+
+          final initFuture = controller.initChat();
+          for (var i = 0; i < 40 && service.pageRequests.isEmpty; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(1));
+          service.completePage(
+            service.pageRequests.single,
+            service.messagesOf('conv-a'),
+            startIndex: 0,
+          );
+          var initDone = false;
+          unawaited(initFuture.whenComplete(() => initDone = true));
+          for (var i = 0; i < 40 && !initDone; i++) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+          expect(initDone, isTrue);
+          await initFuture;
+          expect(cancelled, isEmpty);
+
+          for (
+            var i = 0;
+            i < 40 && controller.currentConversation?.id != 'conv-b';
+            i++
+          ) {
+            for (final req in service.pageRequests) {
+              if (!req.completer.isCompleted &&
+                  req.conversationId == 'conv-b') {
+                service.completePage(
+                  req,
+                  service.messagesOf('conv-b'),
+                  startIndex: 0,
+                );
+              }
+            }
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+
+          expect(controller.currentConversation?.id, 'conv-b');
+          expect(cancelled, ['conv-b']);
+          await tester.pumpWidget(const SizedBox());
+          settings.dispose();
+          assistants.dispose();
+        });
+      },
+    );
+  });
 }
 
 class _ControllerHarness extends StatefulWidget {
-  const _ControllerHarness({required this.onCreated, this.timeline});
+  const _ControllerHarness({
+    required this.onCreated,
+    this.timeline,
+    this.isAndroidOverride,
+  });
 
   final ValueChanged<HomePageController> onCreated;
   final Widget Function(HomePageController)? timeline;
+  final bool? isAndroidOverride;
 
   @override
   State<_ControllerHarness> createState() => _ControllerHarnessState();
@@ -1645,6 +2062,7 @@ class _ControllerHarnessState extends State<_ControllerHarness>
       inputController: _inputController,
       mediaController: _mediaController,
       scrollController: _scrollController,
+      isAndroidOverride: widget.isAndroidOverride,
     );
     widget.onCreated(_controller);
   }

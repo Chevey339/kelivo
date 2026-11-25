@@ -30,6 +30,18 @@ class NotificationService {
 
   static bool _inited = false;
   static Future<void>? _initialization;
+  static final Map<String, int> _chatCompletionTokens = <String, int>{};
+
+  @visibleForTesting
+  static FutureOr<void> Function(String conversationId, int notificationId)?
+  debugCancelChatCompleted;
+
+  @visibleForTesting
+  static void debugReset() {
+    _chatCompletionTokens.clear();
+    debugCancelChatCompleted = null;
+  }
+
   static String? _pendingConversationId;
   static final Map<String, String> _pendingMessageIds = {};
   static final Map<String, String> _pendingComposerText = {};
@@ -152,7 +164,9 @@ class NotificationService {
   }) async {
     if (!Platform.isAndroid && !Platform.isIOS) return;
     if (conversationId.trim().isEmpty) return;
-    await ensureInitialized();
+    final token = _chatCompletionTokens[conversationId] ?? 0;
+    if (!_inited) await ensureInitialized();
+    if ((_chatCompletionTokens[conversationId] ?? 0) != token) return;
     await _plugin.show(
       notificationIdForConversation(conversationId),
       title ?? 'Generation complete',
@@ -181,6 +195,26 @@ class NotificationService {
       ),
       payload: '$_chatCompletionPayloadPrefix$conversationId',
     );
+  }
+
+  /// Cancels the per-conversation completion notification if present.
+  static Future<void> cancelChatCompleted(String? conversationId) async {
+    if (conversationId == null || conversationId.trim().isEmpty) return;
+    final notificationId = notificationIdForConversation(conversationId);
+    _chatCompletionTokens[conversationId] =
+        (_chatCompletionTokens[conversationId] ?? 0) + 1;
+    final override = debugCancelChatCompleted;
+    if (override != null) {
+      try {
+        await override(conversationId, notificationId);
+      } catch (_) {}
+      return;
+    }
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    try {
+      if (!_inited) await ensureInitialized();
+      await _plugin.cancel(notificationId);
+    } catch (_) {}
   }
 
   static void _handleNotificationResponse(NotificationResponse response) {
