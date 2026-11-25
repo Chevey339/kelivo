@@ -17,6 +17,7 @@ import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
 import '../services/media/openrouter_media_catalog.dart';
+import '../services/media/fal_model_discovery.dart';
 import '../services/media/replicate_models.dart';
 import '../services/media/modelscope_models.dart';
 import '../services/media/gemini_media_models.dart';
@@ -61,6 +62,17 @@ class OpenAIProvider extends BaseProvider {
 
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    if (cfg.isFal) {
+      final client = providerHttpClient(
+        cfg,
+        timeout: const Duration(seconds: 15),
+      );
+      try {
+        return await FalModelDiscovery.forProvider(client, cfg).listModels();
+      } finally {
+        client.close();
+      }
+    }
     final replaceMetadata = await _resolver.startModelListRefresh(cfg);
     if (ReplicateMediaModel.isHost(Uri.tryParse(cfg.baseUrl)?.host)) {
       await replaceMetadata(const []);

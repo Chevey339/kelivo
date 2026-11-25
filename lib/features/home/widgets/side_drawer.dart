@@ -4467,6 +4467,7 @@ class _MobileAssistantBlock extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [if (belowList) content, header, if (!belowList) content],
       ),
     );

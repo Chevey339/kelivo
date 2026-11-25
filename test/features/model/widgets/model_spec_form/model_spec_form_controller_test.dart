@@ -46,6 +46,33 @@ void main() {
   });
 
   test(
+    'manual fal video with a new endpoint ID survives editing and reload',
+    () async {
+      final config = ProviderConfig.defaultsFor('fal').copyWith(enabled: true);
+      final settings = await _settings(config);
+      addTearDown(settings.dispose);
+      final form = ModelSpecFormController(
+        config: config,
+        modelKey: '',
+        isNew: true,
+      );
+      addTearDown(form.dispose);
+      form.apiModelIdController.text = 'private-model';
+      expect(await form.save(settings), isFalse);
+      const id = 'my-team/new-motion';
+      form.apiModelIdController.text = id;
+      form.setApiModelId(id);
+      form.setType(ModelType.video);
+      expect(await form.save(settings), isTrue);
+      final saved = ProviderConfig.fromJson(
+        settings.getProviderConfig('fal').toJson(),
+      );
+      expect(saved.models, contains(id));
+      expect(ModelSpecResolver.instance.spec(saved, id).type, ModelType.video);
+    },
+  );
+
+  test(
     'chat image aliases preview, persist and clear a per-model creation protocol',
     () async {
       const id = 'my-image-model';

@@ -18309,14 +18309,21 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get creationFalCatalogHint =>
-      'Kelivo, fal’ın modellerini ve parametrelerini içerir. Getir, kaldırılan modelleri geri yükler.';
+      'fal’ın canlı kataloğuna göz atmak için Getir’i kullanın veya uç nokta kimliğiyle model eklemek için + simgesini kullanın.';
+
+  @override
+  String get falCatalogMore => 'Daha fazla model yükle';
+
+  @override
+  String get falCatalogNoMatch => 'Eşleşen görsel veya video modeli yok';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return 'fal model verileri yüklenemedi ($error)';
+  }
 
   @override
   String get creationFalModelId => 'model ID';
-
-  @override
-  String get creationOpenAiMediaPaths =>
-      'Görsel /images/generations · Video /videos';
 
   @override
   String get creationSelectPlatformImage => 'Görsel seç';

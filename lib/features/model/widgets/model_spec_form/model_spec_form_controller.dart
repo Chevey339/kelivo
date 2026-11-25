@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../../../core/services/media/fal_model_catalog.dart';
+
 import 'package:flutter/widgets.dart';
 
 import '../../../../core/models/media_creation.dart';
@@ -880,6 +882,7 @@ class ModelSpecFormController extends ChangeNotifier {
     if (!_validMediaExtra) return false;
     final apiModelId = apiModelIdController.text.trim();
     if (apiModelId.isEmpty || apiModelId.length < 2) return false;
+    if (config.isFal && !isFalEndpointId(apiModelId)) return false;
     if (_invalidNumber(contextWindowController.text) ||
         _invalidNumber(maxOutputController.text) ||
         _invalidNumber(pricingInputController.text, decimal: true) ||

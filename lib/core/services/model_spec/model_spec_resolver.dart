@@ -426,7 +426,7 @@ class ModelSpecResolver {
       }
     }
     if (cfg.isFal) {
-      final fal = falModels[upstreamId];
+      final fal = resolveFalModel(upstreamId, cfg.modelOverrides[modelKey]);
       final video = fal?.video ?? type == ModelType.video;
       base = base.copyWith(
         displayName: displayName ?? fal?.name ?? modelKey,

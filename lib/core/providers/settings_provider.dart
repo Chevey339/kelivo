@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:collection';
+import 'package:collection/collection.dart' show DeepCollectionEquality;
 import 'dart:io';
 import 'package:socks5_proxy/socks_client.dart' as socks;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -122,9 +123,6 @@ class SettingsProvider extends ChangeNotifier {
     'Grok',
     'ByteDance',
     'fal',
-    'Replicate',
-    'ModelScope',
-    'BytePlus',
   ];
   static const Set<String> _builtInProviderKeys = {
     ..._builtInProviderKeysInOrder,
@@ -1673,6 +1671,31 @@ class SettingsProvider extends ChangeNotifier {
     await _reloadLocalFontsIfAny();
 
     // Final cleanup pass for provider order + grouping state (best-effort).
+    // Reordering providers in the preview also persisted unused presets.
+    // Keep entries with settings, models, or a group chosen by the user.
+    var removedUnusedPreset = false;
+    for (final key in const ['Replicate', 'ModelScope', 'BytePlus']) {
+      final saved = _providerConfigs[key];
+      if (saved == null ||
+          saved.enabled ||
+          saved.apiKey.isNotEmpty ||
+          saved.modelOverrides.isNotEmpty ||
+          _providerGroupMap.containsKey(key)) {
+        continue;
+      }
+      final preset = ProviderConfig.defaultsFor(key);
+      if (listEquals(saved.models, preset.models) &&
+          const DeepCollectionEquality().equals(
+            saved.toJson(),
+            preset.toJson(),
+          )) {
+        _providerConfigs.remove(key);
+        removedUnusedPreset = true;
+      }
+    }
+    if (removedUnusedPreset) {
+      await prefs.setString(_providerConfigsKey, jsonEncode(_providerConfigs));
+    }
     if (_cleanupProviderOrderAndGrouping()) {
       try {
         await prefs.setStringList(_providersOrderKey, _providersOrder);
@@ -7087,8 +7110,6 @@ class ProviderConfig {
   final String? oauthModelsClientVersion;
   bool get isOAuth => oauthProvider != null;
   bool get isFal => id == 'fal';
-  ProviderConfig withBuiltInFalModels() =>
-      copyWith(models: {...models, ...falModels.keys}.toList());
   final String baseUrl;
   final bool autoVersionDisabled;
   final ProviderKind?

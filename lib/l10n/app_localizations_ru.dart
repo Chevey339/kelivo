@@ -18525,14 +18525,22 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get creationFalCatalogHint =>
-      'Kelivo включает модели и параметры fal. «Получить» восстановит удалённые модели.';
+      'Нажмите «Загрузить», чтобы просмотреть актуальный каталог fal, или «+», чтобы добавить модель по её endpoint ID.';
+
+  @override
+  String get falCatalogMore => 'Загрузить ещё модели';
+
+  @override
+  String get falCatalogNoMatch =>
+      'Нет подходящих моделей изображений или видео';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return 'Не удалось загрузить данные моделей fal ($error)';
+  }
 
   @override
   String get creationFalModelId => 'ID модели';
-
-  @override
-  String get creationOpenAiMediaPaths =>
-      'Изображения /images/generations · Видео /videos';
 
   @override
   String get creationSelectPlatformImage => 'Выбрать изображение';

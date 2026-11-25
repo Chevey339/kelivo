@@ -18202,14 +18202,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get creationFalCatalogHint =>
-      'Kelivo includes fal’s models and parameters. Fetch restores removed models.';
+      'Use Fetch to browse fal’s live catalog, or use + to add a model by its endpoint ID.';
+
+  @override
+  String get falCatalogMore => 'Load more models';
+
+  @override
+  String get falCatalogNoMatch => 'No matching image or video models';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return 'Could not load fal model data ($error)';
+  }
 
   @override
   String get creationFalModelId => 'model ID';
-
-  @override
-  String get creationOpenAiMediaPaths =>
-      'Image /images/generations · Video /videos';
 
   @override
   String get creationSelectPlatformImage => 'Choose image';

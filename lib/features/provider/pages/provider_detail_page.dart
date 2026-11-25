@@ -4,6 +4,7 @@ import '../widgets/provider_test_details.dart';
 import '../utils/provider_url_editor.dart';
 import '../widgets/provider_input_row.dart';
 import '../widgets/fal_catalog_notice.dart';
+import '../widgets/fal_model_picker.dart';
 import '../widgets/provider_base_url_field.dart';
 import '../widgets/provider_icon_picker.dart';
 import '../widgets/provider_sponsor_card.dart';
@@ -3057,7 +3058,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       defaultName: widget.displayName,
     );
     if (cfg.isFal) {
-      await settings.setProviderConfig(cfg.id, cfg.withBuiltInFalModels());
+      await showFalModelPicker(context, cfg, desktop: false);
       return;
     }
     final controller = TextEditingController();

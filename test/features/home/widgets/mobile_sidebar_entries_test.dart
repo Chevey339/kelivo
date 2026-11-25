@@ -64,6 +64,13 @@ void main() {
     await tester.longPress(find.text(l10n.sideDrawerHistory));
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(Divider),
+      ),
+      findsNothing,
+    );
     await tester.tap(find.text(SidebarVisibility.hidden.menuLabel(l10n)));
     await tester.pumpAndSettle();
     expect(

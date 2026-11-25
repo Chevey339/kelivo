@@ -334,9 +334,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'Grok', key: 'Grok'),
       (name: l10n.providersPageByteDanceName, key: 'ByteDance'),
       (name: 'fal', key: 'fal'),
-      (name: 'Replicate', key: 'Replicate'),
-      (name: 'ModelScope', key: 'ModelScope'),
-      (name: 'BytePlus', key: 'BytePlus'),
     ];
 
     final cfgs = settings.providerConfigs;
@@ -2201,9 +2198,10 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                               widget.providerKey,
                             );
                             if (current.isFal) {
-                              await sp.setProviderConfig(
-                                current.id,
-                                current.withBuiltInFalModels(),
+                              await showFalModelPicker(
+                                context,
+                                current,
+                                desktop: true,
                               );
                               return;
                             }

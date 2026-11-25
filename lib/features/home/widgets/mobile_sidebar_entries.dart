@@ -44,7 +44,6 @@ void _showEntryActions(
       ActionSheetItem(
         icon: Lucide.Settings2,
         label: l10n.sidebarCustomize,
-        startsGroup: true,
         onTap:
             openSettings ??
             () {

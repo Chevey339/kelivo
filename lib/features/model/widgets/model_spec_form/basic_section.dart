@@ -64,7 +64,9 @@ class BasicSection extends StatelessWidget {
               IosFormTextField(
                 label: '',
                 controller: controller.apiModelIdController,
-                hintText: l10n.modelDetailSheetModelIdHint,
+                hintText: controller.config.isFal
+                    ? 'fal-ai/flux/dev'
+                    : l10n.modelDetailSheetModelIdHint,
                 inlineLabel: false,
                 onChanged: controller.setApiModelId,
               )

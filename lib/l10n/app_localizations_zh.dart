@@ -17175,14 +17175,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 创建后粘贴到这里';
 
   @override
-  String get creationFalCatalogHint =>
-      'fal 的模型列表和每个模型的参数由 Kelivo 内置，「获取」会补回被移除的模型。';
+  String get creationFalCatalogHint => '点「获取」浏览 fal 在线模型目录，或点「＋」按端点 ID 手动添加。';
+
+  @override
+  String get falCatalogMore => '加载更多模型';
+
+  @override
+  String get falCatalogNoMatch => '没有匹配的图像或视频模型';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return '无法获取 fal 模型信息（$error）';
+  }
 
   @override
   String get creationFalModelId => '模型 ID';
-
-  @override
-  String get creationOpenAiMediaPaths => '图像 /images/generations · 视频 /videos';
 
   @override
   String get creationSelectPlatformImage => '选择图片';
@@ -34940,14 +34947,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 创建后粘贴到这里';
 
   @override
-  String get creationFalCatalogHint =>
-      'fal 的模型列表和每个模型的参数由 Kelivo 内置，「获取」会补回被移除的模型。';
+  String get creationFalCatalogHint => '点「获取」浏览 fal 在线模型目录，或点「＋」按端点 ID 手动添加。';
+
+  @override
+  String get falCatalogMore => '加载更多模型';
+
+  @override
+  String get falCatalogNoMatch => '没有匹配的图像或视频模型';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return '无法获取 fal 模型信息（$error）';
+  }
 
   @override
   String get creationFalModelId => '模型 ID';
-
-  @override
-  String get creationOpenAiMediaPaths => '图像 /images/generations · 视频 /videos';
 
   @override
   String get creationSelectPlatformImage => '选择图片';
@@ -52756,14 +52770,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get creationFalKeyHint => '在 fal.ai › Dashboard › API Keys 建立後貼到這裡';
 
   @override
-  String get creationFalCatalogHint =>
-      'fal 的模型列表和每個模型的參數由 Kelivo 內建，「取得」會補回被移除的模型。';
+  String get creationFalCatalogHint => '點「取得」瀏覽 fal 線上模型目錄，或點「＋」依端點 ID 手動新增。';
+
+  @override
+  String get falCatalogMore => '載入更多模型';
+
+  @override
+  String get falCatalogNoMatch => '沒有符合的圖像或影片模型';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return '無法取得 fal 模型資訊（$error）';
+  }
 
   @override
   String get creationFalModelId => '模型 ID';
-
-  @override
-  String get creationOpenAiMediaPaths => '圖像 /images/generations · 影片 /videos';
 
   @override
   String get creationSelectPlatformImage => '選擇圖片';

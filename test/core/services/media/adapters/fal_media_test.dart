@@ -7,6 +7,7 @@ import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/media/adapters/fal_media.dart';
 import 'package:Kelivo/core/services/media/media_request.dart';
+import 'package:Kelivo/core/services/media/fal_model_discovery.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 
@@ -58,7 +59,7 @@ void main() {
   );
 
   test(
-    'fal starts disabled with a local media catalog and refills removed models',
+    'fal starts disabled and supports manual models alongside its initial catalog',
     () {
       const id = 'fal-ai/flux-2-pro';
       final initial = ProviderConfig.defaultsFor('fal');
@@ -70,18 +71,123 @@ void main() {
         models: ['personal/image'],
         disabledModels: const {id},
       );
-      final refilled = trimmed.withBuiltInFalModels();
-      expect(refilled.models.first, 'personal/image');
-      expect(refilled.models, containsAll(initial.models));
-      expect(refilled.isModelEnabled(id), isFalse);
+      expect(trimmed.models, ['personal/image']);
+      expect(trimmed.isModelEnabled(id), isFalse);
       final resolver = ModelSpecResolver.instance;
-      expect(resolver.spec(refilled, id).displayName, 'FLUX.2 Pro');
-      expect(resolver.spec(refilled, id).type, ModelType.image);
+      expect(resolver.spec(trimmed, id).displayName, 'FLUX.2 Pro');
+      expect(resolver.spec(trimmed, id).type, ModelType.image);
       expect(
-        resolver.spec(refilled, 'minimax/h3-max/text-to-video').type,
+        resolver.spec(trimmed, 'minimax/h3-max/text-to-video').type,
         ModelType.video,
       );
-      expect(resolver.spec(refilled, 'personal/image').type, ModelType.image);
+      expect(resolver.spec(trimmed, 'personal/image').type, ModelType.image);
+    },
+  );
+
+  test(
+    'discovery keeps credentials on the official catalog and follows each cursor once',
+    () async {
+      final calls = <Uri>[];
+      final client = MockClient((request) async {
+        calls.add(request.url);
+        expect(request.headers['authorization'], 'Key fixture');
+        final page = calls.length;
+        return videoJson({
+          'models': [
+            {
+              'endpoint_id': 'studio/model-$page',
+              'metadata': {
+                'display_name': 'Model $page',
+                'category': page == 1 ? 'text-to-image' : 'text-to-video',
+                'status': 'active',
+              },
+            },
+          ],
+          'has_more': true,
+          'next_cursor': 'same',
+        });
+      });
+      final official = ProviderConfig.defaultsFor(
+        'fal',
+      ).copyWith(apiKey: 'fixture');
+      final list = await FalModelDiscovery.forProvider(
+        client,
+        official,
+      ).listModels();
+      expect(calls.map((uri) => uri.host), everyElement('api.fal.ai'));
+      expect(calls.last.queryParameters['cursor'], 'same');
+      expect(list.map((m) => m.type), [ModelType.image, ModelType.video]);
+      final proxy = official.copyWith(baseUrl: 'https://my-relay.example');
+      expect(FalModelDiscovery.forProvider(client, proxy).apiKey, isEmpty);
+      client.close();
+    },
+  );
+
+  test(
+    'a discovered editing endpoint submits its declared fields and accepts a single output image',
+    () async {
+      const id = 'studio/new-editor';
+      final provider = ProviderConfig.defaultsFor('fal').copyWith(
+        models: [id],
+        modelOverrides: {
+          id: {
+            'falEndpoint': {
+              'id': id,
+              'category': 'image-to-image',
+              'name': 'Studio editor',
+              'fields': {
+                'input_image_url': {'required': true},
+                'resolution': {
+                  'choices': ['1K', '2K'],
+                },
+                'aspect_ratio': {
+                  'choices': ['auto', '4:3'],
+                },
+                'output_format': {
+                  'choices': ['jpeg', 'png'],
+                },
+              },
+            },
+          },
+        },
+      );
+      final folder = await Directory.systemTemp.createTemp('fal-catalog-edit');
+      addTearDown(() => folder.delete(recursive: true));
+      final ref = await File('${folder.path}/ref.png').writeAsBytes([1]);
+      final client = MockClient((request) async {
+        if (request.method == 'POST') {
+          expect(request.url.path, '/$id');
+          expect(jsonDecode(request.body), {
+            'prompt': 'Ink drawing',
+            'resolution': '2K',
+            'aspect_ratio': '4:3',
+            'input_image_url': 'data:image/png;base64,AQ==',
+            'output_format': 'png',
+          });
+          return videoJson({'request_id': 'one', 'status': 'COMPLETED'});
+        }
+        return videoJson({
+          'image': {'url': 'https://cdn.example.test/ink.png'},
+        });
+      });
+      final events = await const FalMediaAdapter(MediaMode.image)
+          .generate(
+            videoContext(provider, client),
+            MediaRequest(
+              modelId: id,
+              mode: MediaMode.image,
+              prompt: 'Ink drawing',
+              aspectRatio: '4:3',
+              references: [MediaReference(ref.path)],
+              parameters: const {'size': '2K', 'format': 'png'},
+            ),
+          )
+          .toList();
+      expect(
+        events.whereType<MediaOutput>().single.results.single.url!.path,
+        '/ink.png',
+      );
+      client.close();
     },
   );
 

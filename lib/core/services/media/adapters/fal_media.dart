@@ -13,7 +13,7 @@ class FalMediaAdapter implements MediaAdapter {
   final MediaMode mode;
 
   static FalModel? knownModel(ProviderConfig provider, String id) =>
-      falModels[apiModelId(provider, id)];
+      resolveFalModel(apiModelId(provider, id), provider.modelOverrides[id]);
 
   @override
   MediaCapabilities capabilities(ProviderConfig provider, String modelId) =>
@@ -40,8 +40,7 @@ class FalMediaAdapter implements MediaAdapter {
   ) async* {
     final model = apiModelId(context.provider, request.modelId);
     final segments = model.split('/');
-    if (segments.length < 2 ||
-        !segments.every(RegExp(r'^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$').hasMatch)) {
+    if (!isFalEndpointId(model)) {
       throw const MediaFailure(
         MediaFailureKind.parameters,
         'Invalid fal model ID',
@@ -74,8 +73,11 @@ class FalMediaAdapter implements MediaAdapter {
             : request.aspectRatio,
       if (ratioField == 'image_size' &&
           request.aspectRatio == 'auto' &&
-          size is String)
+          size is String &&
+          details?.imageResolutionField != true)
         'image_size': 'auto_$size',
+      if (details?.imageResolutionField == true && size is String)
+        'resolution': size,
       if (request.count > 1 && !video) 'num_images': request.count,
       if (request.negativePrompt case final value?) 'negative_prompt': value,
       if (request.parameters['format'] case final String format)
@@ -91,7 +93,9 @@ class FalMediaAdapter implements MediaAdapter {
         (details?.firstFrameField ?? 'image_url'): await mediaReferenceDataUri(
           first,
         ),
-      if (last != null) 'end_image_url': await mediaReferenceDataUri(last),
+      if (last != null)
+        (details?.lastFrameField ?? 'end_image_url'):
+            await mediaReferenceDataUri(last),
       if (details?.requiresPromptExpansion == true)
         'prompt_expansion_mode': 'balanced',
       for (final field in caps.platformOptions)
@@ -107,7 +111,7 @@ class FalMediaAdapter implements MediaAdapter {
         for (final ref in request.inputImages) await mediaReferenceDataUri(ref),
       ];
       final field = details?.imageField ?? 'image_urls';
-      update[field] = field == 'image_url' ? refs.first : refs;
+      update[field] = field.endsWith('_urls') ? refs : refs.first;
     }
     final endpoint = context.endpoint(model);
     final headers = context.headers(
@@ -164,15 +168,14 @@ class FalMediaAdapter implements MediaAdapter {
           resultUrl,
           headers: headers,
         );
-        if (video) {
-          final row = output['video'] as Map?;
-          final result = _result(row, video: true);
-          return result == null ? [] : [result];
-        }
+        final rows = output[video ? 'videos' : 'images'];
+        final single = output[video ? 'video' : 'image'];
         return [
           for (final row
-              in (output['images'] as List? ?? const []).whereType<Map>())
-            if (_result(row, video: false) case final result?) result,
+              in rows is List
+                  ? rows.whereType<Map>()
+                  : [if (single is Map) single])
+            if (_result(row, video: video) case final result?) result,
         ];
       },
     );

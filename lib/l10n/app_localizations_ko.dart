@@ -17644,14 +17644,21 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get creationFalCatalogHint =>
-      'fal의 모델 목록과 각 모델의 매개변수는 Kelivo에 내장되어 있으며, 가져오기를 하면 제거된 모델이 복원됩니다.';
+      '「가져오기」를 사용해 fal의 실시간 카탈로그를 둘러보거나, +를 사용해 엔드포인트 ID로 모델을 추가하세요.';
+
+  @override
+  String get falCatalogMore => '모델 더 불러오기';
+
+  @override
+  String get falCatalogNoMatch => '일치하는 이미지 또는 비디오 모델이 없습니다';
+
+  @override
+  String falCatalogLoadFailed(String error) {
+    return 'fal 모델 데이터를 불러올 수 없습니다 ($error)';
+  }
 
   @override
   String get creationFalModelId => '모델 ID';
-
-  @override
-  String get creationOpenAiMediaPaths =>
-      '이미지 /images/generations · 비디오 /videos';
 
   @override
   String get creationSelectPlatformImage => '이미지 선택';

@@ -31818,23 +31818,35 @@ abstract class AppLocalizations {
   /// **'Create a key in fal.ai › Dashboard › API Keys'**
   String get creationFalKeyHint;
 
-  /// Information card above the fal model list on mobile and desktop.
+  /// Hint above the fal provider model list explaining live catalog discovery with Fetch and manual entry of a fal endpoint ID with the plus button.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo includes fal’s models and parameters. Fetch restores removed models.'**
+  /// **'Use Fetch to browse fal’s live catalog, or use + to add a model by its endpoint ID.'**
   String get creationFalCatalogHint;
+
+  /// Button at the bottom of the fal catalog that loads the next page of matching endpoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more models'**
+  String get falCatalogMore;
+
+  /// Empty search result in the fal model picker when the active catalog has no matching creation endpoints.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching image or video models'**
+  String get falCatalogNoMatch;
+
+  /// Network or catalog error in the fal model picker. The error placeholder contains the reason returned by the client.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load fal model data ({error})'**
+  String falCatalogLoadFailed(String error);
 
   /// Placeholder segment in the built-in fal provider's request URL preview.
   ///
   /// In en, this message translates to:
   /// **'model ID'**
   String get creationFalModelId;
-
-  /// Additional endpoint hint under the API base URL in OpenAI-compatible provider settings.
-  ///
-  /// In en, this message translates to:
-  /// **'Image /images/generations · Video /videos'**
-  String get creationOpenAiMediaPaths;
 
   /// Button for the provider-specific file parameter in More options.
   ///

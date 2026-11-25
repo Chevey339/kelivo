@@ -228,16 +228,6 @@ class ProviderRequestUrlPreview extends StatelessWidget {
               fontWeight: AppFontWeights.semibold,
             ),
           ),
-          if (!config.isFal &&
-              ProviderConfig.classify(
-                    config.id,
-                    explicitType: config.providerType,
-                  ) ==
-                  ProviderKind.openai)
-            TextSpan(
-              text: '\n${l10n.creationOpenAiMediaPaths}',
-              style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
-            ),
         ],
       ),
       style: const TextStyle(fontSize: 12, height: 1.4),

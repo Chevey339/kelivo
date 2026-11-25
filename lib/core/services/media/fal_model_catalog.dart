@@ -1,6 +1,167 @@
 import 'adapters/native_image_size.dart';
 import 'media_request.dart';
 
+const falCreationCategories = {
+  'text-to-image',
+  'image-to-image',
+  'text-to-video',
+  'image-to-video',
+};
+final _falIdSegment = RegExp(r'^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$');
+bool isFalEndpointId(String id) =>
+    id.contains('/') && id.split('/').every(_falIdSegment.hasMatch);
+
+const _imageFields = [
+  'image_urls',
+  'input_image_urls',
+  'reference_image_urls',
+  'image_url',
+  'input_image_url',
+  'reference_image_url',
+];
+const _firstFrameFields = [
+  'start_image_url',
+  'first_frame_url',
+  'first_frame_image_url',
+  'first_image_url',
+  'image_url',
+  'input_image_url',
+];
+const _lastFrameFields = [
+  'end_image_url',
+  'last_frame_url',
+  'last_frame_image_url',
+  'last_image_url',
+];
+final falInputFields = <String>{
+  ..._imageFields,
+  ..._firstFrameFields,
+  ..._lastFrameFields,
+  'aspect_ratio',
+  'image_size',
+  'num_images',
+  'duration',
+  'resolution',
+  'output_format',
+  'negative_prompt',
+  'seed',
+  'mask_url',
+  'generate_audio',
+};
+
+/// Curated models retain their hand-tested limits. Newly selected endpoints
+/// describe their own wire fields; an alias must never reuse another ID's schema.
+FalModel? resolveFalModel(String id, Object? override) {
+  final known = falModels[id];
+  if (known != null) return known;
+  final raw = override is Map ? override['falEndpoint'] : null;
+  if (raw is! Map ||
+      raw['id'] != id ||
+      !falCreationCategories.contains(raw['category'])) {
+    return null;
+  }
+  final fields = raw['fields'];
+  if (fields is! Map) return null;
+  final category = raw['category'] as String;
+  final video = category.endsWith('-to-video');
+  final imageInput = category.startsWith('image-');
+  Map field(String key) => fields[key] is Map ? fields[key] as Map : const {};
+  List<Object?> values(String key) =>
+      field(key)['choices'] is List ? field(key)['choices'] as List : const [];
+  final ratio = fields.containsKey('aspect_ratio')
+      ? 'aspect_ratio'
+      : field('image_size')['object'] == true
+      ? 'image_size'
+      : null;
+  final ratios = ratio == 'image_size'
+      ? standardImageRatios
+      : [
+          'auto',
+          ...values(
+            'aspect_ratio',
+          ).whereType<String>().where((v) => v.contains(':')),
+        ];
+  final genericInput = fields.isEmpty && imageInput ? 'image_url' : null;
+  final image =
+      _imageFields.where(fields.containsKey).firstOrNull ?? genericInput;
+  final first =
+      _firstFrameFields.where(fields.containsKey).firstOrNull ?? genericInput;
+  final last = _lastFrameFields.where(fields.containsKey).firstOrNull;
+  final duration = field('duration');
+  final durations = [
+    for (final value in values('duration'))
+      if (int.tryParse(value.toString()) case final int seconds
+          when seconds > 0)
+        seconds,
+  ];
+  if (durations.isEmpty && duration['min'] is int && duration['max'] is int) {
+    final min = (duration['min'] as int).clamp(1, 120);
+    final max = (duration['max'] as int).clamp(1, 120);
+    for (var seconds = min; seconds <= max; seconds++) {
+      durations.add(seconds);
+    }
+  }
+  int boundedInt(Object? value, int fallback) =>
+      value is int ? value.clamp(1, 16) : fallback;
+  final imageLimit = image == null
+      ? 0
+      : image.endsWith('_urls')
+      ? boundedInt(field(image)['maxItems'], 1)
+      : 1;
+  final resolutions = values('resolution').whereType<String>().toList();
+  return FalModel(
+    raw['name'] is String ? raw['name'] as String : id,
+    MediaCapabilities(
+      aspectRatios: ratios,
+      fixedAspectRatio: ratio == null,
+      maxPerRequest: boundedInt(field('num_images')['max'], 1),
+      maxReferences: video
+          ? (first == null
+                ? 0
+                : last == null
+                ? 1
+                : 2)
+          : imageLimit,
+      requiresReference:
+          !video &&
+          image != null &&
+          (imageInput || field(image)['required'] == true),
+      requiresFirstFrame:
+          video &&
+          first != null &&
+          (imageInput || field(first)['required'] == true),
+      frameRoles: [
+        if (video && first != null) MediaReferenceRole.firstFrame,
+        if (video && first != null && last != null)
+          MediaReferenceRole.lastFrame,
+      ],
+      durations: durations,
+      resolutions: video ? resolutions : const [],
+      sizes: video ? const [] : resolutions,
+      formats: values('output_format').whereType<String>().toList(),
+      supportsSeed: fields.containsKey('seed'),
+      supportsNegativePrompt: fields.containsKey('negative_prompt'),
+      platformOptions: [
+        if (fields.containsKey('mask_url'))
+          MediaParameter(
+            'mask_url',
+            MediaParameterType.image,
+            required: field('mask_url')['required'] == true,
+          ),
+        if (fields.containsKey('generate_audio'))
+          const MediaParameter('generate_audio', MediaParameterType.boolean),
+      ],
+    ),
+    video: video,
+    imageField: image ?? 'image_url',
+    firstFrameField: first ?? 'image_url',
+    lastFrameField: last ?? 'end_image_url',
+    ratioField: ratio,
+    durationAsString: duration['string'] == true,
+    imageResolutionField: !video && resolutions.isNotEmpty,
+  );
+}
+
 class FalModel {
   const FalModel(
     this.name,
@@ -9,6 +170,8 @@ class FalModel {
     this.imageField = 'image_urls',
     this.video = false,
     this.firstFrameField = 'image_url',
+    this.lastFrameField = 'end_image_url',
+    this.imageResolutionField = false,
     this.resolutionUppercase = false,
     this.durationAsString = false,
     this.requiresPromptExpansion = false,
@@ -17,8 +180,9 @@ class FalModel {
   final String name;
   final MediaCapabilities capabilities;
   final String? ratioField;
-  final String imageField, firstFrameField;
+  final String imageField, firstFrameField, lastFrameField;
   final bool video,
+      imageResolutionField,
       resolutionUppercase,
       durationAsString,
       requiresPromptExpansion;
