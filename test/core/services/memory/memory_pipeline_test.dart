@@ -7,6 +7,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/auto_retry_options.dart';
 import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
@@ -14,6 +15,7 @@ import 'package:Kelivo/core/models/memory_entry.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider_v2.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/retry_policy.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/memory/memory_gatekeeper.dart';
 import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
@@ -777,5 +779,450 @@ SELECT conversation_id, id, 0, 'text', id, 0, 0 FROM message_rows WHERE conversa
       expect(result.advanced, isTrue);
       expect(convo.lastMemoryExtractedOrder, 9);
     });
+  });
+
+  group('HTTP 200 risk-rejection & retry-keyword retries', () {
+    MemoryPipelineService buildRetryPipeline({List<Duration>? delays}) {
+      final memoryV2 = MemoryProviderV2(
+        repository: memoryRepository,
+        chatRepository: chatRepository,
+      );
+      return MemoryPipelineService(
+        chatService: chatService,
+        repository: memoryRepository,
+        chatRepository: chatRepository,
+        settings: () => settings,
+        assistants: () => assistants,
+        memoryV2: () => memoryV2,
+        delay: (d) async {
+          delays?.add(d);
+        },
+      );
+    }
+
+    test(
+      'Gatekeeper recovers from HTTP 200 risk-rejection on retry and advances watermark',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults();
+
+        await seedAssistant('a1');
+        final convo = await chatService.createConversation(
+          title: 't',
+          assistantId: 'a1',
+        );
+        final delays = <Duration>[];
+        final retryPipeline = buildRetryPipeline(delays: delays);
+
+        var gateCalls = 0;
+        var extractCalls = 0;
+        final result = await retryPipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(mode: MemorySmartAddMode.perItem),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo.id, endOrder: 10),
+          llmCall: (prompt) async {
+            if (prompt.contains('<user_memory>')) {
+              gateCalls++;
+              if (gateCalls <= 2) {
+                return 'The request was rejected because it was considered high risk';
+              }
+              return '<gate><user_memory>true</user_memory></gate>';
+            }
+            if (prompt.contains('<extracted>')) {
+              extractCalls++;
+              return '<extracted><item type="identity">用户是软件工程学生。</item></extracted>';
+            }
+            return jsonEncode({'action': 'NEW', 'relatedIds': <String>[]});
+          },
+        );
+
+        expect(gateCalls, 3);
+        expect(extractCalls, 1);
+        expect(delays, hasLength(2));
+        expect(result.advanced, isTrue);
+        expect(result.error, isNull);
+        expect(result.extractedCount, 1);
+        expect(convo.lastMemoryExtractedOrder, 10);
+      },
+    );
+
+    test(
+      'Extract recovers from HTTP 200 risk-rejection and retry-keyword without re-calling Gatekeeper',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults();
+
+        await seedAssistant('a1');
+        final convo = await chatService.createConversation(
+          title: 't',
+          assistantId: 'a1',
+        );
+        final delays = <Duration>[];
+        final retryPipeline = buildRetryPipeline(delays: delays);
+
+        var gateCalls = 0;
+        var extractCalls = 0;
+        final result = await retryPipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(mode: MemorySmartAddMode.perItem),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo.id, endOrder: 11),
+          llmCall: (prompt) async {
+            if (prompt.contains('<user_memory>')) {
+              gateCalls++;
+              return '<gate><user_memory>true</user_memory></gate>';
+            }
+            if (prompt.contains('<extracted>')) {
+              extractCalls++;
+              if (extractCalls == 1) {
+                return '该模型当前访问量过大，请您稍后再试';
+              }
+              if (extractCalls == 2) {
+                return '内容安全风控拦截：considered high risk';
+              }
+              return '<extracted><item type="workflow">用户关注后台记忆稳定性。</item></extracted>';
+            }
+            return jsonEncode({'action': 'NEW', 'relatedIds': <String>[]});
+          },
+        );
+
+        expect(gateCalls, 1);
+        expect(extractCalls, 3);
+        expect(delays, hasLength(2));
+        expect(result.advanced, isTrue);
+        expect(result.error, isNull);
+        expect(result.extractedCount, 1);
+        expect(convo.lastMemoryExtractedOrder, 11);
+      },
+    );
+
+    test(
+      'empty and whitespace-only HTTP 200 responses recover on retry',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults();
+
+        await seedAssistant('a1');
+        final convo = await chatService.createConversation(
+          title: 't',
+          assistantId: 'a1',
+        );
+        final delays = <Duration>[];
+        final retryPipeline = buildRetryPipeline(delays: delays);
+
+        var gateCalls = 0;
+        final result = await retryPipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo.id, endOrder: 12),
+          llmCall: (_) async {
+            gateCalls++;
+            if (gateCalls == 1) return '';
+            if (gateCalls == 2) return '   \n\t  ';
+            return '<gate><user_memory>false</user_memory></gate>';
+          },
+        );
+
+        expect(gateCalls, 3);
+        expect(delays, hasLength(2));
+        expect(result.advanced, isTrue);
+        expect(result.gate, MemoryGateParseResult.skip);
+        expect(convo.lastMemoryExtractedOrder, 12);
+      },
+    );
+
+    test(
+      'valid Extract response containing retry keywords is NOT retried',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults();
+
+        await seedAssistant('a1');
+        final convo = await chatService.createConversation(
+          title: 't',
+          assistantId: 'a1',
+        );
+        final delays = <Duration>[];
+        final retryPipeline = buildRetryPipeline(delays: delays);
+
+        var gateCalls = 0;
+        var extractCalls = 0;
+        final result = await retryPipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(mode: MemorySmartAddMode.perItem),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo.id, endOrder: 13),
+          llmCall: (prompt) async {
+            if (prompt.contains('<user_memory>')) {
+              gateCalls++;
+              return '<gate><user_memory>true</user_memory></gate>';
+            }
+            if (prompt.contains('<extracted>')) {
+              extractCalls++;
+              return '<extracted><item type="workflow">用户排查 API timeout、限流与 high risk 拦截问题。</item></extracted>';
+            }
+            return jsonEncode({'action': 'NEW', 'relatedIds': <String>[]});
+          },
+        );
+
+        expect(gateCalls, 1);
+        expect(extractCalls, 1);
+        expect(delays, isEmpty);
+        expect(result.advanced, isTrue);
+        expect(result.extractedCount, 1);
+        expect(convo.lastMemoryExtractedOrder, 13);
+      },
+    );
+
+    test(
+      'genuine parse failures fail immediately in 1 attempt without invoking delay',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults();
+
+        await seedAssistant('a1');
+        final convo1 = await chatService.createConversation(
+          title: 'gate-bad',
+          assistantId: 'a1',
+        );
+        final convo2 = await chatService.createConversation(
+          title: 'extract-bad',
+          assistantId: 'a1',
+        );
+        final delays = <Duration>[];
+        final retryPipeline = buildRetryPipeline(delays: delays);
+
+        var gateCalls = 0;
+        final gateFail = await retryPipeline.processWindow(
+          conversationId: convo1.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo1.id, endOrder: 14),
+          llmCall: (_) async {
+            gateCalls++;
+            return '{"bad": json';
+          },
+        );
+
+        expect(gateCalls, 1);
+        expect(delays, isEmpty);
+        expect(gateFail.advanced, isFalse);
+        expect(gateFail.error, 'gate_parse_failed');
+
+        var extractCalls = 0;
+        final extractFail = await retryPipeline.processWindow(
+          conversationId: convo2.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo2.id, endOrder: 15),
+          llmCall: (prompt) async {
+            if (prompt.contains('<user_memory>')) {
+              return '<gate><user_memory>true</user_memory></gate>';
+            }
+            extractCalls++;
+            return 'no extracted tag';
+          },
+        );
+
+        expect(extractCalls, 1);
+        expect(delays, isEmpty);
+        expect(extractFail.advanced, isFalse);
+        expect(extractFail.error, 'extract_parse_failed');
+      },
+    );
+
+    test(
+      'stopKeywords abort immediately in 1 attempt even when risk or retry keywords also match',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults();
+
+        await seedAssistant('a1');
+        final convo1 = await chatService.createConversation(
+          title: 'stop-1',
+          assistantId: 'a1',
+        );
+        final convo2 = await chatService.createConversation(
+          title: 'stop-2',
+          assistantId: 'a1',
+        );
+        final delays = <Duration>[];
+        final retryPipeline = buildRetryPipeline(delays: delays);
+
+        var calls1 = 0;
+        final res1 = await retryPipeline.processWindow(
+          conversationId: convo1.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo1.id, endOrder: 16),
+          llmCall: (_) async {
+            calls1++;
+            return 'Unauthorized: considered high risk';
+          },
+        );
+        expect(calls1, 1);
+        expect(delays, isEmpty);
+        expect(res1.advanced, isFalse);
+        expect(res1.error, 'gate_parse_failed');
+
+        var calls2 = 0;
+        final res2 = await retryPipeline.processWindow(
+          conversationId: convo2.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo2.id, endOrder: 17),
+          llmCall: (prompt) async {
+            if (prompt.contains('<user_memory>')) {
+              return '<gate><user_memory>true</user_memory></gate>';
+            }
+            calls2++;
+            return '余额不足，请稍后重试';
+          },
+        );
+        expect(calls2, 1);
+        expect(delays, isEmpty);
+        expect(res2.advanced, isFalse);
+        expect(res2.error, 'extract_parse_failed');
+      },
+    );
+
+    test(
+      'AutoRetryConfig backoff and bounded maxRetries exhaustion interact cleanly with maxWindowFailures',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults().copyWith(
+          enabled: true,
+          maxRetries: 2,
+          initialDelayMs: 120,
+          multiplier: 2.0,
+          maxDelayMs: 1000,
+          jitter: false,
+        );
+
+        await seedAssistant('a1');
+        final convo = await chatService.createConversation(
+          title: 'exhausted',
+          assistantId: 'a1',
+        );
+        final delays = <Duration>[];
+        final retryPipeline = buildRetryPipeline(delays: delays);
+
+        // Run 1: 1 initial + 2 retries = 3 calls, 2 backoff sleeps, 1 window failure.
+        var calls = 0;
+        final r1 = await retryPipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo.id, endOrder: 18),
+          llmCall: (_) async {
+            calls++;
+            return 'The request was rejected because it was considered high risk';
+          },
+        );
+        expect(calls, 3);
+        expect(delays, [
+          const Duration(milliseconds: 120),
+          const Duration(milliseconds: 240),
+        ]);
+        expect(r1.advanced, isFalse);
+        expect(r1.forcedAdvance, isFalse);
+        expect(r1.error, 'gate_parse_failed:risk_rejected');
+        expect(convo.lastMemoryExtractedOrder, -1);
+
+        // Run 2 (same window): still holds watermark (2/3 window failures).
+        AutoRetryConfig.current = AutoRetryConfig.current.copyWith(
+          maxRetries: 1,
+        );
+        delays.clear();
+        calls = 0;
+        final r2 = await retryPipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo.id, endOrder: 18),
+          llmCall: (_) async {
+            calls++;
+            return 'content_filter';
+          },
+        );
+        expect(calls, 2);
+        expect(delays, [const Duration(milliseconds: 120)]);
+        expect(r2.advanced, isFalse);
+        expect(r2.forcedAdvance, isFalse);
+        expect(r2.error, 'gate_parse_failed:risk_rejected');
+
+        // Run 3: reaches maxWindowFailures = 3 and force-advances.
+        final r3 = await retryPipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo.id, endOrder: 18),
+          llmCall: (_) async => 'The request was rejected',
+        );
+        expect(r3.advanced, isTrue);
+        expect(r3.forcedAdvance, isTrue);
+        expect(r3.error, 'gate_parse_failed:risk_rejected');
+        expect(convo.lastMemoryExtractedOrder, 18);
+      },
+    );
+
+    test(
+      'thrown exceptions are not retried inside MemoryPipelineService when AutoRetryConfig is enabled',
+      () async {
+        final previous = AutoRetryConfig.current;
+        addTearDown(() => AutoRetryConfig.current = previous);
+        AutoRetryConfig.current = const AutoRetryOptions.defaults().copyWith(
+          enabled: true,
+          maxRetries: 3,
+          jitter: false,
+        );
+
+        await seedAssistant('a1');
+        final convo = await chatService.createConversation(
+          title: 'exception',
+          assistantId: 'a1',
+        );
+        final delays = <Duration>[];
+        final retryPipeline = buildRetryPipeline(delays: delays);
+
+        var calls = 0;
+        final res = await retryPipeline.processWindow(
+          conversationId: convo.id,
+          assistant: assistant(),
+          settings: settings,
+          watermark: -1,
+          window: sampleWindow(conversationId: convo.id, endOrder: 19),
+          llmCall: (_) async {
+            calls++;
+            throw StateError('network down');
+          },
+        );
+
+        expect(calls, 1);
+        expect(delays, isEmpty);
+        expect(res.advanced, isFalse);
+        expect(res.error, contains('gate_request_failed:'));
+      },
+    );
   });
 }
