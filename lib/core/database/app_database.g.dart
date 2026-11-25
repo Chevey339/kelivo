@@ -15190,6 +15190,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_generation_runs_state_updated',
     'CREATE INDEX idx_generation_runs_state_updated ON generation_run_rows (state, updated_at, id)',
   );
+  late final Index idxTimelineGenerationTarget = Index(
+    'idx_timeline_generation_target',
+    'CREATE INDEX idx_timeline_generation_target ON generation_run_rows (target_revision_id)',
+  );
   late final Index idxAssistantMemoriesAssistant = Index(
     'idx_assistant_memories_assistant',
     'CREATE INDEX idx_assistant_memories_assistant ON assistant_memory_rows (assistant_id, id)',
@@ -15295,6 +15299,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxMessageAssetsAsset,
     idxGenerationRunsActiveTarget,
     idxGenerationRunsStateUpdated,
+    idxTimelineGenerationTarget,
     idxAssistantMemoriesAssistant,
     idxMemoryEntriesVisible,
     idxMemoryEntriesRecent,

@@ -180,6 +180,75 @@ void main() {
     }
   });
 
+  for (final (version, oldIndex) in [
+    (5, null),
+    (5, "(target_revision_id) WHERE state = 'streaming'"),
+    (6, null),
+    (6, '(target_revision_id)'),
+  ]) {
+    test('schema $version indexes branch deletion before opening a timeline '
+        '(old index: ${oldIndex ?? 'absent'})', () async {
+      const index = 'idx_timeline_generation_target';
+      final file = databasePath();
+      final legacy = GeneratedHelper().databaseForVersion(
+        NativeDatabase(file),
+        version,
+      );
+      try {
+        await legacy.customStatement('PRAGMA user_version = $version');
+        await legacy.customStatement('''
+            INSERT INTO conversation_rows(id, title, created_at, updated_at)
+            VALUES ('parent', 'Parent', 1, 1), ('branch', 'Branch', 1, 1)
+          ''');
+        await legacy.customStatement('''
+            INSERT INTO message_rows(id, conversation_id, role, timestamp, message_order)
+            VALUES ('p', 'parent', 'assistant', 1, 0), ('b', 'branch', 'assistant', 1, 0)
+          ''');
+        await legacy.customStatement('''
+            INSERT INTO generation_run_rows(id, conversation_id, target_revision_id,
+              state, created_at, updated_at, terminal_at)
+            VALUES ('run', 'parent', 'p', 'completed', 1, 1, 1)
+          ''');
+        if (oldIndex != null) {
+          await legacy.customStatement(
+            'CREATE INDEX $index ON generation_run_rows $oldIndex',
+          );
+        }
+      } finally {
+        await legacy.close();
+      }
+
+      await SchemaMigrations.upgradeFileInPlace(file);
+      // Restore discards the timeline's derived objects after migration.
+      await ChatDatabaseRepository.prepareSnapshotForRestore(file);
+
+      final raw = sqlite.sqlite3.open(file.path);
+      try {
+        raw.execute('PRAGMA foreign_keys = ON');
+        final lookups = raw
+            .select(
+              'EXPLAIN QUERY PLAN DELETE FROM message_rows WHERE id = ?',
+              ['b'],
+            )
+            .map((row) => row['detail'] as String)
+            .where((detail) => detail.contains('generation_run_rows'));
+        expect(lookups, hasLength(1));
+        expect(lookups.single, startsWith('SEARCH generation_run_rows'));
+        expect(lookups.single, contains(index));
+
+        raw.execute("DELETE FROM conversation_rows WHERE id = 'branch'");
+        expect(raw.select('SELECT id FROM message_rows').single['id'], 'p');
+        expect(
+          raw.select('SELECT id FROM generation_run_rows').single['id'],
+          'run',
+        );
+        expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
+      } finally {
+        raw.close();
+      }
+    });
+  }
+
   test('migrated shape matches a freshly created database', () async {
     final file = await createV1Database();
     final database = AppDatabase(AppDatabase.upgradeExecutor(file));

@@ -358,6 +358,11 @@ class AssetReferenceDirtyRows extends Table {
   name: 'idx_generation_runs_state_updated',
   columns: {#state, #updatedAt, #id},
 )
+// Cascading message deletes check references from runs in every state.
+@TableIndex(
+  name: 'idx_timeline_generation_target',
+  columns: {#targetRevisionId},
+)
 class GenerationRunRows extends Table {
   TextColumn get id => text()();
   TextColumn get conversationId =>
@@ -824,14 +829,14 @@ class AppDatabase extends _$AppDatabase {
   // extension_entity_rows) so later features can ship without further
   // migrations. Schema 5 adds isolated GenUI state and its derived search index;
   // schema 4 was never published. Schema 6 adds media creation records.
-  // Every version outside
+  // Schema 7 indexes generation runs by target revision. Every version outside
   // [publishedSchemaVersions] belongs to an unpublished or future format and
   // is rejected.
-  static const currentSchemaVersion = 6;
+  static const currentSchemaVersion = 7;
 
   /// Every schema that has ever shipped. A file at any of these can be
   /// upgraded by `SchemaMigrations`; anything else is rejected outright.
-  static const publishedSchemaVersions = <int>{1, 2, 3, 5, 6};
+  static const publishedSchemaVersions = <int>{1, 2, 3, 5, 6, 7};
 
   /// Whether a live application connection may use a file as-is: either freshly
   /// created (0) or already at the current schema.
@@ -1092,6 +1097,13 @@ FROM probe;
         await m.create(schema.idxGenerationItemsBatchOrdinal);
         await m.create(schema.idxGenerationItemsFavorite);
         await m.create(schema.idxGenerationItemsModeCreated);
+      },
+      from6To7: (m, schema) async {
+        // An older install may have built this index lazily or kept a
+        // different same-name definition from a forward-compatible backup.
+        final index = schema.idxTimelineGenerationTarget;
+        await m.drop(index);
+        await m.create(index);
       },
     ),
     beforeOpen: (details) async {

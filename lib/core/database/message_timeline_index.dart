@@ -36,7 +36,6 @@ final class MessageTimelineIndex {
     'DROP TRIGGER IF EXISTS timeline_selection_update',
     'DROP TRIGGER IF EXISTS timeline_group_insert',
     'DROP TRIGGER IF EXISTS timeline_group_delete',
-    'DROP INDEX IF EXISTS idx_timeline_generation_target',
     'DROP TABLE IF EXISTS timeline_revision_rows',
     'DROP TABLE IF EXISTS timeline_group_rows',
     'DROP TABLE IF EXISTS timeline_selection_rows',
@@ -189,10 +188,6 @@ ON CONFLICT(conversation_id,group_id) DO UPDATE SET
 ''';
 
   static final _schema = <String>[
-    // Both search pages and ordinary timeline reads hydrate the latest run
-    // for each visible revision, including completed runs.
-    '''CREATE INDEX IF NOT EXISTS idx_timeline_generation_target
-      ON generation_run_rows(target_revision_id)''',
     '''CREATE TABLE IF NOT EXISTS timeline_state(
       conversation_id TEXT PRIMARY KEY REFERENCES conversation_rows(id) ON DELETE CASCADE,
       ready INTEGER NOT NULL, group_count INTEGER NOT NULL DEFAULT 0, message_count INTEGER NOT NULL DEFAULT 0

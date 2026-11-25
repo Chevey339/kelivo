@@ -368,6 +368,10 @@ class ChatDatabaseRepository {
         for (final sql in ContextOperationIndex.discardStatements) {
           database.execute(sql);
         }
+        // A newer index's WHERE clause may depend on a column we must drop.
+        database.execute(
+          'DROP INDEX IF EXISTS idx_timeline_generation_target;',
+        );
         GenUiDerivedSchema.discard(database);
         final presentTables = database
             .select("SELECT name FROM sqlite_master WHERE type = 'table';")
@@ -424,6 +428,9 @@ class ChatDatabaseRepository {
           ),
         );
         try {
+          await Migrator(
+            schemaDatabase,
+          ).create(schemaDatabase.idxTimelineGenerationTarget);
           await GenUiDerivedSchema.rebuild(schemaDatabase);
         } finally {
           await schemaDatabase.close();
