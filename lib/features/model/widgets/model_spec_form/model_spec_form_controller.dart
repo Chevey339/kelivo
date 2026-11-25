@@ -1,5 +1,9 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart' show CancelToken;
+import '../../../../core/services/media/fal_model_discovery.dart';
+import '../../../provider/widgets/fal_catalog_notice.dart';
+
 import '../../../../core/services/media/fal_model_catalog.dart';
 
 import 'package:flutter/widgets.dart';
@@ -662,11 +666,17 @@ class ModelSpecFormController extends ChangeNotifier {
     return BuiltInToolNames.parseFromOverride(draft.toJson()).contains(name);
   }
 
+  bool get _validModelId {
+    final id = apiModelIdController.text.trim();
+    return id.length >= 2 && (!config.isFal || isFalEndpointId(id));
+  }
+
   String? validate(AppLocalizations l10n) {
     if (!_validMediaExtra) return l10n.modelSpecFormInvalidJson;
-    final apiModelId = apiModelIdController.text.trim();
-    if (apiModelId.isEmpty || apiModelId.length < 2) {
-      return l10n.modelDetailSheetInvalidIdError;
+    if (!_validModelId) {
+      return config.isFal
+          ? l10n.falInvalidEndpointId
+          : l10n.modelDetailSheetInvalidIdError;
     }
     if (_invalidNumber(contextWindowController.text) ||
         _invalidNumber(maxOutputController.text) ||
@@ -699,11 +709,51 @@ class ModelSpecFormController extends ChangeNotifier {
     return null;
   }
 
-  Future<bool> save(SettingsProvider settings) async {
-    if (!_hasValidDraft()) return false;
+  bool _saving = false;
+  bool get saving => _saving;
+  bool _disposed = false;
+  CancelToken? _falLookup;
+  Object? _falError;
+
+  String saveErrorMessage(AppLocalizations l10n) => _falError == null
+      ? l10n.modelDetailSheetSaveFailedMessage
+      : falCatalogErrorMessage(l10n, _falError!);
+
+  Future<bool> save(
+    SettingsProvider settings, {
+    FalModelDiscovery? falCatalog,
+    bool Function()? canSave,
+  }) async {
+    if (_saving || !_hasValidDraft()) return false;
+    _saving = true;
+    _falError = null;
     _commitIdentityFields();
 
     try {
+      final apiModelId = apiModelIdController.text.trim();
+      final savedOverride = isNew ? null : _config.modelOverrides[_modelKey];
+      Map<String, dynamic>? falEndpoint;
+      if (FalModelDiscovery.needsSchema(_config, apiModelId, savedOverride)) {
+        notifyListeners();
+        final token = _falLookup = CancelToken();
+        try {
+          falEndpoint = falCatalog == null
+              ? await FalModelDiscovery.fetchEndpoint(
+                  _config,
+                  apiModelId,
+                  token,
+                )
+              : await falCatalog.endpoint(apiModelId);
+        } catch (error) {
+          _falError = error;
+          return false;
+        }
+        if (_disposed ||
+            token.isCancelled ||
+            apiModelId != apiModelIdController.text.trim()) {
+          return false;
+        }
+      }
       var savedAvatar = avatar;
       if (_avatarTouched && savedAvatar?.type == AvatarType.file) {
         savedAvatar = AvatarConfig(
@@ -711,14 +761,26 @@ class ModelSpecFormController extends ChangeNotifier {
           value: await importAvatarFile(savedAvatar!.value),
         );
       }
+      if (_disposed || canSave?.call() == false) return false;
       final current = settings.providerConfigs[providerId] ?? _config;
-      final apiModelId = apiModelIdController.text.trim();
+      if (falEndpoint != null && current.baseUrl != _config.baseUrl) {
+        return false;
+      }
       final key = isNew ? _nextModelKey(current, apiModelId) : _modelKey;
       final payload = _payloadForSave(
         currentConfig: current,
         previous: current.modelOverrides[key],
         logicalKey: key,
       );
+      if (falEndpoint != null) {
+        payload['falEndpoint'] = falEndpoint;
+        if (falEndpoint['category'] is String) {
+          // A public endpoint has one output type, regardless of the form's initial tab.
+          payload.remove('type');
+          payload.remove('output');
+          payload.remove('input');
+        }
+      }
       if (_avatarTouched) {
         payload.remove('avatar');
         if (savedAvatar != null) payload['avatar'] = savedAvatar.toJson();
@@ -755,12 +817,18 @@ class ModelSpecFormController extends ChangeNotifier {
     } catch (e, st) {
       FlutterLogger.log('[ModelSpecForm] save failed: $e\n$st', tag: 'Model');
       return false;
+    } finally {
+      _saving = false;
+      _falLookup = null;
+      if (!_disposed) notifyListeners();
     }
     return true;
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    _falLookup?.cancel();
     mediaExtraController.dispose();
     apiModelIdController.dispose();
     displayNameController.dispose();
@@ -879,10 +947,7 @@ class ModelSpecFormController extends ChangeNotifier {
   }
 
   bool _hasValidDraft() {
-    if (!_validMediaExtra) return false;
-    final apiModelId = apiModelIdController.text.trim();
-    if (apiModelId.isEmpty || apiModelId.length < 2) return false;
-    if (config.isFal && !isFalEndpointId(apiModelId)) return false;
+    if (!_validMediaExtra || !_validModelId) return false;
     if (_invalidNumber(contextWindowController.text) ||
         _invalidNumber(maxOutputController.text) ||
         _invalidNumber(pricingInputController.text, decimal: true) ||

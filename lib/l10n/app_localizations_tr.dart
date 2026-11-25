@@ -18091,6 +18091,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get creationLastFrame => 'Son kare';
 
   @override
+  String get creationBothFramesRequired => 'Hem ilk hem de son kareyi seçin.';
+
+  @override
   String get creationFirstFrameRequired =>
       'Bir ilk kare seçin. Son kare isteğe bağlıdır.';
 
@@ -18318,6 +18321,25 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get creationFalCatalogHint =>
       'fal’ın canlı kataloğuna göz atmak için Getir’i kullanın veya uç nokta kimliğiyle model eklemek için + simgesini kullanın.';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return 'Bu model, Creation\'ın sağlayamadığı $field alanını gerektiriyor.';
+  }
+
+  @override
+  String get falUnsupportedOutput =>
+      'Bu model, Creation\'ın kaydedebileceği bir görsel veya video döndürmüyor.';
+
+  @override
+  String get falCheckingModel => 'Model kontrol ediliyor…';
+
+  @override
+  String get falInvalidEndpointId =>
+      'Bir fal uç noktası ID\'si girin, örneğin fal-ai/flux/dev.';
+
+  @override
+  String get creationOptionalTitle => 'Bu çalışmayı adlandırın (isteğe bağlı)';
 
   @override
   String get falCatalogMore => 'Daha fazla model yükle';

@@ -3675,7 +3675,11 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<int> deleteModels(String providerKey, Set<String> modelIds) async {
     if (modelIds.isEmpty) return 0;
-    final old = _providerConfigs[providerKey];
+    final old =
+        _providerConfigs[providerKey] ??
+        (_builtInProviderKeys.contains(providerKey)
+            ? getProviderConfig(providerKey)
+            : null);
     if (old == null) return 0;
     final deletedModelIds = old.models
         .where((modelId) => modelIds.contains(modelId))
@@ -3697,10 +3701,16 @@ class SettingsProvider extends ChangeNotifier {
 
     await setProviderConfig(
       providerKey,
-      old.copyWith(models: nextModels, modelOverrides: nextOverrides),
+      old.copyWith(
+        models: nextModels,
+        modelOverrides: nextOverrides,
+        disabledModels: old.disabledModels.difference(deletedModelIds),
+      ),
     );
     for (final modelId in deletedModelIds) {
-      await clearSelectionsForModel(providerKey, modelId);
+      if (_providerConfigs[providerKey]?.models.contains(modelId) != true) {
+        await clearSelectionsForModel(providerKey, modelId);
+      }
     }
     return deletedCount;
   }
@@ -7115,10 +7125,15 @@ class ProviderConfig {
   final DateTime? oauthModelsSyncedAt;
   final String? oauthModelsClientVersion;
   bool get isOAuth => oauthProvider != null;
-  bool get isFal => id == 'fal';
+  bool get isFal => id == 'fal' || usesOfficialFalQueue;
 
-  bool get usesOfficialFalQueue {
-    if (!isFal) return false;
+  // Shared configurations receive a new provider ID when imported.
+  late final bool usesOfficialFalQueue =
+      !isOAuth &&
+      (providerType == null || providerType == ProviderKind.openai) &&
+      _isOfficialFalOrigin(baseUrl);
+
+  static bool _isOfficialFalOrigin(String baseUrl) {
     final base = Uri.tryParse(baseUrl);
     return base?.scheme == 'https' &&
         base?.host == 'queue.fal.run' &&

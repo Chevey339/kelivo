@@ -156,6 +156,7 @@ class MediaOptionsSection extends StatelessWidget {
                     active: last,
                     onChanged:
                         first &&
+                            !defaults.requiresLastFrame &&
                             defaults.configurableFrameRoles.contains(
                               MediaReferenceRole.lastFrame,
                             )
@@ -195,7 +196,7 @@ class MediaOptionsSection extends StatelessWidget {
               child: _Count(
                 value: caps.maxReferences,
                 maximum: defaults.configurableReferences,
-                minimum: caps.requiresReference ? 1 : 0,
+                minimum: defaults.referenceLimits(const {}).min,
                 onChanged: (value) =>
                     controller.setMediaValue('maxReferences', value),
               ),

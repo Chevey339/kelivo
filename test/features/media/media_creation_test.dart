@@ -69,6 +69,108 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'fal video form and runner enforce required end frames and accept a reference-image list',
+    () async {
+      const frames = 'studio/paired';
+      const references = 'studio/references';
+      Map<String, dynamic> override(String id, Map<String, dynamic> fields) => {
+        'falEndpoint': {
+          'id': id,
+          'name': id,
+          'category': 'image-to-video',
+          'output': 'video',
+          'fields': fields,
+        },
+      };
+      final provider = ProviderConfig.defaultsFor('fal').copyWith(
+        enabled: true,
+        models: [frames, references],
+        modelOverrides: {
+          frames: override(frames, {
+            'prompt': {},
+            'first_frame_url': {'required': true},
+            'last_frame_url': {'required': true},
+          }),
+          references: override(references, {
+            'prompt': {},
+            'image_urls': {
+              'required': true,
+              'array': true,
+              'minItems': 2,
+              'maxItems': 3,
+            },
+          }),
+        },
+      );
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      await settings.setProviderConfig('fal', provider);
+      final runner = MediaGenerationRunner(
+        repository: MediaRepository(harness.database),
+        files: const MediaFileStore(),
+      );
+      final controller = MediaCreationController(
+        runner: runner,
+        settings: settings,
+        preferences: harness.preferences,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await runner.shutdown();
+        runner.dispose();
+        settings.dispose();
+      });
+      controller.setMode(MediaMode.video);
+      controller.selectModel(
+        controller
+            .modelsFor(MediaMode.video)
+            .firstWhere((choice) => choice.spec.id == frames),
+      );
+      controller.setFrame(null, MediaReferenceRole.firstFrame, 'first.png');
+      expect(controller.canSubmit(null), isFalse);
+      await expectLater(
+        runner.enqueue(
+          provider: provider,
+          request: const MediaRequest(
+            modelId: frames,
+            mode: MediaMode.video,
+            prompt: 'Movement',
+            references: [
+              MediaReference('first.png', role: MediaReferenceRole.firstFrame),
+            ],
+          ),
+        ),
+        throwsA(
+          isA<MediaFailure>().having(
+            (err) => err.kind,
+            'invalid frames',
+            MediaFailureKind.parameters,
+          ),
+        ),
+      );
+      controller.setFrame(null, MediaReferenceRole.lastFrame, 'last.png');
+      expect(controller.canSubmit(null), isTrue);
+      controller.selectModel(
+        controller
+            .modelsFor(MediaMode.video)
+            .firstWhere((choice) => choice.spec.id == references),
+      );
+      expect(controller.showsFrames(null), isFalse);
+      expect(controller.canSubmit(null), isFalse);
+      expect(
+        controller.addReferencePaths(null, ['one.png', 'two.png']),
+        CreationReferenceResult.added,
+      );
+      expect(controller.canSubmit(null), isTrue);
+      expect(controller.enhancementReferencePaths(null), [
+        'one.png',
+        'two.png',
+      ]);
+    },
+  );
+
+  test(
     'enhancement includes only the selected video model’s reference frames',
     () async {
       final harness = await createBusinessTestHarness();

@@ -18299,6 +18299,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get creationLastFrame => 'Последний кадр';
 
   @override
+  String get creationBothFramesRequired => 'Выберите первый и последний кадр.';
+
+  @override
   String get creationFirstFrameRequired =>
       'Выберите первый кадр. Последний кадр необязателен.';
 
@@ -18534,6 +18537,25 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get creationFalCatalogHint =>
       'Нажмите «Загрузить», чтобы просмотреть актуальный каталог fal, или «+», чтобы добавить модель по её endpoint ID.';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return 'Эта модель требует $field, который Creation не может предоставить.';
+  }
+
+  @override
+  String get falUnsupportedOutput =>
+      'Эта модель не возвращает изображение или видео, которое Creation может сохранить.';
+
+  @override
+  String get falCheckingModel => 'Проверка модели…';
+
+  @override
+  String get falInvalidEndpointId =>
+      'Введите ID эндпоинта fal, например fal-ai/flux/dev.';
+
+  @override
+  String get creationOptionalTitle => 'Назовите эту работу (необязательно)';
 
   @override
   String get falCatalogMore => 'Загрузить ещё модели';

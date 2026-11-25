@@ -18,6 +18,7 @@ const _imageFields = [
   'image_url',
   'input_image_url',
   'reference_image_url',
+  'model_image',
 ];
 const _firstFrameFields = [
   'start_image_url',
@@ -34,6 +35,7 @@ const _lastFrameFields = [
   'last_image_url',
 ];
 final falInputFields = <String>{
+  'prompt',
   ..._imageFields,
   ..._firstFrameFields,
   ..._lastFrameFields,
@@ -82,32 +84,61 @@ FalModel? resolveFalModel(String id, Object? override) {
           ).whereType<String>().where((v) => v.contains(':')),
         ];
   final genericInput = fields.isEmpty && imageInput ? 'image_url' : null;
+  final extraImages = <String>{
+    if (!video)
+      ...[..._firstFrameFields, ..._lastFrameFields].where(fields.containsKey),
+    ...fields.keys.whereType<String>().where(
+      (key) => field(key)['imageInput'] == true,
+    ),
+  };
   final image =
-      _imageFields.where(fields.containsKey).firstOrNull ?? genericInput;
+      _imageFields.where(fields.containsKey).firstOrNull ??
+      extraImages.firstOrNull ??
+      genericInput;
   final first =
       _firstFrameFields.where(fields.containsKey).firstOrNull ?? genericInput;
   final last = _lastFrameFields.where(fields.containsKey).firstOrNull;
   final duration = field('duration');
-  final durations = [
-    for (final value in values('duration'))
-      if (int.tryParse(value.toString()) case final int seconds
-          when seconds > 0)
-        seconds,
-  ];
-  if (durations.isEmpty && duration['min'] is int && duration['max'] is int) {
+  final durationValues = <int, Object>{};
+  for (final value in values('duration')) {
+    final match = RegExp(r'^([0-9]+)s?$').firstMatch(value.toString());
+    final seconds = int.tryParse(match?.group(1) ?? '');
+    if (seconds != null && seconds > 0 && value != null) {
+      durationValues[seconds] = value;
+    }
+  }
+  if (durationValues.isEmpty &&
+      duration['min'] is int &&
+      duration['max'] is int) {
     final min = (duration['min'] as int).clamp(1, 120);
     final max = (duration['max'] as int).clamp(1, 120);
     for (var seconds = min; seconds <= max; seconds++) {
-      durations.add(seconds);
+      durationValues[seconds] = seconds;
     }
   }
   int boundedInt(Object? value, int fallback) =>
       value is int ? value.clamp(1, 16) : fallback;
+  final array =
+      image != null &&
+      (field(image)['array'] == true || image.endsWith('_urls'));
+  // Some official schemas document the limit without declaring maxItems.
+  final defaultLimit = switch (id) {
+    'fal-ai/veo3.1/reference-to-video' => 3,
+    'bytedance/seedream/v5/pro/edit' => 10,
+    _ => 16,
+  };
   final imageLimit = image == null
       ? 0
-      : image.endsWith('_urls')
-      ? boundedInt(field(image)['maxItems'], 1)
+      : array
+      ? boundedInt(field(image)['maxItems'], defaultLimit)
       : 1;
+  final frameModel = video && first != null;
+  final minImages =
+      !frameModel &&
+          image != null &&
+          (imageInput || field(image)['required'] == true)
+      ? boundedInt(field(image)['minItems'], 1)
+      : 0;
   final resolutions = values('resolution').whereType<String>().toList();
   return FalModel(
     raw['name'] is String ? raw['name'] as String : id,
@@ -115,33 +146,36 @@ FalModel? resolveFalModel(String id, Object? override) {
       aspectRatios: ratios,
       fixedAspectRatio: ratio == null,
       maxPerRequest: boundedInt(field('num_images')['max'], 1),
-      maxReferences: video
-          ? (first == null
-                ? 0
-                : last == null
-                ? 1
-                : 2)
-          : imageLimit,
-      requiresReference:
-          !video &&
-          image != null &&
-          (imageInput || field(image)['required'] == true),
+      maxReferences: frameModel ? (last == null ? 1 : 2) : imageLimit,
+      requiresReference: minImages > 0,
+      minimumReferences: minImages,
+      acceptsPrompt: raw['output'] == null || fields.containsKey('prompt'),
       requiresFirstFrame:
-          video &&
-          first != null &&
-          (imageInput || field(first)['required'] == true),
+          frameModel &&
+          (imageInput ||
+              field(first)['required'] == true ||
+              last != null && field(last)['required'] == true),
+      requiresLastFrame:
+          frameModel && last != null && field(last)['required'] == true,
       frameRoles: [
         if (video && first != null) MediaReferenceRole.firstFrame,
         if (video && first != null && last != null)
           MediaReferenceRole.lastFrame,
       ],
-      durations: durations,
+      durations: durationValues.keys.toList(),
       resolutions: video ? resolutions : const [],
       sizes: video ? const [] : resolutions,
       formats: values('output_format').whereType<String>().toList(),
       supportsSeed: fields.containsKey('seed'),
       supportsNegativePrompt: fields.containsKey('negative_prompt'),
       platformOptions: [
+        for (final key in extraImages)
+          if (key != image && (!video || key != first && key != last))
+            MediaParameter(
+              key,
+              MediaParameterType.image,
+              required: field(key)['required'] == true,
+            ),
         if (fields.containsKey('mask_url'))
           MediaParameter(
             'mask_url',
@@ -154,6 +188,9 @@ FalModel? resolveFalModel(String id, Object? override) {
     ),
     video: video,
     imageField: image ?? 'image_url',
+    imageArray: array,
+    outputField: raw['output'] is String ? raw['output'] as String : null,
+    durationValues: durationValues,
     firstFrameField: first ?? 'image_url',
     lastFrameField: last ?? 'end_image_url',
     ratioField: ratio,
@@ -168,6 +205,9 @@ class FalModel {
     this.capabilities, {
     this.ratioField = 'image_size',
     this.imageField = 'image_urls',
+    this.imageArray,
+    this.outputField,
+    this.durationValues = const {},
     this.video = false,
     this.firstFrameField = 'image_url',
     this.lastFrameField = 'end_image_url',
@@ -181,6 +221,9 @@ class FalModel {
   final MediaCapabilities capabilities;
   final String? ratioField;
   final String imageField, firstFrameField, lastFrameField;
+  final bool? imageArray;
+  final String? outputField;
+  final Map<int, Object> durationValues;
   final bool video,
       imageResolutionField,
       resolutionUppercase,

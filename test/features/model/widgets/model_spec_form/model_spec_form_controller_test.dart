@@ -1,5 +1,12 @@
 import '../../../../support/business_test_harness.dart';
+import '../../../../support/fal_catalog_fixture.dart';
+import 'dart:convert';
+import 'package:Kelivo/core/services/media/adapters/fal_media.dart';
+import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:flutter/material.dart';
+import 'package:Kelivo/core/services/media/fal_model_discovery.dart';
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/model_spec.dart';
@@ -58,17 +65,88 @@ void main() {
       );
       addTearDown(form.dispose);
       form.apiModelIdController.text = 'private-model';
+      expect(form.validate(l10n), l10n.falInvalidEndpointId);
       expect(await form.save(settings), isFalse);
       const id = 'my-team/new-motion';
       form.apiModelIdController.text = id;
       form.setApiModelId(id);
       form.setType(ModelType.video);
-      expect(await form.save(settings), isTrue);
+      final client = MockClient((request) async {
+        expect(request.url.queryParameters['endpoint_id'], id);
+        return http.Response('{"models":[]}', 200);
+      });
+      addTearDown(client.close);
+      expect(
+        await form.save(settings, falCatalog: FalModelDiscovery(client)),
+        isTrue,
+      );
       final saved = ProviderConfig.fromJson(
         settings.getProviderConfig('fal').toJson(),
       );
       expect(saved.models, contains(id));
       expect(ModelSpecResolver.instance.spec(saved, id).type, ModelType.video);
+    },
+  );
+
+  test(
+    'manual public fal ID stores the same schema as the catalog and rejects unsupported output',
+    () async {
+      const id = 'fal-ai/birefnet/v2';
+      var supportsOutput = true;
+      final client = MockClient((request) async {
+        expect(request.url.queryParameters['endpoint_id'], id);
+        return http.Response(
+          jsonEncode({
+            'models': [
+              falCatalogFixture(
+                id: id,
+                category: 'image-to-image',
+                inputs: {
+                  'image_url': {'type': 'string'},
+                },
+                requiredInputs: ['image_url'],
+                outputs: supportsOutput
+                    ? {'image': falFileFixture}
+                    : {
+                        'rle': {'type': 'array'},
+                      },
+              ),
+            ],
+          }),
+          200,
+        );
+      });
+      addTearDown(client.close);
+      final catalog = FalModelDiscovery(client);
+      final expected = await catalog.lookup(id);
+      final config = ProviderConfig.defaultsFor(
+        'fal',
+      ).copyWith(enabled: true, models: []);
+      final settings = await _settings(config);
+      addTearDown(settings.dispose);
+      final form = ModelSpecFormController(
+        config: config,
+        modelKey: '',
+        isNew: true,
+      );
+      addTearDown(form.dispose);
+      form.apiModelIdController.text = id;
+      form.setApiModelId(id);
+      supportsOutput = false;
+      expect(await form.save(settings, falCatalog: catalog), isFalse);
+      expect(settings.getProviderConfig('fal').models, isEmpty);
+      expect(form.saveErrorMessage(l10n), l10n.falUnsupportedOutput);
+      supportsOutput = true;
+      expect(await form.save(settings, falCatalog: catalog), isTrue);
+      final saved = settings.getProviderConfig('fal');
+      expect(saved.modelOverrides[id]['falEndpoint'], expected);
+      expect(FalMediaAdapter.knownModel(saved, id)?.imageField, 'image_url');
+      expect(
+        const FalMediaAdapter(
+          MediaMode.image,
+        ).capabilities(saved, id).acceptsPrompt,
+        isFalse,
+      );
     },
   );
 

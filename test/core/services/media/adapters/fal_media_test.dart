@@ -11,7 +11,9 @@ import 'package:Kelivo/core/services/media/fal_model_discovery.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 
+import 'package:Kelivo/core/services/media/media_adapter_resolver.dart';
 import 'video_fixture.dart';
+import '../../../../support/fal_catalog_fixture.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -188,6 +190,261 @@ void main() {
         '/ink.png',
       );
       client.close();
+    },
+  );
+
+  test(
+    'discovered schemas distinguish reference video from frames and retain wire duration values',
+    () async {
+      const id = 'fal-ai/veo3.1/reference-to-video';
+      final temp = await Directory.systemTemp.createTemp('fal-reference-video');
+      addTearDown(() => temp.delete(recursive: true));
+      final ref = await File('${temp.path}/ref.png').writeAsBytes([1]);
+      final client = MockClient((request) async {
+        if (request.url.host == 'api.fal.ai') {
+          return videoJson({
+            'models': [
+              falCatalogFixture(
+                id: id,
+                category: 'image-to-video',
+                inputs: {
+                  'prompt': {'type': 'string'},
+                  'image_urls': {
+                    'type': 'array',
+                    'items': {'type': 'string'},
+                  },
+                  'duration': {'type': 'string', 'const': '8s'},
+                },
+                requiredInputs: ['prompt', 'image_urls'],
+                outputs: {'video': falFileFixture},
+              ),
+            ],
+          });
+        }
+        if (request.method == 'POST') {
+          expect(jsonDecode(request.body), {
+            'prompt': 'Animate',
+            'duration': '8s',
+            'image_urls': [
+              'data:image/png;base64,AQ==',
+              'data:image/png;base64,AQ==',
+            ],
+          });
+          return videoJson({'status': 'COMPLETED', 'request_id': 'test'});
+        }
+        return videoJson({
+          'video': {'url': 'https://cdn.example.test/v.mp4'},
+        });
+      });
+      addTearDown(client.close);
+      final provider = ProviderConfig.defaultsFor('fal').copyWith(
+        enabled: true,
+        models: [id],
+        modelOverrides: {
+          id: {'falEndpoint': await FalModelDiscovery(client).lookup(id)},
+        },
+      );
+      final caps = const MediaAdapterResolver().capabilities(
+        provider,
+        MediaMode.video,
+        id,
+      )!;
+      expect(caps.referenceLimits({}), (min: 1, max: 3));
+      expect(caps.frameRoles, isEmpty);
+      expect(caps.durations, [8]);
+      final result = await const FalMediaAdapter(MediaMode.video)
+          .generate(
+            videoContext(provider, client),
+            MediaRequest(
+              modelId: id,
+              mode: MediaMode.video,
+              prompt: 'Animate',
+              durationSec: 8,
+              references: [MediaReference(ref.path), MediaReference(ref.path)],
+            ),
+          )
+          .toList();
+      expect(
+        result.whereType<MediaOutput>().single.results.single.url!.path,
+        '/v.mp4',
+      );
+    },
+  );
+
+  test(
+    'fal discovery rejects unsupported results and reports unrepresentable required inputs before generation',
+    () async {
+      const id = 'studio/transform';
+      const raster = {
+        'images': {'type': 'array', 'items': falFileFixture},
+      };
+      Future<Map<String, dynamic>?> check(
+        Map<String, Object?> outputs, {
+        String? extra,
+      }) async {
+        final client = MockClient((request) async {
+          expect(request.method, 'GET');
+          return videoJson({
+            'models': [
+              falCatalogFixture(
+                id: id,
+                category: 'image-to-image',
+                inputs: {
+                  'image_url': {'type': 'string'},
+                  if (extra != null) extra: {'type': 'object'},
+                },
+                requiredInputs: ['image_url', ?extra],
+                outputs: outputs,
+              ),
+            ],
+          });
+        });
+        try {
+          return await FalModelDiscovery(client).lookup(id);
+        } finally {
+          client.close();
+        }
+      }
+
+      expect(await check(raster), isNotNull);
+      await expectLater(
+        check({
+          'rle': {'type': 'array'},
+        }),
+        throwsA(isA<FalUnsupportedEndpoint>()),
+      );
+      await expectLater(
+        check({
+          'image': {
+            'allOf': [falFileFixture],
+            'examples': [
+              {
+                'content_type': 'image/svg+xml',
+                'url': 'https://example.test/result.svg',
+              },
+            ],
+          },
+        }),
+        throwsA(isA<FalUnsupportedEndpoint>()),
+      );
+      await expectLater(
+        check({
+          'images': {
+            'type': 'array',
+            'items': falFileFixture,
+            'description': 'The generated SVG files.',
+          },
+        }),
+        throwsA(isA<FalUnsupportedEndpoint>()),
+      );
+      await expectLater(
+        check(raster, extra: 'scene'),
+        throwsA(
+          isA<FalUnsupportedEndpoint>().having(
+            (e) => e.input,
+            'input',
+            'scene',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'named secondary inputs and required last frames survive capability overrides',
+    () async {
+      Future<MediaCapabilities> caps(
+        String category,
+        Map<String, Object?> inputs,
+        List<String> required,
+      ) async {
+        const id = 'studio/custom';
+        final video = category.endsWith('-video');
+        final client = MockClient(
+          (_) async => videoJson({
+            'models': [
+              falCatalogFixture(
+                id: id,
+                category: category,
+                inputs: inputs,
+                requiredInputs: required,
+                outputs: {video ? 'video' : 'image': falFileFixture},
+              ),
+            ],
+          }),
+        );
+        addTearDown(client.close);
+        final desc = await FalModelDiscovery(client).lookup(id);
+        final provider = ProviderConfig.defaultsFor('fal').copyWith(
+          models: [id],
+          modelOverrides: {
+            id: {
+              'falEndpoint': desc,
+              'media': {'lastFrame': false},
+            },
+          },
+        );
+        return const MediaAdapterResolver().capabilities(
+          provider,
+          video ? MediaMode.video : MediaMode.image,
+          id,
+        )!;
+      }
+
+      const string = {'type': 'string'};
+      final frames = await caps(
+        'image-to-video',
+        {'first_frame_url': string, 'last_frame_url': string},
+        ['first_frame_url', 'last_frame_url'],
+      );
+      expect(frames.requiresFirstFrame, isTrue);
+      expect(frames.requiresLastFrame, isTrue);
+      expect(frames.frameRoles, [
+        MediaReferenceRole.firstFrame,
+        MediaReferenceRole.lastFrame,
+      ]);
+      final dissolve = await caps(
+        'image-to-image',
+        {'image_url': string, 'dissolve_image_url': string},
+        ['image_url', 'dissolve_image_url'],
+      );
+      expect(dissolve.platformOptions.single.key, 'dissolve_image_url');
+      expect(dissolve.platformOptions.single.required, isTrue);
+      expect(dissolve.acceptsPrompt, isFalse);
+      final unbounded = await caps(
+        'image-to-image',
+        {
+          'image_urls': {'type': 'array', 'items': string},
+        },
+        ['image_urls'],
+      );
+      expect(unbounded.maxReferences, greaterThan(1));
+      final described = await caps(
+        'image-to-image',
+        {
+          'image_urls': {
+            'type': 'array',
+            'items': string,
+            'description':
+                'A maximum of 4 images are allowed, only the first 4 will be used.',
+          },
+        },
+        ['image_urls'],
+      );
+      expect(described.maxReferences, 4);
+      final bounded = await caps(
+        'image-to-image',
+        {
+          'image_urls': {
+            'type': 'array',
+            'minItems': 2,
+            'maxItems': 6,
+            'items': string,
+          },
+        },
+        ['image_urls'],
+      );
+      expect(bounded.referenceLimits({}), (min: 2, max: 6));
     },
   );
 

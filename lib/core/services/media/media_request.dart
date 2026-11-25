@@ -183,6 +183,9 @@ class MediaCapabilities {
     this.ratiosByResolution = const {},
     this.framesUseAutomaticRatio = false,
     this.requiresFirstFrame = false,
+    this.requiresLastFrame = false,
+    this.minimumReferences = 0,
+    this.acceptsPrompt = true,
     this.requiresReference = false,
     this.referenceBounds,
     this.maxCombinedInputsAndOutputs,
@@ -217,7 +220,10 @@ class MediaCapabilities {
   final List<MediaReferenceRole> frameRoles;
   final Map<String, List<String>> ratiosByResolution;
   final bool framesUseAutomaticRatio;
-  final bool requiresFirstFrame;
+  final bool requiresFirstFrame, requiresLastFrame;
+  final int minimumReferences;
+  final bool acceptsPrompt;
+  bool get usesReferenceImages => maxReferences > 0 && frameRoles.isEmpty;
   final bool requiresReference;
   final ({int min, int max}) Function(Map<String, dynamic>)? referenceBounds;
   final int? maxCombinedInputsAndOutputs;
@@ -228,7 +234,10 @@ class MediaCapabilities {
   ({int min, int max}) referenceLimits(Map<String, dynamic> options) {
     final bounds = referenceBounds?.call(options);
     return (
-      min: math.max(requiresReference ? 1 : 0, bounds?.min ?? 0),
+      min: math.max(
+        math.max(requiresReference ? 1 : 0, minimumReferences),
+        bounds?.min ?? 0,
+      ),
       max: math.min(maxReferences, bounds?.max ?? maxReferences),
     );
   }

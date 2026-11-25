@@ -91,6 +91,7 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
   }
 
   Future<void> _save() async {
+    if (_controller.saving) return;
     final l10n = AppLocalizations.of(context)!;
     final error = _controller.validate(l10n);
     if (error != null) {
@@ -98,12 +99,14 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
       return;
     }
     final settings = context.read<SettingsProvider>();
-    final ok = await _controller.save(settings);
-    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    bool stillEditing() => mounted && route?.isCurrent != false;
+    final ok = await _controller.save(settings, canSave: stillEditing);
+    if (!mounted || !stillEditing()) return;
     if (!ok) {
       showAppSnackBar(
         context,
-        message: l10n.modelDetailSheetSaveFailedMessage,
+        message: _controller.saveErrorMessage(l10n),
         type: NotificationType.error,
       );
       return;
@@ -167,9 +170,11 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
                         CreationAction(
                           key: const ValueKey('model-spec-save'),
                           foreground: cs.primary,
-                          onPressed: _save,
+                          onPressed: _controller.saving ? null : _save,
                           child: Text(
-                            widget.isNew
+                            _controller.saving
+                                ? l10n.falCheckingModel
+                                : widget.isNew
                                 ? l10n.modelDetailSheetAddButton
                                 : l10n.defaultModelPageSave,
                           ),

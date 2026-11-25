@@ -1,3 +1,4 @@
+import '../../../support/fal_catalog_fixture.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -89,6 +90,58 @@ void main() {
     await database.close();
     await root.delete(recursive: true);
   });
+
+  test(
+    'a saved public fal endpoint without a verified result never submits a data-only job',
+    () async {
+      const id = 'fal-ai/sam-3/image-rle';
+      final config = ProviderConfig.defaultsFor('fal').copyWith(
+        id: 'OpenAI - fal',
+        enabled: true,
+        models: [id],
+        modelOverrides: {
+          id: {
+            'falEndpoint': {'id': id, 'output': 'images'},
+          },
+        },
+      );
+      final methods = <String>[];
+      final runner = MediaGenerationRunner(
+        repository: repository,
+        files: files,
+        clientFactory: (_, _) => MockClient((request) async {
+          methods.add(request.method);
+          return http.Response(
+            jsonEncode({
+              'models': [
+                falCatalogFixture(
+                  id: id,
+                  category: 'image-to-image',
+                  inputs: {},
+                  requiredInputs: [],
+                  outputs: {
+                    'rle': {'type': 'array'},
+                  },
+                ),
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+      addTearDown(runner.dispose);
+      final job = await runner.enqueue(
+        provider: config,
+        request: const MediaRequest(
+          modelId: id,
+          mode: MediaMode.image,
+          prompt: 'Isolate the cat',
+        ),
+      );
+      expect(await job.completed, GenerationStatus.failed);
+      expect(methods, ['GET']);
+    },
+  );
 
   test(
     'large chunked JSON and declared oversized responses respect the transport boundary',

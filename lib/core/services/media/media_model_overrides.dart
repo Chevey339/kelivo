@@ -103,9 +103,12 @@ class MediaModelOverrides {
                 .contains(MediaReferenceRole.firstFrame));
     final last =
         first &&
-        (lastFrame != false &&
-            (lastFrame == true ? base.configurableFrameRoles : base.frameRoles)
-                .contains(MediaReferenceRole.lastFrame));
+        (base.requiresLastFrame ||
+            lastFrame != false &&
+                (lastFrame == true
+                        ? base.configurableFrameRoles
+                        : base.frameRoles)
+                    .contains(MediaReferenceRole.lastFrame));
     final ratios = base.fixedAspectRatio
         ? base.aspectRatios
         : aspectRatios ?? base.aspectRatios;
@@ -120,14 +123,18 @@ class MediaModelOverrides {
               1,
               base.configurableOutputs,
             ),
-      maxReferences: video
+      maxReferences: video && !base.usesReferenceImages
           ? (last
                 ? 2
                 : first
                 ? 1
                 : 0)
           : (maxReferences ?? base.maxReferences).clamp(
-              base.requiresReference ? 1 : 0,
+              base.minimumReferences > 0
+                  ? base.minimumReferences
+                  : base.requiresReference
+                  ? 1
+                  : 0,
               base.configurableReferences,
             ),
       nativeProgress: base.nativeProgress,
@@ -149,6 +156,9 @@ class MediaModelOverrides {
       },
       framesUseAutomaticRatio: base.framesUseAutomaticRatio,
       requiresFirstFrame: base.requiresFirstFrame,
+      requiresLastFrame: base.requiresLastFrame,
+      minimumReferences: base.minimumReferences,
+      acceptsPrompt: base.acceptsPrompt,
       requiresReference: base.requiresReference,
       referenceBounds: base.referenceBounds,
       maxCombinedInputsAndOutputs: base.maxCombinedInputsAndOutputs,

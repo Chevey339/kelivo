@@ -21,6 +21,7 @@ import '../network/provider_http_client.dart';
 import '../network/request_logger.dart';
 import '../storage/attachment_file_lock.dart';
 import 'media_adapter.dart';
+import 'fal_model_discovery.dart';
 import 'media_adapter_resolver.dart';
 import 'media_file_store.dart';
 import 'media_request.dart';
@@ -209,9 +210,12 @@ class MediaGenerationRunner extends ChangeNotifier {
             caps
                 .resolutionsFor(hasLastFrame: last)
                 .contains(request.resolution)) &&
-        roles.length == request.inputImages.length &&
-        roles.every(caps.frameRoles.contains) &&
-        (first || !caps.requiresFirstFrame && !last);
+        (caps.usesReferenceImages
+            ? roles.every((role) => role == MediaReferenceRole.image)
+            : roles.length == request.inputImages.length &&
+                  roles.every(caps.frameRoles.contains) &&
+                  (first || !caps.requiresFirstFrame && !last) &&
+                  (last || !caps.requiresLastFrame));
   }
 
   Future<MediaGenerationTicket> enqueue({
@@ -452,11 +456,6 @@ class MediaGenerationRunner extends ChangeNotifier {
       }
       final raw = _client(job.provider, job.token);
       try {
-        final adapter = resolver.resolve(
-          job.provider,
-          job.request.mode,
-          modelId: job.request.modelId,
-        )!;
         final auth = ProviderOAuthService.instance.authenticatedClient(
           raw,
           job.provider,
@@ -465,15 +464,42 @@ class MediaGenerationRunner extends ChangeNotifier {
         final apiKey = job.provider.isOAuth
             ? ''
             : apiKeyForRequest(job.provider, job.request.modelId);
+        var provider = job.provider;
+        var caps = job.capabilities;
+        final modelId = job.request.modelId;
+        if (provider.usesOfficialFalQueue) {
+          final upstream = apiModelId(provider, modelId);
+          final previous = provider.modelOverrides[modelId];
+          if (FalModelDiscovery.needsSchema(provider, upstream, previous)) {
+            final endpoint = await FalModelDiscovery(
+              raw,
+              apiKey: apiKey,
+            ).endpoint(upstream);
+            _checkCancelled(job);
+            provider = provider.copyWith(
+              modelOverrides: {
+                ...provider.modelOverrides,
+                modelId: {
+                  if (previous is Map) ...Map<String, dynamic>.from(previous),
+                  'falEndpoint': endpoint,
+                },
+              },
+            );
+            caps = _validate(provider, job.request);
+          }
+        }
+        final adapter = resolver.resolve(
+          provider,
+          job.request.mode,
+          modelId: modelId,
+        )!;
         for (var attempt = saved; attempt < job.request.count;) {
           _checkCancelled(job);
-          final requestCap = job.capabilities.outputLimit(
-            job.request.inputImages.length,
-          );
+          final requestCap = caps.outputLimit(job.request.inputImages.length);
           final count = math.min(requestCap, job.request.count - attempt);
           final request = job.request.copyWith(count: count);
           final context = MediaContext(
-            provider: job.provider,
+            provider: provider,
             client: auth,
             apiKey: apiKey,
             cancelToken: job.token,

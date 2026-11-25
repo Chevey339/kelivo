@@ -31458,6 +31458,12 @@ abstract class AppLocalizations {
   /// **'Last frame'**
   String get creationLastFrame;
 
+  /// Instruction beside the video frame slots for a model that requires both a start image and an end image.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose both a first and a last frame.'**
+  String get creationBothFramesRequired;
+
   /// Hint for video models that require a first frame when a last frame is attached.
   ///
   /// In en, this message translates to:
@@ -31835,6 +31841,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use Fetch to browse fal’s live catalog, or use + to add a model by its endpoint ID.'**
   String get creationFalCatalogHint;
+
+  /// Message when adding a fal endpoint whose required input is unavailable in Creation. The field is the API parameter name.
+  ///
+  /// In en, this message translates to:
+  /// **'This model requires {field}, which Creation cannot supply.'**
+  String falUnsupportedInput(String field);
+
+  /// Message when adding a fal endpoint that returns unsupported results, such as segmentation data or vector files.
+  ///
+  /// In en, this message translates to:
+  /// **'This model does not return an image or video that Creation can save.'**
+  String get falUnsupportedOutput;
+
+  /// Save-button label while looking up the schema of a manually entered fal model ID.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking model…'**
+  String get falCheckingModel;
+
+  /// Validation error in the model editor when the fal endpoint ID is malformed. Keep the example ID unchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a fal endpoint ID, such as fal-ai/flux/dev.'**
+  String get falInvalidEndpointId;
+
+  /// Composer placeholder for models that use reference images without a text prompt. This optional title stays in the user’s workspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Name this work (optional)'**
+  String get creationOptionalTitle;
 
   /// Button at the bottom of the fal catalog that loads the next page of matching endpoints.
   ///

@@ -382,10 +382,13 @@ class _CreationComposerState extends State<CreationComposer> {
     final references = state.imageReferences(widget.topicId);
     final frames = state.showsFrames(widget.topicId);
     final caps = model?.capabilities;
+    final videoFrames = video && caps?.usesReferenceImages != true;
     final aspectRatio = state.ratioFor(widget.topicId);
     final selectedDuration = state.durationFor(widget.topicId);
     final hint = model == null
         ? l10n.creationNoModelPlaceholder
+        : caps?.acceptsPrompt == false
+        ? l10n.creationOptionalTitle
         : switch ((state.mode, widget.desktop && widget.topicId == null)) {
             (MediaMode.image, true) => l10n.creationNewImagePrompt,
             (MediaMode.image, false) => l10n.creationImagePrompt,
@@ -465,7 +468,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                 onAgain: () => _enhance(again: true),
                                 onApply: _applyEnhancement,
                               ),
-                            if (!video && references.isNotEmpty)
+                            if (!videoFrames && references.isNotEmpty)
                               _ReferenceStrip(
                                 desktop: widget.desktop,
                                 references: references,
@@ -567,7 +570,9 @@ class _CreationComposerState extends State<CreationComposer> {
                                           valueListenable: _prompt,
                                           builder: (context, value, _) {
                                             final enabled =
-                                                value.text.trim().isNotEmpty &&
+                                                (value.text.trim().isNotEmpty ||
+                                                    caps?.acceptsPrompt ==
+                                                        false) &&
                                                 state.canSubmit(widget.topicId);
                                             return IosCardPress(
                                               focusable: true,
@@ -618,13 +623,13 @@ class _CreationComposerState extends State<CreationComposer> {
                                       tooltip: l10n.creationAddReference,
                                       enabled:
                                           limit > 0 &&
-                                          (video
+                                          (videoFrames
                                               ? caps?.frameRoles.isNotEmpty ==
                                                     true
                                               : references.length < limit),
                                       onTap: () => _pickReferences(
                                         anchor,
-                                        role: video
+                                        role: videoFrames
                                             ? MediaReferenceRole.firstFrame
                                             : null,
                                       ),
@@ -1144,6 +1149,12 @@ class _ModelOptionsState extends State<_ModelOptions> {
                                               l10n,
                                             ),
                                           if (model
+                                              .capabilities
+                                              .usesReferenceImages)
+                                            l10n.creationModelReferenceLimit(
+                                              model.capabilities.maxReferences,
+                                            )
+                                          else if (model
                                               .capabilities
                                               .frameRoles
                                               .isEmpty)
@@ -1826,7 +1837,9 @@ class _VideoFrames extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  hasLast
+                  capabilities.requiresLastFrame
+                      ? l10n.creationBothFramesRequired
+                      : hasLast
                       ? l10n.creationFirstFrameRequired
                       : l10n.creationFrameModelFirstOnly(
                           state.model!.spec.displayName,

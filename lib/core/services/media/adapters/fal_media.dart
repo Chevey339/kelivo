@@ -66,7 +66,7 @@ class FalMediaAdapter implements MediaAdapter {
           : 1024,
     );
     final update = <String, dynamic>{
-      'prompt': request.prompt,
+      if (caps.acceptsPrompt) 'prompt': request.prompt,
       if (ratioField != null && request.aspectRatio != 'auto')
         ratioField: ratioField == 'image_size'
             ? {'width': imageSize.width, 'height': imageSize.height}
@@ -84,7 +84,9 @@ class FalMediaAdapter implements MediaAdapter {
         'output_format': format,
       if (request.parameters['seed'] case final int seed) 'seed': seed,
       if (request.durationSec case final duration?)
-        'duration': details?.durationAsString == true ? '$duration' : duration,
+        'duration':
+            details?.durationValues[duration] ??
+            (details?.durationAsString == true ? '$duration' : duration),
       if (request.resolution case final resolution?)
         'resolution': details?.resolutionUppercase == true
             ? resolution.toUpperCase()
@@ -106,12 +108,36 @@ class FalMediaAdapter implements MediaAdapter {
         if (ref.role == MediaReferenceRole.platform && ref.parameterKey != null)
           ref.parameterKey!: await mediaReferenceDataUri(ref),
     };
-    if (!video && request.inputImages.isNotEmpty) {
-      final refs = [
-        for (final ref in request.inputImages) await mediaReferenceDataUri(ref),
-      ];
+    if ((!video || caps.usesReferenceImages) &&
+        request.inputImages.isNotEmpty) {
       final field = details?.imageField ?? 'image_urls';
-      update[field] = field.endsWith('_urls') ? refs : refs.first;
+      if (details?.imageArray ?? field.endsWith('_urls')) {
+        update[field] = [
+          for (final ref in request.inputImages)
+            await mediaReferenceDataUri(ref),
+        ];
+      } else {
+        update[field] = await mediaReferenceDataUri(request.inputImages.first);
+      }
+    }
+    final body = context.body(request, update);
+    final override = context.provider.modelOverrides[request.modelId];
+    final contract = override is Map ? override['falEndpoint'] : null;
+    final fields = contract is Map && contract['id'] == model
+        ? contract['fields']
+        : null;
+    if (fields is Map) {
+      for (final entry in fields.entries) {
+        final value = body[entry.key];
+        if (entry.value is Map &&
+            entry.value['required'] == true &&
+            (value == null || value is List && value.isEmpty || value == '')) {
+          throw MediaFailure(
+            MediaFailureKind.parameters,
+            'Missing required fal input: ${entry.key}',
+          );
+        }
+      }
     }
     final endpoint = context.endpoint(model);
     final headers = context.headers(
@@ -122,7 +148,7 @@ class FalMediaAdapter implements MediaAdapter {
       'POST',
       endpoint,
       headers: headers,
-      body: context.body(request, update),
+      body: body,
     );
     final id = Uri.encodeComponent(requireMediaTaskId(created['request_id']));
     final task = '${segments.take(2).join('/')}/requests/$id';
@@ -168,13 +194,16 @@ class FalMediaAdapter implements MediaAdapter {
           resultUrl,
           headers: headers,
         );
-        final rows = output[video ? 'videos' : 'images'];
-        final single = output[video ? 'video' : 'image'];
+        final verifiedField = details?.outputField;
+        final result = verifiedField != null
+            ? output[verifiedField]
+            : output[video ? 'videos' : 'images'] ??
+                  output[video ? 'video' : 'image'];
         return [
           for (final row
-              in rows is List
-                  ? rows.whereType<Map>()
-                  : [if (single is Map) single])
+              in result is List
+                  ? result.whereType<Map>()
+                  : [if (result is Map) result])
             if (_result(row, video: video) case final result?) result,
         ];
       },

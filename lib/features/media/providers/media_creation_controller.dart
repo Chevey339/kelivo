@@ -474,8 +474,7 @@ class MediaCreationController extends ChangeNotifier {
     String? topicId,
     MediaCapabilities caps,
   ) => [
-    if (mode == MediaMode.image && caps.maxReferences > 0)
-      ...imageReferences(topicId),
+    if (caps.usesReferenceImages) ...imageReferences(topicId),
     if (mode == MediaMode.video && showsFrames(topicId))
       for (final role in caps.frameRoles)
         if (frame(topicId, role) case final value?) value,
@@ -521,12 +520,14 @@ class MediaCreationController extends ChangeNotifier {
       topicId,
       caps,
     ).where((ref) => ref.role != MediaReferenceRole.platform);
-    if (mode == MediaMode.image) {
+    if (mode == MediaMode.image || caps.usesReferenceImages) {
       final limits = caps.referenceLimits(parameters);
       return refs.length >= limits.min && refs.length <= limits.max;
     }
     if (!showsFrames(topicId)) return !caps.requiresFirstFrame;
-    return refs.any((ref) => ref.role == MediaReferenceRole.firstFrame);
+    return refs.any((ref) => ref.role == MediaReferenceRole.firstFrame) &&
+        (!caps.requiresLastFrame ||
+            refs.any((ref) => ref.role == MediaReferenceRole.lastFrame));
   }
 
   CreationReferenceResult addReferencePaths(
@@ -537,7 +538,7 @@ class MediaCreationController extends ChangeNotifier {
     if (paths.isEmpty) return CreationReferenceResult.empty;
     final caps = model?.capabilities;
     if (caps == null) return CreationReferenceResult.unsupported;
-    if (mode == MediaMode.video) {
+    if (mode == MediaMode.video && !caps.usesReferenceImages) {
       final role = frameRole ?? MediaReferenceRole.firstFrame;
       if (!caps.frameRoles.contains(role)) {
         return CreationReferenceResult.unsupported;
@@ -608,9 +609,11 @@ class MediaCreationController extends ChangeNotifier {
     if (!canSubmit(topicId)) return null;
     final choice = model;
     final draft = draftFor(topicId);
-    final prompt = draft.prompt.trim();
-    if (choice == null || prompt.isEmpty) return null;
+    if (choice == null) return null;
     final caps = choice.capabilities;
+    final text = draft.prompt.trim();
+    if (text.isEmpty && caps.acceptsPrompt) return null;
+    final prompt = text.isEmpty ? choice.spec.displayName : text;
     final options = parameters;
     final request = MediaRequest(
       modelId: choice.spec.id,

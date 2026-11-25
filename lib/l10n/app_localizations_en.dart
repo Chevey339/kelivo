@@ -17985,6 +17985,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creationLastFrame => 'Last frame';
 
   @override
+  String get creationBothFramesRequired =>
+      'Choose both a first and a last frame.';
+
+  @override
   String get creationFirstFrameRequired =>
       'Choose a first frame. The last frame is optional.';
 
@@ -18211,6 +18215,25 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get creationFalCatalogHint =>
       'Use Fetch to browse fal’s live catalog, or use + to add a model by its endpoint ID.';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return 'This model requires $field, which Creation cannot supply.';
+  }
+
+  @override
+  String get falUnsupportedOutput =>
+      'This model does not return an image or video that Creation can save.';
+
+  @override
+  String get falCheckingModel => 'Checking model…';
+
+  @override
+  String get falInvalidEndpointId =>
+      'Enter a fal endpoint ID, such as fal-ai/flux/dev.';
+
+  @override
+  String get creationOptionalTitle => 'Name this work (optional)';
 
   @override
   String get falCatalogMore => 'Load more models';

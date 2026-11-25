@@ -19,6 +19,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../utils/brand_assets.dart';
 import '../../media/widgets/creation_controls.dart';
+import 'fal_catalog_notice.dart';
 
 Future<void> showFalModelPicker(
   BuildContext context,
@@ -153,12 +154,7 @@ class _FalModelPickerState extends State<FalModelPicker> {
     try {
       final current = settings.getProviderConfig(key);
       if (current.models.contains(entry.id)) {
-        await settings.setProviderConfig(
-          key,
-          current.copyWith(
-            models: current.models.where((id) => id != entry.id).toList(),
-          ),
-        );
+        await settings.deleteModels(key, {entry.id});
       } else {
         final details = falModels.containsKey(entry.id)
             ? null
@@ -190,9 +186,7 @@ class _FalModelPickerState extends State<FalModelPicker> {
         showAppSnackBar(
           context,
           type: NotificationType.error,
-          message: AppLocalizations.of(
-            context,
-          )!.falCatalogLoadFailed(error.toString()),
+          message: falCatalogErrorMessage(AppLocalizations.of(context)!, error),
         );
       }
     } finally {

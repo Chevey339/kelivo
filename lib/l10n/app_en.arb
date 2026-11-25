@@ -23334,6 +23334,10 @@
   "@creationLastFrame": {
     "description": "Video composer slot label for the ending image."
   },
+  "creationBothFramesRequired": "Choose both a first and a last frame.",
+  "@creationBothFramesRequired": {
+    "description": "Instruction beside the video frame slots for a model that requires both a start image and an end image."
+  },
   "creationFirstFrameRequired": "Choose a first frame. The last frame is optional.",
   "@creationFirstFrameRequired": {
     "description": "Hint for video models that require a first frame when a last frame is attached."
@@ -23610,6 +23614,32 @@
   "creationFalCatalogHint": "Use Fetch to browse fal’s live catalog, or use + to add a model by its endpoint ID.",
   "@creationFalCatalogHint": {
     "description": "Hint above the fal provider model list explaining live catalog discovery with Fetch and manual entry of a fal endpoint ID with the plus button."
+  },
+  "falUnsupportedInput": "This model requires {field}, which Creation cannot supply.",
+  "@falUnsupportedInput": {
+    "description": "Message when adding a fal endpoint whose required input is unavailable in Creation. The field is the API parameter name.",
+    "placeholders": {
+      "field": {
+        "type": "String",
+        "example": "audio_url"
+      }
+    }
+  },
+  "falUnsupportedOutput": "This model does not return an image or video that Creation can save.",
+  "@falUnsupportedOutput": {
+    "description": "Message when adding a fal endpoint that returns unsupported results, such as segmentation data or vector files."
+  },
+  "falCheckingModel": "Checking model…",
+  "@falCheckingModel": {
+    "description": "Save-button label while looking up the schema of a manually entered fal model ID."
+  },
+  "falInvalidEndpointId": "Enter a fal endpoint ID, such as fal-ai/flux/dev.",
+  "@falInvalidEndpointId": {
+    "description": "Validation error in the model editor when the fal endpoint ID is malformed. Keep the example ID unchanged."
+  },
+  "creationOptionalTitle": "Name this work (optional)",
+  "@creationOptionalTitle": {
+    "description": "Composer placeholder for models that use reference images without a text prompt. This optional title stays in the user’s workspace."
   },
   "falCatalogMore": "Load more models",
   "@falCatalogMore": {

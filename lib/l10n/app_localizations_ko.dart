@@ -17433,6 +17433,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get creationLastFrame => '마지막 프레임';
 
   @override
+  String get creationBothFramesRequired => '첫 프레임과 마지막 프레임을 모두 선택하세요.';
+
+  @override
   String get creationFirstFrameRequired => '첫 프레임을 선택하세요. 마지막 프레임은 선택 사항입니다.';
 
   @override
@@ -17652,6 +17655,24 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get creationFalCatalogHint =>
       '「가져오기」를 사용해 fal의 실시간 카탈로그를 둘러보거나, +를 사용해 엔드포인트 ID로 모델을 추가하세요.';
+
+  @override
+  String falUnsupportedInput(String field) {
+    return '이 모델은 $field이(가) 필요하지만, Creation에서 제공할 수 없습니다.';
+  }
+
+  @override
+  String get falUnsupportedOutput =>
+      '이 모델은 Creation에서 저장할 수 있는 이미지나 동영상을 반환하지 않습니다.';
+
+  @override
+  String get falCheckingModel => '모델 확인 중…';
+
+  @override
+  String get falInvalidEndpointId => 'fal 엔드포인트 ID를 입력하세요. 예: fal-ai/flux/dev.';
+
+  @override
+  String get creationOptionalTitle => '작품 이름 지정 (선택 사항)';
 
   @override
   String get falCatalogMore => '모델 더 불러오기';

@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/services/media/fal_model_discovery.dart';
+
+String falCatalogErrorMessage(AppLocalizations l10n, Object error) =>
+    switch (error) {
+      FalUnsupportedEndpoint(input: final key?) => l10n.falUnsupportedInput(
+        key,
+      ),
+      FalUnsupportedEndpoint() => l10n.falUnsupportedOutput,
+      _ => l10n.falCatalogLoadFailed(error.toString()),
+    };
 
 class FalCatalogNotice extends StatelessWidget {
   const FalCatalogNotice({super.key});

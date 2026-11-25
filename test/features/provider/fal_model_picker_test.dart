@@ -58,6 +58,29 @@ void main() {
               ..._row(id, 'image-to-video'),
               'openapi': {
                 'paths': {
+                  '/canonical/model/requests/{request_id}': {
+                    'get': {
+                      'responses': {
+                        '200': {
+                          'content': {
+                            'application/json': {
+                              'schema': {
+                                'type': 'object',
+                                'properties': {
+                                  'video': {
+                                    'type': 'object',
+                                    'properties': {
+                                      'url': {'type': 'string'},
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                   '/canonical/model': {
                     'post': {
                       'requestBody': {
@@ -178,6 +201,20 @@ void main() {
       expect(caps.requiresFirstFrame, isTrue);
       expect(caps.maxReferences, 2);
       expect(resolveMediaModel(restored, id, MediaMode.image), isNull);
+      await settings.setModelEnabled('fal', id, false);
+      await settings.togglePinModel('fal', id);
+      await settings.setCreationModel(CreationModelSlot.video, (
+        providerKey: 'fal',
+        modelId: id,
+      ));
+      await tester.tap(find.byKey(const ValueKey(id)));
+      await tester.pumpAndSettle();
+      final removed = settings.getProviderConfig('fal');
+      expect(removed.models, ['personal/existing']);
+      expect(removed.modelOverrides, isNot(contains(id)));
+      expect(removed.disabledModels, isNot(contains(id)));
+      expect(settings.isModelPinned('fal', id), isFalse);
+      expect(settings.creationModel(CreationModelSlot.video), isNull);
     },
   );
 }

@@ -126,6 +126,7 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
   }
 
   Future<void> _save() async {
+    if (_controller.saving) return;
     final l10n = AppLocalizations.of(context)!;
     final error = _controller.validate(l10n);
     if (error != null) {
@@ -133,12 +134,14 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
       return;
     }
     final settings = context.read<SettingsProvider>();
-    final ok = await _controller.save(settings);
-    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    bool stillEditing() => mounted && route?.isCurrent != false;
+    final ok = await _controller.save(settings, canSave: stillEditing);
+    if (!mounted || !stillEditing()) return;
     if (!ok) {
       showAppSnackBar(
         context,
-        message: l10n.modelDetailSheetSaveFailedMessage,
+        message: _controller.saveErrorMessage(l10n),
         type: NotificationType.error,
       );
       return;
@@ -226,7 +229,9 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
                     onSecondary: () => Navigator.of(context).maybePop(false),
                     primaryKey: const ValueKey('model-spec-confirm'),
                     primaryIcon: widget.isNew ? Lucide.Plus : Lucide.Check,
-                    primaryLabel: widget.isNew
+                    primaryLabel: _controller.saving
+                        ? l10n.falCheckingModel
+                        : widget.isNew
                         ? l10n.modelDetailSheetAddButton
                         : l10n.modelDetailSheetConfirmButton,
                     onPrimary: _save,
