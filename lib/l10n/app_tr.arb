@@ -5291,6 +5291,8 @@
   "falRefreshAdditionalSettings": "Model ayarlarını yenile",
   "falNoPublishedSettings": "fal bu uç nokta için ayar yayımlamadı.",
   "falNoAdditionalSettings": "Bu modelin ek ayarı yok.",
+  "falCopyDraftId": "Taslak kimliğini kopyala",
+  "falOptionalPrompt": "İstem (isteğe bağlı)",
   "falWatermark": "Filigran",
   "falSyncMode": "Senkron Modu",
   "falSafetyChecker": "Güvenlik Denetleyicisini Etkinleştir",

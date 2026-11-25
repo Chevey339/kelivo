@@ -8,6 +8,8 @@ import 'package:Kelivo/core/models/media_creation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/media/adapters/fal_media.dart';
 import 'package:Kelivo/core/services/media/fal_model_discovery.dart';
+import 'package:Kelivo/core/services/media/fal_batch_state.dart';
+import 'package:Kelivo/core/services/media/media_request.dart';
 import 'package:Kelivo/core/services/media/media_file_store.dart';
 import 'package:Kelivo/core/services/media/media_generation_runner.dart';
 import 'package:Kelivo/features/media/providers/media_creation_controller.dart';
@@ -93,16 +95,34 @@ Future<Map<String, dynamic>> _describe(String id) async {
         ],
         'default': 0.5,
       },
-      'loras': {'type': 'array', 'items': falFileFixture},
+      'loras': {
+        'type': 'array',
+        'items': {r'$ref': '#/components/schemas/LoraWeight'},
+      },
+      'version': {'type': 'string', 'const': '1.0'},
+      'variant': {'type': 'string', 'default': 'balanced'},
       'format': {'type': 'string'},
       'automatic_feature': {'type': 'boolean', 'default': true},
       'locked': {'type': 'boolean', 'readOnly': true, 'default': true},
     },
-    requiredInputs: ['prompt', if (id == _edit) 'image_urls'],
+    requiredInputs: [
+      'prompt',
+      'version',
+      'variant',
+      if (id == _edit) 'image_urls',
+    ],
     outputs: {
       'images': {'type': 'array', 'items': falFileFixture},
     },
   );
+  row['openapi']['components']['schemas']['LoraWeight'] = {
+    'type': 'object',
+    'required': ['path'],
+    'properties': {
+      'path': {'type': 'string'},
+      'scale': {'type': 'number', 'minimum': 0, 'maximum': 4},
+    },
+  };
   row['openapi']['components']['schemas']['Input']['x-fal-order-properties'] = [
     'background',
     'watermark',
@@ -210,9 +230,18 @@ void main() {
         expect(fields['strength']!.acceptsDraft('1'), isFalse);
         expect(fields['strength']!.acceptsDraft('0.1'), isFalse);
         expect(fields['strength']!.parseDraft('0.25'), 0.25);
-        expect(fields['loras']!.acceptsDraft('{}'), isFalse);
-        expect(fields['loras']!.parseDraft('[{"url":"first"}]'), [
-          {'url': 'first'},
+        expect(fields['version']!.constant, true);
+        expect(fields['variant']!.required, true);
+        for (final value in [
+          '{}',
+          '[4]',
+          '[{"url":"first"}]',
+          '[{"path":"first","scale":7}]',
+        ]) {
+          expect(fields['loras']!.acceptsDraft(value), false);
+        }
+        expect(fields['loras']!.parseDraft('[{"path":"first"}]'), [
+          {'path': 'first'},
         ]);
         if (id == _builtin) {
           expect(
@@ -430,7 +459,9 @@ void main() {
         SandboxPathResolver.debugSetDirs();
         await root.delete(recursive: true);
       });
-      final png = image.encodePng(image.Image(width: 16, height: 12));
+      final png = image.encodePng(
+        image.Image(width: 16, height: 12, numChannels: 4),
+      );
       final source = await File('${root.path}/cup.png').writeAsBytes(png);
       final requests = <String>[];
       final bodies = <Map>[];
@@ -468,10 +499,16 @@ void main() {
       media.setParameter('fal:sync_mode', true);
       media.setParameter('fal:automatic_feature', false);
       media.setParameter('fal:background', 'transparent');
-      media.setParameter('format', 'png');
+      expect(media.parameters['format'], 'png');
+      media.setParameter('format', 'jpeg');
+      expect(media.canSubmit(null), false);
+      media.setParameter(
+        'format',
+        null,
+      ); // Automatic format must stay PNG for transparency.
       media.setParameter('fal:format', 'model value');
       media.setParameter('size', '1.5K');
-      media.setParameter('fal:loras', '[{"url":"first"}]');
+      media.setParameter('fal:loras', '[{"path":"first"}]');
       expect(media.canSubmit(null), isTrue);
       final topic = (await media.submit(null))!;
       final id = media.lastSubmission(topic)!;
@@ -489,6 +526,8 @@ void main() {
       expect(requests, ['POST', 'GET']);
       expect(bodies.single, {
         'prompt': 'Change the cup to green',
+        'version': '1.0',
+        'variant': 'balanced',
         'image_urls': ['data:image/png;base64,${base64Encode(png)}'],
         'watermark': true,
         'sync_mode': true,
@@ -499,7 +538,7 @@ void main() {
         'format': 'model value',
         'image_size': 'auto_1.5K',
         'loras': [
-          {'url': 'first'},
+          {'path': 'first'},
         ],
       });
       final saved = (await repo.itemsForBatch(id)).single;
@@ -507,6 +546,291 @@ void main() {
         await File(SandboxPathResolver.resolveForIo(saved.path)!).readAsBytes(),
         png,
       );
+    },
+  );
+
+  test(
+    'partial fal download retries the saved queue result and keeps existing files',
+    () async {
+      const id = 'fal-ai/nano-banana';
+      final desc = await _describe(id);
+      final provider = ProviderConfig.defaultsFor('fal').copyWith(
+        enabled: true,
+        apiKey: 'fixture',
+        models: [id],
+        modelOverrides: {
+          id: {'falEndpoint': desc},
+        },
+      );
+      final root = await Directory.systemTemp.createTemp('fal-retry');
+      addTearDown(() => root.delete(recursive: true));
+      final png = base64Encode(
+        image.encodePng(image.Image(width: 4, height: 4)),
+      );
+      var posts = 0, gets = 0;
+      final media = await _controller(
+        provider,
+        fetch: (_, _, _) async => desc,
+        files: MediaFileStore(
+          directory: () async => Directory('${root.path}/generations'),
+        ),
+        client: () => MockClient((r) async {
+          if (r.method == 'POST') {
+            posts++;
+            return http.Response(
+              '{"request_id":"job","status":"COMPLETED"}',
+              200,
+            );
+          }
+          gets++;
+          return http.Response(
+            jsonEncode({
+              'images': [
+                {'url': 'data:image/png;base64,$png'},
+                {'url': 'data:image/png;base64,${gets == 1 ? 'AAAA' : png}'},
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+      final request = MediaRequest(
+        modelId: id,
+        mode: MediaMode.image,
+        prompt: 'A pair',
+        parameters: const {
+          'extra': {'limit_generations': false},
+        },
+      );
+      final first = await media.runner.enqueue(
+        provider: provider,
+        request: request,
+      );
+      expect(await first.completed, GenerationStatus.partial);
+      final repo = media.runner.repository;
+      final retained = (await repo.itemsForBatch(first.batchId)).single;
+      final row = (await repo.batch(first.batchId))!;
+      final cursor = FalBatchState.fromParameters(row.paramsJson)!;
+      expect(cursor.pending!.files, 2);
+      expect(
+        MediaRequest.fromBatch(row).parameters,
+        isNot(contains(FalBatchState.key)),
+      );
+      final retry = (await media.runner.retry(first.batchId, provider))!;
+      expect(await retry.completed, GenerationStatus.succeeded);
+      final results = await repo.itemsForBatch(first.batchId);
+      expect(results.map((r) => r.ordinal), [0, 1]);
+      expect(results.first.id, retained.id);
+      expect((posts, gets), (1, 2));
+    },
+  );
+
+  test(
+    'an interrupted second fal submission resumes by generations, not files',
+    () async {
+      const id = 'fal-ai/bytedance/seedream/v4/text-to-image';
+      final desc = await _describe(id);
+      final provider = ProviderConfig.defaultsFor('fal').copyWith(
+        enabled: true,
+        apiKey: 'fixture',
+        models: [id],
+        modelOverrides: {
+          id: {'falEndpoint': desc},
+        },
+      );
+      final root = await Directory.systemTemp.createTemp('fal-logical-count');
+      addTearDown(() => root.delete(recursive: true));
+      final png = base64Encode(
+        image.encodePng(image.Image(width: 3, height: 3)),
+      );
+      final counts = <int>[];
+      final media = await _controller(
+        provider,
+        fetch: (_, _, _) async => desc,
+        files: MediaFileStore(
+          directory: () async => Directory('${root.path}/generations'),
+        ),
+        client: () => MockClient((r) async {
+          if (r.method == 'POST') {
+            final body = jsonDecode(r.body);
+            counts.add(body['num_images'] as int? ?? 1);
+            if (counts.length == 2) {
+              return http.Response('{"error":"failed"}', 422);
+            }
+            return http.Response(
+              '{"request_id":"chunk","status":"COMPLETED"}',
+              200,
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'images': List.filled(counts.length == 1 ? 8 : 1, {
+                'url': 'data:image/png;base64,$png',
+              }),
+            }),
+            200,
+          );
+        }),
+      );
+      final first = await media.runner.enqueue(
+        provider: provider,
+        request: const MediaRequest(
+          modelId: id,
+          mode: MediaMode.image,
+          prompt: 'A series',
+          count: 7,
+          parameters: {'fal:max_images': 2},
+        ),
+      );
+      expect(await first.completed, GenerationStatus.partial);
+      expect(
+        await media.runner.repository.itemsForBatch(first.batchId),
+        hasLength(8),
+      );
+      final retry = (await media.runner.retry(first.batchId, provider))!;
+      expect(await retry.completed, GenerationStatus.succeeded);
+      expect(counts, [6, 1, 1]);
+      expect(
+        await media.runner.repository.itemsForBatch(first.batchId),
+        hasLength(9),
+      );
+    },
+  );
+
+  test(
+    'video drafts retain their provider ID and requested final frame',
+    () async {
+      const id = 'bytedance/seedance-2.5/text-to-video';
+      final provider = ProviderConfig.defaultsFor(
+        'fal',
+      ).copyWith(enabled: true, apiKey: 'fixture', models: [id, _builtin]);
+      final root = await Directory.systemTemp.createTemp('fal-last-frame');
+      addTearDown(() => root.delete(recursive: true));
+      final clip = base64Encode([0, 0, 0, 12, ...ascii.encode('ftypqt  ')]);
+      final png = base64Encode(
+        image.encodePng(image.Image(width: 4, height: 4)),
+      );
+      final media = await _controller(
+        provider.copyWith(models: [_builtin, id]),
+        fetch: (_, _, _) async => fail('unexpected schema request'),
+        files: MediaFileStore(
+          directory: () async => Directory('${root.path}/generations'),
+        ),
+        client: () => MockClient(
+          (r) async => r.method == 'POST'
+              ? http.Response('{"request_id":"job","status":"COMPLETED"}', 200)
+              : http.Response(
+                  jsonEncode({
+                    'video': {'url': 'data:video/quicktime;base64,$clip'},
+                    'last_frame': {'url': 'data:image/png;base64,$png'},
+                    'draft_id': 'draft-42',
+                  }),
+                  200,
+                ),
+        ),
+      );
+      final ticket = await media.runner.enqueue(
+        provider: provider,
+        request: const MediaRequest(
+          modelId: id,
+          mode: MediaMode.video,
+          prompt: 'A scene',
+          parameters: {
+            'extra': {'draft': true, 'return_last_frame': true},
+          },
+        ),
+      );
+      expect(await ticket.completed, GenerationStatus.succeeded);
+      final repo = media.runner.repository;
+      final rows = await repo.itemsForBatch(ticket.batchId);
+      expect(rows.map((r) => (r.mode, r.mime)), [
+        (MediaMode.video, 'video/quicktime'),
+        (MediaMode.image, 'image/png'),
+      ]);
+      expect(
+        FalBatchState.fromParameters(
+          (await repo.batch(ticket.batchId))!.paramsJson,
+        )!.draftId,
+        'draft-42',
+      );
+    },
+  );
+
+  test(
+    'empty completed results can recover, and repeating uses the historical image count',
+    () async {
+      const id = 'fal-ai/flux/schnell';
+      final provider = ProviderConfig.defaultsFor(
+        'fal',
+      ).copyWith(enabled: true, apiKey: 'key', models: [id]);
+      final root = await Directory.systemTemp.createTemp('fal-empty');
+      addTearDown(() => root.delete(recursive: true));
+      final png = base64Encode(
+        image.encodePng(image.Image(width: 4, height: 4)),
+      );
+      final counts = <int>[];
+      var reads = 0;
+      final media = await _controller(
+        provider,
+        fetch: (_, _, _) async => fail('no schema fetch'),
+        files: MediaFileStore(
+          directory: () => Directory('${root.path}/generations').create(),
+        ),
+        client: () => MockClient((r) async {
+          if (r.method == 'POST') {
+            counts.add(jsonDecode(r.body)['num_images'] as int? ?? 1);
+            return http.Response(
+              '{"request_id":"job","status":"COMPLETED"}',
+              200,
+            );
+          }
+          reads++;
+          return http.Response(
+            jsonEncode({
+              'images': [
+                if (reads > 2) {'url': 'data:image/png;base64,$png'},
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+      final ticket = await media.runner.enqueue(
+        provider: provider,
+        request: const MediaRequest(
+          modelId: id,
+          mode: MediaMode.image,
+          prompt: 'A cup',
+        ),
+      );
+      expect(await ticket.completed, GenerationStatus.failed);
+      final again = (await media.runner.retry(ticket.batchId, provider))!;
+      expect(await again.completed, GenerationStatus.failed);
+      final recovered = (await media.runner.retry(ticket.batchId, provider))!;
+      expect(await recovered.completed, GenerationStatus.succeeded);
+      final row = (await media.runner.repository.batch(ticket.batchId))!;
+      final changed = provider.copyWith(
+        modelOverrides: {
+          id: {
+            'media': {
+              'extra': {'num_images': 3},
+            },
+          },
+        },
+      );
+      await media.settings.setProviderConfig(changed.id, changed);
+      expect(media.count, 3);
+      media.selectCount(2);
+      expect(media.count, 2);
+      expect(media.extraParameters?['num_images'], 2);
+      final repeat = await media.runner.enqueue(
+        provider: changed,
+        request: MediaRequest.fromBatch(row),
+        applyModelExtra: false,
+      );
+      expect(await repeat.completed, GenerationStatus.succeeded);
+      expect(counts, [1, 1]);
+      expect(reads, 4);
     },
   );
 }

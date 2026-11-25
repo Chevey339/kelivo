@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:json_schema/json_schema.dart';
+
 import '../../models/media_creation.dart';
 import '../../database/app_database.dart';
 import '../../../utils/kelivo_file_uri.dart';
+import 'fal_batch_state.dart';
 
 enum MediaReferenceRole { image, firstFrame, lastFrame, platform }
 
@@ -57,6 +60,7 @@ class MediaRequest {
   factory MediaRequest.fromBatch(GenerationBatchRow batch) {
     try {
       final params = jsonDecode(batch.paramsJson) as Map<String, dynamic>;
+      params.remove(FalBatchState.key);
       final refs = [
         for (final row in jsonDecode(batch.referencesJson) as List)
           MediaReference.fromJson((row as Map).cast<String, dynamic>()),
@@ -186,6 +190,9 @@ class MediaCapabilities {
     this.requiresLastFrame = false,
     this.minimumReferences = 0,
     this.acceptsPrompt = true,
+    bool? requiresPrompt,
+    this.alternativePrompt,
+    this.exclusivePrompts = false,
     this.requiresReference = false,
     this.referenceBounds,
     this.maxCombinedInputsAndOutputs,
@@ -196,16 +203,22 @@ class MediaCapabilities {
     this.supportsSeed = false,
     this.supportsTransparent = false,
     this.platformOptions = const [],
-  });
+  }) : requiresPrompt = requiresPrompt ?? acceptsPrompt;
 
   MediaCapabilities.withModelSettings(
     MediaCapabilities base,
     this.platformOptions, {
+    List<String>? aspectRatios,
     List<String>? formats,
     List<String>? sizes,
+    bool? acceptsPrompt,
+    bool? requiresPrompt,
+    String? alternativePrompt,
+    bool? exclusivePrompts,
+    int? maxCombinedInputsAndOutputs,
     bool? supportsSeed,
     bool? supportsNegativePrompt,
-  }) : aspectRatios = base.aspectRatios,
+  }) : aspectRatios = aspectRatios ?? base.aspectRatios,
        maxPerRequest = base.maxPerRequest,
        customImageEndpoint = base.customImageEndpoint,
        protocolFrameRoles = base.protocolFrameRoles,
@@ -222,10 +235,14 @@ class MediaCapabilities {
        requiresFirstFrame = base.requiresFirstFrame,
        requiresLastFrame = base.requiresLastFrame,
        minimumReferences = base.minimumReferences,
-       acceptsPrompt = base.acceptsPrompt,
+       acceptsPrompt = acceptsPrompt ?? base.acceptsPrompt,
+       requiresPrompt = requiresPrompt ?? base.requiresPrompt,
+       alternativePrompt = alternativePrompt ?? base.alternativePrompt,
+       exclusivePrompts = exclusivePrompts ?? base.exclusivePrompts,
        requiresReference = base.requiresReference,
        referenceBounds = base.referenceBounds,
-       maxCombinedInputsAndOutputs = base.maxCombinedInputsAndOutputs,
+       maxCombinedInputsAndOutputs =
+           maxCombinedInputsAndOutputs ?? base.maxCombinedInputsAndOutputs,
        sizes = sizes ?? base.sizes,
        qualities = base.qualities,
        formats = formats ?? base.formats,
@@ -258,7 +275,16 @@ class MediaCapabilities {
   final bool framesUseAutomaticRatio;
   final bool requiresFirstFrame, requiresLastFrame;
   final int minimumReferences;
-  final bool acceptsPrompt;
+  final bool acceptsPrompt, requiresPrompt;
+  final String? alternativePrompt;
+  final bool exclusivePrompts;
+  bool validPromptAlternatives(Object? primary, Object? alternate) {
+    final hasPrompt = primary is String && primary.trim().isNotEmpty;
+    final hasShots = alternate is List && alternate.isNotEmpty;
+    return (hasPrompt || hasShots) &&
+        !(exclusivePrompts && hasPrompt && hasShots);
+  }
+
   bool get usesReferenceImages => maxReferences > 0 && frameRoles.isEmpty;
   final bool requiresReference;
   final ({int min, int max}) Function(Map<String, dynamic>)? referenceBounds;
@@ -319,6 +345,8 @@ class MediaParameter {
     this.title,
     this.description,
     this.readOnly = false,
+    this.constant = false,
+    this.schema,
     this.exclusiveMinimum,
     this.exclusiveMaximum,
     this.multipleOf,
@@ -327,7 +355,8 @@ class MediaParameter {
 
   final String key, storageKey;
   final String? title, description;
-  final bool readOnly;
+  final bool readOnly, constant;
+  final JsonSchema? schema;
   final num? exclusiveMinimum, exclusiveMaximum, multipleOf;
   final MediaParameterType type;
   final List<Object> choices;
@@ -337,7 +366,7 @@ class MediaParameter {
   final bool required;
 
   Object? parseDraft(Object? raw) {
-    if (raw == null || readOnly) return null;
+    if (raw == null || readOnly || constant) return null;
     final value = switch (type) {
       MediaParameterType.integer when raw is String => int.parse(raw.trim()),
       MediaParameterType.number when raw is String => num.parse(raw.trim()),
@@ -346,6 +375,14 @@ class MediaParameter {
       MediaParameterType.json when raw is String => jsonDecode(raw),
       _ => raw,
     };
+    checkWireValue(value);
+    return value;
+  }
+
+  void checkWireValue(Object? value) {
+    if (constant && value != defaultValue) {
+      throw FormatException('Invalid constant for $key');
+    }
     final valid = switch (type) {
       MediaParameterType.enumeration => choices.contains(value),
       MediaParameterType.boolean => value is bool,
@@ -357,6 +394,7 @@ class MediaParameter {
       MediaParameterType.string || MediaParameterType.image => value is String,
     };
     if (!valid ||
+        (schema != null && !schema!.validate(value).isValid) ||
         value is num &&
             (!value.isFinite ||
                 minimum != null && value < minimum! ||
@@ -372,16 +410,21 @@ class MediaParameter {
         throw FormatException('Invalid increment for $key');
       }
     }
-    return value;
   }
 
+  static final _lastCheck = Expando<({String raw, bool valid})>();
   bool acceptsDraft(Object? raw) {
+    final structured = raw is String && schema != null;
+    final cached = structured ? _lastCheck[this] : null;
+    if (cached != null && identical(cached.raw, raw)) return cached.valid;
+    var valid = true;
     try {
       parseDraft(raw);
-      return true;
     } on FormatException {
-      return false;
+      valid = false;
     }
+    if (structured) _lastCheck[this] = (raw: raw, valid: valid);
+    return valid;
   }
 }
 
@@ -390,6 +433,8 @@ class MediaResult {
     required this.mime,
     this.bytes,
     this.base64,
+    this.base64Offset = 0,
+    this.mode,
     this.url,
     this.revisedPrompt,
     this.previewUrl,
@@ -403,6 +448,8 @@ class MediaResult {
   final String mime;
   final Uint8List? bytes;
   final String? base64;
+  final int base64Offset;
+  final MediaMode? mode;
   final Uri? url;
   final String? revisedPrompt;
   final Uri? previewUrl;
@@ -428,9 +475,13 @@ class MediaPreview extends MediaEvent {
 }
 
 class MediaOutput extends MediaEvent {
-  const MediaOutput(this.results, {this.filesPerGeneration = 1});
+  const MediaOutput(this.results);
   final List<MediaResult> results;
-  final int filesPerGeneration;
+}
+
+class FalResultAvailable extends MediaEvent {
+  const FalResultAvailable(this.location);
+  final FalResultLocation location;
 }
 
 class MediaTaskAccepted extends MediaEvent {

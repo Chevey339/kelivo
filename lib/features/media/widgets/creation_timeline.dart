@@ -16,6 +16,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/models/media_creation.dart';
 import '../../../core/models/provider_oauth.dart';
 import '../../../core/services/media/media_request.dart';
+import '../../../core/services/media/fal_batch_state.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
@@ -604,7 +605,7 @@ class _BatchGroupState extends State<_BatchGroup> {
                       GestureDetector(
                         onTap: () => setState(() => _expanded = !_expanded),
                         child: Text(
-                          batch.prompt,
+                          batch.prompt.isEmpty ? batch.modelId : batch.prompt,
                           maxLines: _expanded ? null : 2,
                           overflow: _expanded ? null : TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 14.5, height: 1.55),
@@ -755,7 +756,25 @@ class _BatchGroupState extends State<_BatchGroup> {
               item.status == GenerationItemStatus.ready,
         )
         .toList();
+    final draftId = batch.mode == MediaMode.video
+        ? FalBatchState.draftIdForMenu(batch.paramsJson)
+        : null;
     final choices = [
+      if (draftId != null && draftId.isNotEmpty)
+        ActionSheetItem(
+          icon: Lucide.Copy,
+          label: l10n.falCopyDraftId,
+          onTap: () async {
+            await Clipboard.setData(ClipboardData(text: draftId));
+            if (mounted) {
+              showAppSnackBar(
+                context,
+                type: NotificationType.success,
+                message: l10n.creationOptionCopied,
+              );
+            }
+          },
+        ),
       ActionSheetItem(
         icon: Lucide.RotateCcw,
         label: l10n.creationRepeat,

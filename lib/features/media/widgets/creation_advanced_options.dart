@@ -12,6 +12,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../core/services/media/media_request.dart';
+import '../../../core/services/media/adapters/fal_media.dart';
 import '../../../core/services/media/media_models.dart';
 import '../../../core/services/media/fal_model_discovery.dart';
 import '../../provider/widgets/fal_catalog_notice.dart';
@@ -118,7 +119,11 @@ class CreationAdvancedOptions extends StatelessWidget {
             [
               if (!caps.formats.contains('auto')) 'auto',
               for (final value in caps.formats)
-                if (options['background'] != 'transparent' || value != 'jpeg')
+                if (FalMediaAdapter.transparentEdit(model.spec.upstreamId, {
+                      'background': options['fal:background'],
+                    })
+                    ? value == 'png' || value == 'auto'
+                    : options['background'] != 'transparent' || value != 'jpeg')
                   value,
             ],
             (value) =>
@@ -370,11 +375,13 @@ class _PlatformInput extends StatelessWidget {
         alignment: AlignmentDirectional.centerStart,
         child: IosSwitch(
           value: value == true,
-          onChanged: field.readOnly ? null : update,
+          onChanged: field.readOnly || field.constant ? null : update,
           semanticLabel: title,
         ),
       ),
-      _ when field.readOnly => Text(value?.toString() ?? l10n.creationAuto),
+      _ when field.readOnly || field.constant => Text(
+        value?.toString() ?? l10n.creationAuto,
+      ),
       MediaParameterType.enumeration => _Choices<Object>(
         values: field.choices,
         value: value,
@@ -442,6 +449,17 @@ class _PlatformInput extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (structured && field.choices.isNotEmpty)
+            _Choices<Object>(
+              values: field.choices,
+              value: raw == null
+                  ? field.defaultValue
+                  : !invalid
+                  ? field.parseDraft(raw)
+                  : null,
+              display: (v) => v.toString(),
+              onChanged: (v) => update(v == null ? null : jsonEncode(v)),
+            ),
           input,
           if (invalid)
             Text(

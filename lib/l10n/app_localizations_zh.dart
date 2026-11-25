@@ -17208,6 +17208,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get falNoAdditionalSettings => '此模型没有其他可调参数。';
 
   @override
+  String get falCopyDraftId => '复制草稿 ID';
+
+  @override
+  String get falOptionalPrompt => '提示词（可选）';
+
+  @override
   String get falWatermark => '水印';
 
   @override
@@ -35026,6 +35032,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get falNoAdditionalSettings => '此模型没有其他可调参数。';
+
+  @override
+  String get falCopyDraftId => '复制草稿 ID';
+
+  @override
+  String get falOptionalPrompt => '提示词（可选）';
 
   @override
   String get falWatermark => '水印';
@@ -52897,6 +52909,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get falNoAdditionalSettings => '此模型沒有其他設定。';
+
+  @override
+  String get falCopyDraftId => '複製草稿 ID';
+
+  @override
+  String get falOptionalPrompt => '提示詞（選填）';
 
   @override
   String get falWatermark => '浮水印';

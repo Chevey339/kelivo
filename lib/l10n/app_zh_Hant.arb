@@ -5291,6 +5291,8 @@
   "falRefreshAdditionalSettings": "重新整理模型設定",
   "falNoPublishedSettings": "fal 尚未公布此端點的設定。",
   "falNoAdditionalSettings": "此模型沒有其他設定。",
+  "falCopyDraftId": "複製草稿 ID",
+  "falOptionalPrompt": "提示詞（選填）",
   "falWatermark": "浮水印",
   "falSyncMode": "同步模式",
   "falSafetyChecker": "啟用安全檢查",

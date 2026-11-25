@@ -389,6 +389,8 @@ class _CreationComposerState extends State<CreationComposer> {
         ? l10n.creationNoModelPlaceholder
         : caps?.acceptsPrompt == false
         ? l10n.creationOptionalTitle
+        : caps?.requiresPrompt == false
+        ? l10n.falOptionalPrompt
         : switch ((state.mode, widget.desktop && widget.topicId == null)) {
             (MediaMode.image, true) => l10n.creationNewImagePrompt,
             (MediaMode.image, false) => l10n.creationImagePrompt,
@@ -571,7 +573,7 @@ class _CreationComposerState extends State<CreationComposer> {
                                           builder: (context, value, _) {
                                             final enabled =
                                                 (value.text.trim().isNotEmpty ||
-                                                    caps?.acceptsPrompt ==
+                                                    caps?.requiresPrompt ==
                                                         false) &&
                                                 state.canSubmit(widget.topicId);
                                             return IosCardPress(
@@ -1359,11 +1361,7 @@ class _ImageCountOptionsState extends State<_ImageCountOptions> {
     final count = state.count;
     final custom = _custom || count > 4;
     final model = state.model;
-    final max =
-        model?.capabilities.outputLimit(
-          state.imageReferences(widget.topicId).length,
-        ) ??
-        1;
+    final max = state.requestLimitFor(widget.topicId);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

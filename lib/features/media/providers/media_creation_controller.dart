@@ -321,7 +321,59 @@ class MediaCreationController extends ChangeNotifier {
     return models.firstOrNull;
   }
 
-  int get count => mode == MediaMode.video ? 1 : _currentOptions.count;
+  ({
+    MediaModelChoice choice,
+    Map<String, dynamic> draft,
+    Map<String, dynamic>? inputs,
+  })?
+  _falInputs;
+
+  Map<String, dynamic>? _currentFalInputs(MediaModelChoice choice) {
+    final draft =
+        _currentOptions.parameters[choice.key] ?? const <String, dynamic>{};
+    final cached = _falInputs;
+    if (cached != null &&
+        identical(cached.choice, choice) &&
+        identical(cached.draft, draft)) {
+      return cached.inputs;
+    }
+    final adapter = runner.resolver.resolve(
+      choice.provider,
+      mode,
+      modelId: choice.spec.id,
+    );
+    final inputs = adapter is FalMediaAdapter
+        ? FalMediaAdapter.inputOptions(
+            choice.provider,
+            choice.spec.id,
+            draft,
+            extraParameters ?? const {},
+          )
+        : null;
+    _falInputs = (choice: choice, draft: draft, inputs: inputs);
+    return inputs;
+  }
+
+  int requestLimitFor(String? topicId) {
+    final choice = model;
+    if (choice == null) return 1;
+    final refs = imageReferences(topicId).length;
+    final inputs = _currentFalInputs(choice);
+    return inputs == null
+        ? choice.capabilities.outputLimit(refs)
+        : FalMediaAdapter.requestLimit(choice.capabilities, refs, inputs);
+  }
+
+  int get count {
+    if (mode == MediaMode.video) return 1;
+    final choice = model;
+    final inputs = choice == null ? null : _currentFalInputs(choice);
+    final n = inputs?['num_images'];
+    return n is int && n >= 1 && n <= MediaGenerationRunner.maxCount
+        ? n
+        : _currentOptions.count;
+  }
+
   List<String> ratiosFor(String? topicId) {
     final caps = model?.capabilities;
     if (caps == null ||
@@ -445,8 +497,28 @@ class MediaCreationController extends ChangeNotifier {
   }
 
   void selectRatio(String value) => _updateOptions(ratio: value);
-  void selectCount(int value) =>
-      _updateOptions(count: value.clamp(1, MediaGenerationRunner.maxCount));
+  void selectCount(int value) {
+    final count = value.clamp(1, MediaGenerationRunner.maxCount);
+    final choice = model;
+    final extra = extraParameters;
+    if (choice != null &&
+        extra != null &&
+        _currentFalInputs(choice)?.containsKey('num_images') == true) {
+      _updateOptions(
+        count: count,
+        parameters: {
+          ..._currentOptions.parameters,
+          choice.key: {
+            ...parameters,
+            'extra': jsonEncode({...extra, 'num_images': count}),
+          },
+        },
+      );
+    } else {
+      _updateOptions(count: count);
+    }
+  }
+
   void selectDuration(int value) => _updateOptions(duration: value);
   void selectResolution(String value) => _updateOptions(resolution: value);
 
@@ -461,6 +533,14 @@ class MediaCreationController extends ChangeNotifier {
       update.remove(field);
     } else {
       update[field] = value;
+    }
+    final selected = model;
+    if (field == 'fal:background' &&
+        selected != null &&
+        FalMediaAdapter.transparentEdit(selected.spec.upstreamId, {
+          'background': value,
+        })) {
+      update['format'] = 'png';
     }
     _updateOptions(parameters: {..._currentOptions.parameters, key: update});
   }
@@ -487,14 +567,22 @@ class MediaCreationController extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? _lastExtraJson;
+  Map<String, dynamic>? _lastParsedExtra;
   Map<String, dynamic>? get extraParameters {
     final raw = parameters['extra'];
-    if (raw is! String || raw.trim().isEmpty) return const {};
+    if (raw is! String || raw.isEmpty) {
+      _lastExtraJson = null;
+      _lastParsedExtra = null;
+      return const {};
+    }
+    if (identical(raw, _lastExtraJson)) return _lastParsedExtra;
+    _lastExtraJson = raw;
     try {
-      final parsed = jsonDecode(raw);
-      return parsed is Map<String, dynamic> ? parsed : null;
+      final parsed = raw.trim().isEmpty ? <String, dynamic>{} : jsonDecode(raw);
+      return _lastParsedExtra = parsed is Map<String, dynamic> ? parsed : null;
     } on FormatException {
-      return null;
+      return _lastParsedExtra = null;
     }
   }
 
@@ -575,6 +663,7 @@ class MediaCreationController extends ChangeNotifier {
           (!field.acceptsDraft(options[field.storageKey]) ||
               field.required &&
                   !field.readOnly &&
+                  !field.constant &&
                   options[field.storageKey] == null &&
                   field.defaultValue == null &&
                   defaults[field.key] == null &&
@@ -596,6 +685,37 @@ class MediaCreationController extends ChangeNotifier {
       topicId,
       caps,
     ).where((ref) => ref.role != MediaReferenceRole.platform);
+    final inputs = _currentFalInputs(selected);
+    if (inputs != null) {
+      final n = inputs['num_images'];
+      if (inputs.containsKey('num_images') &&
+          (n is! int || n < 1 || n > MediaGenerationRunner.maxCount)) {
+        return false;
+      }
+      if (FalMediaAdapter.requestLimit(caps, refs.length, inputs) < 1) {
+        return false;
+      }
+      if (FalMediaAdapter.transparentEdit(selected.spec.upstreamId, inputs) &&
+          (refs.length != 1 ||
+              inputs['output_format'] != null &&
+                  inputs['output_format'] != 'png')) {
+        return false;
+      }
+      if (caps.alternativePrompt case final alternative?) {
+        var shots = inputs[alternative];
+        if (shots is String) {
+          try {
+            shots = jsonDecode(shots);
+          } on FormatException {
+            return false;
+          }
+        }
+        final primary = inputs['prompt'] ?? draftFor(topicId).prompt;
+        if (!caps.validPromptAlternatives(primary, shots)) {
+          return false;
+        }
+      }
+    }
     if (mode == MediaMode.image || caps.usesReferenceImages) {
       final limits = caps.referenceLimits(parameters);
       return refs.length >= limits.min && refs.length <= limits.max;
@@ -688,13 +808,13 @@ class MediaCreationController extends ChangeNotifier {
     if (choice == null) return null;
     final caps = choice.capabilities;
     final text = draft.prompt.trim();
-    if (text.isEmpty && caps.acceptsPrompt) return null;
+    if (text.isEmpty && caps.requiresPrompt) return null;
     final prompt = text.isEmpty ? choice.spec.displayName : text;
     final options = parameters;
     final request = MediaRequest(
       modelId: choice.spec.id,
       mode: mode,
-      prompt: prompt,
+      prompt: caps.acceptsPrompt ? text : prompt,
       negativePrompt:
           caps.supportsNegativePrompt &&
               options['negativePrompt'] is String &&
@@ -729,7 +849,7 @@ class MediaCreationController extends ChangeNotifier {
     final now = DateTime.now();
     final titleSource = _titleModel();
     final promptTitle = prompt.characters.take(20).toString();
-    final naming = topicId == null && titleSource != null;
+    final naming = topicId == null && text.isNotEmpty && titleSource != null;
     if (naming) _namingTopics.add(id);
     _work.add(topicId);
     notifyListeners();

@@ -137,8 +137,10 @@ class MediaFileStore {
           await pending.writeAsBytes(bytes, flush: true);
         } else {
           final encoded = result.base64!;
-          if (encoded.isEmpty ||
-              encoded.length > ((_maxFileBytes + 2) ~/ 3) * 4) {
+          final offset = result.base64Offset;
+          if (offset < 0 ||
+              offset >= encoded.length ||
+              encoded.length - offset > ((_maxFileBytes + 2) ~/ 3) * 4) {
             throw const MediaFailure(
               MediaFailureKind.download,
               'Invalid media length',
@@ -147,6 +149,7 @@ class MediaFileStore {
           await compute(_writeInlineMedia, (
             path: pending.path,
             encoded: encoded,
+            offset: offset,
           ));
           final length = await pending.length();
           if (length == 0 || length > _maxFileBytes) {
@@ -665,10 +668,16 @@ typedef _ImageInfo = ({
   Uint8List? thumbnail,
 });
 
-Future<void> _writeInlineMedia(({String path, String encoded}) input) async {
+Future<void> _writeInlineMedia(
+  ({String path, String encoded, int offset}) input,
+) async {
   Stream<String> chunks() async* {
     const size = 64 * 1024;
-    for (var start = 0; start < input.encoded.length; start += size) {
+    for (
+      var start = input.offset;
+      start < input.encoded.length;
+      start += size
+    ) {
       yield input.encoded.substring(
         start,
         (start + size).clamp(0, input.encoded.length),

@@ -5291,6 +5291,8 @@
   "falRefreshAdditionalSettings": "모델 설정 새로고침",
   "falNoPublishedSettings": "fal에서 이 엔드포인트의 설정을 공개하지 않았습니다.",
   "falNoAdditionalSettings": "이 모델에는 추가 설정이 없습니다.",
+  "falCopyDraftId": "초안 ID 복사",
+  "falOptionalPrompt": "프롬프트(선택 사항)",
   "falWatermark": "워터마크",
   "falSyncMode": "동기화 모드",
   "falSafetyChecker": "안전 검사 활성화",

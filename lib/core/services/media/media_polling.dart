@@ -9,7 +9,8 @@ Stream<MediaEvent> pollMediaTask(
   required Future<Map<String, dynamic>> Function() poll,
   required FutureOr<List<MediaResult>?> Function(Map<String, dynamic>) result,
   MediaTaskAccepted accepted = const MediaTaskAccepted(),
-  int filesPerGeneration = 1,
+  MediaOutput Function(List<MediaResult>) outputEvent = MediaOutput.new,
+  MediaEvent? Function(Map<String, dynamic>)? beforeResult,
   double? Function(Map<String, dynamic>)? progress,
   Map<String, dynamic>? initial,
 }) async* {
@@ -18,6 +19,7 @@ Stream<MediaEvent> pollMediaTask(
   var waitBeforeRequest = initial == null;
   var interval = 2;
   var failures = 0;
+  var resultAnnounced = false;
   Duration? retryDelay;
   final elapsed = Stopwatch()..start();
   const timeout = Duration(minutes: 15);
@@ -45,9 +47,16 @@ Stream<MediaEvent> pollMediaTask(
       final current = response!;
       // Keep the last status while retrieving the completed result. A transient
       // result fetch must never submit another generation.
+      if (!resultAnnounced && beforeResult != null) {
+        final event = beforeResult(current);
+        if (event != null) {
+          resultAnnounced = true;
+          yield event;
+        }
+      }
       final output = await withinDeadline(() async => result(current));
       if (output != null) {
-        yield MediaOutput(output, filesPerGeneration: filesPerGeneration);
+        yield outputEvent(output);
         return;
       }
       final fraction = progress?.call(current);

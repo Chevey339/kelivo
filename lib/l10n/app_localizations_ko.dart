@@ -17678,6 +17678,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get falNoAdditionalSettings => '이 모델에는 추가 설정이 없습니다.';
 
   @override
+  String get falCopyDraftId => '초안 ID 복사';
+
+  @override
+  String get falOptionalPrompt => '프롬프트(선택 사항)';
+
+  @override
   String get falWatermark => '워터마크';
 
   @override

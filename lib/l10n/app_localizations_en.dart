@@ -18240,6 +18240,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'This model has no additional settings.';
 
   @override
+  String get falCopyDraftId => 'Copy draft ID';
+
+  @override
+  String get falOptionalPrompt => 'Prompt (optional)';
+
+  @override
   String get falWatermark => 'Watermark';
 
   @override

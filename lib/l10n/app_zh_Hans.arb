@@ -6548,6 +6548,8 @@
   "falRefreshAdditionalSettings": "刷新模型参数",
   "falNoPublishedSettings": "fal 尚未公布此端点的参数。",
   "falNoAdditionalSettings": "此模型没有其他可调参数。",
+  "falCopyDraftId": "复制草稿 ID",
+  "falOptionalPrompt": "提示词（可选）",
   "falWatermark": "水印",
   "falSyncMode": "同步模式",
   "falSafetyChecker": "启用安全检查",

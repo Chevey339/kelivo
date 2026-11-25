@@ -1,3 +1,10 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show compute;
+import 'package:image/image.dart' as img;
+import '../../../../utils/sandbox_path_resolver.dart';
+import '../../custom_request_merger.dart';
+import '../fal_batch_state.dart';
+import '../media_model_overrides.dart';
 import '../../../models/media_creation.dart';
 import '../../../providers/settings_provider.dart';
 import '../../api/chat_api_helpers.dart';
@@ -14,6 +21,48 @@ class FalMediaAdapter implements MediaAdapter {
 
   static FalModel? knownModel(ProviderConfig provider, String id) =>
       resolveFalModel(apiModelId(provider, id), provider.modelOverrides[id]);
+
+  /// Project the settings used by preflight through the same wire precedence as a submission.
+  static Map<String, dynamic> inputOptions(
+    ProviderConfig provider,
+    String id,
+    Map<String, dynamic> params,
+    Map<String, dynamic> extra, {
+    bool includeDefaults = true,
+  }) {
+    final raw = provider.modelOverrides[id];
+    final result = <String, dynamic>{
+      for (final entry in params.entries)
+        if (entry.key.startsWith('fal:')) entry.key.substring(4): entry.value,
+      if (params['format'] != null) 'output_format': params['format'],
+    };
+    CustomRequestMerger.applyBody(result, customBody(provider, id));
+    if (includeDefaults) {
+      CustomRequestMerger.applyBody(
+        result,
+        MediaModelOverrides.fromJson(raw is Map ? raw['media'] : null).extra,
+      );
+    }
+    CustomRequestMerger.applyBody(result, extra);
+    return result;
+  }
+
+  static bool transparentEdit(String upstream, Map inputs) =>
+      inputs['background'] == 'transparent' &&
+      (upstream == 'bytedance/seedream/v5/flash/edit' ||
+          upstream == 'bytedance/seedream/v5/pro/edit');
+
+  static int requestLimit(MediaCapabilities caps, int references, Map inputs) {
+    final combined = caps.maxCombinedInputsAndOutputs;
+    final multi = inputs['max_images'];
+    if (combined == null || multi == null) return caps.outputLimit(references);
+    final perGeneration = multi is int ? multi : int.tryParse(multi.toString());
+    if (perGeneration == null || perGeneration < 1) return 0;
+    return ((combined - references) ~/ perGeneration).clamp(
+      0,
+      caps.maxPerRequest,
+    );
+  }
 
   @override
   MediaCapabilities capabilities(ProviderConfig provider, String modelId) {
@@ -71,8 +120,10 @@ class FalMediaAdapter implements MediaAdapter {
           : 1024,
     );
     final update = <String, dynamic>{
-      if (caps.acceptsPrompt) 'prompt': request.prompt,
-      if (ratioField != null && request.aspectRatio != 'auto')
+      if (caps.acceptsPrompt && request.prompt.trim().isNotEmpty)
+        'prompt': request.prompt,
+      if (ratioField != null &&
+          (request.aspectRatio != 'auto' || ratioField == 'resolution_mode'))
         ratioField: ratioField == 'image_size'
             ? {'width': imageSize.width, 'height': imageSize.height}
             : request.aspectRatio,
@@ -107,7 +158,10 @@ class FalMediaAdapter implements MediaAdapter {
         'prompt_expansion_mode': 'balanced',
       for (final field in caps.platformOptions)
         if (!field.readOnly && field.type != MediaParameterType.image)
-          if (request.parameters.containsKey(field.storageKey))
+          if (field.constant && field.required)
+            field.key: field.defaultValue
+          else if (!field.constant &&
+              request.parameters.containsKey(field.storageKey))
             field.key: request.parameters[field.storageKey]
           else if (field.required && field.defaultValue != null)
             field.key: field.defaultValue,
@@ -130,15 +184,64 @@ class FalMediaAdapter implements MediaAdapter {
     final body = context.body(request, update);
     final override = context.provider.modelOverrides[request.modelId];
     final contract = override is Map ? override['falEndpoint'] : null;
+    if (transparentEdit(model, body)) {
+      body.putIfAbsent('output_format', () => 'png');
+      final refs = request.inputImages.toList();
+      if (body['output_format'] != 'png' ||
+          refs.length != 1 ||
+          !await compute(
+            _alphaReference,
+            SandboxPathResolver.resolveForIo(refs.single.path),
+          )) {
+        throw const MediaFailure(
+          MediaFailureKind.parameters,
+          'Transparent output requires PNG and one reference image with an alpha channel.',
+        );
+      }
+    }
+    if (caps.alternativePrompt case final alternate?) {
+      if (!caps.validPromptAlternatives(body['prompt'], body[alternate])) {
+        throw MediaFailure(
+          MediaFailureKind.parameters,
+          'Provide either prompt or $alternate.',
+        );
+      }
+    }
+    final generations = video ? 1 : body['num_images'] ?? request.count;
+    if (generations is! int ||
+        generations < 1 ||
+        generations > requestLimit(caps, request.inputImages.length, body)) {
+      throw const MediaFailure(
+        MediaFailureKind.parameters,
+        'Too many input and output images.',
+      );
+    }
     final fields = contract is Map && contract['id'] == model
         ? contract['fields']
         : null;
+    for (final field in caps.platformOptions) {
+      if (!field.readOnly &&
+          field.type != MediaParameterType.image &&
+          body[field.key] != null) {
+        try {
+          field.checkWireValue(body[field.key]);
+        } on FormatException {
+          throw MediaFailure(
+            MediaFailureKind.parameters,
+            'Invalid fal input: ${field.key}',
+          );
+        }
+      }
+    }
     if (fields is Map) {
       for (final entry in fields.entries) {
         final value = body[entry.key];
         if (entry.value is Map &&
             entry.value['required'] == true &&
-            (value == null || value is List && value.isEmpty || value == '')) {
+            (!body.containsKey(entry.key) ||
+                value == null && entry.value['nullable'] != true ||
+                entry.value['setting'] != true &&
+                    (value is List && value.isEmpty || value == ''))) {
           throw MediaFailure(
             MediaFailureKind.parameters,
             'Missing required fal input: ${entry.key}',
@@ -172,13 +275,30 @@ class FalMediaAdapter implements MediaAdapter {
       created['cancel_url'],
       '$task/cancel',
     );
+    final maxImages = body['max_images'];
+    final limit = video
+        ? 1
+        : body['limit_generations'] == false
+        ? null
+        : generations * (maxImages is int && maxImages > 0 ? maxImages : 1);
+    late FalResultLocation location;
+    late FalCompletedOutput completed;
     yield* pollMediaTask(
       context,
-      // Seedream's max_images is the number of files per generation; num_images
-      // controls the number of independent generations in the request.
-      filesPerGeneration: !video && body['max_images'] is int
-          ? body['max_images'] as int
-          : 1,
+      outputEvent: (_) => completed,
+      beforeResult: (data) {
+        if (data['status'] != 'COMPLETED') return null;
+        location = FalResultLocation(
+          model: model,
+          submission: endpoint,
+          result: data['response_url'] == null
+              ? response
+              : _taskUrl(context, endpoint, data['response_url'], task),
+          limit: limit,
+          lastFrame: video && body['return_last_frame'] == true,
+        );
+        return FalResultAvailable(location);
+      },
       accepted: MediaTaskAccepted(
         cancelUrl: cancellation,
         cancelHeaders: headers,
@@ -198,27 +318,96 @@ class FalMediaAdapter implements MediaAdapter {
           failedMediaTask(data['error'] ?? data);
         }
         if (state != 'COMPLETED') return null;
-        final resultUrl = data['response_url'] == null
-            ? response
-            : _taskUrl(context, endpoint, data['response_url'], task);
-        final output = await context.jsonRequest(
-          'GET',
-          resultUrl,
-          headers: headers,
-        );
-        final verifiedField = details?.outputField;
-        final result = verifiedField != null
-            ? output[verifiedField]
-            : output[video ? 'videos' : 'images'] ??
-                  output[video ? 'video' : 'image'];
-        return [
-          for (final row
-              in result is List
-                  ? result.whereType<Map>()
-                  : [if (result is Map) result])
-            if (_result(row, video: video) case final result?) result,
-        ];
+        completed = await _completed(context, request, location, headers);
+        return completed.results;
       },
+    );
+  }
+
+  Future<FalCompletedOutput> recover(
+    MediaContext context,
+    MediaRequest request,
+    FalPendingResult pending,
+  ) async {
+    final model = apiModelId(context.provider, request.modelId);
+    final location = pending.location;
+    final submission = context.endpoint(model);
+    if (model != location.model ||
+        mediaResultUri(location.result.toString()) == null ||
+        location.result.origin != submission.origin ||
+        FalResultLocation.address(submission) !=
+            FalResultLocation.address(location.submission)) {
+      throw const MediaFailure(
+        MediaFailureKind.parameters,
+        'The original fal result endpoint is unavailable.',
+      );
+    }
+    try {
+      final output = await _completed(
+        context,
+        request,
+        location,
+        context.headers(
+          request.modelId,
+          auth: {'Authorization': 'Key ${context.apiKey}'},
+        ),
+      );
+      if (pending.files != null && output.results.length != pending.files) {
+        throw const MediaFailure(
+          MediaFailureKind.invalidResponse,
+          'The original fal result files changed.',
+        );
+      }
+      return output;
+    } on MediaFailure catch (e) {
+      if (e.statusCode != 404 && e.statusCode != 410) rethrow;
+      throw MediaFailure(
+        MediaFailureKind.download,
+        'The original fal result is unavailable. Use Generate again to start a new batch.',
+        statusCode: e.statusCode,
+      );
+    }
+  }
+
+  Future<FalCompletedOutput> _completed(
+    MediaContext context,
+    MediaRequest request,
+    FalResultLocation location,
+    Map<String, String> headers,
+  ) async {
+    final data = await context.jsonRequest(
+      'GET',
+      location.result,
+      headers: headers,
+    );
+    final limit = location.limit;
+    final lastFrame = location.lastFrame;
+    final video = mode == MediaMode.video;
+    final field = knownModel(context.provider, request.modelId)?.outputField;
+    final value = field != null
+        ? data[field]
+        : data[video ? 'videos' : 'images'] ?? data[video ? 'video' : 'image'];
+    final rows = value is List
+        ? value.whereType<Map>()
+        : [if (value is Map) value];
+    final results = <MediaResult>[
+      for (final row in limit == null ? rows : rows.take(limit))
+        if (_result(row, video: video) case final result?) result,
+    ];
+    if (results.isEmpty) {
+      throw const MediaFailure(
+        MediaFailureKind.invalidResponse,
+        'Provider returned no media.',
+      );
+    }
+    final frame = data['last_frame'];
+    if (lastFrame && results.isNotEmpty && frame is Map) {
+      if (_result(frame, video: false) case final image?) results.add(image);
+    }
+    return FalCompletedOutput(
+      results,
+      location,
+      draftId: data['draft_id'] is String ? data['draft_id'] as String : null,
     );
   }
 
@@ -243,6 +432,7 @@ class FalMediaAdapter implements MediaAdapter {
     final raw = row?['url'];
     if (raw is! String) return null;
     String? encoded;
+    var offset = 0;
     Uri? url;
     var mime =
         row?['content_type'] as String? ?? (video ? 'video/mp4' : 'image/png');
@@ -253,7 +443,8 @@ class FalMediaAdapter implements MediaAdapter {
       final header = Uri.tryParse(raw.substring(0, comma + 1))?.data;
       if (header == null || !header.isBase64) return null;
       mime = header.mimeType;
-      encoded = raw.substring(comma + 1);
+      encoded = raw;
+      offset = comma + 1;
     } else {
       url = mediaResultUri(raw);
       if (url == null) return null;
@@ -262,9 +453,46 @@ class FalMediaAdapter implements MediaAdapter {
       mime: mime,
       url: url,
       base64: encoded,
+      base64Offset: offset,
+      mode: video ? MediaMode.video : MediaMode.image,
       width: (row?['width'] as num?)?.toInt(),
       height: (row?['height'] as num?)?.toInt(),
       durationMs: videoDurationMs(row?['duration']),
     );
   }
+}
+
+class FalCompletedOutput extends MediaOutput {
+  const FalCompletedOutput(super.results, this.location, {this.draftId});
+  final FalResultLocation location;
+  final String? draftId;
+}
+
+// Inspect compressed file metadata on a worker; no full-size pixel buffer is needed.
+Future<bool> _alphaReference(String? path) async {
+  if (path == null) return false;
+  final file = File(path);
+  final handle = await file.open();
+  try {
+    final prefix = await handle.read(26);
+    if (prefix.length < 26 || prefix[0] == 0xff && prefix[1] == 0xd8) {
+      return false;
+    }
+    if (prefix[0] == 0x89 &&
+        prefix[1] == 0x50 &&
+        (prefix[25] == 4 || prefix[25] == 6)) {
+      return true;
+    }
+  } finally {
+    await handle.close();
+  }
+  final bytes = await file.readAsBytes();
+  final info = img.findDecoderForData(bytes)?.startDecode(bytes);
+  return switch (info) {
+    img.PngInfo() =>
+      info.colorType == 4 || info.colorType == 6 || info.transparency != null,
+    img.WebPInfo() => info.hasAlpha,
+    img.GifInfo() => info.frames.any((f) => f.colorMap?.transparent != null),
+    _ => false,
+  };
 }

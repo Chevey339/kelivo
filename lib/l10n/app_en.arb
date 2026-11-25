@@ -23645,6 +23645,14 @@
   "@falNoAdditionalSettings": {
     "description": "Status after loading a fal schema with no model-specific controls beyond the standard Creation inputs."
   },
+  "falCopyDraftId": "Copy draft ID",
+  "@falCopyDraftId": {
+    "description": "Action in a finished fal video generation's menu which copies the provider's draft ID for completing that draft."
+  },
+  "falOptionalPrompt": "Prompt (optional)",
+  "@falOptionalPrompt": {
+    "description": "Creation composer placeholder when the selected fal endpoint accepts an optional text prompt, such as a cutout or a model with separate multi-shot prompts."
+  },
   "falWatermark": "Watermark",
   "@falWatermark": {
     "description": "Label for the fal watermark switch, which adds a visible provider watermark to generated images."

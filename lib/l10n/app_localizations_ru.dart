@@ -18562,6 +18562,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'У этой модели нет дополнительных настроек.';
 
   @override
+  String get falCopyDraftId => 'Копировать ID черновика';
+
+  @override
+  String get falOptionalPrompt => 'Запрос (необязательно)';
+
+  @override
   String get falWatermark => 'Водяной знак';
 
   @override

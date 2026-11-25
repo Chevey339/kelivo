@@ -1,3 +1,5 @@
+import 'package:json_schema/json_schema.dart';
+
 import 'adapters/native_image_size.dart';
 import 'media_request.dart';
 
@@ -155,6 +157,10 @@ FalModel? resolveFalModel(String id, Object? override) {
       requiresReference: minImages > 0,
       minimumReferences: minImages,
       acceptsPrompt: raw['output'] == null || fields.containsKey('prompt'),
+      requiresPrompt:
+          raw['output'] == null || field('prompt')['required'] == true,
+      alternativePrompt: field('prompt')['alternative'] as String?,
+      exclusivePrompts: field('prompt')['exclusive'] == true,
       requiresFirstFrame:
           frameModel &&
           (imageInput ||
@@ -226,6 +232,21 @@ class FalModel {
     this.requiresPromptExpansion = false,
   });
 
+  // Settings and models reuse the same compact map until fal publishes a new schema.
+  static final _compiledSchemas = Expando<JsonSchema>();
+  static JsonSchema? _validator(Object? definition) {
+    if (definition is! Map) return null;
+    final cached = _compiledSchemas[definition];
+    if (cached != null) return cached;
+    try {
+      return _compiledSchemas[definition] = JsonSchema.create(definition);
+    } catch (_) {
+      // An invalid imported constraint cannot block other models. Its field
+      // stays unset until a refresh supplies a usable definition.
+      return _compiledSchemas[definition] = JsonSchema.create(false);
+    }
+  }
+
   MediaCapabilities withSavedSettings(String id, Object? override) {
     final endpoint = override is Map ? override['falEndpoint'] : null;
     final options = endpoint is Map && endpoint['id'] == id
@@ -280,6 +301,8 @@ class FalModel {
               fields[key] is Map &&
               fields[key]['required'] == true,
           readOnly: data['readOnly'] == true,
+          constant: data['constant'] == true,
+          schema: _validator(data['schema']),
           availableWithLastFrame: original?.availableWithLastFrame ?? true,
         ),
       );
@@ -297,6 +320,9 @@ class FalModel {
           : const [];
     }
 
+    final prompt = fields is Map && fields['prompt'] is Map
+        ? fields['prompt'] as Map
+        : const {};
     final formats = choices('output_format');
     final sizes = choices(
       'image_size',
@@ -304,6 +330,18 @@ class FalModel {
     return MediaCapabilities.withModelSettings(
       capabilities,
       parameters,
+      aspectRatios:
+          ratioField == 'resolution_mode' &&
+              choices('resolution_mode').isNotEmpty
+          ? choices('resolution_mode')
+          : null,
+      acceptsPrompt: fields is Map ? fields.containsKey('prompt') : null,
+      requiresPrompt: fields is Map ? prompt['required'] == true : null,
+      alternativePrompt: prompt['alternative'] as String?,
+      exclusivePrompts: prompt['exclusive'] == true,
+      maxCombinedInputsAndOutputs: options['max_images'] is Map
+          ? (options['max_images'] as Map)['combinedImageLimit'] as int?
+          : null,
       formats: formats.isEmpty ? null : formats,
       sizes: !video && ratioField == 'image_size' && sizes.isNotEmpty
           ? sizes

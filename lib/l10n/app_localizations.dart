@@ -31878,6 +31878,18 @@ abstract class AppLocalizations {
   /// **'This model has no additional settings.'**
   String get falNoAdditionalSettings;
 
+  /// Action in a finished fal video generation's menu which copies the provider's draft ID for completing that draft.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy draft ID'**
+  String get falCopyDraftId;
+
+  /// Creation composer placeholder when the selected fal endpoint accepts an optional text prompt, such as a cutout or a model with separate multi-shot prompts.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt (optional)'**
+  String get falOptionalPrompt;
+
   /// Label for the fal watermark switch, which adds a visible provider watermark to generated images.
   ///
   /// In en, this message translates to:

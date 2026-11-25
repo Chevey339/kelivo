@@ -22,6 +22,8 @@ import '../network/request_logger.dart';
 import '../storage/attachment_file_lock.dart';
 import 'media_adapter.dart';
 import 'fal_model_discovery.dart';
+import 'fal_batch_state.dart';
+import 'adapters/fal_media.dart';
 import 'media_adapter_resolver.dart';
 import 'media_file_store.dart';
 import 'media_request.dart';
@@ -144,7 +146,7 @@ class MediaGenerationRunner extends ChangeNotifier {
         !provider.enabledModels.contains(request.modelId) ||
         request.count < 1 ||
         request.count > maxCount ||
-        request.prompt.trim().isEmpty ||
+        (caps.requiresPrompt && request.prompt.trim().isEmpty) ||
         (!caps.ratiosFor(request.resolution).contains(request.aspectRatio) &&
             !(request.mode == MediaMode.video &&
                 request.aspectRatio == 'auto' &&
@@ -232,7 +234,6 @@ class MediaGenerationRunner extends ChangeNotifier {
   }) async {
     await initialized;
     _requireOpen();
-    final caps = _validate(provider, request);
     if (applyModelExtra) {
       final extra = request.parameters['extra'];
       request = request.copyWith(
@@ -245,6 +246,33 @@ class MediaGenerationRunner extends ChangeNotifier {
         },
       );
     }
+    final adapter = resolver.resolve(
+      provider,
+      request.mode,
+      modelId: request.modelId,
+    );
+    if (adapter is FalMediaAdapter && request.mode == MediaMode.image) {
+      final raw = request.parameters['extra'];
+      final input = FalMediaAdapter.inputOptions(
+        provider,
+        request.modelId,
+        request.parameters,
+        raw is Map<String, dynamic> ? raw : const {},
+        includeDefaults: false,
+      );
+      if (input.containsKey('num_images') &&
+          (applyModelExtra || raw is Map && raw.containsKey('num_images'))) {
+        final n = input['num_images'];
+        if (n is! int || n < 1 || n > maxCount) {
+          throw const MediaFailure(
+            MediaFailureKind.parameters,
+            'Invalid fal image count.',
+          );
+        }
+        request = request.copyWith(count: n);
+      }
+    }
+    final caps = _validate(provider, request);
     final id = _uuid.v4();
     final now = DateTime.now();
     return AttachmentFileLock.synchronized(() async {
@@ -329,6 +357,7 @@ class MediaGenerationRunner extends ChangeNotifier {
         }
         final existing = await repository.itemsForBatch(id);
         final saved = MediaRequest.fromBatch(batch);
+        final falState = FalBatchState.fromParameters(batch.paramsJson);
         var request = saved;
         if (existing.isEmpty &&
             batch.status == GenerationStatus.failed &&
@@ -340,7 +369,17 @@ class MediaGenerationRunner extends ChangeNotifier {
           final options = capabilities(provider, batch.mode, batch.modelId);
           if (options != null) request = saved.withCurrentVideoOptions(options);
         }
-        final caps = _validate(provider, request);
+        final caps = falState?.pending == null
+            ? _validate(provider, request)
+            : capabilities(provider, request.mode, request.modelId);
+        if (caps == null ||
+            !provider.enabled ||
+            !provider.enabledModels.contains(request.modelId)) {
+          throw const MediaFailure(
+            MediaFailureKind.parameters,
+            'Restore the original provider to retry.',
+          );
+        }
         final firstOrdinal = existing.isEmpty ? 0 : existing.last.ordinal + 1;
         _requireOpen();
         await repository.updateBatch(
@@ -361,8 +400,9 @@ class MediaGenerationRunner extends ChangeNotifier {
           request: request,
           capabilities: caps,
           replacementVersion: repository.replacementVersion,
-          firstOrdinal: firstOrdinal,
-          retainedCount: existing.length,
+          firstOrdinal: falState?.pending?.first ?? firstOrdinal,
+          retainedCount: falState?.completed ?? existing.length,
+          falState: falState,
         );
         _queued.add(job);
         _drain();
@@ -431,9 +471,9 @@ class MediaGenerationRunner extends ChangeNotifier {
     try {
       final existing = await repository.itemsForBatch(job.id);
       saved = existing.length;
+      final ordinals = existing.map((row) => row.ordinal).toSet();
       job.endOrdinal =
           job.firstOrdinal + math.max(0, job.request.count - saved);
-      await files.validateReferences(job.request.references);
       await _updateActiveBatch(
         job,
         GenerationBatchRowsCompanion(
@@ -467,37 +507,67 @@ class MediaGenerationRunner extends ChangeNotifier {
         var provider = job.provider;
         var caps = job.capabilities;
         final modelId = job.request.modelId;
-        if (provider.usesOfficialFalQueue) {
-          final upstream = apiModelId(provider, modelId);
-          final previous = provider.modelOverrides[modelId];
-          if (FalModelDiscovery.needsSchema(provider, upstream, previous)) {
-            final endpoint = await FalModelDiscovery(
-              raw,
-              apiKey: apiKey,
-            ).endpoint(upstream);
-            _checkCancelled(job);
-            provider = provider.copyWith(
-              modelOverrides: {
-                ...provider.modelOverrides,
-                modelId: {
-                  if (previous is Map) ...Map<String, dynamic>.from(previous),
-                  'falEndpoint': endpoint,
+        var submissionValidated = false;
+        Future<void> validateSubmission() async {
+          if (submissionValidated) return;
+          await files.validateReferences(job.request.references);
+          if (provider.usesOfficialFalQueue) {
+            final upstream = apiModelId(provider, modelId);
+            final previous = provider.modelOverrides[modelId];
+            if (FalModelDiscovery.needsSchema(provider, upstream, previous)) {
+              final endpoint = await FalModelDiscovery(
+                raw,
+                apiKey: apiKey,
+              ).endpoint(upstream);
+              _checkCancelled(job);
+              provider = provider.copyWith(
+                modelOverrides: {
+                  ...provider.modelOverrides,
+                  modelId: {
+                    if (previous is Map) ...Map<String, dynamic>.from(previous),
+                    'falEndpoint': endpoint,
+                  },
                 },
-              },
-            );
-            caps = _validate(provider, job.request);
+              );
+            }
           }
+          caps = _validate(provider, job.request);
+          submissionValidated = true;
         }
+
         final adapter = resolver.resolve(
           provider,
           job.request.mode,
           modelId: modelId,
         )!;
-        for (var attempt = saved; attempt < job.request.count;) {
+        final extra = job.request.parameters['extra'];
+        final falOptions = adapter is FalMediaAdapter
+            ? FalMediaAdapter.inputOptions(
+                provider,
+                modelId,
+                job.request.parameters,
+                extra is Map<String, dynamic> ? extra : const {},
+                includeDefaults: false,
+              )
+            : null;
+        var attempt = job.falState?.completed ?? saved;
+        // Older multi-file partial batches have no logical progress cursor.
+        // Without its queue result we can neither recover the missing files nor infer which generations to repeat.
+        if (job.falState == null &&
+            falOptions != null &&
+            saved > 0 &&
+            (falOptions['max_images'] is int && falOptions['max_images'] > 1 ||
+                falOptions['limit_generations'] == false ||
+                falOptions['return_last_frame'] == true)) {
+          throw const MediaFailure(
+            MediaFailureKind.download,
+            'This older multi-file batch has no saved fal result. Use Generate again to start a new batch.',
+          );
+        }
+        while (attempt < job.request.count) {
           _checkCancelled(job);
-          final requestCap = caps.outputLimit(job.request.inputImages.length);
-          final count = math.min(requestCap, job.request.count - attempt);
-          final request = job.request.copyWith(count: count);
+          final pending = job.falState?.pending;
+          if (pending == null) await validateSubmission();
           final context = MediaContext(
             provider: provider,
             client: auth,
@@ -507,27 +577,111 @@ class MediaGenerationRunner extends ChangeNotifier {
             delay: _delay,
             log: job.log,
           );
-          final results = await _requestWithRetry(
-            job,
-            adapter,
-            context,
-            request,
-            completed: attempt,
+          final state = job.falState;
+          if (state != null &&
+              (adapter is! FalMediaAdapter ||
+                  state.model != apiModelId(provider, modelId) ||
+                  FalResultLocation.address(state.submission) !=
+                      FalResultLocation.address(
+                        context.endpoint(state.model),
+                      ))) {
+            throw const MediaFailure(
+              MediaFailureKind.parameters,
+              'Restore the original fal endpoint to retry this batch.',
+            );
+          }
+          final references = job.request.inputImages.length;
+          final requestCap = falOptions == null
+              ? caps.outputLimit(references)
+              : FalMediaAdapter.requestLimit(caps, references, falOptions);
+          if (pending == null && requestCap < 1 ||
+              pending != null && pending.count > job.request.count - attempt) {
+            throw const MediaFailure(
+              MediaFailureKind.parameters,
+              'Invalid generation count for these inputs.',
+            );
+          }
+          final count =
+              pending?.count ??
+              math.min(requestCap, job.request.count - attempt);
+          final pendingFiles = pending?.files;
+          if (pending != null &&
+              pendingFiles != null &&
+              ordinals
+                      .where(
+                        (i) =>
+                            i >= pending.first &&
+                            i < pending.first + pendingFiles,
+                      )
+                      .length ==
+                  pendingFiles) {
+            attempt += math.min(count, pendingFiles);
+            job.nextOrdinal = pending.first + pendingFiles;
+            await _storeFalState(job, job.falState!.advance(attempt));
+            continue;
+          }
+          final request = job.request.copyWith(
+            count: count,
+            parameters: falOptions?.containsKey('num_images') == true
+                ? {
+                    ...job.request.parameters,
+                    'extra': {
+                      if (extra is Map) ...Map<String, dynamic>.from(extra),
+                      'num_images': count,
+                    },
+                  }
+                : null,
           );
-          await _updateActiveBatch(
-            job,
-            const GenerationBatchRowsCompanion(
-              status: Value(GenerationStatus.downloading),
+          final output = switch ((pending, adapter)) {
+            (final receipt?, FalMediaAdapter fal) => await fal.recover(
+              context,
+              request,
+              receipt,
             ),
-          );
-          if (results.length > count) job.endOrdinal += results.length - count;
-          for (final result in results) {
+            (null, _) => await _requestWithRetry(
+              job,
+              adapter,
+              context,
+              request,
+              completed: attempt,
+            ),
+            _ => throw const MediaFailure(
+              MediaFailureKind.parameters,
+              'Restore the original fal provider to retry.',
+            ),
+          };
+          final results = output.results;
+          final first = pending?.first ?? job.nextOrdinal;
+          if (output is FalCompletedOutput && pending?.files == null) {
+            await _markFalDownload(
+              job,
+              output.location,
+              completed: attempt,
+              first: first,
+              count: count,
+              files: results.length,
+              draftId: output.draftId,
+            );
+          } else {
+            await _updateActiveBatch(
+              job,
+              const GenerationBatchRowsCompanion(
+                status: Value(GenerationStatus.downloading),
+              ),
+            );
+          }
+          job.endOrdinal = math.max(job.endOrdinal, first + results.length);
+          for (final (index, result) in results.indexed) {
+            final ordinal = output is FalCompletedOutput
+                ? first + index
+                : job.nextOrdinal;
+            if (ordinals.contains(ordinal)) continue;
             try {
               _checkCancelled(job);
               await files.store(
                 batchId: job.id,
-                ordinal: job.nextOrdinal,
-                mode: request.mode,
+                ordinal: ordinal,
+                mode: result.mode ?? request.mode,
                 result: result,
                 downloadClient: raw,
                 waitForDownloadRetry: (duration) async {
@@ -544,7 +698,10 @@ class MediaGenerationRunner extends ChangeNotifier {
               );
               job.revisedPrompt ??= result.revisedPrompt;
               saved++;
-              job.nextOrdinal++;
+              ordinals.add(ordinal);
+              while (ordinals.contains(job.nextOrdinal)) {
+                job.nextOrdinal++;
+              }
             } catch (error) {
               _checkCancelled(job);
               final cause = classifyMediaFailure(error);
@@ -555,7 +712,19 @@ class MediaGenerationRunner extends ChangeNotifier {
               );
             }
           }
-          attempt += count;
+          if (output is FalCompletedOutput) {
+            if (failure != null) throw failure;
+            attempt += math.min(count, results.length);
+            await _storeFalState(job, job.falState!.advance(attempt));
+            if (results.length < count) {
+              throw const MediaFailure(
+                MediaFailureKind.invalidResponse,
+                'Incomplete output',
+              );
+            }
+          } else {
+            attempt += count;
+          }
           if (attempt < job.request.count) {
             if (_progress[job.id] case (:final fraction, preview: String _)) {
               _progress[job.id] = (fraction: fraction, preview: null);
@@ -619,7 +788,7 @@ class MediaGenerationRunner extends ChangeNotifier {
     }
   }
 
-  Future<List<MediaResult>> _requestWithRetry(
+  Future<MediaOutput> _requestWithRetry(
     _MediaJob job,
     MediaAdapter adapter,
     MediaContext context,
@@ -630,7 +799,7 @@ class MediaGenerationRunner extends ChangeNotifier {
       var accepted = false;
       try {
         _checkCancelled(job);
-        List<MediaResult>? results;
+        MediaOutput? output;
         await for (final event in adapter.generate(context, request)) {
           if (event is MediaTaskAccepted) {
             job.remoteTask = event;
@@ -639,12 +808,19 @@ class MediaGenerationRunner extends ChangeNotifier {
           _checkCancelled(job);
           final previous = _progress[job.id];
           switch (event) {
-            case MediaOutput(results: final values, :final filesPerGeneration):
-              final limit =
-                  request.count * filesPerGeneration.clamp(1, maxCount);
-              results = values.length <= limit
-                  ? values
-                  : values.sublist(0, limit);
+            case MediaOutput(results: final values):
+              output =
+                  event is FalCompletedOutput || values.length <= request.count
+                  ? event
+                  : MediaOutput(values.sublist(0, request.count));
+            case FalResultAvailable(:final location):
+              await _markFalDownload(
+                job,
+                location,
+                completed: completed,
+                first: job.nextOrdinal,
+                count: request.count,
+              );
             case MediaTaskAccepted():
               break;
             case MediaProgress(:final fraction):
@@ -664,13 +840,13 @@ class MediaGenerationRunner extends ChangeNotifier {
           }
           if (!_disposed) notifyListeners();
         }
-        if (results == null || results.isEmpty) {
+        if (output == null || output.results.isEmpty) {
           throw const MediaFailure(
             MediaFailureKind.invalidResponse,
             'Provider returned no media',
           );
         }
-        return results;
+        return output;
       } catch (error) {
         _checkCancelled(job);
         final failure = classifyMediaFailure(error);
@@ -701,6 +877,51 @@ class MediaGenerationRunner extends ChangeNotifier {
         ]);
       }
     }
+  }
+
+  Future<void> _markFalDownload(
+    _MediaJob job,
+    FalResultLocation location, {
+    required int completed,
+    required int first,
+    required int count,
+    int? files,
+    String? draftId,
+  }) => _storeFalState(
+    job,
+    FalBatchState(
+      model: location.model,
+      submission: location.submission,
+      completed: completed,
+      draftId: draftId ?? job.falState?.draftId,
+      pending: FalPendingResult(
+        location: location,
+        count: count,
+        first: first,
+        files: files,
+      ),
+    ),
+    status: GenerationStatus.downloading,
+  );
+
+  Future<void> _storeFalState(
+    _MediaJob job,
+    FalBatchState state, {
+    GenerationStatus? status,
+  }) async {
+    await _updateActiveBatch(
+      job,
+      GenerationBatchRowsCompanion(
+        status: status == null ? const Value.absent() : Value(status),
+        paramsJson: Value(
+          jsonEncode({
+            ...job.request.storedParameters,
+            FalBatchState.key: state.json,
+          }),
+        ),
+      ),
+    );
+    job.falState = state;
   }
 
   Future<void> _cancelRemote(
@@ -840,6 +1061,7 @@ class _MediaJob {
     required this.replacementVersion,
     this.firstOrdinal = 0,
     int retainedCount = 0,
+    this.falState,
   }) : nextOrdinal = firstOrdinal,
        endOrdinal = firstOrdinal + math.max(0, request.count - retainedCount);
 
@@ -850,6 +1072,7 @@ class _MediaJob {
   final int replacementVersion;
   final int firstOrdinal;
   int nextOrdinal, endOrdinal;
+  FalBatchState? falState;
   final result = Completer<GenerationStatus>();
   String? revisedPrompt;
   final token = CancelToken();

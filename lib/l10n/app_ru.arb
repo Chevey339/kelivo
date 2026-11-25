@@ -5291,6 +5291,8 @@
   "falRefreshAdditionalSettings": "Обновить настройки модели",
   "falNoPublishedSettings": "fal не опубликовал настройки для этой конечной точки.",
   "falNoAdditionalSettings": "У этой модели нет дополнительных настроек.",
+  "falCopyDraftId": "Копировать ID черновика",
+  "falOptionalPrompt": "Запрос (необязательно)",
   "falWatermark": "Водяной знак",
   "falSyncMode": "Режим синхронизации",
   "falSafetyChecker": "Включить проверку безопасности",

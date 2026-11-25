@@ -82,7 +82,8 @@ class FalModelDiscovery {
     final saved = overrides is Map ? overrides['falEndpoint'] : null;
     return saved is Map &&
         saved['id'] == id &&
-        saved['additionalSettings'] is Map;
+        saved['additionalSettings'] is Map &&
+        saved['settingsVersion'] == 2;
   }
 
   static bool needsSchema(ProviderConfig config, String id, Object? overrides) {
@@ -207,6 +208,7 @@ class FalModelDiscovery {
         'output': output,
         'fields': inputs.fields,
         'additionalSettings': inputs.settings,
+        'settingsVersion': 2,
       };
     }
     // An unlisted endpoint can still be added by its owner.
@@ -298,7 +300,62 @@ class _FalSchema {
     caseSensitive: false,
   );
 
-  static Map<String, dynamic> _setting(Map field, List<Map> variants) {
+  // Store only the validation keywords and definitions reachable from this input.
+  // Examples and unrelated model schemas can contain large media payloads.
+  Map<String, dynamic> _validation(Map root) {
+    final definitions = <String, dynamic>{};
+    Object compact(Object? raw) {
+      if (raw is! Map) return raw is bool ? raw : true;
+      final ref = raw[r'$ref'];
+      final combined = <Object>[];
+      if (ref is String && ref.startsWith('#/components/schemas/')) {
+        final name = ref.substring('#/components/schemas/'.length);
+        final source = api['components']?['schemas']?[name];
+        if (source is Map) {
+          if (!definitions.containsKey(name)) {
+            definitions[name] = true;
+            definitions[name] = compact(source);
+          }
+          combined.add({r'$ref': '#/definitions/$name'});
+        }
+      }
+      if (raw['allOf'] case final List list) combined.addAll(list.map(compact));
+      return <String, dynamic>{
+        for (final k in const [
+          'type',
+          'const',
+          'enum',
+          'required',
+          'minimum',
+          'maximum',
+          'exclusiveMinimum',
+          'exclusiveMaximum',
+          'multipleOf',
+          'minItems',
+          'maxItems',
+          'uniqueItems',
+          'minLength',
+          'maxLength',
+        ])
+          if (raw.containsKey(k)) k: raw[k],
+        if (raw['properties'] case final Map properties)
+          'properties': {
+            for (final e in properties.entries)
+              e.key.toString(): compact(e.value),
+          },
+        for (final k in const ['items', 'additionalProperties', 'not'])
+          if (raw[k] is Map || raw[k] is bool) k: compact(raw[k]),
+        for (final k in const ['anyOf', 'oneOf'])
+          if (raw[k] case final List list) k: list.map(compact).toList(),
+        if (combined.isNotEmpty) 'allOf': combined,
+      };
+    }
+
+    final result = compact(root) as Map<String, dynamic>;
+    return {...result, if (definitions.isNotEmpty) 'definitions': definitions};
+  }
+
+  Map<String, dynamic> _setting(Map field, List<Map> variants) {
     final types = {
       for (final v in variants)
         for (final type in v['type'] is List ? v['type'] as List : [v['type']])
@@ -332,11 +389,14 @@ class _FalSchema {
         variants.map((v) => v[name]).whereType<num>().firstOrNull;
     return {
       'type': type,
-      if (enumerated) 'choices': choices.toList(),
+      if (choices.isNotEmpty) 'choices': choices.toList(),
+      if (const {'array', 'object', 'json'}.contains(type))
+        'schema': _validation(field),
+      if (fixed) 'constant': true,
       if (field['title'] is String) 'title': field['title'],
       if (field['description'] is String) 'description': field['description'],
-      if (defaultValue != null) 'default': defaultValue,
-      if (fixed || field['readOnly'] == true) 'readOnly': true,
+      if (defaultValue != null || fixed) 'default': defaultValue,
+      if (field['readOnly'] == true) 'readOnly': true,
       for (final key in [
         'minimum',
         'maximum',
@@ -384,19 +444,56 @@ class _FalSchema {
             RegExp(r'(?:^|_)(?:image|frame)(?:_url)?$').hasMatch(key);
         if (!falInputFields.contains(key) &&
             !extraImage &&
-            (!required.contains(key) || nativeOptions.contains(key))) {
-          settings[key] = _setting(field, variants);
-          if (required.contains(key)) fields[key] = {'required': true};
+            key != model?.ratioField) {
+          final setting = _setting(field, variants);
+          final requiredInput =
+              required.contains(key) && setting['readOnly'] != true;
+          if (requiredInput &&
+              !nativeOptions.contains(key) &&
+              !const {
+                'string',
+                'boolean',
+                'number',
+                'integer',
+                'enumeration',
+              }.contains(setting['type']) &&
+              !field.containsKey('const') &&
+              !field.containsKey('default')) {
+            throw FalUnsupportedEndpoint(key);
+          }
+          if (key == 'max_images') {
+            final combined = RegExp(
+              r'image inputs\s*\+\s*image outputs\)?\s*must not exceed\s+(\d+)',
+              caseSensitive: false,
+            ).firstMatch(field['description'].toString());
+            if (combined != null) {
+              setting['combinedImageLimit'] = int.tryParse(combined.group(1)!);
+            }
+          }
+          settings[key] = setting;
+          if (requiredInput) {
+            fields[key] = {
+              'required': true,
+              'setting': true,
+              if (field['nullable'] == true ||
+                  field.containsKey('const') && field['const'] == null ||
+                  variants.any(
+                    (v) =>
+                        v['type'] == 'null' ||
+                        v['type'] is List &&
+                            (v['type'] as List).contains('null'),
+                  ))
+                'nullable': true,
+            };
+          }
           continue;
-        }
-        if (!falInputFields.contains(key) && !extraImage) {
-          throw FalUnsupportedEndpoint(key);
         }
         // Audio is an ordinary fal switch. Size enums without a custom-dimensions
         // variant have no equivalent in the aspect-ratio control.
         if (key == 'generate_audio' ||
             (key == 'image_size' &&
-                !variants.any((v) => v['type'] == 'object'))) {
+                (model != null && model.ratioField == null ||
+                    !variants.any((v) => v['type'] == 'object')))) {
           settings[key] = _setting(field, variants);
         }
         final choices = <Object>{
@@ -415,6 +512,17 @@ class _FalSchema {
         fields[key] = {
           if (choices.isNotEmpty) 'choices': choices.toList(),
           if (string) 'string': true,
+          if (key == 'prompt' &&
+              props.containsKey('multi_prompt') &&
+              RegExp(
+                r'either\s+prompt\s+or\s+multi_prompt\s+must\s+be\s+provided',
+                caseSensitive: false,
+              ).hasMatch(field['description'].toString())) ...{
+            'alternative': 'multi_prompt',
+            'exclusive': field['description'].toString().toLowerCase().contains(
+              'but not both',
+            ),
+          },
           if (array) 'array': true,
           if (extraImage) 'imageInput': true,
           if (variants.any((v) => v['type'] == 'object')) 'object': true,
