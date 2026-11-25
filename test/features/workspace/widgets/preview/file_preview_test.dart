@@ -5,6 +5,7 @@ import 'package:markstream/markstream.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
@@ -799,4 +800,203 @@ void main() {
     expect(resolver.calls.single.relativePath, 'foo.txt');
     expect(find.byType(CodeFilePreview), findsOneWidget);
   });
+
+  testWidgets(
+    'markdown preview resolves /workspace and relative images from owning workspace, ignoring unrelated chat binding',
+    (tester) async {
+      final wsARoot = Directory(p.join(tempDir.path, 'wsA'))..createSync();
+      final wsBRoot = Directory(p.join(tempDir.path, 'wsB'))..createSync();
+      File(
+        p.join(wsARoot.path, 'root.png'),
+      ).writeAsBytesSync(_pngBytesOf(width: 12, height: 12));
+      File(p.join(wsARoot.path, '图片', '图 1.png'))
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync(_pngBytesOf(width: 14, height: 14));
+      File(p.join(wsARoot.path, 'docs', 'local.png'))
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync(_pngBytesOf(width: 16, height: 16));
+      File(p.join(wsARoot.path, 'assets', 'shared.png'))
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync(_pngBytesOf(width: 18, height: 18));
+      // Workspace B has decoy images of a distinct height (99px) and a file
+      // named only_in_b.png that must never resolve inside Workspace A's preview.
+      File(
+        p.join(wsBRoot.path, 'root.png'),
+      ).writeAsBytesSync(_pngBytesOf(width: 99, height: 99));
+      File(
+        p.join(wsBRoot.path, 'only_in_b.png'),
+      ).writeAsBytesSync(_pngBytesOf(width: 99, height: 99));
+      File(
+        p.join(tempDir.path, 'outside_secret.png'),
+      ).writeAsBytesSync(_pngBytesOf(width: 24, height: 24));
+
+      final mdFile = File(p.join(wsARoot.path, 'docs', 'readme.md'))
+        ..writeAsStringSync(
+          [
+            '![ws-root](/workspace/root.png)',
+            '![ws-cjk](/workspace/图片/图 1.png)',
+            '![ws-kelivo](kelivo://workspace/root.png)',
+            '![rel-local](local.png)',
+            '![rel-up](../assets/shared.png)',
+            '![b-only](/workspace/only_in_b.png)',
+            '![escape](/workspace/../outside_secret.png)',
+            '![rel-escape](../../outside_secret.png)',
+          ].join('\n\n'),
+        );
+
+      late AppDatabase database;
+      late WorkspaceProvider workspaces;
+      await tester.runAsync(() async {
+        database = AppDatabase(NativeDatabase.memory());
+        await database.customSelect('SELECT 1;').getSingle();
+        workspaces = WorkspaceProvider(store: ExtensionEntityStore(database));
+        await workspaces.loaded;
+        await workspaces.create(
+          name: 'wsA',
+          kind: WorkspaceKind.linked,
+          hostPath: wsARoot.path,
+        );
+        final wsB = await workspaces.create(
+          name: 'wsB',
+          kind: WorkspaceKind.linked,
+          hostPath: wsBRoot.path,
+        );
+        expect(wsB.id, isNotEmpty);
+      });
+      addTearDown(() async {
+        workspaces.dispose();
+        await database.close();
+      });
+
+      final wsB = workspaces.workspaces.last;
+      final chat = _FakeChatService(
+        Conversation(
+          id: 'conv-b',
+          title: 'Chat B',
+          extras: {WorkspaceBinding.keyId: wsB.id},
+        ),
+      );
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: MarkdownFilePreview(file: mdFile, autoLoad: false),
+            ),
+          ),
+        ),
+      );
+      await _loadMarkdownPreview(tester);
+
+      for (var i = 0; i < 30; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+        final decoded = tester
+            .widgetList<RawImage>(find.byType(RawImage))
+            .where((img) => img.image != null)
+            .toList();
+        if (decoded.length == 5) break;
+      }
+
+      final decoded = tester
+          .widgetList<RawImage>(find.byType(RawImage))
+          .where((img) => img.image != null)
+          .toList();
+      expect(decoded, hasLength(5));
+      expect(
+        decoded.map((img) => img.image!.height).toList(),
+        everyElement(isNot(99)),
+      );
+      expect(find.byIcon(Lucide.ImageOff), findsNWidgets(3));
+
+      // Tapping a resolved /workspace image pushes ImageViewerPage with host path.
+      await tester.tap(find.byType(Image).first);
+      await tester.pumpAndSettle();
+      final viewer = tester.widget<ImageViewerPage>(
+        find.byType(ImageViewerPage),
+      );
+      expect(viewer.images, [p.join(wsARoot.path, 'root.png')]);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'markdown preview outside any workspace fails closed on /workspace even when chat has bound workspace',
+    (tester) async {
+      final wsBRoot = Directory(p.join(tempDir.path, 'wsB'))..createSync();
+      File(
+        p.join(wsBRoot.path, 'root.png'),
+      ).writeAsBytesSync(_pngBytesOf(width: 20, height: 20));
+      final standaloneDir = Directory(p.join(tempDir.path, 'standalone'))
+        ..createSync();
+      final standaloneMd = File(p.join(standaloneDir.path, 'note.md'))
+        ..writeAsStringSync(
+          '![ws](/workspace/root.png)\n\n![kelivo](kelivo://workspace/root.png)',
+        );
+
+      late AppDatabase database;
+      late WorkspaceProvider workspaces;
+      await tester.runAsync(() async {
+        database = AppDatabase(NativeDatabase.memory());
+        await database.customSelect('SELECT 1;').getSingle();
+        workspaces = WorkspaceProvider(store: ExtensionEntityStore(database));
+        await workspaces.loaded;
+        await workspaces.create(
+          name: 'wsB',
+          kind: WorkspaceKind.linked,
+          hostPath: wsBRoot.path,
+        );
+      });
+      addTearDown(() async {
+        workspaces.dispose();
+        await database.close();
+      });
+
+      final chat = _FakeChatService(
+        Conversation(
+          id: 'conv-b',
+          title: 'Chat B',
+          extras: {WorkspaceBinding.keyId: workspaces.workspaces.single.id},
+        ),
+      );
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: MarkdownFilePreview(file: standaloneMd, autoLoad: false),
+            ),
+          ),
+        ),
+      );
+      await _loadMarkdownPreview(tester);
+      await _pumpAsyncUi(tester);
+
+      expect(find.byType(RawImage), findsNothing);
+      expect(find.byIcon(Lucide.ImageOff), findsNWidgets(2));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

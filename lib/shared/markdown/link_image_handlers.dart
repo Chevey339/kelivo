@@ -7,12 +7,15 @@ import 'markdown_image_sources.dart';
 import 'package:flutter/material.dart';
 import 'package:crypto/crypto.dart';
 import 'package:markstream/markstream.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
+import 'package:Kelivo/features/workspace/widgets/preview/file_preview.dart';
 import 'package:Kelivo/features/workspace/workspace_file_navigation.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -31,10 +34,12 @@ class MarkdownLinkScope extends InheritedWidget {
     required super.child,
     required this.source,
     this.conversationId,
+    this.baseFilePath,
     this.imageStorage,
   });
   final String source;
   final String? conversationId;
+  final String? baseFilePath;
   final PageStorageBucket? imageStorage;
   static MarkdownLinkScope? of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<MarkdownLinkScope>();
@@ -43,7 +48,98 @@ class MarkdownLinkScope extends InheritedWidget {
   @override
   bool updateShouldNotify(MarkdownLinkScope oldWidget) =>
       conversationId != oldWidget.conversationId ||
+      baseFilePath != oldWidget.baseFilePath ||
       !identical(imageStorage, oldWidget.imageStorage);
+}
+
+FileLinkResolver? _obtainFileLinkResolver(
+  BuildContext context, [
+  FileLinkResolver? injected,
+]) {
+  final resolver = injected ?? context.read<FileLinkResolver?>();
+  if (resolver != null) return resolver;
+  final workspaces = context.read<WorkspaceProvider?>();
+  if (workspaces == null) return null;
+  return FileLinkResolver(
+    workspaces: workspaces,
+    externalMounts: context.read<ExternalMountsProvider?>(),
+  );
+}
+
+Future<File?> _resolvePreviewWorkspaceFile(
+  FileLinkResolver resolver,
+  KelivoLink link,
+  String baseFilePath,
+) async {
+  try {
+    final owner = await resolver.findOwningWorkspace(baseFilePath);
+    if (owner == null) return null;
+    return await resolver.resolveToHostFileInWorkspace(
+      link,
+      workspaceId: owner.id,
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<File?> _resolveRelativeFileForPreview(
+  FileLinkResolver? resolver,
+  String rawRef,
+  String baseFilePath,
+) async {
+  String? boundaryRoot;
+  if (resolver != null) {
+    try {
+      final owner = await resolver.findOwningWorkspace(baseFilePath);
+      if (owner != null) {
+        boundaryRoot = await resolver.workspaces.hostRootFor(owner);
+      }
+    } catch (_) {
+      boundaryRoot = null;
+    }
+  }
+  return FileLinkResolver.resolveRelativeToFile(
+    rawRef,
+    baseFilePath: baseFilePath,
+    boundaryRoot: boundaryRoot,
+  );
+}
+
+Future<File?> _resolveVirtualFileInChat(
+  BuildContext context,
+  KelivoLink link, {
+  String? conversationId,
+}) async {
+  final chat = context.read<ChatService?>();
+  final id = conversationId ?? chat?.currentConversationId;
+  final conversation = id == null ? null : chat?.getConversation(id);
+  final resolver = _obtainFileLinkResolver(context);
+  if (conversation != null && resolver != null) {
+    try {
+      final entry = await resolver.resolveToHostEntry(
+        link,
+        conversationId: conversation.id,
+        binding: WorkspaceBinding.fromExtras(conversation.extras),
+      );
+      if (entry is File) return entry;
+    } catch (_) {
+      // Fall through to standalone skill/host-tmp checks below.
+    }
+  }
+  if (link.kind == KelivoLinkKind.skillFile) {
+    return FileLinkResolver.resolveSkillFile(link);
+  }
+  if (link.kind == KelivoLinkKind.temporaryFile &&
+      !Platform.isAndroid &&
+      !Platform.isIOS) {
+    final hostPath = link.relativePath.isEmpty
+        ? '/tmp'
+        : p.posix.join('/tmp', link.relativePath);
+    final file = File(hostPath);
+    if (file.existsSync()) return file;
+  }
+  return null;
 }
 
 class KelivoLinkHandler implements LinkHandler {
@@ -53,12 +149,101 @@ class KelivoLinkHandler implements LinkHandler {
     final url = link.destination
         .replaceAll(RegExp(r'[\u200B\u200C\u200D\uFEFF]'), '')
         .trim();
-    if (KelivoLink.tryParse(url) != null) {
+    final scope = MarkdownLinkScope.read(context);
+    final baseFilePath = scope?.baseFilePath;
+    final kelivoLink = KelivoLink.tryParse(url);
+    if (kelivoLink != null) {
+      if (baseFilePath != null &&
+          kelivoLink.kind == KelivoLinkKind.workspaceFile) {
+        final resolver = _obtainFileLinkResolver(context);
+        final file = resolver == null
+            ? null
+            : await _resolvePreviewWorkspaceFile(
+                resolver,
+                kelivoLink,
+                baseFilePath,
+              );
+        if (!context.mounted) return;
+        if (file != null) {
+          await showFilePreview(context, file);
+        } else {
+          showAppSnackBar(
+            context,
+            message: AppLocalizations.of(context)!.workspaceFileNotAvailable,
+            type: NotificationType.info,
+          );
+        }
+        return;
+      }
       await openWorkspaceLinkedFile(
         context,
         url,
-        conversationId: MarkdownLinkScope.read(context)?.conversationId,
+        conversationId: scope?.conversationId,
       );
+      return;
+    }
+    final virtualLink = KelivoLink.tryParseVirtualPath(url);
+    if (virtualLink != null ||
+        KelivoLink.hasVirtualSandboxPrefix(url) ||
+        KelivoLink.isDisallowedLocalUriOrUnc(url)) {
+      File? file;
+      if (virtualLink != null) {
+        if (baseFilePath != null) {
+          if (virtualLink.kind == KelivoLinkKind.workspaceFile) {
+            final resolver = _obtainFileLinkResolver(context);
+            if (resolver != null) {
+              file = await _resolvePreviewWorkspaceFile(
+                resolver,
+                virtualLink,
+                baseFilePath,
+              );
+            }
+          } else if (virtualLink.kind == KelivoLinkKind.skillFile) {
+            file = await FileLinkResolver.resolveSkillFile(virtualLink);
+          } else if (scope?.conversationId != null) {
+            file = await _resolveVirtualFileInChat(
+              context,
+              virtualLink,
+              conversationId: scope?.conversationId,
+            );
+          }
+        } else {
+          file = await _resolveVirtualFileInChat(
+            context,
+            virtualLink,
+            conversationId: scope?.conversationId,
+          );
+        }
+      }
+      if (!context.mounted) return;
+      if (file != null) {
+        await showFilePreview(context, file);
+      } else {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.workspaceFileNotAvailable,
+          type: NotificationType.info,
+        );
+      }
+      return;
+    }
+    if (baseFilePath != null && FileLinkResolver.isRelativeFileRef(url)) {
+      final resolver = _obtainFileLinkResolver(context);
+      final file = await _resolveRelativeFileForPreview(
+        resolver,
+        url,
+        baseFilePath,
+      );
+      if (!context.mounted) return;
+      if (file != null) {
+        await showFilePreview(context, file);
+      } else {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.workspaceFileNotAvailable,
+          type: NotificationType.info,
+        );
+      }
       return;
     }
     final l10n = AppLocalizations.of(context)!;
@@ -112,13 +297,17 @@ ImageProvider? markdownImageProvider(
   String source, {
   Color currentColor = const Color(0xff000000),
 }) {
+  if (KelivoLink.isDisallowedLocalUriOrUnc(source)) {
+    return null;
+  }
   if (isSvgImageSource(source)) {
     return SvgImageProvider(source, currentColor: currentColor);
   }
-  if (source.startsWith('http://') || source.startsWith('https://')) {
+  final lower = source.toLowerCase();
+  if (lower.startsWith('http://') || lower.startsWith('https://')) {
     return NetworkImage(source);
   }
-  if (source.startsWith('data:')) {
+  if (lower.startsWith('data:')) {
     try {
       return MemoryImage(UriData.parse(source).contentAsBytes());
     } catch (_) {
@@ -151,7 +340,9 @@ class _MarkdownImageState extends State<_MarkdownImage> {
   Future<File?>? _file;
   File? _cachedFile;
   Object? _fileCacheId;
+  bool _failedClosed = false;
   String? _conversationId;
+  String? _baseFilePath;
   late String _sourceId = sha256.convert(utf8.encode(widget.url)).toString();
   PageStorageBucket? _storage;
   double? _aspect;
@@ -161,7 +352,8 @@ class _MarkdownImageState extends State<_MarkdownImage> {
   ImageStream? _stream;
   ImageStreamListener? _listener;
 
-  Object get _aspectId => ('markdown-image-aspect', _conversationId, _sourceId);
+  Object get _aspectId =>
+      ('markdown-image-aspect', _conversationId, _baseFilePath, _sourceId);
 
   bool _syncAspect({bool sourceChanged = false}) {
     final storage =
@@ -178,11 +370,15 @@ class _MarkdownImageState extends State<_MarkdownImage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final conversationId = MarkdownLinkScope.of(context)?.conversationId;
-    final changed = conversationId != _conversationId;
+    final scope = MarkdownLinkScope.of(context);
+    final conversationId = scope?.conversationId;
+    final baseFilePath = scope?.baseFilePath;
+    final changed =
+        conversationId != _conversationId || baseFilePath != _baseFilePath;
     _conversationId = conversationId;
+    _baseFilePath = baseFilePath;
     final storageChanged = _syncAspect(sourceChanged: changed);
-    if (_file == null || changed || storageChanged) {
+    if ((_file == null && !_failedClosed) || changed || storageChanged) {
       _resolve();
     }
   }
@@ -257,13 +453,123 @@ class _MarkdownImageState extends State<_MarkdownImage> {
   }
 
   void _resolve() {
-    final link = KelivoLink.tryParse(widget.url);
     _cachedFile = null;
     _fileCacheId = null;
-    if (link == null) {
+    _failedClosed = false;
+
+    if (KelivoLink.isDisallowedLocalUriOrUnc(widget.url)) {
+      _failedClosed = true;
       _file = null;
       return;
     }
+
+    final kelivoLink = KelivoLink.tryParse(widget.url);
+    final virtualLink = kelivoLink == null
+        ? KelivoLink.tryParseVirtualPath(widget.url)
+        : null;
+    if (kelivoLink == null &&
+        virtualLink == null &&
+        KelivoLink.hasVirtualSandboxPrefix(widget.url)) {
+      _failedClosed = true;
+      _file = null;
+      return;
+    }
+
+    final baseFilePath = _baseFilePath;
+    if (kelivoLink == null && virtualLink == null) {
+      if (baseFilePath != null &&
+          FileLinkResolver.isRelativeFileRef(widget.url)) {
+        final injectedResolver = context.read<FileLinkResolver?>();
+        final resolver = _obtainFileLinkResolver(context, injectedResolver);
+        _fileCacheId = (
+          'markdown-preview-relative-image',
+          baseFilePath,
+          _sourceId,
+          injectedResolver,
+        );
+        _cachedFile =
+            _storage?.readState(context, identifier: _fileCacheId) as File?;
+        final request = _resolveRelativeFileForPreview(
+          resolver,
+          widget.url,
+          baseFilePath,
+        );
+        _trackResolvedFile(request);
+        return;
+      }
+      _file = null;
+      return;
+    }
+
+    final link = (kelivoLink ?? virtualLink)!;
+    if (virtualLink != null &&
+        link.kind == KelivoLinkKind.temporaryFile &&
+        !Platform.isAndroid &&
+        !Platform.isIOS) {
+      final hostTmpPath = link.relativePath.isEmpty
+          ? '/tmp'
+          : p.posix.join('/tmp', link.relativePath);
+      final hostFile = File(hostTmpPath);
+      if (hostFile.existsSync()) {
+        if (!widget.url.contains('?') && !widget.url.contains('#')) {
+          _file = null;
+          return;
+        }
+        _trackResolvedFile(Future<File?>.value(hostFile));
+        return;
+      }
+    }
+
+    if (baseFilePath != null) {
+      final injectedResolver = context.read<FileLinkResolver?>();
+      final resolver = _obtainFileLinkResolver(context, injectedResolver);
+      if (link.kind == KelivoLinkKind.workspaceFile) {
+        if (resolver == null) {
+          _failedClosed = true;
+          _file = null;
+          return;
+        }
+        _fileCacheId = (
+          'markdown-preview-workspace-image',
+          baseFilePath,
+          _sourceId,
+          injectedResolver,
+        );
+        _cachedFile =
+            _storage?.readState(context, identifier: _fileCacheId) as File?;
+        _trackResolvedFile(
+          _resolvePreviewWorkspaceFile(resolver, link, baseFilePath),
+        );
+        return;
+      }
+      if (link.kind == KelivoLinkKind.skillFile) {
+        _trackResolvedFile(
+          resolver != null
+              ? resolver.resolveToHostFile(
+                  link,
+                  conversationId: _conversationId ?? '',
+                  binding: const WorkspaceBinding(),
+                )
+              : FileLinkResolver.resolveSkillFile(link),
+        );
+        return;
+      }
+      final explicitConversationId = link.conversationId ?? _conversationId;
+      if (explicitConversationId != null && resolver != null) {
+        _trackResolvedFile(
+          resolver.resolveToHostFile(
+            link,
+            conversationId: explicitConversationId,
+            binding: const WorkspaceBinding(),
+          ),
+        );
+        return;
+      }
+      _failedClosed = true;
+      _file = null;
+      return;
+    }
+
     if (link.kind == KelivoLinkKind.workspaceFile) {
       final chat = context.read<ChatService?>();
       final id = _conversationId ?? chat?.currentConversationId;
@@ -289,13 +595,23 @@ class _MarkdownImageState extends State<_MarkdownImage> {
       _cachedFile =
           _storage?.readState(context, identifier: _fileCacheId) as File?;
     }
+    final request = kelivoLink != null
+        ? resolveWorkspaceLinkedFile(
+            context,
+            widget.url,
+            conversationId: _conversationId,
+          )
+        : _resolveVirtualFileInChat(
+            context,
+            virtualLink!,
+            conversationId: _conversationId,
+          );
+    _trackResolvedFile(request);
+  }
+
+  void _trackResolvedFile(Future<File?> request) {
     final storage = _storage;
     final cacheId = _fileCacheId;
-    final request = resolveWorkspaceLinkedFile(
-      context,
-      widget.url,
-      conversationId: _conversationId,
-    );
     _file = request;
     request.then((file) {
       if (!mounted || !identical(_file, request)) return;
@@ -355,11 +671,14 @@ class _MarkdownImageState extends State<_MarkdownImage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_failedClosed) {
+      return _broken();
+    }
     if (_file == null) {
       return _image(widget.url, _imageProvider(widget.url));
     }
     return FutureBuilder<File?>(
-      key: ValueKey((_conversationId, _sourceId, _fileCacheId)),
+      key: ValueKey((_conversationId, _baseFilePath, _sourceId, _fileCacheId)),
       future: _file,
       initialData: _cachedFile,
       builder: (context, snapshot) {
@@ -478,13 +797,21 @@ class _MarkdownImageState extends State<_MarkdownImage> {
   }
 
   void _open(String url) {
-    final source = MarkdownLinkScope.read(context)?.source;
+    final scope = MarkdownLinkScope.read(context);
+    final source = scope?.source;
+    final baseFilePath = scope?.baseFilePath;
     final urls = <String>[];
     if (source != null) {
       urls.addAll(
-        markdownImageSources(
-          source,
-        ).where((url) => KelivoLink.tryParse(url) == null),
+        markdownImageSources(source).where(
+          (candidate) =>
+              KelivoLink.tryParse(candidate) == null &&
+              KelivoLink.tryParseVirtualPath(candidate) == null &&
+              !KelivoLink.hasVirtualSandboxPrefix(candidate) &&
+              !KelivoLink.isDisallowedLocalUriOrUnc(candidate) &&
+              (baseFilePath == null ||
+                  !FileLinkResolver.isRelativeFileRef(candidate)),
+        ),
       );
     }
     if (!urls.contains(url)) urls.insert(0, url);

@@ -573,4 +573,306 @@ void main() {
       expect(resolved, isNull);
     });
   });
+
+  group('KelivoLink.tryParseVirtualPath & helpers', () {
+    test('parses workspace, chat, skill, tmp, and local file URIs', () {
+      final ws = KelivoLink.tryParseVirtualPath('/workspace/docs/plot.png');
+      expect(ws?.kind, KelivoLinkKind.workspaceFile);
+      expect(ws?.relativePath, 'docs/plot.png');
+
+      final wsRoot = KelivoLink.tryParseVirtualPath('/workspace');
+      expect(wsRoot?.kind, KelivoLinkKind.workspaceFile);
+      expect(wsRoot?.relativePath, '');
+
+      final wsRootSlash = KelivoLink.tryParseVirtualPath('/workspace/');
+      expect(wsRootSlash?.kind, KelivoLinkKind.workspaceFile);
+      expect(wsRootSlash?.relativePath, '');
+
+      final cjk = KelivoLink.tryParseVirtualPath(
+        '/workspace/图片/图%201.png?v=2#top',
+      );
+      expect(cjk?.kind, KelivoLinkKind.workspaceFile);
+      expect(cjk?.relativePath, '图片/图 1.png');
+
+      final fileUri = KelivoLink.tryParseVirtualPath(
+        'file:///workspace/sub%20dir/a.png',
+      );
+      expect(fileUri?.kind, KelivoLinkKind.workspaceFile);
+      expect(fileUri?.relativePath, 'sub dir/a.png');
+
+      final localhostUri = KelivoLink.tryParseVirtualPath(
+        'file://localhost/workspace/chart.svg',
+      );
+      expect(localhostUri?.kind, KelivoLinkKind.workspaceFile);
+      expect(localhostUri?.relativePath, 'chart.svg');
+
+      expect(
+        KelivoLink.tryParseVirtualPath('/chat/attachments/photo.png')?.kind,
+        KelivoLinkKind.chatAttachment,
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/chat/outputs/result.png')?.kind,
+        KelivoLinkKind.chatOutput,
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/chat/notes.md')?.kind,
+        KelivoLinkKind.chatFile,
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/skills/weather/icon.png')?.kind,
+        KelivoLinkKind.skillFile,
+      );
+      expect(
+        KelivoLink.tryParseVirtualPath('/tmp/plot.png')?.kind,
+        KelivoLinkKind.temporaryFile,
+      );
+    });
+
+    test('rejects traversal, prefix tricks, UNC, and non-local file URIs', () {
+      const invalid = [
+        '/workspace/../secret.png',
+        '/workspace/a/../../secret.png',
+        '/workspace/%2e%2e/secret.png',
+        '/workspace/%2e%2e%2fsecret.png',
+        '/workspace/./a.png',
+        '/workspace//etc/passwd',
+        r'/workspace\..\secret.png',
+        '/workspace/C:/Windows/win.ini',
+        '/workspace_evil/a.png',
+        '/chat/../secret.png',
+        '/skills/../secret.png',
+        '/tmp/../secret.png',
+        'file:///workspace/../secret.png',
+        'file:///workspace/%2e%2e/secret.png',
+        'file://evil/workspace/a.png',
+        '//evil/workspace/a.png',
+        r'\\evil\workspace\a.png',
+        'https://example.com/workspace/a.png',
+        'kelivo://workspace/a.png',
+        '',
+      ];
+      for (final raw in invalid) {
+        expect(KelivoLink.tryParseVirtualPath(raw), isNull, reason: raw);
+      }
+
+      expect(
+        KelivoLink.hasVirtualSandboxPrefix('/workspace/../secret'),
+        isTrue,
+      );
+      expect(
+        KelivoLink.hasVirtualSandboxPrefix('file:///workspace/%2e%2e/x'),
+        isTrue,
+      );
+      expect(
+        KelivoLink.hasVirtualSandboxPrefix(r'/workspace\..\secret'),
+        isTrue,
+      );
+      expect(
+        KelivoLink.hasVirtualSandboxPrefix('/workspace_evil/a.png'),
+        isFalse,
+      );
+      expect(
+        KelivoLink.isDisallowedLocalUriOrUnc('file://evil/share/a.png'),
+        isTrue,
+      );
+      expect(
+        KelivoLink.isDisallowedLocalUriOrUnc('//evil/share/a.png'),
+        isTrue,
+      );
+      expect(
+        KelivoLink.isDisallowedLocalUriOrUnc(r'\\evil\share\a.png'),
+        isTrue,
+      );
+      expect(
+        KelivoLink.isDisallowedLocalUriOrUnc('file:///workspace/a.png'),
+        isFalse,
+      );
+    });
+
+    test('KelivoLink.tryParse remains strictly kelivo://-only', () {
+      expect(KelivoLink.tryParse('/workspace/a.png'), isNull);
+    });
+  });
+
+  group('FileLinkResolver workspace-owned & relative resolution', () {
+    late Directory tempDir;
+    late Directory appData;
+    late AppDatabase database;
+    late WorkspaceProvider workspaces;
+    late FileLinkResolver resolver;
+    late PathProviderPlatform previousPathProvider;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('kelivo_rel_link_');
+      appData = Directory(p.join(tempDir.path, 'app'))..createSync();
+      previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(appData.path);
+      database = AppDatabase(NativeDatabase.memory());
+      await database.customSelect('SELECT 1;').getSingle();
+      workspaces = WorkspaceProvider(store: ExtensionEntityStore(database));
+      await workspaces.loaded;
+      resolver = FileLinkResolver(workspaces: workspaces);
+    });
+
+    tearDown(() async {
+      PathProviderPlatform.instance = previousPathProvider;
+      await database.close();
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    test(
+      'findOwningWorkspace selects deepest root and rejects siblings',
+      () async {
+        final parentRoot = Directory(p.join(tempDir.path, 'ws'))..createSync();
+        final nestedRoot = Directory(p.join(parentRoot.path, 'nested'))
+          ..createSync();
+        final siblingRoot = Directory(p.join(tempDir.path, 'ws_evil'))
+          ..createSync();
+
+        final wsParent = await workspaces.create(
+          name: 'parent',
+          kind: WorkspaceKind.linked,
+          hostPath: parentRoot.path,
+        );
+        final wsNested = await workspaces.create(
+          name: 'nested',
+          kind: WorkspaceKind.linked,
+          hostPath: nestedRoot.path,
+        );
+
+        final parentMd = File(p.join(parentRoot.path, 'docs', 'a.md'))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('# a');
+        final nestedMd = File(p.join(nestedRoot.path, 'b.md'))
+          ..writeAsStringSync('# b');
+        final siblingMd = File(p.join(siblingRoot.path, 'c.md'))
+          ..writeAsStringSync('# c');
+
+        expect(
+          (await resolver.findOwningWorkspace(parentMd.path))?.id,
+          wsParent.id,
+        );
+        expect(
+          (await resolver.findOwningWorkspace(nestedMd.path))?.id,
+          wsNested.id,
+        );
+        expect(await resolver.findOwningWorkspace(siblingMd.path), isNull);
+
+        final img = File(p.join(parentRoot.path, '图片', 'chart.png'))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('png');
+        final resolved = await resolver.resolveToHostFileInWorkspace(
+          KelivoLink.tryParseVirtualPath('/workspace/图片/chart.png')!,
+          workspaceId: wsParent.id,
+        );
+        expect(resolved?.path, img.path);
+      },
+    );
+
+    test(
+      'resolveRelativeToFile resolves inside boundary and blocks escapes',
+      () {
+        final wsRoot = Directory(p.join(tempDir.path, 'workspace'))
+          ..createSync();
+        final docsDir = Directory(p.join(wsRoot.path, 'docs'))..createSync();
+        final md = File(p.join(docsDir.path, 'guide.md'))
+          ..writeAsStringSync('#');
+        final sameDir = File(p.join(docsDir.path, 'pic.png'))
+          ..writeAsStringSync('png');
+        final subDir = File(p.join(docsDir.path, '图片', '图 1.png'))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('png');
+        final siblingAssets = File(p.join(wsRoot.path, 'assets', 'logo.png'))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('png');
+        File(p.join(tempDir.path, 'secret.png')).writeAsStringSync('secret');
+
+        expect(
+          FileLinkResolver.resolveRelativeToFile(
+            'pic.png',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          )?.path,
+          sameDir.path,
+        );
+        expect(
+          FileLinkResolver.resolveRelativeToFile(
+            './图片/图%201.png?v=1#top',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          )?.path,
+          subDir.path,
+        );
+        expect(
+          FileLinkResolver.resolveRelativeToFile(
+            '../assets/logo.png',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          )?.path,
+          siblingAssets.path,
+        );
+        expect(
+          FileLinkResolver.resolveRelativeToFile(
+            r'图片\图 1.png',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          )?.path,
+          subDir.path,
+        );
+
+        // Escaping workspace boundary fails.
+        expect(
+          FileLinkResolver.resolveRelativeToFile(
+            '../../secret.png',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isNull,
+        );
+        // Without workspace boundary, escaping file.parent fails.
+        expect(
+          FileLinkResolver.resolveRelativeToFile(
+            '../assets/logo.png',
+            baseFilePath: md.path,
+          ),
+          isNull,
+        );
+        expect(
+          FileLinkResolver.resolveRelativeToFile(
+            'a%2fb.png',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isNull,
+        );
+        expect(
+          FileLinkResolver.resolveRelativeToFile(
+            'C:/Windows/win.ini',
+            baseFilePath: md.path,
+            boundaryRoot: wsRoot.path,
+          ),
+          isNull,
+        );
+      },
+    );
+
+    test('resolveRelativeToFile blocks symlinks escaping boundary', () {
+      final wsRoot = Directory(p.join(tempDir.path, 'ws_sym'))..createSync();
+      final md = File(p.join(wsRoot.path, 'readme.md'))..writeAsStringSync('#');
+      final outside = File(p.join(tempDir.path, 'outside.png'))
+        ..writeAsStringSync('secret');
+      Link(p.join(wsRoot.path, 'link.png')).createSync(outside.path);
+
+      expect(
+        FileLinkResolver.resolveRelativeToFile(
+          'link.png',
+          baseFilePath: md.path,
+          boundaryRoot: wsRoot.path,
+        ),
+        isNull,
+      );
+    }, skip: Platform.isWindows ? 'requires symlink privileges' : false);
+  });
 }

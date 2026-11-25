@@ -123,7 +123,10 @@ class MarkdownFilePreviewState extends State<MarkdownFilePreview> {
                   hint: l10n.workspacePreviewEmptyHint,
                   icon: Lucide.FileText,
                 )
-              : _MarkdownRenderedView(source: source),
+              : _MarkdownRenderedView(
+                  source: source,
+                  baseFilePath: widget.file.path,
+                ),
         ),
       ],
     );
@@ -131,9 +134,10 @@ class MarkdownFilePreviewState extends State<MarkdownFilePreview> {
 }
 
 class _MarkdownRenderedView extends StatelessWidget {
-  const _MarkdownRenderedView({required this.source});
+  const _MarkdownRenderedView({required this.source, this.baseFilePath});
 
   final String source;
+  final String? baseFilePath;
 
   @override
   Widget build(BuildContext context) {
@@ -152,6 +156,7 @@ class _MarkdownRenderedView extends StatelessWidget {
           text: source,
           useBlockRendering: true,
           baseStyle: baseStyle,
+          baseFilePath: baseFilePath,
         ),
       ),
     );

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../../models/workspace.dart';
 import '../../models/workspace_binding.dart';
 import '../../providers/workspace_provider.dart';
 import '../../providers/external_mounts_provider.dart';
@@ -180,6 +181,114 @@ class KelivoLink {
     }
   }
 
+  static String _stripInvisibleAndTrim(String url) =>
+      url.replaceAll(RegExp(r'[\u200B\u200C\u200D\uFEFF]'), '').trim();
+
+  static String? _unwrapLocalFileUri(String raw) {
+    if (raw.length < 5 || raw.substring(0, 5).toLowerCase() != 'file:') {
+      return raw;
+    }
+    final rest = raw.substring(5);
+    if (rest.startsWith('///')) {
+      return rest.substring(2);
+    }
+    if (rest.length >= 12 &&
+        rest.substring(0, 12).toLowerCase() == '//localhost/') {
+      return rest.substring(11);
+    }
+    return null;
+  }
+
+  static String _stripQueryAndFragment(String raw) {
+    final hash = raw.indexOf('#');
+    final withoutFragment = hash < 0 ? raw : raw.substring(0, hash);
+    final q = withoutFragment.indexOf('?');
+    return q < 0 ? withoutFragment : withoutFragment.substring(0, q);
+  }
+
+  /// True for UNC network paths (`//...`, `\\...`) and non-local `file:` URIs.
+  static bool isDisallowedLocalUriOrUnc(String url) {
+    final raw = _stripInvisibleAndTrim(url);
+    if (raw.isEmpty) return false;
+    if (raw.startsWith('//') || raw.startsWith(r'\\')) return true;
+    if (raw.length >= 5 && raw.substring(0, 5).toLowerCase() == 'file:') {
+      final unwrapped = _unwrapLocalFileUri(raw);
+      if (unwrapped == null) return true;
+      if (unwrapped.startsWith('//') || unwrapped.startsWith(r'\\')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// True when [url] (or a local `file:` URI wrapping it) targets one of the
+  /// sandbox virtual prefixes (`/workspace`, `/chat`, `/skills`, `/tmp`).
+  static bool hasVirtualSandboxPrefix(String url) {
+    final cleaned = _stripInvisibleAndTrim(url);
+    if (cleaned.isEmpty) return false;
+    final unwrapped = _unwrapLocalFileUri(cleaned);
+    if (unwrapped == null) return false;
+    if (unwrapped.startsWith('//') || unwrapped.startsWith(r'\\')) {
+      return false;
+    }
+    final path = _stripQueryAndFragment(unwrapped);
+    const prefixes = [
+      WorkspacePaths.guestWorkspace,
+      WorkspacePaths.guestChat,
+      WorkspacePaths.guestSkills,
+      WorkspacePaths.guestTmp,
+    ];
+    for (final prefix in prefixes) {
+      if (path == prefix ||
+          path.startsWith('$prefix/') ||
+          path.startsWith('$prefix\\')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Parses sandbox virtual paths such as `/workspace/...`, `/chat/...`,
+  /// `/skills/...`, `/tmp/...`, and local `file:///workspace/...` URIs.
+  static KelivoLink? tryParseVirtualPath(String url) {
+    final cleaned = _stripInvisibleAndTrim(url);
+    if (cleaned.isEmpty) return null;
+    final unwrapped = _unwrapLocalFileUri(cleaned);
+    if (unwrapped == null) return null;
+    if (unwrapped.startsWith('//') || unwrapped.startsWith(r'\\')) {
+      return null;
+    }
+    final path = _stripQueryAndFragment(unwrapped);
+    if (path.contains(r'\') || path.contains('\x00')) return null;
+
+    const routes = [
+      (
+        '${WorkspacePaths.guestChat}/attachments',
+        KelivoLinkKind.chatAttachment,
+      ),
+      ('${WorkspacePaths.guestChat}/outputs', KelivoLinkKind.chatOutput),
+      (WorkspacePaths.guestChat, KelivoLinkKind.chatFile),
+      (WorkspacePaths.guestWorkspace, KelivoLinkKind.workspaceFile),
+      (WorkspacePaths.guestSkills, KelivoLinkKind.skillFile),
+      (WorkspacePaths.guestTmp, KelivoLinkKind.temporaryFile),
+    ];
+
+    for (final (prefix, kind) in routes) {
+      final String? tail;
+      if (path == prefix) {
+        tail = null;
+      } else if (path.startsWith('$prefix/')) {
+        tail = path.substring(prefix.length);
+      } else {
+        continue;
+      }
+      final segments = _decodedRelativeSegments(tail);
+      if (segments == null) return null;
+      return KelivoLink(kind: kind, relativePath: segments.join('/'));
+    }
+    return null;
+  }
+
   /// Decodes path segments and rejects `..`, `.`, empties, separators, and
   /// absolute-host / drive paths. [rawPath] is the `/...` portion before
   /// query/fragment, not a normalized [Uri.path].
@@ -261,6 +370,188 @@ class FileLinkResolver {
     } on FileLinkException {
       return null;
     }
+  }
+
+  Future<Workspace?> findOwningWorkspace(String filePath) async {
+    await workspaces.loaded;
+    final canonicalFile = _canonicalizeExistingOrLexical(filePath);
+    Workspace? bestMatch;
+    var bestLength = -1;
+    for (final workspace in workspaces.workspaces) {
+      final String hostRoot;
+      try {
+        hostRoot = await workspaces.hostRootFor(workspace);
+      } catch (_) {
+        continue;
+      }
+      if (hostRoot.isEmpty) continue;
+      final canonicalRoot = _canonicalizeExistingDirOrLexical(hostRoot);
+      if (p.equals(canonicalRoot, canonicalFile) ||
+          p.isWithin(canonicalRoot, canonicalFile)) {
+        if (canonicalRoot.length > bestLength) {
+          bestLength = canonicalRoot.length;
+          bestMatch = workspace;
+        }
+      }
+    }
+    return bestMatch;
+  }
+
+  Future<FileSystemEntity?> resolveToHostEntryInWorkspace(
+    KelivoLink link, {
+    required String workspaceId,
+  }) async {
+    if (link.kind != KelivoLinkKind.workspaceFile) return null;
+    if (!_isSafeRelativePath(link.relativePath)) return null;
+    await workspaces.loaded;
+    final workspace = workspaces.byId(workspaceId);
+    if (workspace == null) return null;
+    final String root;
+    try {
+      root = await workspaces.hostRootFor(workspace);
+    } catch (_) {
+      return null;
+    }
+    return _entryUnderRoot(root, link.relativePath);
+  }
+
+  Future<File?> resolveToHostFileInWorkspace(
+    KelivoLink link, {
+    required String workspaceId,
+  }) async {
+    try {
+      final entry = await resolveToHostEntryInWorkspace(
+        link,
+        workspaceId: workspaceId,
+      );
+      return entry is File ? entry : null;
+    } on FileLinkException {
+      return null;
+    }
+  }
+
+  static Future<File?> resolveSkillFile(KelivoLink link) async {
+    if (link.kind != KelivoLinkKind.skillFile) return null;
+    if (!_isSafeRelativePath(link.relativePath)) return null;
+    try {
+      final root = (await AppDirectories.getSkillsDirectory()).path;
+      final entry = _entryUnderRoot(root, link.relativePath);
+      return entry is File ? entry : null;
+    } on FileLinkException {
+      return null;
+    }
+  }
+
+  static final RegExp _schemeOrDrivePrefix = RegExp(
+    r'^[a-zA-Z][a-zA-Z0-9+.-]*:',
+  );
+
+  /// True when [url] is a relative file reference (not empty, not rooted with
+  /// `/` or `\`, not a URI scheme or Windows drive prefix, and no NUL bytes).
+  static bool isRelativeFileRef(String url) {
+    final raw = KelivoLink._stripInvisibleAndTrim(url);
+    if (raw.isEmpty) return false;
+    if (raw.startsWith('/') || raw.startsWith(r'\')) return false;
+    if (raw.contains('\x00')) return false;
+    if (_schemeOrDrivePrefix.hasMatch(raw)) return false;
+    final path = KelivoLink._stripQueryAndFragment(raw);
+    return path.isNotEmpty;
+  }
+
+  /// Resolves a relative reference against [baseFilePath]'s parent directory,
+  /// confining both the base directory and the symlink-resolved target strictly
+  /// inside [boundaryRoot] (or `File(baseFilePath).parent` when omitted).
+  static File? resolveRelativeToFile(
+    String rawRef, {
+    required String baseFilePath,
+    String? boundaryRoot,
+  }) {
+    if (!isRelativeFileRef(rawRef)) return null;
+    final raw = KelivoLink._stripQueryAndFragment(
+      KelivoLink._stripInvisibleAndTrim(rawRef),
+    );
+    if (raw.isEmpty) return null;
+
+    final normalizedRef = raw.replaceAll(r'\', '/');
+    final rawParts = normalizedRef.split('/');
+    final decodedSegments = <String>[];
+    for (final rawPart in rawParts) {
+      if (rawPart.isEmpty) return null;
+      final part = KelivoLink._decodePathSegment(rawPart);
+      if (part == null ||
+          part.isEmpty ||
+          part.contains('/') ||
+          part.contains(r'\') ||
+          part.contains('\x00')) {
+        return null;
+      }
+      decodedSegments.add(part);
+    }
+    if (decodedSegments.isEmpty) return null;
+
+    try {
+      final baseDir = File(baseFilePath).parent;
+      if (!baseDir.existsSync()) return null;
+      final canonicalBaseDir = p.canonicalize(
+        baseDir.resolveSymbolicLinksSync(),
+      );
+      final effectiveBoundary = boundaryRoot ?? baseDir.path;
+      if (!Directory(effectiveBoundary).existsSync()) return null;
+      final canonicalBoundary = p.canonicalize(
+        Directory(effectiveBoundary).resolveSymbolicLinksSync(),
+      );
+      if (!p.equals(canonicalBoundary, canonicalBaseDir) &&
+          !p.isWithin(canonicalBoundary, canonicalBaseDir)) {
+        return null;
+      }
+
+      final joined = p.canonicalize(
+        p.joinAll([baseDir.path, ...decodedSegments]),
+      );
+      final type = FileSystemEntity.typeSync(joined);
+      if (type != FileSystemEntityType.file) return null;
+      final canonicalTarget = p.canonicalize(
+        File(joined).resolveSymbolicLinksSync(),
+      );
+      if (!p.equals(canonicalBoundary, canonicalTarget) &&
+          !p.isWithin(canonicalBoundary, canonicalTarget)) {
+        return null;
+      }
+      return File(joined);
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  static String _canonicalizeExistingOrLexical(String path) {
+    try {
+      if (File(path).existsSync()) {
+        return p.canonicalize(File(path).resolveSymbolicLinksSync());
+      }
+      if (Directory(path).existsSync()) {
+        return p.canonicalize(Directory(path).resolveSymbolicLinksSync());
+      }
+      final parent = Directory(p.dirname(path));
+      if (parent.existsSync()) {
+        return p.canonicalize(
+          p.join(parent.resolveSymbolicLinksSync(), p.basename(path)),
+        );
+      }
+    } on FileSystemException {
+      // Fall back to lexical canonicalization when target/parent is unreachable.
+    }
+    return p.canonicalize(path);
+  }
+
+  static String _canonicalizeExistingDirOrLexical(String path) {
+    try {
+      if (Directory(path).existsSync()) {
+        return p.canonicalize(Directory(path).resolveSymbolicLinksSync());
+      }
+    } on FileSystemException {
+      // Fall back to lexical canonicalization when directory is unreachable.
+    }
+    return p.canonicalize(path);
   }
 
   Future<FileSystemEntity?> resolveToHostEntry(
